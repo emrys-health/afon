@@ -1,0 +1,63 @@
+# Add Reference: UK National Data Library – Distributed Architecture for Research
+
+## 📄 Summary
+
+This PR updates the `README.md` to include a reference to the technical white paper:
+
+**Title**: *UK National Data Library: Distributed Architecture for Research*  
+**Creators**: William Browne, Pollyanna Jones, James Fleming, Winston Chang, James Petter  
+**Affiliations**: Emrys Health, Francis Crick Institute, Snowflake  
+**Published on**: [Zenodo](https://zenodo.org/records/14673493)
+
+---
+
+## ✅ What Changed
+
+- Added a detailed citation and summary of the white paper in the `README.md` under the **References** or **Research** section.
+- Captures the vision and relevance of a National Data Library (NDL) using distributed architecture and open standards.
+
+---
+
+## 📘 Paper Summary (as added to the README)
+
+> **UK National Data Library: Distributed Architecture for Research**  
+>  
+> This paper, submitted to the Wellcome–ESRC Technical White Paper Challenge, outlines a vision for a National Data Library (NDL) that enhances access to UK public sector datasets using a distributed and secure architecture. The authors argue for the creation of an open, interoperable data protocol akin to what TCP/IP did for the internet.  
+>  
+> Key proposals include:
+> - **Open standards** for data storage
+> - **Mechanisms for secure and governed data sharing**
+> - **Template-driven cloud infrastructure**
+>  
+> The paper aims to unify fragmented data systems across research and the public sector to improve data-driven policy and research while maintaining public trust.  
+>  
+> 📎 [Read on Zenodo](https://zenodo.org/records/14673493)
+
+---
+
+## 🔍 Why This Matters
+
+- **Strategic alignment**: The NDL framework aligns closely with the goals of our infrastructure initiatives (e.g., Afon), particularly around interoperable research data access.
+- **Architecture inspiration**: It outlines a modular, scalable system architecture using secure cloud collaboration and templated infrastructure.
+- **Governance model**: Strong emphasis on trust, transparency, and long-term viability of data systems.
+
+---
+
+## 📎 Suggested Next Steps
+
+- Evaluate technical components for inclusion in Emrys cloud governance stack.
+- Consider the governance framework as a baseline for data-sharing across NHS and research environments.
+- Discuss adoption of “data interchange protocol” ideas in current service design planning.
+
+---
+
+## 🙋 Reviewer Suggestions
+
+@data-platform  
+@infrastructure-leads  
+@policy-engagement  
+@afon-core-team  
+
+---
+
+_This PR shares a critical architectural reference point for how we approach scalable, trust-centered data infrastructure in the UK and beyond._
