@@ -1,4 +1,4 @@
-# Add Reference: UK National Data Library – Distributed Architecture for Research
+# UK National Data Library – Distributed Architecture for Research
 
 ## 📄 Summary
 
@@ -37,26 +37,11 @@ This PR updates the `README.md` to include a reference to the technical white pa
 
 ## 🔍 Why This Matters
 
-- **Strategic alignment**: The NDL framework aligns closely with the goals of our infrastructure initiatives (e.g., Afon), particularly around interoperable research data access.
+- **Strategic alignment**: As a team we wrote this paper to summarise some of our thinking about the NDL. The NDL framework aligns closely with the goals of our infrastructure initiatives (e.g., Afon), particularly around interoperable research data access.
 - **Architecture inspiration**: It outlines a modular, scalable system architecture using secure cloud collaboration and templated infrastructure.
 - **Governance model**: Strong emphasis on trust, transparency, and long-term viability of data systems.
 
----
 
-## 📎 Suggested Next Steps
-
-- Evaluate technical components for inclusion in Emrys cloud governance stack.
-- Consider the governance framework as a baseline for data-sharing across NHS and research environments.
-- Discuss adoption of “data interchange protocol” ideas in current service design planning.
-
----
-
-## 🙋 Reviewer Suggestions
-
-@data-platform  
-@infrastructure-leads  
-@policy-engagement  
-@afon-core-team  
 
 ---
 
