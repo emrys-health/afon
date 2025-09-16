@@ -4,3 +4,9 @@ aws iam detach-group-policy --group-name AfonGroup --policy-arn arn:aws:iam::418
 aws iam delete-group --group-name AfonGroup
 aws s3 rm s3://emrys-afon-bucket --recursive
 ws s3api delete-bucket --bucket  emrys-afon-bucket
+
+POLICY_ARN=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='AssumeS3ReadRolePolicy'].Arn" --output text| tr -d '[:cntrl:]')
+POLICY_ARN=$(aws iam get-role --role-name S3ReadWriteRole --query "Role.Arn" --output text  | tr -d '[:cntrl:]')
+POLICY_ARN=$(echo $POLICY_ARN | perl -pe s/.*arn/arn/g | perl -pe s/Policy.*/Policy/g)
+aws iam delete-policy --policy-arn "$POLICY_ARN"
+
