@@ -13,14 +13,15 @@ aws iam create-role --role-name S3ReadWriteRole --assume-role-policy-document '{
   ]
 }'
 aws iam attach-role-policy   --role-name S3ReadWriteRole  --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
-# TODO - make this next line's arn dynamic
+ROLE_ARN=$(aws iam get-role --role-name S3ReadWriteRole --query "Role.Arn" --output text  | tr -d '[:cntrl:]')
+ROLE_ARN=$(echo $ROLE_ARN | perl -pe s/.*arn/arn/g | perl -pe s/Role.*/Role/g)
 aws iam create-policy --policy-name AssumeS3ReadRolePolicy --policy-document '{
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": "arn:aws:iam::418295715997:role/S3ReadWriteRole"
+      "Resource": "'$ROLE_ARN'"
      }
   ]
 }'
