@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>health.emrys</groupId>
-        <artifactId>Afon_2.13</artifactId>
+        <artifactId>Afon</artifactId>
         <version>0.1</version>
     </parent>
 
