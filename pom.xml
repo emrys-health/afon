@@ -3,8 +3,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>health.emrys</groupId>
-    <artifactId>Afon_${scala.compat.version}</artifactId>
+    <artifactId>Afon</artifactId>
     <version>0.1</version>
+    <packaging>pom</packaging>
     <name>${project.artifactId}</name>
     <description>core infrastructure required to deploy infrastructure across clouds that enables secure cross cloud querying</description>
     <inceptionYear>2025</inceptionYear>
