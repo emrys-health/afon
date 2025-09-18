@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.PROJECT_PROPERTIES_FILE;
+
 public class JsonMaker {
     /**
      * For testing the config JSON only.
@@ -24,7 +26,7 @@ public class JsonMaker {
 
     private void smokeTestOutput() throws Exception {
         Properties properties = new Properties();
-        properties.load(new FileInputStream("afon.properties"));
+        properties.load(new FileInputStream(PROJECT_PROPERTIES_FILE));
         CloudConfigForPolaris config = new AwsCloudConfigForPolaris(properties);
         System.out.println(config.catalogConfig());
     }

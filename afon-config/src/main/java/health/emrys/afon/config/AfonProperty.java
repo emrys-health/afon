@@ -8,7 +8,7 @@ import static java.util.Set.copyOf;
 
 public class AfonProperty {
 
-    private final Set<String> ALL_PROPERTIES = new HashSet<>();
+    private static final Set<String> ALL_PROPERTIES = new HashSet<>();
 
     private final String propertyName;
 
@@ -20,7 +20,7 @@ public class AfonProperty {
         ALL_PROPERTIES.add(propertyName);
     }
 
-    public Set<String> getAllProperties() {
+    public static Set<String> getAllProperties() {
         return copyOf(ALL_PROPERTIES);
     }
 

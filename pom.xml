@@ -41,6 +41,7 @@
         <module>afon-iceberg</module>
         <module>afon-polaris</module>
         <module>afon-config</module>
+        <module>afon-acceptance-tests</module>
     </modules>
 
     <dependencies>
