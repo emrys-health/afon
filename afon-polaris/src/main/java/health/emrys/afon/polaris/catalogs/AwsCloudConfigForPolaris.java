@@ -8,20 +8,20 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 
-public class AwsCloudConfigForPolaris implements CloudConfigForPolaris {
+public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
     private final String warehouseName;
     private final String roleArn;
     private final String bucket;
     private final String region;
-    private final JsonMaker jsonMaker;
+
 
     public AwsCloudConfigForPolaris(Properties properties) {
+        super(new JsonMaker());
         this.warehouseName = AWS_WAREHOUSE_NAME.getValueFrom(properties);
         this.roleArn = AWS_S3_ROLE_ARN.getValueFrom(properties);
         this.bucket = AWS_S3_BUCKET_NAME.getValueFrom(properties);
         this.region = AWS_REGION.getValueFrom(properties);
-        this.jsonMaker = new JsonMaker();
     }
 
     @Override
@@ -42,21 +42,7 @@ public class AwsCloudConfigForPolaris implements CloudConfigForPolaris {
                 storageConfigInfo
         );
         Catalogs catalogs = new Catalogs(List.of(catalog));
-        try {
-            return jsonMaker.toJson(catalogs);
-        } catch (JsonProcessingException e) {
-            throw new IncorrectConfigException(this.toString(), e);
-        }
-    }
-
-    @Override
-    public String catalogAdminGrants() {
-        return "";
-    }
-
-    @Override
-    public String catalogRoles() {
-        return "";
+        return toJson(catalogs);
     }
 
     @Override
@@ -71,7 +57,6 @@ public class AwsCloudConfigForPolaris implements CloudConfigForPolaris {
                 ", roleArn='" + roleArn + '\'' +
                 ", bucket='" + bucket + '\'' +
                 ", region='" + region + '\'' +
-                ", jsonMaker=" + jsonMaker +
                 '}';
     }
 }
