@@ -19,7 +19,7 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
         super(new JsonMaker());
         this.warehouseName = AWS_WAREHOUSE_NAME.getValueFrom(properties);
         this.roleArn = AWS_S3_ROLE_ARN.getValueFrom(properties);
-        this.bucket = AWS_S3_BUCKET_NAME.getValueFrom(properties);
+        this.bucket = "s3a://" + AWS_S3_BUCKET_NAME.getValueFrom(properties);
         this.region = AWS_REGION.getValueFrom(properties);
     }
 
@@ -43,8 +43,7 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
                 null,
                 storageConfigInfo
         );
-        Catalogs catalogs = new Catalogs(List.of(catalog));
-        return toJson(catalogs);
+        return toJson(new CreateCatalogRequest(catalog));
     }
 
     @Override

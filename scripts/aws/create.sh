@@ -11,4 +11,4 @@ aws iam create-role --role-name S3ReadWriteRole --assume-role-policy-document '{
     }
   ]
 }' && \
-aws iam attach-role-policy   --role-name S3ReadWriteRole  --policy-arn $AWS_S3_ROLE_ARN
+aws iam attach-role-policy   --role-name S3ReadWriteRole  --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
