@@ -1,26 +1,17 @@
 package health.emrys.afon.polaris.catalogs;
 
-public class GoogleCloudConfigForPolaris implements CloudConfigForPolaris {
+public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
 
     private final String warehouseName;
 
     public GoogleCloudConfigForPolaris(String warehouseName) {
+        super(new JsonMaker());
         this.warehouseName = warehouseName;
     }
 
     @Override
     public String catalogConfig() {
-        return "";
-    }
-
-    @Override
-    public String catalogAdminGrants() {
-        return "";
-    }
-
-    @Override
-    public String catalogRoles() {
-        return "";
+        throw new UnsupportedOperationException("TODO");
     }
 
     @Override
