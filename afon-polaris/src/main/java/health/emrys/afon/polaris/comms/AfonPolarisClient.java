@@ -3,6 +3,7 @@ package health.emrys.afon.polaris.comms;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperties;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -20,22 +21,23 @@ import static java.lang.String.format;
 public class AfonPolarisClient {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AfonProperties.class);
+    static final String CONTENT_TYPE = "Content-Type";
 
     private final String endpoint;
     private final String clientId;
     private final String clientSecret;
 
     AfonPolarisClient(Properties properties) {
-        this.endpoint = POLARIS_ENDPOINT.getValueFrom(properties);
-        this.clientId = POLARIS_ID.getValueFrom(properties);
+        this.endpoint     = format("http://%s", POLARIS_ENDPOINT.getValueFrom(properties));
+        this.clientId     = POLARIS_ID.getValueFrom(properties);
         this.clientSecret = POLARIS_SECRET.getValueFrom(properties);
     }
 
-    public String getAccessToken() throws RuntimeException {
-        String uri = format("http://%s//api/catalog/v1/oauth/tokens", endpoint);
+    String getAccessToken() throws RuntimeException {
+        String uri = format("%s/api/catalog/v1/oauth/tokens", endpoint);
         logger.info("Calling " + uri);
         HttpPost post = new HttpPost(uri);
-        post.setHeader("Content-Type", "application/x-www-form-urlencoded");
+        post.setHeader(CONTENT_TYPE, "application/x-www-form-urlencoded");
         post.setHeader("Polaris-Realm", "POLARIS");
         String body = format("grant_type=client_credentials&client_id=%s&client_secret=%s&scope=PRINCIPAL_ROLE:ALL", clientId, clientSecret);
         try {
@@ -46,10 +48,31 @@ public class AfonPolarisClient {
         }
     }
 
+    ClassicHttpResponse putJsonCall(String uri,
+                                    String json,
+                                    String accessToken) throws IOException {
+        return makeCallWithToken(json, new HttpPut(endpoint + uri), accessToken);
+    }
+
+    ClassicHttpResponse postJsonCall(String uri,
+                                     String json,
+                                     String accessToken) throws IOException {
+        return makeCallWithToken(json, new HttpPost(endpoint + uri), accessToken);
+    }
+
+    private ClassicHttpResponse makeCallWithToken(String payload,
+                                                  BasicClassicHttpRequest post,
+                                                  String accessToken) throws IOException {
+        post.setHeader("Authorization", "Bearer " + accessToken);
+        post.setHeader("Accept", "application/json");
+        post.setHeader(CONTENT_TYPE, "application/json");
+        return makeCall(payload, post);
+    }
+
     private static String parseAccessToken(ClassicHttpResponse response) throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        Map<String, Object> tokenResponse = mapper.readValue(response.getEntity().getContent(), Map.class);
-        String accessTokenFromResponse = (String) tokenResponse.get("access_token");
+        ObjectMapper        mapper                  = new ObjectMapper();
+        Map<String, Object> tokenResponse           = mapper.readValue(response.getEntity().getContent(), Map.class);
+        String              accessTokenFromResponse = (String) tokenResponse.get("access_token");
         return accessTokenFromResponse;
     }
 

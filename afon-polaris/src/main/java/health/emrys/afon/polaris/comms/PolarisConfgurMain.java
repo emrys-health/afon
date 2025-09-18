@@ -4,7 +4,6 @@ import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.PROJECT_PROPERTIES_FILE;
@@ -25,8 +24,11 @@ public class PolarisConfgurMain {
         CloudConfigForPolaris config = new AwsCloudConfigForPolaris(properties);
         System.out.println(config.catalogConfig());
 
-        var client = new AfonPolarisClient(properties);
-        System.out.println(client.getAccessToken());
+        var    client      = new AfonPolarisClient(properties);
+        String accessToken = client.getAccessToken();
+        client.postJsonCall("/api/management/v1/catalogs",
+                            config.catalogConfig(),
+                            accessToken);
     }
 
 }

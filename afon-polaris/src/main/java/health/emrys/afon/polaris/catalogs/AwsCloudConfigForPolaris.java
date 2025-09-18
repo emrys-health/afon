@@ -38,6 +38,9 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
                 Catalog.TypeEnum.INTERNAL,
                 warehouseName,
                 catalogProperties,
+                System.currentTimeMillis(),
+                System.currentTimeMillis(),
+                null,
                 storageConfigInfo
         );
         Catalogs catalogs = new Catalogs(List.of(catalog));
