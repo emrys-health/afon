@@ -13,5 +13,13 @@
     <groupId>health.emrys</groupId>
     <artifactId>afon-config</artifactId>
     <version>${parent.version}</version>
-    
+
+    <dependencies>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.25</version>
+        </dependency>
+    </dependencies>
+
 </project>

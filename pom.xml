@@ -40,6 +40,7 @@
         <module>afon-iceberg</module>
         <module>afon-polaris</module>
         <module>afon-config</module>
+        <module>afon-spark</module>
         <module>afon-acceptance-tests</module>
     </modules>
 
@@ -49,12 +50,7 @@
             <artifactId>azure-storage-file-datalake</artifactId>
             <version>12.22.0</version>
         </dependency>
-        <dependency>
-            <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-spark-runtime-${spark.compat.version}_${scala.compat.version}
-            </artifactId>
-            <version>${iceberg.version}</version>
-        </dependency>
+
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
@@ -123,23 +119,6 @@
             <version>3.1.0</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.compat.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-hive_${scala.compat.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>1.7.25</version>
-        </dependency>
-        <dependency>
             <groupId>uk.co.odinconsultants.documentation_utils</groupId>
             <artifactId>scalatest_utils</artifactId>
             <version>${documentation_utils.version}</version>
@@ -182,6 +161,9 @@
                 <configuration>
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
+<!--                    <compilerArgs>-->
+<!--                        <arg>&#45;&#45;enable-preview &#45;&#45;source 21</arg>-->
+<!--                    </compilerArgs>-->
                 </configuration>
             </plugin>
             <plugin>
