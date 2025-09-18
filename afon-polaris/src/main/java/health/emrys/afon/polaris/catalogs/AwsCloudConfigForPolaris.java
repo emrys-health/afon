@@ -18,9 +18,9 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
     public AwsCloudConfigForPolaris(Properties properties) {
         super(new JsonMaker());
         this.warehouseName = AWS_WAREHOUSE_NAME.getValueFrom(properties);
-        this.roleArn = AWS_S3_ROLE_ARN.getValueFrom(properties);
-        this.bucket = "s3a://" + AWS_S3_BUCKET_NAME.getValueFrom(properties);
-        this.region = AWS_REGION.getValueFrom(properties);
+        this.roleArn       = AWS_S3_ROLE_ARN.getValueFrom(properties);
+        this.bucket        = "s3a://" + AWS_S3_BUCKET_NAME.getValueFrom(properties);
+        this.region        = AWS_REGION.getValueFrom(properties);
     }
 
     @Override

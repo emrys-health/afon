@@ -9,13 +9,12 @@ import java.io.IOException;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.PROJECT_PROPERTIES_FILE;
-import static java.lang.String.format;
 
-public class PolarisConfgurMain {
+public class PolarisConfigureMain {
 
     public static void main(String[] args) {
         try {
-            new PolarisConfgurMain().smokeTest();
+            new PolarisConfigureMain().smokeTest();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -29,18 +28,12 @@ public class PolarisConfgurMain {
         callPolaris(properties, config);
     }
 
-    private static void callPolaris(Properties properties, CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
+    public void callPolaris(Properties properties, CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
         var    client      = new AfonPolarisClient(properties);
+        var    configurer  = new PolarisConfigurer(client);
         String accessToken = client.getAccessToken();
-        client.postJsonCall("/api/management/v1/catalogs",
-                            config.catalogConfig(),
-                            accessToken);
-        client.putJsonCall(format("/api/management/v1/catalogs/%s/catalog-roles/catalog_admin/grants", config.warehouseName()),
-                           config.catalogAdminGrants(),
-                           accessToken);
-        client.putJsonCall(format("/api/management/v1/principal-roles/service_admin/catalog-roles/%s", config.warehouseName()),
-                           config.catalogRoles(),
-                           accessToken);
+        configurer.configurCatalogFor(config, accessToken);
     }
+
 
 }
