@@ -1,6 +1,5 @@
 package health.emrys.afon.polaris.catalogs;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.polaris.core.admin.model.*;
 
 import java.util.List;

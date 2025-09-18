@@ -27,7 +27,7 @@ public abstract class CloudConfigForPolaris {
         );
     }
 
-    abstract String catalogConfig() throws IncorrectConfigException;
+    public abstract String catalogConfig() throws IncorrectConfigException;
 
     abstract String warehouseName();
 
