@@ -12,7 +12,19 @@
 
     <groupId>health.emrys</groupId>
     <artifactId>afon-polaris</artifactId>
-    <version>0.1</version>
+    <version>${parent.version}</version>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.polaris</groupId>
+            <artifactId>polaris-api-management-model</artifactId>
+            <version>1.0.1-incubating</version>
+        </dependency>
+        <dependency>
+            <groupId>${parent.groupId}</groupId>
+            <artifactId>afon-config</artifactId>
+            <version>${parent.version}</version>
+        </dependency>
+    </dependencies>
     
 </project>

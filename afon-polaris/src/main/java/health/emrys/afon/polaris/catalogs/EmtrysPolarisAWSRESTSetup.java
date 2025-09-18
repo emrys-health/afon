@@ -21,12 +21,51 @@ public class EmtrysPolarisAWSRESTSetup {
 
     public static void main(String[] args) {
         try {
-            setup();
-        } catch (IOException e) {
+            System.out.println("{\n" +
+                            "           \"catalog\": {\n" +
+                            "             \"name\": \"" + WAREHOUSE_NAME + "\",\n" +
+                            "             \"type\": \"INTERNAL\",\n" +
+                            "             \"readOnly\": false,\n" +
+                            "             \"properties\": {\n" +
+                            "               \"default-base-location\": \"s3a://emrys-afon-bucket/\"\n" +
+                            "             },\n" +
+                            "             \"storageConfigInfo\": {\n" +
+                            "               \"roleArn\": \"arn:aws:iam::418295715997:role/S3ReadWriteRole\",\n" +
+                            "               \"storageType\": \"S3\",\n" +
+                            "               \"region\": \"eu-west-2\",\n" +
+                            "               \"allowedLocations\": [\n" +
+                            "                 \"s3a://emrys-afon-bucket/\"\n" +
+                            "               ]\n" +
+                            "             }\n" +
+                            "           }\n" +
+                            "         }");
+        } catch (Exception e) {
             System.err.println(e);
         }
     }
 
+    /**
+<pre>
+     {
+     "catalog": {
+     "name": "aws_spark",
+     "type": "INTERNAL",
+     "readOnly": false,
+     "properties": {
+     "default-base-location": "s3a://emrys-afon-bucket/"
+     },
+     "storageConfigInfo": {
+     "roleArn": "arn:aws:iam::418295715997:role/S3ReadWriteRole",
+     "storageType": "S3",
+     "region": "eu-west-2",
+     "allowedLocations": [
+     "s3a://emrys-afon-bucket/"
+     ]
+     }
+     }
+     }
+</pre>>
+     */
     public static void setup() throws IOException {
         System.out.println("Starting Polaris REST API");
         postJsonCall("/api/management/v1/catalogs",
