@@ -27,13 +27,13 @@ public class AfonPolarisClient {
     private final String clientId;
     private final String clientSecret;
 
-    AfonPolarisClient(Properties properties) {
+    public AfonPolarisClient(Properties properties) {
         this.endpoint     = format("http://%s", POLARIS_ENDPOINT.getValueFrom(properties));
         this.clientId     = POLARIS_ID.getValueFrom(properties);
         this.clientSecret = ***REMOVED***
     }
 
-    String getAccessToken() throws RuntimeException {
+    public String getAccessToken() throws RuntimeException {
         String uri = format("%s/api/catalog/v1/oauth/tokens", endpoint);
         logger.info("Calling " + uri);
         HttpPost post = new HttpPost(uri);
