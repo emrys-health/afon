@@ -1,6 +1,11 @@
 package health.emrys.afon.polaris.catalogs;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.polaris.core.admin.model.CatalogGrant;
+import org.apache.polaris.core.admin.model.CatalogPrivilege;
+import org.apache.polaris.core.admin.model.CatalogRole;
+import org.apache.polaris.core.admin.model.GrantResource;
+import org.apache.polaris.core.entity.PolarisEntityConstants;
 
 public abstract class CloudConfigForPolaris {
 
@@ -10,13 +15,16 @@ public abstract class CloudConfigForPolaris {
         this.jsonMaker = jsonMaker;
     }
 
-
     public String catalogAdminGrants() throws IncorrectConfigException {
-        throw new UnsupportedOperationException("TODO");
+        return toJson(
+            new CatalogGrant(CatalogPrivilege.TABLE_WRITE_DATA, GrantResource.TypeEnum.CATALOG)
+        );
     }
 
     public String catalogRoles() throws IncorrectConfigException {
-        throw new UnsupportedOperationException("TODO");
+        return toJson(
+            new CatalogRole(PolarisEntityConstants.getNameOfCatalogAdminRole())
+        );
     }
 
     abstract String catalogConfig() throws IncorrectConfigException;

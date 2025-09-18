@@ -28,7 +28,6 @@
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <encoding>UTF-8</encoding>
         <scala.version>2.13.14</scala.version>
         <scala.compat.version>2.13</scala.compat.version>
         <spark.compat.version>3.5</spark.compat.version>
