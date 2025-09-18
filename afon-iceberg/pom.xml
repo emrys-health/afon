@@ -14,5 +14,17 @@
     <artifactId>afon-iceberg</artifactId>
     <version>0.1</version>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-spark-runtime-${spark.compat.version}_${scala.compat.version}</artifactId>
+            <version>${iceberg.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-kafka-connect</artifactId>
+            <version>${iceberg.version}</version>
+        </dependency>
+    </dependencies>
     
 </project>
