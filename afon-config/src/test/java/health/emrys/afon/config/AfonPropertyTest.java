@@ -29,6 +29,13 @@ public class AfonPropertyTest {
         properties.load(new FileInputStream("../" + PROJECT_PROPERTIES_FILE));
         checkAllExpectedInPropertiesFile(properties);
         checkOnlyExpectedInPropertiesFile(properties);
+        checkExpectedValuesNotEmpty(properties);
+    }
+
+    private void checkExpectedValuesNotEmpty(Properties properties) {
+        for (String property : AfonProperty.getAllProperties()) {
+            assertThat(properties.get(property)).isNotEqualTo("");
+        }
     }
 
     private static void checkOnlyExpectedInPropertiesFile(Properties properties) {

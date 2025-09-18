@@ -12,4 +12,7 @@ public class AfonProperties {
     public static final AfonProperty AWS_S3_ROLE_ARN    = new AfonProperty("AWS_S3_ROLE_ARN");
     public static final AfonProperty AWS_WAREHOUSE_NAME = new AfonProperty("AWS_WAREHOUSE_NAME");
     public static final AfonProperty AWS_REGION         = new AfonProperty("AWS_REGION");
+    public static final AfonProperty POLARIS_ID         = new AfonProperty("POLARIS_ID");
+    public static final AfonProperty POLARIS_SECRET     = new AfonProperty("POLARIS_SECRET");
+    public static final AfonProperty POLARIS_ENDPOINT   = new AfonProperty("POLARIS_ENDPOINT");
 }
