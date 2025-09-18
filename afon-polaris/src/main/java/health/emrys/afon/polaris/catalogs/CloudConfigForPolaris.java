@@ -29,7 +29,7 @@ public abstract class CloudConfigForPolaris {
 
     public abstract String catalogConfig() throws IncorrectConfigException;
 
-    abstract String warehouseName();
+    public abstract  String warehouseName();
 
     protected String toJson(Object object) throws IncorrectConfigException {
         try {
