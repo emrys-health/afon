@@ -1,7 +1,6 @@
 package health.emrys.afon.polaris.comms;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import health.emrys.afon.config.AfonProperties;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -20,7 +19,7 @@ import static java.lang.String.format;
 
 public class AfonPolarisClient {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AfonProperties.class);
+    static final Logger logger       = org.slf4j.LoggerFactory.getLogger(AfonPolarisClient.class);
     static final String CONTENT_TYPE = "Content-Type";
 
     private final String endpoint;
@@ -48,15 +47,19 @@ public class AfonPolarisClient {
         }
     }
 
-    ClassicHttpResponse putJsonCall(String uri,
-                                    String json,
-                                    String accessToken) throws IOException {
+    public String getEndpoint() {
+        return endpoint;
+    }
+
+    public ClassicHttpResponse putJsonCall(String uri,
+                                           String json,
+                                           String accessToken) throws IOException {
         return makeCallWithToken(json, new HttpPut(endpoint + uri), accessToken);
     }
 
-    ClassicHttpResponse postJsonCall(String uri,
-                                     String json,
-                                     String accessToken) throws IOException {
+    public ClassicHttpResponse postJsonCall(String uri,
+                                            String json,
+                                            String accessToken) throws IOException {
         return makeCallWithToken(json, new HttpPost(endpoint + uri), accessToken);
     }
 

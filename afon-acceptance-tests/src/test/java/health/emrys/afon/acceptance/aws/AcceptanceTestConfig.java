@@ -30,26 +30,40 @@ public class AcceptanceTestConfig {
 
     private final AwsCloudConfigForPolaris awsCloudConfigForPolaris;
     private final AfonPolarisClient        polarisClient;
-    private final String                   accessToken;
     private final String                   clientId;
     private final String                   clientSecret;
+    private final Properties               properties;
 
     private AcceptanceTestConfig(Properties properties) {
+        this.clientId                 = POLARIS_ID.getValueFrom(properties);
+        this.clientSecret             = POLARIS_SECRET.getValueFrom(properties);
+        this.properties               = properties;
+        this.polarisClient            = new AfonPolarisClient(properties);
+        this.awsCloudConfigForPolaris = new AwsCloudConfigForPolaris(properties);
+    }
+
+    /**
+     * This initializes Polaris completely.
+     */
+    public void initializePolaris() {
         try {
-            this.clientId            = POLARIS_ID.getValueFrom(properties);
-            this.clientSecret        = POLARIS_SECRET.getValueFrom(properties);
-            polarisClient            = new AfonPolarisClient(properties);
-            accessToken              = polarisClient.getAccessToken();
-            awsCloudConfigForPolaris = new AwsCloudConfigForPolaris(properties);
             var configurer = new PolarisConfigurer(polarisClient);
-            configurer.configurCatalogFor(awsCloudConfigForPolaris, accessToken);
+            configurer.configurCatalogFor(awsCloudConfigForPolaris, getAccessToken());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
+    public Properties getProperties() {
+        return new Properties(properties);
+    }
+
+    public AfonPolarisClient getPolarisClient() {
+        return polarisClient;
+    }
+
     public String getAccessToken() {
-        return accessToken;
+        return polarisClient.getAccessToken();
     }
 
     public String getClientId() {
