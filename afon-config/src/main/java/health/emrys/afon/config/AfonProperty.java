@@ -31,4 +31,8 @@ public class AfonProperty {
         }
         return value;
     }
+
+    public String getPropertyName() {
+        return propertyName;
+    }
 }
