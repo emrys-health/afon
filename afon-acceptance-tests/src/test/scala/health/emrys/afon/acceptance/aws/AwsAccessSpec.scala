@@ -52,7 +52,7 @@ class AwsAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
       import scala.jdk.CollectionConverters._
       val conf = SparkHelper.sparkWarehouse.sparkConfigs().asScala.map {
         case(k, v) =>
-          val value = if (k.toLowerCase.contains("token") || k.toLowerCase.contains("oauth")) "REDACTED" else k
+          val value = if (k.toLowerCase.contains("token") || k.toLowerCase.contains("oauth")) "REDACTED" else v
           String.format("%-75s%50s", k, value)
       }.mkString("\n")
       Given(s"Spark is configured with:\n$conf")
