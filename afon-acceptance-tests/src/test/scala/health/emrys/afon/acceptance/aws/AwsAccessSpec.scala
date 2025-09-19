@@ -20,8 +20,9 @@ class AwsAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
     "be told about the catalog" in {
       val uri = getCreateCatalogURI
       Given(s"a Polaris endpoint at ${client.getEndpoint}")
-      When(s"we call $uri")
-      client.postJsonCall(uri, config.catalogConfig, accessToken)
+      val json = config.catalogConfig
+      When(s"we call $uri with payload:\n$json")
+      client.postJsonCall(uri, json, accessToken)
       val uriGet = s"/api/catalog/v1/config?warehouse=${config.warehouseName()}"
       Then(s"Polaris acknowledges the catalog when we call $uriGet")
       val response = client.getCall(uriGet, accessToken)
@@ -53,14 +54,14 @@ class AwsAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
       val conf = SparkHelper.sparkWarehouse.sparkConfigs().asScala.map {
         case(k, v) =>
           val value = if (k.toLowerCase.contains("token") || k.toLowerCase.contains("oauth")) "REDACTED" else v
-          String.format("%-75s%50s", k, value)
+          String.format("%-50s%50s", k, value)
       }.mkString("\n")
-      Given(s"Spark is configured with:\n$conf")
+      Given(s"Spark is configured with:\n\n$conf")
       val sql = s"CREATE NAMESPACE IF NOT EXISTS $FULL_NAMESPACE"
       When(s"we create a namespace with SQL '$sql'")
       spark.sql(sql)
       val uri = s"/api/catalog/v1/${config.warehouseName()}/namespaces/$namespace"
-      Then("Polaris acknowledges the namespace exists")
+      Then(s"Polaris acknowledges the namespace exists when call '$uri''")
       val response = client.getCall(uri, accessToken)
       assert(response.getCode == 200)
     }
