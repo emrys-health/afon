@@ -1,31 +1,22 @@
 package health.emrys.afon.acceptance.aws;
 
+import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.polaris.comms.PolarisConfigurer;
 
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 
 public class AcceptanceTestConfig {
 
     public static final AcceptanceTestConfig instance;
 
     static {
-        Properties properties = new Properties();
-        try {
-            properties.load(new FileInputStream("../" + PROJECT_PROPERTIES_FILE)); // are we running as a build?
-        } catch (IOException e) {
-            try {
-                properties.load(new FileInputStream(PROJECT_PROPERTIES_FILE)); // ...or in the IDE?
-            } catch (IOException ex) {
-                throw new RuntimeException(ex); // urgh, the properties file is not there
-            }
-        }
-        instance = new AcceptanceTestConfig(properties);
+        AfonPropertiesLoader loader = new AfonPropertiesLoader();
+        instance = new AcceptanceTestConfig(loader.getProperties());
     }
 
     private final AwsCloudConfigForPolaris awsCloudConfigForPolaris;

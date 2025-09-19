@@ -1,14 +1,12 @@
 package health.emrys.afon.polaris.comms;
 
+import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
-
-import static health.emrys.afon.config.AfonProperties.PROJECT_PROPERTIES_FILE;
 
 public class PolarisConfigureMain {
 
@@ -21,9 +19,9 @@ public class PolarisConfigureMain {
     }
 
     private void smokeTest() throws Exception {
-        Properties properties = new Properties();
-        properties.load(new FileInputStream(PROJECT_PROPERTIES_FILE));
-        CloudConfigForPolaris config = new AwsCloudConfigForPolaris(properties);
+        AfonPropertiesLoader  loader     = new AfonPropertiesLoader();
+        Properties            properties = loader.getProperties();
+        CloudConfigForPolaris config     = new AwsCloudConfigForPolaris(properties);
 
         callPolaris(properties, config);
     }
