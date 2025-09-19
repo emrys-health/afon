@@ -17,6 +17,11 @@
     <dependencies>
         <dependency>
             <groupId>${parent.groupId}</groupId>
+            <artifactId>afon-config</artifactId>
+            <version>${parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${parent.groupId}</groupId>
             <artifactId>afon-iceberg</artifactId>
             <version>${parent.version}</version>
         </dependency>
