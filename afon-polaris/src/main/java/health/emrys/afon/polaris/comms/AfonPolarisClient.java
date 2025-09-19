@@ -8,6 +8,8 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicClassicHttpRequest;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -61,6 +63,17 @@ public class AfonPolarisClient {
                                             String json,
                                             String accessToken) throws IOException {
         return makeCallWithToken(json, new HttpPost(endpoint + uri), accessToken);
+    }
+
+    public ClassicHttpResponse getCall(String uri,
+                                       String accessToken) throws IOException {
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(endpoint + uri);
+            request.setHeader("Authorization", "Bearer " + accessToken);
+            ClassicHttpResponse response = client.execute(request);
+            logger.info(format("%s:%d", request, response.getCode()));
+            return response;
+        }
     }
 
     private ClassicHttpResponse makeCallWithToken(String payload,
