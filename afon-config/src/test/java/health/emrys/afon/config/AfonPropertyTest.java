@@ -3,12 +3,10 @@ package health.emrys.afon.config;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.Set;
 
-import static health.emrys.afon.config.AfonProperties.PROJECT_PROPERTIES_FILE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,8 +23,9 @@ public class AfonPropertyTest {
 
     @Test
     public void testAllPropertiesInProjectConfigFileAreRecognised() throws IOException {
-        Properties properties = new Properties();
-        properties.load(new FileInputStream("../" + PROJECT_PROPERTIES_FILE));
+        AfonPropertiesLoader loader = new AfonPropertiesLoader();
+        Properties properties = loader.getProperties();
+        assertThat(properties).hasSizeGreaterThan(0);
         checkAllExpectedInPropertiesFile(properties);
         checkOnlyExpectedInPropertiesFile(properties);
         checkExpectedValuesNotEmpty(properties);
@@ -49,7 +48,7 @@ public class AfonPropertyTest {
 
     private static void checkAllExpectedInPropertiesFile(Properties properties) {
         for (String property : AfonProperty.getAllProperties()) {
-            assertThat(properties.get(property)).isNotNull();
+            assertThat(properties.get(property)).as("property = %s", property).isNotNull();
         }
     }
 
