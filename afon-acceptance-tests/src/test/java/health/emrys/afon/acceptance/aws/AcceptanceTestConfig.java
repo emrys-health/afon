@@ -2,6 +2,7 @@ package health.emrys.afon.acceptance.aws;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
+import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.polaris.comms.PolarisConfigurer;
@@ -26,15 +27,17 @@ public class AcceptanceTestConfig {
     private final String                      clientSecret;
     private final Properties                  properties;
     private final GoogleCloudConfigForPolaris gcpCloudConfigForPolaris;
+    private final AzureCloudConfigForPolaris azureCloudConfigForPolaris;
 
     private AcceptanceTestConfig(Properties properties) {
         this.clientId     = POLARIS_ID.getValueFrom(properties);
         this.clientSecret = POLARIS_SECRET.getValueFrom(properties);
         this.properties   = properties;
         ContainerHelper.instance.start(properties);
-        this.polarisClient            = new AfonPolarisClient(properties);
-        this.awsCloudConfigForPolaris = new AwsCloudConfigForPolaris(properties);
-        this.gcpCloudConfigForPolaris = new GoogleCloudConfigForPolaris(properties);
+        this.polarisClient              = new AfonPolarisClient(properties);
+        this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
+        this.gcpCloudConfigForPolaris   = new GoogleCloudConfigForPolaris(properties);
+        this.azureCloudConfigForPolaris = new AzureCloudConfigForPolaris(properties);
     }
 
     /**
@@ -75,5 +78,9 @@ public class AcceptanceTestConfig {
 
     public GoogleCloudConfigForPolaris getGcpCloudConfigForPolaris() {
         return gcpCloudConfigForPolaris;
+    }
+
+    public AzureCloudConfigForPolaris getAzureCloudConfigForPolaris() {
+        return azureCloudConfigForPolaris;
     }
 }

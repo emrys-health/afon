@@ -15,6 +15,9 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
   def config: CloudConfigForPolaris
 
+  protected def createTableAndPopulate(): Unit = {
+    spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).create()
+  }
 
   val client = AcceptanceTestConfig.instance.getPolarisClient
   val accessToken = AcceptanceTestConfig.instance.getAccessToken()
@@ -71,7 +74,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     s"be created and populated with $NUM_ROWS rows" in {
       Given(s"a namespace '$FULL_NAMESPACE''")
       And(s"we write $NUM_ROWS rows of data to a table in that namespace called '$tableName'")
-      spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).create()
+      createTableAndPopulate()
       Then(s"when we read the table, we find $NUM_ROWS rows of data")
       val output = spark.read.table(tableNameFQN)
       assert(output.collect().size == NUM_ROWS)

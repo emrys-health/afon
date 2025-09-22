@@ -1,6 +1,7 @@
 package health.emrys.afon.polaris.catalogs;
 
 import org.apache.polaris.core.admin.model.*;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Properties;
@@ -13,7 +14,6 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
     private final String bucket;
     private final String region;
 
-
     public AwsCloudConfigForPolaris(Properties properties) {
         super(new JsonMaker());
         this.roleArn       = AWS_S3_ROLE_ARN.getValueFrom(properties);
@@ -23,7 +23,6 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
     @Override
     public String catalogConfig() throws IncorrectConfigException {
-        CatalogProperties catalogProperties = new CatalogProperties(bucket);
         StorageConfigInfo storageConfigInfo = new AwsStorageConfigInfo(
                 roleArn,
                 null,
@@ -32,15 +31,7 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
                 StorageConfigInfo.StorageTypeEnum.S3,
                 List.of(bucket)
         );
-        Catalog catalog = new Catalog(
-                Catalog.TypeEnum.INTERNAL,
-                warehouseName(),
-                catalogProperties,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
-                null,
-                storageConfigInfo
-        );
+        Catalog catalog = createCatalog(bucket, storageConfigInfo);
         return toJson(new CreateCatalogRequest(catalog));
     }
 

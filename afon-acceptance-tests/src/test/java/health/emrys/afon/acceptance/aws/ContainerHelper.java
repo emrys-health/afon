@@ -42,18 +42,25 @@ public class ContainerHelper {
             String polarisId     = POLARIS_ID.getValueFrom(properties);
             String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
             myContainer = new GenericContainer<>("apache/polaris")
+                    // AWS
                     .withEnv(AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties))
                     .withEnv(AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties))
+                    // Azure
+                    .withEnv(AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties))
+                    .withEnv(AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties))
+                    .withEnv(AZURE_TENANT_ID.getPropertyName(), AZURE_TENANT_ID.getValueFrom(properties))
+                    // Polaris
                     .withEnv(POLARIS_ID.getPropertyName(), polarisId)
                     .withEnv(POLARIS_SECRET.getPropertyName(), polarisSecret)
                     .withEnv(ENVIRONMENT_VARIABLE, String.format("POLARIS,%s,%s", polarisId, polarisSecret))
+                    // GCP
                     .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
                     .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
             ;
             myContainer.setPortBindings(List.of("8181:8181", "8182:8182"));
             logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading the image.");
-            myContainer.start();
-            myContainer.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
+//            myContainer.start();
+//            myContainer.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
         }
     }
 
