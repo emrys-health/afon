@@ -38,5 +38,10 @@
             <version>${spark.version}</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>health.emrys</groupId>
+            <artifactId>afon-config</artifactId>
+            <version>${parent.version}</version>
+        </dependency>
     </dependencies>
 </project>

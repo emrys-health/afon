@@ -1,6 +1,6 @@
 package health.emrys.afon.acceptance.aws
 
-import health.emrys.afon.acceptance.aws.SparkHelper.{namespace, spark, sparkWarehouse}
+import health.emrys.afon.acceptance.aws.SparkHelper.{namespace, spark}
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCatalogAdminGrantsURI, getCatalogRolesURI, getCreateCatalogURI}
 import org.scalatest.GivenWhenThen
@@ -11,9 +11,10 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
   val NUM_ROWS = 100
   val REST_CODE_RESOURCE_CREATED = 201
-  val FULL_NAMESPACE = s"${sparkWarehouse.getSparkCatalog}.$namespace"
+  val FULL_NAMESPACE = s"${cloudProvider}.$namespace"
 
   def config: CloudConfigForPolaris
+
 
   val client = AcceptanceTestConfig.instance.getPolarisClient
   val accessToken = AcceptanceTestConfig.instance.getAccessToken()
@@ -53,7 +54,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   s"A table" should {
     "have a namespace" in {
       import scala.jdk.CollectionConverters._
-      val conf = SparkHelper.sparkWarehouse.sparkConfigs().asScala.map {
+      val conf = SparkHelper.sparkWarehouse.sparkConfigs(cloudProvider).asScala.map {
         case(k, v) =>
           val value = if (k.toLowerCase.contains("token") || k.toLowerCase.contains("oauth")) "REDACTED" else v
           String.format("%-50s%50s", k, value)

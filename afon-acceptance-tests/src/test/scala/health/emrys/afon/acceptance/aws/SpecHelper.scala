@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance.aws
 
 import health.emrys.afon.acceptance.aws.SparkHelper.{namespace, sparkWarehouse}
+import health.emrys.afon.config.AfonProperties
 import uk.co.odinconsultants.documentation_utils.Datum
 
 import java.sql.{Date, Timestamp}
@@ -16,7 +17,8 @@ trait SpecHelper {
   val formatted: String = now.format(formatter)
 
   val tableName: String = simpleTableName + formatted
-  val tableNameFQN = sparkWarehouse.getSparkCatalog + "." + namespace + "." + tableName
+  def cloudProvider: AfonProperties.SupportedCloudsEnum
+  val tableNameFQN = cloudProvider + "." + namespace + "." + tableName
 
   def syntheticData(numRows: Int, numPartitions: Int = 4): Seq[Datum] = {
     Seq.range(0, numRows).map((i: Int) => Datum(

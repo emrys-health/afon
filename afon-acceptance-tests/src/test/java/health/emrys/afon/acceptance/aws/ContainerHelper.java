@@ -44,6 +44,9 @@ public class ContainerHelper {
                     .withEnv(POLARIS_ID.getPropertyName(), polarisId)
                     .withEnv(POLARIS_SECRET.getPropertyName(), polarisSecret)
                     .withEnv(ENVIRONMENT_VARIABLE, String.format("POLARIS,%s,%s", polarisId, polarisSecret))
+                    .withCreateContainerCmdModifier(cmd -> cmd.withUser("1001:1001"))
+                    .withEnv("GOOGLE_APPLICATION_CREDENTIALS", "/tmp/host/application_default_credentials.json")
+                    .withFileSystemBind("/home/henryp/.config/gcloud/", "/tmp/host") // hack for Google
                     .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
             ;
             myContainer.setPortBindings(List.of("8181:8181", "8182:8182"));
