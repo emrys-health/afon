@@ -4,6 +4,7 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.builder.Transferable;
 
 import java.util.List;
 import java.util.Properties;
@@ -17,7 +18,8 @@ public class ContainerHelper {
 
     private static final Logger logger = getLogger(ContainerHelper.class);
 
-    public static final ContainerHelper instance = new ContainerHelper();
+    public static final ContainerHelper instance    = new ContainerHelper();
+    public static final String          GOOGLE_FILE = "/tmp/application_default_credentials.json";
 
     /**
      * For testing.
@@ -36,6 +38,7 @@ public class ContainerHelper {
 
     public synchronized void start(Properties properties) {
         if (myContainer == null) {
+            String googleCreds   = GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties);
             String polarisId     = POLARIS_ID.getValueFrom(properties);
             String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
             myContainer = new GenericContainer<>("apache/polaris")
@@ -44,14 +47,13 @@ public class ContainerHelper {
                     .withEnv(POLARIS_ID.getPropertyName(), polarisId)
                     .withEnv(POLARIS_SECRET.getPropertyName(), polarisSecret)
                     .withEnv(ENVIRONMENT_VARIABLE, String.format("POLARIS,%s,%s", polarisId, polarisSecret))
-                    .withCreateContainerCmdModifier(cmd -> cmd.withUser("1001:1001"))
-                    .withEnv("GOOGLE_APPLICATION_CREDENTIALS", "/tmp/host/application_default_credentials.json")
-                    .withFileSystemBind("/home/henryp/.config/gcloud/", "/tmp/host") // hack for Google
+                    .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
                     .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
             ;
             myContainer.setPortBindings(List.of("8181:8181", "8182:8182"));
             logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading the image.");
             myContainer.start();
+            myContainer.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
         }
     }
 
