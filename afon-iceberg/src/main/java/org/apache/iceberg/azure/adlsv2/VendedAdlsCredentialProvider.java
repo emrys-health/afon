@@ -65,45 +65,50 @@ public class VendedAdlsCredentialProvider implements Serializable, AutoCloseable
     Preconditions.checkArgument(null != properties, "Invalid properties: null");
     Preconditions.checkArgument(null != properties.get(URI), "Invalid credentials endpoint: null");
     Preconditions.checkArgument(
-        null != properties.get(CatalogProperties.URI), "Invalid catalog endpoint: null");
+            null != properties.get(CatalogProperties.URI), "Invalid catalog endpoint: null");
     this.properties = SerializableMap.copyOf(properties);
     this.credentialsEndpoint = properties.get(URI);
     this.catalogEndpoint = properties.get(CatalogProperties.URI);
   }
 
-  synchronized String credentialForAccount(String storageAccount) {
+  Mono<String> credentialForAccount(String storageAccount) {
     return sasCredentialByAccount()
-        .computeIfAbsent(
-            storageAccount,
-            ignored ->
-                new SimpleTokenCache(
-                    () -> Mono.fromSupplier(() -> sasTokenForAccount(storageAccount))))
-        .getToken()
-        .map(AccessToken::getToken)
-        .block();
+            .computeIfAbsent(
+                    storageAccount,
+                    ignored ->
+                            new SimpleTokenCache(
+                                    () -> Mono.fromSupplier(() -> sasTokenForAccount(storageAccount))))
+            .getToken()
+            .map(AccessToken::getToken);
   }
 
   private AccessToken sasTokenForAccount(String storageAccount) {
     LoadCredentialsResponse response = fetchCredentials();
     List<Credential> adlsCredentials =
-        response.credentials().stream()
-            .filter(c -> c.prefix().contains(storageAccount))
-            .collect(Collectors.toList());
+            response.credentials().stream()
+                    .filter(c -> c.prefix().contains(storageAccount))
+                    .collect(Collectors.toList());
     Preconditions.checkState(
-        !adlsCredentials.isEmpty(),
-        String.format("Invalid ADLS Credentials for storage-account %s: empty", storageAccount));
+            !adlsCredentials.isEmpty(),
+            String.format("Invalid ADLS Credentials for storage-account %s: empty", storageAccount));
     Preconditions.checkState(
-        adlsCredentials.size() == 1,
-        "Invalid ADLS Credentials: only one ADLS credential should exist per storage-account");
-    String key =
-        "expiration-time"; // AzureProperties.ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + storageAccount;
+            adlsCredentials.size() == 1,
+            "Invalid ADLS Credentials: only one ADLS credential should exist per storage-account");
+
     Credential adlsCredential = adlsCredentials.get(0);
     checkCredential(adlsCredential, AzureProperties.ADLS_SAS_TOKEN_PREFIX + storageAccount);
-    checkCredential(adlsCredential, key);
+    String key = "expiration-time"; // AzureProperties.ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + storageAccount
+    checkCredential(
+            adlsCredential, key);
 
     String sasToken =
-        adlsCredential.config().get(AzureProperties.ADLS_SAS_TOKEN_PREFIX + storageAccount);
-    Instant tokenExpiresAt = Instant.ofEpochMilli(Long.parseLong(adlsCredential.config().get(key)));
+            adlsCredential.config().get(AzureProperties.ADLS_SAS_TOKEN_PREFIX + storageAccount);
+    Instant tokenExpiresAt =
+            Instant.ofEpochMilli(
+                    Long.parseLong(
+                            adlsCredential
+                                    .config()
+                                    .get(key)));
 
     return new AccessToken(sasToken, tokenExpiresAt.atOffset(ZoneOffset.UTC));
   }
@@ -112,7 +117,7 @@ public class VendedAdlsCredentialProvider implements Serializable, AutoCloseable
     if (this.sasCredentialByAccount == null) {
       synchronized (this) {
         if (this.sasCredentialByAccount == null) {
-          this.sasCredentialByAccount = Maps.newHashMap();
+          this.sasCredentialByAccount = Maps.newConcurrentMap();
         }
       }
     }
@@ -136,19 +141,19 @@ public class VendedAdlsCredentialProvider implements Serializable, AutoCloseable
 
   private LoadCredentialsResponse fetchCredentials() {
     return httpClient()
-        .get(
-            credentialsEndpoint,
-            null,
-            LoadCredentialsResponse.class,
-            Map.of(),
-            ErrorHandlers.defaultErrorHandler());
+            .get(
+                    credentialsEndpoint,
+                    null,
+                    LoadCredentialsResponse.class,
+                    Map.of(),
+                    ErrorHandlers.defaultErrorHandler());
   }
 
   private void checkCredential(Credential credential, String property) {
     Preconditions.checkState(
-        credential.config().containsKey(property),
-        "Invalid ADLS Credentials: %s not set",
-        property);
+            credential.config().containsKey(property),
+            "Invalid ADLS Credentials: %s not set",
+            property);
   }
 
   @Override

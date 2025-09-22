@@ -22,17 +22,8 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
 
     @Override
     public String catalogConfig() throws IncorrectConfigException {
-        CatalogProperties catalogProperties = new CatalogProperties(bucket);
         StorageConfigInfo storageConfigInfo = new GcpStorageConfigInfo(serviceAccount, GCS, List.of(bucket));
-        Catalog catalog = new Catalog(
-                Catalog.TypeEnum.INTERNAL,
-                warehouseName(),
-                catalogProperties,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
-                null,
-                storageConfigInfo
-        );
+        Catalog catalog = createCatalog(bucket, storageConfigInfo);
         return toJson(new CreateCatalogRequest(catalog));
     }
 
