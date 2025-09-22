@@ -24,7 +24,7 @@ public class AzureCloudConfigForPolaris extends CloudConfigForPolaris{
         String storageAccount = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
         this.bucket = format("abfss://%s@%s.dfs.core.windows.net", bucketName, storageAccount);
         this.tenant = AZURE_TENANT_ID.getValueFrom(properties);
-        this.multiTenantAppName = AZURE_APP_ID.getValueFrom(properties);
+        this.multiTenantAppName = AZURE_CLIENT_ID.getValueFrom(properties);
         this.clientId = AZURE_CLIENT_ID.getValueFrom(properties);
     }
 
