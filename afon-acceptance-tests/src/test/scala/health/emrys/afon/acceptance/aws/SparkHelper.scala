@@ -11,7 +11,6 @@ object SparkHelper {
     instance.getAccessToken,
     instance.getClientId,
     instance.getClientSecret,
-    instance.getAwsCloudConfigForPolaris.warehouseName,
     namespace);
   val sc: SparkContext = SparkContext.getOrCreate(sparkWarehouse.sparkConf())
   val spark: SparkSession = SparkSession

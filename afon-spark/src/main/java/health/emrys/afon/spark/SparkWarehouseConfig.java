@@ -1,10 +1,9 @@
 package health.emrys.afon.spark;
 
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.SQLConf$;
 import org.apache.spark.sql.internal.StaticSQLConf$;
-
-import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,6 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static java.lang.String.format;
+import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 
 public class SparkWarehouseConfig {
 
@@ -19,49 +19,42 @@ public class SparkWarehouseConfig {
     private final String DEFAULT_CATALOG = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
     private final String WAREHOUSE_PATH = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
 
-    private final String sparkCatalog;
     private final String accessToken;
     private final String clientId;
     private final String clientSecret;
-    private final String warehouseName;
-    private final String namespace;
 
     public SparkWarehouseConfig(
                                 String accessToken,
                                 String clientId,
                                 String clientSecret,
-                                String warehouseName,
                                 String namespace) {
         this.accessToken   = accessToken;
         this.clientId      = clientId;
         this.clientSecret  = clientSecret;
-        this.warehouseName = warehouseName;
-        this.namespace     = namespace;
-        this.sparkCatalog  = "polaris";
-    }
-
-    public String getSparkCatalog() {
-        return sparkCatalog;
     }
 
     public SparkConf sparkConf() throws IOException {
+        return sparkConf(4);
+    }
+
+    public SparkConf sparkConf(int cores) throws IOException {
         String tmpDir  = Files.createTempDirectory("SparkForTesting").toString();
         SparkConf sparkConf = new SparkConf()
-                .setMaster("local[4]")
+                .setMaster(format("local[%d]", cores))
                 .setAppName("Tests")
                 .setSparkHome(tmpDir)
                 .set(WAREHOUSE_PATH, tmpDir);
-        sparkConfigs().entrySet().stream().forEach(entry -> {
-            sparkConf.set(entry.getKey(), entry.getValue());
-        });
+        for (SupportedCloudsEnum cloudProvider : SupportedCloudsEnum.values()) {
+            sparkConfigs(cloudProvider).entrySet().stream().forEach(entry -> {
+                sparkConf.set(entry.getKey(), entry.getValue());
+            });
+        }
         return sparkConf;
     }
 
-    public Map<String, String> sparkConfigs() {
+    public Map<String, String> sparkConfigs(SupportedCloudsEnum sparkCatalog) {
         Map conf = new HashMap<String, String>();
         conf.put(SPARK_SESSION_EXTENSIONS, "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        conf.put(format("spark.sql.catalog.%s", namespace), "org.apache.iceberg.rest.RESTCatalog");
-        conf.put(DEFAULT_CATALOG, sparkCatalog);
         conf.put("spark.sql.iceberg.planning.preserve-data-grouping", "true");
         conf.put("spark.sql.sources.bucketing.enabled", "true");
         conf.put("spark.sql.sources.v2.bucketing.enabled", "true");
@@ -69,7 +62,7 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
-        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), warehouseName);
+        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), sparkCatalog.toString()); // this is the Polaris catalog name
         conf.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
         conf.put(format("spark.sql.catalog.%s.oauth2.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s.rest.auth.oauth2.scope", sparkCatalog), "PRINCIPAL_ROLE:ALL");

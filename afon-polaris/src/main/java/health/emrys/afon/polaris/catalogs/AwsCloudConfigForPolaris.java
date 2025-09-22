@@ -9,7 +9,6 @@ import static health.emrys.afon.config.AfonProperties.*;
 
 public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
-    private final String warehouseName;
     private final String roleArn;
     private final String bucket;
     private final String region;
@@ -17,7 +16,6 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
     public AwsCloudConfigForPolaris(Properties properties) {
         super(new JsonMaker());
-        this.warehouseName = AWS_WAREHOUSE_NAME.getValueFrom(properties);
         this.roleArn       = AWS_S3_ROLE_ARN.getValueFrom(properties);
         this.bucket        = "s3a://" + AWS_S3_BUCKET_NAME.getValueFrom(properties);
         this.region        = AWS_REGION.getValueFrom(properties);
@@ -36,7 +34,7 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
         );
         Catalog catalog = new Catalog(
                 Catalog.TypeEnum.INTERNAL,
-                warehouseName,
+                warehouseName(),
                 catalogProperties,
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
@@ -48,13 +46,13 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
     @Override
     public String warehouseName() {
-        return warehouseName;
+        return SupportedCloudsEnum.AWS.toString();
     }
 
     @Override
     public String toString() {
         return "AwsCloudConfigForPolaris{" +
-                "warehouseName='" + warehouseName + '\'' +
+                "warehouseName='" + warehouseName() + '\'' +
                 ", roleArn='" + roleArn + '\'' +
                 ", bucket='" + bucket + '\'' +
                 ", region='" + region + '\'' +
