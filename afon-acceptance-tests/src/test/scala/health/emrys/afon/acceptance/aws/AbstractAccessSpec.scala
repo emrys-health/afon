@@ -92,13 +92,20 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       if (AbstractAccessSpec.tables.size == 2) {
         val x = AbstractAccessSpec.tables.head
         val y = AbstractAccessSpec.tables.tail.head
-        Given(s"two tables in Polaris and cloud storage called '$x' and '$y'")
+        Given(
+          s"""two tables in Polaris and cloud storage called
+             | '$x'
+             |and
+             | '$y'
+             |each with $NUM_ROWS that typically look like:
+             |${spark.sql(s"SELECT * FROM $x").collect().take(3).mkString("\n")}
+             |...""".stripMargin)
         val sql = s"SELECT * FROM $x AS x INNER JOIN $y AS y ON x.id = y.id"
         When(s"we execute the SQL:\n$sql")
         val xs = spark.sql(sql).collect()
         Then(s"we get $NUM_ROWS rows")
         assert(xs.size == NUM_ROWS)
-        And(s"the results look like:\n${xs.take(5).mkString("\n")}\n...")
+        And(s"the results look like:\n${xs.take(3).mkString("\n")}\n...")
       }
     }
   }
