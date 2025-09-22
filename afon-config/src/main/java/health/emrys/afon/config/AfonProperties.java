@@ -30,7 +30,6 @@ public class AfonProperties {
     // AZURE
     public static final AfonProperty AZURE_BUCKET          = new AfonProperty("AZURE_BUCKET");
     public static final AfonProperty AZURE_STORAGE_ACCOUNT = new AfonProperty("AZURE_STORAGE_ACCOUNT");
-    public static final AfonProperty AZURE_APP_ID          = new AfonProperty("AZURE_APP_ID");
     // needed by Polaris:
     public static final AfonProperty AZURE_TENANT_ID       = new AfonProperty("AZURE_TENANT_ID");
     public static final AfonProperty AZURE_CLIENT_ID       = new AfonProperty("AZURE_CLIENT_ID");
