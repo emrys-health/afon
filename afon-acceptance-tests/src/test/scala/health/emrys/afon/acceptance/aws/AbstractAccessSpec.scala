@@ -83,6 +83,27 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val response = client.getCall(uriGet, accessToken)
       Then("Polaris acknowledges the table has been created")
       assert(response.getCode == 200)
+      AbstractAccessSpec.tables.add(s"$FULL_NAMESPACE.$tableName")
     }
   }
+
+  "Cross cloud tables" should {
+    "require 2 clouds" in {
+      if (AbstractAccessSpec.tables.size == 2) {
+        val x = AbstractAccessSpec.tables.head
+        val y = AbstractAccessSpec.tables.tail.head
+        Given(s"two tables in Polaris and cloud storage called '$x' and '$y'")
+        val sql = s"SELECT * FROM $x AS x INNER JOIN $y AS y ON x.id = y.id"
+        When(s"we execute the SQL:\n$sql")
+        val xs = spark.sql(sql).collect()
+        Then(s"we get $NUM_ROWS rows")
+        assert(xs.size == NUM_ROWS)
+        And(s"the results look like:\n${xs.take(5).mkString("\n")}\n...")
+      }
+    }
+  }
+}
+
+object AbstractAccessSpec {
+  val tables = scala.collection.mutable.Set[String]()
 }
