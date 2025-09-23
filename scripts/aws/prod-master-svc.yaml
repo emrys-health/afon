@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-master-lb
+  creationTimestamp: "2025-09-23T14:49:15Z"
+  labels:
+    spark-role: master
+    spark-version: 4.0.1
+    spark.operator/name: spark-kubernetes-operator
+    spark.operator/spark-cluster-name: prod
+  namespace: default
+spec:
+  type: LoadBalancer
+  ports:
+  - name: web
+    port: 8080
+    protocol: TCP
+    targetPort: web
+  - name: spark
+    port: 7077
+    protocol: TCP
+    targetPort: 7077
+  - name: rest
+    port: 6066
+    protocol: TCP
+    targetPort: rest
+  selector:
+    spark-role: master
