@@ -41,7 +41,7 @@ public class ContainerHelper {
             String googleCreds   = GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties);
             String polarisId     = POLARIS_ID.getValueFrom(properties);
             String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
-            myContainer = new GenericContainer<>("apache/polaris")
+            myContainer = new GenericContainer<>("apache/polaris:1.1.0-incubating")
                     // AWS
                     .withEnv(AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties))
                     .withEnv(AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties))
