@@ -23,3 +23,14 @@ spec:
         ports:
         - containerPort: 7077
         - containerPort: 8080
+        volumeMounts:
+          - name: secrets-store
+            mountPath: /etc/secrets     # secrets show up as files here
+            readOnly: true
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "aws-sm-provider"
