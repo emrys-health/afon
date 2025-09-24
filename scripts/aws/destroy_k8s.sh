@@ -1,0 +1,1 @@
+eksctl delete cluster --name spark-cluster --region eu-west-2
