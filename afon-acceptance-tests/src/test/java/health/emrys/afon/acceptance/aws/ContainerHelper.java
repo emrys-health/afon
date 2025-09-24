@@ -59,8 +59,8 @@ public class ContainerHelper {
             ;
             myContainer.setPortBindings(List.of("8181:8181", "8182:8182"));
             logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading the image.");
-//            myContainer.start();
-//            myContainer.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
+            myContainer.start();
+            myContainer.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
         }
     }
 
