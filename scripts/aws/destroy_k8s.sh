@@ -1,1 +1,7 @@
 eksctl delete cluster --name spark-cluster --region eu-west-2
+
+# not sure this is actually linked....?
+aws iam detach-role-policy --role-name ReadSecrets --policy-arn  arn:aws:iam::418295715997:policy/SecretAccessPolicy
+
+
+aws iam delete-role --role-name ReadSecrets
