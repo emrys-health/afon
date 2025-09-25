@@ -39,15 +39,18 @@ eksctl utils associate-iam-oidc-provider --region="$REGION" --cluster="$CLUSTERN
 
 
 eksctl create iamserviceaccount --name nginx-irsa-deployment-sa --region="$REGION" --cluster "$CLUSTERNAME" --attach-policy-arn "$POLICY_ARN" --approve --override-existing-serviceaccounts
+# test:
+eksctl get iamserviceaccount --name nginx-irsa-deployment-sa --region="$REGION" --cluster "$CLUSTERNAME" -o yaml
 
-# This wasn't in the docs...
+
+# This was not in the docs...
 kubectl apply -n kube-system -f https://raw.githubusercontent.com/aws/secrets-store-csi-driver-provider-aws/main/deployment/aws-provider-installer.yaml
 kubectl get daemonset -n kube-system csi-secrets-store-provider-aws
 
 
 
 
-# TEST
+# Experiment
 
 aws iam update-assume-role-policy --role-name eksctl-spark-cluster-addon-iamserviceaccount--Role1-mjLHFL0CzdVN  --policy-document '{
   "Version": "2012-10-17",
@@ -66,3 +69,36 @@ aws iam update-assume-role-policy --role-name eksctl-spark-cluster-addon-iamserv
     }
   ]
 }'
+
+aws iam attach-role-policy --role-name eksctl-spark-cluster-addon-iamserviceaccount--Role1-mjLHFL0CzdVN --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
+# TEST
+aws iam list-attached-role-policies --role-name  eksctl-spark-cluster-addon-iamserviceaccount--Role1-mjLHFL0CzdVN
+
+
+# Experiment #2
+
+eksctl create addon --name eks-pod-identity-agent --cluster "$CLUSTERNAME" --region "$REGION"
+
+#aws --region "$REGION" --query Role.Arn --output text 
+aws iam create-role --role-name emrys-deployment-role --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "pods.eks.amazonaws.com"
+            },
+            "Action": [
+                "sts:AssumeRole",
+                "sts:TagSession"
+            ]
+        }
+    ]
+}'
+ROLE_ARN=$(aws iam get-role --role-name emrys-deployment-role --query "Role.Arn" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g  | perl -pe s/\\[.*//g)
+
+aws iam attach-role-policy     --role-name emrys-deployment-role     --policy-arn $POLICY_ARN
+
+eksctl create podidentityassociation     --cluster "$CLUSTERNAME"     --namespace default     --region "$REGION"     --service-account-name nginx-pod-identity-deployment-sa     --role-arn $ROLE_ARN     --create-service-account true
+
+

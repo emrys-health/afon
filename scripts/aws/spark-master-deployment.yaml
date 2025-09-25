@@ -16,7 +16,7 @@ spec:
         app: spark
         role: master
     spec:
-      serviceAccountName: nginx-irsa-deployment-sa
+      serviceAccountName: nginx-pod-identity-deployment-sa
       volumes:
       - name: secrets-store-inline
         csi:
@@ -27,7 +27,7 @@ spec:
       containers:
       - name: spark-master
         image: apache/spark
-        command: ["/opt/entrypoint.sh", "driver"]
+        command: ["tail", "-f", "/dev/null"]
         ports:
         - containerPort: 7077
         - containerPort: 8080
