@@ -16,6 +16,14 @@ spec:
         app: spark
         role: master
     spec:
+      serviceAccountName: nginx-irsa-deployment-sa
+      volumes:
+      - name: secrets-store-inline
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: "nginx-pod-identity-deployment-aws-secrets"
       containers:
       - name: spark-master
         image: apache/spark
@@ -24,13 +32,7 @@ spec:
         - containerPort: 7077
         - containerPort: 8080
         volumeMounts:
-          - name: secrets-store
-            mountPath: /etc/secrets     # secrets show up as files here
-            readOnly: true
-      volumes:
-        - name: secrets-store
-          csi:
-            driver: secrets-store.csi.k8s.io
-            readOnly: true
-            volumeAttributes:
-              secretProviderClass: "aws-sm-provider"
+        - name: secrets-store-inline
+          mountPath: "/mnt/secrets-store"
+          readOnly: true
+
