@@ -76,3 +76,7 @@ helm install spark spark/spark-kubernetes-operator
 kubectl apply -f spark_cluster.yaml
 
 kubectl apply -f polaris-deployment.yaml
+
+kubectl apply -f deployment_jupyter.yaml
+
+kubectl apply -f prod-jupyter-svc.yam
