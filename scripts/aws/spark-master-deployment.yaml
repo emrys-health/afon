@@ -27,7 +27,7 @@ spec:
       containers:
       - name: spark-master
         image: apache/spark
-        command: ["tail", "-f", "/dev/null"]
+        command: ["/bin/bash","-c","/opt/spark/sbin/start-master.sh && while /opt/spark/sbin/spark-daemon.sh status org.apache.spark.deploy.master.Master 1; do sleep 1; done"]
         ports:
         - containerPort: 7077
         - containerPort: 8080
