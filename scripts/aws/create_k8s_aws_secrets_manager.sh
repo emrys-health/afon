@@ -72,3 +72,7 @@ kubectl apply -f secret_provider_class.yaml
 helm repo add spark https://apache.github.io/spark-kubernetes-operator
 helm repo update
 helm install spark spark/spark-kubernetes-operator
+
+kubectl apply -f spark_cluster.yaml
+
+kubectl apply -f polaris-deployment.yaml
