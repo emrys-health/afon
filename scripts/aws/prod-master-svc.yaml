@@ -4,7 +4,7 @@ metadata:
   name: spark-master-lb
   labels:
     spark-role: master
-    spark-version: 4.0.1
+    spark-version: 3.5.0
     spark.operator/name: spark-kubernetes-operator
     spark.operator/spark-cluster-name: prod
   namespace: default
