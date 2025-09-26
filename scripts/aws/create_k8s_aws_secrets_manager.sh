@@ -1,14 +1,14 @@
 export REGION=eu-west-2
 export CLUSTERNAME=spark-cluster
 
-# Create and configure the Kubernetes cluster in AWS
-eksctl create cluster --name spark-cluster --nodes 3
+# Create and configure the Kubernetes cluster in AWS. This next line can take 10 mins.
+eksctl create cluster --name $CLUSTERNAME --nodes 3
 eksctl utils associate-iam-oidc-provider \
-  --cluster spark-cluster \
+  --cluster $CLUSTERNAME \
   --approve
 eksctl update addon \
   --name vpc-cni \
-  --cluster spark-cluster \
+  --cluster $CLUSTERNAME \
   --region eu-west-2
 
 export CLUSTERID=$(aws eks describe-cluster --name spark-cluster --region eu-west-2 --query "cluster.identity.oidc.issuer" --output text | awk -F'/' '{print $NF}'  | head -c 32)
@@ -37,49 +37,15 @@ POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='nginx-deploym
 
 eksctl utils associate-iam-oidc-provider --region="$REGION" --cluster="$CLUSTERNAME" --approve # Only run this once
 
-
-eksctl create iamserviceaccount --name nginx-irsa-deployment-sa --region="$REGION" --cluster "$CLUSTERNAME" --attach-policy-arn "$POLICY_ARN" --approve --override-existing-serviceaccounts
-# test:
-eksctl get iamserviceaccount --name nginx-irsa-deployment-sa --region="$REGION" --cluster "$CLUSTERNAME" -o yaml
-
-
 # This was not in the docs...
 kubectl apply -n kube-system -f https://raw.githubusercontent.com/aws/secrets-store-csi-driver-provider-aws/main/deployment/aws-provider-installer.yaml
 kubectl get daemonset -n kube-system csi-secrets-store-provider-aws
 
-
-
-
-# Experiment
-
-aws iam update-assume-role-policy --role-name eksctl-spark-cluster-addon-iamserviceaccount--Role1-mjLHFL0CzdVN  --policy-document '{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "arn:aws:iam::418295715997:oidc-provider/oidc.eks.'$REGION'.amazonaws.com/id/'$CLUSTERID'"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "oidc.eks.'$REGION'.amazonaws.com/id/'$CLUSTERID':sub": "system:serviceaccount:default:nginx-irsa-deployment-sa"
-        }
-      }
-    }
-  ]
-}'
-
-aws iam attach-role-policy --role-name eksctl-spark-cluster-addon-iamserviceaccount--Role1-mjLHFL0CzdVN --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
-# TEST
-aws iam list-attached-role-policies --role-name  eksctl-spark-cluster-addon-iamserviceaccount--Role1-mjLHFL0CzdVN
-
-
-# Experiment #2
+# note that I had to use Option 2 from https://github.com/aws/secrets-store-csi-driver-provider-aws
+# option 1 does not appear to work for me
 
 eksctl create addon --name eks-pod-identity-agent --cluster "$CLUSTERNAME" --region "$REGION"
 
-#aws --region "$REGION" --query Role.Arn --output text 
 aws iam create-role --role-name emrys-deployment-role --assume-role-policy-document '{
     "Version": "2012-10-17",
     "Statement": [
@@ -97,8 +63,8 @@ aws iam create-role --role-name emrys-deployment-role --assume-role-policy-docum
 }'
 ROLE_ARN=$(aws iam get-role --role-name emrys-deployment-role --query "Role.Arn" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g  | perl -pe s/\\[.*//g)
 
-aws iam attach-role-policy     --role-name emrys-deployment-role     --policy-arn $POLICY_ARN
+aws iam attach-role-policy --role-name emrys-deployment-role --policy-arn $POLICY_ARN
 
-eksctl create podidentityassociation     --cluster "$CLUSTERNAME"     --namespace default     --region "$REGION"     --service-account-name nginx-pod-identity-deployment-sa     --role-arn $ROLE_ARN     --create-service-account true
+eksctl create podidentityassociation --cluster "$CLUSTERNAME" --namespace default --region "$REGION" --service-account-name nginx-pod-identity-deployment-sa --role-arn $ROLE_ARN --create-service-account true
 
-
+kubectl apply -f secret_provider_class.yaml
