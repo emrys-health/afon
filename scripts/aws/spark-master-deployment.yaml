@@ -35,4 +35,9 @@ spec:
         - name: secrets-store-inline
           mountPath: "/mnt/secrets-store"
           readOnly: true
+      - name: spark-worker
+        image: apache/spark
+        command: [ "/bin/bash", "-c", "/opt/spark/sbin/start-worker.sh spark://spark-master-svc:7077 && while /opt/spark/sbin/spark-daemon.sh status org.apache.spark.deploy.worker.Worker 1; do sleep 1; done" ]
+        ports:
+          - containerPort: 8081
 

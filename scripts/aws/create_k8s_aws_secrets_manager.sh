@@ -68,3 +68,7 @@ aws iam attach-role-policy --role-name emrys-deployment-role --policy-arn $POLIC
 eksctl create podidentityassociation --cluster "$CLUSTERNAME" --namespace default --region "$REGION" --service-account-name nginx-pod-identity-deployment-sa --role-arn $ROLE_ARN --create-service-account true
 
 kubectl apply -f secret_provider_class.yaml
+
+helm repo add spark https://apache.github.io/spark-kubernetes-operator
+helm repo update
+helm install spark spark/spark-kubernetes-operator
