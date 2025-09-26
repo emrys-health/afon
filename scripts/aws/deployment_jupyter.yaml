@@ -1,19 +1,20 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Pod
 metadata:
-  name: jupiter-spark
-  namespace: default
+  name: jupyter-notebook
+  labels:
+    app: jupyter
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: jupyter
-  template:
-    metadata:
-      labels:
-        app: jupyter
-    spec:
-      containers:
-        - name: jupiter-spark-container
-          image: quay.io/jupyter/all-spark-notebook
-          imagePullPolicy: IfNotPresent
+  containers:
+    - name: jupyter
+      image: jupyter/pyspark-notebook:latest
+      ports:
+        - containerPort: 8888
+      env:
+        - name: SPARK_MASTER
+          value: "k8s://https://kubernetes.default.svc"
+        - name: SPARK_HOME
+          value: "/usr/local/spark"
+        - name: PYSPARK_PYTHON
+          value: "python3"
+
