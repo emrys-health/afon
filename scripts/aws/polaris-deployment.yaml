@@ -27,7 +27,7 @@ spec:
       containers:
       - name: polaris
         image: apache/polaris:1.1.0-incubating
-#        command: ["/bin/bash", "-c", "/opt/spark/sbin/start-master.sh && while /opt/spark/sbin/spark-daemon.sh status org.apache.spark.deploy.master.Master 1; do sleep 1; done"]
+        command: ["/bin/bash", "-c", "source /mnt/secrets-store/MySecret && /opt/jboss/container/java/run/run-java.sh"]
         ports:
         - containerPort: 8181
         - containerPort: 8182
