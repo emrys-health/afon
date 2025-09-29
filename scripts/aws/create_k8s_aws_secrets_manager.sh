@@ -21,7 +21,8 @@ helm install -n kube-system csi-secrets-store secrets-store-csi-driver/secrets-s
 kubectl --namespace=kube-system get pods -l "app=secrets-store-csi-driver"
 
 # Create secrets. TODO these are test values:
-aws --region "$REGION" secretsmanager  create-secret --name MySecret --secret-string '{"username":"memeuser", "password":"hunter2"}'
+#aws --region "$REGION" secretsmanager  create-secret --name MySecret --secret-string '{"username":"memeuser", "password":"hunter2"}'
+aws --region "$REGION" secretsmanager  update-secret --secret-id $SECRET_ARN --secret-string "$(cat ~/polaris_emrys_creds.sh)"
 SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='MySecret'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
 
 aws iam create-policy --policy-name nginx-deployment-policy --policy-document '{
@@ -37,7 +38,6 @@ POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='nginx-deploym
 
 eksctl utils associate-iam-oidc-provider --region="$REGION" --cluster="$CLUSTERNAME" --approve # Only run this once
 
-# This was not in the docs...
 kubectl apply -n kube-system -f https://raw.githubusercontent.com/aws/secrets-store-csi-driver-provider-aws/main/deployment/aws-provider-installer.yaml
 kubectl get daemonset -n kube-system csi-secrets-store-provider-aws
 

@@ -1,17 +1,9 @@
-# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Uses our bespoke Spark image that uses Python 3.11 so Jupyter can integrate with it
+# Build it with:
+# docker build -t ph1ll1phenry/spark-3.5-py311 .
+# docker push  ph1ll1phenry/spark-3.5-py311
+# in the directory of the appropriate Docker file
+
 apiVersion: spark.apache.org/v1alpha1
 kind: SparkCluster
 metadata:
@@ -25,7 +17,7 @@ spec:
       minWorkers: 3
       maxWorkers: 3
   sparkConf:
-    spark.kubernetes.container.image: "apache/spark:3.5.0"
+    spark.kubernetes.container.image: "ph1ll1phenry/spark-3.5-py311"
     spark.master.ui.title: "Prod Spark Cluster"
     spark.master.rest.enabled: "true"
     spark.master.rest.host: "0.0.0.0"
