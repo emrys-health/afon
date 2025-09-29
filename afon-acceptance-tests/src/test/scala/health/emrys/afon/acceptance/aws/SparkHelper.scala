@@ -10,8 +10,7 @@ object SparkHelper {
   val sparkWarehouse = new SparkWarehouseConfig(
     instance.getAccessToken,
     instance.getClientId,
-    instance.getClientSecret,
-    namespace);
+    instance.getClientSecret);
   val sc: SparkContext = SparkContext.getOrCreate(sparkWarehouse.sparkConf())
   val spark: SparkSession = SparkSession
     .builder()

@@ -16,21 +16,30 @@ import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 public class SparkWarehouseConfig {
 
     private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
-    private final String DEFAULT_CATALOG = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
-    private final String WAREHOUSE_PATH = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
+    private final String DEFAULT_CATALOG          = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
+    private final String WAREHOUSE_PATH           = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
 
     private final String accessToken;
     private final String clientId;
     private final String clientSecret;
+    private final String host;
 
     public SparkWarehouseConfig(
-                                String accessToken,
-                                String clientId,
-                                String clientSecret,
-                                String namespace) {
-        this.accessToken   = accessToken;
-        this.clientId      = clientId;
-        this.clientSecret  = ***REMOVED***
+            String accessToken,
+            String clientId,
+            String clientSecret,
+            String host) {
+        this.accessToken  = accessToken;
+        this.clientId     = clientId;
+        this.clientSecret = ***REMOVED***
+        this.host         = host;
+    }
+
+    public SparkWarehouseConfig(
+            String accessToken,
+            String clientId,
+            String clientSecret) {
+        this(accessToken, clientId, clientSecret, "localhost");
     }
 
     public SparkConf sparkConf() throws IOException {
@@ -38,7 +47,7 @@ public class SparkWarehouseConfig {
     }
 
     public SparkConf sparkConf(int cores) throws IOException {
-        String tmpDir  = Files.createTempDirectory("SparkForTesting").toString();
+        String tmpDir = Files.createTempDirectory("SparkForTesting").toString();
         SparkConf sparkConf = new SparkConf()
                 .setMaster(format("local[%d]", cores))
                 .setAppName("Tests")
@@ -58,7 +67,7 @@ public class SparkWarehouseConfig {
         conf.put("spark.sql.iceberg.planning.preserve-data-grouping", "true");
         conf.put("spark.sql.sources.bucketing.enabled", "true");
         conf.put("spark.sql.sources.v2.bucketing.enabled", "true");
-        conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), "http://localhost:8181/api/catalog");
+        conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("http://%s:8181/api/catalog", host)); // TODO not necessarily localhost
         conf.put(format("spark.sql.catalog.%s.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
@@ -74,5 +83,16 @@ public class SparkWarehouseConfig {
         conf.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
         conf.put("spark.driver.allowMultipleContexts", "true");
         return Map.copyOf(conf);
+    }
+
+    public static final void main(String[] args) {
+        SparkWarehouseConfig app = new SparkWarehouseConfig("{ACCESS_TOKEN}",
+                                                            "{CLIENT_ID}",
+                                                            "{CLIENT_SECRET}",
+                                                            "{HOST}");
+        Map<String, String> configs = app.sparkConfigs(SupportedCloudsEnum.AWS);
+        for (Map.Entry<String, String> entry : configs.entrySet()) {
+            System.out.println(format(".config(\"%s\", f\"%s\")", entry.getKey(), entry.getValue()));
+        }
     }
 }
