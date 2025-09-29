@@ -73,10 +73,12 @@ helm repo add spark https://apache.github.io/spark-kubernetes-operator
 helm repo update
 helm install spark spark/spark-kubernetes-operator
 
+sleep 30 # need to wait for spark-kubernetes-operator to start
+
 kubectl apply -f spark_cluster.yaml
 
 kubectl apply -f polaris-deployment.yaml
 
 kubectl apply -f deployment_jupyter.yaml
 
-kubectl apply -f prod-jupyter-svc.yam
+kubectl apply -f prod-jupyter-svc.yaml
