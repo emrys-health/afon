@@ -21,9 +21,14 @@ helm install -n kube-system csi-secrets-store secrets-store-csi-driver/secrets-s
 kubectl --namespace=kube-system get pods -l "app=secrets-store-csi-driver"
 
 # Create secrets. TODO these are test values:
-#aws --region "$REGION" secretsmanager  create-secret --name MySecret --secret-string '{"username":"memeuser", "password":"hunter2"}'
-aws --region "$REGION" secretsmanager  update-secret --secret-id $SECRET_ARN --secret-string "$(cat ~/polaris_emrys_creds.sh)"
+aws --region "$REGION" secretsmanager  create-secret --name MySecret --secret-string "$(cat ~/polaris_emrys_creds.sh)"
+#aws --region "$REGION" secretsmanager  update-secret --secret-id $SECRET_ARN --secret-string "$(cat ~/polaris_emrys_creds.sh)"
 SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='MySecret'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
+
+aws --region "$REGION" secretsmanager  create-secret --name GoogleSecret --secret-string "$(cat ~/.config/gcloud/application_default_credentials.json)"
+GOOGLE_SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='GoogleSecret'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
+
+
 
 aws iam create-policy --policy-name nginx-deployment-policy --policy-document '{
     "Version": "2012-10-17",
@@ -31,9 +36,15 @@ aws iam create-policy --policy-name nginx-deployment-policy --policy-document '{
         "Effect": "Allow",
         "Action": ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
         "Resource": ["'$SECRET_ARN'"]
-    } ]
+    },
+    {
+            "Effect": "Allow",
+            "Action": ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
+            "Resource": ["'$GOOGLE_SECRET_ARN'"]
+        }
+     ]
 }'
-#
+
 POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='nginx-deployment-policy'].Arn" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
 
 eksctl utils associate-iam-oidc-provider --region="$REGION" --cluster="$CLUSTERNAME" --approve # Only run this once
@@ -68,7 +79,9 @@ aws iam attach-role-policy --role-name emrys-deployment-role --policy-arn $POLIC
 eksctl create podidentityassociation --cluster "$CLUSTERNAME" --namespace default --region "$REGION" --service-account-name nginx-pod-identity-deployment-sa --role-arn $ROLE_ARN --create-service-account true
 
 kubectl apply -f secret_provider_class.yaml
+kubectl apply -f secret_provider_class_google.yaml
 
+# An easier way to manage Spark clusters
 helm repo add spark https://apache.github.io/spark-kubernetes-operator
 helm repo update
 helm install spark spark/spark-kubernetes-operator
@@ -77,7 +90,8 @@ sleep 30 # need to wait for spark-kubernetes-operator to start
 
 kubectl apply -f spark_cluster.yaml
 
-kubectl apply -f polaris-deployment.yaml
+#kubectl apply -f polaris-deployment.yaml
+kubectl apply -f deployment_polaris.yaml
 
 kubectl apply -f deployment_jupyter.yaml
 
