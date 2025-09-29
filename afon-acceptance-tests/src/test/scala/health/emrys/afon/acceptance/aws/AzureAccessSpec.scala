@@ -14,7 +14,6 @@ class AzureAccessSpec extends AbstractAccessSpec {
   override def cloudProvider: SupportedCloudsEnum = SupportedCloudsEnum.AZURE
 
   override protected def createTableAndPopulate(): Unit = {
-//    spark.sql(s"USE NAMESPACE ${FULL_NAMESPACE}")
     spark.sql(createDatumTable(s" IF NOT EXISTS $FULL_NAMESPACE.$tableName"))
     spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).append()
   }
