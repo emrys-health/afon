@@ -25,8 +25,8 @@ aws --region "$REGION" secretsmanager  create-secret --name CloudDetails --secre
 #aws --region "$REGION" secretsmanager  update-secret --secret-id $SECRET_ARN --secret-string "$(cat ~/polaris_emrys_creds.sh)"
 SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='CloudDetails'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
 
-aws --region "$REGION" secretsmanager  create-secret --name GoogleSecret --secret-string "$(cat ~/.config/gcloud/application_default_credentials.json)"
-GOOGLE_SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='GoogleSecret'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
+aws --region "$REGION" secretsmanager  create-secret --name application_default_credentials.json --secret-string "$(cat ~/.config/gcloud/application_default_credentials.json)"
+GOOGLE_SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='application_default_credentials.json'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
 
 
 aws iam create-policy --policy-name nginx-deployment-policy --policy-document '{
