@@ -19,6 +19,11 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.*;
 import static java.lang.String.format;
 
+/**
+ * Closes the HTTP connection on each call.
+ * So, not efficient but it won't leak resources.
+ * Since you won't make many calls, this is reasonable,
+ */
 public class AfonPolarisClient {
 
     static final Logger logger       = org.slf4j.LoggerFactory.getLogger(AfonPolarisClient.class);

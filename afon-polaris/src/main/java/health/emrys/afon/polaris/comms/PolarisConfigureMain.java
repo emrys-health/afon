@@ -1,20 +1,55 @@
 package health.emrys.afon.polaris.comms;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.polaris.catalogs.*;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
+
 public class PolarisConfigureMain {
+
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisConfigureMain.class);
 
     public static void main(String[] args) {
         try {
-            new PolarisConfigureMain().smokeTest();
+            PolarisConfigureMain app = new PolarisConfigureMain();
+            if (args.length == 0) {
+                logger.info("Running smoke test");
+                app.smokeTest();
+            } else {
+                AfonPropertiesLoader loader = null;
+                if (args.length == 1) {
+                    loader = new AfonPropertiesLoader();
+                } else {
+                    loader = new AfonPropertiesLoader(args[1]);
+                }
+                Properties props = loader.getProperties();
+                app.createAllCatalogs(props, args[0]);
+            }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void createAllCatalogs(Properties properties, String accessToken) throws IncorrectConfigException, IOException {
+        String[] creds = accessToken.split(":");
+        if (creds.length != 2) {
+            logger.error("Incorrect access token {}. The token should have a ':' delimiting ID from Secret", accessToken);
+        }
+        properties.setProperty(POLARIS_ID.getPropertyName(), creds[0]);
+        properties.setProperty(POLARIS_SECRET.getPropertyName(), creds[1]);
+        CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
+                new AwsCloudConfigForPolaris(properties),
+                new GoogleCloudConfigForPolaris(properties),
+                new AzureCloudConfigForPolaris(properties),
+                };
+        for (CloudConfigForPolaris config : configs) {
+            logger.info("Configuring {}", config.warehouseName());
+            callPolaris(properties, config);
         }
     }
 
@@ -22,7 +57,7 @@ public class PolarisConfigureMain {
         AfonPropertiesLoader  loader     = new AfonPropertiesLoader();
         Properties            properties = loader.getProperties();
         CloudConfigForPolaris config     = new AwsCloudConfigForPolaris(properties);
-
+        logger.info("Configuring {}", config.warehouseName());
         callPolaris(properties, config);
     }
 
