@@ -2,9 +2,11 @@ package health.emrys.afon.polaris.comms;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.*;
+import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
@@ -43,7 +45,14 @@ public class PolarisConfigureMain {
                 };
         for (CloudConfigForPolaris config : configs) {
             logger.info("Configuring {}", config.warehouseName());
-            callPolaris(properties, config);
+            var responses = callPolaris(properties, config);
+            Arrays.stream(responses).forEach(PolarisConfigureMain::logIfProblem);
+        }
+    }
+
+    private static void logIfProblem(HttpResponse response) {
+        if (response.getCode() / 100 != 2) {
+            logger.error("HTTP code {}. Error = {}", response.getCode(), response.getReasonPhrase());
         }
     }
 
@@ -55,11 +64,11 @@ public class PolarisConfigureMain {
         callPolaris(properties, config);
     }
 
-    public void callPolaris(Properties properties, CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
+    public HttpResponse[] callPolaris(Properties properties, CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
         var    client      = new AfonPolarisClient(properties);
         var    configurer  = new PolarisConfigurer(client);
         String accessToken = client.getAccessToken();
-        configurer.configurCatalogFor(config, accessToken);
+        return configurer.configurCatalogFor(config, accessToken);
     }
 
 
