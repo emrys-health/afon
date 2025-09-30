@@ -20,6 +20,12 @@ RUN apt-get update && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 2 && \
     python3 --version
 
+# Install debugging tools
+RUN  apt-get install net-tools && \
+     apt-get install iputils-ping && \
+     apt-get install procps && \
+     apt-get install lsof
+
 USER spark
 
 # Ensure pyspark finds the right python

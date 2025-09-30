@@ -10,7 +10,7 @@ metadata:
   name: emrys
 spec:
   runtimeVersions:
-    sparkVersion: "4.0.1"
+    sparkVersion: "3.5.0"
   clusterTolerations:
     instanceConfig:
       initWorkers: 3

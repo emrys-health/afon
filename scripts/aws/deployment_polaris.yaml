@@ -31,5 +31,5 @@ spec:
           mountPath: "/mnt/secrets-store"
           readOnly: true
         - name: secrets-google
-          mountPath: "/mnt/secrets-store-google"
+          mountPath: "/home/polaris/.config/gcloud"
           readOnly: true

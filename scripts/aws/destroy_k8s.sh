@@ -10,5 +10,5 @@ aws iam delete-role --role-name emrys-deployment-role
 aws iam delete-policy  --policy-arn $POLICY_ARN
 
 aws --region "$REGION" secretsmanager  delete-secret --secret-id CloudDetails --force-delete-without-recovery
-aws --region "$REGION" secretsmanager  delete-secret --secret-id GoogleSecret --force-delete-without-recovery
+aws --region "$REGION" secretsmanager  delete-secret --secret-id application_default_credentials.json --force-delete-without-recovery
 
