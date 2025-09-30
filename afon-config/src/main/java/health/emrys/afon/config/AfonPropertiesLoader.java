@@ -7,8 +7,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.ENV_PROPERTIES_FILE;
-import static health.emrys.afon.config.AfonProperties.PROJECT_PROPERTIES_FILE;
+import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class AfonPropertiesLoader {
@@ -17,6 +17,16 @@ public class AfonPropertiesLoader {
     private static final List<String> PROPERTY_FILES = List.of(PROJECT_PROPERTIES_FILE, ENV_PROPERTIES_FILE);
 
     private final Properties properties;
+
+    public static Properties add(String accessToken, Properties properties) {
+        String[] creds = accessToken.split(":");
+        if (creds.length != 2) {
+            logger.error("Incorrect access token {}. The token should have a ':' delimiting ID from Secret", accessToken);
+        }
+        properties.setProperty(POLARIS_ID.getPropertyName(), creds[0]);
+        properties.setProperty(POLARIS_SECRET.getPropertyName(), creds[1]);
+        return properties;
+    }
 
     public AfonPropertiesLoader(String overrideFile) throws IOException {
         this();

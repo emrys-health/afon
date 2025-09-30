@@ -7,8 +7,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
+import static health.emrys.afon.config.AfonPropertiesLoader.add;
 
 public class PolarisConfigureMain {
 
@@ -36,12 +35,7 @@ public class PolarisConfigureMain {
     }
 
     private void createAllCatalogs(Properties properties, String accessToken) throws IncorrectConfigException, IOException {
-        String[] creds = accessToken.split(":");
-        if (creds.length != 2) {
-            logger.error("Incorrect access token {}. The token should have a ':' delimiting ID from Secret", accessToken);
-        }
-        properties.setProperty(POLARIS_ID.getPropertyName(), creds[0]);
-        properties.setProperty(POLARIS_SECRET.getPropertyName(), creds[1]);
+        properties = add(accessToken, properties);
         CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
                 new AwsCloudConfigForPolaris(properties),
                 new GoogleCloudConfigForPolaris(properties),
