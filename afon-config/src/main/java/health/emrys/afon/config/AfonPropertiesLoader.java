@@ -18,6 +18,14 @@ public class AfonPropertiesLoader {
 
     private final Properties properties;
 
+    public AfonPropertiesLoader(String overrideFile) throws IOException {
+        this();
+        logger.info("Loading properties from {}", overrideFile);
+        FileInputStream fis = new FileInputStream(overrideFile);
+        properties.load(fis);
+        fis.close();
+    }
+
     public AfonPropertiesLoader() {
         properties = new Properties();
         try {
