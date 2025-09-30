@@ -85,14 +85,4 @@ public class SparkWarehouseConfig {
         return Map.copyOf(conf);
     }
 
-    public static final void main(String[] args) {
-        SparkWarehouseConfig app = new SparkWarehouseConfig("{ACCESS_TOKEN}",
-                                                            "{CLIENT_ID}",
-                                                            "{CLIENT_SECRET}",
-                                                            "{HOST}");
-        Map<String, String> configs = app.sparkConfigs(SupportedCloudsEnum.AWS);
-        for (Map.Entry<String, String> entry : configs.entrySet()) {
-            System.out.println(format(".config(\"%s\", f\"%s\")", entry.getKey(), entry.getValue()));
-        }
-    }
 }
