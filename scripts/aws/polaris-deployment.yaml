@@ -27,7 +27,7 @@ spec:
       containers:
       - name: polaris
         image: apache/polaris:1.1.0-incubating
-        command: ["/bin/bash", "-c", "source /mnt/secrets-store/MySecret && /opt/jboss/container/java/run/run-java.sh"]
+        command: ["/bin/bash", "-c", "source /mnt/secrets-store/CloudDetails && /opt/jboss/container/java/run/run-java.sh"]
         ports:
         - containerPort: 8181
         - containerPort: 8182
