@@ -39,7 +39,7 @@ public class SparkWarehouseConfig {
             String accessToken,
             String clientId,
             String clientSecret) {
-        this(accessToken, clientId, clientSecret, "localhost");
+        this(accessToken, clientId, clientSecret, "localhost:8181");
     }
 
     public SparkConf sparkConf() throws IOException {
@@ -67,7 +67,7 @@ public class SparkWarehouseConfig {
         conf.put("spark.sql.iceberg.planning.preserve-data-grouping", "true");
         conf.put("spark.sql.sources.bucketing.enabled", "true");
         conf.put("spark.sql.sources.v2.bucketing.enabled", "true");
-        conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("http://%s:8181/api/catalog", host)); // TODO not necessarily localhost
+        conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("http://%s/api/catalog", host)); // TODO not necessarily localhost
         conf.put(format("spark.sql.catalog.%s.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
