@@ -26,8 +26,8 @@
     </developers>
 
     <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <scala.version>2.13.14</scala.version>
         <scala.compat.version>2.13</scala.compat.version>
         <spark.compat.version>3.5</spark.compat.version>
@@ -39,11 +39,12 @@
     </properties>
 
     <modules>
+        <module>afon-acceptance-tests</module>
+        <module>afon-config</module>
+        <module>afon-core</module>
         <module>afon-iceberg</module>
         <module>afon-polaris</module>
-        <module>afon-config</module>
         <module>afon-spark</module>
-        <module>afon-acceptance-tests</module>
     </modules>
 
     <dependencies>
