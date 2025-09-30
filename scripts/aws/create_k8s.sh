@@ -20,14 +20,13 @@ helm install -n kube-system csi-secrets-store secrets-store-csi-driver/secrets-s
 # Check:
 kubectl --namespace=kube-system get pods -l "app=secrets-store-csi-driver"
 
-# Create secrets. TODO these are test values:
-aws --region "$REGION" secretsmanager  create-secret --name MySecret --secret-string "$(cat ~/polaris_emrys_creds.sh)"
+# Create secrets.
+aws --region "$REGION" secretsmanager  create-secret --name CloudDetails --secret-string "$(cat ~/emrys.sh)"
 #aws --region "$REGION" secretsmanager  update-secret --secret-id $SECRET_ARN --secret-string "$(cat ~/polaris_emrys_creds.sh)"
-SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='MySecret'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
+SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='CloudDetails'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
 
 aws --region "$REGION" secretsmanager  create-secret --name GoogleSecret --secret-string "$(cat ~/.config/gcloud/application_default_credentials.json)"
 GOOGLE_SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='GoogleSecret'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
-
 
 
 aws iam create-policy --policy-name nginx-deployment-policy --policy-document '{
