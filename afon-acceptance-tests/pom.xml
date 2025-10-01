@@ -52,4 +52,61 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>uber</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <version>3.5.3</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Name of the resulting uber-jar -->
+                                    <finalName>${project.artifactId}-${project.version}-uber</finalName>
+
+                                    <artifactSet>
+                                        <includes>
+                                            <!--                                    <include>com.google.guava:guava:33.4.0-jre</include>-->
+                                            <include>org.apache.hadoop:hadoop-aws</include>
+                                            <include>org.apache.hadoop:hadoop-azure</include>
+                                            <include>org.apache.hadoop:hadoop-common</include>
+                                            <include>com.google.cloud:google-cloud-storage</include>
+                                            <include>software.amazon.awssdk:bundle</include>
+                                            <include>org.apache.iceberg:iceberg-spark-runtime-3.5_2.12</include>
+                                        </includes>
+                                        <excludes>
+                                            <exclude>org.apache.hadoop:hadoop-client-api</exclude>
+                                        </excludes>
+                                    </artifactSet>
+
+                                    <!-- Optionally filter out signature files that can break the jar -->
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
