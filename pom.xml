@@ -26,6 +26,7 @@
     </developers>
 
     <properties>
+        <hadoop.version>3.3.4</hadoop.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <scala.version>2.12.20</scala.version>
@@ -53,7 +54,6 @@
             <artifactId>azure-storage-file-datalake</artifactId>
             <version>12.22.0</version>
         </dependency>
-
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
@@ -120,11 +120,6 @@
             <groupId>org.apache.httpcomponents.client5</groupId>
             <artifactId>httpclient5-fluent</artifactId>
             <version>5.5</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-aws</artifactId>
-            <version>3.4.2</version>
         </dependency>
         <dependency>
             <groupId>com.google.cloud</groupId>
