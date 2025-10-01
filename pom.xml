@@ -28,8 +28,8 @@
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <scala.version>2.13.14</scala.version>
-        <scala.compat.version>2.13</scala.compat.version>
+        <scala.version>2.12.20</scala.version>
+        <scala.compat.version>2.12</scala.compat.version>
         <spark.compat.version>3.5</spark.compat.version>
         <spark.version>${spark.compat.version}.0</spark.version>
         <iceberg.version>1.10.0</iceberg.version>
@@ -115,16 +115,6 @@
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
             <version>3.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>uk.co.odinconsultants.documentation_utils</groupId>
-            <artifactId>scalatest_utils</artifactId>
-            <version>${documentation_utils.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>uk.co.odinconsultants.documentation_utils</groupId>
-            <artifactId>spark</artifactId>
-            <version>${documentation_utils.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
