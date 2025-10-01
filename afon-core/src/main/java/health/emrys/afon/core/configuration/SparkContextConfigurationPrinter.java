@@ -7,6 +7,8 @@ import health.emrys.afon.spark.SparkWarehouseConfig;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Properties;
 
@@ -96,12 +98,13 @@ spark = (SparkSession.builder\s
         addDependencies(szb, new String[]{"google-cloud-storage",}, "com.google.cloud", "2.57.0");
         addDependencies(szb, new String[]{"s3", "iam-policy-builder", }, "software.amazon.awssdk", "2.31.59");
         szb.append("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0"); // our docker image uses Spark 2.12
+        String tableName = tableName();
         System.out.println(format("""
     .config("spark.jars.packages", "%s")
     .config("spark.driver.userClassPathFirst", "true")
     .config("spark.executor.userClassPathFirst", "true")
                                    """, szb));
-        System.out.println("""
+        System.out.println(format("""
     .getOrCreate()
         )        
 print("Setup complete.");
@@ -110,18 +113,25 @@ df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
 print("Initialized test data")
 
 gcp_namespace = "gcp.acceptancetests"
-gcp_fqn = f"{gcp_namespace}.test_df"
+gcp_fqn = f"{gcp_namespace}.%s"
 spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {gcp_namespace}")
 print("Created namespace")
 
 df_test.writeTo(gcp_fqn).create()
 print("Wrote to GCP")
-                                   """);
+                                   """, tableName));
     }
 
     private static void addDependencies(StringBuffer szb, String[] dependencies, String groupId, String version) {
         for (String artifactId : dependencies) {
             szb.append(format("%s:%s:%s,", groupId, artifactId, version));
         }
+    }
+
+    private static final String tableName() {
+        LocalDateTime     now       = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMddmmHHss");
+        String formatted = now.format(formatter);
+        return "smoketesttable" + formatted;
     }
 }
