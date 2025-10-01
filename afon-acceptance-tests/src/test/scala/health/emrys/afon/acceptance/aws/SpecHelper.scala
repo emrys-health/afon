@@ -26,7 +26,8 @@ trait SpecHelper {
       s"label_$i",
       i % numPartitions,
       new Date(now.toEpochSecond(UTC) + (i * 3600 * 1000 * 24)),
-      new Timestamp(now.toEpochSecond(UTC) + (i * 3600 * 1000)))
+      new Timestamp(now.toEpochSecond(UTC) + (i * 3600 * 1000)),
+      i),
     )
   }
 }

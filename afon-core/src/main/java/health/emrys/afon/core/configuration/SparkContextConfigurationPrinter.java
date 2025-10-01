@@ -16,6 +16,13 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 import static java.lang.String.format;
 
+/**
+ * You'll need to presign with:
+ * copy it to S3 with:
+ * docker run --rm -it  -v ~/.aws:/root/.aws -v /home/henryp/Code/Emrys/afon-core/afon-iceberg/target/:/tmp/target  amazon/aws-cli s3 cp /tmp/target/afon-iceberg-0.1.jar s3://emrys-afon-bucket/afon-iceberg-0.1.jar
+ * then
+ * aws s3 presign s3://emrys-afon-bucket/afon-iceberg-0.1.jar --expires-in 14400
+ */
 public class SparkContextConfigurationPrinter {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(SparkContextConfigurationPrinter.class);
@@ -112,6 +119,7 @@ spark = (SparkSession.builder\s
     .config("spark.jars.packages", "%s")
     .config("spark.driver.userClassPathFirst", "true")
     .config("spark.executor.userClassPathFirst", "true")
+    .config("spark.jars", "s3://emrys-afon-bucket/afon-iceberg-0.1.jar")
                                    """, szb));
         System.out.println("""
     .getOrCreate()
@@ -122,6 +130,16 @@ df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
 print("Initialized test data")
 """);
 
+        System.out.println(format("""
+az_namespace = "azure.acceptancetests"
+az_fqn = f"{az_namespace}.%s"
+
+spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {az_namespace}")
+print(f"Created namespace {az_namespace}")
+
+spark.sql(f"CREATE TABLE {az_fqn} (name String, num Integer) USING iceberg")
+df_test.writeTo(az_fqn).append()
+                                   """, tableName));
         System.out.println(awsSmokeTest(tableName));
         System.out.println(gcpSmokeTest(tableName));
 
