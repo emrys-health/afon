@@ -4,6 +4,7 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.spark.SparkWarehouseConfig;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -93,10 +94,18 @@ spark = (SparkSession.builder\s
             }
             System.out.println();
         }
+
+        /*
+        This works for AWS
+        software.amazon.awssdk:bundle:2.34.6,
+        org.apache.hadoop:hadoop-aws:3.4.2,
+        org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0
+         */
         StringBuffer szb = new StringBuffer("com.google.guava:guava:33.4.0-jre,org.apache.hadoop:hadoop-aws:3.4.2,");
-        addDependencies(szb, new String[]{"iceberg-aws",}, "org.apache.iceberg", "1.9.0");
+//        addDependencies(szb, new String[]{"iceberg-aws",}, "org.apache.iceberg", "1.9.0");
         addDependencies(szb, new String[]{"google-cloud-storage",}, "com.google.cloud", "2.57.0");
-        addDependencies(szb, new String[]{"s3", "iam-policy-builder", }, "software.amazon.awssdk", "2.31.59");
+//        addDependencies(szb, new String[]{"s3", "sts", "iam-policy-builder", }, "software.amazon.awssdk", "2.31.59");
+        szb.append("software.amazon.awssdk:bundle:2.34.6,");
         szb.append("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0"); // our docker image uses Spark 2.12
         String tableName = tableName();
         System.out.println(format("""
@@ -104,22 +113,42 @@ spark = (SparkSession.builder\s
     .config("spark.driver.userClassPathFirst", "true")
     .config("spark.executor.userClassPathFirst", "true")
                                    """, szb));
-        System.out.println(format("""
+        System.out.println("""
     .getOrCreate()
         )        
 print("Setup complete.");
 
 df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
 print("Initialized test data")
+""");
 
-gcp_namespace = "gcp.acceptancetests"
-gcp_fqn = f"{gcp_namespace}.%s"
-spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {gcp_namespace}")
-print("Created namespace")
+        System.out.println(awsSmokeTest(tableName));
+        System.out.println(gcpSmokeTest(tableName));
 
-df_test.writeTo(gcp_fqn).create()
-print("Wrote to GCP")
-                                   """, tableName));
+    }
+
+    private static @NotNull String awsSmokeTest(String tableName) {
+        return format("""
+                              aws_namespace = "aws.acceptancetests"
+                              aws_fqn = f"{aws_namespace}.%s"
+                              spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {aws_namespace}")
+                              print(f"Created namespace {aws_namespace}")
+                              
+                              df_test.writeTo(aws_fqn).create()
+                              print(f"Wrote {aws_fqn} to AWS")
+                              """, tableName);
+    }
+
+    private static @NotNull String gcpSmokeTest(String tableName) {
+        return format("""
+                              gcp_namespace = "gcp.acceptancetests"
+                              gcp_fqn = f"{gcp_namespace}.%s"
+                              spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {gcp_namespace}")
+                              print(f"Created namespace {gcp_namespace}")
+                              
+                              df_test.writeTo(gcp_fqn).create()
+                              print(f"Wrote {gcp_fqn} to GCP")
+                              """, tableName);
     }
 
     private static void addDependencies(StringBuffer szb, String[] dependencies, String groupId, String version) {
