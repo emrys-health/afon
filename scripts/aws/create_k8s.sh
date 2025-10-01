@@ -22,12 +22,10 @@ kubectl --namespace=kube-system get pods -l "app=secrets-store-csi-driver"
 
 # Create secrets.
 aws --region "$REGION" secretsmanager  create-secret --name CloudDetails --secret-string "$(cat ~/emrys.sh)"
-#aws --region "$REGION" secretsmanager  update-secret --secret-id $SECRET_ARN --secret-string "$(cat ~/polaris_emrys_creds.sh)"
-SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='CloudDetails'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
-
 aws --region "$REGION" secretsmanager  create-secret --name application_default_credentials.json --secret-string "$(cat ~/.config/gcloud/application_default_credentials.json)"
-GOOGLE_SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='application_default_credentials.json'].ARN" --output text | tr -d '[:cntrl:]' | perl -pe s/.*arn/arn/g | perl -pe s/\\[.*//g)
 
+GOOGLE_SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='application_default_credentials.json'].ARN" --output text --no-cli-pager | tr -d '[:cntrl:]' | tr -d '\n')
+SECRET_ARN=$(aws secretsmanager list-secrets --query "SecretList[?Name=='CloudDetails'].ARN" --output text --no-cli-pager | tr -d '[:cntrl:]' | tr -d '\n')
 
 aws iam create-policy --policy-name nginx-deployment-policy --policy-document '{
     "Version": "2012-10-17",
