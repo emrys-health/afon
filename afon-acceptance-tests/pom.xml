@@ -94,9 +94,24 @@
                                         <filter>
                                             <artifact>*:*</artifact>
                                             <excludes>
+                                                <exclude>org/apache/hadoop/conf/**</exclude>
+                                                <exclude>org/apache/hadoop/crypto/**</exclude>
+                                                <exclude>org/apache/hadoop/ha/**</exclude>
+                                                <exclude>org/apache/hadoop/htto/**</exclude>
+                                                <exclude>org/apache/hadoop/io/**</exclude>
+                                                <exclude>org/apache/hadoop/ipc/**</exclude>
+                                                <exclude>org/apache/hadoop/jmx/**</exclude>
+                                                <exclude>org/apache/hadoop/log/**</exclude>
+                                                <exclude>org/apache/hadoop/metrics2/**</exclude>
+                                                <exclude>org/apache/hadoop/security/**</exclude>
+                                                <exclude>org/apache/hadoop/service/**</exclude>
+                                                <exclude>org/apache/hadoop/tools/**</exclude>
+                                                <exclude>org/apache/hadoop/tracing/**</exclude>
+                                                <exclude>org/apache/hadoop/util/**</exclude>
                                                 <exclude>META-INF/*.SF</exclude>
                                                 <exclude>META-INF/*.DSA</exclude>
                                                 <exclude>META-INF/*.RSA</exclude>
+                                                <exclude>META-INF/services/**</exclude>
                                             </excludes>
                                         </filter>
                                     </filters>

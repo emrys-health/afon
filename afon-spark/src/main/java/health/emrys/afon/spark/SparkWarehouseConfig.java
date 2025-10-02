@@ -54,19 +54,22 @@ public class SparkWarehouseConfig {
                 .setSparkHome(tmpDir)
                 .set(WAREHOUSE_PATH, tmpDir);
         for (SupportedCloudsEnum cloudProvider : SupportedCloudsEnum.values()) {
-            sparkConfigs(cloudProvider).entrySet().stream().forEach(entry -> {
-                sparkConf.set(entry.getKey(), entry.getValue());
-            });
+            configureWith(sparkConfigs(cloudProvider), sparkConf);
         }
+
+        configureWith(sparkConfigStatics(), sparkConf);
+
         return sparkConf;
+    }
+
+    private static void configureWith(Map<String, String> sparkProperties, SparkConf sparkConf) {
+        sparkProperties.entrySet().stream().forEach(entry -> {
+            sparkConf.set(entry.getKey(), entry.getValue());
+        });
     }
 
     public Map<String, String> sparkConfigs(SupportedCloudsEnum sparkCatalog) {
         Map conf = new HashMap<String, String>();
-        conf.put(SPARK_SESSION_EXTENSIONS, "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        conf.put("spark.sql.iceberg.planning.preserve-data-grouping", "true");
-        conf.put("spark.sql.sources.bucketing.enabled", "true");
-        conf.put("spark.sql.sources.v2.bucketing.enabled", "true");
         conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("http://%s/api/catalog", host)); // TODO not necessarily localhost
         conf.put(format("spark.sql.catalog.%s.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
@@ -80,9 +83,18 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.client_secret", sparkCatalog), clientSecret);
         conf.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
         conf.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
+        return Map.copyOf(conf);
+    }
+
+    public Map<String, String> sparkConfigStatics() {
+        Map conf = new HashMap<String, String>();
+        conf.put(SPARK_SESSION_EXTENSIONS, "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
+        conf.put("spark.sql.iceberg.planning.preserve-data-grouping", "true");
+        conf.put("spark.sql.sources.bucketing.enabled", "true");
+        conf.put("spark.sql.sources.v2.bucketing.enabled", "true");
         conf.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
         conf.put("spark.driver.allowMultipleContexts", "true");
-        return Map.copyOf(conf);
+        return conf;
     }
 
 }
