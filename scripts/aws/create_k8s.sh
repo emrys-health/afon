@@ -114,6 +114,9 @@ echo "Success. K8s can now assume AWS roles"
 echo "---------------"
 
 echo "Installing our software into the K8s cluster"
+echo "Installing Polaris into K8s"
+#kubectl apply -f polaris-deployment.yaml
+kubectl apply -f deployment_polaris.yaml
 echo "Installing an easier way to manage Spark clusters"
 helm repo add spark https://apache.github.io/spark-kubernetes-operator
 helm repo update
@@ -122,12 +125,13 @@ echo "Waiting 30s for the Spark K8s cluster to setup..."
 sleep 30 # need to wait for spark-kubernetes-operator to start
 echo "Start a Spark cluster in K8s"
 kubectl apply -f spark_cluster.yaml
-echo "Installing Polaris into K8s"
-#kubectl apply -f polaris-deployment.yaml
-kubectl apply -f deployment_polaris.yaml
 echo "Installing Jupyter into K8s. Note Jupyter is a big Docker image so it can take >60s for the K8s pod to start"
 kubectl apply -f deployment_jupyter.yaml
 echo "Opening Jupyter up to the greater internet"
 kubectl apply -f prod-jupyter-svc.yaml
+echo "Opening Polaris to the greate internet"
+kubectl apply -f prod-polaris-svc.yaml
 echo "Use the EXTERNAL-IP for Jupyter below to see it in your browser:"
 kubectl get services
+echo "Getting the Root credential from the Polaris logs. This is the accessToken used in the Java code"
+kubectl logs polaris 2>&1  | tr '\r\n' '\275\276' | tr -d "[:cntrl:]" | tr "\275\276" "\r\n" | grep "root principal" | perl -pe s/.*root\ principal\ credentials:\ //g
