@@ -88,13 +88,6 @@ public class SparkContextConfigurationPrinter {
         );
     }
 
-    public SparkContextConfigurationPrinter() {
-        polarisConfig = new SparkWarehouseConfig("{ACCESS_TOKEN}",
-                                                 "{CLIENT_ID}",
-                                                 "{CLIENT_SECRET}",
-                                                 "polaris-internal");
-    }
-
     public void printSparkConfig() {
 
         System.out.println("""
@@ -120,12 +113,15 @@ public class SparkContextConfigurationPrinter {
             System.out.println();
         }
 
+        // org.apache.hadoop:hadoop-azure:3.3.4
         /*
-        This works for AWS
-        software.amazon.awssdk:bundle:2.34.6,
-        org.apache.hadoop:hadoop-aws:3.4.2,
-        org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0
+: org.apache.spark.SparkException: Job aborted due to stage failure: Task 3 in stage 0.0 failed 4 times, most recent failure: Lost task 3.3 in stage 0.0 (TID 9) (192.168.26.47 executor 2): org.apache.iceberg.exceptions.RuntimeIOException: Failed to get file system for path: abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable251002171646/data/00003-9-1df1e69c-b012-4ac0-a8ca-017471b846a7-0-00001.parquet
+	at org.apache.iceberg.hadoop.Util.getFs(Util.java:57)
+...
+Caused by: Failure to initialize configuration
+	at org.apache.hadoop.fs.azurebfs.services.SimpleKeyProvider.getStorageAccountKey(SimpleKeyProvider.java:51
          */
+
         StringBuffer szb = new StringBuffer("com.google.guava:guava:33.4.0-jre,org.apache.hadoop:hadoop-aws:3.4.2,");
 //        addDependencies(szb, new String[]{"iceberg-aws",}, "org.apache.iceberg", "1.9.0");
         addDependencies(szb, new String[]{"google-cloud-storage",}, "com.google.cloud", "2.57.0");
@@ -137,7 +133,6 @@ public class SparkContextConfigurationPrinter {
                                           .config("spark.jars.packages", "%s")
                                           .config("spark.driver.userClassPathFirst", "true")
                                           .config("spark.executor.userClassPathFirst", "true")
-                                          .config("spark.jars", "s3://emrys-afon-bucket/afon-iceberg-0.1.jar")
                                           """, szb));
         System.out.println("""
                                        .getOrCreate()
