@@ -39,6 +39,7 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
             <version>1.21.3</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>${parent.groupId}</groupId>
@@ -49,6 +50,7 @@
             <groupId>com.github.vertical-blank</groupId>
             <artifactId>sql-formatter</artifactId>
             <version>2.0.4</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -75,43 +77,127 @@
                                     <finalName>${project.artifactId}-${project.version}-uber</finalName>
 
                                     <artifactSet>
+<!--                                        <includes>-->
+<!--                                            <include>health.emrys:afon-iceberg:0.1</include>-->
+<!--                                            <include>org.apache.iceberg:iceberg-spark-runtime-3.5_2.12</include>-->
+<!--                                            <include>org.apache.polaris:polaris-core:1.0.1-incubating</include>-->
+<!--                                        </includes>-->
+<!--                                        <excludes>-->
+<!--                                            <exclude>org.apache.spark:spark*</exclude>-->
+<!--                                            <exclude>org.apache.spark.hive*</exclude>-->
+<!--                                            <exclude>org.apache:iceberg-core</exclude>-->
+<!--                                            <exclude>javax*:*:*</exclude>-->
+<!--                                            <exclude>jakarta*:*:*</exclude>-->
+<!--                                            <exclude>org.scala-lang*:*:*</exclude>-->
+<!--                                            <exclude>com.fasterxml*:*:*</exclude>-->
+<!--                                            <exclude>org.glassfish*:*:*</exclude>-->
+<!--                                            <exclude>org.glassfish.hk2.external:*:*</exclude>-->
+<!--                                        </excludes>-->
                                         <includes>
-                                            <!--                                    <include>com.google.guava:guava:33.4.0-jre</include>-->
-                                            <include>org.apache.hadoop:hadoop-aws</include>
-                                            <include>org.apache.hadoop:hadoop-azure</include>
-                                            <include>org.apache.hadoop:hadoop-common</include>
-                                            <include>com.google.cloud:google-cloud-storage</include>
-                                            <include>software.amazon.awssdk:bundle</include>
                                             <include>org.apache.iceberg:iceberg-spark-runtime-3.5_2.12</include>
+                                            <include>health.emrys:afon-polaris</include>
+                                            <include>org.apache.polaris:polaris-api-management-model:1.0.1-incubating:compile</include>
+                                            <include>org.apache.polaris:polaris-core:1.0.1-incubating:compile</include>
+                                            <include>org.apache.iceberg:iceberg-api</include>
+                                            <include>org.apache.iceberg:iceberg-bundled-guava</include>
+                                            <include>org.apache.iceberg:iceberg-core</include>
+                                            <include>org.apache.iceberg:iceberg-common</include>
+                                            <include>io.airlift:aircompressor</include>
+                                            <include>com.github.ben-manes.caffeine:caffeine</include>
+                                            <include>org.jspecify:jspecify</include>
+                                            <include>org.apache.commons:commons-lang3</include>
+                                            <include>io.swagger:swagger-annotations</include>
+                                            <include>io.swagger:swagger-jaxrs</include>
+                                            <include>io.swagger:swagger-core</include>
+                                            <include>jakarta.xml.bind:jakarta.xml.bind-api</include>
+                                            <include>jakarta.activation:jakarta.activation-api</include>
+                                            <include>com.fasterxml.jackson.dataformat:jackson-dataformat-yaml</include>
+                                            <include>io.swagger:swagger-models</include>
+                                            <include>javax.validation:validation-api:1.1.0.Final</include>
+                                            <include>org.yaml:snakeyaml</include>
+                                            <include>javax.ws.rs:jsr311-api</include>
+                                            <include>org.reflections:reflections</include>
+                                            <include>jakarta.inject:jakarta.inject-api</include>
+                                            <include>jakarta.validation:jakarta.validation-api</include>
+                                            <include>jakarta.ws.rs:jakarta.ws.rs-api</include>
+                                            <include>io.smallrye.common:smallrye-common-annotation</include>
+                                            <include>org.apache.iceberg:iceberg-aws</include>
+                                            <include>dev.failsafe:failsafe</include>
+                                            <include>software.amazon.awssdk:sts</include>
+                                            <include>software.amazon.awssdk:aws-query-protocol</include>
+                                            <include>software.amazon.awssdk:protocol-core</include>
+                                            <include>software.amazon.awssdk:profiles</include>
+                                            <include>software.amazon.awssdk:http-auth-aws</include>
+                                            <include>software.amazon.awssdk:sdk-core</include>
+                                            <include>software.amazon.awssdk:retries</include>
+                                            <include>software.amazon.awssdk:auth</include>
+                                            <include>software.amazon.awssdk:http-auth-aws-eventstream</include>
+                                            <include>software.amazon.eventstream:eventstream</include>
+                                            <include>software.amazon.awssdk:http-auth-spi</include>
+                                            <include>software.amazon.awssdk:http-auth</include>
+                                            <include>software.amazon.awssdk:identity-spi</include>
+                                            <include>software.amazon.awssdk:http-client-spi</include>
+                                            <include>software.amazon.awssdk:regions</include>
+                                            <include>software.amazon.awssdk:annotations</include>
+                                            <include>software.amazon.awssdk:utils</include>
+                                            <include>software.amazon.awssdk:aws-core</include>
+                                            <include>software.amazon.awssdk:metrics-spi</include>
+                                            <include>software.amazon.awssdk:json-utils</include>
+                                            <include>software.amazon.awssdk:endpoints-spi</include>
+                                            <include>software.amazon.awssdk:retries-spi</include>
+                                            <include>software.amazon.awssdk:apache-client</include>
+                                            <include>software.amazon.awssdk:netty-nio-client</include>
+                                            <include>software.amazon.awssdk:iam-policy-builder</include>
+                                            <include>software.amazon.awssdk:third-party-jackson-core</include>
+                                            <include>software.amazon.awssdk:s3</include>
+                                            <include>software.amazon.awssdk:aws-xml-protocol</include>
+                                            <include>software.amazon.awssdk:arns</include>
+                                            <include>software.amazon.awssdk:crt-core</include>
+                                            <include>software.amazon.awssdk:checksums</include>
+                                            <include>software.amazon.awssdk:checksums-spi</include>
+                                            <include>org.apache.iceberg:iceberg-azure</include>
+                                            <include>com.azure:azure-storage-common</include>
+                                            <include>com.azure:azure-identity</include>
+                                            <include>com.microsoft.azure:msal4j</include>
+                                            <include>com.nimbusds:oauth2-oidc-sdk</include>
+                                            <include>com.github.stephenc.jcip:jcip-annotations</include>
+                                            <include>com.nimbusds:content-type</include>
+                                            <include>com.nimbusds:lang-tag</include>
+                                            <include>com.nimbusds:nimbus-jose-jwt</include>
+                                            <include>net.minidev:json-smart</include>
+                                            <include>net.minidev:accessors-smart</include>
+                                            <include>org.ow2.asm:asm</include>
+                                            <include>com.microsoft.azure:msal4j-persistence-extension</include>
+                                            <include>net.java.dev.jna:jna-platform</include>
+                                            <include>org.apache.iceberg:iceberg-gcp</include>
+                                            <include>org.apache.httpcomponents.client5:httpclient5-fluent</include>
+                                            <include>org.apache.httpcomponents.client5:httpclient5</include>
+                                            <include>org.apache.httpcomponents.core5:httpcore5</include>
+                                            <include>org.apache.httpcomponents.core5:httpcore5-h2</include>
+                                            <include>org.apache.hadoop:hadoop-azure</include>
                                         </includes>
-                                        <excludes>
-                                            <exclude>org.apache.hadoop:hadoop-client-api</exclude>
-                                        </excludes>
                                     </artifactSet>
+
+<!--                                    <transformers>-->
+<!--                                        <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">-->
+<!--                                            <resources>-->
+<!--                                                <resource>**/*.class</resource>-->
+<!--                                            </resources>-->
+<!--                                        </transformer>-->
+<!--                                    </transformers>-->
 
                                     <!-- Optionally filter out signature files that can break the jar -->
                                     <filters>
                                         <filter>
+                                            <artifact>org.apache.iceberg:iceberg-spark-runtime-3.5_2.12</artifact>
+                                            <excludes>
+                                                <exclude>org/apache/iceberg/azure/adlsv2/VendedAdlsCredentialProvider.class</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
                                             <artifact>*:*</artifact>
                                             <excludes>
-                                                <exclude>org/apache/hadoop/conf/**</exclude>
-                                                <exclude>org/apache/hadoop/crypto/**</exclude>
-                                                <exclude>org/apache/hadoop/ha/**</exclude>
-                                                <exclude>org/apache/hadoop/htto/**</exclude>
-                                                <exclude>org/apache/hadoop/io/**</exclude>
-                                                <exclude>org/apache/hadoop/ipc/**</exclude>
-                                                <exclude>org/apache/hadoop/jmx/**</exclude>
-                                                <exclude>org/apache/hadoop/log/**</exclude>
-                                                <exclude>org/apache/hadoop/metrics2/**</exclude>
-                                                <exclude>org/apache/hadoop/security/**</exclude>
-                                                <exclude>org/apache/hadoop/service/**</exclude>
-                                                <exclude>org/apache/hadoop/tools/**</exclude>
-                                                <exclude>org/apache/hadoop/tracing/**</exclude>
-                                                <exclude>org/apache/hadoop/util/**</exclude>
-                                                <exclude>META-INF/*.SF</exclude>
-                                                <exclude>META-INF/*.DSA</exclude>
-                                                <exclude>META-INF/*.RSA</exclude>
-                                                <exclude>META-INF/services/**</exclude>
+                                                <exclude>META-INF/**/*</exclude>
                                             </excludes>
                                         </filter>
                                     </filters>
