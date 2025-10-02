@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: polaris-internal
+  namespace: default
+spec:
+  type: ClusterIP
+  clusterIP: None
+  clusterIPs:
+    - None
+  internalTrafficPolicy: Cluster
+  ports:
+    - name: web
+      port: 8181
+      protocol: TCP
+      targetPort: 8181
+  selector:
+    app: polaris

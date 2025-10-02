@@ -2,8 +2,12 @@ package health.emrys.afon.core.configuration;
 
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.infra.ClusterPolarisConfiguration;
+import health.emrys.afon.infra.PolarisCredentialGrabber;
+import health.emrys.afon.infra.k8s.EksInfoClient;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.spark.SparkWarehouseConfig;
+import io.kubernetes.client.openapi.ApiException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
@@ -13,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 import static java.lang.String.format;
 
@@ -36,31 +41,39 @@ public class SparkContextConfigurationPrinter {
     }
 
     private static void createSparkConf(String[] args) throws IOException {
-        SparkContextConfigurationPrinter app = null;
-        if (args.length == 0) {
-            app = new SparkContextConfigurationPrinter();
-        } else if (args.length == 2 || args.length == 3) {
-            AfonPropertiesLoader loader = null;
-            if (args.length == 2) {
-                loader = new AfonPropertiesLoader();
-            } else {
-                loader = new AfonPropertiesLoader(args[2]);
-            }
-            app = createDynamicConfig(args[0], loader, args[1]);
-        } else {
-            logger.error("arguements must be: TOKEN POLARIS_ENDPOINT [OVERRIDE_PROPERTIES_FILE]");
-        }
+        String clusterName        = "spark-cluster";
+        String polarisPodName     = "polaris";
+        String polarisServiceName = "polaris-lb";
 
-        app.printSparkConfig();
+        AfonPropertiesLoader loader       = new AfonPropertiesLoader();
+        Properties           properties   = loader.getProperties();
+        var                  eksClient    = new EksInfoClient(clusterName, properties);
+        var                  tokenGrabber = new PolarisCredentialGrabber();
+        String               accessToken  = null;
+        try {
+            accessToken = tokenGrabber.getCredentials(eksClient.getLogsOf(polarisPodName));
+
+            ClusterPolarisConfiguration clusterPolaris = new ClusterPolarisConfiguration(clusterName, properties);
+            clusterPolaris.addPolarisEndpointToProperties(polarisServiceName, eksClient);
+            String polarisEndpoint = POLARIS_ENDPOINT.getValueFrom(properties);
+            logger.info("Polaris endpoint: {}", polarisEndpoint);
+
+            SparkContextConfigurationPrinter app = createDynamicConfig(accessToken,
+                                                                       properties,
+                                                                       polarisEndpoint);
+            app.printSparkConfig();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private static SparkContextConfigurationPrinter createDynamicConfig(String creds,
-                                                                        AfonPropertiesLoader loader,
+                                                                        Properties properties,
                                                                         String polarisEndpoint) {
-        Properties props       = add(creds, loader.getProperties());
+        Properties props       = add(creds, properties);
         var        client      = new AfonPolarisClient(props);
         String     accessToken = client.getAccessToken();
-        props.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), polarisEndpoint);
+        props.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisEndpoint);
         return new SparkContextConfigurationPrinter(props, accessToken);
     }
 
@@ -71,7 +84,7 @@ public class SparkContextConfigurationPrinter {
                 accessToken,
                 AfonProperties.POLARIS_ID.getValueFrom(props),
                 AfonProperties.POLARIS_SECRET.getValueFrom(props),
-                AfonProperties.POLARIS_ENDPOINT.getValueFrom(props)
+                POLARIS_ENDPOINT.getValueFrom(props)
         );
     }
 
@@ -79,19 +92,19 @@ public class SparkContextConfigurationPrinter {
         polarisConfig = new SparkWarehouseConfig("{ACCESS_TOKEN}",
                                                  "{CLIENT_ID}",
                                                  "{CLIENT_SECRET}",
-                                                 "{POLARIS_HOST}");
+                                                 "polaris-internal");
     }
 
     public void printSparkConfig() {
 
         System.out.println("""
-from pyspark.sql import SparkSession
-
-spark = (SparkSession.builder\s
-    .appName("practice")\s
-    .master("spark://emrys-master-svc:7077")\s
-    .config("spark.driver.host", f"{DRIVER_HOST}")\s
-    .config("spark.driver.port", "7078")
+                                   from pyspark.sql import SparkSession
+                                   
+                                   spark = (SparkSession.builder\s
+                                       .appName("practice")\s
+                                       .master("spark://emrys-master-svc:7077")\s
+                                       .config("spark.driver.host", "jupyter-internal")\s
+                                       .config("spark.driver.port", "7078")
                                    """);
 
         for (Map.Entry<String, String> entry : polarisConfig.sparkConfigStatics().entrySet()) {
@@ -121,30 +134,30 @@ spark = (SparkSession.builder\s
         szb.append("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0"); // our docker image uses Spark 2.12
         String tableName = tableName();
         System.out.println(format("""
-    .config("spark.jars.packages", "%s")
-    .config("spark.driver.userClassPathFirst", "true")
-    .config("spark.executor.userClassPathFirst", "true")
-    .config("spark.jars", "s3://emrys-afon-bucket/afon-iceberg-0.1.jar")
-                                   """, szb));
+                                          .config("spark.jars.packages", "%s")
+                                          .config("spark.driver.userClassPathFirst", "true")
+                                          .config("spark.executor.userClassPathFirst", "true")
+                                          .config("spark.jars", "s3://emrys-afon-bucket/afon-iceberg-0.1.jar")
+                                          """, szb));
         System.out.println("""
-    .getOrCreate()
-        )        
-print("Setup complete.");
-
-df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
-print("Initialized test data")
-""");
+                                       .getOrCreate()
+                                           )        
+                                   print("Setup complete.");
+                                   
+                                   df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
+                                   print("Initialized test data")
+                                   """);
 
         System.out.println(format("""
-az_namespace = "azure.acceptancetests"
-az_fqn = f"{az_namespace}.%s"
-
-spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {az_namespace}")
-print(f"Created namespace {az_namespace}")
-
-spark.sql(f"CREATE TABLE {az_fqn} (name String, num Integer) USING iceberg")
-df_test.writeTo(az_fqn).append()
-                                   """, tableName));
+                                          az_namespace = "azure.acceptancetests"
+                                          az_fqn = f"{az_namespace}.%s"
+                                          
+                                          spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {az_namespace}")
+                                          print(f"Created namespace {az_namespace}")
+                                          
+                                          spark.sql(f"CREATE TABLE {az_fqn} (name String, num Integer) USING iceberg")
+                                          df_test.writeTo(az_fqn).append()
+                                          """, tableName));
         System.out.println(awsSmokeTest(tableName));
         System.out.println(gcpSmokeTest(tableName));
 
@@ -183,7 +196,7 @@ df_test.writeTo(az_fqn).append()
     private static final String tableName() {
         LocalDateTime     now       = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMddmmHHss");
-        String formatted = now.format(formatter);
+        String            formatted = now.format(formatter);
         return "smoketesttable" + formatted;
     }
 }

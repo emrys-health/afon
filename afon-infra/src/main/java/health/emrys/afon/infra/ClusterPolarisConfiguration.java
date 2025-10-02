@@ -49,7 +49,7 @@ public class ClusterPolarisConfiguration {
         polarisClient.createAllCatalogs(properties, accessToken);
     }
 
-    private void addPolarisEndpointToProperties(String polarisServiceName, EksInfoClient eksClient) throws ApiException, IncorrectConfigException {
+    public void addPolarisEndpointToProperties(String polarisServiceName, EksInfoClient eksClient) throws ApiException, IncorrectConfigException {
         Optional<List<String>> optionalIngress = eksClient.getIngressFor(polarisServiceName);
         if (!optionalIngress.isPresent()) {
             throw new IncorrectConfigException(format("No service called '{}' in cluster'{}", polarisServiceName, clusterName));
