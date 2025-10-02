@@ -11,7 +11,7 @@
     </parent>
 
     <groupId>${parent.groupId}</groupId>
-    <artifactId>afon-core</artifactId>
+    <artifactId>afon-infra</artifactId>
     <version>${parent.version}</version>
 
     <dependencies>

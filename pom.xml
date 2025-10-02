@@ -42,7 +42,7 @@
     <modules>
         <module>afon-acceptance-tests</module>
         <module>afon-config</module>
-        <module>afon-core</module>
+        <module>afon-infra</module>
         <module>afon-iceberg</module>
         <module>afon-polaris</module>
         <module>afon-spark</module>

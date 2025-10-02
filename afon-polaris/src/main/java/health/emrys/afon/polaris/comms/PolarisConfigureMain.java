@@ -36,7 +36,7 @@ public class PolarisConfigureMain {
         }
     }
 
-    private void createAllCatalogs(Properties properties, String accessToken) throws IncorrectConfigException, IOException {
+    public void createAllCatalogs(Properties properties, String accessToken) throws IncorrectConfigException, IOException {
         properties = add(accessToken, properties);
         CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
                 new AwsCloudConfigForPolaris(properties),
