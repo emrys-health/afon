@@ -10,6 +10,7 @@ import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api.APIlistNamespacedPodRequest;
 import io.kubernetes.client.openapi.apis.CoreV1Api.APIlistNamespacedServiceRequest;
+import io.kubernetes.client.openapi.apis.CoreV1Api.APIreadNamespacedPodLogRequest;
 import io.kubernetes.client.openapi.models.V1LoadBalancerIngress;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1Service;
@@ -104,6 +105,12 @@ public class EksInfoClient {
         APIlistNamespacedPodRequest request = api.listNamespacedPod("default");
         List<V1Pod>                 pods    = request.execute().getItems();
         return pods;
+    }
+
+    public String getLogsOf(String pod) throws ApiException {
+        CoreV1Api api = new CoreV1Api();
+        APIreadNamespacedPodLogRequest request = api.readNamespacedPodLog("polaris", "default");
+        return request.execute().toString();
     }
 }
 

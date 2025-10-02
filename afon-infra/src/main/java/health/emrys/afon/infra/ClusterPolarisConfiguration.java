@@ -20,20 +20,13 @@ public class ClusterPolarisConfiguration {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
     public static void main(String[] args) {
-        if (args.length != 1) {
-            logger.error("""
-Need Polaris's acess token as an argument. Find it by running:
-kubectl logs polaris 2>&1  | tr '\\r\\n' '\\275\\276' | tr -d "[:cntrl:]" | tr "\\275\\276" "\\r\\n" | grep "root principal" | perl -pe s/.*root\\ principal\\ credentials:\\ //g
-                                 """);
-        } else {
-            String     clusterName = "spark-cluster";
-            Properties properties  = new AfonPropertiesLoader().getProperties();
-            var        app         = new ClusterPolarisConfiguration(clusterName, properties);
-            try {
-                app.initializePolaris("polaris-lb", args[0]);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        String     clusterName = "spark-cluster";
+        Properties properties  = new AfonPropertiesLoader().getProperties();
+        var        app         = new ClusterPolarisConfiguration(clusterName, properties);
+        try {
+            app.initializePolaris("polaris-lb", "polaris");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -45,9 +38,12 @@ kubectl logs polaris 2>&1  | tr '\\r\\n' '\\275\\276' | tr -d "[:cntrl:]" | tr "
         this.properties  = properties;
     }
 
-    public void initializePolaris(String polarisServiceName, String accessToken) throws ApiException, IncorrectConfigException, IOException {
+    public void initializePolaris(String polarisServiceName,
+                                  String polarisPodName) throws ApiException, IncorrectConfigException, IOException {
         logger.info("We assume that an EKS cluster called {} is running...", clusterName);
-        var eksClient = new EksInfoClient(clusterName, properties);
+        var    eksClient    = new EksInfoClient(clusterName, properties);
+        var    tokenGrabber = new PolarisCredentialGrabber();
+        String accessToken  = tokenGrabber.getCredentials(eksClient.getLogsOf(polarisPodName));
         addPolarisEndpointToProperties(polarisServiceName, eksClient);
         PolarisConfigureMain polarisClient = new PolarisConfigureMain();
         polarisClient.createAllCatalogs(properties, accessToken);
