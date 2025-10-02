@@ -86,7 +86,7 @@ public class EksInfoClient {
         for (V1Service service : listServices()) {
             if (service.getMetadata().getName().equals(serviceName)) {
                 List<V1LoadBalancerIngress> ingress = service.getStatus().getLoadBalancer().getIngress();
-                var serviceNames = ingress.stream().map(x -> x.toString()).collect(Collectors.toList());
+                var serviceNames = ingress.stream().map(x -> x.getHostname()).collect(Collectors.toList());
                 return Optional.of(serviceNames);
             }
         }
