@@ -94,6 +94,11 @@ spark = (SparkSession.builder\s
     .config("spark.driver.port", "7078")
                                    """);
 
+        for (Map.Entry<String, String> entry : polarisConfig.sparkConfigStatics().entrySet()) {
+            System.out.println(format("    .config(\"%s\", f\"%s\")", entry.getKey(), entry.getValue()));
+        }
+        System.out.println();
+
         for (AfonProperties.SupportedCloudsEnum cloudProvider : AfonProperties.SupportedCloudsEnum.values()) {
             Map<String, String> configs = polarisConfig.sparkConfigs(cloudProvider);
             for (Map.Entry<String, String> entry : configs.entrySet()) {
