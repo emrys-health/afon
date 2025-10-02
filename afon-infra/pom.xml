@@ -14,6 +14,21 @@
     <artifactId>afon-infra</artifactId>
     <version>${parent.version}</version>
 
+    <properties>
+        <aws.java.sdk.version>2.34.6</aws.java.sdk.version>
+    </properties>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws.java.sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>${parent.groupId}</groupId>
@@ -24,6 +39,20 @@
             <groupId>${parent.groupId}</groupId>
             <artifactId>afon-polaris</artifactId>
             <version>${parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.kubernetes</groupId>
+            <artifactId>client-java</artifactId>
+            <version>24.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.fabric8</groupId>
+            <artifactId>kubernetes-client</artifactId>
+            <version>7.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>eks</artifactId>
         </dependency>
     </dependencies>
     
