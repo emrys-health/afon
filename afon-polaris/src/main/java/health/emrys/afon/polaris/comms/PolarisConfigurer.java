@@ -3,7 +3,6 @@ package health.emrys.afon.polaris.comms;
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import org.apache.hc.core5.http.HttpResponse;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 
@@ -13,15 +12,15 @@ public class PolarisConfigurer {
 
     private final AfonPolarisClient client;
 
-    public static @NotNull String getCatalogRolesURI(String warehouseName) {
+    public static String getCatalogRolesURI(String warehouseName) {
         return format("/api/management/v1/principal-roles/service_admin/catalog-roles/%s", warehouseName);
     }
 
-    public static @NotNull String getCreateCatalogURI() {
+    public static String getCreateCatalogURI() {
         return "/api/management/v1/catalogs";
     }
 
-    public static @NotNull String getCatalogAdminGrantsURI(String warehouseName) {
+    public static String getCatalogAdminGrantsURI(String warehouseName) {
         return format("/api/management/v1/catalogs/%s/catalog-roles/catalog_admin/grants", warehouseName);
     }
 

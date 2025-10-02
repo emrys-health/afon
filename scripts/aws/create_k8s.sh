@@ -122,7 +122,7 @@ helm repo add spark https://apache.github.io/spark-kubernetes-operator
 helm repo update
 helm install spark spark/spark-kubernetes-operator
 echo "Waiting 30s for the Spark K8s cluster to setup..."
-sleep 30 # need to wait for spark-kubernetes-operator to start
+sleep 30
 echo "Start a Spark cluster in K8s"
 kubectl apply -f spark_cluster.yaml
 echo "Installing Jupyter into K8s. Note Jupyter is a big Docker image so it can take >60s for the K8s pod to start"
@@ -131,7 +131,11 @@ echo "Opening Jupyter up to the greater internet"
 kubectl apply -f prod-jupyter-svc.yaml
 echo "Opening Polaris to the greate internet"
 kubectl apply -f prod-polaris-svc.yaml
+echo "Giving Jupyter a fixed internal host name"
+kubectl apply -f prod-jupyter-internal-svc.yaml
+echo "Giving Polaris a fixed internal host name"
+kubectl apply -f prod-polaris-internal-svc.yaml
+echo "Opening the Spark web GUI to the outside world. You might not want this as it's not password protected. But it is useful for debugging"
+kubectl apply -f prod-master-svc.yaml
 echo "Use the EXTERNAL-IP for Jupyter below to see it in your browser:"
 kubectl get services
-echo "Getting the Root credential from the Polaris logs. This is the accessToken used in the Java code"
-kubectl logs polaris 2>&1  | tr '\r\n' '\275\276' | tr -d "[:cntrl:]" | tr "\275\276" "\r\n" | grep "root principal" | perl -pe s/.*root\ principal\ credentials:\ //g

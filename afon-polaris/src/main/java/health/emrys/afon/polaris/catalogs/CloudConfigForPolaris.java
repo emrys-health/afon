@@ -3,7 +3,6 @@ package health.emrys.afon.polaris.catalogs;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.polaris.core.admin.model.*;
 import org.apache.polaris.core.entity.PolarisEntityConstants;
-import org.jetbrains.annotations.NotNull;
 
 public abstract class CloudConfigForPolaris {
 
@@ -37,7 +36,7 @@ public abstract class CloudConfigForPolaris {
         }
     }
 
-    protected @NotNull Catalog createCatalog(String bucket,
+    protected Catalog createCatalog(String bucket,
                                              StorageConfigInfo storageConfigInfo) {
         CatalogProperties catalogProperties = new CatalogProperties(bucket);
         return new Catalog(

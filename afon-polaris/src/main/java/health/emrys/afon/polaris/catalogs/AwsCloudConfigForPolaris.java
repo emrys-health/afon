@@ -1,7 +1,6 @@
 package health.emrys.afon.polaris.catalogs;
 
 import org.apache.polaris.core.admin.model.*;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Properties;
