@@ -21,6 +21,7 @@ public class InfraExplorer {
         InfraExplorer app        = new InfraExplorer();
         try {
             app.printJupyterDetails(clusterName, properties, JUPYTER_SERVICE_NAME, JUPYTER_POD_NAME);
+            app.printSparkDetails(clusterName, properties, SPARK_SERVICE_NAME);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -43,6 +44,15 @@ public class InfraExplorer {
         String logs = eksClient.getLogsOf(jupyterPodName);
         String uri  = logParser.searchForTextAfter("http://127.0.0.1", logs);
         logger.info("Jupyter can be found at:\nhttp://{}{}", jupyterHost, uri);
+    }
+
+    private void printSparkDetails(String clusterName,
+                                   Properties properties,
+                                   String sparkServiceName) throws IncorrectConfigException, ApiException {
+        var eksClient = new EksInfoClient(clusterName, properties);
+        logger.info("Cluster querying: {} for service name {}", clusterName, sparkServiceName);
+        String sparkHost = eksClient.getIngressExpectingOnlyOneFor(sparkServiceName);
+        logger.info("Spark can be found at:\nhttp://{}:8080/", sparkHost);
     }
 
 }

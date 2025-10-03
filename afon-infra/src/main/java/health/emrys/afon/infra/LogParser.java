@@ -13,7 +13,7 @@ public class LogParser {
         Pattern pattern = Pattern.compile(searchTerm + "(.*)");
         Matcher matcher = pattern.matcher(logs);
         matcher.find();
-        if (matcher.groupCount() < 2) {
+        if (matcher.groupCount() < 1) {
             logger.error("Cannot find text '{}' in\n{}", searchTerm, logs);
         }
         return matcher.group(1);
