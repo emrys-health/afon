@@ -28,15 +28,21 @@
         </dependency>
         <dependency>
             <groupId>com.azure</groupId>
+            <artifactId>azure-core-http-netty</artifactId>
+            <version>1.15.6</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
             <artifactId>azure-storage-file-datalake</artifactId>
             <version>12.22.0</version>
             <scope>compile</scope>
         </dependency>
-        <dependency>
-            <groupId>org.apache.polaris</groupId>
-            <artifactId>polaris-core</artifactId>
-            <version>${polaris.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.polaris</groupId>-->
+<!--            <artifactId>polaris-core</artifactId>-->
+<!--            <version>${polaris.version}</version>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-azure</artifactId>
@@ -65,13 +71,13 @@
                                 <configuration>
                                     <artifactSet>
                                         <excludes>
-                                            <exclude>org.apache.iceberg:iceberg-spark-runtime-*:*</exclude>
-<!--                                            <exclude>org.apache.iceberg:iceberg-api:*:*</exclude>-->
-<!--                                            <exclude>org.apache.iceberg:iceberg-aws:*:*</exclude>-->
-<!--                                            <exclude>org.apache.iceberg:iceberg-azure:*:*</exclude>-->
-<!--                                            <exclude>org.apache.iceberg:iceberg-common:*:*</exclude>-->
-<!--                                            <exclude>org.apache.iceberg:iceberg-core:*:*</exclude>-->
-<!--                                            <exclude>org.apache.iceberg:iceberg-gcp:*:*</exclude>-->
+<!--                                            <exclude>org.apache.iceberg:iceberg-spark-runtime-*:*</exclude>-->
+                                            <exclude>org.apache.iceberg:iceberg-api:*:*</exclude>
+                                            <exclude>org.apache.iceberg:iceberg-aws:*:*</exclude>
+                                            <exclude>org.apache.iceberg:iceberg-azure:*:*</exclude>
+                                            <exclude>org.apache.iceberg:iceberg-common:*:*</exclude>
+                                            <exclude>org.apache.iceberg:iceberg-core:*:*</exclude>
+                                            <exclude>org.apache.iceberg:iceberg-gcp:*:*</exclude>
                                             <exclude>org.scala-lang*:*:*</exclude>
                                             <exclude>com.fasterxml*:*:*</exclude>
                                         </excludes>
