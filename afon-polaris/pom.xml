@@ -14,11 +14,6 @@
     <artifactId>afon-polaris</artifactId>
     <version>${parent.version}</version>
 
-    <properties>
-        <polaris.version>1.0.1-incubating</polaris.version>
-    </properties>
-
-
     <dependencies>
         <dependency>
             <groupId>org.apache.polaris</groupId>
