@@ -113,6 +113,7 @@ public class SparkContextConfigurationPrinter {
         }
 
         // org.apache.hadoop:hadoop-azure:3.3.4
+        // org.apache.polaris:polaris-core:1.0.1-incubating,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0
         /*
 : org.apache.spark.SparkException: Job aborted due to stage failure: Task 3 in stage 0.0 failed 4 times, most recent failure: Lost task 3.3 in stage 0.0 (TID 9) (192.168.26.47 executor 2): org.apache.iceberg.exceptions.RuntimeIOException: Failed to get file system for path: abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable251002171646/data/00003-9-1df1e69c-b012-4ac0-a8ca-017471b846a7-0-00001.parquet
 	at org.apache.iceberg.hadoop.Util.getFs(Util.java:57)
