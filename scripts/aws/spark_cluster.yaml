@@ -22,3 +22,4 @@ spec:
     spark.master.rest.enabled: "true"
     spark.master.rest.host: "0.0.0.0"
     spark.ui.reverseProxy: "true"
+#    imagePullPolicy: Always

@@ -24,7 +24,8 @@ RUN apt-get update && \
 RUN  apt-get install net-tools && \
      apt-get install iputils-ping && \
      apt-get install procps && \
-     apt-get install lsof
+     apt-get install lsof && \
+     apt-get install unzip
 
 USER spark
 
