@@ -20,6 +20,11 @@
             <artifactId>iceberg-spark-runtime-${spark.compat.version}_${scala.compat.version}</artifactId>
             <version>${iceberg.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.polaris</groupId>
+            <artifactId>polaris-core</artifactId>
+            <version>${polaris.version}</version>
+        </dependency>
     </dependencies>
 
     <profiles>
@@ -43,25 +48,11 @@
                                 <configuration>
                                     <!-- Name of the resulting uber-jar -->
                                     <finalName>${project.artifactId}-${project.version}-uber</finalName>
-
-                                    <artifactSet>
-                                        <includes>
-        <!--                                    <include>com.google.guava:guava:33.4.0-jre</include>-->
-                                            <include>org.apache.hadoop:hadoop-aws</include>
-                                            <include>com.google.cloud:google-cloud-storage</include>
-                                            <include>software.amazon.awssdk:bundle</include>
-                                            <include>org.apache.iceberg:iceberg-spark-runtime-3.5_2.12</include>
-                                        </includes>
-                                    </artifactSet>
-
-                                    <!-- Optionally filter out signature files that can break the jar -->
                                     <filters>
                                         <filter>
                                             <artifact>*:*</artifact>
                                             <excludes>
-                                                <exclude>META-INF/*.SF</exclude>
-                                                <exclude>META-INF/*.DSA</exclude>
-                                                <exclude>META-INF/*.RSA</exclude>
+                                                <exclude>META-INF/**/*</exclude>
                                             </excludes>
                                         </filter>
                                     </filters>
