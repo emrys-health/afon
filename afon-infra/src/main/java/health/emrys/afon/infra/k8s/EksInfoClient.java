@@ -4,6 +4,7 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.STSSessionCredentialsProvider;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
@@ -30,13 +31,15 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
+import static java.lang.String.format;
 
 public class EksInfoClient {
 
     static final  Logger logger = org.slf4j.LoggerFactory.getLogger(EksInfoClient.class);
 
     public static void main(String[] args) {
-        EksInfoClient app = new EksInfoClient("spark-cluster", new AfonPropertiesLoader().getProperties());
+        EksInfoClient app = new EksInfoClient(CLUSTER_NAME, new AfonPropertiesLoader().getProperties());
         try {
             for (V1Pod pod : app.listPods()) {
                 System.out.printf("Pod: %s, IP: %s%n",
@@ -83,6 +86,19 @@ public class EksInfoClient {
         Configuration.setDefaultApiClient(client);
     }
 
+    public String getIngressExpectingOnlyOneFor(String serviceName) throws ApiException, IncorrectConfigException {
+        Optional<List<String>> optionalIngress = getIngressFor(serviceName);
+        if (!optionalIngress.isPresent()) {
+            throw new IncorrectConfigException(format("No service called '{}'", serviceName));
+        }
+        List<String> polarisIngress = optionalIngress.get();
+        if (polarisIngress.size() != 1) {
+            throw new IncorrectConfigException(format("Was expecting 1 service address but got {}", polarisIngress.toString()));
+        }
+        String polarisHost = polarisIngress.get(0);
+        return polarisHost;
+    }
+
     public Optional<List<String>> getIngressFor(String serviceName) throws ApiException {
         for (V1Service service : listServices()) {
             if (service.getMetadata().getName().equals(serviceName)) {
@@ -109,7 +125,7 @@ public class EksInfoClient {
 
     public String getLogsOf(String pod) throws ApiException {
         CoreV1Api api = new CoreV1Api();
-        APIreadNamespacedPodLogRequest request = api.readNamespacedPodLog("polaris", "default");
+        APIreadNamespacedPodLogRequest request = api.readNamespacedPodLog(pod, "default");
         return request.execute().toString();
     }
 }

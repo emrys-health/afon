@@ -143,3 +143,4 @@ echo "Opening the Spark web GUI to the outside world. You might not want this as
 kubectl apply -f prod-master-svc.yaml
 echo "Use the EXTERNAL-IP for Jupyter below to see it in your browser:"
 kubectl get services
+echo "Note that it can take a minute or so for the EXTERNAL-IPs to be assigned"

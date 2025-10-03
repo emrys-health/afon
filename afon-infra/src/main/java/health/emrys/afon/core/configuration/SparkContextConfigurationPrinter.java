@@ -19,6 +19,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
+import static health.emrys.afon.infra.Defaults.*;
 import static java.lang.String.format;
 
 /**
@@ -41,9 +42,7 @@ public class SparkContextConfigurationPrinter {
     }
 
     private static void createSparkConf(String[] args) throws IOException {
-        String clusterName        = "spark-cluster";
-        String polarisPodName     = "polaris";
-        String polarisServiceName = "polaris-lb";
+        String clusterName        = CLUSTER_NAME;
 
         AfonPropertiesLoader loader       = new AfonPropertiesLoader();
         Properties           properties   = loader.getProperties();
@@ -51,10 +50,10 @@ public class SparkContextConfigurationPrinter {
         var                  tokenGrabber = new PolarisCredentialGrabber();
         String               accessToken  = null;
         try {
-            accessToken = tokenGrabber.getCredentials(eksClient.getLogsOf(polarisPodName));
+            accessToken = tokenGrabber.getCredentials(eksClient.getLogsOf(POLARIS_POD_NAME));
 
             ClusterPolarisConfiguration clusterPolaris = new ClusterPolarisConfiguration(clusterName, properties);
-            clusterPolaris.addPolarisEndpointToProperties(polarisServiceName, eksClient);
+            clusterPolaris.addPolarisEndpointToProperties(POLARIS_SERVICE_NAME, eksClient);
             String polarisEndpoint = POLARIS_ENDPOINT.getValueFrom(properties);
             logger.info("Polaris endpoint: {}", polarisEndpoint);
 
