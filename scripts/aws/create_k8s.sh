@@ -3,9 +3,11 @@ export CLUSTERNAME=spark-cluster
 
 echo "Create and configure the Kubernetes cluster ($CLUSTERNAME) in AWS. This can take 10-15 mins."
 eksctl create cluster --name $CLUSTERNAME --nodes 3
+echo "Associating OIDC provider"
 eksctl utils associate-iam-oidc-provider \
   --cluster $CLUSTERNAME \
-  --approve || echo "Cannot use eksctl to create cluster$CLUSTERNAME" && exit 1
+  --approve
+echo "Updaing VPC CNI addon"
 eksctl update addon \
   --name vpc-cni \
   --cluster $CLUSTERNAME \
@@ -18,7 +20,7 @@ echo "Install secret store. It might be there already and that's fine"
 helm repo add secrets-store-csi-driver https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
 helm install -n kube-system csi-secrets-store secrets-store-csi-driver/secrets-store-csi-driver
 echo "Let's see if the drivers are there"
-kubectl --namespace=kube-system get pods -l "app=secrets-store-csi-driver" || echo "drivers not installed" && exit 1
+kubectl --namespace=kube-system get pods -l "app=secrets-store-csi-driver"
 echo "Success. Cluster installed"
 echo "---------------"
 
@@ -99,6 +101,8 @@ echo "Configuring K8s so it can talk to AWS IAM"
 eksctl utils associate-iam-oidc-provider --region="$REGION" --cluster="$CLUSTERNAME" --approve
 echo "Installing the AWS/K8s bridge for secrets"
 kubectl apply -n kube-system -f https://raw.githubusercontent.com/aws/secrets-store-csi-driver-provider-aws/main/deployment/aws-provider-installer.yaml
+echo "Waiting 10s for it to be set up"
+sleep 10
 echo "Check it's set up:"
 kubectl get daemonset -n kube-system csi-secrets-store-provider-aws || echo "secret store driver not installed" && exit 1
 # note that I had to use Option 2 from https://github.com/aws/secrets-store-csi-driver-provider-aws
@@ -117,6 +121,8 @@ echo "Installing our software into the K8s cluster"
 echo "Installing Polaris into K8s"
 #kubectl apply -f polaris-deployment.yaml
 kubectl apply -f deployment_polaris.yaml
+echo "Installing Jupyter into K8s. Note Jupyter is a big Docker image so it can take >60s for the K8s pod to start"
+kubectl apply -f deployment_jupyter.yaml
 echo "Installing an easier way to manage Spark clusters"
 helm repo add spark https://apache.github.io/spark-kubernetes-operator
 helm repo update
@@ -125,8 +131,6 @@ echo "Waiting 30s for the Spark K8s cluster to setup..."
 sleep 30
 echo "Start a Spark cluster in K8s"
 kubectl apply -f spark_cluster.yaml
-echo "Installing Jupyter into K8s. Note Jupyter is a big Docker image so it can take >60s for the K8s pod to start"
-kubectl apply -f deployment_jupyter.yaml
 echo "Opening Jupyter up to the greater internet"
 kubectl apply -f prod-jupyter-svc.yaml
 echo "Opening Polaris to the greate internet"
