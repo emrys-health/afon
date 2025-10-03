@@ -20,6 +20,9 @@ After you have created the K8s cluster using `./scripts/aws/create_k8.sh` and th
 Neither of these scripts take any arguments. 
 They query the Kubernetes cluster (using defaults) to find what they need.
 
+Note that the Spark Docker image has been slightly modified (see `scripts/docker/spark/Dockerfile`).
+This is to ensure that the samve verion of Python (3.11) is used as the Jupyter notebook.
+
 # Running the Java code
 
 The project is built with Maven using:
