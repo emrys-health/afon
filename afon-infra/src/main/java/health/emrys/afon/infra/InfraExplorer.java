@@ -1,0 +1,48 @@
+package health.emrys.afon.infra;
+
+import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.infra.k8s.EksInfoClient;
+import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import io.kubernetes.client.openapi.ApiException;
+import org.slf4j.Logger;
+
+import java.util.Properties;
+
+import static health.emrys.afon.infra.Defaults.*;
+
+public class InfraExplorer {
+
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(InfraExplorer.class);
+
+    public static final void main(String[] args) {
+        String clusterName = CLUSTER_NAME;
+        logger.info("Exploring infra. I'm assuming that cluster {} is up and running...", clusterName);
+        Properties    properties = new AfonPropertiesLoader().getProperties();
+        InfraExplorer app        = new InfraExplorer();
+        try {
+            app.printJupyterDetails(clusterName, properties, JUPYTER_SERVICE_NAME, JUPYTER_POD_NAME);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private final LogParser logParser;
+
+    public InfraExplorer() {
+        logParser = new LogParser();
+    }
+
+    private void printJupyterDetails(String clusterName,
+                                     Properties properties,
+                                     String jupyterServiceName,
+                                     String jupyterPodName) throws ApiException, IncorrectConfigException {
+        var eksClient = new EksInfoClient(clusterName, properties);
+        logger.info("Cluster querying: {} for service name {}", clusterName, jupyterServiceName);
+        String jupyterHost = eksClient.getIngressExpectingOnlyOneFor(jupyterServiceName);
+        logger.info("Cluster querying: {} for the logs of pod {}", clusterName, jupyterPodName);
+        String logs = eksClient.getLogsOf(jupyterPodName);
+        String uri  = logParser.searchForTextAfter("http://127.0.0.1", logs);
+        logger.info("Jupyter can be found at:\nhttp://{}{}", jupyterHost, uri);
+    }
+
+}

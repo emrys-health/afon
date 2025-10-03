@@ -9,10 +9,9 @@ import io.kubernetes.client.openapi.ApiException;
 import org.slf4j.Logger;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
 import java.util.Properties;
 
+import static health.emrys.afon.infra.Defaults.*;
 import static java.lang.String.format;
 
 public class ClusterPolarisConfiguration {
@@ -20,11 +19,11 @@ public class ClusterPolarisConfiguration {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
     public static void main(String[] args) {
-        String     clusterName = "spark-cluster";
+
         Properties properties  = new AfonPropertiesLoader().getProperties();
-        var        app         = new ClusterPolarisConfiguration(clusterName, properties);
+        var        app         = new ClusterPolarisConfiguration(CLUSTER_NAME, properties);
         try {
-            app.initializePolaris("polaris-lb", "polaris");
+            app.initializePolaris(POLARIS_SERVICE_NAME, POLARIS_POD_NAME);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -50,15 +49,7 @@ public class ClusterPolarisConfiguration {
     }
 
     public void addPolarisEndpointToProperties(String polarisServiceName, EksInfoClient eksClient) throws ApiException, IncorrectConfigException {
-        Optional<List<String>> optionalIngress = eksClient.getIngressFor(polarisServiceName);
-        if (!optionalIngress.isPresent()) {
-            throw new IncorrectConfigException(format("No service called '{}' in cluster'{}", polarisServiceName, clusterName));
-        }
-        List<String> polarisIngress = optionalIngress.get();
-        if (polarisIngress.size() != 1) {
-            throw new IncorrectConfigException(format("Was expecting 1 service adderss but got {}", polarisIngress.toString()));
-        }
-        String polarisHost = polarisIngress.get(0);
+        String polarisHost = eksClient.getIngressExpectingOnlyOneFor(polarisServiceName);
         logger.info("Polaris is available to the outisde world at: {}", polarisHost);
         properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), format("%s:8181", polarisHost));
     }
