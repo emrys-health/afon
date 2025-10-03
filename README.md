@@ -10,6 +10,16 @@ You'll need to define the environment variables first with:
 
 The scripts then live in `./scripts` for each cloud provider.
 
+# Configuring the environment
+
+After you have created the K8s cluster using `./scripts/aws/create_k8.sh` and the cluster is up and running, you must:
+
+1. Configure Polaris. This is done by running `health.emrys.afon.infra.ClusterPolarisConfiguration`.
+2. To get the URLs for the Jupyter and Spark GUIs, run `health.emrys.afon.infra.InfraExplorer`
+
+Neither of these scripts take any arguments. 
+They query the Kubernetes cluster (using defaults) to find what they need.
+
 # Running the Java code
 
 The project is built with Maven using:
