@@ -1,5 +1,18 @@
 # afon-core
-core infrastructure required to deploy infrastructure across clouds that enables secure cross cloud querying
+Core project required to deploy infrastructure across clouds that enables secure cross cloud querying
+
+# Caveat
+
+There is an [outstanding issue](https://github.com/emrys-health/afon-core/issues/10) with GCP credentials such that we
+must refresh them daily with:
+
+```shell
+gcloud auth application-default login --impersonate-service-account=my-vendable-sa@philltest.iam.gserviceaccount.com
+```
+
+which is somewhat annoying and affects all below. 
+
+Presumably, it's just a matter of configuring GCP to make the token live longer but I've not had a chance to look further.
 
 # Running the scripts
 
