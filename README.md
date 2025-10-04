@@ -23,7 +23,7 @@ This is [patched](afon-iceberg/src/main/java/org/apache/iceberg/azure/adlsv2/Ven
 Azure [integration test](afon-acceptance-tests/src/test/scala/health/emrys/afon/acceptance/aws/AzureAccessSpec.scala)
 but not in the Spark/Kubernetes environment.
 
-Neither of these scripts take any arguments. 
+None of these scripts take any arguments. 
 They query the Kubernetes cluster (using defaults) to find what they need.
 
 Note that the Spark Docker image has been slightly modified (see `scripts/docker/spark/Dockerfile`).
