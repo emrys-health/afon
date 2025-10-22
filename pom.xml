@@ -23,6 +23,9 @@
         <developer>
             <name>phil.henry@emrys.health</name>
         </developer>
+        <developer>
+            <name>will@emrys.health</name>
+        </developer>
     </developers>
 
     <properties>
