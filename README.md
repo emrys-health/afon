@@ -10,6 +10,12 @@ must refresh them daily with:
 gcloud auth application-default login --impersonate-service-account=my-vendable-sa@philltest.iam.gserviceaccount.com
 ```
 
+After this, refresh daily with:
+
+```shell
+gcloud auth application-default login
+```
+
 which is somewhat annoying and affects all below. 
 
 Presumably, it's just a matter of configuring GCP to make the token live longer but I've not had a chance to look further.

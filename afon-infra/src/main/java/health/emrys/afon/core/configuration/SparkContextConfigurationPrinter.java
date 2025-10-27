@@ -23,7 +23,9 @@ import static health.emrys.afon.infra.Defaults.*;
 import static java.lang.String.format;
 
 /**
- * You'll need to presign with:
+ * This generates the PySpark code you can run in Jupyter.
+ *
+ * If you're messing around the Spark artifact, you might need to presign with:
  * copy it to S3 with:
  * docker run --rm -it  -v ~/.aws:/root/.aws -v /home/henryp/Code/Emrys/afon-core/afon-iceberg/target/:/tmp/target  amazon/aws-cli s3 cp /tmp/target/afon-iceberg-0.1.jar s3://emrys-afon-bucket/afon-iceberg-0.1.jar
  * then

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 export REGION=eu-west-2
 export CLUSTERNAME=spark-cluster
 
@@ -102,7 +104,7 @@ eksctl utils associate-iam-oidc-provider --region="$REGION" --cluster="$CLUSTERN
 echo "Installing the AWS/K8s bridge for secrets"
 kubectl apply -n kube-system -f https://raw.githubusercontent.com/aws/secrets-store-csi-driver-provider-aws/main/deployment/aws-provider-installer.yaml
 echo "Waiting 10s for it to be set up"
-sleep 10
+sleep 20
 echo "Check it's set up:"
 kubectl get daemonset -n kube-system csi-secrets-store-provider-aws || echo "secret store driver not installed" && exit 1
 # note that I had to use Option 2 from https://github.com/aws/secrets-store-csi-driver-provider-aws
@@ -110,6 +112,7 @@ kubectl get daemonset -n kube-system csi-secrets-store-provider-aws || echo "sec
 echo "Installing the identity agent so pods can assume AWS roles"
 eksctl create addon --name eks-pod-identity-agent --cluster "$CLUSTERNAME" --region "$REGION"
 echo "Creating a service account that is associated with our AWS role"
+sleep 10 # below can sometimes fail - apparently, the above line is asynchronous. So, let's guess a time to wait
 eksctl create podidentityassociation --cluster "$CLUSTERNAME" --namespace default --region "$REGION" --service-account-name nginx-pod-identity-deployment-sa --role-arn $ROLE_ARN --create-service-account true
 echo "Configuring the secrets to which our pods will refer"
 kubectl apply -f secret_provider_class.yaml
