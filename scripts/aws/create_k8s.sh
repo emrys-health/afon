@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 export REGION=eu-west-2
 export CLUSTERNAME=spark-cluster
