@@ -1,3 +1,11 @@
+#!/usr/bin/env bash
+shopt -s expand_aliases
+
+# interactive aliases, eg `aws`
+if [ -f ~/.bashrc ]; then
+  source ~/.bashrc
+fi
+
 export REGION=eu-west-2
 export CLUSTERNAME=spark-cluster
 
