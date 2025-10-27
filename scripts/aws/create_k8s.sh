@@ -113,7 +113,7 @@ echo "Installing the identity agent so pods can assume AWS roles"
 eksctl create addon --name eks-pod-identity-agent --cluster "$CLUSTERNAME" --region "$REGION"
 echo "Creating a service account that is associated with our AWS role"
 sleep 10 # below can sometimes fail - apparently, the above line is asynchronous. So, let's guess a time to wait
-eksctl create podidentityassociation --cluster "$CLUSTERNAME" --namespace default --region "$REGION" --service-account-name nginx-pod-identity-deployment-sa --role-arn $ROLE_ARN --create-service-account true
+eksctl create podidentityassociation --cluster "$CLUSTERNAME" --namespace default --region "$REGION" --service-account-name nginx-pod-identity-deployment-sa --role-arn $ROLE_ARN --create-service-account true  || echo "addon not yet ready" && exit 1
 echo "Configuring the secrets to which our pods will refer"
 kubectl apply -f secret_provider_class.yaml
 kubectl apply -f secret_provider_class_google.yaml
@@ -122,7 +122,6 @@ echo "---------------"
 
 echo "Installing our software into the K8s cluster"
 echo "Installing Polaris into K8s"
-#kubectl apply -f polaris-deployment.yaml
 kubectl apply -f deployment_polaris.yaml
 echo "Installing Jupyter into K8s. Note Jupyter is a big Docker image so it can take >60s for the K8s pod to start"
 kubectl apply -f deployment_jupyter.yaml
