@@ -14,12 +14,15 @@ import java.util.Properties;
 import static health.emrys.afon.infra.Defaults.*;
 import static java.lang.String.format;
 
+/**
+ * Configures the AWS Polaris instance so Spark can talk to it.
+ * It basically registers the clouds storage locations.
+ */
 public class ClusterPolarisConfiguration {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
     public static void main(String[] args) {
-
         Properties properties  = new AfonPropertiesLoader().getProperties();
         var        app         = new ClusterPolarisConfiguration(CLUSTER_NAME, properties);
         try {
