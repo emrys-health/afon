@@ -73,6 +73,16 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>eks</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.hashicorp</groupId>
+            <artifactId>cdktf</artifactId>
+            <version>0.21.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.hashicorp</groupId>
+            <artifactId>cdktf-provider-aws</artifactId>
+            <version>21.0.0</version>
+        </dependency>
     </dependencies>
     
 </project>
