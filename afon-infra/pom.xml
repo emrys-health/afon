@@ -17,6 +17,7 @@
     <properties>
         <aws.java.sdk.version>2.34.6</aws.java.sdk.version>
     </properties>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -82,6 +83,16 @@
             <groupId>com.hashicorp</groupId>
             <artifactId>cdktf-provider-aws</artifactId>
             <version>21.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.hashicorp</groupId>
+            <artifactId>cdktf-provider-kubernetes</artifactId>
+            <version>12.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.hashicorp</groupId>
+            <artifactId>cdktf-provider-helm</artifactId>
+            <version>12.0.0</version>
         </dependency>
     </dependencies>
     
