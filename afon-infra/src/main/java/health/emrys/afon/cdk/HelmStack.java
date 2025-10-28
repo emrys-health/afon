@@ -2,20 +2,39 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
+import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
+import com.hashicorp.cdktf.providers.aws.provider.AwsProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderConfig;
 import software.constructs.Construct;
 
+import static health.emrys.afon.infra.Defaults.AWS_REGION;
+import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
+
 /**
  * You need to export KUBE_CONFIG_PATH when you run the output of this in tofu apply.
- * For example <pre></pre>export KUBE_CONFIG_PATH=/home/henryp/.kube/config</pre>
+ * For example <pre>export KUBE_CONFIG_PATH=/home/henryp/.kube/config</pre>
  */
 class HelmStack extends TerraformStack {
 
     public HelmStack(final Construct scope, final String id) {
         super(scope, id);
+
+        AwsProvider.Builder.create(this, "aws")
+                           .region(AWS_REGION) // Set your desired AWS Region
+                           .build();
+
+        EksAddon.Builder.create(this, "vpc-cni")
+                        .clusterName(CLUSTER_NAME)
+                        .region(AWS_REGION)
+                        .addonName("vpc-cni")
+                        // To update the addon, simply change the addonVersion property
+//                        .addonVersion("v1.10.1-eksbuild.2")
+                        // Setting resolveConflicts to OVERWRITE forces the update even if manual changes exist
+                        .resolveConflictsOnUpdate("OVERWRITE")
+                        .build();
 
         // 1. Configure the Kubernetes Provider
         // The Helm provider relies on the Kubernetes provider to connect to the cluster.
