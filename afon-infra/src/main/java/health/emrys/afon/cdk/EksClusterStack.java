@@ -24,6 +24,9 @@ import software.constructs.Construct;
 import java.util.List;
 import java.util.Map;
 
+import static health.emrys.afon.infra.Defaults.AWS_REGION;
+import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
+
 // Define a high-level construct to encapsulate the EKS Cluster and its prerequisites
 class EksClusterConstruct extends Construct {
     public final EksCluster cluster;
@@ -109,7 +112,7 @@ class EksClusterConstruct extends Construct {
         final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
 
         this.cluster = EksCluster.Builder.create(this, "eksCluster")
-                                         .name("spark-cluster")
+                                         .name(CLUSTER_NAME)
                                          .roleArn(eksClusterRole.getArn())
                                          .vpcConfig(vpcConfig)
                                          .version("1.29")
@@ -192,13 +195,11 @@ public class EksClusterStack extends TerraformStack {
     public EksClusterStack(final Construct scope, final String id) {
         super(scope, id);
 
-        final String awsRegion = "eu-west-2";
-
         AwsProvider.Builder.create(this, "aws")
-                           .region(awsRegion)
+                           .region(AWS_REGION)
                            .build();
 
-        new EksClusterConstruct(this, "myEksCluster", awsRegion);
+        new EksClusterConstruct(this, "myEksCluster", AWS_REGION);
     }
 
     // Application entry point for running the CDKTF synthesis
