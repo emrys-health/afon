@@ -30,8 +30,6 @@ class HelmStack extends TerraformStack {
                         .clusterName(CLUSTER_NAME)
                         .region(AWS_REGION)
                         .addonName("vpc-cni")
-                        // To update the addon, simply change the addonVersion property
-//                        .addonVersion("v1.10.1-eksbuild.2")
                         // Setting resolveConflicts to OVERWRITE forces the update even if manual changes exist
                         .resolveConflictsOnUpdate("OVERWRITE")
                         .build();
