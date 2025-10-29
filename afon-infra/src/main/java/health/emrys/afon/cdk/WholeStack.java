@@ -30,7 +30,12 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
-// The main stack where we define our infrastructure
+import static health.emrys.afon.infra.Defaults.AWS_REGION;
+import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
+
+/***
+ * This currently assumes the EKS cluster is up and running
+ */
 class WholeStack extends TerraformStack {
 
     public WholeStack(final Construct scope, final String id) {
@@ -39,17 +44,14 @@ class WholeStack extends TerraformStack {
         // --- AWS Provider Configuration (Required for EKS Addon) ---
         // 1. Configure the AWS Provider
         AwsProvider.Builder.create(this, "aws")
-                           .region("us-west-2") // Set your desired AWS Region
+                           .region(AWS_REGION) // Set your desired AWS Region
                            .build();
 
         // 2. Define or update the EKS Addon (e.g., 'coredns')
-        final String clusterName = "my-cdktf-eks-cluster-name"; // <<< REPLACE WITH YOUR EKS CLUSTER NAME
-
-        EksAddon.Builder.create(this, "coreDnsAddon")
-                        .clusterName(clusterName)
-                        .addonName("coredns")
-                        // To update the addon, simply change the addonVersion property
-                        .addonVersion("v1.10.1-eksbuild.2")
+        EksAddon.Builder.create(this, "vpc-cni")
+                        .clusterName(CLUSTER_NAME)
+                        .region(AWS_REGION)
+                        .addonName("vpc-cni")
                         // Setting resolveConflicts to OVERWRITE forces the update even if manual changes exist
                         .resolveConflictsOnUpdate("OVERWRITE")
                         .build();
@@ -68,8 +70,8 @@ class WholeStack extends TerraformStack {
         Secret.Builder.create(this, "mySecret")
                       .metadata(SecretMetadata.builder().name("my-app-secret").build())
                       .data(Map.of(
-                              "api_key.txt", Base64.getEncoder().encodeToString("super-secret-key-123".getBytes()),
-                              "env.config", Base64.getEncoder().encodeToString("ENVIRONMENT=production\nDEBUG=false".getBytes())
+                              "api_key.txt", "super-secret-key-123",
+                              "env.config", "ENVIRONMENT=production\nDEBUG=false"
                                   ))
                       .type("Opaque")
                       .build();
@@ -154,39 +156,21 @@ class WholeStack extends TerraformStack {
 
 
         // 7. Install a Helm Chart (equivalent to 'helm install')
-        Release.Builder.create(this, "redisRelease")
-                       .name("cdktf-redis-prod") // The release name
-                       .chart("redis") // The chart name within the repository
-                       .repository("https://charts.bitnami.com/bitnami")
-                       .version("18.6.0") // Specify a stable version
-                       .namespace("default") // Target Kubernetes namespace
-                       .createNamespace(true) // Automatically create the namespace if it does not exist
+        // This single `Release` resource handles both adding the repository URL and installing the chart.
+        Release.Builder.create(this, "secrets-store-csi-driver")
+                       .name("csi-secrets-store") // The release name
+                       .chart("secrets-store-csi-driver") // The chart name within the repository
+                       .repository("https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts")
+                       .namespace("kube-system") // Target Kubernetes namespace
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
                        .atomic(true) // If installation fails, completely uninstall the release
-
-                       // Override chart values using the 'set' property (equivalent to '--set key=value')
-                       .set(List.of(
-                               ReleaseSet.builder()
-                                         .name("master.persistence.enabled")
-                                         .value("false")
-                                         .build(),
-                               ReleaseSet.builder()
-                                         .name("replica.replicaCount")
-                                         .value("2")
-                                         .build()
-                                   ))
-                       // Override values using a map (equivalent to setting 'values.yaml' content)
-                       .values(List.of(
-                               // Using a full JSON string for values is common for complex overrides
-                               "{\"architecture\":\"standalone\"}"
-                                      ))
                        .build();
 
     }
 
     public static void main(String[] args) {
         final App app = new App();
-        new WholeStack(app, "helm-redis-deployment");
+        new WholeStack(app, "helm-nginx-deployment");
         app.synth();
     }
 }
