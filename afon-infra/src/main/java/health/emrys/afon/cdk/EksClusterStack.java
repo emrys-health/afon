@@ -41,6 +41,7 @@ class EksClusterConstruct extends Construct {
                                                        .name("cdktf-app-config-secret")
                                                        .description("Secret containing application configuration or API keys for EKS.")
                                                        .tags(Map.of("Name", "EKSAppConfig"))
+                                                       .recoveryWindowInDays(0)
                                                        .build();
 
         // Add content to the secret (this is the actual sensitive data)
