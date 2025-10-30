@@ -263,8 +263,13 @@ class WholeStack extends TerraformStack {
 
         // 3. Configure the Kubernetes Provider
         String configPath = System.getProperty("user.home") + "/.kube/config";
+        String base64CertData = cluster.getCertificateAuthority().get(0).getData();
+        String encodedCert = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
         KubernetesProvider kubernetesProvider = KubernetesProvider.Builder.create(this, "kubernetes")
-                                                                          .configPath(configPath)
+                                                                          // Direct EKS Connection Configuration:
+                                                                          .host(cluster.getEndpoint())
+                                                                          .clusterCaCertificate(encodedCert)
+                                                                          .token(eksAuthData.getToken()) // Dynamically generated token
                                                                           .build();
 //        kubernetesProvider.addOverride("depends_on", List.of(eksDependOn));
 
