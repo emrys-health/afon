@@ -341,13 +341,7 @@ class WholeStack extends TerraformStack {
                                                                                                    // Rule 1: Allow traffic to a specific external service IP (e.g., a Database)
                                                                                                    NetworkPolicySpecEgressTo.builder()
                                                                                                                             .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
-                                                                                                                                                                     .cidr("203.0.113.1/32") // Use /32 for a single IP
-                                                                                                                                                                     .build())
-                                                                                                                            .build(),
-                                                                                                   // Rule 2: Allow traffic to a range of IPs (e.g., a specific API service range)
-                                                                                                   NetworkPolicySpecEgressTo.builder()
-                                                                                                                            .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
-                                                                                                                                                                     .cidr("198.51.100.0/24") // Use CIDR notation for ranges
+                                                                                                                                                                     .cidr("151.101.0.0/16") // Use /32 for a single IP
                                                                                                                                                                      .build())
                                                                                                                             .build()
                                                                                                       ))
@@ -365,6 +359,16 @@ class WholeStack extends TerraformStack {
                             // No explicit configuration needed here, but you could add experimental features
                             // or specific connection details if needed.
                             .build();
+
+        Release.Builder.create(this, "calicoOperator")
+                       .name("tigera-operator")
+                       .chart("tigera-operator")
+                       .repository("https://docs.tigera.io/calico/charts")
+                       .namespace("tigera-operator") // Standard namespace for the operator
+                       .createNamespace(true)
+                       .version("3.28.0") // Using a recent stable version
+                       .atomic(true)
+                       .build();
 
 
         // 7. Install a Helm Chart (equivalent to 'helm install')
