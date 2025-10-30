@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
@@ -40,7 +41,9 @@ import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplat
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
+import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import software.constructs.Construct;
+import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 
 import java.util.Base64;
 import java.util.List;
@@ -148,6 +151,23 @@ class WholeStack extends TerraformStack {
                                          .version("1.29")
                                          .dependsOn(List.of(eksClusterRole, publicSubnet1, publicSubnet2))
                                          .tags(Map.of("Name", "cdktf-eks")).build();
+
+        NullProvider.Builder.create(this, "nullProvider")
+                            .build();
+        Resource.Builder.create(this, "kubeconfigUpdater") // FIXED: Use Resource.Builder
+                        .dependsOn(List.of(cluster)) // Wait for the cluster to be ready
+                        .provisioners(List.of(
+                                LocalExecProvisioner.builder()
+                                                    .when("create") // Run only when the resource is created
+                                                    .command(String.format(
+                                                            "aws eks update-kubeconfig --name %s --region %s",
+                                                            CLUSTER_NAME,
+                                                            AWS_REGION)
+                                                            )
+                                                    .type("local-exec")
+                                                    .build()
+                                             ))
+                        .build();
 
         // --- 4. EKS Node Group IAM Role & NEW Custom Policy ---
 
