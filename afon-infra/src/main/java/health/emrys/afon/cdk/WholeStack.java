@@ -2,7 +2,9 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.TerraformElement;
 import com.hashicorp.cdktf.TerraformStack;
+import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterVpcConfig;
@@ -152,22 +154,30 @@ class WholeStack extends TerraformStack {
                                          .dependsOn(List.of(eksClusterRole, publicSubnet1, publicSubnet2))
                                          .tags(Map.of("Name", "cdktf-eks")).build();
 
+        // if one depends_on this, then the cluster should be running
+        DataAwsEksClusterAuth eksAuthData = DataAwsEksClusterAuth.Builder.create(this, "eksClusterAuthData")
+                                                                         .name(cluster.getName()) // Uses the name of the EKS cluster
+                                                                         .build();
+
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
-        Resource.Builder.create(this, "kubeconfigUpdater") // FIXED: Use Resource.Builder
-                        .dependsOn(List.of(cluster)) // Wait for the cluster to be ready
-                        .provisioners(List.of(
-                                LocalExecProvisioner.builder()
-                                                    .when("create") // Run only when the resource is created
-                                                    .command(String.format(
-                                                            "aws eks update-kubeconfig --name %s --region %s",
-                                                            CLUSTER_NAME,
-                                                            AWS_REGION)
-                                                            )
-                                                    .type("local-exec")
-                                                    .build()
-                                             ))
-                        .build();
+
+        Resource newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater") // FIXED: Use Resource.Builder
+                                         .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
+                                         .provisioners(List.of(
+                                                 LocalExecProvisioner.builder()
+                                                                     .when("create") // Run only when the resource is created
+                                                                     .command(String.format(
+                                                                                      "aws eks update-kubeconfig --name %s --region %s",
+                                                                                      CLUSTER_NAME,
+                                                                                      AWS_REGION)
+                                                                             )
+                                                                     .type("local-exec")
+                                                                     .build()
+                                                              ))
+                                         .build();
+
+        var eksDependOn = List.of(newKubeConfig);
 
         // --- 4. EKS Node Group IAM Role & NEW Custom Policy ---
 
@@ -235,7 +245,7 @@ class WholeStack extends TerraformStack {
                             .nodeRoleArn(nodeGroupRole.getArn())
                             .instanceTypes(List.of("t3.medium"))
                             .scalingConfig(scalingConfig)
-                            .dependsOn(List.of(cluster))
+                            .dependsOn(eksDependOn)
                             .tags(Map.of("Name", "cdktf-eks-nodegroup")).build();
 
         // 2. Define or update the EKS Addon (e.g., 'coredns')
@@ -243,6 +253,7 @@ class WholeStack extends TerraformStack {
                         .clusterName(CLUSTER_NAME)
                         .region(AWS_REGION)
                         .addonName("vpc-cni")
+                        .dependsOn(eksDependOn)
                         // Setting resolveConflicts to OVERWRITE forces the update even if manual changes exist
                         .resolveConflictsOnUpdate("OVERWRITE")
                         .build();
@@ -252,13 +263,15 @@ class WholeStack extends TerraformStack {
 
         // 3. Configure the Kubernetes Provider
         String configPath = System.getProperty("user.home") + "/.kube/config";
-        KubernetesProvider.Builder.create(this, "kubernetes")
-                                  .configPath(configPath)
-                                  .build();
+        KubernetesProvider kubernetesProvider = KubernetesProvider.Builder.create(this, "kubernetes")
+                                                                          .configPath(configPath)
+                                                                          .build();
+//        kubernetesProvider.addOverride("depends_on", List.of(eksDependOn));
 
         // 4. Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
         Secret.Builder.create(this, "mySecret")
+                      .dependsOn(eksDependOn)
                       .metadata(SecretMetadata.builder().name("my-app-secret").build())
                       .data(Map.of(
                               "api_key.txt", "super-secret-key-123",
@@ -272,6 +285,7 @@ class WholeStack extends TerraformStack {
         final Map<String, String> labels = Map.of("app", "my-secret-app");
 
         Deployment.Builder.create(this, "secretAppDeployment")
+                          .dependsOn(eksDependOn)
                           .metadata(DeploymentMetadata.builder()
                                                       .name("secret-app-deployment")
                                                       .labels(labels)
@@ -304,6 +318,7 @@ class WholeStack extends TerraformStack {
 
         // 5.1. Define a NetworkPolicy to control egress traffic for the Deployment
         NetworkPolicy.Builder.create(this, "secretAppEgressPolicy")
+                             .dependsOn(eksDependOn)
                              .metadata(NetworkPolicyMetadata.builder()
                                                             .name("allow-only-specific-egress")
                                                             .namespace("default") // Assuming the Deployment is in the default namespace
@@ -354,6 +369,7 @@ class WholeStack extends TerraformStack {
                        .chart("secrets-store-csi-driver") // The chart name within the repository
                        .repository("https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts")
                        .namespace("kube-system") // Target Kubernetes namespace
+                       .dependsOn(eksDependOn)
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
                        .atomic(true) // If installation fails, completely uninstall the release
                        .build();
@@ -361,6 +377,7 @@ class WholeStack extends TerraformStack {
     }
 
     public static void main(String[] args) {
+        System.out.println(new java.util.Date());
         final App app = new App();
         new WholeStack(app, "helm-nginx-deployment");
         app.synth();
