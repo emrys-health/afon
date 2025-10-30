@@ -30,7 +30,7 @@ echo "Create secrets. This references scripts on your local drive. Make sure the
 echo "You might need to run gcloud auth application-default login ... again (see the create.sh script in the gcp directory)"
 echo "This will refresh the token before deploying it as a token (see Afon bug ticket #10)"
 aws --region "$REGION" secretsmanager  create-secret --name CloudDetails --secret-string "$(cat ~/emrys.sh)"
-aws --region "$REGION" secretsmanager  create-secret --name application_default_credentials.json --secret-string "$(cat ~/.config/gcloud/application_default_credentials.json)"
+aws --region "$REGION" secretsmanager  create-secret --name application_default_credentials.json --secret-string "$(cat ~/service-account.json)"
 
 echo "Waiting 10s for the secrets to be created..."
 sleep 10
