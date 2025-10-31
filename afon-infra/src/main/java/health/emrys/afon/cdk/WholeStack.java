@@ -323,35 +323,55 @@ class WholeStack extends TerraformStack {
 
         // 5.1. Define a NetworkPolicy to control egress traffic for the Deployment
         NetworkPolicy.Builder.create(this, "secretAppEgressPolicy")
-                             .dependsOn(eksDependOn)
                              .metadata(NetworkPolicyMetadata.builder()
                                                             .name("allow-only-specific-egress")
-                                                            .namespace("default") // Assuming the Deployment is in the default namespace
+                                                            .namespace("default")
                                                             .build())
                              .spec(NetworkPolicySpec.builder()
-                                                    // Target the pods created by the Deployment using the same labels
                                                     .podSelector(NetworkPolicySpecPodSelector.builder().matchLabels(labels).build())
-
-                                                    // Set policy type to Egress (outbound). This implicitly denies all other outbound traffic.
                                                     .policyTypes(List.of("Egress"))
+                                                    // Policy requires two separate Egress rules, as ports must be defined per rule.
+                                                    .egress(List.of(
+                                                            // Egress Rule 1: External CIDR (151.101.0.0/16)
+                                                            NetworkPolicySpecEgress.builder()
+                                                                                   .to(List.of(
+                                                                                           NetworkPolicySpecEgressTo.builder()
+                                                                                                                    .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
+                                                                                                                                                             .cidr("151.101.0.0/16")
+                                                                                                                                                             .build())
+                                                                                                                    .build()
+                                                                                              ))
+                                                                                   // Ports are defined here on the Egress builder
+                                                                                   .ports(List.of(
+                                                                                           // Allow common HTTP/HTTPS to the external CIDR
+                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("80").build(),
+                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build()
+                                                                                                 ))
+                                                                                   .build(),
 
-                                                    // Define the allowed outbound connections
-                                                    .egress(List.of(NetworkPolicySpecEgress.builder()
-                                                                                           .to(List.of(
-                                                                                                   // Rule 1: Allow traffic to a specific external service IP (e.g., a Database)
-                                                                                                   NetworkPolicySpecEgressTo.builder()
-                                                                                                                            .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
-                                                                                                                                                                     .cidr("151.101.0.0/16") // Use /32 for a single IP
-                                                                                                                                                                     .build())
-                                                                                                                            .build()
-                                                                                                      ))
-                                                                                           // By omitting the 'ports' property here, all TCP/UDP ports are allowed to the targets defined in 'to'.
-                                                                                           // To restrict to port 443 (HTTPS), you would add:
-                                                                                           // .ports(List.of(NetworkPolicySpecEgressPort.builder().port("443").protocol("TCP").build()))
-                                                                                           .build()
+                                                            // Egress Rule 2: DNS Traffic (10.96.0.0/12)
+                                                            NetworkPolicySpecEgress.builder()
+                                                                                   .to(List.of(
+                                                                                           NetworkPolicySpecEgressTo.builder()
+                                                                                                                    .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
+                                                                                                                                                             .cidr("172.20.0.0/16")
+                                                                                                                                                             .build())
+                                                                                                                    .build()
+                                                                                              ))
+                                                                                   // Ports are defined here on the Egress builder
+                                                                                   .ports(List.of(
+                                                                                           // Allow UDP/53 for standard DNS lookups
+                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("UDP").port("53").build(),
+                                                                                           // Allow TCP/53 for DNS zone transfers or large responses
+                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("53").build()
+                                                                                                 ))
+                                                                                   .build()
                                                                    ))
                                                     .build())
-                             .build();
+                             .build(); // NOTE: Removed dependency on kubeconfigUpdater
+
+
+
 
 
         // 6. Configure the Helm Provider
