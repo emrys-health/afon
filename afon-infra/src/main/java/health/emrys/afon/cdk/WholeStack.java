@@ -46,7 +46,7 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import software.constructs.Construct;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-
+import com.hashicorp.cdktf.providers.kubernetes.network_policy.NetworkPolicySpecPodSelector;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -332,7 +332,7 @@ class WholeStack extends TerraformStack {
                                                     .policyTypes(List.of("Egress"))
                                                     // Policy requires two separate Egress rules, as ports must be defined per rule.
                                                     .egress(List.of(
-                                                            // Egress Rule 1: External CIDR (151.101.0.0/16)
+                                                            // Egress Rule 1: External CIDR (151.101.0.0/16) - No change
                                                             NetworkPolicySpecEgress.builder()
                                                                                    .to(List.of(
                                                                                            NetworkPolicySpecEgressTo.builder()
@@ -349,12 +349,17 @@ class WholeStack extends TerraformStack {
                                                                                                  ))
                                                                                    .build(),
 
-                                                            // Egress Rule 2: DNS Traffic (10.96.0.0/12)
+                                                            // Egress Rule 2: DNS Traffic (Target CoreDNS Pods directly)
                                                             NetworkPolicySpecEgress.builder()
                                                                                    .to(List.of(
+                                                                                           // 1. Select the 'kube-system' namespace (common EKS label for system namespaces)
                                                                                            NetworkPolicySpecEgressTo.builder()
-                                                                                                                    .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
-                                                                                                                                                             .cidr("172.20.0.0/16")
+                                                                                                                    .namespaceSelector(NetworkPolicySpecEgressToNamespaceSelector.builder()
+                                                                                                                                                                   .matchLabels(Map.of("kubernetes.io/metadata.name", "kube-system"))
+                                                                                                                                                                   .build())
+                                                                                                                    // 2. Select the CoreDNS Pods within that namespace
+                                                                                                                    .podSelector(NetworkPolicySpecEgressToPodSelector.builder()
+                                                                                                                                                             .matchLabels(Map.of("k8s-app", "kube-dns"))
                                                                                                                                                              .build())
                                                                                                                     .build()
                                                                                               ))
@@ -369,6 +374,7 @@ class WholeStack extends TerraformStack {
                                                                    ))
                                                     .build())
                              .build(); // NOTE: Removed dependency on kubeconfigUpdater
+
 
 
 
