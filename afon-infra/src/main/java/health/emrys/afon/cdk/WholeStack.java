@@ -35,6 +35,7 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import io.kubernetes.client.proto.V1;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -162,22 +163,22 @@ class WholeStack extends TerraformStack {
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
 
-//        Resource newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater")
-//                                                 .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
-//                                                 .provisioners(List.of(
-//                                                         LocalExecProvisioner.builder()
-//                                                                             .when("create") // Run only when the resource is created
-//                                                                             .command(String.format(
-//                                                                                              "aws eks update-kubeconfig --name %s --region %s",
-//                                                                                              CLUSTER_NAME,
-//                                                                                              AWS_REGION)
-//                                                                                     )
-//                                                                             .type("local-exec")
-//                                                                             .build()
-//                                                                      ))
-//                                                 .build();
+        Resource newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater")
+                                                 .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
+                                                 .provisioners(List.of(
+                                                         LocalExecProvisioner.builder()
+                                                                             .when("create") // Run only when the resource is created
+                                                                             .command(String.format(
+                                                                                              "aws eks update-kubeconfig --name %s --region %s",
+                                                                                              CLUSTER_NAME,
+                                                                                              AWS_REGION)
+                                                                                     )
+                                                                             .type("local-exec")
+                                                                             .build()
+                                                                      ))
+                                                 .build();
 
-        var eksDependOn = List.of(cluster, eksAuthData); //List.of(newKubeConfig);
+        var eksDependOn = List.of(newKubeConfig);
 
         // --- 4. EKS Node Group IAM Role & NEW Custom Policy ---
 
@@ -279,19 +280,32 @@ class WholeStack extends TerraformStack {
         // 4. Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
         String secretName = "my-app-secret";
-        Secret.Builder.create(this, "mySecret")
-                      .dependsOn(eksDependOn)
-                      .metadata(SecretMetadata.builder().name(secretName).build())
-                      .data(Map.of(
-                              "api_key.txt", "super-secret-key-123",
-                              "env.config", "ENVIRONMENT=production\nDEBUG=false"
-                                  )
-                           )
-                      .type("Opaque")
-                      .build();
+        Secret secret = Secret.Builder.create(this, "mySecret")
+                                     .dependsOn(eksDependOn)
+                                     .metadata(SecretMetadata.builder().name(secretName).build())
+                                     .data(Map.of(
+                                             "spark-defaults.conf", """
+                                                     spark.sql.catalog.azure.warehouse=azure                                                       \s
+                                                     spark.sql.catalog.azure.header.X-Iceberg-Access-Delegation=vended-credentials            \s
+                                                     spark.sql.catalog.azure.credential=root:s3cr3t                                          \s
+                                                     spark.sql.catalog.azure.cache-enabled=false                                                   \s
+                                                     spark.sql.catalog.azure.rest.auth.oauth2.scope=REDACTED                                    \s
+                                                     spark.sql.catalog.azure=org.apache.iceberg.spark.SparkCatalog\s
+                                                     spark.sql.catalog.azure.oauth2.token=REDACTED                                              \s
+                                                     spark.sql.catalog.azure.client_secret=s3cr3t                                                 \s
+                                                     spark.sql.catalog.azure.uri=http://localhost:8181/api/catalog     \s
+                                                     spark.sql.catalog.azure.token=REDACTED                                                     \s
+                                                     spark.sql.catalog.azure.type=rest                                                              \s
+                                                     spark.sql.catalog.azure.scope=PRINCIPAL_ROLE:ALL                                 \s
+                                                     spark.sql.catalog.azure.client_id=root""",
+                                             "env.config", "ENVIRONMENT=production\nDEBUG=false"
+                                                 )
+                                          )
+                                     .type("Opaque")
+                                     .build();
 
         // 5. Define a Deployment that mounts the Secret as a Volume
-        final Map<String, String> labels = Map.of("app", "my-secret-app");
+        final Map<String, String> labels = Map.of("app", "jupyter");
 
         String secretVolume = "secret-volume";
         List<DeploymentSpecTemplateSpecVolume> volumes = List.of(DeploymentSpecTemplateSpecVolume.builder()
@@ -403,22 +417,24 @@ class WholeStack extends TerraformStack {
 
         Release.Builder.create(this, "calicoOperator")
                        .name("tigera-operator")
+                       .dependsOn(eksDependOn)
                        .chart("tigera-operator")
                        .repository("https://docs.tigera.io/calico/charts")
                        .namespace("tigera-operator") // Standard namespace for the operator
                        .createNamespace(true)
                        .version("3.31.0") // Using a recent stable version
                        .atomic(true)
+                       .timeout(300)
                        .build();
 
         // 7. Install a Helm Chart (equivalent to 'helm install')
         // This single `Release` resource handles both adding the repository URL and installing the chart.
         Release.Builder.create(this, "secrets-store-csi-driver")
+                       .dependsOn(eksDependOn)
                        .name("csi-secrets-store") // The release name
                        .chart("secrets-store-csi-driver") // The chart name within the repository
                        .repository("https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts")
                        .namespace("kube-system") // Target Kubernetes namespace
-                       .dependsOn(eksDependOn)
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
                        .atomic(true) // If installation fails, completely uninstall the release
                        .build();
