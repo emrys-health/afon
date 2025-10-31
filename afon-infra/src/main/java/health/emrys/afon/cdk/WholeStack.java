@@ -2,10 +2,10 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.LocalExecProvisioner;
-import com.hashicorp.cdktf.TerraformElement;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
+import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterVpcConfig;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroup;
@@ -14,8 +14,6 @@ import com.hashicorp.cdktf.providers.aws.iam_policy.IamPolicy;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachment;
 import com.hashicorp.cdktf.providers.aws.internet_gateway.InternetGateway;
-import com.hashicorp.cdktf.providers.aws.provider.AwsProvider;
-import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
 import com.hashicorp.cdktf.providers.aws.provider.AwsProvider;
 import com.hashicorp.cdktf.providers.aws.route_table.RouteTable;
 import com.hashicorp.cdktf.providers.aws.route_table.RouteTableRoute;
@@ -26,28 +24,17 @@ import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
-import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
-import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
-import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderConfig;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpec;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecSelector;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplate;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateMetadata; // NEW: Correct import for template metadata
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpec;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeSecret;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import software.constructs.Construct;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import com.hashicorp.cdktf.providers.kubernetes.network_policy.NetworkPolicySpecPodSelector;
-import java.util.Base64;
+import io.kubernetes.client.proto.V1;
+import software.constructs.Construct;
+
 import java.util.List;
 import java.util.Map;
 
@@ -55,7 +42,19 @@ import static health.emrys.afon.infra.Defaults.AWS_REGION;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 
 /***
- * This currently assumes the EKS cluster is up and running
+ * Creates the markup to create the full stack in AWS.
+ * Note: it does not create anything other than JSON files!
+ * You need to run tofu on those files for the infra to be provisioned.
+ * Don't forget to
+ * <UL>
+ *     <LI>
+ *          set environment variables, something like <pre>KUBE_CONFIG_PATH=/home/henryp/.kube/config</pre>
+ *     </LI>
+ *      <LI>
+ *          <pre>unalias aws</pre> if you're using the Dockerized version and put the actual binary in your <pre>PATH</pre>
+ *      </LI>
+ * </UL>
+ * when you run the output
  */
 class WholeStack extends TerraformStack {
 
@@ -132,7 +131,8 @@ class WholeStack extends TerraformStack {
 
         // --- 3. EKS Cluster IAM Role (Same as before) ---
 
-        final String eksAssumeRolePolicy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"eks.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}";
+        final String eksAssumeRolePolicy = """
+                {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole"}]}""";
         final IamRole eksClusterRole = IamRole.Builder.create(this, "eksClusterRole")
                                                       .name("cdktf-eks-cluster-role")
                                                       .assumeRolePolicy(eksAssumeRolePolicy).build();
@@ -147,12 +147,12 @@ class WholeStack extends TerraformStack {
         final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
 
         var cluster = EksCluster.Builder.create(this, "eksCluster")
-                                         .name(CLUSTER_NAME)
-                                         .roleArn(eksClusterRole.getArn())
-                                         .vpcConfig(vpcConfig)
-                                         .version("1.29")
-                                         .dependsOn(List.of(eksClusterRole, publicSubnet1, publicSubnet2))
-                                         .tags(Map.of("Name", "cdktf-eks")).build();
+                                        .name(CLUSTER_NAME)
+                                        .roleArn(eksClusterRole.getArn())
+                                        .vpcConfig(vpcConfig)
+                                        .version("1.29")
+                                        .dependsOn(List.of(eksClusterRole, publicSubnet1, publicSubnet2))
+                                        .tags(Map.of("Name", "cdktf-eks")).build();
 
         // if one depends_on this, then the cluster should be running
         DataAwsEksClusterAuth eksAuthData = DataAwsEksClusterAuth.Builder.create(this, "eksClusterAuthData")
@@ -162,43 +162,46 @@ class WholeStack extends TerraformStack {
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
 
-        Resource newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater") // FIXED: Use Resource.Builder
-                                         .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
-                                         .provisioners(List.of(
-                                                 LocalExecProvisioner.builder()
-                                                                     .when("create") // Run only when the resource is created
-                                                                     .command(String.format(
-                                                                                      "aws eks update-kubeconfig --name %s --region %s",
-                                                                                      CLUSTER_NAME,
-                                                                                      AWS_REGION)
-                                                                             )
-                                                                     .type("local-exec")
-                                                                     .build()
-                                                              ))
-                                         .build();
+//        Resource newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater")
+//                                                 .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
+//                                                 .provisioners(List.of(
+//                                                         LocalExecProvisioner.builder()
+//                                                                             .when("create") // Run only when the resource is created
+//                                                                             .command(String.format(
+//                                                                                              "aws eks update-kubeconfig --name %s --region %s",
+//                                                                                              CLUSTER_NAME,
+//                                                                                              AWS_REGION)
+//                                                                                     )
+//                                                                             .type("local-exec")
+//                                                                             .build()
+//                                                                      ))
+//                                                 .build();
 
-        var eksDependOn = List.of(newKubeConfig);
+        var eksDependOn = List.of(cluster, eksAuthData); //List.of(newKubeConfig);
 
         // --- 4. EKS Node Group IAM Role & NEW Custom Policy ---
 
-        final String workerAssumeRolePolicy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}";
+        final String workerAssumeRolePolicy = """
+                {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}""";
         final IamRole nodeGroupRole = IamRole.Builder.create(this, "eksNodeGroupRole")
                                                      .name("cdktf-eks-nodegroup-role")
                                                      .assumeRolePolicy(workerAssumeRolePolicy).build();
 
         // ** NEW STEP: Create Custom IAM Policy referencing the Secret ARN **
         // We use String.format to insert the secret's ARN dynamically into the policy JSON.
+        // %s will be replaced by the Secret ARN
         final String customSecretPolicyDocument = String.format(
-                "{\n" +
-                        "  \"Version\": \"2012-10-17\",\n" +
-                        "  \"Statement\": [\n" +
-                        "    {\n" +
-                        "      \"Effect\": \"Allow\",\n" +
-                        "      \"Action\": \"secretsmanager:GetSecretValue\",\n" +
-                        "      \"Resource\": \"%s\"\n" + // %s will be replaced by the Secret ARN
-                        "    }\n" +
-                        "  ]\n" +
-                        "}", applicationSecret.getArn()
+                """
+                        {
+                          "Version": "2012-10-17",
+                          "Statement": [
+                            {
+                              "Effect": "Allow",
+                              "Action": "secretsmanager:GetSecretValue",
+                              "Resource": "%s"
+                            }
+                          ]
+                        }""", applicationSecret.getArn()
                                                                );
 
         final IamPolicy customSecretPolicy = IamPolicy.Builder.create(this, "SecretAccessPolicy")
@@ -262,9 +265,9 @@ class WholeStack extends TerraformStack {
         // --- Kubernetes and Helm Provider Configuration (Original Code) ---
 
         // 3. Configure the Kubernetes Provider
-        String configPath = System.getProperty("user.home") + "/.kube/config";
+        String configPath     = System.getProperty("user.home") + "/.kube/config";
         String base64CertData = cluster.getCertificateAuthority().get(0).getData();
-        String encodedCert = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
+        String encodedCert    = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
         KubernetesProvider kubernetesProvider = KubernetesProvider.Builder.create(this, "kubernetes")
                                                                           // Direct EKS Connection Configuration:
                                                                           .host(cluster.getEndpoint())
@@ -275,9 +278,10 @@ class WholeStack extends TerraformStack {
 
         // 4. Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
+        String secretName = "my-app-secret";
         Secret.Builder.create(this, "mySecret")
                       .dependsOn(eksDependOn)
-                      .metadata(SecretMetadata.builder().name("my-app-secret").build())
+                      .metadata(SecretMetadata.builder().name(secretName).build())
                       .data(Map.of(
                               "api_key.txt", "super-secret-key-123",
                               "env.config", "ENVIRONMENT=production\nDEBUG=false"
@@ -289,10 +293,36 @@ class WholeStack extends TerraformStack {
         // 5. Define a Deployment that mounts the Secret as a Volume
         final Map<String, String> labels = Map.of("app", "my-secret-app");
 
-        Deployment.Builder.create(this, "secretAppDeployment")
+        String secretVolume = "secret-volume";
+        List<DeploymentSpecTemplateSpecVolume> volumes = List.of(DeploymentSpecTemplateSpecVolume.builder()
+                                                                                                 .name(secretVolume)
+                                                                                                 .secret(DeploymentSpecTemplateSpecVolumeSecret.builder()
+                                                                                                                                               .secretName(secretName)
+                                                                                                                                               .build())
+                                                                                                 .build());
+        String secretsDir = "/etc/app-secrets";
+        List<DeploymentSpecTemplateSpecContainerVolumeMount> mounts = List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
+                                                                                                                            .name(secretVolume) // Must match the volume name defined below
+                                                                                                                            .mountPath(secretsDir) // The directory where secret files will appear
+                                                                                                                            .readOnly(true)
+                                                                                                                            .build());
+
+        List<? extends DeploymentSpecTemplateSpecContainerEnv> envVars = List.of(
+                DeploymentSpecTemplateSpecContainerEnv.builder()
+                                                      .name("SPARK_CONF_DIR")
+                                                      .value(secretsDir)
+                                                      .build()
+       );
+        List<DeploymentSpecTemplateSpecContainer> containers = List.of(DeploymentSpecTemplateSpecContainer.builder()
+                                                                                                          .name("jupyter")
+                                                                                                          .image("jupyter/pyspark-notebook:x86_64-spark-3.5.0")
+                                                                                                          .env(envVars)
+                                                                                                          .volumeMount(mounts)
+                                                                                                          .build());
+        Deployment.Builder.create(this, "jupyterDeployment")
                           .dependsOn(eksDependOn)
                           .metadata(DeploymentMetadata.builder()
-                                                      .name("secret-app-deployment")
+                                                      .name("jupyter-deployment")
                                                       .labels(labels)
                                                       .build())
                           .spec(DeploymentSpec.builder()
@@ -301,27 +331,43 @@ class WholeStack extends TerraformStack {
                                               .template(DeploymentSpecTemplate.builder()
                                                                               .metadata(DeploymentSpecTemplateMetadata.builder().labels(labels).build()) // FIX: Correctly using DeploymentSpecTemplateMetadata builder
                                                                               .spec(DeploymentSpecTemplateSpec.builder()
-                                                                                                              .container(List.of(DeploymentSpecTemplateSpecContainer.builder()
-                                                                                                                                                                    .name("main-app-container")
-                                                                                                                                                                    .image("nginx:latest") // Example container image
-                                                                                                                                                                    .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
-                                                                                                                                                                                                                                       .name("secret-volume") // Must match the volume name defined below
-                                                                                                                                                                                                                                       .mountPath("/etc/app-secrets") // The directory where secret files will appear
-                                                                                                                                                                                                                                       .readOnly(true)
-                                                                                                                                                                                                                                       .build()))
-                                                                                                                                                                    .build()))
-                                                                                                              .volume(List.of(DeploymentSpecTemplateSpecVolume.builder()
-                                                                                                                                                              .name("secret-volume") // The volume name, referenced above
-                                                                                                                                                              .secret(DeploymentSpecTemplateSpecVolumeSecret.builder()
-                                                                                                                                                                                                            .secretName("my-app-secret") // The name of the Kubernetes Secret resource to mount
-                                                                                                                                                                                                            .build())
-                                                                                                                                                              .build()))
+                                                                                                              .container(containers)
+                                                                                                              .volume(volumes)
                                                                                                               .build())
                                                                               .build())
                                               .build())
                           .build();
 
         // 5.1. Define a NetworkPolicy to control egress traffic for the Deployment
+        List<NetworkPolicySpecEgressPorts> dnsPorts = List.of(
+                // Allow UDP/53 for standard DNS lookups
+                NetworkPolicySpecEgressPorts.builder().protocol("UDP").port("53").build(),
+                // Allow TCP/53 for DNS zone transfers or large responses
+                NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("53").build()
+        );
+        List<NetworkPolicySpecEgressPorts> webPorts = List.of(
+                // Allow common HTTP/HTTPS to the external CIDR
+                NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("80").build(),
+                NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build()
+        );
+        NetworkPolicySpecEgressTo dnsNetworkPolicy = NetworkPolicySpecEgressTo
+                .builder() // 1. Select the 'kube-system' namespace (common EKS label for system namespaces)
+                .namespaceSelector(NetworkPolicySpecEgressToNamespaceSelector.builder()
+                                                                             .matchLabels(Map.of("kubernetes.io/metadata.name", "kube-system"))
+                                                                             .build())
+                // 2. Select the CoreDNS Pods within that namespace
+                .podSelector(NetworkPolicySpecEgressToPodSelector.builder()
+                                                                 .matchLabels(Map.of("k8s-app", "kube-dns"))
+                                                                 .build())
+                .build();
+        String bbcNews = "151.101.0.0/16";
+        List<NetworkPolicySpecEgressTo> allowedIPs = List.of(
+                NetworkPolicySpecEgressTo.builder()
+                                         .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
+                                                                                  .cidr(bbcNews)
+                                                                                  .build())
+                                         .build()
+        );
         NetworkPolicy.Builder.create(this, "secretAppEgressPolicy")
                              .metadata(NetworkPolicyMetadata.builder()
                                                             .name("allow-only-specific-egress")
@@ -334,51 +380,20 @@ class WholeStack extends TerraformStack {
                                                     .egress(List.of(
                                                             // Egress Rule 1: External CIDR (151.101.0.0/16) - No change
                                                             NetworkPolicySpecEgress.builder()
-                                                                                   .to(List.of(
-                                                                                           NetworkPolicySpecEgressTo.builder()
-                                                                                                                    .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
-                                                                                                                                                             .cidr("151.101.0.0/16")
-                                                                                                                                                             .build())
-                                                                                                                    .build()
-                                                                                              ))
+                                                                                   .to(allowedIPs)
                                                                                    // Ports are defined here on the Egress builder
-                                                                                   .ports(List.of(
-                                                                                           // Allow common HTTP/HTTPS to the external CIDR
-                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("80").build(),
-                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build()
-                                                                                                 ))
+                                                                                   .ports(webPorts)
                                                                                    .build(),
 
                                                             // Egress Rule 2: DNS Traffic (Target CoreDNS Pods directly)
                                                             NetworkPolicySpecEgress.builder()
-                                                                                   .to(List.of(
-                                                                                           // 1. Select the 'kube-system' namespace (common EKS label for system namespaces)
-                                                                                           NetworkPolicySpecEgressTo.builder()
-                                                                                                                    .namespaceSelector(NetworkPolicySpecEgressToNamespaceSelector.builder()
-                                                                                                                                                                   .matchLabels(Map.of("kubernetes.io/metadata.name", "kube-system"))
-                                                                                                                                                                   .build())
-                                                                                                                    // 2. Select the CoreDNS Pods within that namespace
-                                                                                                                    .podSelector(NetworkPolicySpecEgressToPodSelector.builder()
-                                                                                                                                                             .matchLabels(Map.of("k8s-app", "kube-dns"))
-                                                                                                                                                             .build())
-                                                                                                                    .build()
-                                                                                              ))
+                                                                                   .to(List.of(dnsNetworkPolicy))
                                                                                    // Ports are defined here on the Egress builder
-                                                                                   .ports(List.of(
-                                                                                           // Allow UDP/53 for standard DNS lookups
-                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("UDP").port("53").build(),
-                                                                                           // Allow TCP/53 for DNS zone transfers or large responses
-                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("53").build()
-                                                                                                 ))
+                                                                                   .ports(dnsPorts)
                                                                                    .build()
                                                                    ))
                                                     .build())
                              .build(); // NOTE: Removed dependency on kubeconfigUpdater
-
-
-
-
-
 
         // 6. Configure the Helm Provider
         HelmProvider.Builder.create(this, "helm")
@@ -392,10 +407,9 @@ class WholeStack extends TerraformStack {
                        .repository("https://docs.tigera.io/calico/charts")
                        .namespace("tigera-operator") // Standard namespace for the operator
                        .createNamespace(true)
-                       .version("3.28.0") // Using a recent stable version
+                       .version("3.31.0") // Using a recent stable version
                        .atomic(true)
                        .build();
-
 
         // 7. Install a Helm Chart (equivalent to 'helm install')
         // This single `Release` resource handles both adding the repository URL and installing the chart.
@@ -408,13 +422,12 @@ class WholeStack extends TerraformStack {
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
                        .atomic(true) // If installation fails, completely uninstall the release
                        .build();
-
     }
 
     public static void main(String[] args) {
         System.out.println(new java.util.Date());
         final App app = new App();
-        new WholeStack(app, "helm-nginx-deployment");
+        new WholeStack(app, "jupyter-deployment");
         app.synth();
     }
 }
