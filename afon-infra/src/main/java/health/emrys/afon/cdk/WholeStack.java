@@ -240,7 +240,10 @@ class WholeStack extends TerraformStack {
         // --- 5. EKS Managed Node Group Creation (Same as before) ---
 
         final EksNodeGroupScalingConfig scalingConfig = EksNodeGroupScalingConfig.builder()
-                                                                                 .desiredSize(1.0).minSize(1.0).maxSize(2.0).build();
+                                                                                 .desiredSize(3.0)
+                                                                                 .minSize(3.0)
+                                                                                 .maxSize(3.0)
+                                                                                 .build();
 
         EksNodeGroup.Builder.create(this, "eksNodeGroup")
                             .clusterName(cluster.getName())
@@ -327,12 +330,20 @@ class WholeStack extends TerraformStack {
                                                       .value(secretsDir)
                                                       .build()
        );
-        List<DeploymentSpecTemplateSpecContainer> containers = List.of(DeploymentSpecTemplateSpecContainer.builder()
-                                                                                                          .name("jupyter")
-                                                                                                          .image("jupyter/pyspark-notebook:x86_64-spark-3.5.0")
-                                                                                                          .env(envVars)
-                                                                                                          .volumeMount(mounts)
-                                                                                                          .build());
+        List<DeploymentSpecTemplateSpecContainer> containers = List.of(
+                DeploymentSpecTemplateSpecContainer.builder()
+                                                   .name("jupyter")
+                                                   .image("jupyter/pyspark-notebook:x86_64-spark-3.5.0")
+                                                   .env(envVars)
+                                                   .volumeMount(mounts)
+                                                   .build(),
+               DeploymentSpecTemplateSpecContainer.builder()
+                                                   .name("nginx")
+                                                   .image("nginx:latest")
+                                                   .env(envVars)
+                                                   .volumeMount(mounts)
+                                                   .build()
+                                                                      );
         Deployment.Builder.create(this, "jupyterDeployment")
                           .dependsOn(eksDependOn)
                           .metadata(DeploymentMetadata.builder()
@@ -419,6 +430,8 @@ class WholeStack extends TerraformStack {
                        .name("tigera-operator")
                        .dependsOn(eksDependOn)
                        .chart("tigera-operator")
+                       .cleanupOnFail(true)
+                       .forceUpdate(true)
                        .repository("https://docs.tigera.io/calico/charts")
                        .namespace("tigera-operator") // Standard namespace for the operator
                        .createNamespace(true)
