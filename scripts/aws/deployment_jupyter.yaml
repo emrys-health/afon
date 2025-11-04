@@ -13,8 +13,9 @@ spec:
       env:
         - name: SPARK_MASTER
           value: "k8s://https://kubernetes.default.svc"
+        - name: SPARK_CONF_DIR
+          value: "/home/jovyan/"
         - name: SPARK_HOME
           value: "/usr/local/spark"
         - name: PYSPARK_PYTHON
           value: "python3"
-
