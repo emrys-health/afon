@@ -189,3 +189,14 @@ data/outputs/**
 !data/outputs/.gitkeep
 correlation_analysis/data/**
 prediction_modelling/data/**
+
+#metals
+.metals
+.metals/**
+.metals/.reports
+.metals/.reports/**
+
+
+# bloop
+.bloop
+.bloop/**
