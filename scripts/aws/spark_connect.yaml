@@ -22,5 +22,20 @@ spec:
     spark.submit.deployMode: "cluster"
     spark.executor.cores: "1"
     spark.cores.max: "3"
-#    spark.kubernetes.authenticate.driver.serviceAccountName: "nginx-pod-identity-deployment-sa"
-#    spark.kubernetes.authenticate.driver.serviceAccountName: "spark"
+    spark.kubernetes.authenticate.driver.serviceAccountName: "nginx-pod-identity-deployment-sa"
+  driverSpec:
+#    serviceAccountName: nginx-pod-identity-deployment-sa
+    podTemplateSpec:
+      spec:
+        containers:
+          - volumeMounts:
+              - name: "secrets-store-inline"
+                mountPath: "/etc/secrets"
+                readOnly: true
+        volumes:
+          - name: secrets-store-inline
+            csi:
+              driver: secrets-store.csi.k8s.io
+              readOnly: true
+              volumeAttributes:
+                secretProviderClass: "nginx-pod-identity-deployment-aws-secrets"
