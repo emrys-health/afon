@@ -1,0 +1,26 @@
+# Uses our bespoke Spark image that uses Python 3.11 so Jupyter can integrate with it
+# Build it with:
+# docker build -t ph1ll1phenry/spark-3.5-py311 .
+# docker push  ph1ll1phenry/spark-3.5-py311
+# in the directory of the appropriate Docker file
+
+apiVersion: spark.apache.org/v1
+kind: SparkApplication
+metadata:
+  name: emrys2
+spec:
+  runtimeVersions:
+    sparkVersion: "4.0.1"
+  mainClass: "org.apache.spark.sql.connect.service.SparkConnectServer"
+  sparkConf:
+    spark.kubernetes.container.image: "apache/spark:4.0.1"
+    spark.master.ui.title: "Prod Spark Cluster"
+    spark.master.rest.enabled: "true"
+    spark.master.rest.host: "0.0.0.0"
+    spark.ui.reverseProxy: "true"
+    spark.master: "spark://emrys-master-svc:7077"
+    spark.submit.deployMode: "cluster"
+    spark.executor.cores: "1"
+    spark.cores.max: "3"
+#    spark.kubernetes.authenticate.driver.serviceAccountName: "nginx-pod-identity-deployment-sa"
+#    spark.kubernetes.authenticate.driver.serviceAccountName: "spark"

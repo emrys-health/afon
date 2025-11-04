@@ -133,6 +133,7 @@ echo "Waiting 30s for the Spark K8s cluster to setup..."
 sleep 30
 echo "Start a Spark cluster in K8s"
 kubectl apply -f spark_cluster.yaml
+kubectl apply -f spark_connect.yaml
 echo "Opening Jupyter up to the greater internet"
 kubectl apply -f prod-jupyter-svc.yaml
 echo "Opening Polaris to the greate internet"

@@ -10,14 +10,14 @@ metadata:
   name: emrys
 spec:
   runtimeVersions:
-    sparkVersion: "3.5.0"
+    sparkVersion: "4.0.1"
   clusterTolerations:
     instanceConfig:
-      initWorkers: 3
-      minWorkers: 3
-      maxWorkers: 3
+      initWorkers: 2
+      minWorkers: 2
+      maxWorkers: 2
   sparkConf:
-    spark.kubernetes.container.image: "ph1ll1phenry/spark-3.5-py311"
+    spark.kubernetes.container.image: "apache/spark:4.0.1"
     spark.master.ui.title: "Prod Spark Cluster"
     spark.master.rest.enabled: "true"
     spark.master.rest.host: "0.0.0.0"
