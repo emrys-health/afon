@@ -30,12 +30,15 @@ import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
+import com.hashicorp.cdktf.providers.kubernetes.service.Service;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import io.kubernetes.client.proto.V1;
+import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -284,31 +287,31 @@ class WholeStack extends TerraformStack {
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
         String secretName = "my-app-secret";
         Secret secret = Secret.Builder.create(this, "mySecret")
-                                     .dependsOn(eksDependOn)
-                                     .metadata(SecretMetadata.builder().name(secretName).build())
-                                     .data(Map.of(
-                                             "spark-defaults.conf", """
-                                                     spark.sql.catalog.azure.warehouse=azure                                                       \s
-                                                     spark.sql.catalog.azure.header.X-Iceberg-Access-Delegation=vended-credentials            \s
-                                                     spark.sql.catalog.azure.credential=root:s3cr3t                                          \s
-                                                     spark.sql.catalog.azure.cache-enabled=false                                                   \s
-                                                     spark.sql.catalog.azure.rest.auth.oauth2.scope=REDACTED                                    \s
-                                                     spark.sql.catalog.azure=org.apache.iceberg.spark.SparkCatalog\s
-                                                     spark.sql.catalog.azure.oauth2.token=REDACTED                                              \s
-                                                     spark.sql.catalog.azure.client_secret=s3cr3t                                                 \s
-                                                     spark.sql.catalog.azure.uri=http://localhost:8181/api/catalog     \s
-                                                     spark.sql.catalog.azure.token=REDACTED                                                     \s
-                                                     spark.sql.catalog.azure.type=rest                                                              \s
-                                                     spark.sql.catalog.azure.scope=PRINCIPAL_ROLE:ALL                                 \s
-                                                     spark.sql.catalog.azure.client_id=root""",
-                                             "env.config", "ENVIRONMENT=production\nDEBUG=false"
-                                                 )
-                                          )
-                                     .type("Opaque")
-                                     .build();
+                                      .dependsOn(eksDependOn)
+                                      .metadata(SecretMetadata.builder().name(secretName).build())
+                                      .data(Map.of(
+                                              "spark-defaults.conf", """
+                                                      spark.sql.catalog.azure.warehouse=azure                                                       \s
+                                                      spark.sql.catalog.azure.header.X-Iceberg-Access-Delegation=vended-credentials            \s
+                                                      spark.sql.catalog.azure.credential=root:s3cr3t                                          \s
+                                                      spark.sql.catalog.azure.cache-enabled=false                                                   \s
+                                                      spark.sql.catalog.azure.rest.auth.oauth2.scope=REDACTED                                    \s
+                                                      spark.sql.catalog.azure=org.apache.iceberg.spark.SparkCatalog\s
+                                                      spark.sql.catalog.azure.oauth2.token=REDACTED                                              \s
+                                                      spark.sql.catalog.azure.client_secret=s3cr3t                                                 \s
+                                                      spark.sql.catalog.azure.uri=http://localhost:8181/api/catalog     \s
+                                                      spark.sql.catalog.azure.token=REDACTED                                                     \s
+                                                      spark.sql.catalog.azure.type=rest                                                              \s
+                                                      spark.sql.catalog.azure.scope=PRINCIPAL_ROLE:ALL                                 \s
+                                                      spark.sql.catalog.azure.client_id=root""",
+                                              "env.config", "ENVIRONMENT=production\nDEBUG=false"
+                                                  )
+                                           )
+                                      .type("Opaque")
+                                      .build();
 
         // 5. Define a Deployment that mounts the Secret as a Volume
-        final Map<String, String> labels = Map.of("app", "jupyter");
+        final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
         String secretVolume = "secret-volume";
         List<DeploymentSpecTemplateSpecVolume> volumes = List.of(DeploymentSpecTemplateSpecVolume.builder()
@@ -319,8 +322,8 @@ class WholeStack extends TerraformStack {
                                                                                                  .build());
         String secretsDir = "/etc/app-secrets";
         List<DeploymentSpecTemplateSpecContainerVolumeMount> mounts = List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
-                                                                                                                            .name(secretVolume) // Must match the volume name defined below
-                                                                                                                            .mountPath(secretsDir) // The directory where secret files will appear
+                                                                                                                            .name(secretVolume)
+                                                                                                                            .mountPath(secretsDir)
                                                                                                                             .readOnly(true)
                                                                                                                             .build());
 
@@ -329,52 +332,70 @@ class WholeStack extends TerraformStack {
                                                       .name("SPARK_CONF_DIR")
                                                       .value(secretsDir)
                                                       .build()
-       );
-        List<DeploymentSpecTemplateSpecContainer> containers = List.of(
-                DeploymentSpecTemplateSpecContainer.builder()
-                                                   .name("jupyter")
-                                                   .image("jupyter/pyspark-notebook:x86_64-spark-3.5.0")
-                                                   .env(envVars)
-                                                   .volumeMount(mounts)
-                                                   .build(),
-               DeploymentSpecTemplateSpecContainer.builder()
-                                                   .name("nginx")
-                                                   .image("nginx:latest")
-                                                   .env(envVars)
-                                                   .volumeMount(mounts)
-                                                   .build()
-                                                                      );
-        Deployment.Builder.create(this, "jupyterDeployment")
-                          .dependsOn(eksDependOn)
-                          .metadata(DeploymentMetadata.builder()
-                                                      .name("jupyter-deployment")
-                                                      .labels(labels)
-                                                      .build())
-                          .spec(DeploymentSpec.builder()
-                                              .selector(DeploymentSpecSelector.builder().matchLabels(labels).build())
-                                              .replicas("1")
-                                              .template(DeploymentSpecTemplate.builder()
-                                                                              .metadata(DeploymentSpecTemplateMetadata.builder().labels(labels).build()) // FIX: Correctly using DeploymentSpecTemplateMetadata builder
-                                                                              .spec(DeploymentSpecTemplateSpec.builder()
-                                                                                                              .container(containers)
-                                                                                                              .volume(volumes)
-                                                                                                              .build())
-                                                                              .build())
-                                              .build())
-                          .build();
+                                                                                );
+        DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer.builder()
+                                                                                                  .name("jupyter")
+                                                                                                  .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1")
+                                                                                                  .env(envVars)
+                                                                                                  .volumeMount(mounts)
+                                                                                                  .build();
+        DeploymentSpecTemplateSpecContainer nginxContainer = DeploymentSpecTemplateSpecContainer.builder()
+                                                                                                .name("nginx")
+                                                                                                .image("nginx:latest")
+                                                                                                .env(envVars)
+                                                                                                .volumeMount(mounts)
+                                                                                                .build();
+        deploy(eksDependOn, jupyterLabels, List.of(jupyterContainer), volumes, "jupyter");
+        deploy(eksDependOn, Map.of("app", "nginx"), List.of(nginxContainer), volumes, "nginx");
 
+
+        Service.Builder.create(this, "jupyter-lb")
+                       .metadata(ServiceMetadata.builder()
+                                                .name("jupyter-lb")
+//                                                .annotations(Map.of(
+//                                                        // Annotation to specify an AWS Network Load Balancer (NLB) for better performance/static IP
+//                                                        // Omit this annotation to default to a Classic Load Balancer (CLB)
+//                                                        "service.beta.kubernetes.io/aws-load-balancer-type", "nlb"
+//                                                                   ))
+                                                .build())
+                       .spec(ServiceSpec.builder()
+                                        .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
+                                        .type("LoadBalancer")
+                                        .port(List.of(
+                                                ServiceSpecPort.builder()
+                                                               .name("web")
+                                                               .port(8888) // Port the load balancer listens on
+                                                               .targetPort("8888") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build()
+                                                     ))
+                                        .build())
+                       .build();
+
+
+        networkPolicies(jupyterLabels);
+
+        // 6. Configure the Helm Provider
+        HelmProvider.Builder.create(this, "helm").build();
+
+        calico(eksDependOn);
+
+        csiSecretsDriver(eksDependOn);
+    }
+
+    private void networkPolicies(Map<String, String> labels) {
         // 5.1. Define a NetworkPolicy to control egress traffic for the Deployment
         List<NetworkPolicySpecEgressPorts> dnsPorts = List.of(
                 // Allow UDP/53 for standard DNS lookups
                 NetworkPolicySpecEgressPorts.builder().protocol("UDP").port("53").build(),
                 // Allow TCP/53 for DNS zone transfers or large responses
                 NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("53").build()
-        );
+                                                             );
         List<NetworkPolicySpecEgressPorts> webPorts = List.of(
                 // Allow common HTTP/HTTPS to the external CIDR
                 NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("80").build(),
                 NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build()
-        );
+                                                             );
         NetworkPolicySpecEgressTo dnsNetworkPolicy = NetworkPolicySpecEgressTo
                 .builder() // 1. Select the 'kube-system' namespace (common EKS label for system namespaces)
                 .namespaceSelector(NetworkPolicySpecEgressToNamespaceSelector.builder()
@@ -392,7 +413,7 @@ class WholeStack extends TerraformStack {
                                                                                   .cidr(bbcNews)
                                                                                   .build())
                                          .build()
-        );
+                                                            );
         NetworkPolicy.Builder.create(this, "secretAppEgressPolicy")
                              .metadata(NetworkPolicyMetadata.builder()
                                                             .name("allow-only-specific-egress")
@@ -419,13 +440,9 @@ class WholeStack extends TerraformStack {
                                                                    ))
                                                     .build())
                              .build(); // NOTE: Removed dependency on kubeconfigUpdater
+    }
 
-        // 6. Configure the Helm Provider
-        HelmProvider.Builder.create(this, "helm")
-                            // No explicit configuration needed here, but you could add experimental features
-                            // or specific connection details if needed.
-                            .build();
-
+    private void calico(List<@NotNull Resource> eksDependOn) {
         Release.Builder.create(this, "calicoOperator")
                        .name("tigera-operator")
                        .dependsOn(eksDependOn)
@@ -439,9 +456,9 @@ class WholeStack extends TerraformStack {
                        .atomic(true)
                        .timeout(300)
                        .build();
+    }
 
-        // 7. Install a Helm Chart (equivalent to 'helm install')
-        // This single `Release` resource handles both adding the repository URL and installing the chart.
+    private void csiSecretsDriver(List<@NotNull Resource> eksDependOn) {
         Release.Builder.create(this, "secrets-store-csi-driver")
                        .dependsOn(eksDependOn)
                        .name("csi-secrets-store") // The release name
@@ -451,6 +468,33 @@ class WholeStack extends TerraformStack {
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
                        .atomic(true) // If installation fails, completely uninstall the release
                        .build();
+    }
+
+    private void deploy(List<@NotNull Resource> eksDependOn,
+                        Map<String, String> labels,
+                        List<DeploymentSpecTemplateSpecContainer> containers,
+                        List<DeploymentSpecTemplateSpecVolume> volumes,
+                        String name) {
+        DeploymentSpecTemplateMetadata metadata = DeploymentSpecTemplateMetadata.builder().labels(labels).build();
+        DeploymentSpecTemplate specTemplate = DeploymentSpecTemplate.builder()
+                                                                    .metadata(metadata)
+                                                                    .spec(DeploymentSpecTemplateSpec.builder()
+                                                                                                    .container(containers)
+                                                                                                    .volume(volumes)
+                                                                                                    .build())
+                                                                    .build();
+        Deployment.Builder.create(this, name + "Deployment")
+                          .dependsOn(eksDependOn)
+                          .metadata(DeploymentMetadata.builder()
+                                                      .name(name + "-deployment")
+                                                      .labels(labels)
+                                                      .build())
+                          .spec(DeploymentSpec.builder()
+                                              .selector(DeploymentSpecSelector.builder().matchLabels(labels).build())
+                                              .replicas("1")
+                                              .template(specTemplate)
+                                              .build())
+                          .build();
     }
 
     public static void main(String[] args) {
