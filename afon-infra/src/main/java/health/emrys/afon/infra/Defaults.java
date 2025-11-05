@@ -6,7 +6,6 @@ public interface Defaults {
     String AWS_REGION   = "eu-west-2";
 
     String JUPYTER_SERVICE_NAME = "jupyter-lb";
-    String JUPYTER_POD_NAME     = "jupyter-notebook";
 
     String POLARIS_POD_NAME     = "polaris";
     String POLARIS_SERVICE_NAME = "polaris-lb";

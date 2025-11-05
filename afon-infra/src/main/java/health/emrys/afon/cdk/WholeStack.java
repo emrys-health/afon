@@ -39,7 +39,6 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
@@ -50,10 +49,8 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.AZURE_CLIENT_SECRET;
-import static health.emrys.afon.config.AfonProperties.AZURE_TENANT_ID;
+import static health.emrys.afon.infra.Defaults.*;
 import static health.emrys.afon.infra.Defaults.AWS_REGION;
-import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
 /***
@@ -365,9 +362,43 @@ class WholeStack extends TerraformStack {
         deploy(eksDependOn, Map.of("app", "polaris"), List.of(polarisContainer), volumes, "polaris");
 
 
-        Service.Builder.create(this, "jupyter-lb")
+        Service.Builder.create(this, SPARK_SERVICE_NAME)
                        .metadata(ServiceMetadata.builder()
-                                                .name("jupyter-lb")
+                                                .name(SPARK_SERVICE_NAME)
+                                                .build())
+                       .spec(ServiceSpec.builder()
+                                        .selector(Map.of(
+                                                "spark-role", "master",
+                                                "spark-version", "4.0.1",
+                                                "spark.operator/name", "spark-kubernetes-operator",
+                                                "spark.operator/spark-cluster-name", "prod"))
+                                        .type("LoadBalancer")
+                                        .port(List.of(
+                                                ServiceSpecPort.builder()
+                                                               .name("web")
+                                                               .port(8080) // Port the load balancer listens on
+                                                               .targetPort("web") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build(),
+                                                ServiceSpecPort.builder()
+                                                               .name("spark")
+                                                               .port(7077) // Port the load balancer listens on
+                                                               .targetPort("7077") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build(),
+                                                ServiceSpecPort.builder()
+                                                               .name("rest")
+                                                               .port(6066) // Port the load balancer listens on
+                                                               .targetPort("rest") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build()
+                                                     ))
+                                        .build())
+                       .build();
+
+        Service.Builder.create(this, JUPYTER_SERVICE_NAME)
+                       .metadata(ServiceMetadata.builder()
+                                                .name(JUPYTER_SERVICE_NAME)
                                                 .build())
                        .spec(ServiceSpec.builder()
                                         .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
