@@ -39,15 +39,22 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
+import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.AZURE_CLIENT_SECRET;
+import static health.emrys.afon.config.AfonProperties.AZURE_TENANT_ID;
 import static health.emrys.afon.infra.Defaults.AWS_REGION;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
+import static java.lang.String.format;
 
 /***
  * Creates the markup to create the full stack in AWS.
@@ -175,7 +182,7 @@ class WholeStack extends TerraformStack {
                                                  .provisioners(List.of(
                                                          LocalExecProvisioner.builder()
                                                                              .when("create") // Run only when the resource is created
-                                                                             .command(String.format(
+                                                                             .command(format(
                                                                                               "aws eks update-kubeconfig --name %s --region %s",
                                                                                               CLUSTER_NAME,
                                                                                               AWS_REGION)
@@ -198,7 +205,7 @@ class WholeStack extends TerraformStack {
         // ** NEW STEP: Create Custom IAM Policy referencing the Secret ARN **
         // We use String.format to insert the secret's ARN dynamically into the policy JSON.
         // %s will be replaced by the Secret ARN
-        final String customSecretPolicyDocument = String.format(
+        final String customSecretPolicyDocument = format(
                 """
                         {
                           "Version": "2012-10-17",
@@ -289,25 +296,30 @@ class WholeStack extends TerraformStack {
 
         // 4. Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
-        String secretName = "my-app-secret";
-        Secret secret = Secret.Builder.create(this, "mySecret")
+        String               secretName = "my-app-secret";
+        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
+        Properties           properties = loader.getProperties();
+        String               polarisEnv = "polaris_env.sh";
+        Secret              secret      = Secret.Builder.create(this, "mySecret")
                                       .dependsOn(eksDependOn)
                                       .metadata(SecretMetadata.builder().name(secretName).build())
                                       .data(Map.of(
-                                              "spark-defaults.conf", """
-                                                      spark.sql.catalog.azure.warehouse=azure                                                       \s
-                                                      spark.sql.catalog.azure.header.X-Iceberg-Access-Delegation=vended-credentials            \s
-                                                      spark.sql.catalog.azure.credential=root:s3cr3t                                          \s
-                                                      spark.sql.catalog.azure.cache-enabled=false                                                   \s
-                                                      spark.sql.catalog.azure.rest.auth.oauth2.scope=REDACTED                                    \s
-                                                      spark.sql.catalog.azure=org.apache.iceberg.spark.SparkCatalog\s
-                                                      spark.sql.catalog.azure.oauth2.token=REDACTED                                              \s
-                                                      spark.sql.catalog.azure.client_secret=s3cr3t                                                 \s
-                                                      spark.sql.catalog.azure.uri=http://localhost:8181/api/catalog     \s
-                                                      spark.sql.catalog.azure.token=REDACTED                                                     \s
-                                                      spark.sql.catalog.azure.type=rest                                                              \s
-                                                      spark.sql.catalog.azure.scope=PRINCIPAL_ROLE:ALL                                 \s
-                                                      spark.sql.catalog.azure.client_id=root""",
+                                              polarisEnv, format("""
+                                                      export POLARIS_ID=root
+                                                      export POLARIS_SECRET=s3cr3t
+                                                      
+                                                      export %s=%s
+                                                      export %s=%s
+                                                      export %s=%s
+                                                      export %s=%s
+                                                      export %s=%s
+                                                      """,
+                                                                 AWS_ACCESS_KEY_ID.getPropertyName(),     AWS_ACCESS_KEY_ID.getValueFrom(properties),
+                                                                 AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties),
+                                                                 AZURE_CLIENT_ID.getPropertyName(),       AZURE_CLIENT_ID.getValueFrom(properties),
+                                                                 AZURE_TENANT_ID.getPropertyName(),       AZURE_TENANT_ID.getValueFrom(properties),
+                                                                 AZURE_CLIENT_SECRET.getPropertyName(),   AZURE_CLIENT_SECRET.getValueFrom(properties)
+                                                                ),
                                               "env.config", "ENVIRONMENT=production\nDEBUG=false"
                                                   )
                                            )
@@ -343,14 +355,14 @@ class WholeStack extends TerraformStack {
                                                                                                   .env(envVars)
                                                                                                   .volumeMount(mounts)
                                                                                                   .build();
-        DeploymentSpecTemplateSpecContainer nginxContainer = DeploymentSpecTemplateSpecContainer.builder()
-                                                                                                .name("nginx")
-                                                                                                .image("nginx:latest")
+        DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer.builder()
+                                                                                                .name("polaris")
+                                                                                                .image("apache/polaris:1.1.0-incubating")
                                                                                                 .env(envVars)
                                                                                                 .volumeMount(mounts)
                                                                                                 .build();
         deploy(eksDependOn, jupyterLabels, List.of(jupyterContainer), volumes, "jupyter");
-        deploy(eksDependOn, Map.of("app", "nginx"), List.of(nginxContainer), volumes, "nginx");
+        deploy(eksDependOn, Map.of("app", "polaris"), List.of(polarisContainer), volumes, "polaris");
 
 
         Service.Builder.create(this, "jupyter-lb")
