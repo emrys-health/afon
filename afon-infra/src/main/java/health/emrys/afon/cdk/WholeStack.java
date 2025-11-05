@@ -39,16 +39,21 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.core.configuration.SparkContextConfigurationPrinter;
+import health.emrys.afon.spark.SparkWarehouseConfig;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.core.configuration.SparkContextConfigurationPrinter.createSparkConf;
 import static health.emrys.afon.infra.Defaults.*;
 import static health.emrys.afon.infra.Defaults.AWS_REGION;
 import static java.lang.String.format;
@@ -214,7 +219,7 @@ class WholeStack extends TerraformStack {
                             }
                           ]
                         }""", applicationSecret.getArn()
-                                                               );
+                                                        );
 
         final IamPolicy customSecretPolicy = IamPolicy.Builder.create(this, "SecretAccessPolicy")
                                                               .name("EKS-Secret-Access-Policy")
@@ -297,25 +302,25 @@ class WholeStack extends TerraformStack {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
         String               polarisEnv = "polaris_env.sh";
-        Secret               secret     = Secret.Builder.create(this, "mySecret")
+        Secret secret = Secret.Builder.create(this, "mySecret")
                                       .dependsOn(eksDependOn)
                                       .metadata(SecretMetadata.builder().name(secretName).build())
                                       .data(Map.of(
                                               polarisEnv, format("""
-                                                      export POLARIS_ID=root
-                                                      export POLARIS_SECRET=s3cr3t
-                                                      
-                                                      export %s=%s
-                                                      export %s=%s
-                                                      export %s=%s
-                                                      export %s=%s
-                                                      export %s=%s
-                                                      """,
-                                                                 AWS_ACCESS_KEY_ID.getPropertyName(),     AWS_ACCESS_KEY_ID.getValueFrom(properties),
+                                                                         export POLARIS_ID=root
+                                                                         export POLARIS_SECRET=s3cr3t
+                                                                         
+                                                                         export %s=%s
+                                                                         export %s=%s
+                                                                         export %s=%s
+                                                                         export %s=%s
+                                                                         export %s=%s
+                                                                         """,
+                                                                 AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties),
                                                                  AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties),
-                                                                 AZURE_CLIENT_ID.getPropertyName(),       AZURE_CLIENT_ID.getValueFrom(properties),
-                                                                 AZURE_TENANT_ID.getPropertyName(),       AZURE_TENANT_ID.getValueFrom(properties),
-                                                                 AZURE_CLIENT_SECRET.getPropertyName(),   AZURE_CLIENT_SECRET.getValueFrom(properties)
+                                                                 AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties),
+                                                                 AZURE_TENANT_ID.getPropertyName(), AZURE_TENANT_ID.getValueFrom(properties),
+                                                                 AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties)
                                                                 ),
                                               "env.config", "ENVIRONMENT=production\nDEBUG=false"
                                                   )
@@ -372,9 +377,9 @@ class WholeStack extends TerraformStack {
                        .metadata(ServiceMetadata.builder()
                                                 .name(SPARK_SERVICE_NAME)
                                                 .labels(Map.of("spark-role", "master",
-                                                              "spark-version", "4.0.1",
-                                                              "spark.operator/name", "spark-kubernetes-operator",
-                                                              "spark.operator/spark-cluster-name", "prod")
+                                                               "spark-version", "4.0.1",
+                                                               "spark.operator/name", "spark-kubernetes-operator",
+                                                               "spark.operator/spark-cluster-name", "prod")
                                                        )
                                                 .build())
                        .spec(ServiceSpec.builder()
@@ -538,32 +543,7 @@ class WholeStack extends TerraformStack {
                         "sparkConf", sparkConfig(serviceAccountName),
                         "driverSpec", Map.of(
                                 "podTemplateSpec", Map.of(
-                                        "spec", Map.of(
-//                                                "containers", List.of(
-//                                                        Map.of(
-//                                                                // This assumes the first container is the driver, which is typical for SparkApplications
-//                                                                "volumeMounts", List.of(
-//                                                                        Map.of(
-//                                                                                "name", "secrets-store-inline",
-//                                                                                "mountPath", "/etc/secrets",
-//                                                                                "readOnly", true
-//                                                                              )
-//                                                                                       )
-//                                                              )
-//                                                                     ),
-//                                                "volumes", List.of(
-//                                                        Map.of(
-//                                                                "name", "secrets-store-inline",
-//                                                                "csi", Map.of(
-//                                                                        "driver", "secrets-store.csi.k8s.io",
-//                                                                        "readOnly", true,
-//                                                                        "volumeAttributes", Map.of(
-//                                                                                "secretProviderClass", "nginx-pod-identity-deployment-aws-secrets"
-//                                                                                                  )
-//                                                                             )
-//                                                              )
-//                                                                  )
-                                                      )
+                                        "spec", Map.of()
                                                          )
                                             )
                               )
@@ -604,6 +584,19 @@ class WholeStack extends TerraformStack {
                 "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
                            );
         var toReturn = new HashMap<String, String>();
+        try {
+            SparkContextConfigurationPrinter app           = SparkContextConfigurationPrinter.createSparkConf();
+            var                              polarisConfig = app.getPolarisConfig();
+            for (AfonProperties.SupportedCloudsEnum cloudProvider : AfonProperties.SupportedCloudsEnum.values()) {
+                Map<String, String> configs = polarisConfig.sparkConfigs(cloudProvider);
+                for (Map.Entry<String, String> entry : configs.entrySet()) {
+                    toReturn.put(entry.getKey(), entry.getValue());
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         toReturn.putAll(first);
         toReturn.putAll(second);
         return toReturn;
@@ -650,64 +643,64 @@ class WholeStack extends TerraformStack {
                                                     .policyTypes(List.of("Egress"))
                                                     // Policy requires two separate Egress rules, as ports must be defined per rule.
                                                     .egress(List.of(
-                                                                        // Egress Rule 1: External CIDR (151.101.0.0/16) - No change
-                                                                        NetworkPolicySpecEgress.builder()
-                                                                                               .to(allowedIPs)
-                                                                                               .ports(webPorts)
-                                                                                               .build(),
-                                                                        NetworkPolicySpecEgress.builder()
-                                                                                               .to(List.of(dnsNetworkPolicy))
-                                                                                               .ports(dnsPorts)
-                                                                                               .build(),
-                                                                        NetworkPolicySpecEgress.builder()
-                                                                                               .to(List.of(
-                                                                                                       NetworkPolicySpecEgressTo.builder()
-                                                                                                                                .podSelector(NetworkPolicySpecEgressToPodSelector.builder().matchLabels(Map.of()).build())
-                                                                                                                                .build()
-                                                                                                          ))
-                                                                                               .build(),
-                                                                        NetworkPolicySpecEgress.builder()
-                                                                                               .to(List.of(
-                                                                                                       NetworkPolicySpecEgressTo.builder()
-                                                                                                                                // Placeholder CIDR for cluster service range (often 10.96.0.0/12 or 172.20.0.0/16, using a standard service CIDR block for safety)
-                                                                                                                                .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
-                                                                                                                                                                         .cidr("10.96.0.0/12")
-                                                                                                                                                                         .build())
-                                                                                                                                .build()
-                                                                                                          ))
-                                                                                               .ports(List.of(
-                                                                                                       // API server usually runs on 443
-                                                                                                       NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build()
-                                                                                                             ))
-                                                                                               .build(),
-                                                                        NetworkPolicySpecEgress.builder()
-                                                                                               .to(List.of(
-                                                                                                       NetworkPolicySpecEgressTo.builder()
-                                                                                                                                .podSelector(NetworkPolicySpecEgressToPodSelector.builder()
-                                                                                                                                                                                 .matchLabels(Map.of("app.kubernetes.io/name", sparkConnectorName))
+                                                            // Egress Rule 1: External CIDR (151.101.0.0/16) - No change
+                                                            NetworkPolicySpecEgress.builder()
+                                                                                   .to(allowedIPs)
+                                                                                   .ports(webPorts)
+                                                                                   .build(),
+                                                            NetworkPolicySpecEgress.builder()
+                                                                                   .to(List.of(dnsNetworkPolicy))
+                                                                                   .ports(dnsPorts)
+                                                                                   .build(),
+                                                            NetworkPolicySpecEgress.builder()
+                                                                                   .to(List.of(
+                                                                                           NetworkPolicySpecEgressTo.builder()
+                                                                                                                    .podSelector(NetworkPolicySpecEgressToPodSelector.builder().matchLabels(Map.of()).build())
+                                                                                                                    .build()
+                                                                                              ))
+                                                                                   .build(),
+                                                            NetworkPolicySpecEgress.builder()
+                                                                                   .to(List.of(
+                                                                                           NetworkPolicySpecEgressTo.builder()
+                                                                                                                    // Placeholder CIDR for cluster service range (often 10.96.0.0/12 or 172.20.0.0/16, using a standard service CIDR block for safety)
+                                                                                                                    .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
+                                                                                                                                                             .cidr("10.96.0.0/12")
+                                                                                                                                                             .build())
+                                                                                                                    .build()
+                                                                                              ))
+                                                                                   .ports(List.of(
+                                                                                           // API server usually runs on 443
+                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build()
+                                                                                                 ))
+                                                                                   .build(),
+                                                            NetworkPolicySpecEgress.builder()
+                                                                                   .to(List.of(
+                                                                                           NetworkPolicySpecEgressTo.builder()
+                                                                                                                    .podSelector(NetworkPolicySpecEgressToPodSelector.builder()
+                                                                                                                                                                     .matchLabels(Map.of("app.kubernetes.io/name", sparkConnectorName))
+                                                                                                                                                                     .build())
+                                                                                                                    .build()
+                                                                                              ))
+                                                                                   .ports(List.of(
+                                                                                           NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("15002").build()
+                                                                                                 ))
+                                                                                   .build(),
+                                                            NetworkPolicySpecEgress.builder()
+                                                                                   .to(List.of(
+                                                                                           NetworkPolicySpecEgressTo.builder()
+                                                                                                                    // Target the spark-operator namespace
+                                                                                                                    .namespaceSelector(NetworkPolicySpecEgressToNamespaceSelector.builder()
+                                                                                                                                                                                 .matchLabels(Map.of("kubernetes.io/metadata.name", "spark-operator"))
                                                                                                                                                                                  .build())
-                                                                                                                                .build()
-                                                                                                          ))
-                                                                                               .ports(List.of(
-                                                                                                       NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("15002").build()
-                                                                                                             ))
-                                                                                               .build(),
-                                                                        NetworkPolicySpecEgress.builder()
-                                                                                               .to(List.of(
-                                                                                                       NetworkPolicySpecEgressTo.builder()
-                                                                                                                                // Target the spark-operator namespace
-                                                                                                                                .namespaceSelector(NetworkPolicySpecEgressToNamespaceSelector.builder()
-                                                                                                                                                                                             .matchLabels(Map.of("kubernetes.io/metadata.name", "spark-operator"))
-                                                                                                                                                                                             .build())
-                                                                                                                                // Target the operator pod itself (optional, but good practice for specific control plane traffic)
-                                                                                                                                .podSelector(NetworkPolicySpecEgressToPodSelector.builder()
-                                                                                                                                                                                 .matchLabels(Map.of("app.kubernetes.io/name", "spark-operator"))
-                                                                                                                                                                                 .build())
-                                                                                                                                .build()
-                                                                                                          ))
-                                                                                               .build()
+                                                                                                                    // Target the operator pod itself (optional, but good practice for specific control plane traffic)
+                                                                                                                    .podSelector(NetworkPolicySpecEgressToPodSelector.builder()
+                                                                                                                                                                     .matchLabels(Map.of("app.kubernetes.io/name", "spark-operator"))
+                                                                                                                                                                     .build())
+                                                                                                                    .build()
+                                                                                              ))
+                                                                                   .build()
                                                                    )
-                                                                )
+                                                           )
                                                     .build()
                                   ).build();
     }
