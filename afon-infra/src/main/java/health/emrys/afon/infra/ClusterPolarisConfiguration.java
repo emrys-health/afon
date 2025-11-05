@@ -6,6 +6,7 @@ import health.emrys.afon.infra.k8s.EksInfoClient;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.PolarisConfigureMain;
 import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.models.V1Pod;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -41,11 +42,12 @@ public class ClusterPolarisConfiguration {
     }
 
     public void initializePolaris(String polarisServiceName,
-                                  String polarisPodName) throws ApiException, IncorrectConfigException, IOException {
+                                  String polarisPodNamePrefix) throws ApiException, IncorrectConfigException, IOException {
         logger.info("We assume that an EKS cluster called {} is running...", clusterName);
-        var    eksClient    = new EksInfoClient(clusterName, properties);
-        var    tokenGrabber = new PolarisCredentialGrabber();
-        String accessToken  = tokenGrabber.getCredentials(eksClient.getLogsOf(polarisPodName));
+        var   eksClient    = new EksInfoClient(clusterName, properties);
+        V1Pod polarisPod   = eksClient.getPodExpectingOnlyOneStartingWith(polarisPodNamePrefix);
+        var   tokenGrabber = new PolarisCredentialGrabber();
+        String accessToken  = tokenGrabber.getCredentials(eksClient.getLogsOf(polarisPod.getMetadata().getName()));
         addPolarisEndpointToProperties(polarisServiceName, eksClient);
         PolarisConfigureMain polarisClient = new PolarisConfigureMain();
         polarisClient.createAllCatalogs(properties, accessToken);
