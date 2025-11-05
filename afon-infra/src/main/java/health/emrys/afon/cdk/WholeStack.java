@@ -381,7 +381,7 @@ class WholeStack extends TerraformStack {
                                         .type("ClusterIP")
                                         .internalTrafficPolicy("Cluster")
                                         .clusterIp("None")
-                                     .clusterIps(List.of())
+                                        .clusterIps(List.of())
                                         .port(List.of(
                                                 ServiceSpecPort.builder()
                                                                .name("spark")
@@ -393,8 +393,8 @@ class WholeStack extends TerraformStack {
                                         .build())
                        .build();
 
-
-        networkPolicies(jupyterLabels);
+        String sparkConnectorName = "emrys2";
+        networkPolicies(jupyterLabels, sparkConnectorName);
 
         // 6. Configure the Helm Provider
         HelmProvider.Builder.create(this, "helm").build();
@@ -458,7 +458,7 @@ class WholeStack extends TerraformStack {
                 "apiVersion", "spark.apache.org/v1",
                 "kind", "SparkApplication",
                 "metadata", Map.of(
-                        "name", "emrys2",
+                        "name", sparkConnectorName,
                         "namespace", "default"
                                   ),
                 "spec", Map.of(
@@ -498,7 +498,7 @@ class WholeStack extends TerraformStack {
                                                          )
                                             )
                               )
-                                                                 );
+                                                               );
 
         Manifest.Builder.create(this, "sparkClusterManifest")
                         .manifest(sparkClusterManifest)
@@ -522,7 +522,7 @@ class WholeStack extends TerraformStack {
                 "spark.executor.cores", "1",
                 "spark.cores.max", "3",
                 "spark.kubernetes.authenticate.driver.serviceAccountName", serviceAccountName
-              );
+                          );
         var second = Map.of(
                 "spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
                 "spark.driver.allowMultipleContexts", "true",
@@ -533,14 +533,14 @@ class WholeStack extends TerraformStack {
                 "spark.driver.userClassPathFirst", "true",
                 "spark.executor.userClassPathFirst", "true",
                 "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
-              );
+                           );
         var toReturn = new HashMap<String, String>();
         toReturn.putAll(first);
         toReturn.putAll(second);
         return toReturn;
     }
 
-    private void networkPolicies(Map<String, String> labels) {
+    private void networkPolicies(Map<String, String> labels, String sparkConnectorName) {
         // 5.1. Define a NetworkPolicy to control egress traffic for the Deployment
         List<NetworkPolicySpecEgressPorts> dnsPorts = List.of(
                 // Allow UDP/53 for standard DNS lookups
@@ -581,22 +581,66 @@ class WholeStack extends TerraformStack {
                                                     .policyTypes(List.of("Egress"))
                                                     // Policy requires two separate Egress rules, as ports must be defined per rule.
                                                     .egress(List.of(
-                                                            // Egress Rule 1: External CIDR (151.101.0.0/16) - No change
-                                                            NetworkPolicySpecEgress.builder()
-                                                                                   .to(allowedIPs)
-                                                                                   // Ports are defined here on the Egress builder
-                                                                                   .ports(webPorts)
-                                                                                   .build(),
-
-                                                            // Egress Rule 2: DNS Traffic (Target CoreDNS Pods directly)
-                                                            NetworkPolicySpecEgress.builder()
-                                                                                   .to(List.of(dnsNetworkPolicy))
-                                                                                   // Ports are defined here on the Egress builder
-                                                                                   .ports(dnsPorts)
-                                                                                   .build()
-                                                                   ))
-                                                    .build())
-                             .build(); // NOTE: Removed dependency on kubeconfigUpdater
+                                                                        // Egress Rule 1: External CIDR (151.101.0.0/16) - No change
+                                                                        NetworkPolicySpecEgress.builder()
+                                                                                               .to(allowedIPs)
+                                                                                               .ports(webPorts)
+                                                                                               .build(),
+                                                                        NetworkPolicySpecEgress.builder()
+                                                                                               .to(List.of(dnsNetworkPolicy))
+                                                                                               .ports(dnsPorts)
+                                                                                               .build(),
+                                                                        NetworkPolicySpecEgress.builder()
+                                                                                               .to(List.of(
+                                                                                                       NetworkPolicySpecEgressTo.builder()
+                                                                                                                                .podSelector(NetworkPolicySpecEgressToPodSelector.builder().matchLabels(Map.of()).build())
+                                                                                                                                .build()
+                                                                                                          ))
+                                                                                               .build(),
+                                                                        NetworkPolicySpecEgress.builder()
+                                                                                               .to(List.of(
+                                                                                                       NetworkPolicySpecEgressTo.builder()
+                                                                                                                                // Placeholder CIDR for cluster service range (often 10.96.0.0/12 or 172.20.0.0/16, using a standard service CIDR block for safety)
+                                                                                                                                .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
+                                                                                                                                                                         .cidr("10.96.0.0/12")
+                                                                                                                                                                         .build())
+                                                                                                                                .build()
+                                                                                                          ))
+                                                                                               .ports(List.of(
+                                                                                                       // API server usually runs on 443
+                                                                                                       NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build()
+                                                                                                             ))
+                                                                                               .build(),
+                                                                        NetworkPolicySpecEgress.builder()
+                                                                                               .to(List.of(
+                                                                                                       NetworkPolicySpecEgressTo.builder()
+                                                                                                                                .podSelector(NetworkPolicySpecEgressToPodSelector.builder()
+                                                                                                                                                                                 .matchLabels(Map.of("app.kubernetes.io/name", sparkConnectorName))
+                                                                                                                                                                                 .build())
+                                                                                                                                .build()
+                                                                                                          ))
+                                                                                               .ports(List.of(
+                                                                                                       NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("15002").build()
+                                                                                                             ))
+                                                                                               .build(),
+                                                                        NetworkPolicySpecEgress.builder()
+                                                                                               .to(List.of(
+                                                                                                       NetworkPolicySpecEgressTo.builder()
+                                                                                                                                // Target the spark-operator namespace
+                                                                                                                                .namespaceSelector(NetworkPolicySpecEgressToNamespaceSelector.builder()
+                                                                                                                                                                                             .matchLabels(Map.of("kubernetes.io/metadata.name", "spark-operator"))
+                                                                                                                                                                                             .build())
+                                                                                                                                // Target the operator pod itself (optional, but good practice for specific control plane traffic)
+                                                                                                                                .podSelector(NetworkPolicySpecEgressToPodSelector.builder()
+                                                                                                                                                                                 .matchLabels(Map.of("app.kubernetes.io/name", "spark-operator"))
+                                                                                                                                                                                 .build())
+                                                                                                                                .build()
+                                                                                                          ))
+                                                                                               .build()
+                                                                   )
+                                                                )
+                                                    .build()
+                                  ).build();
     }
 
     private void calico(List<@NotNull Resource> eksDependOn) {
