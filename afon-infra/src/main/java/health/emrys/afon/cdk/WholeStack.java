@@ -297,7 +297,7 @@ class WholeStack extends TerraformStack {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
         String               polarisEnv = "polaris_env.sh";
-        Secret              secret      = Secret.Builder.create(this, "mySecret")
+        Secret               secret     = Secret.Builder.create(this, "mySecret")
                                       .dependsOn(eksDependOn)
                                       .metadata(SecretMetadata.builder().name(secretName).build())
                                       .data(Map.of(
@@ -365,13 +365,15 @@ class WholeStack extends TerraformStack {
         Service.Builder.create(this, SPARK_SERVICE_NAME)
                        .metadata(ServiceMetadata.builder()
                                                 .name(SPARK_SERVICE_NAME)
+                                                .labels(Map.of("spark-role", "master",
+                                                              "spark-version", "4.0.1",
+                                                              "spark.operator/name", "spark-kubernetes-operator",
+                                                              "spark.operator/spark-cluster-name", "prod")
+                                                       )
                                                 .build())
                        .spec(ServiceSpec.builder()
                                         .selector(Map.of(
-                                                "spark-role", "master",
-                                                "spark-version", "4.0.1",
-                                                "spark.operator/name", "spark-kubernetes-operator",
-                                                "spark.operator/spark-cluster-name", "prod"))
+                                                "spark-role", "master"))
                                         .type("LoadBalancer")
                                         .port(List.of(
                                                 ServiceSpecPort.builder()
