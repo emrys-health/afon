@@ -123,6 +123,11 @@ public class EksInfoClient {
         return pods;
     }
 
+    public V1Pod getPodExpectingOnlyOneStartingWith(String podName) throws ApiException {
+        return listPods().stream().filter(x -> x.getMetadata().getName().startsWith(podName)).findFirst().orElseThrow();
+    }
+
+
     public String getLogsOf(String pod) throws ApiException {
         CoreV1Api api = new CoreV1Api();
         APIreadNamespacedPodLogRequest request = api.readNamespacedPodLog(pod, "default");

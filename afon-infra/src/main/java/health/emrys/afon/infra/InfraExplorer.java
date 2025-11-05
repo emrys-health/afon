@@ -20,7 +20,7 @@ public class InfraExplorer {
         Properties    properties = new AfonPropertiesLoader().getProperties();
         InfraExplorer app        = new InfraExplorer();
         try {
-            app.printJupyterDetails(clusterName, properties, JUPYTER_SERVICE_NAME, JUPYTER_POD_NAME);
+            app.printJupyterDetails(clusterName, properties, JUPYTER_SERVICE_NAME);
             app.printSparkDetails(clusterName, properties, SPARK_SERVICE_NAME);
         } catch (Exception e) {
             e.printStackTrace();
@@ -35,9 +35,9 @@ public class InfraExplorer {
 
     private void printJupyterDetails(String clusterName,
                                      Properties properties,
-                                     String jupyterServiceName,
-                                     String jupyterPodName) throws ApiException, IncorrectConfigException {
+                                     String jupyterServiceName) throws ApiException, IncorrectConfigException {
         var eksClient = new EksInfoClient(clusterName, properties);
+        String jupyterPodName = eksClient.getPodExpectingOnlyOneStartingWith("jupyter").getMetadata().getName();
         logger.info("Cluster querying: {} for service name {}", clusterName, jupyterServiceName);
         String jupyterHost = eksClient.getIngressExpectingOnlyOneFor(jupyterServiceName);
         logger.info("Cluster querying: {} for the logs of pod {}", clusterName, jupyterPodName);
