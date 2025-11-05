@@ -26,6 +26,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
+import com.hashicorp.cdktf.providers.kubernetes.manifest.Manifest;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
@@ -34,11 +35,14 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
+import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -352,11 +356,6 @@ class WholeStack extends TerraformStack {
         Service.Builder.create(this, "jupyter-lb")
                        .metadata(ServiceMetadata.builder()
                                                 .name("jupyter-lb")
-//                                                .annotations(Map.of(
-//                                                        // Annotation to specify an AWS Network Load Balancer (NLB) for better performance/static IP
-//                                                        // Omit this annotation to default to a Classic Load Balancer (CLB)
-//                                                        "service.beta.kubernetes.io/aws-load-balancer-type", "nlb"
-//                                                                   ))
                                                 .build())
                        .spec(ServiceSpec.builder()
                                         .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
@@ -381,6 +380,142 @@ class WholeStack extends TerraformStack {
         calico(eksDependOn);
 
         csiSecretsDriver(eksDependOn);
+
+        String serviceAccountName = "spark-application-sa";
+        final ServiceAccount sparkApplicationSa = ServiceAccount.Builder.create(this, "sparkApplicationSa")
+                                                                        .metadata(ServiceAccountMetadata.builder()
+                                                                                                        .name(serviceAccountName)
+                                                                                                        .namespace("default")
+                                                                                                        .build())
+                                                                        .build();
+
+        // 8. INSTALL SPARK OPERATOR (CRD CONTROLLER)
+        Release sparkOperatorRelease = Release.Builder.create(this, "sparkOperator")
+                                                      .name("spark-kubernetes-operator")
+                                                      .chart("spark-kubernetes-operator")
+                                                      .repository("https://apache.github.io/spark-kubernetes-operator")
+                                                      .namespace("default")
+//                                                      .version("1.3.0")
+                                                      .atomic(true)
+                                                      .dependsOn(List.of(eksAuthData)) // Depend on EKS Auth
+                                                      .build();
+
+
+        // 9. DEPLOY SPARK CONNECT APPLICATION (Custom Resource Definition via Manifest)
+        // This creates a dedicated Spark cluster whose driver acts as the Spark Connect server.
+
+        final Map<String, Object> sparkClusterManifest = Map.of(
+                "apiVersion", "spark.apache.org/v1alpha1",
+                "kind", "SparkCluster",
+                "metadata", Map.of(
+                        "name", "emrys",
+                        "namespace", "default"
+                                  ),
+                "spec", Map.of(
+                        "runtimeVersions", Map.of(
+                                "sparkVersion", "4.0.1"
+                                                 ),
+                        "clusterTolerations", Map.of(
+                                "instanceConfig", Map.of(
+                                        "initWorkers", 2, // Integer type
+                                        "minWorkers", 2, // Integer type
+                                        "maxWorkers", 2  // Integer type
+                                                        )
+                                                    ),
+                        "sparkConf", Map.of(
+                                "spark.kubernetes.container.image", "apache/spark:4.0.1",
+                                "spark.master.ui.title", "Prod Spark Cluster",
+                                "spark.master.rest.enabled", "true",
+                                "spark.master.rest.host", "0.0.0.0",
+                                "spark.ui.reverseProxy", "true"
+                                           )
+                              )
+                                                               );
+
+        final Map<String, Object> sparkConnectManifest = Map.of(
+                "apiVersion", "spark.apache.org/v1",
+                "kind", "SparkApplication",
+                "metadata", Map.of(
+                        "name", "emrys2",
+                        "namespace", "default"
+                                  ),
+                "spec", Map.of(
+                        "runtimeVersions", Map.of(
+                                "sparkVersion", "4.0.1"
+                                                 ),
+                        "mainClass", "org.apache.spark.sql.connect.service.SparkConnectServer",
+                        "sparkConf", sparkConfig(serviceAccountName),
+                        "driverSpec", Map.of(
+                                "podTemplateSpec", Map.of(
+                                        "spec", Map.of(
+//                                                "containers", List.of(
+//                                                        Map.of(
+//                                                                // This assumes the first container is the driver, which is typical for SparkApplications
+//                                                                "volumeMounts", List.of(
+//                                                                        Map.of(
+//                                                                                "name", "secrets-store-inline",
+//                                                                                "mountPath", "/etc/secrets",
+//                                                                                "readOnly", true
+//                                                                              )
+//                                                                                       )
+//                                                              )
+//                                                                     ),
+//                                                "volumes", List.of(
+//                                                        Map.of(
+//                                                                "name", "secrets-store-inline",
+//                                                                "csi", Map.of(
+//                                                                        "driver", "secrets-store.csi.k8s.io",
+//                                                                        "readOnly", true,
+//                                                                        "volumeAttributes", Map.of(
+//                                                                                "secretProviderClass", "nginx-pod-identity-deployment-aws-secrets"
+//                                                                                                  )
+//                                                                             )
+//                                                              )
+//                                                                  )
+                                                      )
+                                                         )
+                                            )
+                              )
+                                                                 );
+
+        Manifest.Builder.create(this, "sparkClusterManifest")
+                        .manifest(sparkClusterManifest)
+                        .dependsOn(List.of(sparkOperatorRelease))
+                        .build();
+        Manifest.Builder.create(this, "sparkConnectManifest")
+                        .manifest(sparkConnectManifest)
+                        .dependsOn(List.of(sparkOperatorRelease))
+                        .build();
+    }
+
+    private Map<String, String> sparkConfig(String serviceAccountName) {
+        var first = Map.of(
+                "spark.kubernetes.container.image", "apache/spark:4.0.1",
+                "spark.master.ui.title", "Prod Spark Cluster",
+                "spark.master.rest.enabled", "true",
+                "spark.master.rest.host", "0.0.0.0",
+                "spark.ui.reverseProxy", "true",
+                "spark.master", "spark://emrys-master-svc:7077",
+                "spark.submit.deployMode", "cluster",
+                "spark.executor.cores", "1",
+                "spark.cores.max", "3",
+                "spark.kubernetes.authenticate.driver.serviceAccountName", serviceAccountName
+              );
+        var second = Map.of(
+                "spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+                "spark.driver.allowMultipleContexts", "true",
+                "spark.sql.iceberg.planning.preserve-data-grouping", "true",
+                "spark.sql.sources.v2.bucketing.enabled", "true",
+                "spark.sql.sources.bucketing.enabled", "true",
+                "spark.jars.packages", "com.google.guava:guava:33.4.0-jre,org.apache.hadoop:hadoop-aws:3.4.2,com.google.cloud:google-cloud-storage:2.57.0,software.amazon.awssdk:bundle:2.34.6,org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.0",
+                "spark.driver.userClassPathFirst", "true",
+                "spark.executor.userClassPathFirst", "true",
+                "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
+              );
+        var toReturn = new HashMap<String, String>();
+        toReturn.putAll(first);
+        toReturn.putAll(second);
+        return toReturn;
     }
 
     private void networkPolicies(Map<String, String> labels) {
