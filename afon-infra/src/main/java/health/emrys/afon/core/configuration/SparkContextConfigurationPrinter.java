@@ -24,7 +24,7 @@ import static java.lang.String.format;
 
 /**
  * This generates the PySpark code you can run in Jupyter.
- *
+ * <p>
  * If you're messing around the Spark artifact, you might need to presign with:
  * copy it to S3 with:
  * docker run --rm -it  -v ~/.aws:/root/.aws -v /home/henryp/Code/Emrys/afon-core/afon-iceberg/target/:/tmp/target  amazon/aws-cli s3 cp /tmp/target/afon-iceberg-0.1.jar s3://emrys-afon-bucket/afon-iceberg-0.1.jar
@@ -44,7 +44,7 @@ public class SparkContextConfigurationPrinter {
     }
 
     private static void createSparkConf(String[] args) throws IOException {
-        String clusterName        = CLUSTER_NAME;
+        String clusterName = CLUSTER_NAME;
 
         AfonPropertiesLoader loader       = new AfonPropertiesLoader();
         Properties           properties   = loader.getProperties();
@@ -52,7 +52,8 @@ public class SparkContextConfigurationPrinter {
         var                  tokenGrabber = new PolarisCredentialGrabber();
         String               accessToken  = null;
         try {
-            accessToken = tokenGrabber.getCredentials(eksClient.getLogsOf(POLARIS_POD_NAME));
+            String podName  = eksClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME).getMetadata().getName();
+            accessToken     = tokenGrabber.getCredentials(eksClient.getLogsOf(podName));
 
             ClusterPolarisConfiguration clusterPolaris = new ClusterPolarisConfiguration(clusterName, properties);
             clusterPolaris.addPolarisEndpointToProperties(POLARIS_SERVICE_NAME, eksClient);

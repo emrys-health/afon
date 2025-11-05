@@ -325,6 +325,7 @@ class WholeStack extends TerraformStack {
 
         // 5. Define a Deployment that mounts the Secret as a Volume
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
+        final Map<String, String> polarisLabels = Map.of("app", "polaris");
 
         String secretVolume = "secret-volume";
         List<DeploymentSpecTemplateSpecVolume> volumes = List.of(DeploymentSpecTemplateSpecVolume.builder()
@@ -352,14 +353,19 @@ class WholeStack extends TerraformStack {
                                                                                                   .env(envVars)
                                                                                                   .volumeMount(mounts)
                                                                                                   .build();
+        List<String> commands = List.of("/bin/bash",
+                                        "-c",
+                                        format("source %s/%s && /opt/jboss/container/java/run/run-java.sh",
+                                               secretsDir, polarisEnv));
         DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer.builder()
-                                                                                                .name("polaris")
-                                                                                                .image("apache/polaris:1.1.0-incubating")
-                                                                                                .env(envVars)
-                                                                                                .volumeMount(mounts)
-                                                                                                .build();
+                                                                                                  .name("polaris")
+                                                                                                  .image("apache/polaris:1.1.0-incubating")
+                                                                                                  .env(envVars)
+                                                                                                  .command(commands)
+                                                                                                  .volumeMount(mounts)
+                                                                                                  .build();
         deploy(eksDependOn, jupyterLabels, List.of(jupyterContainer), volumes, "jupyter");
-        deploy(eksDependOn, Map.of("app", "polaris"), List.of(polarisContainer), volumes, "polaris");
+        deploy(eksDependOn, polarisLabels, List.of(polarisContainer), volumes, "polaris");
 
 
         Service.Builder.create(this, SPARK_SERVICE_NAME)
@@ -392,6 +398,24 @@ class WholeStack extends TerraformStack {
                                                                .name("rest")
                                                                .port(6066) // Port the load balancer listens on
                                                                .targetPort("rest") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build()
+                                                     ))
+                                        .build())
+                       .build();
+
+        Service.Builder.create(this, POLARIS_SERVICE_NAME)
+                       .metadata(ServiceMetadata.builder()
+                                                .name(POLARIS_SERVICE_NAME)
+                                                .build())
+                       .spec(ServiceSpec.builder()
+                                        .selector(polarisLabels)
+                                        .type("LoadBalancer")
+                                        .port(List.of(
+                                                ServiceSpecPort.builder()
+                                                               .name("web")
+                                                               .port(8181)
+                                                               .targetPort("8181")
                                                                .protocol("TCP")
                                                                .build()
                                                      ))
