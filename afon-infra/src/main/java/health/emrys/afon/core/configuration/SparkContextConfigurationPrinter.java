@@ -7,7 +7,6 @@ import health.emrys.afon.infra.PolarisCredentialGrabber;
 import health.emrys.afon.infra.k8s.EksInfoClient;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.spark.SparkWarehouseConfig;
-import io.kubernetes.client.openapi.ApiException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
@@ -37,36 +36,38 @@ public class SparkContextConfigurationPrinter {
 
     public static final void main(String[] args) {
         try {
-            createSparkConf(args);
+            var app = createSparkConf();
+            app.printSparkConfig();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static void createSparkConf(String[] args) throws IOException {
-        String clusterName = CLUSTER_NAME;
-
-        AfonPropertiesLoader loader       = new AfonPropertiesLoader();
-        Properties           properties   = loader.getProperties();
-        var                  eksClient    = new EksInfoClient(clusterName, properties);
-        var                  tokenGrabber = new PolarisCredentialGrabber();
-        String               accessToken  = null;
+    public static SparkContextConfigurationPrinter createSparkConf() throws IOException {
+        String                           clusterName  = CLUSTER_NAME;
+        AfonPropertiesLoader             loader       = new AfonPropertiesLoader();
+        Properties                       properties   = loader.getProperties();
+        var                              eksClient    = new EksInfoClient(clusterName, properties);
+        var                              tokenGrabber = new PolarisCredentialGrabber();
+        String                           accessToken  = null;
+        SparkContextConfigurationPrinter app          = null;
         try {
-            String podName  = eksClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME).getMetadata().getName();
-            accessToken     = tokenGrabber.getCredentials(eksClient.getLogsOf(podName));
+            String podName = eksClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME).getMetadata().getName();
+            accessToken = tokenGrabber.getCredentials(eksClient.getLogsOf(podName));
 
             ClusterPolarisConfiguration clusterPolaris = new ClusterPolarisConfiguration(clusterName, properties);
             clusterPolaris.addPolarisEndpointToProperties(POLARIS_SERVICE_NAME, eksClient);
             String polarisEndpoint = POLARIS_ENDPOINT.getValueFrom(properties);
             logger.info("Polaris endpoint: {}", polarisEndpoint);
 
-            SparkContextConfigurationPrinter app = createDynamicConfig(accessToken,
-                                                                       properties,
-                                                                       polarisEndpoint);
-            app.printSparkConfig();
+            app = createDynamicConfig(accessToken,
+                                      properties,
+                                      polarisEndpoint);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return app;
     }
 
     private static SparkContextConfigurationPrinter createDynamicConfig(String creds,
@@ -88,6 +89,10 @@ public class SparkContextConfigurationPrinter {
                 AfonProperties.POLARIS_SECRET.getValueFrom(props),
                 POLARIS_ENDPOINT.getValueFrom(props)
         );
+    }
+
+    public SparkWarehouseConfig getPolarisConfig() {
+        return polarisConfig;
     }
 
     public void printSparkConfig() {
@@ -115,20 +120,8 @@ public class SparkContextConfigurationPrinter {
             System.out.println();
         }
 
-        // org.apache.hadoop:hadoop-azure:3.3.4
-        // org.apache.polaris:polaris-core:1.0.1-incubating,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0
-        /*
-: org.apache.spark.SparkException: Job aborted due to stage failure: Task 3 in stage 0.0 failed 4 times, most recent failure: Lost task 3.3 in stage 0.0 (TID 9) (192.168.26.47 executor 2): org.apache.iceberg.exceptions.RuntimeIOException: Failed to get file system for path: abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable251002171646/data/00003-9-1df1e69c-b012-4ac0-a8ca-017471b846a7-0-00001.parquet
-	at org.apache.iceberg.hadoop.Util.getFs(Util.java:57)
-...
-Caused by: Failure to initialize configuration
-	at org.apache.hadoop.fs.azurebfs.services.SimpleKeyProvider.getStorageAccountKey(SimpleKeyProvider.java:51
-         */
-
         StringBuffer szb = new StringBuffer("com.google.guava:guava:33.4.0-jre,org.apache.hadoop:hadoop-aws:3.4.2,");
-//        addDependencies(szb, new String[]{"iceberg-aws",}, "org.apache.iceberg", "1.9.0");
         addDependencies(szb, new String[]{"google-cloud-storage",}, "com.google.cloud", "2.57.0");
-//        addDependencies(szb, new String[]{"s3", "sts", "iam-policy-builder", }, "software.amazon.awssdk", "2.31.59");
         szb.append("software.amazon.awssdk:bundle:2.34.6,");
         szb.append("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0"); // our docker image uses Spark 2.12
         String tableName = tableName();
