@@ -371,6 +371,28 @@ class WholeStack extends TerraformStack {
                                         .build())
                        .build();
 
+        Service.Builder.create(this, "jupyter-internal")
+                       .metadata(ServiceMetadata.builder()
+                                                .name("jupyter-internal")
+                                                .namespace("default")
+                                                .build())
+                       .spec(ServiceSpec.builder()
+                                        .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
+                                        .type("ClusterIP")
+                                        .internalTrafficPolicy("Cluster")
+                                        .clusterIp("None")
+                                     .clusterIps(List.of())
+                                        .port(List.of(
+                                                ServiceSpecPort.builder()
+                                                               .name("spark")
+                                                               .port(7078) // Port the load balancer listens on
+                                                               .targetPort("7078") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build()
+                                                     ))
+                                        .build())
+                       .build();
+
 
         networkPolicies(jupyterLabels);
 
