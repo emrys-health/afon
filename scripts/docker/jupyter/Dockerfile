@@ -1,0 +1,23 @@
+# Uses Spark 4
+# Build it with:
+# docker build -t ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1 .
+# docker push ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1
+#FROM quay.io/jupyter/base-notebook:lab-4.1.5
+FROM jupyter/pyspark-notebook:x86_64-spark-3.5.0
+
+USER root
+# 1. Download Spark 4.0.1 (ensure correct version and Hadoop distro)
+RUN wget -qO- https://archive.apache.org/dist/spark/spark-4.0.1/spark-4.0.1-bin-hadoop3.tgz | tar -xz -C /opt/
+RUN rm -rf /usr/local/spark && rm -rf /usr/local/spark-3.5.0-bin-hadoop3
+RUN ln -s /opt/spark-4.0.1-bin-hadoop3 /usr/local/spark
+
+# 2. Set SPARK_HOME and PATH
+#ENV SPARK_HOME=/opt/spark
+#ENV PATH=$PATH:$SPARK_HOME/bin
+
+# 3. Install the matching PySpark package (for the Python client)
+USER $NB_UID
+#RUN conda remove pyspark && conda install -c conda-forge pyspark=4.0.0
+RUN pip install --no-cache-dir pyspark==4.0.1 grpcio>=1.48.1 grpcio-status
+
+# The image is now ready to be built with: docker build -t your-pyspark4-image .
