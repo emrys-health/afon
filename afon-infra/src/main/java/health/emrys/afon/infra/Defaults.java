@@ -11,5 +11,6 @@ public interface Defaults {
     String POLARIS_SERVICE_NAME = "polaris-lb";
 
     String SPARK_SERVICE_NAME = "spark-master-lb";
-
+    String SPARK_CONNECTOR_NAME = "spark-connector";
+    String SPARK_SERVICE_ACCOUNT_NAME = "spark-application-sa";
 }
