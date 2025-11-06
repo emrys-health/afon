@@ -42,7 +42,6 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.core.configuration.SparkContextConfigurationPrinter;
-import health.emrys.afon.spark.SparkWarehouseConfig;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
@@ -53,7 +52,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.core.configuration.SparkContextConfigurationPrinter.createSparkConf;
 import static health.emrys.afon.infra.Defaults.*;
 import static health.emrys.afon.infra.Defaults.AWS_REGION;
 import static java.lang.String.format;
@@ -194,7 +192,7 @@ class WholeStack extends TerraformStack {
                                                                       ))
                                                  .build();
 
-        var eksDependOn = List.of(newKubeConfig);
+        List<Resource> eksDependOn = List.of(newKubeConfig);
 
         // --- 4. EKS Node Group IAM Role & NEW Custom Policy ---
 
@@ -328,147 +326,10 @@ class WholeStack extends TerraformStack {
                                       .type("Opaque")
                                       .build();
 
-        // 5. Define a Deployment that mounts the Secret as a Volume
-        final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
-        final Map<String, String> polarisLabels = Map.of("app", "polaris");
-
-        String secretVolume = "secret-volume";
-        List<DeploymentSpecTemplateSpecVolume> volumes = List.of(DeploymentSpecTemplateSpecVolume.builder()
-                                                                                                 .name(secretVolume)
-                                                                                                 .secret(DeploymentSpecTemplateSpecVolumeSecret.builder()
-                                                                                                                                               .secretName(secretName)
-                                                                                                                                               .build())
-                                                                                                 .build());
-        String secretsDir = "/etc/app-secrets";
-        List<DeploymentSpecTemplateSpecContainerVolumeMount> mounts = List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
-                                                                                                                            .name(secretVolume)
-                                                                                                                            .mountPath(secretsDir)
-                                                                                                                            .readOnly(true)
-                                                                                                                            .build());
-
-        List<? extends DeploymentSpecTemplateSpecContainerEnv> envVars = List.of(
-                DeploymentSpecTemplateSpecContainerEnv.builder()
-                                                      .name("SPARK_CONF_DIR")
-                                                      .value(secretsDir)
-                                                      .build()
-                                                                                );
-        DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer.builder()
-                                                                                                  .name("jupyter")
-                                                                                                  .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1")
-                                                                                                  .env(envVars)
-                                                                                                  .volumeMount(mounts)
-                                                                                                  .build();
-        List<String> commands = List.of("/bin/bash",
-                                        "-c",
-                                        format("source %s/%s && /opt/jboss/container/java/run/run-java.sh",
-                                               secretsDir, polarisEnv));
-        DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer.builder()
-                                                                                                  .name("polaris")
-                                                                                                  .image("apache/polaris:1.1.0-incubating")
-                                                                                                  .env(envVars)
-                                                                                                  .command(commands)
-                                                                                                  .volumeMount(mounts)
-                                                                                                  .build();
-        deploy(eksDependOn, jupyterLabels, List.of(jupyterContainer), volumes, "jupyter");
-        deploy(eksDependOn, polarisLabels, List.of(polarisContainer), volumes, "polaris");
-
-
-        Service.Builder.create(this, SPARK_SERVICE_NAME)
-                       .metadata(ServiceMetadata.builder()
-                                                .name(SPARK_SERVICE_NAME)
-                                                .labels(Map.of("spark-role", "master",
-                                                               "spark-version", "4.0.1",
-                                                               "spark.operator/name", "spark-kubernetes-operator",
-                                                               "spark.operator/spark-cluster-name", "prod")
-                                                       )
-                                                .build())
-                       .spec(ServiceSpec.builder()
-                                        .selector(Map.of(
-                                                "spark-role", "master"))
-                                        .type("LoadBalancer")
-                                        .port(List.of(
-                                                ServiceSpecPort.builder()
-                                                               .name("web")
-                                                               .port(8080) // Port the load balancer listens on
-                                                               .targetPort("web") // Port the container is listening on
-                                                               .protocol("TCP")
-                                                               .build(),
-                                                ServiceSpecPort.builder()
-                                                               .name("spark")
-                                                               .port(7077) // Port the load balancer listens on
-                                                               .targetPort("7077") // Port the container is listening on
-                                                               .protocol("TCP")
-                                                               .build(),
-                                                ServiceSpecPort.builder()
-                                                               .name("rest")
-                                                               .port(6066) // Port the load balancer listens on
-                                                               .targetPort("rest") // Port the container is listening on
-                                                               .protocol("TCP")
-                                                               .build()
-                                                     ))
-                                        .build())
-                       .build();
-
-        Service.Builder.create(this, POLARIS_SERVICE_NAME)
-                       .metadata(ServiceMetadata.builder()
-                                                .name(POLARIS_SERVICE_NAME)
-                                                .build())
-                       .spec(ServiceSpec.builder()
-                                        .selector(polarisLabels)
-                                        .type("LoadBalancer")
-                                        .port(List.of(
-                                                ServiceSpecPort.builder()
-                                                               .name("web")
-                                                               .port(8181)
-                                                               .targetPort("8181")
-                                                               .protocol("TCP")
-                                                               .build()
-                                                     ))
-                                        .build())
-                       .build();
-
-        Service.Builder.create(this, JUPYTER_SERVICE_NAME)
-                       .metadata(ServiceMetadata.builder()
-                                                .name(JUPYTER_SERVICE_NAME)
-                                                .build())
-                       .spec(ServiceSpec.builder()
-                                        .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
-                                        .type("LoadBalancer")
-                                        .port(List.of(
-                                                ServiceSpecPort.builder()
-                                                               .name("web")
-                                                               .port(8888) // Port the load balancer listens on
-                                                               .targetPort("8888") // Port the container is listening on
-                                                               .protocol("TCP")
-                                                               .build()
-                                                     ))
-                                        .build())
-                       .build();
-
-        Service.Builder.create(this, "jupyter-internal")
-                       .metadata(ServiceMetadata.builder()
-                                                .name("jupyter-internal")
-                                                .namespace("default")
-                                                .build())
-                       .spec(ServiceSpec.builder()
-                                        .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
-                                        .type("ClusterIP")
-                                        .internalTrafficPolicy("Cluster")
-                                        .clusterIp("None")
-                                        .clusterIps(List.of())
-                                        .port(List.of(
-                                                ServiceSpecPort.builder()
-                                                               .name("spark")
-                                                               .port(7078) // Port the load balancer listens on
-                                                               .targetPort("7078") // Port the container is listening on
-                                                               .protocol("TCP")
-                                                               .build()
-                                                     ))
-                                        .build())
-                       .build();
-
+        deployPolaris(secretName, polarisEnv, eksDependOn);
         String sparkConnectorName = "emrys2";
-        networkPolicies(jupyterLabels, sparkConnectorName);
+
+        deployJupyter(eksDependOn, sparkConnectorName);
 
         // 6. Configure the Helm Provider
         HelmProvider.Builder.create(this, "helm").build();
@@ -500,6 +361,119 @@ class WholeStack extends TerraformStack {
         // 9. DEPLOY SPARK CONNECT APPLICATION (Custom Resource Definition via Manifest)
         // This creates a dedicated Spark cluster whose driver acts as the Spark Connect server.
 
+        deploySparkCluster(sparkConnectorName, serviceAccountName, sparkOperatorRelease, eksDependOn);
+    }
+
+    private void deployJupyter(List<Resource> eksDependOn, String sparkConnectorName) {
+        final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
+
+        DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer.builder()
+                                                                                                  .name("jupyter")
+                                                                                                  .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1")
+                                                                                                  .build();
+        var jupyterDeployment = deploy(eksDependOn, jupyterLabels, List.of(jupyterContainer), List.of(), "jupyter");
+
+        Service.Builder.create(this, JUPYTER_SERVICE_NAME)
+                       .metadata(ServiceMetadata.builder()
+                                                .name(JUPYTER_SERVICE_NAME)
+                                                .build())
+                       .dependsOn(eksDependOn)
+                       .spec(ServiceSpec.builder()
+                                        .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
+                                        .type("LoadBalancer")
+                                        .port(List.of(
+                                                ServiceSpecPort.builder()
+                                                               .name("web")
+                                                               .port(8888) // Port the load balancer listens on
+                                                               .targetPort("8888") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build()
+                                                     ))
+                                        .build())
+                       .build();
+
+        Service.Builder.create(this, "jupyter-internal")
+                       .metadata(ServiceMetadata.builder()
+                                                .name("jupyter-internal")
+                                                .namespace("default")
+                                                .build())
+                       .dependsOn(eksDependOn)
+                       .spec(ServiceSpec.builder()
+                                        .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
+                                        .type("ClusterIP")
+                                        .internalTrafficPolicy("Cluster")
+                                        .clusterIp("None")
+                                        .clusterIps(List.of())
+                                        .port(List.of(
+                                                ServiceSpecPort.builder()
+                                                               .name("spark")
+                                                               .port(7078) // Port the load balancer listens on
+                                                               .targetPort("7078") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build()
+                                                     ))
+                                        .build())
+                       .build();
+
+
+        networkPolicies(jupyterLabels, sparkConnectorName);
+    }
+
+    private void deployPolaris(String secretName, String polarisEnv, List<Resource> eksDependOn) {
+        String secretVolume = "secret-volume";
+        List<DeploymentSpecTemplateSpecVolume> volumes = List.of(DeploymentSpecTemplateSpecVolume.builder()
+                                                                                                 .name(secretVolume)
+                                                                                                 .secret(DeploymentSpecTemplateSpecVolumeSecret.builder()
+                                                                                                                                               .secretName(secretName)
+                                                                                                                                               .build())
+                                                                                                 .build());
+
+        String secretsDir = "/etc/app-secrets";
+
+        List<DeploymentSpecTemplateSpecContainerVolumeMount> mounts = List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
+                                                                                                                            .name(secretVolume)
+                                                                                                                            .mountPath(secretsDir)
+                                                                                                                            .readOnly(true)
+                                                                                                                            .build());
+
+        List<String> commands = List.of("/bin/bash",
+                                        "-c",
+                                        format("source %s/%s && /opt/jboss/container/java/run/run-java.sh",
+                                               secretsDir, polarisEnv));
+        DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer.builder()
+                                                                                                  .name("polaris")
+                                                                                                  .image("apache/polaris:1.1.0-incubating")
+//                                                                                                  .env(envVars)
+                                                                                                  .command(commands)
+                                                                                                  .volumeMount(mounts)
+                                                                                                  .build();
+        final Map<String, String> polarisLabels = Map.of("app", "polaris");
+        var polarisDeployment = deploy(eksDependOn, polarisLabels, List.of(polarisContainer), volumes, "polaris");
+
+        Service.Builder.create(this, POLARIS_SERVICE_NAME)
+                       .metadata(ServiceMetadata.builder()
+                                                .name(POLARIS_SERVICE_NAME)
+                                                .build())
+                       .dependsOn(List.of(polarisDeployment))
+                       .spec(ServiceSpec.builder()
+                                        .selector(polarisLabels)
+                                        .type("LoadBalancer")
+                                        .port(List.of(
+                                                ServiceSpecPort.builder()
+                                                               .name("web")
+                                                               .port(8181)
+                                                               .targetPort("8181")
+                                                               .protocol("TCP")
+                                                               .build()
+                                                     ))
+                                        .build())
+                       .build();
+    }
+
+    private void deploySparkCluster(String sparkConnectorName,
+                                    String serviceAccountName,
+                                    Release sparkOperatorRelease,
+                                    List<Resource> eksDependOn) {
         final Map<String, Object> sparkClusterManifest = Map.of(
                 "apiVersion", "spark.apache.org/v1alpha1",
                 "kind", "SparkCluster",
@@ -557,6 +531,44 @@ class WholeStack extends TerraformStack {
                         .manifest(sparkConnectManifest)
                         .dependsOn(List.of(sparkOperatorRelease))
                         .build();
+
+        Service.Builder.create(this, SPARK_SERVICE_NAME)
+                       .metadata(ServiceMetadata.builder()
+                                                .name(SPARK_SERVICE_NAME)
+                                                .labels(Map.of("spark-role", "master",
+                                                               "spark-version", "4.0.1",
+                                                               "spark.operator/name", "spark-kubernetes-operator",
+                                                               "spark.operator/spark-cluster-name", "prod")
+                                                       )
+                                                .build())
+                       .dependsOn(eksDependOn)
+                       .spec(ServiceSpec.builder()
+                                        .selector(Map.of(
+                                                "spark-role", "master"))
+                                        .type("LoadBalancer")
+                                        .port(List.of(
+                                                ServiceSpecPort.builder()
+                                                               .name("web")
+                                                               .port(8080) // Port the load balancer listens on
+                                                               .targetPort("web") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build(),
+                                                ServiceSpecPort.builder()
+                                                               .name("spark")
+                                                               .port(7077) // Port the load balancer listens on
+                                                               .targetPort("7077") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build(),
+                                                ServiceSpecPort.builder()
+                                                               .name("rest")
+                                                               .port(6066) // Port the load balancer listens on
+                                                               .targetPort("rest") // Port the container is listening on
+                                                               .protocol("TCP")
+                                                               .build()
+                                                     ))
+                                        .build())
+                       .build();
+
     }
 
     private Map<String, String> sparkConfig(String serviceAccountName) {
@@ -733,11 +745,11 @@ class WholeStack extends TerraformStack {
                        .build();
     }
 
-    private void deploy(List<@NotNull Resource> eksDependOn,
-                        Map<String, String> labels,
-                        List<DeploymentSpecTemplateSpecContainer> containers,
-                        List<DeploymentSpecTemplateSpecVolume> volumes,
-                        String name) {
+    private Deployment deploy(List<@NotNull Resource> eksDependOn,
+                              Map<String, String> labels,
+                              List<DeploymentSpecTemplateSpecContainer> containers,
+                              List<DeploymentSpecTemplateSpecVolume> volumes,
+                              String name) {
         DeploymentSpecTemplateMetadata metadata = DeploymentSpecTemplateMetadata.builder().labels(labels).build();
         DeploymentSpecTemplate specTemplate = DeploymentSpecTemplate.builder()
                                                                     .metadata(metadata)
@@ -746,7 +758,7 @@ class WholeStack extends TerraformStack {
                                                                                                     .volume(volumes)
                                                                                                     .build())
                                                                     .build();
-        Deployment.Builder.create(this, name + "Deployment")
+        return Deployment.Builder.create(this, name + "Deployment")
                           .dependsOn(eksDependOn)
                           .metadata(DeploymentMetadata.builder()
                                                       .name(name + "-deployment")
