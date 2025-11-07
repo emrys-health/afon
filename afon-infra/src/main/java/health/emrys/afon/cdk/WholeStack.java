@@ -20,6 +20,7 @@ import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -47,7 +48,9 @@ import static java.lang.String.format;
  */
 class WholeStack extends TerraformStack {
 
-    public static final String ID = "jupyter-deployment";
+    static final        Logger logger = org.slf4j.LoggerFactory.getLogger(WholeStack.class);
+
+    public static final String ID     = "jupyter-deployment";
 
     public WholeStack(final Construct scope, final String id) {
         super(scope, id);
@@ -62,7 +65,6 @@ class WholeStack extends TerraformStack {
         // --- Kubernetes and Helm Provider Configuration (Original Code) ---
 
         // 3. Configure the Kubernetes Provider
-        String configPath     = System.getProperty("user.home") + "/.kube/config";
         String base64CertData = cloudProvider.getBase64CertData();
         String encodedCert    = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
         KubernetesProvider kubernetesProvider = KubernetesProvider.Builder.create(this, "kubernetes")
@@ -394,5 +396,6 @@ class WholeStack extends TerraformStack {
         final App app = new App();
         new WholeStack(app, ID);
         app.synth();
+        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu -apply");
     }
 }
