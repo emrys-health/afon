@@ -1,6 +1,5 @@
 package health.emrys.afon.cdk;
 
-import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
@@ -34,6 +33,7 @@ import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
 public class AwsConstruct extends Construct implements CloudProvider {
+    public static final String VPC_NAME = "cdktf-eks-vpc";
     private final DataAwsEksClusterAuth eksAuthData;
     private final EksCluster            cluster;
     private final List<Resource>        eksDependOn;
@@ -71,7 +71,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
                          .cidrBlock("10.0.0.0/16")
                          .enableDnsSupport(true)
                          .enableDnsHostnames(true)
-                         .tags(Map.of("Name", "cdktf-eks-vpc")).build();
+                         .tags(Map.of("Name", VPC_NAME)).build();
 
         final InternetGateway igw = InternetGateway.Builder.create(this, "vpcIgw")
                                                            .vpcId(vpc.getId())
@@ -347,7 +347,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
                               """, vpcId, AWS_REGION);
     }
 
-    private static @NotNull String cleancleanSubNetsCommand(String vpcId) {
+    private static @NotNull String cleanSubNetsCommand(String vpcId) {
         String cleanSubNets = format("""
                 for SN in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].[SubnetId]' --output text) ; do { 
                     echo $SN ; 
@@ -355,6 +355,18 @@ public class AwsConstruct extends Construct implements CloudProvider {
                 } done
                 """, vpcId, AWS_REGION, AWS_REGION);
         return cleanSubNets;
+    }
+
+    private static @NotNull String getDeleteVPCCommand() {
+        return format("""
+                aws ec2 delete-vpc --vpc-id $VPC
+                              
+                """);
+    }
+    private static @NotNull String getVPCCommand() {
+        return format("""
+                export VPC=$(aws ec2 describe-vpcs   --query "Vpcs[?Tags[?Key=='Name' && Value=='%s']].VpcId"   --output text)
+                """, VPC_NAME);
     }
 
     @Override
@@ -387,14 +399,19 @@ public class AwsConstruct extends Construct implements CloudProvider {
                                           %s
                                           %s
                                           %s
+                                          %s
+                                          %s
+                                          %s
                                           """,
-                                cleanELBsCommand(),
-                                cleanGatewaysCommand(vpcId),
-                                cleanNetworkInterfacesCommand(vpcId),
-                                cleancleanSubNetsCommand(vpcId),
-                                cleanSecurityGroupsCommand(vpcId),
-                                cleanRoutesCommand(vpcId),
-                                cleanEksCommand()
+                                  getVPCCommand(),
+                                  cleanELBsCommand(),
+                                  cleanGatewaysCommand(vpcId),
+                                  cleanNetworkInterfacesCommand(vpcId),
+                                  cleanSubNetsCommand(vpcId),
+                                  cleanSecurityGroupsCommand(vpcId),
+                                  cleanRoutesCommand(vpcId),
+                                  cleanEksCommand(),
+                                  getDeleteVPCCommand()
                                  ));
     }
 }
