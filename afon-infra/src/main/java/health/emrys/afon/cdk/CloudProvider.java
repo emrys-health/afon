@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 
 import java.util.List;
@@ -13,5 +14,7 @@ public interface CloudProvider {
     String getEndpoint();
 
     String getToken();
+
+    void configureLoadBalancerDestroy(List<Service> loadBalancers);
 
 }

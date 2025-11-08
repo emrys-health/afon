@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -81,7 +82,7 @@ class WholeStack extends TerraformStack {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
         String               polarisEnv = "polaris_env.sh";
-        Secret secret = Secret.Builder.create(this, "mySecret")
+        Secret              secret      = Secret.Builder.create(this, "mySecret")
                                       .dependsOn(cloudProvider.getDependables())
                                       .metadata(SecretMetadata.builder().name(secretName).build())
                                       .data(Map.of(
@@ -107,8 +108,9 @@ class WholeStack extends TerraformStack {
                                       .type("Opaque")
                                       .build();
 
-        deployPolaris(secretName, polarisEnv, cloudProvider.getDependables());
-        deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME);
+        Service polarisLB = deployPolaris(secretName, polarisEnv, cloudProvider.getDependables());
+        Service jupyterLB = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME);
+        List<Service> loadBalancers = List.of(polarisLB, jupyterLB);
 
         // 6. Configure the Helm Provider
         HelmProvider.Builder.create(this, "helm").build();
@@ -124,10 +126,10 @@ class WholeStack extends TerraformStack {
                                                                                                         .build())
                                                                         .build();
 
-
+        cloudProvider.configureLoadBalancerDestroy(loadBalancers);
     }
 
-    private void deployJupyter(List<Resource> eksDependOn, String sparkConnectorName) {
+    private Service deployJupyter(List<Resource> eksDependOn, String sparkConnectorName) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer.builder()
@@ -136,7 +138,7 @@ class WholeStack extends TerraformStack {
                                                                                                   .build();
         var jupyterDeployment = deploy(eksDependOn, jupyterLabels, List.of(jupyterContainer), List.of(), "jupyter");
 
-        Service.Builder.create(this, JUPYTER_SERVICE_NAME)
+        Service loadbalancer = Service.Builder.create(this, JUPYTER_SERVICE_NAME)
                        .metadata(ServiceMetadata.builder()
                                                 .name(JUPYTER_SERVICE_NAME)
                                                 .build())
@@ -180,9 +182,11 @@ class WholeStack extends TerraformStack {
 
 
         networkPolicies(jupyterLabels, sparkConnectorName);
+
+        return loadbalancer;
     }
 
-    private void deployPolaris(String secretName, String polarisEnv, List<Resource> eksDependOn) {
+    private Service deployPolaris(String secretName, String polarisEnv, List<Resource> eksDependOn) {
         String secretVolume = "secret-volume";
         List<DeploymentSpecTemplateSpecVolume> volumes = List.of(DeploymentSpecTemplateSpecVolume.builder()
                                                                                                  .name(secretVolume)
@@ -213,7 +217,7 @@ class WholeStack extends TerraformStack {
         final Map<String, String> polarisLabels = Map.of("app", "polaris");
         var polarisDeployment = deploy(eksDependOn, polarisLabels, List.of(polarisContainer), volumes, "polaris");
 
-        Service.Builder.create(this, POLARIS_SERVICE_NAME)
+        return Service.Builder.create(this, POLARIS_SERVICE_NAME)
                        .metadata(ServiceMetadata.builder()
                                                 .name(POLARIS_SERVICE_NAME)
                                                 .build())
@@ -348,7 +352,7 @@ class WholeStack extends TerraformStack {
                        .createNamespace(true)
                        .version("3.31.0") // Using a recent stable version
                        .atomic(true)
-                       .timeout(300)
+                       .timeout(600)
                        .build();
     }
 
