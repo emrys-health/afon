@@ -21,7 +21,9 @@ import com.hashicorp.cdktf.providers.aws.secretsmanager_secret.SecretsmanagerSec
 import com.hashicorp.cdktf.providers.aws.secretsmanager_secret_version.SecretsmanagerSecretVersion;
 import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
+import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
+import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -35,6 +37,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
     private final DataAwsEksClusterAuth eksAuthData;
     private final EksCluster            cluster;
     private final List<Resource>        eksDependOn;
+    final         Vpc                   vpc;
 
     public AwsConstruct(final Construct scope, final String id) {
         super(scope, id);
@@ -64,11 +67,11 @@ public class AwsConstruct extends Construct implements CloudProvider {
 
 
         // --- 2. VPC and Networking Setup (Same as before) ---
-        final Vpc vpc = Vpc.Builder.create(this, "eksVpc")
-                                   .cidrBlock("10.0.0.0/16")
-                                   .enableDnsSupport(true)
-                                   .enableDnsHostnames(true)
-                                   .tags(Map.of("Name", "cdktf-eks-vpc")).build();
+        vpc = Vpc.Builder.create(this, "eksVpc")
+                         .cidrBlock("10.0.0.0/16")
+                         .enableDnsSupport(true)
+                         .enableDnsHostnames(true)
+                         .tags(Map.of("Name", "cdktf-eks-vpc")).build();
 
         final InternetGateway igw = InternetGateway.Builder.create(this, "vpcIgw")
                                                            .vpcId(vpc.getId())
@@ -255,6 +258,105 @@ public class AwsConstruct extends Construct implements CloudProvider {
 
     }
 
+    public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
+                /*
+        Using the VPC ID this way can lead to:
+│ Destroy-time provisioners and their connection configurations may only reference attributes of the related resource, via 'self', 'count.index', or 'each.key'.
+│
+│ References to other resources during the destroy phase can cause dependency cycles and interact poorly with create_before_destroy.
+         */
+        String vpcId = vpc.getId();
+        String command = cleanCommands(vpcId);
+        Resource cleanupSecurityGroups = Resource.Builder.create(this, "cleanupSecurityGroups")
+                                                         // Ensure this runs only after the K8s Services are destroyed by Terraform
+                                                         .dependsOn(loadBalancers)
+                                                         .provisioners(List.of(
+                                                                 LocalExecProvisioner.builder()
+                                                                                     .type("local-exec")
+                                                                                     .when("destroy")
+                                                                                     .command(
+                                                                                             command
+                                                                                             )
+                                                                                     .build()
+                                                                              ))
+                                                         .build();
+    }
+
+    private static @NotNull String cleanCommands(String vpcId) {
+        String command = format("""
+                                       %s
+                                       """,
+                                cleanELBsCommand()
+//                                cleanGatewaysCommand(vpcId),
+//                                cleanNetworkInterfacesCommand(vpcId),
+//                                cleancleanSubNetsCommand(vpcId),
+//                                cleanSecurityGroupsCommand(vpcId),
+//                                cleanRoutesCommand(vpcId),
+//                                cleanEksCommand()
+                              );
+        return command;
+    }
+
+    private static @NotNull String cleanEksCommand() {
+        return format("eksctl delete cluster --name %s --region %s", CLUSTER_NAME, AWS_REGION);
+    }
+
+    private static @NotNull String cleanELBsCommand() {
+        return format("""
+                              for ELB in $(aws elb describe-load-balancers --region %s --query 'LoadBalancerDescriptions[*].LoadBalancerName' --o text) ; do { 
+                                  echo $ELB ; 
+                                  aws elb delete-load-balancer --load-balancer-name $ELB ; 
+                              } done
+                              """, AWS_REGION);
+    }
+
+    private static @NotNull String cleanNetworkInterfacesCommand(String vpcId) {
+        return format("""
+                              for ENI in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text) ; do { 
+                                  echo $ENI ; 
+                                  aws ec2 delete-network-interface --network-interface-id $ENI ; 
+                              } done
+                              """, vpcId, AWS_REGION);
+    }
+
+    private static @NotNull String cleanRoutesCommand(String vpcId) {
+        return format("""
+                              for RT in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=%s --region %s --query 'RouteTables[*].RouteTableId' --output text) ; do { 
+                                  echo $RT ; 
+                                  aws ec2 delete-route-table --route-table-id $RT --region %s ; 
+                              } done
+                              """, vpcId, AWS_REGION, AWS_REGION);
+    }
+
+    private static @NotNull String cleanGatewaysCommand(String vpcId) {
+        return format("""
+                              for IG in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=%s --region %s --query 'InternetGateways[*].InternetGatewayId' --output text) ; do { 
+                                echo $IG ; 
+                                aws ec2 detach-internet-gateway --internet-gateway-id $IG --vpc-id %s --region %s ; 
+                                aws ec2 delete-internet-gateway --internet-gateway-id $IG --region %s ; 
+                              } done
+                              """, vpcId, AWS_REGION, vpcId, AWS_REGION, AWS_REGION);
+    }
+
+    private static @NotNull String cleanSecurityGroupsCommand(String vpcId) {
+        return format("""
+                              for SG_ID in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=%s --region %s --query 'SecurityGroups[*].[GroupId]' --output text --no-cli-pager); do { 
+                                echo $SG_ID ;  
+                                aws ec2 delete-security-group --group-id $SG_ID || true ; 
+                              } done
+                              """, vpcId, AWS_REGION);
+    }
+
+    private static @NotNull String cleancleanSubNetsCommand(String vpcId) {
+        String cleanSubNets = format("""
+                for SN in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].[SubnetId]' --output text) ; do { 
+                    echo $SN ; 
+                    aws ec2 delete-subnet --subnet-id $SN --region $REGION ; 
+                } done
+                """, vpcId, AWS_REGION, AWS_REGION);
+        return cleanSubNets;
+    }
+
     @Override
     public List<Resource> getDependables() {
         return eksDependOn; // List.of(cluster, eksAuthData);
@@ -273,5 +375,26 @@ public class AwsConstruct extends Construct implements CloudProvider {
     @Override
     public String getToken() {
         return eksAuthData.getToken();
+    }
+
+    public static void main(String[] args) {
+        String vpcId = "$VPC";
+        System.out.println(cleanCommands(vpcId));
+        System.out.println(format("""
+                                          %s
+                                          %s
+                                          %s
+                                          %s
+                                          %s
+                                          %s
+                                          """,
+                                cleanELBsCommand(),
+                                cleanGatewaysCommand(vpcId),
+                                cleanNetworkInterfacesCommand(vpcId),
+                                cleancleanSubNetsCommand(vpcId),
+                                cleanSecurityGroupsCommand(vpcId),
+                                cleanRoutesCommand(vpcId),
+                                cleanEksCommand()
+                                 ));
     }
 }
