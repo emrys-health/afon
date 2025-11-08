@@ -346,6 +346,8 @@ class WholeStack extends TerraformStack {
                        .dependsOn(eksDependOn)
                        .chart("tigera-operator")
                        .cleanupOnFail(true)
+                       .disableCrdHooks(true)
+                       .disableWebhooks(true)
                        .forceUpdate(true)
                        .repository("https://docs.tigera.io/calico/charts")
                        .namespace("tigera-operator") // Standard namespace for the operator
