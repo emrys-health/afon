@@ -11,7 +11,7 @@ public interface CloudProvider {
 
     String getBase64CertData();
 
-    String getEndpoint();
+    String getClusterEndpoint();
 
     String getToken();
 

@@ -1,12 +1,10 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
@@ -60,55 +58,8 @@ class WholeStack extends TerraformStack {
                             .build();
 
         CloudProvider cloudProvider = new AwsConstruct(this, id);
-
-        // --- 4. EKS Node Group IAM Role & NEW Custom Policy ---
-
-        // --- Kubernetes and Helm Provider Configuration (Original Code) ---
-
-        // 3. Configure the Kubernetes Provider
-        String base64CertData = cloudProvider.getBase64CertData();
-        String encodedCert    = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
-        KubernetesProvider kubernetesProvider = KubernetesProvider.Builder.create(this, "kubernetes")
-                                                                          // Direct EKS Connection Configuration:
-                                                                          .host(cloudProvider.getEndpoint())
-                                                                          .clusterCaCertificate(encodedCert)
-                                                                          .token(cloudProvider.getToken()) // Dynamically generated token
-                                                                          .build();
-//        kubernetesProvider.addOverride("depends_on", List.of(eksDependOn));
-
-        // 4. Define a Kubernetes Secret
-        // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
-        String               secretName = "my-app-secret";
-        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
-        Properties           properties = loader.getProperties();
-        String               polarisEnv = "polaris_env.sh";
-        Secret              secret      = Secret.Builder.create(this, "mySecret")
-                                      .dependsOn(cloudProvider.getDependables())
-                                      .metadata(SecretMetadata.builder().name(secretName).build())
-                                      .data(Map.of(
-                                              polarisEnv, format("""
-                                                                         export POLARIS_ID=root
-                                                                         export POLARIS_SECRET=s3cr3t
-                                                                         
-                                                                         export %s=%s
-                                                                         export %s=%s
-                                                                         export %s=%s
-                                                                         export %s=%s
-                                                                         export %s=%s
-                                                                         """,
-                                                                 AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties),
-                                                                 AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties),
-                                                                 AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties),
-                                                                 AZURE_TENANT_ID.getPropertyName(), AZURE_TENANT_ID.getValueFrom(properties),
-                                                                 AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties)
-                                                                ),
-                                              "env.config", "ENVIRONMENT=production\nDEBUG=false"
-                                                  )
-                                           )
-                                      .type("Opaque")
-                                      .build();
-
-        Service polarisLB = deployPolaris(secretName, polarisEnv, cloudProvider.getDependables());
+        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
+        Service polarisLB = polarisConfig.deployPolaris(cloudProvider.getDependables());
         Service jupyterLB = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME);
         List<Service> loadBalancers = List.of(polarisLB, jupyterLB);
 
@@ -136,7 +87,12 @@ class WholeStack extends TerraformStack {
                                                                                                   .name("jupyter")
                                                                                                   .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1")
                                                                                                   .build();
-        var jupyterDeployment = deploy(eksDependOn, jupyterLabels, List.of(jupyterContainer), List.of(), "jupyter");
+        var jupyterDeployment = DeploymentUtils.deploy(this,
+                                                       eksDependOn,
+                                                       jupyterLabels,
+                                                       List.of(jupyterContainer),
+                                                       List.of(),
+                                                       "jupyter");
 
         Service loadbalancer = Service.Builder.create(this, JUPYTER_SERVICE_NAME)
                        .metadata(ServiceMetadata.builder()
@@ -186,56 +142,7 @@ class WholeStack extends TerraformStack {
         return loadbalancer;
     }
 
-    private Service deployPolaris(String secretName, String polarisEnv, List<Resource> eksDependOn) {
-        String secretVolume = "secret-volume";
-        List<DeploymentSpecTemplateSpecVolume> volumes = List.of(DeploymentSpecTemplateSpecVolume.builder()
-                                                                                                 .name(secretVolume)
-                                                                                                 .secret(DeploymentSpecTemplateSpecVolumeSecret.builder()
-                                                                                                                                               .secretName(secretName)
-                                                                                                                                               .build())
-                                                                                                 .build());
 
-        String secretsDir = "/etc/app-secrets";
-
-        List<DeploymentSpecTemplateSpecContainerVolumeMount> mounts = List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
-                                                                                                                            .name(secretVolume)
-                                                                                                                            .mountPath(secretsDir)
-                                                                                                                            .readOnly(true)
-                                                                                                                            .build());
-
-        List<String> commands = List.of("/bin/bash",
-                                        "-c",
-                                        format("source %s/%s && /opt/jboss/container/java/run/run-java.sh",
-                                               secretsDir, polarisEnv));
-        DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer.builder()
-                                                                                                  .name("polaris")
-                                                                                                  .image("apache/polaris:1.1.0-incubating")
-//                                                                                                  .env(envVars)
-                                                                                                  .command(commands)
-                                                                                                  .volumeMount(mounts)
-                                                                                                  .build();
-        final Map<String, String> polarisLabels = Map.of("app", "polaris");
-        var polarisDeployment = deploy(eksDependOn, polarisLabels, List.of(polarisContainer), volumes, "polaris");
-
-        return Service.Builder.create(this, POLARIS_SERVICE_NAME)
-                       .metadata(ServiceMetadata.builder()
-                                                .name(POLARIS_SERVICE_NAME)
-                                                .build())
-                       .dependsOn(List.of(polarisDeployment))
-                       .spec(ServiceSpec.builder()
-                                        .selector(polarisLabels)
-                                        .type("LoadBalancer")
-                                        .port(List.of(
-                                                ServiceSpecPort.builder()
-                                                               .name("web")
-                                                               .port(8181)
-                                                               .targetPort("8181")
-                                                               .protocol("TCP")
-                                                               .build()
-                                                     ))
-                                        .build())
-                       .build();
-    }
 
     private void networkPolicies(Map<String, String> labels, String sparkConnectorName) {
         // 5.1. Define a NetworkPolicy to control egress traffic for the Deployment
@@ -341,6 +248,13 @@ class WholeStack extends TerraformStack {
     }
 
     private void calico(List<@NotNull Resource> eksDependOn) {
+        /* This is still timing out after 10 minutes with:
+│ Error: Error uninstalling release
+│
+│ Unable to uninstall Helm release tigera-operator: uninstallation completed with 1 error(s): context deadline exceeded
+╵
+        running tofu destroy a second time works.
+         */
         Release.Builder.create(this, "calicoOperator")
                        .name("tigera-operator")
                        .dependsOn(eksDependOn)
@@ -368,33 +282,6 @@ class WholeStack extends TerraformStack {
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
                        .atomic(true) // If installation fails, completely uninstall the release
                        .build();
-    }
-
-    private Deployment deploy(List<@NotNull Resource> eksDependOn,
-                              Map<String, String> labels,
-                              List<DeploymentSpecTemplateSpecContainer> containers,
-                              List<DeploymentSpecTemplateSpecVolume> volumes,
-                              String name) {
-        DeploymentSpecTemplateMetadata metadata = DeploymentSpecTemplateMetadata.builder().labels(labels).build();
-        DeploymentSpecTemplate specTemplate = DeploymentSpecTemplate.builder()
-                                                                    .metadata(metadata)
-                                                                    .spec(DeploymentSpecTemplateSpec.builder()
-                                                                                                    .container(containers)
-                                                                                                    .volume(volumes)
-                                                                                                    .build())
-                                                                    .build();
-        return Deployment.Builder.create(this, name + "Deployment")
-                          .dependsOn(eksDependOn)
-                          .metadata(DeploymentMetadata.builder()
-                                                      .name(name + "-deployment")
-                                                      .labels(labels)
-                                                      .build())
-                          .spec(DeploymentSpec.builder()
-                                              .selector(DeploymentSpecSelector.builder().matchLabels(labels).build())
-                                              .replicas("1")
-                                              .template(specTemplate)
-                                              .build())
-                          .build();
     }
 
     public static void main(String[] args) {
