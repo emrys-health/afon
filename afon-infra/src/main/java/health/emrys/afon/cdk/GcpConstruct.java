@@ -1,22 +1,18 @@
 package health.emrys.afon.cdk;
 
-import com.hashicorp.cdktf.providers.google.container_cluster.ContainerClusterReleaseChannel;
-import com.hashicorp.cdktf.providers.google.container_node_pool.ContainerNodePoolManagement;
-import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.TerraformStack;
-import com.hashicorp.cdktf.providers.google.provider.GoogleProvider;
-import com.hashicorp.cdktf.providers.google.provider.GoogleProviderConfig;
 import com.hashicorp.cdktf.providers.google.container_cluster.ContainerCluster;
 import com.hashicorp.cdktf.providers.google.container_cluster.ContainerClusterConfig;
+import com.hashicorp.cdktf.providers.google.container_cluster.ContainerClusterReleaseChannel;
 import com.hashicorp.cdktf.providers.google.container_node_pool.ContainerNodePool;
 import com.hashicorp.cdktf.providers.google.container_node_pool.ContainerNodePoolConfig;
+import com.hashicorp.cdktf.providers.google.container_node_pool.ContainerNodePoolManagement;
 import com.hashicorp.cdktf.providers.google.container_node_pool.ContainerNodePoolNodeConfig;
+import com.hashicorp.cdktf.providers.google.data_google_client_config.DataGoogleClientConfig;
+import com.hashicorp.cdktf.providers.google.provider.GoogleProvider;
+import com.hashicorp.cdktf.providers.google.provider.GoogleProviderConfig;
+import com.hashicorp.cdktf.providers.kubernetes.service.Service;
+import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import software.constructs.Construct;
-
-import java.util.Collections;
-import java.util.List;
 
 import java.util.List;
 
@@ -100,7 +96,8 @@ public class GcpConstruct extends Construct implements CloudProvider {
 
     @Override
     public String getToken() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        DataGoogleClientConfig clientConfig = new DataGoogleClientConfig(this, "currentClient");
+        return clientConfig.getAccessToken();
     }
 
     @Override
