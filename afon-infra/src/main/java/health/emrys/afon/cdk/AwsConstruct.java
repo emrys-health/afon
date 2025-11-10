@@ -33,13 +33,13 @@ import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
 public class AwsConstruct extends Construct implements CloudProvider {
-    public static final String VPC_NAME = "cdktf-eks-vpc";
-    private final DataAwsEksClusterAuth eksAuthData;
-    private final EksCluster            cluster;
-    private final List<Resource>        eksDependOn;
-    final         Vpc                   vpc;
+    public static final String                VPC_NAME = "cdktf-eks-vpc";
+    private final       DataAwsEksClusterAuth eksAuthData;
+    private final       EksCluster            cluster;
+    private final       List<Resource>        eksDependOn;
+    final               Vpc                   vpc;
 
-    public AwsConstruct(final Construct scope, final String id) {
+    AwsConstruct(final Construct scope, final String id) {
         super(scope, id);
         // --- AWS Provider Configuration (Required for EKS Addon) ---
         // 1. Configure the AWS Provider
@@ -265,36 +265,44 @@ public class AwsConstruct extends Construct implements CloudProvider {
 │
 │ References to other resources during the destroy phase can cause dependency cycles and interact poorly with create_before_destroy.
          */
-        String vpcId = vpc.getId();
-        String command = cleanCommands(vpcId);
-        Resource cleanupSecurityGroups = Resource.Builder.create(this, "cleanupSecurityGroups")
-                                                         // Ensure this runs only after the K8s Services are destroyed by Terraform
-                                                         .dependsOn(loadBalancers)
-                                                         .provisioners(List.of(
-                                                                 LocalExecProvisioner.builder()
-                                                                                     .type("local-exec")
-                                                                                     .when("destroy")
-                                                                                     .command(
-                                                                                             command
-                                                                                             )
-                                                                                     .build()
-                                                                              ))
-                                                         .build();
+        Resource.Builder.create(this, "cleanupELBs")
+                        // Ensure this runs only after the K8s Services are destroyed by Terraform
+                        .dependsOn(loadBalancers)
+                        .provisioners(List.of(
+                                LocalExecProvisioner.builder()
+                                                    .type("local-exec")
+                                                    .when("destroy")
+                                                    .command(
+                                                            cleanCommands()
+                                                            )
+                                                    .build()
+                                             ))
+                        .build();
+        Resource.Builder.create(this, "cleanupSecurityGroups")
+                        .dependsOn(loadBalancers)
+                        .provisioners(List.of(
+                                LocalExecProvisioner.builder()
+                                                    .type("local-exec")
+                                                    .when("destroy")
+                                                    .command(
+                                                            format("""
+                                                                           %s
+                                                                           %s
+                                                                           """,
+                                                                   getVPCCommand(),
+                                                                   cleanSecurityGroupsCommand("VPC"))
+                                                            )
+                                                    .build()
+                                             ))
+                        .build();
     }
 
-    private static @NotNull String cleanCommands(String vpcId) {
-        String command = format("""
-                                       %s
-                                       """,
-                                cleanELBsCommand()
-//                                cleanGatewaysCommand(vpcId),
-//                                cleanNetworkInterfacesCommand(vpcId),
-//                                cleancleanSubNetsCommand(vpcId),
-//                                cleanSecurityGroupsCommand(vpcId),
-//                                cleanRoutesCommand(vpcId),
-//                                cleanEksCommand()
-                              );
-        return command;
+    private static @NotNull String cleanCommands() {
+        return format("""
+                              %s
+                              """,
+                      cleanELBsCommand()
+                     );
     }
 
     private static @NotNull String cleanEksCommand() {
@@ -353,26 +361,27 @@ public class AwsConstruct extends Construct implements CloudProvider {
     }
 
     private static @NotNull String cleanSubNetsCommand(String vpcId) {
-        String cleanSubNets = format("""
-                for SN in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].[SubnetId]' --output text) ; do { 
-                    echo $SN ; 
-                    aws ec2 delete-subnet --subnet-id $SN --region $REGION ; 
-                } done
-                """, vpcId, AWS_REGION, AWS_REGION);
-        return cleanSubNets;
+        return format("""
+                              echo "Destroying subnets"
+                              for SN in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].[SubnetId]' --output text) ; do { 
+                                  echo $SN ; 
+                                  aws ec2 delete-subnet --subnet-id $SN --region $REGION ; 
+                              } done
+                              """, vpcId, AWS_REGION, AWS_REGION);
     }
 
     private static @NotNull String getDeleteVPCCommand() {
         return format("""
-                echo "Destroying vpc"
-                aws ec2 delete-vpc --vpc-id $VPC
+                              echo "Destroying vpc"
+                              aws ec2 delete-vpc --vpc-id $VPC
                               
-                """);
+                              """);
     }
+
     private static @NotNull String getVPCCommand() {
         return format("""
-                export VPC=$(aws ec2 describe-vpcs   --query "Vpcs[?Tags[?Key=='Name' && Value=='%s']].VpcId"   --output text)
-                """, VPC_NAME);
+                              export VPC=$(aws ec2 describe-vpcs   --query "Vpcs[?Tags[?Key=='Name' && Value=='%s']].VpcId"   --output text)
+                              """, VPC_NAME);
     }
 
     @Override
@@ -386,7 +395,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
     }
 
     @Override
-    public String getEndpoint() {
+    public String getClusterEndpoint() {
         return cluster.getEndpoint();
     }
 
@@ -397,7 +406,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
 
     public static void main(String[] args) {
         String vpcId = "$VPC";
-        System.out.println(cleanCommands(vpcId));
+        System.out.println(cleanCommands());
         System.out.println(format("""
                                           %s
                                           %s
