@@ -4,11 +4,8 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
-import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
-import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
-import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
@@ -17,18 +14,14 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.*;
-import static java.lang.String.format;
 
 /***
  * Creates the markup to create the full stack in AWS.
@@ -268,7 +261,7 @@ class WholeStack extends TerraformStack {
                        .createNamespace(true)
                        .version("3.31.0") // Using a recent stable version
                        .atomic(true)
-                       .timeout(600)
+                       .timeout(000)
                        .build();
     }
 

@@ -40,40 +40,40 @@ public class PolarisConfig extends Construct {
         // Configure the Kubernetes Provider
         String base64CertData = cloudProvider.getBase64CertData();
         String encodedCert    = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
-        KubernetesProvider kubernetesProvider = KubernetesProvider.Builder.create(this, "kubernetes")
-                                                                          .host(cloudProvider.getClusterEndpoint())
-                                                                          .clusterCaCertificate(encodedCert)
-                                                                          .token(cloudProvider.getToken()) // Dynamically generated token
-                                                                          .build();
+        KubernetesProvider.Builder.create(this, "kubernetes")
+                                  .host(cloudProvider.getClusterEndpoint())
+                                  .clusterCaCertificate(encodedCert)
+                                  .token(cloudProvider.getToken()) // Dynamically generated token
+                                  .build();
 
         // Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
-        Secret secret = Secret.Builder.create(this, "mySecret")
-                                      .dependsOn(cloudProvider.getDependables())
-                                      .metadata(SecretMetadata.builder().name(SECRET_NAME).build())
-                                      .data(Map.of(
-                                              POLARIS_ENV, format("""
-                                                                          export POLARIS_ID=root
-                                                                          export POLARIS_SECRET=s3cr3t
-                                                                          
-                                                                          export %s=%s
-                                                                          export %s=%s
-                                                                          export %s=%s
-                                                                          export %s=%s
-                                                                          export %s=%s
-                                                                          """,
-                                                                  AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties),
-                                                                  AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties),
-                                                                  AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties),
-                                                                  AZURE_TENANT_ID.getPropertyName(), AZURE_TENANT_ID.getValueFrom(properties),
-                                                                  AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties)
-                                                                 )
-                                                  )
-                                           )
-                                      .type("Opaque")
-                                      .build();
+        Secret.Builder.create(this, "mySecret")
+                      .dependsOn(cloudProvider.getDependables())
+                      .metadata(SecretMetadata.builder().name(SECRET_NAME).build())
+                      .data(Map.of(
+                              POLARIS_ENV, format("""
+                                                          export POLARIS_ID=root
+                                                          export POLARIS_SECRET=s3cr3t
+                                                          
+                                                          export %s=%s
+                                                          export %s=%s
+                                                          export %s=%s
+                                                          export %s=%s
+                                                          export %s=%s
+                                                          """,
+                                                  AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties),
+                                                  AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties),
+                                                  AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties),
+                                                  AZURE_TENANT_ID.getPropertyName(), AZURE_TENANT_ID.getValueFrom(properties),
+                                                  AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties)
+                                                 )
+                                  )
+                           )
+                      .type("Opaque")
+                      .build();
     }
 
     public Service deployPolaris(List<Resource> eksDependOn) {
