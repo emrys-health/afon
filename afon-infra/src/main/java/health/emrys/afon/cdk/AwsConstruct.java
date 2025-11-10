@@ -303,6 +303,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
 
     private static @NotNull String cleanELBsCommand() {
         return format("""
+                              echo "Destroying ELBs"
                               for ELB in $(aws elb describe-load-balancers --region %s --query 'LoadBalancerDescriptions[*].LoadBalancerName' --o text) ; do { 
                                   echo $ELB ; 
                                   aws elb delete-load-balancer --load-balancer-name $ELB ; 
@@ -312,6 +313,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
 
     private static @NotNull String cleanNetworkInterfacesCommand(String vpcId) {
         return format("""
+                              echo "Destroying network interfaces"
                               for ENI in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text) ; do { 
                                   echo $ENI ; 
                                   aws ec2 delete-network-interface --network-interface-id $ENI ; 
@@ -321,6 +323,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
 
     private static @NotNull String cleanRoutesCommand(String vpcId) {
         return format("""
+                              echo "Destroying routes"
                               for RT in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=%s --region %s --query 'RouteTables[*].RouteTableId' --output text) ; do { 
                                   echo $RT ; 
                                   aws ec2 delete-route-table --route-table-id $RT --region %s ; 
@@ -330,6 +333,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
 
     private static @NotNull String cleanGatewaysCommand(String vpcId) {
         return format("""
+                              echo "Destroying gateways"
                               for IG in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=%s --region %s --query 'InternetGateways[*].InternetGatewayId' --output text) ; do { 
                                 echo $IG ; 
                                 aws ec2 detach-internet-gateway --internet-gateway-id $IG --vpc-id %s --region %s ; 
@@ -340,6 +344,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
 
     private static @NotNull String cleanSecurityGroupsCommand(String vpcId) {
         return format("""
+                              echo "Destroying security-groups"
                               for SG_ID in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=%s --region %s --query 'SecurityGroups[*].[GroupId]' --output text --no-cli-pager); do { 
                                 echo $SG_ID ;  
                                 aws ec2 delete-security-group --group-id $SG_ID || true ; 
@@ -359,6 +364,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
 
     private static @NotNull String getDeleteVPCCommand() {
         return format("""
+                echo "Destroying vpc"
                 aws ec2 delete-vpc --vpc-id $VPC
                               
                 """);
