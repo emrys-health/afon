@@ -278,7 +278,6 @@ class WholeStack extends TerraformStack {
     }
 
     public static void main(String[] args) {
-        System.out.println(new java.util.Date());
         final App app = new App();
         new WholeStack(app, ID);
         app.synth();
