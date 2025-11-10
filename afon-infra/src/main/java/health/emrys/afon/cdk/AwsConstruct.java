@@ -290,7 +290,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
                                                                            %s
                                                                            """,
                                                                    getVPCCommand(),
-                                                                   cleanSecurityGroupsCommand("VPC"))
+                                                                   cleanSecurityGroupsCommand("$VPC"))
                                                             )
                                                     .build()
                                              ))
