@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.providers.azurerm.data_azurerm_kubernetes_cluster.DataAzurermKubernetesCluster;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesCluster;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterDefaultNodePool;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterIdentity;
@@ -25,7 +26,8 @@ import static java.lang.String.format;
 
 public class AzureConstruct extends Construct implements CloudProvider {
 
-    private final KubernetesCluster aksCluster;
+    private final KubernetesCluster            aksCluster;
+    private final DataAzurermKubernetesCluster aksData;
 
     public AzureConstruct(@NotNull Construct scope, @NotNull String id) {
         super(scope, id);
@@ -87,6 +89,11 @@ public class AzureConstruct extends Construct implements CloudProvider {
                                               .provisioners(List.of(updateCredentials))
                                               .build();
 
+        aksData = DataAzurermKubernetesCluster.Builder.create(this, "AksData")
+                                                      .name(aksCluster.getName())
+                                                      .resourceGroupName(aksCluster.getResourceGroupName())
+                                                      .build();
+
     }
 
     @Override
@@ -106,7 +113,8 @@ public class AzureConstruct extends Construct implements CloudProvider {
 
     @Override
     public String getToken() {
-        return aksCluster.getKubeConfigRaw();
+        var admin = aksCluster.getKubeAdminConfig().get(0);
+        return aksData.getKubeAdminConfig().get(0).getPassword();
     }
 
     @Override

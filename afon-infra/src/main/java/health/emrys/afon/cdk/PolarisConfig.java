@@ -38,13 +38,7 @@ public class PolarisConfig extends Construct {
         this.cloudProvider = cloudProvider;
 
         // Configure the Kubernetes Provider
-        String base64CertData = cloudProvider.getBase64CertData();
-        String encodedCert    = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
-        KubernetesProvider.Builder.create(this, "kubernetes")
-                                  .host(cloudProvider.getClusterEndpoint())
-                                  .clusterCaCertificate(encodedCert)
-                                  .token(cloudProvider.getToken()) // Dynamically generated token
-                                  .build();
+        configureK8s(cloudProvider);
 
         // Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
@@ -74,6 +68,16 @@ public class PolarisConfig extends Construct {
                            )
                       .type("Opaque")
                       .build();
+    }
+
+    protected void configureK8s(CloudProvider cloudProvider) {
+        String base64CertData = cloudProvider.getBase64CertData();
+        String encodedCert    = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
+        KubernetesProvider.Builder.create(this, "kubernetes")
+                                  .host(cloudProvider.getClusterEndpoint())
+                                  .clusterCaCertificate(encodedCert)
+                                  .token(cloudProvider.getToken()) // Dynamically generated token
+                                  .build();
     }
 
     public Service deployPolaris(List<Resource> eksDependOn) {

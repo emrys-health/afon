@@ -4,20 +4,19 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
 import software.constructs.Construct;
 
-import java.util.List;
-
 class AksKubernetesStack extends TerraformStack {
+
+    public static final String ID = "az-polaris";
+    protected final AzureConstruct cloudProvider;
+
     public AksKubernetesStack(final Construct scope, final String id) {
         super(scope, id);
-
-        AzureConstruct cloudProvider = new AzureConstruct(this, id);
-        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
-        polarisConfig.deployPolaris(List.of());
+        cloudProvider = new AzureConstruct(this, id);
     }
 
     public static void main(String[] args) {
         final App app = new App();
-        new AksKubernetesStack(app, "az-polaris");
+        new AksKubernetesStack(app, ID);
         app.synth();
     }
 }
