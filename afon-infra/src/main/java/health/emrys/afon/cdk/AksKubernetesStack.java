@@ -40,43 +40,27 @@ public class AksKubernetesStack extends TerraformStack {
                             .build();
 
         // --- Configuration Constants ---
-        final String RESOURCE_GROUP_NAME = "afon_resource_group";
+        final String RESOURCE_GROUP_NAME = "afon_resource_group_aks";
         final String KUBERNETES_VERSION  = "1.31";
         // -------------------------------
 
-        // 1. Configure the Azure Provider (azurerm)
         // Authentication should be handled via environment variables (AZURE_CLIENT_ID, etc.)
         AzurestackProviderFeatures features = AzurestackProviderFeatures.builder().build();
         AzurestackProviderConfig providerConfig = AzurestackProviderConfig.builder()
                                                                           .features(features)
                                                                           .metadataHost(AZURE_REGION)
                                                                           .build();
-//        new AzurestackProvider(this, "azurerm", providerConfig);
         AzurestackProvider.Builder.create(this, "azurestack").features(features).metadataHost("metadatahost").build();
 
-//        var rmFeatures = AzurermProvider.Builder.create(this, "azure-features").features(List.of()).build();
-//        Properties properties = new AfonPropertiesLoader().getProperties();
-//        Subscription subscription = Subscription.Builder.create(this, "subscription").id("b0cf8b88-d564-4245-b609-498635346319").build();
         List<AzurermProviderFeatures> rmFeatures = List.of(
-//                AzurermProviderFeatures.builder().subscription(List.of(subscription)).build()
                 AzurermProviderFeatures.builder().build()
                                                           );
         AzurermProvider.Builder.create(this, "azurerm").features(rmFeatures).subscriptionId("ffae1297-4c57-47e0-9a89-5583b97835cf").build();
 
-//        AzurermBackend.Builder.create(this).containerName("container-name")
-//                                                     .key("container-key")
-//                                                    .storageAccountName("afonstorageaccount")
-//                                                     .build();
-
-//        new AzurermBackend(this, AzurermBackendConfig.builder()
-//                                                     .containerName("container-name")
-//                                                     .key("container-key")
-//                                                    .storageAccountName("afonstorageaccount")
-//                                                     .build());
 
         // 2. Create Azure Resource Group
         ResourceGroup resourceGroup = new ResourceGroup(this, "aks-rg", ResourceGroupConfig.builder()
-                                                                                           .name("afon_resource_group_aks")
+                                                                                           .name(RESOURCE_GROUP_NAME)
                                                                                            .location(AZURE_REGION)
                                                                                            .build());
 
@@ -98,23 +82,6 @@ public class AksKubernetesStack extends TerraformStack {
                                                                 .defaultNodePool(nodePool)
                                                                 .identity(identity)
                                                                 .build();
-
-//        KubernetesCluster aksCluster = new KubernetesCluster(this, "aks-cluster", clusterConfig);
-
-//        KubernetesProvider.Builder.create(this, "kubernetes")
-//                                  .host(aksCluster.getKubeConfig().get(0).getHost())
-////                                  .clusterCaCertificate(encodedCert)
-////                                  .token(cloudProvider.getToken()) // Dynamically generated token
-//                                  .build();
-
-//
-//        // 5. Deploy a Resource using the Kubernetes Provider (Example: a Namespace)
-//        new Namespace(this, "cdktf-aks-namespace", com.hashicorp.cdktf.providers.kubernetes.namespace.NamespaceConfig.builder()
-//                                                                                                                     .metadata(
-//                                                                                                                             NamespaceMetadata.builder()
-//                                                                                                                                              .name("cdktf-azure-namespace")
-//                                                                                                                                              .build())
-//                                                                                                                     .build());
     }
 
     public static void main(String[] args) {
