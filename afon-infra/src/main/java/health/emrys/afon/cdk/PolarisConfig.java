@@ -57,12 +57,14 @@ public class PolarisConfig extends Construct {
                                                           export %s=%s
                                                           export %s=%s
                                                           export %s=%s
+                                                          export %s=%s
                                                           """,
                                                   AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties),
                                                   AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties),
                                                   AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties),
                                                   AZURE_TENANT_ID.getPropertyName(), AZURE_TENANT_ID.getValueFrom(properties),
-                                                  AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties)
+                                                  AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties),
+                                                  GOOGLE_APPLICATION_CREDENTIALS.getPropertyName(), GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties)
                                                  )
                                   )
                            )
