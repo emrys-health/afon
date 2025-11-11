@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.google.container_cluster.ContainerCluster;
 import com.hashicorp.cdktf.providers.google.container_cluster.ContainerClusterConfig;
 import com.hashicorp.cdktf.providers.google.container_cluster.ContainerClusterReleaseChannel;
@@ -23,6 +24,12 @@ public class GcpConstruct extends Construct implements CloudProvider {
 
     private final ContainerCluster gkeCluster;
 
+    /**
+     * Generate with:
+     * gcloud projects list --format="table(projectId,name)"
+     */
+    private final String PROJECT_ID = "afon-core";
+
     GcpConstruct(final Construct scope, final String id, String projectID) {
         super(scope, id);
         // 1. Configure Google Provider
@@ -33,24 +40,35 @@ public class GcpConstruct extends Construct implements CloudProvider {
 
         // 2. Create the GKE Cluster
         // It's best practice to disable the default node pool to manage node pools separately.
+
+        String gcloudCommand = String.format(
+                "gcloud container clusters get-credentials %s --region %s --project %s",
+                CLUSTER_NAME,
+                GCP_REGION,
+                PROJECT_ID
+                                            );
+        // Attach the LocalExec Provisioner
+        LocalExecProvisioner refreshCredentials = LocalExecProvisioner.builder()
+                                                                      .command(gcloudCommand)
+                                                                      // Optionally specify the interpreter for security/compatibility
+                                                                      .interpreter(List.of("/bin/bash", "-c"))
+                                                                      .type("local-exec")
+                                                                      .build();
+
+
         ContainerClusterReleaseChannel releaseChannel = ContainerClusterReleaseChannel.builder().channel("REGULAR").build();
         ContainerClusterConfig clusterConfig = ContainerClusterConfig.builder()
                                                                      .name(CLUSTER_NAME)
                                                                      .location(GCP_REGION)
-                                                                     // Disable the default node pool to manage it with the dedicated resource below
                                                                      .removeDefaultNodePool(true)
-                                                                     .initialNodeCount(1) // Required, but the default will be deleted
-
+                                                                     .initialNodeCount(1)
                                                                      // Recommended configuration for Autopilot/Standard GKE Networking
                                                                      .networkingMode("VPC_NATIVE")
-
-                                                                     // Enable certain features
+                                                                     .provisioners(List.of(refreshCredentials))
                                                                      .releaseChannel(releaseChannel)
-
                                                                      // You would typically configure VPC, subnets, and other security features here.
                                                                      .build();
         gkeCluster = new ContainerCluster(this, "gkeCluster", clusterConfig);
-        //
 
         // 3. Create a Separate Node Pool for Worker Nodes
         // Managing the node pool separately allows adding/removing it without recreating the cluster.
@@ -71,7 +89,6 @@ public class GcpConstruct extends Construct implements CloudProvider {
                                                                               .nodeConfig(nodeConfig)
                                                                               .management(poolManagement)
                                                                               .build());
-
         // 4. Output the Cluster Endpoint
         com.hashicorp.cdktf.TerraformOutput.Builder.create(this, "gkeEndpoint")
                                                    .value(gkeCluster.getEndpoint())

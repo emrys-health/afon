@@ -12,7 +12,7 @@ public class GcpPolarisStack extends TerraformStack {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(WholeStack.class);
 
-    public static final String ID     = "polaris-deployment";
+    public static final String ID     = "gcp-polaris-deployment";
 
     public GcpPolarisStack(final Construct scope, final String id) {
         super(scope, id);
@@ -26,6 +26,7 @@ public class GcpPolarisStack extends TerraformStack {
     }
 
     public static void main(String[] args) {
+        logger.warn("You may need to first run: gcloud auth application-default login");
         final App app = new App();
         new GcpPolarisStack(app, ID);
         app.synth();
