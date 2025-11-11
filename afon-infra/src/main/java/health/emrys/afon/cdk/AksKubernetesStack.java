@@ -76,7 +76,7 @@ public class AksKubernetesStack extends TerraformStack {
 
         // 2. Create Azure Resource Group
         ResourceGroup resourceGroup = new ResourceGroup(this, "aks-rg", ResourceGroupConfig.builder()
-                                                                                           .name(RESOURCE_GROUP_NAME)
+                                                                                           .name("afon_resource_group_aks")
                                                                                            .location(AZURE_REGION)
                                                                                            .build());
 
@@ -87,7 +87,7 @@ public class AksKubernetesStack extends TerraformStack {
         KubernetesClusterDefaultNodePool nodePool = KubernetesClusterDefaultNodePool.builder()
                                                                                     .name("systempool")
                                                                                     .nodeCount(1)
-                                                                                    .vmSize("Standard_DS2_v2")
+                                                                                    .vmSize("Standard_A8_v2")
                                                                                     .build();
         KubernetesCluster aksCluster = KubernetesCluster.Builder.create(this, "aks")
                                                                 .name(CLUSTER_NAME)
