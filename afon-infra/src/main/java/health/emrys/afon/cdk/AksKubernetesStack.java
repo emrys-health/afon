@@ -1,9 +1,6 @@
 package health.emrys.afon.cdk;
 
-import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.AzurermBackend;
-import com.hashicorp.cdktf.AzurermBackendConfig;
-import com.hashicorp.cdktf.TerraformStack;
+import com.hashicorp.cdktf.*;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesCluster;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterConfig;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterDefaultNodePool;
@@ -26,11 +23,12 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import software.constructs.Construct;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.infra.Defaults.AZURE_REGION;
-import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
+import static health.emrys.afon.infra.Defaults.*;
+import static java.lang.String.format;
 
 public class AksKubernetesStack extends TerraformStack {
     public AksKubernetesStack(final Construct scope, final String id) {
@@ -73,6 +71,15 @@ public class AksKubernetesStack extends TerraformStack {
                                                                                     .nodeCount(1)
                                                                                     .vmSize("Standard_A8_v2")
                                                                                     .build();
+        LocalExecProvisioner updateCredentials = LocalExecProvisioner.builder()
+                                                                     .when("create") // Run only when the resource is created
+                                                                     .command(format(
+                                                                                      "az aks get-credentials --resource-group %s --name %s --overwrite-existing",
+                                                                                      resourceGroup.getName(),
+                                                                                      CLUSTER_NAME)
+                                                                             )
+                                                                     .type("local-exec")
+                                                                     .build();
         KubernetesCluster aksCluster = KubernetesCluster.Builder.create(this, "aks")
                                                                 .name(CLUSTER_NAME)
                                                                 .location(resourceGroup.getLocation())
@@ -81,6 +88,7 @@ public class AksKubernetesStack extends TerraformStack {
                                                                 .kubernetesVersion(KUBERNETES_VERSION)
                                                                 .defaultNodePool(nodePool)
                                                                 .identity(identity)
+                                                                .provisioners(List.of(updateCredentials))
                                                                 .build();
     }
 
