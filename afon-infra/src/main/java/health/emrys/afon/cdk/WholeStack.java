@@ -261,7 +261,7 @@ class WholeStack extends TerraformStack {
                        .createNamespace(true)
                        .version("3.31.0") // Using a recent stable version
                        .atomic(true)
-                       .timeout(000)
+                       .timeout(900)
                        .build();
     }
 
