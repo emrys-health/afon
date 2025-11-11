@@ -8,13 +8,13 @@ import software.constructs.Construct;
 
 import java.util.List;
 
-public class GcpPlarisStack extends TerraformStack {
+public class GcpPolarisStack extends TerraformStack {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(WholeStack.class);
 
     public static final String ID     = "polaris-deployment";
 
-    public GcpPlarisStack(final Construct scope, final String id) {
+    public GcpPolarisStack(final Construct scope, final String id) {
         super(scope, id);
 
         NullProvider.Builder.create(this, "nullProvider")
@@ -27,7 +27,7 @@ public class GcpPlarisStack extends TerraformStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new GcpPlarisStack(app, ID);
+        new GcpPolarisStack(app, ID);
         app.synth();
     }
 }
