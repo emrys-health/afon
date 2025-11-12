@@ -31,8 +31,7 @@ public class SparkClusterDeployment extends WholeStack {
         super(scope, id);
         String sparkConnectorName = SPARK_CONNECTOR_NAME;
         String sparkServiceAccountName = SPARK_SERVICE_ACCOUNT_NAME;
-        Resource resource = installSparkOperatorHelmChart(List.of());
-        List<Resource> eksDependOn = List.of(resource);
+        List<Resource> eksDependOn = List.of();
 
         final Map<String, Object> sparkClusterManifest = Map.of(
                 "apiVersion", "spark.apache.org/v1alpha1",
@@ -128,35 +127,6 @@ public class SparkClusterDeployment extends WholeStack {
                                                      ))
                                         .build())
                        .build();
-
-
-
-
-    }
-
-    private @NotNull Resource installSparkOperatorHelmChart(List<Resource> eksDependOn) {
-        // INSTALL SPARK OPERATOR (CRD CONTROLLER)
-        Release sparkOperatorRelease = Release.Builder.create(this, "sparkOperator")
-                                                      .name("spark-kubernetes-operator")
-                                                      .chart("spark-kubernetes-operator")
-                                                      .repository("https://apache.github.io/spark-kubernetes-operator")
-                                                      .namespace("default")
-                                                      .atomic(true)
-                                                      .dependsOn(eksDependOn) // Depend on EKS Auth
-                                                      .build();
-        // Block until the Spark Operator Helm Release is fully installed and ready
-        Resource sparkOperatorReadyWaiter = Resource.Builder.create(this, "sparkOperatorReadyWaiter")
-                                                            .dependsOn(List.of(sparkOperatorRelease)) // Must wait for the release object to be created
-                                                            .provisioners(List.of(
-                                                                    LocalExecProvisioner.builder()
-                                                                                        .type("local-exec")
-                                                                                        .when("create")
-                                                                                        // The --wait flag blocks until all resources are in a ready state.
-                                                                                        .command("helm status spark-operator --namespace spark-operator --wait")
-                                                                                        .build()
-                                                                                 ))
-                                                            .build();
-        return sparkOperatorReadyWaiter;
     }
 
     private Map<String, String> sparkConfig(String serviceAccountName) {

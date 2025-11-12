@@ -12,7 +12,6 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
-import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
@@ -22,9 +21,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.AZURE_CLIENT_ID;
-import static health.emrys.afon.config.AfonProperties.AZURE_CLIENT_SECRET;
-import static health.emrys.afon.config.AfonProperties.AZURE_TENANT_ID;
 import static health.emrys.afon.infra.Defaults.POLARIS_SERVICE_NAME;
 import static java.lang.String.format;
 
