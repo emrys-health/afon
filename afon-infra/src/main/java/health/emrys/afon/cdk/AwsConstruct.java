@@ -72,6 +72,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
                          .cidrBlock("10.0.0.0/16")
                          .enableDnsSupport(true)
                          .enableDnsHostnames(true)
+                         .provisioners(destroySGsAndVPC())
                          .tags(Map.of("Name", VPC_NAME)).build();
 
         final InternetGateway igw = InternetGateway.Builder.create(this, "vpcIgw")
@@ -101,13 +102,13 @@ public class AwsConstruct extends Construct implements CloudProvider {
                                                               .route(List.of(route))
                                                               .tags(Map.of("Name", "cdktf-eks-public-rt")).build();
 
-        RouteTableAssociation.Builder.create(this, "subnet1Association")
-                                     .subnetId(publicSubnet1.getId())
-                                     .routeTableId(publicRouteTable.getId()).build();
+        RouteTableAssociation subnet1Association = RouteTableAssociation.Builder.create(this, "subnet1Association")
+                                                                                .subnetId(publicSubnet1.getId())
+                                                                                .routeTableId(publicRouteTable.getId()).build();
 
-        RouteTableAssociation.Builder.create(this, "subnet2Association")
-                                     .subnetId(publicSubnet2.getId())
-                                     .routeTableId(publicRouteTable.getId()).build();
+        RouteTableAssociation subnet2Association = RouteTableAssociation.Builder.create(this, "subnet2Association")
+                                                                                .subnetId(publicSubnet2.getId())
+                                                                                .routeTableId(publicRouteTable.getId()).build();
 
         final List<String> subnetIds = List.of(publicSubnet1.getId(), publicSubnet2.getId());
 
@@ -132,8 +133,11 @@ public class AwsConstruct extends Construct implements CloudProvider {
                                     .name(CLUSTER_NAME)
                                     .roleArn(eksClusterRole.getArn())
                                     .vpcConfig(vpcConfig)
+//                                    .provisioners(destroyELBs())
                                     .version("1.31")
-                                    .dependsOn(List.of(eksClusterRole, publicSubnet1, publicSubnet2))
+                                    .dependsOn(List.of(eksClusterRole,
+                                                       publicSubnet1, publicSubnet2, igw, eksClusterPolicy,
+                                                       subnet2Association, subnet1Association))
                                     .tags(Map.of("Name", "cdktf-eks")).build();
 
         // if one depends_on this, then the cluster should be running
@@ -269,11 +273,11 @@ public class AwsConstruct extends Construct implements CloudProvider {
         Resource.Builder.create(this, "cleanupELBs")
                         // Ensure this runs only after the K8s Services are destroyed by Terraform
                         .dependsOn(loadBalancers)
-                        .provisioners(destroyELBs())
+//                        .provisioners(destroyELBs())
                         .build();
         Resource.Builder.create(this, "cleanupSecurityGroups")
                         .dependsOn(loadBalancers)
-                        .provisioners(destroySGsAndVPC())
+//                        .provisioners(destroySGsAndVPC())
                         .build();
     }
 
@@ -413,6 +417,12 @@ public class AwsConstruct extends Construct implements CloudProvider {
         return eksAuthData.getToken();
     }
 
+    /**
+     * Note that EKS depends on the subnets.
+     * Once the EKS is nuked with "eksctl delete cluster", you can delete the subnets with:
+     * aws ec2 delete-subnet --subnet-id subnet-XXX
+     * then delete the whole VPC
+     */
     public static void main(String[] args) {
         String vpcId = "$VPC";
         System.out.println(cleanCommands());
@@ -426,15 +436,16 @@ public class AwsConstruct extends Construct implements CloudProvider {
                                           %s
                                           %s
                                           %s
+                                          aws iam delete-role --role-name  cdktf-eks-cluster-role
                                           """,
                                   getVPCCommand(),
                                   cleanELBsCommand(),
                                   cleanGatewaysCommand(vpcId),
                                   cleanNetworkInterfacesCommand(vpcId),
-                                  cleanSubNetsCommand(vpcId),
                                   cleanSecurityGroupsCommand(vpcId),
                                   cleanRoutesCommand(vpcId),
                                   cleanEksCommand(),
+                                  cleanSubNetsCommand(vpcId),
                                   getDeleteVPCCommand()
                                  ));
     }

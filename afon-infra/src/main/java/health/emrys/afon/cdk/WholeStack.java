@@ -84,7 +84,6 @@ class WholeStack extends AwsKubernetesPolaris {
                                                                        .name(JUPYTER_SERVICE_NAME)
                                                                        .build())
                                               .dependsOn(eksDependOn)
-                                              .provisioners(AwsConstruct.destroyELBs())
                                               .spec(ServiceSpec.builder()
                                                                .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
                                                                .type("LoadBalancer")

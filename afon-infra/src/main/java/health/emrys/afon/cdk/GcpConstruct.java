@@ -20,6 +20,10 @@ import java.util.List;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static health.emrys.afon.infra.Defaults.GCP_REGION;
 
+/**
+ * If you need to destroy by hand, run:
+ * gcloud container clusters delete $CLUSTER_NAME  --zone=$REGION  --project afon-core
+ */
 public class GcpConstruct extends Construct implements CloudProvider {
 
     private final ContainerCluster gkeCluster;
@@ -61,7 +65,7 @@ public class GcpConstruct extends Construct implements CloudProvider {
                                                                      .name(CLUSTER_NAME)
                                                                      .location(GCP_REGION)
                                                                      .removeDefaultNodePool(true)
-                                                                     .initialNodeCount(1)
+                                                                     .initialNodeCount(3)
                                                                      // Recommended configuration for Autopilot/Standard GKE Networking
                                                                      .networkingMode("VPC_NATIVE")
                                                                      .provisioners(List.of(refreshCredentials))
