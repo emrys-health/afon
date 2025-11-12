@@ -30,7 +30,8 @@ public class SparkClusterDeployment extends WholeStack {
         super(scope, id);
         String sparkConnectorName = SPARK_CONNECTOR_NAME;
         String sparkServiceAccountName = SPARK_SERVICE_ACCOUNT_NAME;
-        List<Resource> eksDependOn = List.of();
+        Resource resource = installSparkOperatorHelmChart(List.of());
+        List<Resource> eksDependOn = List.of(resource);
 
         final Map<String, Object> sparkClusterManifest = Map.of(
                 "apiVersion", "spark.apache.org/v1alpha1",
@@ -127,9 +128,12 @@ public class SparkClusterDeployment extends WholeStack {
                                         .build())
                        .build();
 
+
+
+
     }
 
-    private @NotNull Resource installSparkOperatorHelmChar(List<Resource> eksDependOn) {
+    private @NotNull Resource installSparkOperatorHelmChart(List<Resource> eksDependOn) {
         // INSTALL SPARK OPERATOR (CRD CONTROLLER)
         Release sparkOperatorRelease = Release.Builder.create(this, "sparkOperator")
                                                       .name("spark-kubernetes-operator")
@@ -200,7 +204,7 @@ public class SparkClusterDeployment extends WholeStack {
     public static void main(String[] args) {
         logger.info("Creating JSON for a Spark cluster");
         final App app = new App();
-        new SparkClusterDeployment(app, SparkClusterDeployment.ID);
+        new SparkClusterDeployment(app, AwsKubernetesPolaris.ID);
         app.synth();
     }
 
