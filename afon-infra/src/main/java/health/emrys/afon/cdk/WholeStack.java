@@ -62,6 +62,7 @@ class WholeStack extends AwsKubernetesPolaris {
                                                                         .build();
 
         cloudProvider.configureLoadBalancerDestroy(loadBalancers);
+        SparkConfig sparkConfig = new SparkConfig(this, "sparkop", cloudProvider.getDependables());
     }
 
     private Service deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName) {
