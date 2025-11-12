@@ -1,7 +1,6 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
@@ -12,7 +11,6 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
-import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -38,22 +36,13 @@ import static health.emrys.afon.infra.Defaults.*;
  * </UL>
  * when you run the output
  */
-class WholeStack extends TerraformStack {
+class WholeStack extends AwsKubernetesPolaris {
 
-    static final        Logger logger = org.slf4j.LoggerFactory.getLogger(WholeStack.class);
-
-    public static final String ID     = "jupyter-deployment";
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(WholeStack.class);
 
     public WholeStack(final Construct scope, final String id) {
         super(scope, id);
-
-        NullProvider.Builder.create(this, "nullProvider")
-                            .build();
-
-        CloudProvider cloudProvider = new AwsConstruct(this, id);
-        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
-        Service polarisLB = polarisConfig.deployPolaris(cloudProvider.getDependables());
-        Service jupyterLB = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME);
+        Service       jupyterLB     = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME);
         List<Service> loadBalancers = List.of(polarisLB, jupyterLB);
 
         // 6. Configure the Helm Provider
@@ -88,23 +77,24 @@ class WholeStack extends TerraformStack {
                                                        "jupyter");
 
         Service loadbalancer = Service.Builder.create(this, JUPYTER_SERVICE_NAME)
-                       .metadata(ServiceMetadata.builder()
-                                                .name(JUPYTER_SERVICE_NAME)
-                                                .build())
-                       .dependsOn(eksDependOn)
-                       .spec(ServiceSpec.builder()
-                                        .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
-                                        .type("LoadBalancer")
-                                        .port(List.of(
-                                                ServiceSpecPort.builder()
-                                                               .name("web")
-                                                               .port(8888) // Port the load balancer listens on
-                                                               .targetPort("8888") // Port the container is listening on
-                                                               .protocol("TCP")
-                                                               .build()
-                                                     ))
-                                        .build())
-                       .build();
+                                              .metadata(ServiceMetadata.builder()
+                                                                       .name(JUPYTER_SERVICE_NAME)
+                                                                       .build())
+                                              .dependsOn(eksDependOn)
+                                              .provisioners(AwsConstruct.destroyELBs())
+                                              .spec(ServiceSpec.builder()
+                                                               .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
+                                                               .type("LoadBalancer")
+                                                               .port(List.of(
+                                                                       ServiceSpecPort.builder()
+                                                                                      .name("web")
+                                                                                      .port(8888) // Port the load balancer listens on
+                                                                                      .targetPort("8888") // Port the container is listening on
+                                                                                      .protocol("TCP")
+                                                                                      .build()
+                                                                            ))
+                                                               .build())
+                                              .build();
 
         Service.Builder.create(this, "jupyter-internal")
                        .metadata(ServiceMetadata.builder()
@@ -134,7 +124,6 @@ class WholeStack extends TerraformStack {
 
         return loadbalancer;
     }
-
 
 
     private void networkPolicies(Map<String, String> labels, String sparkConnectorName) {

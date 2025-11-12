@@ -268,33 +268,41 @@ public class AwsConstruct extends Construct implements CloudProvider {
         Resource.Builder.create(this, "cleanupELBs")
                         // Ensure this runs only after the K8s Services are destroyed by Terraform
                         .dependsOn(loadBalancers)
-                        .provisioners(List.of(
-                                LocalExecProvisioner.builder()
-                                                    .type("local-exec")
-                                                    .when("destroy")
-                                                    .command(
-                                                            cleanCommands()
-                                                            )
-                                                    .build()
-                                             ))
+                        .provisioners(destroyELBs())
                         .build();
         Resource.Builder.create(this, "cleanupSecurityGroups")
                         .dependsOn(loadBalancers)
-                        .provisioners(List.of(
-                                LocalExecProvisioner.builder()
-                                                    .type("local-exec")
-                                                    .when("destroy")
-                                                    .command(
-                                                            format("""
-                                                                           %s
-                                                                           %s
-                                                                           """,
-                                                                   getVPCCommand(),
-                                                                   cleanSecurityGroupsCommand("$VPC"))
-                                                            )
-                                                    .build()
-                                             ))
+                        .provisioners(destroySGsAndVPC())
                         .build();
+    }
+
+    public static @NotNull List<LocalExecProvisioner> destroySGsAndVPC() {
+        return List.of(
+                LocalExecProvisioner.builder()
+                                    .type("local-exec")
+                                    .when("destroy")
+                                    .command(
+                                            format("""
+                                                           %s
+                                                           %s
+                                                           """,
+                                                   getVPCCommand(),
+                                                   cleanSecurityGroupsCommand("$VPC"))
+                                            )
+                                    .build()
+                      );
+    }
+
+    public static @NotNull List<LocalExecProvisioner> destroyELBs() {
+        return List.of(
+                LocalExecProvisioner.builder()
+                                    .type("local-exec")
+                                    .when("destroy")
+                                    .command(
+                                            cleanCommands()
+                                            )
+                                    .build()
+                      );
     }
 
     private static @NotNull String cleanCommands() {
