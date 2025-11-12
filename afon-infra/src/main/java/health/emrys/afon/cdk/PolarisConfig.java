@@ -29,9 +29,12 @@ import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
 
-    public static final String        SECRET_NAME = "my-app-secret";
-    public static final String        POLARIS_ENV = "polaris_env.sh";
-    private final       CloudProvider cloudProvider;
+    private static final String SECRET_NAME      = "my-app-secret";
+    private static final String POLARIS_ENV_FILE = "polaris_env.sh";
+    private static final String GCP_CRED_FILE    = "service-account.json";
+    private static final String SECRETS_DIR      = "/etc/app-secrets";
+
+    private final CloudProvider cloudProvider;
 
     public PolarisConfig(@NotNull Construct scope, @NotNull String id, CloudProvider cloudProvider) {
         super(scope, id);
@@ -42,34 +45,42 @@ public class PolarisConfig extends Construct {
 
         // Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
-        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
-        Properties           properties = loader.getProperties();
+        Properties properties = appProperties();
         Secret.Builder.create(this, "mySecret")
                       .dependsOn(cloudProvider.getDependables())
                       .metadata(SecretMetadata.builder().name(SECRET_NAME).build())
-                      .data(Map.of(
-                              POLARIS_ENV, format("""
-                                                          export POLARIS_ID=root
-                                                          export POLARIS_SECRET=s3cr3t
-                                                          
-                                                          export %s=%s
-                                                          export %s=%s
-                                                          export %s=%s
-                                                          export %s=%s
-                                                          export %s=%s
-                                                          export %s=%s
-                                                          """,
-                                                  AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties),
-                                                  AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties),
-                                                  AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties),
-                                                  AZURE_TENANT_ID.getPropertyName(), AZURE_TENANT_ID.getValueFrom(properties),
-                                                  AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties),
-                                                  GOOGLE_APPLICATION_CREDENTIALS.getPropertyName(), GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties)
-                                                 )
-                                  )
-                           )
+                      .data(Map.of(POLARIS_ENV_FILE, getProviderCredentials(properties),
+                                   GCP_CRED_FILE, GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties)))
                       .type("Opaque")
                       .build();
+    }
+
+    private static Properties appProperties() {
+        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
+        Properties           properties = loader.getProperties();
+        return properties;
+    }
+
+    private static String getProviderCredentials(Properties properties) {
+
+        return format("""
+                              export POLARIS_ID=root
+                              export POLARIS_SECRET=s3cr3t
+                              
+                              export %s=%s
+                              export %s=%s
+                              export %s=%s
+                              export %s=%s
+                              export %s=%s
+                              export %s='%s'
+                              """,
+                      AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties),
+                      AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties),
+                      AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties),
+                      AZURE_TENANT_ID.getPropertyName(), AZURE_TENANT_ID.getValueFrom(properties),
+                      AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties),
+                      GOOGLE_APPLICATION_CREDENTIALS.getPropertyName(), SECRETS_DIR + "/" + GCP_CRED_FILE
+                     );
     }
 
     protected void configureK8s(CloudProvider cloudProvider) {
@@ -91,18 +102,17 @@ public class PolarisConfig extends Construct {
                                                                                                                                                .build())
                                                                                                  .build());
 
-        String secretsDir = "/etc/app-secrets";
 
         List<DeploymentSpecTemplateSpecContainerVolumeMount> mounts = List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
                                                                                                                             .name(secretVolume)
-                                                                                                                            .mountPath(secretsDir)
+                                                                                                                            .mountPath(SECRETS_DIR)
                                                                                                                             .readOnly(true)
                                                                                                                             .build());
 
         List<String> commands = List.of("/bin/bash",
                                         "-c",
                                         format("source %s/%s && /opt/jboss/container/java/run/run-java.sh",
-                                               secretsDir, POLARIS_ENV));
+                                               SECRETS_DIR, POLARIS_ENV_FILE));
         DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer.builder()
                                                                                                   .name("polaris")
                                                                                                   .image("apache/polaris:1.1.0-incubating")
@@ -137,5 +147,9 @@ public class PolarisConfig extends Construct {
                                                             ))
                                                .build())
                               .build();
+    }
+
+    public static final void main(String[] unused) {
+        System.out.println(PolarisConfig.getProviderCredentials(appProperties()));
     }
 }
