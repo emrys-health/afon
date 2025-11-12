@@ -2,6 +2,7 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.manifest.Manifest;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;

@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_kubernetes_cluster.DataAzurermKubernetesCluster;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesCluster;
@@ -14,7 +15,6 @@ import com.hashicorp.cdktf.providers.azurestack.resource_group.ResourceGroup;
 import com.hashicorp.cdktf.providers.azurestack.resource_group.ResourceGroupConfig;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
@@ -97,7 +97,7 @@ public class AzureConstruct extends Construct implements CloudProvider {
     }
 
     @Override
-    public List<Resource> getDependables() {
+    public List<ITerraformDependable> getDependables() {
         return List.of();
     }
 

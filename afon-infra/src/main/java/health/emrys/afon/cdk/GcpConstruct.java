@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.google.container_cluster.ContainerCluster;
 import com.hashicorp.cdktf.providers.google.container_cluster.ContainerClusterConfig;
@@ -12,7 +13,6 @@ import com.hashicorp.cdktf.providers.google.data_google_client_config.DataGoogle
 import com.hashicorp.cdktf.providers.google.provider.GoogleProvider;
 import com.hashicorp.cdktf.providers.google.provider.GoogleProviderConfig;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -97,7 +97,7 @@ public class GcpConstruct extends Construct implements CloudProvider {
     }
 
     @Override
-    public List<Resource> getDependables() {
+    public List<ITerraformDependable> getDependables() {
         return List.of();
     }
 

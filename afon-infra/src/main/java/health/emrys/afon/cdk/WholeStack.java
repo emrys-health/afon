@@ -1,9 +1,11 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
+import com.hashicorp.cdktf.providers.kubernetes.manifest.Manifest;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -62,7 +64,7 @@ class WholeStack extends AwsKubernetesPolaris {
         cloudProvider.configureLoadBalancerDestroy(loadBalancers);
     }
 
-    private Service deployJupyter(List<Resource> eksDependOn, String sparkConnectorName) {
+    private Service deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer.builder()
@@ -229,7 +231,7 @@ class WholeStack extends AwsKubernetesPolaris {
                                   ).build();
     }
 
-    private void calico(List<@NotNull Resource> eksDependOn) {
+    private void calico(List<@NotNull ITerraformDependable> eksDependOn) {
         /* This is still timing out after 10 minutes with:
 │ Error: Error uninstalling release
 │
@@ -254,7 +256,7 @@ class WholeStack extends AwsKubernetesPolaris {
                        .build();
     }
 
-    private void csiSecretsDriver(List<@NotNull Resource> eksDependOn) {
+    private void csiSecretsDriver(List<@NotNull ITerraformDependable> eksDependOn) {
         Release.Builder.create(this, "secrets-store-csi-driver")
                        .dependsOn(eksDependOn)
                        .name("csi-secrets-store") // The release name
