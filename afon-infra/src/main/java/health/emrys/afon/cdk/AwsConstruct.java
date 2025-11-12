@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
@@ -35,9 +36,9 @@ import static java.lang.String.format;
 public class AwsConstruct extends Construct implements CloudProvider {
     public static final String                VPC_NAME = "cdktf-eks-vpc";
     private final       DataAwsEksClusterAuth eksAuthData;
-    private final       EksCluster            cluster;
-    private final       List<Resource>        eksDependOn;
-    final               Vpc                   vpc;
+    private final       EksCluster                 cluster;
+    private final       List<ITerraformDependable> eksDependOn;
+    final               Vpc                        vpc;
 
     AwsConstruct(final Construct scope, final String id) {
         super(scope, id);
@@ -233,7 +234,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
                                                                       ))
                                                  .build();
 
-        eksDependOn = List.of(newKubeConfig);
+        eksDependOn = List.of(newKubeConfig, cluster, eksAuthData);
 
         EksNodeGroup.Builder.create(this, "eksNodeGroup")
                             .clusterName(cluster.getName())
@@ -393,7 +394,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
     }
 
     @Override
-    public List<Resource> getDependables() {
+    public List<ITerraformDependable> getDependables() {
         return eksDependOn; // List.of(cluster, eksAuthData);
     }
 

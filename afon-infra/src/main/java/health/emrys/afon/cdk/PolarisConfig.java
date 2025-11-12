@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
@@ -93,7 +94,7 @@ public class PolarisConfig extends Construct {
                                   .build();
     }
 
-    public Service deployPolaris(List<Resource> eksDependOn) {
+    public Service deployPolaris(List<ITerraformDependable> eksDependOn) {
         String secretVolume = "secret-volume";
         List<DeploymentSpecTemplateSpecVolume> volumes = List.of(DeploymentSpecTemplateSpecVolume.builder()
                                                                                                  .name(secretVolume)

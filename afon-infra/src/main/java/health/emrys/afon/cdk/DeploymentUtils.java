@@ -1,7 +1,7 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
-import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
@@ -13,7 +13,7 @@ public class DeploymentUtils {
 
     public static Deployment deploy(
             Construct scope,
-            List<@NotNull Resource> eksDependOn,
+            List<@NotNull ITerraformDependable> eksDependOn,
             Map<String, String> labels,
             List<DeploymentSpecTemplateSpecContainer> containers,
             List<DeploymentSpecTemplateSpecVolume> volumes,

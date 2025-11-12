@@ -1,9 +1,9 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -18,7 +18,7 @@ public class AksKubernetesPolaris extends AksKubernetesStack {
         CloudProvider localCloud = new CloudProvider() {
 
             @Override
-            public List<Resource> getDependables() {
+            public List<ITerraformDependable> getDependables() {
                 return List.of();
             }
 
