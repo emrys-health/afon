@@ -2,15 +2,15 @@
 
 There are two.
 
-1. Just Polaris. This contains everything that is needed to vend credentials.
-2. The whole stack (Jupyter and Spark in addition to Polaris)
+1. Just Polaris. This contains everything that is needed to vend credentials. We have deployments for all three cloud providers.
+2. The whole stack (Jupyter and Spark in addition to Polaris). At the moment, this is just available for AWS. More coming soon.
 
 # What the Java code does
 
 The code does not provision the environment.
 It creates the input for Terraform/Tofu.
 
-When the Java is run, run `cd ./cdktf.out/stacks/YOUR_DEPLOYMENT`.
+After the Java is run, run `cd ./cdktf.out/stacks/YOUR_DEPLOYMENT`.
 There, you can run `tofu apply` (or `tofu destroy` if you want to tear the stack down).
 
 ### Deployment #1
@@ -55,11 +55,11 @@ Spark needs to Polaris to be up and running before we can configure it since Pol
 
 ### Tearing down the AWS environment
 
-In AWS, deleting the Polaris deployment is fine.
+In all cloud providers, deleting the Polaris deployment is fine.
 However, destroying the whole stack in AWS is problematic.
 It appears that there are lingering AWS infrastructure components.
 Run `health.emrys.afon.cdk.AwsConstruct` to print out helpful command lines.
-In particular, this should blatt everything.
+In particular, this should blatt everything:
 
 ```shell
 export VPC=$(aws ec2 describe-vpcs   --query "Vpcs[?Tags[?Key=='Name' && Value=='cdktf-eks-vpc']].VpcId"   --output text)
@@ -70,6 +70,7 @@ for SN in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=$VP
     echo $SN ;
     aws ec2 delete-subnet --subnet-id $SN --region $REGION ;
 } done
+
 aws ec2 delete-vpc --vpc-id $VPC
 
 aws iam delete-role --role-name  cdktf-eks-cluster-role
