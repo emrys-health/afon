@@ -26,7 +26,7 @@ public class GcpPolarisStack extends TerraformStack {
     }
 
     public static void main(String[] args) {
-        logger.warn("You may need to first run: gcloud auth application-default login");
+        logger.warn("You may need to first run: gcloud auth application-default login before running tofu apply -auto-approve");
         final App app = new App();
         new GcpPolarisStack(app, ID);
         app.synth();
