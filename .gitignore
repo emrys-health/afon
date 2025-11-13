@@ -127,6 +127,13 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+cdktf.out
+*pom.xml
+env.properties
+.idea
 
 # Spyder project settings
 .spyderproject
