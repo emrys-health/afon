@@ -10,28 +10,28 @@ There are two.
 The code does not provision the environment.
 It creates the input for Terraform/Tofu.
 
-When the Java is run, run `cd afon-core/cdktf.out/stacks/YOUR_DEPLOYMENT`.
+When the Java is run, run `cd ./cdktf.out/stacks/YOUR_DEPLOYMENT`.
 There, you can run `tofu apply` (or `tofu destroy` if you want to tear the stack down).
 
 ### Deployment #1
 
-The classes for creating markup to create just Polaris are:
+Run the classes for creating markup to create just Polaris by running (in the `afon-infra` directory):
 
-`health.emrys.afon.cdk.AwsKubernetesPolaris`
+`mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsKubernetesPolaris exec:java`
 
-`health.emrys.afon.cdk.AzureKubernetesPolaris`
+`mvn -Dexec.mainClass=health.emrys.afon.cdk.AzureKubernetesPolaris exec:java`
 
-`health.emrys.afon.cdk.GcpKubernetesPolaris`
+`mvn -Dexec.mainClass=health.emrys.afon.cdk.GcpKubernetesPolaris exec:java`
 
 for each cloud provider.
 
-Note that the credentials in your `afon-core/env.properties` are used by the deployed Polaris.
+Note that the credentials in your `env.properties` are used by the deployed Polaris.
 
 ### Deployment #2
 
 If you want to create config for the whole stack in AWS, run:
 
-`health.emrys.afon.cdk.AwsWholeStack`
+`mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsWholeStack exec:java`
 
 # Future improvements
 
@@ -54,3 +54,4 @@ aws ec2 delete-vpc --vpc-id $VPC
 
 aws iam delete-role --role-name  cdktf-eks-cluster-role
 ```
+
