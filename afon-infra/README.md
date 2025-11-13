@@ -33,7 +33,27 @@ If you want to create config for the whole stack in AWS, run:
 
 `mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsWholeStack exec:java`
 
+This will output your `cdk.tf.json` file.
+Run it with `tofu apply -auto-approve` if you are happy with it.
+After about 10 minutes, you should have a working cluster.
+Check this by running `kubectl get pods`. 
+You should see Polaris and Jupyter.
+
+"But where is Spark?" I hear you gasp. 
+Relax, dear reader. 
+For this, we need to run:
+
+`mvn -Dexec.mainClass=health.emrys.afon.cdk.SparkClusterDeployment exec:java`
+
+In the same directory, you'll see a new `cdk.tf.json`. 
+So, run `tofu apply -auto-approve`.
+
+*Why is this a two step process?*
+Spark needs to Polaris to be up and running before we can configure it since Polaris generates keys at runtime.
+
 # Future improvements
+
+### Tearing down the AWS environment
 
 In AWS, deleting the Polaris deployment is fine.
 However, destroying the whole stack in AWS is problematic.
@@ -55,3 +75,13 @@ aws ec2 delete-vpc --vpc-id $VPC
 aws iam delete-role --role-name  cdktf-eks-cluster-role
 ```
 
+### Addressing the 2-step Spark deployment
+
+We can probably configure Polaris in a more [production like](https://polaris.apache.org/releases/1.0.0/configuring-polaris-for-production/) manner.
+If its metastore credentials were [persistent](https://github.com/emrys-health/afon-core/issues/6) we might not need the 2 phased delpoyment. 
+
+### Be GitOps aligned
+
+The idea in GitOps is that we check Terraform code into Git.
+However, our Terraform can contain confidential details. 
+If we are to adopt GitOps, we need to pull this sensitive data out.
