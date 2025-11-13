@@ -10,7 +10,7 @@ import java.util.List;
 
 public class GcpPolarisStack extends TerraformStack {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(WholeStack.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
 
     public static final String ID     = "gcp-polaris-deployment";
 

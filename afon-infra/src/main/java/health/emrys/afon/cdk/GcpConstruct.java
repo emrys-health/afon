@@ -65,6 +65,7 @@ public class GcpConstruct extends Construct implements CloudProvider {
                                                                      .name(CLUSTER_NAME)
                                                                      .location(GCP_REGION)
                                                                      .removeDefaultNodePool(true)
+                                                                     .deletionProtection(false)
                                                                      .initialNodeCount(3)
                                                                      // Recommended configuration for Autopilot/Standard GKE Networking
                                                                      .networkingMode("VPC_NATIVE")
