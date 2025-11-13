@@ -8,8 +8,8 @@ import software.constructs.Construct;
 
 import java.util.List;
 
-public class AksKubernetesPolaris extends AksKubernetesStack {
-    public AksKubernetesPolaris(Construct scope, String id) {
+public class AzureKubernetesPolaris extends AzureKubernetesStack {
+    public AzureKubernetesPolaris(Construct scope, String id) {
         super(scope, id);
         KubernetesProvider kubernetes = KubernetesProvider.Builder.create(this, "kubernetes-local")
                                   .configPath("~/.kube/config")
@@ -51,7 +51,7 @@ public class AksKubernetesPolaris extends AksKubernetesStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AksKubernetesPolaris(app, ID);
+        new AzureKubernetesPolaris(app, ID);
         app.synth();
     }
 }
