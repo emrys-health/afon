@@ -5,7 +5,6 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.manifest.Manifest;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -13,7 +12,6 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
-import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -38,11 +36,11 @@ import static health.emrys.afon.infra.Defaults.*;
  * </UL>
  * when you run the output
  */
-class WholeStack extends AwsKubernetesPolaris {
+class AwsWholeStack extends AwsKubernetesPolaris {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(WholeStack.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
 
-    public WholeStack(final Construct scope, final String id) {
+    public AwsWholeStack(final Construct scope, final String id) {
         super(scope, id);
         Service       jupyterLB     = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME);
         List<Service> loadBalancers = List.of(polarisLB, jupyterLB);
@@ -270,7 +268,7 @@ class WholeStack extends AwsKubernetesPolaris {
 
     public static void main(String[] args) {
         final App app = new App();
-        new WholeStack(app, ID);
+        new AwsWholeStack(app, ID);
         app.synth();
         logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu -apply");
     }

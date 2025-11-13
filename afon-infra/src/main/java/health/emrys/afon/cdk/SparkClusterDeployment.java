@@ -1,9 +1,6 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.LocalExecProvisioner;
-import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
-import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.manifest.Manifest;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -23,7 +20,7 @@ import java.util.Map;
 
 import static health.emrys.afon.infra.Defaults.*;
 
-public class SparkClusterDeployment extends WholeStack {
+public class SparkClusterDeployment extends AwsWholeStack {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(SparkClusterDeployment.class);
 
