@@ -8,7 +8,6 @@ import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetwork
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkConfig;
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkSecondaryIpRange;
 import com.hashicorp.cdktf.providers.google.container_cluster.*;
-import com.hashicorp.cdktf.providers.google.container_node_pool.*;
 import com.hashicorp.cdktf.providers.google.data_google_client_config.DataGoogleClientConfig;
 import com.hashicorp.cdktf.providers.google.provider.GoogleProvider;
 import com.hashicorp.cdktf.providers.google.provider.GoogleProviderConfig;
@@ -44,7 +43,6 @@ public class GcpConstruct extends Construct implements CloudProvider {
                                                                .build());
 
         // 2. Create the GKE Cluster
-
         ComputeNetwork vpc = new ComputeNetwork(this, "vpc", ComputeNetworkConfig.builder()
                                                                                  .name("gke-private-vpc")
                                                                                  .autoCreateSubnetworks(false)
@@ -79,26 +77,13 @@ public class GcpConstruct extends Construct implements CloudProvider {
                 GCP_REGION,
                 PROJECT_ID
                                             );
-        // Attach the LocalExec Provisioner
-        LocalExecProvisioner refreshCredentials = LocalExecProvisioner.builder()
-                                                                      .command(gcloudCommand)
-                                                                      // Optionally specify the interpreter for security/compatibility
-                                                                      .interpreter(List.of("/bin/bash", "-c"))
-                                                                      .type("local-exec")
-                                                                      .build();
-
-
-        ContainerClusterReleaseChannel releaseChannel = ContainerClusterReleaseChannel
+        // This refreshes your local K8s config
+        LocalExecProvisioner refreshCredentials = LocalExecProvisioner
                 .builder()
-                .channel("REGULAR")
-                .build();
-
-        ContainerClusterClusterAutoscalingAutoProvisioningDefaults provisionDefaults = ContainerClusterClusterAutoscalingAutoProvisioningDefaults
-                .builder()
-                .build();
-        ContainerClusterClusterAutoscaling clusterAutoscaling = ContainerClusterClusterAutoscaling
-                .builder()
-                .enabled(true).autoProvisioningDefaults(provisionDefaults)
+                .command(gcloudCommand)
+                // Optionally specify the interpreter for security/compatibility
+                .interpreter(List.of("/bin/bash", "-c"))
+                .type("local-exec")
                 .build();
         ContainerClusterConfig clusterConfig = ContainerClusterConfig
                 .builder()
@@ -123,66 +108,10 @@ public class GcpConstruct extends Construct implements CloudProvider {
                                     .build())
                 .deletionProtection(false)
                 .provisioners(List.of(refreshCredentials))
-//                .releaseChannel(releaseChannel)
-//                .clusterAutoscaling(clusterAutoscaling)
-                // You would typically configure VPC, subnets, and other security features here.
                 .build();
         gkeCluster = new ContainerCluster(this, "gkeCluster", clusterConfig);
 
-        // 3. Create a Separate Node Pool for Worker Nodes
-        // Managing the node pool separately allows adding/removing it without recreating the cluster.
-        ContainerNodePoolManagement poolManagement = ContainerNodePoolManagement
-                .builder()
-                .autoRepair(true)
-                .autoUpgrade(false)
-                .build();
-        ContainerNodePoolNodeConfig nodeConfig = ContainerNodePoolNodeConfig
-                .builder()
-                .machineType("e2-medium")
-                // Default service account email for GKE nodes
-                .serviceAccount(String.format("%s-compute@developer.gserviceaccount.com", projectID))
-                .oauthScopes(List.of(
-                        "https://www.googleapis.com/auth/cloud-platform"
-                                    ))
-                .build();
-        ContainerNodePoolAutoscaling autoscaling = ContainerNodePoolAutoscaling
-                .builder()
-//                .minNodeCount(1)
-//                .maxNodeCount(MAX_NODE_COUNT)
-                .totalMaxNodeCount(MAX_NODE_COUNT)
-                .totalMinNodeCount(1)
-                .build();
-//        ContainerNodePoolNetworkConfig netConfig = ContainerNodePoolNetworkConfig
-//                .builder()
-//                .enablePrivateNodes(false)
-//                .podIpv4CidrBlock("10.16.0.0/14")
-//                .additionalNodeNetworkConfigs(List.of(ContainerNodePoolNetworkConfigAdditionalNodeNetworkConfigs
-//                                                              .builder()
-//                                                              .network("projects/afon-core/regions/europe-west2/subnetworks/default")
-//                                                              .build()))
-////                .podRange()
-//                .build();
-//        new ContainerNodePool(this, "defaultNodePool", ContainerNodePoolConfig
-//                .builder()
-//                .name("default-pool")
-//                .location(GCP_REGION)
-//                .cluster(gkeCluster.getName())
-//                .nodeCount(MAX_NODE_COUNT) // Specify desired number of nodes
-//                .nodeConfig(nodeConfig)
-//                .networkConfig(ContainerNodePoolNetworkConfig
-//                                       .builder()
-//                                       // ENSURE: This setting overrides the cluster default if needed, guaranteeing no public IP
-//                                       .enablePrivateNodes(true)
-//                                       // Use the Pod secondary range name (Index 0 in the list above)
-//                                       .podRange(subnet.getSecondaryIpRange().get(0).getRangeName())
-//                                       .podIpv4CidrBlock(subnet.getSecondaryIpRange().get(0).getIpCidrRange())
-//                                       .createPodRange(true)
-//                                       .build())
-////                .management(poolManagement)
-////                .networkConfig(netConfig)
-////                .autoscaling(autoscaling).project(PROJECT_ID)
-//                .build());
-        // 4. Output the Cluster Endpoint
+        // Output the Cluster Endpoint
         com.hashicorp.cdktf.TerraformOutput.Builder.create(this, "gkeEndpoint")
                                                    .value(gkeCluster.getEndpoint())
                                                    .build();
