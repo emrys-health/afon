@@ -35,6 +35,7 @@ If you want to create config for the whole stack in AWS, run:
 
 This will output your `cdk.tf.json` file.
 Run it with `tofu apply -auto-approve` if you are happy with it.
+(If it's being run for the first time, you must run `tofu init` first).
 After about 10 minutes, you should have a working cluster.
 Check this by running `kubectl get pods`. 
 You should see Polaris and Jupyter.
