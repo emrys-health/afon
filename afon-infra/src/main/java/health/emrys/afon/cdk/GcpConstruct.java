@@ -25,7 +25,6 @@ import static health.emrys.afon.infra.Defaults.GCP_REGION;
  */
 public class GcpConstruct extends Construct implements CloudProvider {
 
-    public static final int              MAX_NODE_COUNT = 3;
     private final       ContainerCluster gkeCluster;
 
     /**
