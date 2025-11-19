@@ -34,9 +34,15 @@ public class AfonPolarisClient {
     private final String clientSecret;
 
     public AfonPolarisClient(Properties properties) {
-        this.endpoint     = format("http://%s", POLARIS_ENDPOINT.getValueFrom(properties));
-        this.clientId     = POLARIS_ID.getValueFrom(properties);
-        this.clientSecret = POLARIS_SECRET.getValueFrom(properties);
+        this(format("http://%s", POLARIS_ENDPOINT.getValueFrom(properties)),
+             POLARIS_ID.getValueFrom(properties),
+             POLARIS_SECRET.getValueFrom(properties));
+    }
+
+    public AfonPolarisClient(String endpoint, String clientId, String clientSecret) {
+        this.endpoint     = endpoint;
+        this.clientId     = clientId;
+        this.clientSecret = clientSecret;
     }
 
     public String getAccessToken() throws RuntimeException {
@@ -67,7 +73,9 @@ public class AfonPolarisClient {
     public ClassicHttpResponse postJsonCall(String uri,
                                             String json,
                                             String accessToken) throws IOException {
-        return makeCallWithToken(json, new HttpPost(endpoint + uri), accessToken);
+        String url = endpoint + uri;
+        logger.info("Calling " + url);
+        return makeCallWithToken(json, new HttpPost(url), accessToken);
     }
 
     public ClassicHttpResponse getCall(String uri,
