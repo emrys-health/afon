@@ -2,20 +2,14 @@ package health.emrys.afon.infra;
 
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.k8s.EksInfoClient;
-import health.emrys.afon.infra.k8s.GenericK8sClient;
-import health.emrys.afon.infra.k8s.K8sClient;
+import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.PolarisConfigureMain;
 import io.kubernetes.client.openapi.ApiException;
-import io.kubernetes.client.openapi.models.V1Pod;
 import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.Properties;
-
-import static health.emrys.afon.infra.Defaults.*;
-import static java.lang.String.format;
 
 /**
  * Configures the AWS Polaris instance so Spark can talk to it.
@@ -26,39 +20,26 @@ public class ClusterPolarisConfiguration {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
     public static void main(String[] args) {
-        Properties properties  = new AfonPropertiesLoader().getProperties();
-        var        app         = new ClusterPolarisConfiguration(CLUSTER_NAME, properties);
+        Properties properties = new AfonPropertiesLoader().getProperties();
+        var        app        = new ClusterPolarisConfiguration(properties);
         try {
-            app.initializePolaris(POLARIS_SERVICE_NAME, POLARIS_POD_NAME);
+            app.initializePolaris();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private final String     clusterName;
     private final Properties properties;
 
-    public ClusterPolarisConfiguration(String clusterName, Properties properties) {
-        this.clusterName = clusterName;
+    public ClusterPolarisConfiguration(Properties properties) {
         this.properties  = properties;
     }
 
-    public void initializePolaris(String polarisServiceName,
-                                  String polarisPodNamePrefix) throws ApiException, IncorrectConfigException, IOException {
-        logger.info("We assume that an EKS cluster called {} is running...", clusterName);
-        var   eksClient    = new GenericK8sClient(); //new EksInfoClient(clusterName, properties);
-        V1Pod polarisPod   = eksClient.getPodExpectingOnlyOneStartingWith(polarisPodNamePrefix);
-        var   tokenGrabber = new PolarisCredentialGrabber();
-        String accessToken  = tokenGrabber.getCredentials(eksClient.getLogsOf(polarisPod.getMetadata().getName()));
-        addPolarisEndpointToProperties(polarisServiceName, eksClient);
+    public void initializePolaris() throws ApiException, IncorrectConfigException, IOException {
+        ClusterState         state         = new ClusterState();
         PolarisConfigureMain polarisClient = new PolarisConfigureMain();
-        polarisClient.createAllCatalogs(properties, accessToken);
-    }
-
-    public void addPolarisEndpointToProperties(String polarisServiceName, K8sClient eksClient) throws ApiException, IncorrectConfigException {
-        String polarisHost = eksClient.getIngressExpectingOnlyOneFor(polarisServiceName);
-        logger.info("Polaris is available to the outisde world at: {}", polarisHost);
-        properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), format("%s:8181", polarisHost));
+        properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), state.getPolarisEndpoint());
+        polarisClient.createAllCatalogs(properties, state.getAccessToken());
     }
 
 }

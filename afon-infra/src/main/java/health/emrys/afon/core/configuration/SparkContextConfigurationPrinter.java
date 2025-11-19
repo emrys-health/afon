@@ -4,6 +4,7 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.ClusterPolarisConfiguration;
 import health.emrys.afon.infra.PolarisCredentialGrabber;
+import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.infra.k8s.EksInfoClient;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -44,20 +45,13 @@ public class SparkContextConfigurationPrinter {
     }
 
     public static SparkContextConfigurationPrinter createSparkConf() throws IOException {
-        String                           clusterName  = CLUSTER_NAME;
-        AfonPropertiesLoader             loader       = new AfonPropertiesLoader();
-        Properties                       properties   = loader.getProperties();
-        var                              eksClient    = new EksInfoClient(clusterName, properties);
-        var                              tokenGrabber = new PolarisCredentialGrabber();
-        String                           accessToken  = null;
-        SparkContextConfigurationPrinter app          = null;
+        AfonPropertiesLoader             loader     = new AfonPropertiesLoader();
+        Properties                       properties = loader.getProperties();
+        SparkContextConfigurationPrinter app        = null;
         try {
-            String podName = eksClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME).getMetadata().getName();
-            accessToken = tokenGrabber.getCredentials(eksClient.getLogsOf(podName));
-
-            ClusterPolarisConfiguration clusterPolaris = new ClusterPolarisConfiguration(clusterName, properties);
-            clusterPolaris.addPolarisEndpointToProperties(POLARIS_SERVICE_NAME, eksClient);
-            String polarisEndpoint = POLARIS_ENDPOINT.getValueFrom(properties);
+            ClusterState clusterState    = new ClusterState();
+            String       accessToken     = clusterState.getAccessToken();
+            String       polarisEndpoint = clusterState.getPolarisEndpoint();
             logger.info("Polaris endpoint: {}", polarisEndpoint);
 
             app = createDynamicConfig(accessToken,
