@@ -14,9 +14,9 @@ public class AwsKubernetesPolaris extends TerraformStack {
 
     protected static final String ID = "jupyter-deployment";
 
-    protected final PolarisConfig polarisConfig;
-    protected final CloudProvider cloudProvider;
-    protected final Service polarisLB;
+    protected final PolarisConfig     polarisConfig;
+    protected final AbstractConstruct cloudProvider;
+    protected final Service           polarisLB;
 
     public AwsKubernetesPolaris(@NotNull Construct scope, @NotNull String id) {
         super(scope, id);

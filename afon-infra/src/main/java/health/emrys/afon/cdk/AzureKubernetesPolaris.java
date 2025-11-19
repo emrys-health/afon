@@ -23,29 +23,14 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
             }
 
             @Override
-            public String getBase64CertData() {
-                return cloudProvider.getBase64CertData();
-            }
+            public void configureLoadBalancerDestroy(List<Service> loadBalancers) { }
 
             @Override
-            public String getClusterEndpoint() {
-                return cloudProvider.getClusterEndpoint();
-            }
-
-            @Override
-            public String getToken() {
-                return kubernetes.getToken();
-            }
-
-            @Override
-            public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
-
+            public KubernetesProvider configureK8s() {
+                return null;
             }
         };
-        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", localCloud) {
-            @Override
-            protected void configureK8s(CloudProvider cloudProvider) { }
-        };
+        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", localCloud);
         polarisConfig.deployPolaris(List.of());
     }
 

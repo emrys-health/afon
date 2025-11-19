@@ -31,14 +31,10 @@ public class PolarisConfig extends Construct {
     private static final String GCP_CRED_FILE    = "service-account.json";
     private static final String SECRETS_DIR      = "/etc/app-secrets";
 
-    private final CloudProvider cloudProvider;
-
     public PolarisConfig(@NotNull Construct scope, @NotNull String id, CloudProvider cloudProvider) {
         super(scope, id);
-        this.cloudProvider = cloudProvider;
-
         // Configure the Kubernetes Provider
-        configureK8s(cloudProvider);
+        cloudProvider.configureK8s();
 
         // Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
@@ -78,16 +74,6 @@ public class PolarisConfig extends Construct {
                       AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties),
                       GOOGLE_APPLICATION_CREDENTIALS.getPropertyName(), SECRETS_DIR + "/" + GCP_CRED_FILE
                      );
-    }
-
-    protected void configureK8s(CloudProvider cloudProvider) {
-        String base64CertData = cloudProvider.getBase64CertData();
-        String encodedCert    = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
-        KubernetesProvider.Builder.create(this, "kubernetes")
-                                  .host(cloudProvider.getClusterEndpoint())
-                                  .clusterCaCertificate(encodedCert)
-                                  .token(cloudProvider.getToken()) // Dynamically generated token
-                                  .build();
     }
 
     public Service deployPolaris(List<ITerraformDependable> eksDependOn) {
