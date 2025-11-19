@@ -34,7 +34,7 @@ public class PolarisRegisterMain {
             PolarisRegisterMainConjig conf        = new PolarisRegisterMainConjig(args);
             ClusterState              state       = new ClusterState();
             String                    endpoint    = format("http://%s", state.getPolarisEndpoint());
-            String                    accessToken = state.getAccessToken();
+            String                    accessToken = state.getCredentials();
             String[]                  creds       = accessToken.split(":");
             AfonPolarisClient         client      = new AfonPolarisClient(endpoint,
                                                              creds[0],
@@ -42,8 +42,6 @@ public class PolarisRegisterMain {
             String uri = format("/api/catalog/v1/%s/namespaces/%s/register", conf.catalog, conf.namespace);
             ImmutableRegisterTableRequest request = ImmutableRegisterTableRequest
                     .builder().name(conf.table).metadataLocation(conf.metadata).build();
-//            String json = new JsonMaker().toJson(request);
-//            String json = jakarta.ws.rs.client.Entity.json(request);
             String json = format("""
                     {
                         "name" : "%s",

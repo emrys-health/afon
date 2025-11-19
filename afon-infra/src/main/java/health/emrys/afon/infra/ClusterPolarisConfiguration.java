@@ -39,7 +39,7 @@ public class ClusterPolarisConfiguration {
         ClusterState         state         = new ClusterState();
         PolarisConfigureMain polarisClient = new PolarisConfigureMain();
         properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), state.getPolarisEndpoint());
-        polarisClient.createAllCatalogs(properties, state.getAccessToken());
+        polarisClient.createAllCatalogs(properties, state.getCredentials());
     }
 
 }
