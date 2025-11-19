@@ -68,9 +68,9 @@ public class SparkContextConfigurationPrinter {
                                                                         Properties properties,
                                                                         String polarisEndpoint) {
         Properties props       = add(creds, properties);
+        props.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisEndpoint);
         var        client      = new AfonPolarisClient(props);
         String     accessToken = client.getAccessToken();
-        props.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisEndpoint);
         return new SparkContextConfigurationPrinter(props, accessToken);
     }
 
