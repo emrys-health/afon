@@ -12,7 +12,7 @@ public class GcpPolarisStack extends TerraformStack {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
 
-    public static final String ID     = "gcp-polaris-deployment";
+    public static final String ID = "gcp-polaris-deployment";
 
     public GcpPolarisStack(final Construct scope, final String id) {
         super(scope, id);
@@ -20,8 +20,8 @@ public class GcpPolarisStack extends TerraformStack {
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
 
-        CloudProvider cloudProvider = new GcpConstruct(this, id, "afon-core");
-        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
+        AbstractConstruct cloudProvider = new GcpConstruct(this, id, "afon-core");
+        PolarisConfig     polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
         polarisConfig.deployPolaris(List.of());
     }
 

@@ -23,7 +23,7 @@ import static health.emrys.afon.infra.Defaults.GCP_REGION;
  * If you need to destroy by hand, run:
  * gcloud container clusters delete $CLUSTER_NAME  --zone=$REGION  --project afon-core
  */
-public class GcpConstruct extends Construct implements CloudProvider {
+public class GcpConstruct extends AbstractConstruct {
 
     private final       ContainerCluster gkeCluster;
 

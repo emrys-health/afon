@@ -13,6 +13,7 @@ import com.hashicorp.cdktf.providers.azurestack.provider.AzurestackProviderConfi
 import com.hashicorp.cdktf.providers.azurestack.provider.AzurestackProviderFeatures;
 import com.hashicorp.cdktf.providers.azurestack.resource_group.ResourceGroup;
 import com.hashicorp.cdktf.providers.azurestack.resource_group.ResourceGroupConfig;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import org.jetbrains.annotations.NotNull;
@@ -24,7 +25,7 @@ import static health.emrys.afon.infra.Defaults.AZURE_REGION;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
-public class AzureConstruct extends Construct implements CloudProvider {
+public class AzureConstruct extends AbstractConstruct {
 
     private final KubernetesCluster            aksCluster;
     private final DataAzurermKubernetesCluster aksData;
@@ -120,5 +121,10 @@ public class AzureConstruct extends Construct implements CloudProvider {
     @Override
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
         throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public KubernetesProvider configureK8s() {
+        return null;
     }
 }

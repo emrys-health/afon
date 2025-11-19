@@ -21,11 +21,14 @@ import com.hashicorp.cdktf.providers.aws.secretsmanager_secret.SecretsmanagerSec
 import com.hashicorp.cdktf.providers.aws.secretsmanager_secret_version.SecretsmanagerSecretVersion;
 import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
+import com.hashicorp.cdktf.providers.kubernetes.ingress.*;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -33,7 +36,7 @@ import static health.emrys.afon.infra.Defaults.AWS_REGION;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
-public class AwsConstruct extends Construct implements CloudProvider {
+public class AwsConstruct extends AbstractConstruct {
     public static final String                VPC_NAME = "cdktf-eks-vpc";
     private final       DataAwsEksClusterAuth eksAuthData;
     private final       EksCluster                 cluster;
@@ -262,6 +265,81 @@ public class AwsConstruct extends Construct implements CloudProvider {
                         .build();
 
 
+    }
+
+
+// ... inside your Stack class ...
+
+    public Ingress createHttpsIngress(
+            final String certArn,
+            final String hostName,
+            final String serviceName,
+            final int servicePort)
+    {
+        KubernetesProvider kubernetesProvider = configureK8s();
+        // The key annotations for the AWS Load Balancer Controller (LBC)
+        Map<String, String> albAnnotations = Map.of(
+                // 1. Tell the LBC to create an Application Load Balancer (ALB)
+                "kubernetes.io/ingress.class", "alb",
+
+                // 2. CRITICAL: Specify the ARN of the ACM certificate
+                "alb.ingress.kubernetes.io/certificate-arn", certArn,
+
+                // 3. Configure the ALB to listen on both HTTP (80) and HTTPS (443)
+                "alb.ingress.kubernetes.io/listen-ports", "[{\"HTTP\": 80}, {\"HTTPS\": 443}]",
+
+                // 4. Force all HTTP traffic to redirect to HTTPS
+                "alb.ingress.kubernetes.io/actions.ssl-redirect", "{\"Type\": \"redirect\", \"RedirectConfig\": { \"Protocol\": \"HTTPS\", \"Port\": \"443\", \"StatusCode\": \"HTTP_301\"}}",
+
+                // 5. Specify that the traffic from the ALB to the EKS Pods is standard HTTP
+                "alb.ingress.kubernetes.io/backend-protocol", "HTTP",
+
+                // 6. Make the ALB internet-facing
+                "alb.ingress.kubernetes.io/scheme", "internet-facing"
+                                                   );
+
+        // Create the Ingress
+        return Ingress.Builder.create(this, "polaris-https-ingress")
+                              .provider(kubernetesProvider)
+                              .metadata(IngressMetadata.builder()
+                                                       .name("polaris-ingress")
+                                                       .namespace("default") // Change if your service is in a different namespace
+                                                       .annotations(albAnnotations)
+                                                       .build())
+                              .spec(IngressSpec.builder()
+                                               .ingressClassName("alb") // Explicitly set the ingress class
+                                               // Define the TLS configuration using the LBC's "ssl-redirect" action
+                                               .rule(List.of(
+                                                       // Rule 1: HTTP-to-HTTPS Redirect (Uses the annotation action)
+                                                       IngressSpecRule.builder()
+                                                                      .host(hostName)
+                                                                      .http(IngressSpecRuleHttp.builder()
+                                                                                               .path(Collections.singletonList(IngressSpecRuleHttpPath.builder()
+                                                                                                                                                       .path("/")
+//                                                                                                                                                       .pathType("Prefix")
+                                                                                                                                                       .backend(IngressSpecRuleHttpPathBackend.builder()
+                                                                                                                                                                        .serviceName("ssl-redirect").servicePort("use-annotation")
+                                                                                                                                                                                              // Reference the redirect action defined in the annotations
+                                                                                                                                                                                              .build())
+                                                                                                                                                       .build()))
+                                                                                               .build())
+                                                                      .build(),
+
+                                                       // Rule 2: HTTPS Traffic to Service X
+                                                       IngressSpecRule.builder()
+                                                                      .host(hostName)
+                                                                      .http(IngressSpecRuleHttp.builder()
+                                                                                               .path(Collections.singletonList(IngressSpecRuleHttpPath.builder()
+                                                                                                                                                       .path("/")
+//                                                                                                                                                       .pathType("Prefix")
+                                                                                                                                                       .backend(IngressSpecRuleHttpPathBackend.builder().serviceName(serviceName).servicePort(servicePort + "").build())
+                                                                                                                                                       .build()))
+                                                                                               .build())
+                                                                      .build()
+                                                     )
+                                                    )
+                                               .build())
+                              .build();
     }
 
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
