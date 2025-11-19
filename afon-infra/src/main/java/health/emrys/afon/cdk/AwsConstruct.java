@@ -258,6 +258,7 @@ public class AwsConstruct extends Construct implements CloudProvider {
                         .dependsOn(eksDependOn)
                         // Setting resolveConflicts to OVERWRITE forces the update even if manual changes exist
                         .resolveConflictsOnUpdate("OVERWRITE")
+                        .resolveConflictsOnCreate("OVERWRITE")
                         .build();
 
 
