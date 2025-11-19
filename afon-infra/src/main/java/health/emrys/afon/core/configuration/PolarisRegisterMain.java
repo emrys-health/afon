@@ -1,17 +1,11 @@
 package health.emrys.afon.core.configuration;
 
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.k8s.ClusterState;
-import health.emrys.afon.polaris.catalogs.JsonMaker;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.slf4j.Logger;
 
-import java.util.Properties;
-
-import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 import static java.lang.String.format;
 
 public class PolarisRegisterMain {
@@ -37,20 +31,27 @@ public class PolarisRegisterMain {
 
     public static void main(String[] args) {
         try {
-            PolarisRegisterMainConjig conf       = new PolarisRegisterMainConjig(args);
-            ClusterState              state      = new ClusterState();
-            AfonPropertiesLoader      loader     = new AfonPropertiesLoader();
-            Properties                properties = loader.getProperties();
-            String                    endpoint   = format("http://%s", state.getPolarisEndpoint());
-
-            AfonPolarisClient client = new AfonPolarisClient(endpoint,
-                                                             POLARIS_ID.getValueFrom(properties),
-                                                             POLARIS_SECRET.getValueFrom(properties));
-            String uri = format("/v1/%s/namespaces/%s/register", conf.catalog, conf.namespace);
+            PolarisRegisterMainConjig conf        = new PolarisRegisterMainConjig(args);
+            ClusterState              state       = new ClusterState();
+            String                    endpoint    = format("http://%s", state.getPolarisEndpoint());
+            String                    accessToken = state.getAccessToken();
+            String[]                  creds       = accessToken.split(":");
+            AfonPolarisClient         client      = new AfonPolarisClient(endpoint,
+                                                             creds[0],
+                                                             creds[1]);
+            String uri = format("/api/catalog/v1/%s/namespaces/%s/register", conf.catalog, conf.namespace);
             ImmutableRegisterTableRequest request = ImmutableRegisterTableRequest
                     .builder().name(conf.table).metadataLocation(conf.metadata).build();
-            String json = new JsonMaker().toJson(request);
-            client.postJsonCall(uri, json, state.getAccessToken());
+//            String json = new JsonMaker().toJson(request);
+//            String json = jakarta.ws.rs.client.Entity.json(request);
+            String json = format("""
+                    {
+                        "name" : "%s",
+                        "metadata-location": "%s"
+                    }
+                    """, conf.table, conf.metadata);
+            logger.info(json);
+            client.postJsonCall(uri, json, client.getAccessToken());
         } catch (Exception e) {
             logger.error("Could not register table", e);
         }
