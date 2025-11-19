@@ -2,10 +2,7 @@ package health.emrys.afon.core.configuration;
 
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.ClusterPolarisConfiguration;
-import health.emrys.afon.infra.PolarisCredentialGrabber;
 import health.emrys.afon.infra.k8s.ClusterState;
-import health.emrys.afon.infra.k8s.EksInfoClient;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import org.jetbrains.annotations.NotNull;
@@ -19,7 +16,6 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
-import static health.emrys.afon.infra.Defaults.*;
 import static java.lang.String.format;
 
 /**
@@ -50,7 +46,7 @@ public class SparkContextConfigurationPrinter {
         SparkContextConfigurationPrinter app        = null;
         try {
             ClusterState clusterState    = new ClusterState();
-            String       accessToken     = clusterState.getAccessToken();
+            String       accessToken     = clusterState.getCredentials();
             String       polarisEndpoint = clusterState.getPolarisEndpoint();
             logger.info("Polaris endpoint: {}", polarisEndpoint);
 

@@ -29,7 +29,7 @@ public class ClusterState {
     }
 
 
-    public String getAccessToken() {
+    public String getCredentials() {
         return accessToken;
     }
 
