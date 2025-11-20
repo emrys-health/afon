@@ -37,8 +37,8 @@ import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
 public class AwsConstruct extends AbstractConstruct {
-    public static final String                VPC_NAME = "cdktf-eks-vpc";
-    private final       DataAwsEksClusterAuth eksAuthData;
+    public static final String                     VPC_NAME = "cdktf-eks-vpc";
+    private final       DataAwsEksClusterAuth      eksAuthData;
     private final       EksCluster                 cluster;
     private final       List<ITerraformDependable> eksDependOn;
     final               Vpc                        vpc;
@@ -264,7 +264,11 @@ public class AwsConstruct extends AbstractConstruct {
                         .resolveConflictsOnCreate("OVERWRITE")
                         .build();
 
-
+//        createHttpsIngress("arn:aws:acm:eu-west-1:123456789012:certificate/3c86beda-5db1-4f4b-8136-b86cc8d6d43f",
+//                           "TODO",
+//                           "polaris-lb",
+//                           8181
+//                           );
     }
 
 
@@ -274,8 +278,7 @@ public class AwsConstruct extends AbstractConstruct {
             final String certArn,
             final String hostName,
             final String serviceName,
-            final int servicePort)
-    {
+            final int servicePort) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
         Map<String, String> albAnnotations = Map.of(
@@ -299,6 +302,26 @@ public class AwsConstruct extends AbstractConstruct {
                                                    );
 
         // Create the Ingress
+        IngressSpecRuleHttpPath https = IngressSpecRuleHttpPath
+                .builder()
+                .path("/")
+//              .pathType("Prefix")
+                .backend(IngressSpecRuleHttpPathBackend.builder()
+                                                       .serviceName("ssl-redirect")
+                                                       .servicePort("use-annotation")
+                                                       // Reference the redirect action defined in the annotations
+                                                       .build())
+                .build();
+        IngressSpecRuleHttpPathBackend pathBackend = IngressSpecRuleHttpPathBackend
+                .builder().serviceName(serviceName).servicePort(servicePort + "").build();
+        IngressSpecRuleHttp servicePortRule = IngressSpecRuleHttp
+                .builder()
+                .path(Collections.singletonList(IngressSpecRuleHttpPath.builder()
+                                                                       .path("/")
+//                                                                     .pathType("Prefix")
+                                                                       .backend(pathBackend)
+                                                                       .build()))
+                .build();
         return Ingress.Builder.create(this, "polaris-https-ingress")
                               .provider(kubernetesProvider)
                               .metadata(IngressMetadata.builder()
@@ -314,29 +337,16 @@ public class AwsConstruct extends AbstractConstruct {
                                                        IngressSpecRule.builder()
                                                                       .host(hostName)
                                                                       .http(IngressSpecRuleHttp.builder()
-                                                                                               .path(Collections.singletonList(IngressSpecRuleHttpPath.builder()
-                                                                                                                                                       .path("/")
-//                                                                                                                                                       .pathType("Prefix")
-                                                                                                                                                       .backend(IngressSpecRuleHttpPathBackend.builder()
-                                                                                                                                                                        .serviceName("ssl-redirect").servicePort("use-annotation")
-                                                                                                                                                                                              // Reference the redirect action defined in the annotations
-                                                                                                                                                                                              .build())
-                                                                                                                                                       .build()))
+                                                                                               .path(Collections.singletonList(https))
                                                                                                .build())
                                                                       .build(),
 
                                                        // Rule 2: HTTPS Traffic to Service X
                                                        IngressSpecRule.builder()
                                                                       .host(hostName)
-                                                                      .http(IngressSpecRuleHttp.builder()
-                                                                                               .path(Collections.singletonList(IngressSpecRuleHttpPath.builder()
-                                                                                                                                                       .path("/")
-//                                                                                                                                                       .pathType("Prefix")
-                                                                                                                                                       .backend(IngressSpecRuleHttpPathBackend.builder().serviceName(serviceName).servicePort(servicePort + "").build())
-                                                                                                                                                       .build()))
-                                                                                               .build())
+                                                                      .http(servicePortRule)
                                                                       .build()
-                                                     )
+                                                            )
                                                     )
                                                .build())
                               .build();
