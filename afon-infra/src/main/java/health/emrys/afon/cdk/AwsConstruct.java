@@ -21,7 +21,7 @@ import com.hashicorp.cdktf.providers.aws.secretsmanager_secret.SecretsmanagerSec
 import com.hashicorp.cdktf.providers.aws.secretsmanager_secret_version.SecretsmanagerSecretVersion;
 import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
-import com.hashicorp.cdktf.providers.kubernetes.ingress.*;
+import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
@@ -274,7 +274,7 @@ public class AwsConstruct extends AbstractConstruct {
 
 // ... inside your Stack class ...
 
-    public Ingress createHttpsIngress(
+    public IngressV1 createHttpsIngress(
             final String certArn,
             final String hostName,
             final String serviceName,
@@ -302,53 +302,69 @@ public class AwsConstruct extends AbstractConstruct {
                                                    );
 
         // Create the Ingress
-        IngressSpecRuleHttpPath https = IngressSpecRuleHttpPath
+        var sslService = IngressV1SpecRuleHttpPathBackendService
+                .builder()
+                .name("ssl-redirect")
+                .port(IngressV1SpecRuleHttpPathBackendServicePort
+                              .builder()
+                              .name("use-annotation")
+                              .build()
+                     ).build();
+        IngressV1SpecRuleHttpPath https = IngressV1SpecRuleHttpPath
                 .builder()
                 .path("/")
 //              .pathType("Prefix")
-                .backend(IngressSpecRuleHttpPathBackend.builder()
-                                                       .serviceName("ssl-redirect")
-                                                       .servicePort("use-annotation")
-                                                       // Reference the redirect action defined in the annotations
-                                                       .build())
+                .backend(IngressV1SpecRuleHttpPathBackend.builder()
+                                                         .service(sslService)
+                                                         // Reference the redirect action defined in the annotations
+                                                         .build())
                 .build();
-        IngressSpecRuleHttpPathBackend pathBackend = IngressSpecRuleHttpPathBackend
-                .builder().serviceName(serviceName).servicePort(servicePort + "").build();
-        IngressSpecRuleHttp servicePortRule = IngressSpecRuleHttp
+        var sslServicePort = IngressV1SpecRuleHttpPathBackendService
                 .builder()
-                .path(Collections.singletonList(IngressSpecRuleHttpPath.builder()
+                .name("ssl-redirect")
+                .port(IngressV1SpecRuleHttpPathBackendServicePort
+                              .builder()
+                              .number(servicePort)
+                              .name("use-annotation")
+                              .build()
+                     ).build();
+        IngressV1SpecRuleHttpPathBackend pathBackend = IngressV1SpecRuleHttpPathBackend
+                .builder().service(sslServicePort).build();
+        IngressV1SpecRuleHttp servicePortRule = IngressV1SpecRuleHttp
+                .builder()
+                .path(Collections.singletonList(IngressV1SpecRuleHttpPath.builder()
                                                                        .path("/")
 //                                                                     .pathType("Prefix")
                                                                        .backend(pathBackend)
                                                                        .build()))
                 .build();
-        return Ingress.Builder.create(this, "polaris-https-ingress")
+        return IngressV1.Builder.create(this, "polaris-https-ingress")
                               .provider(kubernetesProvider)
-                              .metadata(IngressMetadata.builder()
-                                                       .name("polaris-ingress")
-                                                       .namespace("default") // Change if your service is in a different namespace
-                                                       .annotations(albAnnotations)
-                                                       .build())
-                              .spec(IngressSpec.builder()
-                                               .ingressClassName("alb") // Explicitly set the ingress class
-                                               // Define the TLS configuration using the LBC's "ssl-redirect" action
-                                               .rule(List.of(
+                              .metadata(IngressV1Metadata.builder()
+                                                                  .name("polaris-ingress")
+                                                                  .namespace("default") // Change if your service is in a different namespace
+                                                                  .annotations(albAnnotations)
+                                                                  .build())
+                              .spec(IngressV1Spec.builder()
+                                                      .ingressClassName("alb") // Explicitly set the ingress class
+                                                      // Define the TLS configuration using the LBC's "ssl-redirect" action
+                                                      .rule(List.of(
                                                        // Rule 1: HTTP-to-HTTPS Redirect (Uses the annotation action)
-                                                       IngressSpecRule.builder()
+                                                       IngressV1SpecRule.builder()
                                                                       .host(hostName)
-                                                                      .http(IngressSpecRuleHttp.builder()
+                                                                      .http(IngressV1SpecRuleHttp.builder()
                                                                                                .path(Collections.singletonList(https))
                                                                                                .build())
                                                                       .build(),
 
                                                        // Rule 2: HTTPS Traffic to Service X
-                                                       IngressSpecRule.builder()
+                                                       IngressV1SpecRule.builder()
                                                                       .host(hostName)
                                                                       .http(servicePortRule)
                                                                       .build()
                                                             )
                                                     )
-                                               .build())
+                                                      .build())
                               .build();
     }
 
