@@ -27,6 +27,8 @@ import com.hashicorp.cdktf.providers.aws.secretsmanager_secret.SecretsmanagerSec
 import com.hashicorp.cdktf.providers.aws.secretsmanager_secret_version.SecretsmanagerSecretVersion;
 import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
+import com.hashicorp.cdktf.providers.helm.release.Release;
+import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -361,9 +363,10 @@ public class AwsConstruct extends AbstractConstruct {
                                             .build());
 
 
-        ServiceAccount.Builder.create(scope, "aws-load-balancer-controller")
+        String serviceAccountName = "aws-load-balancer-controller";
+        ServiceAccount.Builder.create(scope, serviceAccountName)
                               .metadata(ServiceAccountMetadata.builder()
-                                                              .name("aws-load-balancer-controller")
+                                                              .name(serviceAccountName)
                                                               .namespace("kube-system")
                                                               .annotations(Map.of(
                                                                       "eks.amazonaws.com/role-arn", loadBalancerRole.getArn()
@@ -371,6 +374,27 @@ public class AwsConstruct extends AbstractConstruct {
                                                               .build())
                               .build();
 
+        /**
+         * helm repo add secrets-store-csi-driver https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
+         * helm install -n kube-system csi-secrets-store secrets-store-csi-driver/secrets-store-csi-driver
+         * echo "Let's see if the drivers are there"
+         * kubectl --namespace=kube-system get pods -l "app=secrets-store-csi-driver"
+         */
+        Release.Builder.create(this, "secrets-store-csi-driver")
+                       .dependsOn(eksDependOn)
+                       .name(serviceAccountName + "-chart")
+                       .chart("aws-load-balancer-controller")
+                       .repository("https://aws.github.io/eks-charts")
+                       .namespace("kube-system")
+                       .timeout(300)
+                       .atomic(true)
+                       .set(List.of(
+                               ReleaseSet.builder().name("clusterName").value(CLUSTER_NAME).build(),
+                               ReleaseSet.builder().name("serviceAccount.create").value("false").build(),
+                               ReleaseSet.builder().name("vpcId").value(vpc.getId()).build(),
+                               ReleaseSet.builder().name("serviceAccount.name").value(serviceAccountName).build()
+                                   ))
+                       .build();
     }
 
 
