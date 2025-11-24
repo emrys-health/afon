@@ -52,12 +52,12 @@ class AwsWholeStack extends AwsKubernetesPolaris {
 
         csiSecretsDriver(cloudProvider.getDependables());
 
-        final ServiceAccount sparkApplicationSa = ServiceAccount.Builder.create(this, "sparkApplicationSa")
-                                                                        .metadata(ServiceAccountMetadata.builder()
-                                                                                                        .name(SPARK_SERVICE_ACCOUNT_NAME)
-                                                                                                        .namespace("default")
-                                                                                                        .build())
-                                                                        .build();
+        ServiceAccount.Builder.create(this, "sparkApplicationSa")
+                              .metadata(ServiceAccountMetadata.builder()
+                                                              .name(SPARK_SERVICE_ACCOUNT_NAME)
+                                                              .namespace("default")
+                                                              .build())
+                              .build();
 
         cloudProvider.configureLoadBalancerDestroy(loadBalancers);
         SparkConfig sparkConfig = new SparkConfig(this, "sparkop", cloudProvider.getDependables());
