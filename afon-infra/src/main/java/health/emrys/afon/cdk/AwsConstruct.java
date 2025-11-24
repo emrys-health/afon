@@ -2,6 +2,8 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
+import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
 import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
@@ -9,6 +11,8 @@ import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterVpcConfig;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroup;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroupScalingConfig;
+import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidConnectProvider;
+import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidConnectProviderConfig;
 import com.hashicorp.cdktf.providers.aws.iam_policy.IamPolicy;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachment;
@@ -264,11 +268,46 @@ public class AwsConstruct extends AbstractConstruct {
                         .resolveConflictsOnCreate("OVERWRITE")
                         .build();
 
+        // 1. Fetch the EKS Cluster details to get the OIDC Issuer URL
+        DataAwsEksCluster clusterData = new DataAwsEksCluster(scope, "EksClusterData",
+                                                              DataAwsEksClusterConfig.
+                                                                      builder()
+                                                                      .dependsOn(eksDependOn)
+                                                                      .name(CLUSTER_NAME)
+                                                                      .build());
+
+        // Extract the OIDC Issuer URL from the cluster data
+        // The issuer is in the format: https://oidc.eks.region.amazonaws.com/id/EXAMPLED9295F773010C7C5F77A986877E...
+        String oidcIssuerUrl  = clusterData.getIdentity().get(0).getOidc().get(0).getIssuer();
+        String oidcIssuerHost = oidcIssuerUrl.substring("https://".length());
+
+        // 2. Create the IAM OIDC Provider resource
+        IamOpenidConnectProviderConfig providerConfig = IamOpenidConnectProviderConfig
+                .builder()
+                // The URL for the provider. Must be retrieved from the EKS cluster data.
+                .url(oidcIssuerUrl)
+
+                // This is the OIDC audience claim, required to allow Kubernetes Service
+                // Accounts to exchange their tokens for AWS IAM roles (IRSA).
+                .clientIdList(List.of("sts.amazonaws.com"))
+
+                // The thumbprint of the OIDC provider's root certificate.
+                // For EKS OIDC, the required thumbprint is well-known and consistent
+                // across AWS regions, simplifying the setup compared to custom providers.
+                // It's recommended to hardcode this known thumbprint for EKS:
+                .thumbprintList(List.of("9e99a48a9960b14926cc7f3b02e22da2b0e791e8"))
+
+                // Optional: Tag the resource
+                .tags(Map.of("Name", CLUSTER_NAME + "-oidc-provider"))
+                .build();
+        IamOpenidConnectProvider iamOidcProvider = new IamOpenidConnectProvider(scope, "EksIamOidcProvider",
+                                                                                providerConfig);
+
         createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
                            "emryspolaris.click",
                            "polaris-lb",
                            8181
-                           );
+                          );
     }
 
 
@@ -316,23 +355,23 @@ public class AwsConstruct extends AbstractConstruct {
         IngressV1SpecRuleHttp servicePortRule = IngressV1SpecRuleHttp
                 .builder()
                 .path(Collections.singletonList(IngressV1SpecRuleHttpPath.builder()
-                                                                       .path("/")
-                                                                       .pathType("Prefix")
-                                                                       .backend(pathBackend)
-                                                                       .build()))
+                                                                         .path("/")
+                                                                         .pathType("Prefix")
+                                                                         .backend(pathBackend)
+                                                                         .build()))
                 .build();
         return IngressV1.Builder.create(this, "polaris-https-ingress")
-                              .provider(kubernetesProvider)
-                              .metadata(IngressV1Metadata.builder()
-                                                                  .name("polaris-ingress")
-                                                                  .namespace("default") // Change if your service is in a different namespace
-                                                                  .annotations(albAnnotations)
-                                                                  .build())
-                              .spec(IngressV1Spec.builder()
-                                                      .ingressClassName("alb") // Explicitly set the ingress class
-                                                      // Define the TLS configuration using the LBC's "ssl-redirect" action
-                                                      .rule(List.of(
-                                                       // Rule 1: HTTP-to-HTTPS Redirect (Uses the annotation action)
+                                .provider(kubernetesProvider)
+                                .metadata(IngressV1Metadata.builder()
+                                                           .name("polaris-ingress")
+                                                           .namespace("default") // Change if your service is in a different namespace
+                                                           .annotations(albAnnotations)
+                                                           .build())
+                                .spec(IngressV1Spec.builder()
+                                                   .ingressClassName("alb") // Explicitly set the ingress class
+                                                   // Define the TLS configuration using the LBC's "ssl-redirect" action
+                                                   .rule(List.of(
+                                                                 // Rule 1: HTTP-to-HTTPS Redirect (Uses the annotation action)
 //                                                       IngressV1SpecRule.builder()
 //                                                                      .host(hostName)
 //                                                                      .http(IngressV1SpecRuleHttp.builder()
@@ -340,15 +379,15 @@ public class AwsConstruct extends AbstractConstruct {
 //                                                                                               .build())
 //                                                                      .build(),
 
-                                                       // Rule 2: HTTPS Traffic to Service X
-                                                       IngressV1SpecRule.builder()
-                                                                      .host(hostName)
-                                                                      .http(servicePortRule)
-                                                                      .build()
-                                                            )
-                                                    )
-                                                      .build())
-                              .build();
+                                                                 // Rule 2: HTTPS Traffic to Service X
+                                                                 IngressV1SpecRule.builder()
+                                                                                  .host(hostName)
+                                                                                  .http(servicePortRule)
+                                                                                  .build()
+                                                                )
+                                                        )
+                                                   .build())
+                                .build();
     }
 
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
@@ -415,7 +454,7 @@ public class AwsConstruct extends AbstractConstruct {
                               echo "Destroying ELBs"
                               for ELB in $(aws elb describe-load-balancers --region %s --query 'LoadBalancerDescriptions[*].LoadBalancerName' --o text) ; do { 
                                   echo $ELB ; 
-                                  aws elb delete-load-balancer --load-balancer-name $ELB ; 
+                                  aws elb delete-load-balancer --load-balancer-name $ELB  || true ; 
                               } done
                               """, AWS_REGION);
     }
@@ -425,7 +464,7 @@ public class AwsConstruct extends AbstractConstruct {
                               echo "Destroying network interfaces"
                               for ENI in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text) ; do { 
                                   echo $ENI ; 
-                                  aws ec2 delete-network-interface --network-interface-id $ENI ; 
+                                  aws ec2 delete-network-interface --network-interface-id $ENI  || true ;
                               } done
                               """, vpcId, AWS_REGION);
     }
@@ -435,7 +474,7 @@ public class AwsConstruct extends AbstractConstruct {
                               echo "Destroying routes"
                               for RT in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=%s --region %s --query 'RouteTables[*].RouteTableId' --output text) ; do { 
                                   echo $RT ; 
-                                  aws ec2 delete-route-table --route-table-id $RT --region %s ; 
+                                  aws ec2 delete-route-table --route-table-id $RT --region %s  || true ;
                               } done
                               """, vpcId, AWS_REGION, AWS_REGION);
     }
@@ -445,8 +484,8 @@ public class AwsConstruct extends AbstractConstruct {
                               echo "Destroying gateways"
                               for IG in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=%s --region %s --query 'InternetGateways[*].InternetGatewayId' --output text) ; do { 
                                 echo $IG ; 
-                                aws ec2 detach-internet-gateway --internet-gateway-id $IG --vpc-id %s --region %s ; 
-                                aws ec2 delete-internet-gateway --internet-gateway-id $IG --region %s ; 
+                                aws ec2 detach-internet-gateway --internet-gateway-id $IG --vpc-id %s --region %s  || true ; 
+                                aws ec2 delete-internet-gateway --internet-gateway-id $IG --region %s  || true ;
                               } done
                               """, vpcId, AWS_REGION, vpcId, AWS_REGION, AWS_REGION);
     }
@@ -456,7 +495,7 @@ public class AwsConstruct extends AbstractConstruct {
                               echo "Destroying security-groups"
                               for SG_ID in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=%s --region %s --query 'SecurityGroups[*].[GroupId]' --output text --no-cli-pager); do { 
                                 echo $SG_ID ;  
-                                aws ec2 delete-security-group --group-id $SG_ID || true ; 
+                                aws ec2 delete-security-group --group-id $SG_ID || true 
                               } done
                               """, vpcId, AWS_REGION);
     }
@@ -466,23 +505,36 @@ public class AwsConstruct extends AbstractConstruct {
                               echo "Destroying subnets"
                               for SN in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].[SubnetId]' --output text) ; do { 
                                   echo $SN ; 
-                                  aws ec2 delete-subnet --subnet-id $SN --region $REGION ; 
+                                  aws ec2 delete-subnet --subnet-id $SN --region %s  || true ;
                               } done
-                              """, vpcId, AWS_REGION, AWS_REGION);
+                              """, vpcId, AWS_REGION, AWS_REGION, AWS_REGION);
     }
 
     private static @NotNull String getDeleteVPCCommand() {
         return format("""
                               echo "Destroying vpc"
-                              aws ec2 delete-vpc --vpc-id $VPC
+                              aws ec2 delete-vpc --vpc-id $VPC  || true ;
                               
                               """);
     }
 
     private static @NotNull String getVPCCommand() {
+        return format("export VPC=$(%s)", getVPCsCommand());
+    }
+
+    private static @NotNull String getVPCsCommand() {
         return format("""
-                              export VPC=$(aws ec2 describe-vpcs   --query "Vpcs[?Tags[?Key=='Name' && Value=='%s']].VpcId"   --output text)
-                              """, VPC_NAME);
+                              aws ec2 describe-vpcs --query "Vpcs[?Tags[?Key=='Name' && Value=='%s']].VpcId"   --output text""",
+                      VPC_NAME);
+    }
+
+    private static String deleteRoutAssociations() {
+        return format("""
+                              for ASSOC in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC --region %s --query "RouteTables[*].Associations[*].RouteTableAssociationId"  --output text) ; do {
+                                 echo Association $ASSOC;
+                                 aws ec2 disassociate-route-table --association-id $ASSOC || true ;
+                              } done
+                              """, AWS_REGION);
     }
 
     @Override
@@ -515,18 +567,20 @@ public class AwsConstruct extends AbstractConstruct {
         String vpcId = "$VPC";
         System.out.println(cleanCommands());
         System.out.println(format("""
-                                          %s
-                                          %s
-                                          %s
-                                          %s
-                                          %s
-                                          %s
-                                          %s
-                                          %s
-                                          %s
+                                          for VPC in $(%s) ; do {
+                                            %s
+                                            %s
+                                            %s
+                                            %s
+                                            %s
+                                            %s
+                                            %s
+                                            %s
+                                            %s
+                                          } done
                                           aws iam delete-role --role-name  cdktf-eks-cluster-role
                                           """,
-                                  getVPCCommand(),
+                                  getVPCsCommand(),
                                   cleanELBsCommand(),
                                   cleanGatewaysCommand(vpcId),
                                   cleanNetworkInterfacesCommand(vpcId),
@@ -534,6 +588,7 @@ public class AwsConstruct extends AbstractConstruct {
                                   cleanRoutesCommand(vpcId),
                                   cleanEksCommand(),
                                   cleanSubNetsCommand(vpcId),
+                                  deleteRoutAssociations(),
                                   getDeleteVPCCommand()
                                  ));
     }
