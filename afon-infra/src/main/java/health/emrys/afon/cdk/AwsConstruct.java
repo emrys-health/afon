@@ -285,40 +285,14 @@ public class AwsConstruct extends AbstractConstruct {
     }
 
     private void configureIngress(Construct scope) {
-        // 1. Fetch the EKS Cluster details to get the OIDC Issuer URL
-        DataAwsEksCluster clusterData = new DataAwsEksCluster(scope, "EksClusterData",
-                                                              DataAwsEksClusterConfig.
-                                                                      builder()
-                                                                      .dependsOn(eksDependOn)
-                                                                      .name(CLUSTER_NAME)
-                                                                      .build());
+        String oidcIssuerHost = associateOIDCProvider(scope);
 
-        // Extract the OIDC Issuer URL from the cluster data
-        // The issuer is in the format: https://oidc.eks.region.amazonaws.com/id/EXAMPLED9295F773010C7C5F77A986877E...
-        String oidcIssuerUrl  = clusterData.getIdentity().get(0).getOidc().get(0).getIssuer();
-        String oidcIssuerHost = oidcIssuerUrl.substring("https://".length());
+        String serviceAccountName = configureServiceAccount(scope, oidcIssuerHost);
 
-        // 2. Create the IAM OIDC Provider resource
-        IamOpenidConnectProviderConfig providerConfig = IamOpenidConnectProviderConfig
-                .builder()
-                // The URL for the provider. Must be retrieved from the EKS cluster data.
-                .url(oidcIssuerUrl)
+        helmInstallLoadBalancer(serviceAccountName);
+    }
 
-                // This is the OIDC audience claim, required to allow Kubernetes Service
-                // Accounts to exchange their tokens for AWS IAM roles (IRSA).
-                .clientIdList(List.of("sts.amazonaws.com"))
-
-                // The thumbprint of the OIDC provider's root certificate.
-                // For EKS OIDC, the required thumbprint is well-known and consistent
-                // across AWS regions, simplifying the setup compared to custom providers.
-                // It's recommended to hardcode this known thumbprint for EKS:
-                .thumbprintList(List.of("9e99a48a9960b14926cc7f3b02e22da2b0e791e8"))
-
-                // Optional: Tag the resource
-                .tags(Map.of("Name", CLUSTER_NAME + "-oidc-provider"))
-                .build();
-        new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig);
-
+    private static @NotNull String configureServiceAccount(Construct scope, String oidcIssuerHost) {
         // 2a. Define the Trust Policy document (JSON)
         String trustPolicy = String.format("""
                                                    {
@@ -368,25 +342,64 @@ public class AwsConstruct extends AbstractConstruct {
                               .metadata(ServiceAccountMetadata.builder()
                                                               .name(serviceAccountName)
                                                               .namespace("kube-system")
+                                                            .labels(Map.of(
+                                                                    "app.kubernetes.io/component", "controller",
+                                                                    "app.kubernetes.io/instance", "aws-load-balancer-controller",
+                                                                    "app.kubernetes.io/name", "aws-load-balancer-controller"
+                                                                          ))
                                                               .annotations(Map.of(
                                                                       "eks.amazonaws.com/role-arn", loadBalancerRole.getArn()
                                                                                  ))
                                                               .build())
                               .build();
+        return serviceAccountName;
+    }
 
-        /**
-         * helm repo add secrets-store-csi-driver https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
-         * helm install -n kube-system csi-secrets-store secrets-store-csi-driver/secrets-store-csi-driver
-         * echo "Let's see if the drivers are there"
-         * kubectl --namespace=kube-system get pods -l "app=secrets-store-csi-driver"
-         */
-        Release.Builder.create(this, "secrets-store-csi-driver")
+    private @NotNull String associateOIDCProvider(Construct scope) {
+        // 1. Fetch the EKS Cluster details to get the OIDC Issuer URL
+        DataAwsEksCluster clusterData = new DataAwsEksCluster(scope, "EksClusterData",
+                                                              DataAwsEksClusterConfig.
+                                                                      builder()
+                                                                      .dependsOn(eksDependOn)
+                                                                      .name(CLUSTER_NAME)
+                                                                      .build());
+
+        // Extract the OIDC Issuer URL from the cluster data
+        // The issuer is in the format: https://oidc.eks.region.amazonaws.com/id/EXAMPLED9295F773010C7C5F77A986877E...
+        String oidcIssuerUrl  = clusterData.getIdentity().get(0).getOidc().get(0).getIssuer();
+        String oidcIssuerHost = oidcIssuerUrl.substring("https://".length());
+
+        // 2. Create the IAM OIDC Provider resource
+        IamOpenidConnectProviderConfig providerConfig = IamOpenidConnectProviderConfig
+                .builder()
+                // The URL for the provider. Must be retrieved from the EKS cluster data.
+                .url(oidcIssuerUrl)
+
+                // This is the OIDC audience claim, required to allow Kubernetes Service
+                // Accounts to exchange their tokens for AWS IAM roles (IRSA).
+                .clientIdList(List.of("sts.amazonaws.com"))
+
+                // The thumbprint of the OIDC provider's root certificate.
+                // For EKS OIDC, the required thumbprint is well-known and consistent
+                // across AWS regions, simplifying the setup compared to custom providers.
+                // It's recommended to hardcode this known thumbprint for EKS:
+                .thumbprintList(List.of("9e99a48a9960b14926cc7f3b02e22da2b0e791e8"))
+
+                // Optional: Tag the resource
+                .tags(Map.of("Name", CLUSTER_NAME + "-oidc-provider"))
+                .build();
+        new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig);
+        return oidcIssuerHost;
+    }
+
+    private void helmInstallLoadBalancer(String serviceAccountName) {
+        Release.Builder.create(this, "aws-load-balancer")
                        .dependsOn(eksDependOn)
                        .name(serviceAccountName + "-chart")
                        .chart("aws-load-balancer-controller")
                        .repository("https://aws.github.io/eks-charts")
                        .namespace("kube-system")
-                       .timeout(300)
+                       .timeout(600)
                        .atomic(true)
                        .set(List.of(
                                ReleaseSet.builder().name("clusterName").value(CLUSTER_NAME).build(),
