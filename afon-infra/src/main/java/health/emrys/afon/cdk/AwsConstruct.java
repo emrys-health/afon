@@ -15,7 +15,9 @@ import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidCo
 import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidConnectProviderConfig;
 import com.hashicorp.cdktf.providers.aws.iam_policy.IamPolicy;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
+import com.hashicorp.cdktf.providers.aws.iam_role.IamRoleConfig;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachment;
+import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachmentConfig;
 import com.hashicorp.cdktf.providers.aws.internet_gateway.InternetGateway;
 import com.hashicorp.cdktf.providers.aws.provider.AwsProvider;
 import com.hashicorp.cdktf.providers.aws.route_table.RouteTable;
@@ -28,6 +30,9 @@ import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
+import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
+import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountConfig;
+import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
@@ -268,6 +273,16 @@ public class AwsConstruct extends AbstractConstruct {
                         .resolveConflictsOnCreate("OVERWRITE")
                         .build();
 
+        configureIngress(scope);
+
+        createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
+                           "emryspolaris.click",
+                           "polaris-lb",
+                           8181
+                          );
+    }
+
+    private void configureIngress(Construct scope) {
         // 1. Fetch the EKS Cluster details to get the OIDC Issuer URL
         DataAwsEksCluster clusterData = new DataAwsEksCluster(scope, "EksClusterData",
                                                               DataAwsEksClusterConfig.
@@ -300,14 +315,62 @@ public class AwsConstruct extends AbstractConstruct {
                 // Optional: Tag the resource
                 .tags(Map.of("Name", CLUSTER_NAME + "-oidc-provider"))
                 .build();
-        IamOpenidConnectProvider iamOidcProvider = new IamOpenidConnectProvider(scope, "EksIamOidcProvider",
-                                                                                providerConfig);
+        new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig);
 
-        createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
-                           "emryspolaris.click",
-                           "polaris-lb",
-                           8181
-                          );
+        // 2a. Define the Trust Policy document (JSON)
+        String trustPolicy = String.format("""
+                                                   {
+                                                     "Version": "2012-10-17",
+                                                     "Statement": [
+                                                       {
+                                                         "Effect": "Allow",
+                                                         "Principal": {
+                                                           "Federated": "arn:aws:iam::418295715997:oidc-provider/%s"
+                                                         },
+                                                         "Action": "sts:AssumeRoleWithWebIdentity",
+                                                         "Condition": {
+                                                           "StringEquals": {
+                                                             "%s:aud": "sts.amazonaws.com",
+                                                             "%s:sub": "system:serviceaccount:kube-system:aws-load-balancer-controller"
+                                                           }
+                                                         }
+                                                       }
+                                                     ]
+                                                   }
+                                                   """,
+                                           oidcIssuerHost,
+                                           oidcIssuerHost,
+                                           oidcIssuerHost
+                                          );
+
+        // 2b. Create the IAM Role with the Trust Policy
+        IamRole loadBalancerRole = new IamRole(scope, "AmazonEKSLoadBalancerControllerRole",
+                                               IamRoleConfig.builder()
+                                                            .name("AmazonEKSLoadBalancerControllerRole")
+                                                            .assumeRolePolicy(trustPolicy)
+                                                            .build());
+
+        // 2c. Attach the required AWS Policy (using the provided ARN)
+        new IamRolePolicyAttachment(scope,
+                                    "LBCPolicyAttachment",
+                                    IamRolePolicyAttachmentConfig
+                                            .builder()
+                                            .dependsOn(List.of(loadBalancerRole))
+                                            .role(loadBalancerRole.getName())
+                                            .policyArn("arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicy")
+                                            .build());
+
+
+        ServiceAccount.Builder.create(scope, "aws-load-balancer-controller")
+                              .metadata(ServiceAccountMetadata.builder()
+                                                              .name("aws-load-balancer-controller")
+                                                              .namespace("kube-system")
+                                                              .annotations(Map.of(
+                                                                      "eks.amazonaws.com/role-arn", loadBalancerRole.getArn()
+                                                                                 ))
+                                                              .build())
+                              .build();
+
     }
 
 
