@@ -275,13 +275,13 @@ public class AwsConstruct extends AbstractConstruct {
                         .resolveConflictsOnCreate("OVERWRITE")
                         .build();
 
-        configureIngress(scope);
-
-        createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
-                           "emryspolaris.click",
-                           "polaris-lb",
-                           8181
-                          );
+//        configureIngress(scope);
+//
+//        createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
+//                           "emryspolaris.click",
+//                           "polaris-lb",
+//                           8181
+//                          );
     }
 
     private void configureIngress(Construct scope) {
@@ -574,6 +574,10 @@ public class AwsConstruct extends AbstractConstruct {
         return eksAuthData.getToken();
     }
 
+    private static @NotNull String cleanEksCommand() {
+        return format("eksctl delete cluster --name %s --region %s", CLUSTER_NAME, AWS_REGION);
+    }
+
     /**
      * Note that EKS depends on the subnets.
      * Once the EKS is nuked with "eksctl delete cluster", you can delete the subnets with:
@@ -585,37 +589,49 @@ public class AwsConstruct extends AbstractConstruct {
                                           
                                           for VPC_ID in $(%s) ; do {
                                              echo Destroying $VPC
+                                             echo destroying service and ingress...
                                               kubectl patch service jupyter-lb      -p '{"metadata":{"finalizers":null}}'  --type=merge
                                               kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":null}}'  --type=merge
-                                              for igw in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=$VPC_ID --query 'InternetGateways[].InternetGatewayId' --output text); do \\
-                                                aws ec2 detach-internet-gateway --internet-gateway-id $igw --vpc-id $VPC_ID; \\
-                                                aws ec2 delete-internet-gateway --internet-gateway-id $igw; \\
-                                              done; \\
-                                              aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=$VPC_ID --query 'VpcEndpoints[].VpcEndpointId' --output text | \\
-                                                xargs -r aws ec2 delete-vpc-endpoints --vpc-endpoint-ids; \\
+                                              # %s
+                                              echo destroying internet gateways...
+                                              for igw in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=$VPC_ID --query 'InternetGateways[].InternetGatewayId' --output text); do { 
+                                                echo $igw
+                                                aws ec2 detach-internet-gateway --internet-gateway-id $igw --vpc-id $VPC_ID; 
+                                                aws ec2 delete-internet-gateway --internet-gateway-id $igw; 
+                                              } done; 
+                                              echo VPC endpoints...
+                                              aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=$VPC_ID --query 'VpcEndpoints[].VpcEndpointId' --output text | \\ 
+                                                xargs -r aws ec2 delete-vpc-endpoints --vpc-endpoint-ids; 
+                                              echo NAT gateways...
                                               aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=$VPC_ID --query 'NatGateways[].NatGatewayId' --output text | \\
-                                                xargs -r -n1 aws ec2 delete-nat-gateway --nat-gateway-id; \\
-                                              aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkInterfaces[].NetworkInterfaceId' --output text | \\
-                                                xargs -r -n1 aws ec2 delete-network-interface --network-interface-id; \\
-                                              for subnet in $(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[].SubnetId' --output text); do \\
-                                                aws ec2 delete-subnet --subnet-id $subnet; \\
-                                              done; \\
-                                              for rtb in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID --query 'RouteTables[].RouteTableId' --output text); do \\
-                                                if ! aws ec2 describe-route-tables --route-table-ids $rtb --query 'RouteTables[].Associations[?Main].Main' --output text | grep -q True; then \\
-                                                  aws ec2 delete-route-table --route-table-id $rtb; \\
-                                                fi; \\
-                                              done; \\
-                                              for sg in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do \\
-                                                aws ec2 delete-security-group --group-id $sg; \\
-                                              done; \\
-                                              for nacl in $(aws ec2 describe-network-acls --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' --output text); do \\
-                                                aws ec2 delete-network-acl --network-acl-id $nacl; \\
-                                              done; \\
+                                                xargs -r -n1 aws ec2 delete-nat-gateway --nat-gateway-id; 
+                                              echo network interfaces...
+                                              aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkInterfaces[].NetworkInterfaceId' --output text | \\ 
+                                                xargs -r -n1 aws ec2 delete-network-interface --network-interface-id; 
+                                              echo subnets...
+                                              for subnet in $(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[].SubnetId' --output text); do {
+                                                aws ec2 delete-subnet --subnet-id $subnet; 
+                                              } done; 
+                                              echo routes tables...
+                                              for rtb in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID --query 'RouteTables[].RouteTableId' --output text); do { 
+                                                if ! aws ec2 describe-route-tables --route-table-ids $rtb --query 'RouteTables[].Associations[?Main].Main' --output text | grep -q True; then 
+                                                  aws ec2 delete-route-table --route-table-id $rtb; 
+                                                fi; 
+                                              } done; 
+                                              echo security groups...
+                                              for sg in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do { 
+                                                aws ec2 delete-security-group --group-id $sg; 
+                                              } done; 
+                                              echo network ACLs
+                                              for nacl in $(aws ec2 describe-network-acls --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' --output text); do { 
+                                                aws ec2 delete-network-acl --network-acl-id $nacl; 
+                                              } done; 
                                               aws ec2 delete-vpc --vpc-id $VPC_ID
                                           } done
                                           aws iam delete-role --role-name  cdktf-eks-cluster-role
                                           """,
-                                  getVPCsCommand()
-                                 ));
+                                  getVPCsCommand(),
+                                  cleanEksCommand()
+                                  ));
     }
 }
