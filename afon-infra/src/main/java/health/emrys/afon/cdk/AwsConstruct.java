@@ -1,6 +1,5 @@
 package health.emrys.afon.cdk;
 
-import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
@@ -42,6 +41,7 @@ import software.constructs.Construct;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.infra.Defaults.AWS_REGION;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
@@ -280,7 +280,8 @@ public class AwsConstruct extends AbstractConstruct {
         createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
                            "emryspolaris.click",
                            "polaris-lb",
-                           8181
+                           8181,
+                           subnetIds
                           );
     }
 
@@ -397,7 +398,8 @@ public class AwsConstruct extends AbstractConstruct {
             final String certArn,
             final String hostName,
             final String serviceName,
-            final int servicePort) {
+            final int servicePort,
+            final List<String> subnetIds) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
         Map<String, String> albAnnotations = Map.of(
@@ -418,7 +420,9 @@ public class AwsConstruct extends AbstractConstruct {
 
                 // 6. Make the ALB internet-facing
                 "alb.ingress.kubernetes.io/scheme", "internet-facing",
-                "external-dns.alpha.kubernetes.io/hostname", hostName
+                "external-dns.alpha.kubernetes.io/hostname", hostName,
+
+                "alb.ingress.kubernetes.io/subnets", subnetIds.stream().collect(Collectors.joining(","))
                                                    );
 
         // Create the Ingress
