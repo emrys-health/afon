@@ -292,102 +292,11 @@ public class AwsConstruct extends AbstractConstruct {
 
     private @NotNull String configureServiceAccount(Construct scope) {
         DataAwsEksCluster clusterData        = associateOIDCProvider(scope);
-        Object            oidcIssuerUrl      = clusterData.getIdentity().get(0).getOidc().get(0).getIssuer();
         String            serviceAccountName = "aws-load-balancer-controller";
-        String            oidcIssuerHost     = Fn.replace(oidcIssuerUrl.toString(), "https://", "");
-
-
-//        String trustPolicy = Fn.jsonencode(
-//                Map.of(
-//                        "Version", "2012-10-17",
-//                        "Statement", List.of(
-//                                Map.of(
-//                                        "Effect", "Allow",
-//                                        "Principal", Map.of(
-//                                                "Federated", Fn.join("", List.of("arn:aws:iam::", "418295715997", ":oidc-provider/", oidcIssuerHost))
-//                                                           ),
-//                                        "Action", "sts:AssumeRoleWithWebIdentity",
-//                                        "Condition", Map.of(
-//                                                "StringEquals", Map.of(
-//                                                        // The condition key is the host + ":sub"
-//                                                        Fn.join("", List.of(oidcIssuerHost, ":sub")),
-////                                                        "oidc.eks.eu-west-2.amazonaws.com/id/3009CD0268E933E4D7CF248DF9DB6F5F:aud",
-////                                                        "XXX",
-//                                                        "system:serviceaccount:kube-system" + serviceAccountName
-//                                                                      )
-//                                                           )
-//                                      )
-//                                            )
-//                      )
-//                                          );
-
-
-// --- 2. Correctly extract the host part using Terraform's replace function ---
-//        Object oidcIssuerHost = Fn.replace(oidcIssuerUrl.toString(), "https://", "");
-
-// --- 3. Correctly build the Trust Policy using nested Maps and TerraformFn.jsonencode ---
-
-// Key for the StringEquals condition: "oidc-issuer-host:sub"
-        String conditionKey = oidcIssuerHost.toString() +  ":sub";
-//
-//// Value for the StringEquals condition: "system:serviceaccount:namespace:name"
-        String conditionValue = "system:serviceaccount:kube-system:aws-load-balancer-controller";
-
-// The full Trust Policy Map
-        Map<String, Object> trustPolicyMap = Map.of(
-                "Version", "2012-10-17",
-                "Statement", List.of(
-                        Map.of(
-                                "Effect", "Allow",
-                                "Principal", Map.of(
-                                        "Federated", "arn:aws:iam::418295715997:oidc-provider/" + oidcIssuerHost.toString()
-                                                   ),
-                                "Action", "sts:AssumeRoleWithWebIdentity",
-                                "Condition", Map.of(
-                                        "StringEquals", Map.of(
-                                                conditionKey,
-                                                conditionValue
-                                                              )
-                                                   )
-                              )
-                                    )
-                                                   );
-
-
-// Apply jsonencode to the entire map. CDKTF/Terraform handles token resolution here.
-        /*
-        You want it to look like:
-        "assume_role_policy": "${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::418295715997:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}"
-         */
-        String trustPolicy = String.format("""
-                                                   {
-                                                        Version = "2012-10-17"
-                                                        Statement = [
-                                                          {
-                                                            Effect = "Allow"
-                                                            Principal = {
-                                                              # ARN of the OIDC provider (arn:aws:iam::ACCOUNT_ID:oidc-provider/OIDC_HOST)
-                                                              Federated = "arn:aws:iam::418295715997:oidc-provider/replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, "https://", "")"
-                                                            }
-                                                            Action = "sts:AssumeRoleWithWebIdentity"
-                                                            Condition = {
-                                                              StringEquals = {
-                                                                "replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, "https://", ""}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
-                                                              }
-                                                            }
-                                                          },
-                                                        ]
-                                                      }
-                                                   """,
-                                           oidcIssuerHost, // Token for Federated Principal
-                                           oidcIssuerHost, // Token for Condition Key
-                                           serviceAccountName // Service Account name
-                                          );
-
         String trustPolicyEncoded = """
                 ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::418295715997:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
                 """;
-        IamRole loadBalancerRole = getLoadBalancerRole(scope, trustPolicyEncoded); //"{\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::418295715997:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})\n"));
+        IamRole loadBalancerRole = getLoadBalancerRole(scope, trustPolicyEncoded);
 
 
         ServiceAccount.Builder.create(scope, serviceAccountName)
