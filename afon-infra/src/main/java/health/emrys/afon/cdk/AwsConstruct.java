@@ -342,7 +342,7 @@ public class AwsConstruct extends AbstractConstruct {
                               .metadata(ServiceAccountMetadata.builder()
                                                               .name(serviceAccountName)
                                                               .namespace("kube-system")
-                                                            .labels(Map.of(
+                                                            .labels(Map.of( // the eksctl has also: app.kubernetes.io/managed-by=eksctl
                                                                     "app.kubernetes.io/component", "controller",
                                                                     "app.kubernetes.io/instance", "aws-load-balancer-controller",
                                                                     "app.kubernetes.io/name", "aws-load-balancer-controller"
@@ -525,71 +525,6 @@ public class AwsConstruct extends AbstractConstruct {
                       );
     }
 
-    public static @NotNull List<LocalExecProvisioner> destroyELBs() {
-        return List.of(
-                LocalExecProvisioner.builder()
-                                    .type("local-exec")
-                                    .when("destroy")
-                                    .command(
-                                            cleanCommands()
-                                            )
-                                    .build()
-                      );
-    }
-
-    private static @NotNull String cleanCommands() {
-        return format("""
-                              %s
-                              """,
-                      cleanELBsCommand()
-                     );
-    }
-
-    private static @NotNull String cleanEksCommand() {
-        return format("eksctl delete cluster --name %s --region %s", CLUSTER_NAME, AWS_REGION);
-    }
-
-    private static @NotNull String cleanELBsCommand() {
-        return format("""
-                              echo "Destroying ELBs"
-                              for ELB in $(aws elb describe-load-balancers --region %s --query 'LoadBalancerDescriptions[*].LoadBalancerName' --o text) ; do { 
-                                  echo $ELB ; 
-                                  aws elb delete-load-balancer --load-balancer-name $ELB  || true ; 
-                              } done
-                              """, AWS_REGION);
-    }
-
-    private static @NotNull String cleanNetworkInterfacesCommand(String vpcId) {
-        return format("""
-                              echo "Destroying network interfaces"
-                              for ENI in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text) ; do { 
-                                  echo $ENI ; 
-                                  aws ec2 delete-network-interface --network-interface-id $ENI  || true ;
-                              } done
-                              """, vpcId, AWS_REGION);
-    }
-
-    private static @NotNull String cleanRoutesCommand(String vpcId) {
-        return format("""
-                              echo "Destroying routes"
-                              for RT in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=%s --region %s --query 'RouteTables[*].RouteTableId' --output text) ; do { 
-                                  echo $RT ; 
-                                  aws ec2 delete-route-table --route-table-id $RT --region %s  || true ;
-                              } done
-                              """, vpcId, AWS_REGION, AWS_REGION);
-    }
-
-    private static @NotNull String cleanGatewaysCommand(String vpcId) {
-        return format("""
-                              echo "Destroying gateways"
-                              for IG in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=%s --region %s --query 'InternetGateways[*].InternetGatewayId' --output text) ; do { 
-                                echo $IG ; 
-                                aws ec2 detach-internet-gateway --internet-gateway-id $IG --vpc-id %s --region %s  || true ; 
-                                aws ec2 delete-internet-gateway --internet-gateway-id $IG --region %s  || true ;
-                              } done
-                              """, vpcId, AWS_REGION, vpcId, AWS_REGION, AWS_REGION);
-    }
-
     private static @NotNull String cleanSecurityGroupsCommand(String vpcId) {
         return format("""
                               echo "Destroying security-groups"
@@ -598,24 +533,6 @@ public class AwsConstruct extends AbstractConstruct {
                                 aws ec2 delete-security-group --group-id $SG_ID || true 
                               } done
                               """, vpcId, AWS_REGION);
-    }
-
-    private static @NotNull String cleanSubNetsCommand(String vpcId) {
-        return format("""
-                              echo "Destroying subnets"
-                              for SN in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=%s --region %s --query 'NetworkInterfaces[*].[SubnetId]' --output text) ; do { 
-                                  echo $SN ; 
-                                  aws ec2 delete-subnet --subnet-id $SN --region %s  || true ;
-                              } done
-                              """, vpcId, AWS_REGION, AWS_REGION, AWS_REGION);
-    }
-
-    private static @NotNull String getDeleteVPCCommand() {
-        return format("""
-                              echo "Destroying vpc"
-                              aws ec2 delete-vpc --vpc-id $VPC  || true ;
-                              
-                              """);
     }
 
     private static @NotNull String getVPCCommand() {
@@ -664,32 +581,41 @@ public class AwsConstruct extends AbstractConstruct {
      * then delete the whole VPC
      */
     public static void main(String[] args) {
-        String vpcId = "$VPC";
-        System.out.println(cleanCommands());
         System.out.println(format("""
-                                          for VPC in $(%s) ; do {
-                                            %s
-                                            %s
-                                            %s
-                                            %s
-                                            %s
-                                            %s
-                                            %s
-                                            %s
-                                            %s
+                                          
+                                          for VPC_ID in $(%s) ; do {
+                                             echo Destroying $VPC
+                                              kubectl patch service jupyter-lb      -p '{"metadata":{"finalizers":null}}'  --type=merge
+                                              kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":null}}'  --type=merge
+                                              for igw in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=$VPC_ID --query 'InternetGateways[].InternetGatewayId' --output text); do \\
+                                                aws ec2 detach-internet-gateway --internet-gateway-id $igw --vpc-id $VPC_ID; \\
+                                                aws ec2 delete-internet-gateway --internet-gateway-id $igw; \\
+                                              done; \\
+                                              aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=$VPC_ID --query 'VpcEndpoints[].VpcEndpointId' --output text | \\
+                                                xargs -r aws ec2 delete-vpc-endpoints --vpc-endpoint-ids; \\
+                                              aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=$VPC_ID --query 'NatGateways[].NatGatewayId' --output text | \\
+                                                xargs -r -n1 aws ec2 delete-nat-gateway --nat-gateway-id; \\
+                                              aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkInterfaces[].NetworkInterfaceId' --output text | \\
+                                                xargs -r -n1 aws ec2 delete-network-interface --network-interface-id; \\
+                                              for subnet in $(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[].SubnetId' --output text); do \\
+                                                aws ec2 delete-subnet --subnet-id $subnet; \\
+                                              done; \\
+                                              for rtb in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID --query 'RouteTables[].RouteTableId' --output text); do \\
+                                                if ! aws ec2 describe-route-tables --route-table-ids $rtb --query 'RouteTables[].Associations[?Main].Main' --output text | grep -q True; then \\
+                                                  aws ec2 delete-route-table --route-table-id $rtb; \\
+                                                fi; \\
+                                              done; \\
+                                              for sg in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do \\
+                                                aws ec2 delete-security-group --group-id $sg; \\
+                                              done; \\
+                                              for nacl in $(aws ec2 describe-network-acls --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' --output text); do \\
+                                                aws ec2 delete-network-acl --network-acl-id $nacl; \\
+                                              done; \\
+                                              aws ec2 delete-vpc --vpc-id $VPC_ID
                                           } done
                                           aws iam delete-role --role-name  cdktf-eks-cluster-role
                                           """,
-                                  getVPCsCommand(),
-                                  cleanELBsCommand(),
-                                  cleanGatewaysCommand(vpcId),
-                                  cleanNetworkInterfacesCommand(vpcId),
-                                  cleanSecurityGroupsCommand(vpcId),
-                                  cleanRoutesCommand(vpcId),
-                                  cleanEksCommand(),
-                                  cleanSubNetsCommand(vpcId),
-                                  deleteRoutAssociations(),
-                                  getDeleteVPCCommand()
+                                  getVPCsCommand()
                                  ));
     }
 }
