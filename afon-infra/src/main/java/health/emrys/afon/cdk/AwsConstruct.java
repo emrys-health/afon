@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
@@ -33,7 +34,6 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
-import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountConfig;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
@@ -275,50 +275,139 @@ public class AwsConstruct extends AbstractConstruct {
                         .resolveConflictsOnCreate("OVERWRITE")
                         .build();
 
-//        configureIngress(scope);
-//
-//        createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
-//                           "emryspolaris.click",
-//                           "polaris-lb",
-//                           8181
-//                          );
+        configureIngress(scope);
+
+        createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
+                           "emryspolaris.click",
+                           "polaris-lb",
+                           8181
+                          );
     }
 
     private void configureIngress(Construct scope) {
-        String oidcIssuerHost = associateOIDCProvider(scope);
-
-        String serviceAccountName = configureServiceAccount(scope, oidcIssuerHost);
+        String serviceAccountName = configureServiceAccount(scope);
 
         helmInstallLoadBalancer(serviceAccountName);
     }
 
-    private static @NotNull String configureServiceAccount(Construct scope, String oidcIssuerHost) {
-        // 2a. Define the Trust Policy document (JSON)
+    private @NotNull String configureServiceAccount(Construct scope) {
+        DataAwsEksCluster clusterData        = associateOIDCProvider(scope);
+        Object            oidcIssuerUrl      = clusterData.getIdentity().get(0).getOidc().get(0).getIssuer();
+        String            serviceAccountName = "aws-load-balancer-controller";
+        String            oidcIssuerHost     = Fn.replace(oidcIssuerUrl.toString(), "https://", "");
+
+
+//        String trustPolicy = Fn.jsonencode(
+//                Map.of(
+//                        "Version", "2012-10-17",
+//                        "Statement", List.of(
+//                                Map.of(
+//                                        "Effect", "Allow",
+//                                        "Principal", Map.of(
+//                                                "Federated", Fn.join("", List.of("arn:aws:iam::", "418295715997", ":oidc-provider/", oidcIssuerHost))
+//                                                           ),
+//                                        "Action", "sts:AssumeRoleWithWebIdentity",
+//                                        "Condition", Map.of(
+//                                                "StringEquals", Map.of(
+//                                                        // The condition key is the host + ":sub"
+//                                                        Fn.join("", List.of(oidcIssuerHost, ":sub")),
+////                                                        "oidc.eks.eu-west-2.amazonaws.com/id/3009CD0268E933E4D7CF248DF9DB6F5F:aud",
+////                                                        "XXX",
+//                                                        "system:serviceaccount:kube-system" + serviceAccountName
+//                                                                      )
+//                                                           )
+//                                      )
+//                                            )
+//                      )
+//                                          );
+
+
+// --- 2. Correctly extract the host part using Terraform's replace function ---
+//        Object oidcIssuerHost = Fn.replace(oidcIssuerUrl.toString(), "https://", "");
+
+// --- 3. Correctly build the Trust Policy using nested Maps and TerraformFn.jsonencode ---
+
+// Key for the StringEquals condition: "oidc-issuer-host:sub"
+        String conditionKey = oidcIssuerHost.toString() +  ":sub";
+//
+//// Value for the StringEquals condition: "system:serviceaccount:namespace:name"
+        String conditionValue = "system:serviceaccount:kube-system:aws-load-balancer-controller";
+
+// The full Trust Policy Map
+        Map<String, Object> trustPolicyMap = Map.of(
+                "Version", "2012-10-17",
+                "Statement", List.of(
+                        Map.of(
+                                "Effect", "Allow",
+                                "Principal", Map.of(
+                                        "Federated", "arn:aws:iam::418295715997:oidc-provider/" + oidcIssuerHost.toString()
+                                                   ),
+                                "Action", "sts:AssumeRoleWithWebIdentity",
+                                "Condition", Map.of(
+                                        "StringEquals", Map.of(
+                                                conditionKey,
+                                                conditionValue
+                                                              )
+                                                   )
+                              )
+                                    )
+                                                   );
+
+
+// Apply jsonencode to the entire map. CDKTF/Terraform handles token resolution here.
+        /*
+        You want it to look like:
+        "assume_role_policy": "${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::418295715997:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}"
+         */
         String trustPolicy = String.format("""
                                                    {
-                                                     "Version": "2012-10-17",
-                                                     "Statement": [
-                                                       {
-                                                         "Effect": "Allow",
-                                                         "Principal": {
-                                                           "Federated": "arn:aws:iam::418295715997:oidc-provider/%s"
-                                                         },
-                                                         "Action": "sts:AssumeRoleWithWebIdentity",
-                                                         "Condition": {
-                                                           "StringEquals": {
-                                                             "%s:aud": "sts.amazonaws.com",
-                                                             "%s:sub": "system:serviceaccount:kube-system:aws-load-balancer-controller"
-                                                           }
-                                                         }
-                                                       }
-                                                     ]
-                                                   }
+                                                        Version = "2012-10-17"
+                                                        Statement = [
+                                                          {
+                                                            Effect = "Allow"
+                                                            Principal = {
+                                                              # ARN of the OIDC provider (arn:aws:iam::ACCOUNT_ID:oidc-provider/OIDC_HOST)
+                                                              Federated = "arn:aws:iam::418295715997:oidc-provider/replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, "https://", "")"
+                                                            }
+                                                            Action = "sts:AssumeRoleWithWebIdentity"
+                                                            Condition = {
+                                                              StringEquals = {
+                                                                "replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, "https://", ""}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+                                                              }
+                                                            }
+                                                          },
+                                                        ]
+                                                      }
                                                    """,
-                                           oidcIssuerHost,
-                                           oidcIssuerHost,
-                                           oidcIssuerHost
+                                           oidcIssuerHost, // Token for Federated Principal
+                                           oidcIssuerHost, // Token for Condition Key
+                                           serviceAccountName // Service Account name
                                           );
 
+        String trustPolicyEncoded = """
+                ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::418295715997:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
+                """;
+        IamRole loadBalancerRole = getLoadBalancerRole(scope, trustPolicyEncoded); //"{\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::418295715997:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})\n"));
+
+
+        ServiceAccount.Builder.create(scope, serviceAccountName)
+                              .metadata(ServiceAccountMetadata.builder()
+                                                              .name(serviceAccountName)
+                                                              .namespace("kube-system")
+                                                              .labels(Map.of( // the eksctl has also: app.kubernetes.io/managed-by=eksctl
+                                                                              "app.kubernetes.io/component", "controller",
+                                                                              "app.kubernetes.io/instance", "aws-load-balancer-controller",
+                                                                              "app.kubernetes.io/name", "aws-load-balancer-controller"
+                                                                            ))
+                                                              .annotations(Map.of(
+                                                                      "eks.amazonaws.com/role-arn", loadBalancerRole.getArn()
+                                                                                 ))
+                                                              .build())
+                              .build();
+        return serviceAccountName;
+    }
+
+    private static @NotNull IamRole getLoadBalancerRole(Construct scope, String trustPolicy) {
         // 2b. Create the IAM Role with the Trust Policy
         IamRole loadBalancerRole = new IamRole(scope, "AmazonEKSLoadBalancerControllerRole",
                                                IamRoleConfig.builder()
@@ -335,27 +424,10 @@ public class AwsConstruct extends AbstractConstruct {
                                             .role(loadBalancerRole.getName())
                                             .policyArn("arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicy")
                                             .build());
-
-
-        String serviceAccountName = "aws-load-balancer-controller";
-        ServiceAccount.Builder.create(scope, serviceAccountName)
-                              .metadata(ServiceAccountMetadata.builder()
-                                                              .name(serviceAccountName)
-                                                              .namespace("kube-system")
-                                                            .labels(Map.of( // the eksctl has also: app.kubernetes.io/managed-by=eksctl
-                                                                    "app.kubernetes.io/component", "controller",
-                                                                    "app.kubernetes.io/instance", "aws-load-balancer-controller",
-                                                                    "app.kubernetes.io/name", "aws-load-balancer-controller"
-                                                                          ))
-                                                              .annotations(Map.of(
-                                                                      "eks.amazonaws.com/role-arn", loadBalancerRole.getArn()
-                                                                                 ))
-                                                              .build())
-                              .build();
-        return serviceAccountName;
+        return loadBalancerRole;
     }
 
-    private @NotNull String associateOIDCProvider(Construct scope) {
+    private @NotNull DataAwsEksCluster associateOIDCProvider(Construct scope) {
         // 1. Fetch the EKS Cluster details to get the OIDC Issuer URL
         DataAwsEksCluster clusterData = new DataAwsEksCluster(scope, "EksClusterData",
                                                               DataAwsEksClusterConfig.
@@ -366,8 +438,7 @@ public class AwsConstruct extends AbstractConstruct {
 
         // Extract the OIDC Issuer URL from the cluster data
         // The issuer is in the format: https://oidc.eks.region.amazonaws.com/id/EXAMPLED9295F773010C7C5F77A986877E...
-        String oidcIssuerUrl  = clusterData.getIdentity().get(0).getOidc().get(0).getIssuer();
-        String oidcIssuerHost = oidcIssuerUrl.substring("https://".length());
+        String oidcIssuerUrl = clusterData.getIdentity().get(0).getOidc().get(0).getIssuer();
 
         // 2. Create the IAM OIDC Provider resource
         IamOpenidConnectProviderConfig providerConfig = IamOpenidConnectProviderConfig
@@ -383,13 +454,13 @@ public class AwsConstruct extends AbstractConstruct {
                 // For EKS OIDC, the required thumbprint is well-known and consistent
                 // across AWS regions, simplifying the setup compared to custom providers.
                 // It's recommended to hardcode this known thumbprint for EKS:
-                .thumbprintList(List.of("9e99a48a9960b14926cc7f3b02e22da2b0e791e8"))
+//                .thumbprintList(List.of("9e99a48a9960b14926cc7f3b02e22da2b0e791e8"))
 
                 // Optional: Tag the resource
                 .tags(Map.of("Name", CLUSTER_NAME + "-oidc-provider"))
                 .build();
         new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig);
-        return oidcIssuerHost;
+        return clusterData;
     }
 
     private void helmInstallLoadBalancer(String serviceAccountName) {
@@ -588,7 +659,7 @@ public class AwsConstruct extends AbstractConstruct {
         System.out.println(format("""
                                           
                                           for VPC_ID in $(%s) ; do {
-                                             echo Destroying $VPC
+                                             echo Destroying $VPC_ID
                                              echo destroying service and ingress...
                                               kubectl patch service jupyter-lb      -p '{"metadata":{"finalizers":null}}'  --type=merge
                                               kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":null}}'  --type=merge
@@ -607,13 +678,24 @@ public class AwsConstruct extends AbstractConstruct {
                                                 xargs -r -n1 aws ec2 delete-nat-gateway --nat-gateway-id; 
                                               echo network interfaces...
                                               aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkInterfaces[].NetworkInterfaceId' --output text | \\ 
-                                                xargs -r -n1 aws ec2 delete-network-interface --network-interface-id; 
+                                                xargs -r -n1 aws ec2 delete-network-interface --network-interface-id;
+                                              echo ELBs
+                                              for SUBNET_ID in $(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID  --query 'Subnets[].{Id:SubnetId}' --output text) ; do { 
+                                                for ELB in $(aws elb describe-load-balancers --query 'LoadBalancerDescriptions[?Subnets.contains(@, `'"$SUBNET_ID"'`)].LoadBalancerName' --output text) ; do {
+                                                  echo $ELB
+                                                  aws elb delete-load-balancer --load-balancer-name  $ELB
+                                                } done
+                                              } done   
                                               echo subnets...
                                               for subnet in $(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[].SubnetId' --output text); do {
+                                                echo $SUBNET_ID ; 
                                                 aws ec2 delete-subnet --subnet-id $subnet; 
                                               } done; 
                                               echo routes tables...
-                                              for rtb in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID --query 'RouteTables[].RouteTableId' --output text); do { 
+                                              for rtb in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID --query 'RouteTables[].RouteTableId' --output text); do {
+                                                for ASSOC in $(aws ec2 describe-route-tables --route-table-ids $rtb --query "RouteTables[0].Associations[0].RouteTableAssociationId" --output text); do {
+                                                  aws ec2 disassociate-route-table   --association-id $ASSOC ;
+                                                } done
                                                 if ! aws ec2 describe-route-tables --route-table-ids $rtb --query 'RouteTables[].Associations[?Main].Main' --output text | grep -q True; then 
                                                   aws ec2 delete-route-table --route-table-id $rtb; 
                                                 fi; 
@@ -626,12 +708,24 @@ public class AwsConstruct extends AbstractConstruct {
                                               for nacl in $(aws ec2 describe-network-acls --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' --output text); do { 
                                                 aws ec2 delete-network-acl --network-acl-id $nacl; 
                                               } done; 
+                                              echo and the VPC
                                               aws ec2 delete-vpc --vpc-id $VPC_ID
                                           } done
+                                          
                                           aws iam delete-role --role-name  cdktf-eks-cluster-role
+                                          
+                                          # if there are problems, get the subnets with 
+                                          # aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID  --query 'Subnets[].{Id:SubnetId,PublicIpAutoAssign:MapPublicIpOnLaunch}' --output table
+                                          # find the loadbalancers with:
+                                          # aws elb describe-load-balancers --query 'LoadBalancerDescriptions[?Subnets.contains(@, `'"$SUBNET_ID"'`)].LoadBalancerName' --output text
+                                          # and delete with:
+                                          # aws elb delete-load-balancer --load-balancer-name XXX
+                                          
+                                          
+                                          
                                           """,
                                   getVPCsCommand(),
                                   cleanEksCommand()
-                                  ));
+                                 ));
     }
 }
