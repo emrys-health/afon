@@ -603,7 +603,10 @@ public class AwsConstruct extends AbstractConstruct {
                                              echo destroying service and ingress...
                                               kubectl patch service jupyter-lb      -p '{"metadata":{"finalizers":null}}'  --type=merge
                                               kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":null}}'  --type=merge
-                                              # %s
+                                              %s
+                                              for LB in $(aws elbv2 describe-load-balancers  --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text) ; do {
+                                                aws elbv2 delete-load-balancer  --load-balancer-arn $LB
+                                              } done
                                               echo destroying internet gateways...
                                               for igw in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=$VPC_ID --query 'InternetGateways[].InternetGatewayId' --output text); do { 
                                                 echo $igw
