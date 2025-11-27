@@ -12,3 +12,7 @@ aws iam create-role --role-name S3ReadWriteRole --assume-role-policy-document '{
   ]
 }' && \
 aws iam attach-role-policy   --role-name S3ReadWriteRole  --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+# Terrafrom assumes the loadblancer policy is provided
+curl -o iam_policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/install/iam_policy.json
+aws iam create-policy --policy-name AWSLoadBalancerControllerIAMPolicy  --policy-document file://iam_policy.json

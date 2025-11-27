@@ -626,16 +626,6 @@ public class AwsConstruct extends AbstractConstruct {
                                           } done
                                           
                                           aws iam delete-role --role-name  cdktf-eks-cluster-role
-                                          
-                                          # if there are problems, get the subnets with 
-                                          # aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID  --query 'Subnets[].{Id:SubnetId,PublicIpAutoAssign:MapPublicIpOnLaunch}' --output table
-                                          # find the loadbalancers with:
-                                          # aws elb describe-load-balancers --query 'LoadBalancerDescriptions[?Subnets.contains(@, `'"$SUBNET_ID"'`)].LoadBalancerName' --output text
-                                          # and delete with:
-                                          # aws elb delete-load-balancer --load-balancer-name XXX
-                                          
-                                          
-                                          
                                           """,
                                   getVPCsCommand(),
                                   cleanEksCommand()
