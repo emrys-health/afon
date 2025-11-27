@@ -2,10 +2,13 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.TerraformDataSource;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
+import com.hashicorp.cdktf.providers.aws.data_aws_route53_zone.DataAwsRoute53Zone;
+import com.hashicorp.cdktf.providers.aws.data_aws_route53_zones.DataAwsRoute53Zones;
 import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterVpcConfig;
@@ -20,6 +23,10 @@ import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolic
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachmentConfig;
 import com.hashicorp.cdktf.providers.aws.internet_gateway.InternetGateway;
 import com.hashicorp.cdktf.providers.aws.provider.AwsProvider;
+import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
+import com.hashicorp.cdktf.providers.aws.route53_record.Route53RecordAlias;
+import com.hashicorp.cdktf.providers.aws.route53_record.Route53RecordConfig;
+import com.hashicorp.cdktf.providers.aws.route53_zone.Route53ZoneConfig;
 import com.hashicorp.cdktf.providers.aws.route_table.RouteTable;
 import com.hashicorp.cdktf.providers.aws.route_table.RouteTableRoute;
 import com.hashicorp.cdktf.providers.aws.route_table_association.RouteTableAssociation;
@@ -43,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.cdk.AwsKubernetesPolaris.POLARIS_INTERNAL;
 import static health.emrys.afon.infra.Defaults.AWS_REGION;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
@@ -277,12 +285,34 @@ public class AwsConstruct extends AbstractConstruct {
 
         configureIngress(scope);
 
-        createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
-                           "emryspolaris.click",
-                           "polaris-lb",
-                           8181,
-                           subnetIds
-                          );
+        IngressV1 ingress = createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
+                                               "emryspolaris.click",
+                                               POLARIS_INTERNAL,
+                                               8181,
+                                               subnetIds
+                                              );
+
+//        final DataAwsRoute53Zone hostedZone = DataAwsRoute53Zone
+//                .Builder.create(this, "HostedZoneLookup")
+//                        .name("emryspolaris.click.") // Must end with a period
+//                        .privateZone(false).count(6)
+//                        .build();
+
+
+        // 2. Create the Alias A Record
+        // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
+        // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
+        new Route53Record(this, "IngressAliasRecord", Route53RecordConfig
+                .builder()
+                .zoneId("Z06847223IC61YVGEH6HR")
+                .name("emryspolaris.click")
+                .type("A") // Use 'A' for an Alias to the ingress hostname
+                .alias(Route53RecordAlias.builder()
+                                         .name(ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getHostname())           // The load balancer hostname from your Ingress
+                                         .zoneId("ZHURV8PSTC4K8") // hard coded that maps to eu-west-2
+                                         .evaluateTargetHealth(true)
+                                         .build())
+                .build());
     }
 
     private void configureIngress(Construct scope) {
@@ -332,7 +362,7 @@ public class AwsConstruct extends AbstractConstruct {
                                             .builder()
                                             .dependsOn(List.of(loadBalancerRole))
                                             .role(loadBalancerRole.getName())
-                                            .policyArn("arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicy")
+                                            .policyArn("arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicyCurl") // TODO remove 'Curl'
                                             .build());
         return loadBalancerRole;
     }
@@ -390,9 +420,6 @@ public class AwsConstruct extends AbstractConstruct {
                                    ))
                        .build();
     }
-
-
-// ... inside your Stack class ...
 
     public IngressV1 createHttpsIngress(
             final String certArn,
