@@ -1,11 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeSecret;
-import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -26,10 +22,17 @@ import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
 
-    private static final String SECRET_NAME      = "my-app-secret";
-    private static final String POLARIS_ENV_FILE = "polaris_env.sh";
-    private static final String GCP_CRED_FILE    = "service-account.json";
-    private static final String SECRETS_DIR      = "/etc/app-secrets";
+    private static final String              SECRET_NAME      = "my-app-secret";
+    private static final String              POLARIS_ENV_FILE = "polaris_env.sh";
+    private static final String              GCP_CRED_FILE    = "service-account.json";
+    private static final String              SECRETS_DIR      = "/etc/app-secrets";
+    public static final ServiceSpecPort POLARIS_PORTS = ServiceSpecPort.builder()
+                                                                       .name("web")
+                                                                       .port(8181)
+                                                                       .targetPort("8181")
+                                                                       .protocol("TCP")
+                                                                       .build();
+    protected            Map<String, String> polarisLabels;
 
     public PolarisConfig(@NotNull Construct scope, @NotNull String id, CloudProvider cloudProvider) {
         super(scope, id);
@@ -103,7 +106,7 @@ public class PolarisConfig extends Construct {
                                                                                                   .command(commands)
                                                                                                   .volumeMount(mounts)
                                                                                                   .build();
-        final Map<String, String> polarisLabels = Map.of("app", "polaris");
+        polarisLabels = Map.of("app", "polaris");
         var polarisDeployment = DeploymentUtils.deploy(
                 this,
                 eksDependOn,
@@ -112,6 +115,10 @@ public class PolarisConfig extends Construct {
                 volumes,
                 "polaris");
 
+        return configurePolarisService(polarisDeployment, polarisLabels);
+    }
+
+    protected @NotNull Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
         return Service.Builder.create(this, POLARIS_SERVICE_NAME)
                               .metadata(ServiceMetadata.builder()
                                                        .name(POLARIS_SERVICE_NAME)
@@ -121,12 +128,7 @@ public class PolarisConfig extends Construct {
                                                .selector(polarisLabels)
                                                .type("LoadBalancer")
                                                .port(List.of(
-                                                       ServiceSpecPort.builder()
-                                                                      .name("web")
-                                                                      .port(8181)
-                                                                      .targetPort("8181")
-                                                                      .protocol("TCP")
-                                                                      .build()
+                                                       POLARIS_PORTS
                                                             ))
                                                .build())
                               .build();
