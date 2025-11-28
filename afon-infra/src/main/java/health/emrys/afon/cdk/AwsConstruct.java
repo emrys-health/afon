@@ -518,6 +518,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                         )
                                                    .build())
                                 .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                                .waitForLoadBalancer(true)
                                 .build();
     }
 
