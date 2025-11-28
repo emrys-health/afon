@@ -246,7 +246,8 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                        .cleanupOnFail(true)
                        .disableCrdHooks(true)
                        .disableWebhooks(true)
-                       .forceUpdate(true).lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                       .forceUpdate(true)
+                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                        .repository("https://docs.tigera.io/calico/charts")
                        .namespace("tigera-operator") // Standard namespace for the operator
                        .createNamespace(true)
@@ -259,6 +260,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
     private void csiSecretsDriver(List<@NotNull ITerraformDependable> eksDependOn) {
         Release.Builder.create(this, "secrets-store-csi-driver")
                        .dependsOn(eksDependOn)
+                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                        .name("csi-secrets-store") // The release name
                        .chart("secrets-store-csi-driver") // The chart name within the repository
                        .repository("https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts")
