@@ -2,6 +2,7 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
@@ -102,7 +103,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                                                 .name("jupyter-internal")
                                                 .namespace("default")
                                                 .build())
-                       .dependsOn(eksDependOn)
+                       .dependsOn(eksDependOn).lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                        .spec(ServiceSpec.builder()
                                         .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
                                         .type("ClusterIP")
@@ -245,7 +246,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                        .cleanupOnFail(true)
                        .disableCrdHooks(true)
                        .disableWebhooks(true)
-                       .forceUpdate(true)
+                       .forceUpdate(true).lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                        .repository("https://docs.tigera.io/calico/charts")
                        .namespace("tigera-operator") // Standard namespace for the operator
                        .createNamespace(true)
