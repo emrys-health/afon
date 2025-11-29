@@ -77,6 +77,17 @@ aws ec2 delete-vpc --vpc-id $VPC
 aws iam delete-role --role-name  cdktf-eks-cluster-role
 ```
 
+There is currently (29/11/25) problems with the dependency graph.
+The permissions are deleted before the jupyter-lb service and the ingress.
+So, when they come to delete the AWS infra for which they are a proxy, they find they are not authorised.
+So, run:
+
+```shell
+aws iam attach-role-policy --role-name cdktf-eks-cluster-role --policy-arn arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicyCurl
+kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":[]}}' --type=merge
+```
+
+
 ### Addressing the 2-step Spark deployment
 
 We can probably configure Polaris in a more [production like](https://polaris.apache.org/releases/1.0.0/configuring-polaris-for-production/) manner.
