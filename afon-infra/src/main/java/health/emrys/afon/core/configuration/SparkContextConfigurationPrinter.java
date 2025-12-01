@@ -47,7 +47,7 @@ public class SparkContextConfigurationPrinter {
         try {
             ClusterState clusterState    = new ClusterState();
             String       accessToken     = clusterState.getCredentials();
-            String       polarisEndpoint = clusterState.getPolarisEndpoint();
+            String       polarisEndpoint = clusterState.getPolarisHost();
             logger.info("Polaris endpoint: {}", polarisEndpoint);
 
             app = createDynamicConfig(accessToken,
@@ -65,7 +65,7 @@ public class SparkContextConfigurationPrinter {
                                                                         String polarisEndpoint) {
         Properties props       = add(creds, properties);
         props.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisEndpoint);
-        var        client      = new AfonPolarisClient(props);
+        var        client      = new AfonPolarisClient(props, "https");
         String     accessToken = client.getAccessToken();
         return new SparkContextConfigurationPrinter(props, accessToken);
     }

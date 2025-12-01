@@ -39,7 +39,7 @@ public class InfraExplorer {
         var eksClient = new EksInfoClient(clusterName, properties);
         String jupyterPodName = eksClient.getPodExpectingOnlyOneStartingWith("jupyter").getMetadata().getName();
         logger.info("Cluster querying: {} for service name {}", clusterName, jupyterServiceName);
-        String jupyterHost = eksClient.getIngressExpectingOnlyOneFor(jupyterServiceName);
+        String jupyterHost = eksClient.getServiceExpectingOnlyOneFor(jupyterServiceName);
         logger.info("Cluster querying: {} for the logs of pod {}", clusterName, jupyterPodName);
         String logs = eksClient.getLogsOf(jupyterPodName);
         String uri  = logParser.searchForTextAfter("http://127.0.0.1", logs);
@@ -51,7 +51,7 @@ public class InfraExplorer {
                                    String sparkServiceName) throws IncorrectConfigException, ApiException {
         var eksClient = new EksInfoClient(clusterName, properties);
         logger.info("Cluster querying: {} for service name {}", clusterName, sparkServiceName);
-        String sparkHost = eksClient.getIngressExpectingOnlyOneFor(sparkServiceName);
+        String sparkHost = eksClient.getServiceExpectingOnlyOneFor(sparkServiceName);
         logger.info("Spark can be found at:\nhttp://{}:8080/", sparkHost);
     }
 
