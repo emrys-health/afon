@@ -21,10 +21,13 @@ public class ClusterPolarisConfiguration {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
+    private final PolarisConfigureMain polarisClient;
+    private final ClusterState         state;
+
     public static void main(String[] args) {
         Properties properties = new AfonPropertiesLoader().getProperties();
-        var        app        = new ClusterPolarisConfiguration(properties);
         try {
+            var app = new ClusterPolarisConfiguration(properties);
             app.initializePolaris();
         } catch (Exception e) {
             e.printStackTrace();
@@ -33,15 +36,26 @@ public class ClusterPolarisConfiguration {
 
     private final Properties properties;
 
-    public ClusterPolarisConfiguration(Properties properties) {
-        this.properties  = properties;
+    public ClusterPolarisConfiguration(Properties properties) throws IncorrectConfigException, IOException, ApiException {
+        this.properties = properties;
+        state           = new ClusterState();
+        polarisClient   = new PolarisConfigureMain();
+        String endpoint = format("%s:443", state.getPolarisHost());
+        logger.info("Calling Polaris endpoint: {}", endpoint);
+        properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), endpoint);
+    }
+
+    public Properties getClusterProperties() {
+        var props = new Properties();
+        properties.entrySet().stream().forEach(entry -> props.setProperty(entry.getKey().toString(), entry.getValue().toString()));
+        return props;
     }
 
     public void initializePolaris() throws ApiException, IncorrectConfigException, IOException {
-        ClusterState         state         = new ClusterState();
-        PolarisConfigureMain polarisClient = new PolarisConfigureMain();
-        properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), format("%s:443", state.getPolarisHost()));
         polarisClient.createAllCatalogs(properties, state.getCredentials());
     }
 
+    public ClusterState getClusterState() {
+        return state;
+    }
 }
