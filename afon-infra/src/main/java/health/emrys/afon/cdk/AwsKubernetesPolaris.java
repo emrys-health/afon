@@ -22,7 +22,7 @@ public class AwsKubernetesPolaris extends TerraformStack {
     public static final    String POLARIS_INTERNAL = "polaris-internal";
 
     protected final PolarisConfig     polarisConfig;
-    protected final AbstractConstruct cloudProvider;
+    protected final AwsConstruct      cloudProvider;
     protected final Service           polarisLB;
 
     public AwsKubernetesPolaris(@NotNull Construct scope, @NotNull String id) {

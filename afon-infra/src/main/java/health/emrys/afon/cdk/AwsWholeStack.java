@@ -3,6 +3,7 @@ package health.emrys.afon.cdk;
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
@@ -17,6 +18,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -43,7 +45,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
 
     public AwsWholeStack(final Construct scope, final String id) {
         super(scope, id);
-        Service       jupyterLB     = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME);
+        Service       jupyterLB     = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
 //        List<Service> loadBalancers = List.of(polarisLB, jupyterLB);
         List<Service> loadBalancers = List.of(jupyterLB); // no long exposing HTTP Polaris
 
@@ -65,7 +67,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
         SparkConfig sparkConfig = new SparkConfig(this, "sparkop", cloudProvider.getDependables());
     }
 
-    private Service deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName) {
+    private Service deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName, IamRole loadBalancerRole) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer.builder()
@@ -79,11 +81,13 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                                                        List.of(),
                                                        "jupyter");
 
+        ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
+        lbDependencies.add(loadBalancerRole);
         Service loadbalancer = Service.Builder.create(this, JUPYTER_SERVICE_NAME)
                                               .metadata(ServiceMetadata.builder()
                                                                        .name(JUPYTER_SERVICE_NAME)
                                                                        .build())
-                                              .dependsOn(eksDependOn)
+                                              .dependsOn(lbDependencies)
                                               .spec(ServiceSpec.builder()
                                                                .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
                                                                .type("LoadBalancer")
