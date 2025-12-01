@@ -65,7 +65,7 @@ public class PolarisConfigureMain {
     }
 
     public HttpResponse[] callPolaris(Properties properties, CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
-        var    client      = new AfonPolarisClient(properties);
+        var    client      = new AfonPolarisClient(properties, "https");
         var    configurer  = new PolarisConfigurer(client);
         String accessToken = client.getAccessToken();
         return configurer.configurCatalogFor(config, accessToken);

@@ -36,4 +36,8 @@ public class ClusterState {
     public String getPolarisEndpoint() {
         return format("%s:8181", polarisHost);
     }
+
+    public String getPolarisHost() {
+        return polarisHost;
+    }
 }

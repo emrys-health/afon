@@ -11,6 +11,8 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.Properties;
 
+import static java.lang.String.format;
+
 /**
  * Configures the AWS Polaris instance so Spark can talk to it.
  * It basically registers the clouds storage locations.
@@ -38,7 +40,7 @@ public class ClusterPolarisConfiguration {
     public void initializePolaris() throws ApiException, IncorrectConfigException, IOException {
         ClusterState         state         = new ClusterState();
         PolarisConfigureMain polarisClient = new PolarisConfigureMain();
-        properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), state.getPolarisEndpoint());
+        properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), format("%s:443", state.getPolarisHost()));
         polarisClient.createAllCatalogs(properties, state.getCredentials());
     }
 
