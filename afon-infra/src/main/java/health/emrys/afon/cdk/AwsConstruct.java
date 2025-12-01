@@ -42,6 +42,7 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -53,11 +54,13 @@ import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
 public class AwsConstruct extends AbstractConstruct {
-    public static final String                     VPC_NAME = "cdktf-eks-vpc";
+    public static final String                     VPC_NAME           = "cdktf-eks-vpc";
+    public static final String                     CLUSTER_POLICY_ARN = "arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicyCurl"; // TODO remove 'Curl'
     private final       DataAwsEksClusterAuth      eksAuthData;
     private final       EksCluster                 cluster;
     private final       List<ITerraformDependable> eksDependOn;
     final               Vpc                        vpc;
+    final               IamRole                    loadBalancerRole;
 
     AwsConstruct(final Construct scope, final String id) {
         super(scope, id);
@@ -296,7 +299,19 @@ public class AwsConstruct extends AbstractConstruct {
                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                         .build();
 
-        Release release = configureIngress(scope);
+        String trustPolicy = """
+                ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::418295715997:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
+                """;
+        loadBalancerRole = new IamRole(scope, "AmazonEKSLoadBalancerControllerRole",
+                                       IamRoleConfig.builder()
+                                                    .name("AmazonEKSLoadBalancerControllerRole")
+                                                    .assumeRolePolicy(trustPolicy)
+                                                    .build());
+        IamRolePolicyAttachment.Builder.create(this, "EKS-Cleanup-Policy-Attachment")
+                                       .policyArn(CLUSTER_POLICY_ARN)
+                                       .role(eksClusterRole.getName())
+                                       .build();
+        Release release = configureIngress(scope, loadBalancerRole);
 
         IngressV1 ingress = createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
                                                "emryspolaris.click",
@@ -334,19 +349,24 @@ public class AwsConstruct extends AbstractConstruct {
                 .build());
     }
 
-    private Release configureIngress(Construct scope) {
-        String serviceAccountName = configureServiceAccount(scope);
+    private Release configureIngress(Construct scope, IamRole loadBalancerRole) {
+        String serviceAccountName = configureServiceAccount(scope, loadBalancerRole);
 
-        return helmInstallLoadBalancer(serviceAccountName);
+        return helmInstallLoadBalancer(serviceAccountName, loadBalancerRole);
     }
 
-    private @NotNull String configureServiceAccount(Construct scope) {
+    private @NotNull String configureServiceAccount(Construct scope, IamRole loadBalancerRole) {
         DataAwsEksCluster clusterData        = associateOIDCProvider(scope);
         String            serviceAccountName = "aws-load-balancer-controller";
-        String trustPolicyEncoded = """
-                ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::418295715997:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
-                """;
-        IamRole loadBalancerRole = getLoadBalancerRole(scope, trustPolicyEncoded);
+
+        new IamRolePolicyAttachment(scope,
+                                    "LBCPolicyAttachment",
+                                    IamRolePolicyAttachmentConfig
+                                            .builder()
+                                            .dependsOn(List.of(loadBalancerRole))
+                                            .role(loadBalancerRole.getName())
+                                            .policyArn(CLUSTER_POLICY_ARN)
+                                            .build());
 
 
         ServiceAccount.Builder.create(scope, serviceAccountName)
@@ -364,26 +384,6 @@ public class AwsConstruct extends AbstractConstruct {
                                                               .build())
                               .build();
         return serviceAccountName;
-    }
-
-    private static @NotNull IamRole getLoadBalancerRole(Construct scope, String trustPolicy) {
-        // 2b. Create the IAM Role with the Trust Policy
-        IamRole loadBalancerRole = new IamRole(scope, "AmazonEKSLoadBalancerControllerRole",
-                                               IamRoleConfig.builder()
-                                                            .name("AmazonEKSLoadBalancerControllerRole")
-                                                            .assumeRolePolicy(trustPolicy)
-                                                            .build());
-
-        // 2c. Attach the required AWS Policy (using the provided ARN)
-        new IamRolePolicyAttachment(scope,
-                                    "LBCPolicyAttachment",
-                                    IamRolePolicyAttachmentConfig
-                                            .builder()
-                                            .dependsOn(List.of(loadBalancerRole))
-                                            .role(loadBalancerRole.getName())
-                                            .policyArn("arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicyCurl") // TODO remove 'Curl'
-                                            .build());
-        return loadBalancerRole;
     }
 
     private @NotNull DataAwsEksCluster associateOIDCProvider(Construct scope) {
@@ -422,22 +422,24 @@ public class AwsConstruct extends AbstractConstruct {
         return clusterData;
     }
 
-    private Release helmInstallLoadBalancer(String serviceAccountName) {
+    private Release helmInstallLoadBalancer(String serviceAccountName, IamRole loadBalancerRole) {
+        ArrayList<ITerraformDependable> dependencies = new ArrayList(eksDependOn);
+        dependencies.add(loadBalancerRole);
         return Release.Builder.create(this, "aws-load-balancer")
-                       .dependsOn(eksDependOn)
-                       .name(serviceAccountName + "-chart")
-                       .chart("aws-load-balancer-controller")
-                       .repository("https://aws.github.io/eks-charts")
-                       .namespace("kube-system")
-                       .timeout(600)
-                       .atomic(true)
-                       .set(List.of(
-                               ReleaseSet.builder().name("clusterName").value(CLUSTER_NAME).build(),
-                               ReleaseSet.builder().name("serviceAccount.create").value("false").build(),
-                               ReleaseSet.builder().name("vpcId").value(vpc.getId()).build(),
-                               ReleaseSet.builder().name("serviceAccount.name").value(serviceAccountName).build()
-                                   ))
-                       .build();
+                              .dependsOn(dependencies)
+                              .name(serviceAccountName + "-chart")
+                              .chart("aws-load-balancer-controller")
+                              .repository("https://aws.github.io/eks-charts")
+                              .namespace("kube-system")
+                              .timeout(600)
+                              .atomic(true)
+                              .set(List.of(
+                                      ReleaseSet.builder().name("clusterName").value(CLUSTER_NAME).build(),
+                                      ReleaseSet.builder().name("serviceAccount.create").value("false").build(),
+                                      ReleaseSet.builder().name("vpcId").value(vpc.getId()).build(),
+                                      ReleaseSet.builder().name("serviceAccount.name").value(serviceAccountName).build()
+                                          ))
+                              .build();
     }
 
     public IngressV1 createHttpsIngress(
@@ -490,18 +492,19 @@ public class AwsConstruct extends AbstractConstruct {
                                                                          .backend(pathBackend)
                                                                          .build()))
                 .build();
-        return IngressV1.Builder.create(this, "polaris-https-ingress")
-                                .provider(kubernetesProvider)
-                                .metadata(IngressV1Metadata.builder()
-                                                           .name("polaris-ingress")
-                                                           .namespace("default") // Change if your service is in a different namespace
-                                                           .annotations(albAnnotations)
-                                                           .build())
-                                .spec(IngressV1Spec.builder()
-                                                   .ingressClassName("alb") // Explicitly set the ingress class
-                                                   // Define the TLS configuration using the LBC's "ssl-redirect" action
-                                                   .rule(List.of(
-                                                                 // Rule 1: HTTP-to-HTTPS Redirect (Uses the annotation action)
+        // kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":[]}}' --type=merge
+        IngressV1 ingress = IngressV1.Builder.create(this, "polaris-https-ingress")
+                                             .provider(kubernetesProvider)
+                                             .metadata(IngressV1Metadata.builder()
+                                                                        .name("polaris-ingress")
+                                                                        .namespace("default") // Change if your service is in a different namespace
+                                                                        .annotations(albAnnotations)
+                                                                        .build())
+                                             .spec(IngressV1Spec.builder()
+                                                                .ingressClassName("alb") // Explicitly set the ingress class
+                                                                // Define the TLS configuration using the LBC's "ssl-redirect" action
+                                                                .rule(List.of(
+                                                                              // Rule 1: HTTP-to-HTTPS Redirect (Uses the annotation action)
 //                                                       IngressV1SpecRule.builder()
 //                                                                      .host(hostName)
 //                                                                      .http(IngressV1SpecRuleHttp.builder()
@@ -509,17 +512,28 @@ public class AwsConstruct extends AbstractConstruct {
 //                                                                                               .build())
 //                                                                      .build(),
 
-                                                                 // Rule 2: HTTPS Traffic to Service X
-                                                                 IngressV1SpecRule.builder()
-                                                                                  .host(hostName)
-                                                                                  .http(servicePortRule)
-                                                                                  .build()
-                                                                )
-                                                        )
-                                                   .build())
-                                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                .waitForLoadBalancer(true)
-                                .build();
+                                                                              // Rule 2: HTTPS Traffic to Service X
+                                                                              IngressV1SpecRule.builder()
+                                                                                               .host(hostName)
+                                                                                               .http(servicePortRule)
+                                                                                               .build()
+                                                                             )
+                                                                     )
+                                                                .build())
+                                             .lifecycle(TerraformResourceLifecycle
+                                                                .builder()
+                                                                .preventDestroy(false)
+//                                                   .ignoreChanges("metadata.0.finalizers")
+                                                                // Explicitly prevents the destroy from being blocked by changes in the status
+                                                                // (which is where the finalizer status is reflected in the eyes of Terraform).
+//                                                   .ignoreChanges(List.of("status"))
+                                                                .build())
+                                             .waitForLoadBalancer(true)
+                                             .build();
+//        ingress.addOverride("metadata.finalizers", Collections.emptyList());
+        // (Optional) Ignore future controller-added finalizers so deletes never block
+//        ingress.addOverride("lifecycle.ignore_changes", Collections.singletonList("metadata.0.finalizers"));
+        return ingress;
     }
 
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
