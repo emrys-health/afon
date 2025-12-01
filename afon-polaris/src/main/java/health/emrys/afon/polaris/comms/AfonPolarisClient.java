@@ -78,7 +78,7 @@ public class AfonPolarisClient {
                                             String json,
                                             String accessToken) throws IOException {
         String url = endpoint + uri;
-        logger.info("Calling " + url + "with " + json);
+        logger.info("Calling " + url + " with " + json);
         return makeCallWithToken(json, new HttpPost(url), accessToken);
     }
 
