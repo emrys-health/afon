@@ -10,7 +10,7 @@ public interface Defaults {
     String JUPYTER_SERVICE_NAME = "jupyter-lb";
 
     String POLARIS_POD_NAME     = "polaris";
-    String POLARIS_SERVICE_NAME = "polaris-lb";
+    String POLARIS_SERVICE_NAME = "polaris-ingress";
 
     String SPARK_SERVICE_NAME         = "spark-master-lb";
     String SPARK_CONNECTOR_NAME       = "spark-connector";

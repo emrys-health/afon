@@ -9,9 +9,9 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api.APIlistNamespacedPodRequest;
 import io.kubernetes.client.openapi.apis.CoreV1Api.APIlistNamespacedServiceRequest;
 import io.kubernetes.client.openapi.apis.CoreV1Api.APIreadNamespacedPodLogRequest;
-import io.kubernetes.client.openapi.models.V1LoadBalancerIngress;
-import io.kubernetes.client.openapi.models.V1Pod;
-import io.kubernetes.client.openapi.models.V1Service;
+import io.kubernetes.client.openapi.apis.NetworkingV1Api;
+import io.kubernetes.client.openapi.apis.NetworkingV1Api.APIlistIngressForAllNamespacesRequest;
+import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.credentials.Authentication;
 import org.slf4j.Logger;
@@ -43,21 +43,20 @@ public class K8sClient {
     }
 
     public Optional<List<String>> getIngressFor(String serviceName) throws ApiException {
-        for (V1Service service : listServices()) {
+        for (V1Ingress service : listIngress()) {
             if (service.getMetadata().getName().equals(serviceName)) {
-                List<V1LoadBalancerIngress> ingress = service.getStatus().getLoadBalancer().getIngress();
-                var serviceNames = ingress.stream().map(x -> getEndpoint(x)).collect(Collectors.toList());
+                List<V1IngressRule> ingress      = service.getSpec().getRules();
+                var                                serviceNames = ingress.stream().map(x -> x.getHost()).collect(Collectors.toList());
                 return Optional.of(serviceNames);
             }
         }
         return Optional.empty();
     }
 
-    private String getEndpoint(V1LoadBalancerIngress x) {
-        if (x.getHostname() == null || x.getHostname().isEmpty()) {
-            return x.getIp();
-        }
-        return x.getHostname();
+    public List<V1Ingress> listIngress() throws ApiException {
+        NetworkingV1Api api     = new NetworkingV1Api();
+        APIlistIngressForAllNamespacesRequest ingress = api.listIngressForAllNamespaces();
+        return ingress.execute().getItems();
     }
 
     public List<V1Service> listServices() throws ApiException {
