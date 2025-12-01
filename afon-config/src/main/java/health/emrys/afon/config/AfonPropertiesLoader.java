@@ -18,10 +18,10 @@ public class AfonPropertiesLoader {
 
     private final Properties properties;
 
-    public static Properties add(String accessToken, Properties properties) {
-        String[] creds = accessToken.split(":");
+    public static Properties add(String credentials, Properties properties) {
+        String[] creds = credentials.split(":");
         if (creds.length != 2) {
-            logger.error("Incorrect access token {}. The token should have a ':' delimiting ID from Secret", accessToken);
+            logger.error("Incorrect access token {}. The token should have a ':' delimiting ID from Secret", credentials);
         }
         properties.setProperty(POLARIS_ID.getPropertyName(), creds[0]);
         properties.setProperty(POLARIS_SECRET.getPropertyName(), creds[1]);

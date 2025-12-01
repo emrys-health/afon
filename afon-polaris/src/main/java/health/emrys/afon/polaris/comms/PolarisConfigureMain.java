@@ -36,8 +36,8 @@ public class PolarisConfigureMain {
         }
     }
 
-    public void createAllCatalogs(Properties properties, String accessToken) throws IncorrectConfigException, IOException {
-        properties = add(accessToken, properties);
+    public void createAllCatalogs(Properties properties, String credentials) throws IncorrectConfigException, IOException {
+        properties = add(credentials, properties);
         CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
                 new AwsCloudConfigForPolaris(properties),
                 new GoogleCloudConfigForPolaris(properties),

@@ -1,26 +1,26 @@
 package health.emrys.afon.infra;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.k8s.EksInfoClient;
-import io.kubernetes.client.openapi.ApiException;
+import health.emrys.afon.infra.k8s.ClusterState;
+import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.slf4j.Logger;
 
 import java.util.Properties;
-
-import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
-import static health.emrys.afon.infra.Defaults.POLARIS_POD_NAME;
 
 public class PolarisCredentialGrabber {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCredentialGrabber.class);
 
     public static void main(String[] args) {
-        Properties properties  = new AfonPropertiesLoader().getProperties();
-        var        eksClient   = new EksInfoClient(CLUSTER_NAME, properties);
-        var        app         = new PolarisCredentialGrabber();
+        Properties properties = new AfonPropertiesLoader().getProperties();
         try {
-            System.out.println(app.getCredentials(eksClient.getLogsOf(POLARIS_POD_NAME)));
-        } catch (ApiException e) {
+            var          clusterConfig     = new ClusterPolarisConfiguration(properties);
+            ClusterState clusterState      = clusterConfig.getClusterState();
+            Properties   clusterProperties = AfonPropertiesLoader.add(clusterState.getCredentials(), clusterConfig.getClusterProperties());
+            var          client            = new AfonPolarisClient(clusterProperties, "https");
+            logger.info("Polaris credential: {}", clusterState.getCredentials());
+            logger.info("Polaris access key: {}", client.getAccessToken());
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -34,7 +34,6 @@ public class PolarisCredentialGrabber {
     public String getCredentials(String logs) {
         return logParser.searchForTextAfter("realm: POLARIS root principal credentials: ", logs);
     }
-
 
 
 }
