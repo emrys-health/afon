@@ -7,6 +7,8 @@ import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 
@@ -22,7 +24,11 @@ public class PolarisRegisterMain {
 
         PolarisRegisterMainConfig(String[] args) {
             if (args.length != 4) {
-                throw new IllegalArgumentException("arguments are: catalog namespace table metadata_location");
+                throw new IllegalArgumentException(format("""
+                                                          arguments are: 
+                                                          catalog namespace table metadata_location
+                                                          was provided with %d arguments: %s 
+                                                          """, args.length, Arrays.stream(args).collect(Collectors.joining(" "))));
             }
             catalog   = AfonProperties.SupportedCloudsEnum.valueOf(args[0]);
             namespace = args[1];
@@ -32,18 +38,18 @@ public class PolarisRegisterMain {
     }
 
     public static void main(String[] args) {
-        try {
-            PolarisRegisterMainConfig conf  = new PolarisRegisterMainConfig(args);
-            ClusterState              state = new ClusterState();
+        try (ClusterState state = new ClusterState()) {
+            PolarisRegisterMainConfig conf        = new PolarisRegisterMainConfig(args);
             String                    endpoint    = format("https://%s", state.getPolarisHost());
             String                    accessToken = state.getCredentials();
             String[]                  creds       = accessToken.split(":");
-            AfonPolarisClient         client      = new AfonPolarisClient(endpoint,
+            AfonPolarisClient client = new AfonPolarisClient(endpoint,
                                                              creds[0],
                                                              creds[1]);
 
             createNamespace(conf, client);
             createTable(conf, client);
+            logger.info("Finished without error. Shutting down resources...");
         } catch (Exception e) {
             logger.error("Could not register table", e);
         }
@@ -54,11 +60,11 @@ public class PolarisRegisterMain {
 //                    .builder().name(conf.table).metadataLocation(conf.metadata).build();
         String uri = format("/api/catalog/v1/%s/namespaces/%s/register", conf.catalog, conf.namespace);
         String json = format("""
-                {
-                    "name" : "%s",
-                    "metadata-location": "%s"
-                }
-                """, conf.table, conf.metadata);
+                                     {
+                                         "name" : "%s",
+                                         "metadata-location": "%s"
+                                     }
+                                     """, conf.table, conf.metadata);
         logger.info(json);
         ClassicHttpResponse response = client.postJsonCall(uri, json, client.getAccessToken());
         logger.info("response: {}", response.getCode());
@@ -67,10 +73,10 @@ public class PolarisRegisterMain {
     private static void createNamespace(PolarisRegisterMainConfig conf, AfonPolarisClient client) throws IOException {
         String uri = format("/api/catalog/v1/%s/namespaces", conf.catalog);
         String json = format("""
-                {
-                    "namespace" : ["%s"]
-                }
-                """, conf.namespace);
+                                     {
+                                         "namespace" : ["%s"]
+                                     }
+                                     """, conf.namespace);
         logger.info(json);
         ClassicHttpResponse response = client.postJsonCall(uri, json, client.getAccessToken());
         logger.info("response: {}", response.getCode());

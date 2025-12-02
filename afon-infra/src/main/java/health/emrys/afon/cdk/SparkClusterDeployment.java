@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,16 @@ public class SparkClusterDeployment extends AwsWholeStack {
                 "metadata", Map.of(
                         "name", sparkConnectorName,
                         "namespace", "default"
+                        /*
+                        This barfs with:
+│ Error: Provider produced inconsistent result after apply
+│
+│ When applying changes to kubernetes_manifest.sparkConnectManifest, provider "provider[\"registry.opentofu.org/hashicorp/kubernetes\"]" produced an unexpected new value:
+│ .object.metadata.finalizers: was cty.ListValEmpty(cty.String), but now null.
+│
+│ This is a bug in the provider, which should be reported in the provider's own issue tracker.
+                        ,"finalizers", Collections.emptyList() // // sparkapplications.spark.apache.org/finalizer in rel life
+                         */
                                   ),
                 "spec", Map.of(
                         "runtimeVersions", Map.of(
@@ -72,7 +83,6 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                                  ),
                         "mainClass", "org.apache.spark.sql.connect.service.SparkConnectServer",
                         "sparkConf", sparkConfig(SPARK_SERVICE_ACCOUNT_NAME),
-
                         "driverSpec", Map.of(
                                 "podTemplateSpec", Map.of(
                                         "spec", Map.of(
