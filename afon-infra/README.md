@@ -77,16 +77,22 @@ aws ec2 delete-vpc --vpc-id $VPC
 aws iam delete-role --role-name  cdktf-eks-cluster-role
 ```
 
-There is currently (29/11/25) problems with the dependency graph.
-The permissions are deleted before the jupyter-lb service and the ingress.
-So, when they come to delete the AWS infra for which they are a proxy, they find they are not authorised.
-So, run:
+### Registering a table with Polaris
+
+When a new version of Polaris is started up, it has nothing in it.
+So, create the warehouases with:
 
 ```shell
-aws iam attach-role-policy --role-name cdktf-eks-cluster-role --policy-arn arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicyCurl
-kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":[]}}' --type=merge
+mvn -Dexec.mainClass=health.emrys.afon.infra.ClusterPolarisConfiguration exec:java
 ```
 
+and register tables with something like:
+
+```shell
+mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
+```
+
+or similar.
 
 ### Addressing the 2-step Spark deployment
 

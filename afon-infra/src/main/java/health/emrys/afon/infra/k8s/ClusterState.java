@@ -12,7 +12,7 @@ import static health.emrys.afon.infra.Defaults.POLARIS_POD_NAME;
 import static health.emrys.afon.infra.Defaults.POLARIS_SERVICE_NAME;
 import static java.lang.String.format;
 
-public class ClusterState {
+public class ClusterState implements AutoCloseable {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterState.class);
 
@@ -39,5 +39,10 @@ public class ClusterState {
 
     public String getPolarisHost() {
         return polarisHost;
+    }
+
+    @Override
+    public void close() throws Exception {
+        k8sClient.close();
     }
 }
