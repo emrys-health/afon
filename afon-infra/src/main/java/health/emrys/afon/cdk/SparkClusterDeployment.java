@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.infra.Defaults.*;
 
@@ -26,9 +27,9 @@ public class SparkClusterDeployment extends AwsWholeStack {
 
     public SparkClusterDeployment(@NotNull Construct scope, @NotNull String id) {
         super(scope, id);
-        String sparkConnectorName = SPARK_CONNECTOR_NAME;
-        String sparkServiceAccountName = SPARK_SERVICE_ACCOUNT_NAME;
-        List<Resource> eksDependOn = List.of();
+        String         sparkConnectorName      = SPARK_CONNECTOR_NAME;
+        String         sparkServiceAccountName = SPARK_SERVICE_ACCOUNT_NAME;
+        List<Resource> eksDependOn             = List.of();
 
         final Map<String, Object> sparkClusterManifest = Map.of(
                 "apiVersion", "spark.apache.org/v1alpha1",
@@ -93,15 +94,22 @@ public class SparkClusterDeployment extends AwsWholeStack {
                         .manifest(sparkConnectManifest)
                         .dependsOn(eksDependOn)
                         .build();
-/*
+
+        sparkExternalService(eksDependOn);
+
+    }
+
+    private void sparkExternalService(List<Resource> eksDependOn) {
+        String subnetIds = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
         Service.Builder.create(this, SPARK_SERVICE_NAME)
                        .metadata(ServiceMetadata.builder()
                                                 .name(SPARK_SERVICE_NAME)
                                                 .labels(Map.of("spark-role", "master",
                                                                "spark-version", "4.0.1",
                                                                "spark.operator/name", "spark-kubernetes-operator",
-                                                               "spark.operator/spark-cluster-name", "prod")
-                                                       )
+                                                               "spark.operator/spark-cluster-name", "prod"
+                                                              ))
+                                                .annotations(Map.of("service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds))
                                                 .build())
                        .dependsOn(eksDependOn)
                        .spec(ServiceSpec.builder()
@@ -130,7 +138,6 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                                      ))
                                         .build())
                        .build();
- */
     }
 
     private Map<String, String> sparkConfig(String serviceAccountName) {
