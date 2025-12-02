@@ -59,6 +59,7 @@ public class AwsConstruct extends AbstractConstruct {
     private final       DataAwsEksClusterAuth      eksAuthData;
     private final       EksCluster                 cluster;
     private final       List<ITerraformDependable> eksDependOn;
+    private final       List<String>               subnetIds;
     final               Vpc                        vpc;
     final               IamRole                    loadBalancerRole;
 
@@ -138,7 +139,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                                                 .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                                                                 .routeTableId(publicRouteTable.getId()).build();
 
-        final List<String> subnetIds = List.of(publicSubnet1.getId(), publicSubnet2.getId());
+        subnetIds = List.of(publicSubnet1.getId(), publicSubnet2.getId());
 
         // --- 3. EKS Cluster IAM Role (Same as before) ---
 
@@ -620,6 +621,10 @@ public class AwsConstruct extends AbstractConstruct {
     @Override
     public String getToken() {
         return eksAuthData.getToken();
+    }
+
+    public List<String> getSubnetIds() {
+        return new  ArrayList<>(subnetIds);
     }
 
     private static @NotNull String cleanEksCommand() {
