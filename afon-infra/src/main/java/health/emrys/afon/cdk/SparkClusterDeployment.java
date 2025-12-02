@@ -71,9 +71,15 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                                  ),
                         "mainClass", "org.apache.spark.sql.connect.service.SparkConnectServer",
                         "sparkConf", sparkConfig(SPARK_SERVICE_ACCOUNT_NAME),
+
                         "driverSpec", Map.of(
                                 "podTemplateSpec", Map.of(
-                                        "spec", Map.of()
+                                        "spec", Map.of(
+                                                "resources", Map.of(
+                                                        "limits", Map.of("ephemeralStorage", "4Gi"),
+                                                        "requests", Map.of("ephemeralStorage", "2Gi")
+                                                                   )
+                                                      )
                                                          )
                                             )
                               )
@@ -87,7 +93,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
                         .manifest(sparkConnectManifest)
                         .dependsOn(eksDependOn)
                         .build();
-
+/*
         Service.Builder.create(this, SPARK_SERVICE_NAME)
                        .metadata(ServiceMetadata.builder()
                                                 .name(SPARK_SERVICE_NAME)
@@ -124,6 +130,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                                      ))
                                         .build())
                        .build();
+ */
     }
 
     private Map<String, String> sparkConfig(String serviceAccountName) {
