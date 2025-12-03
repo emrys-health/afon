@@ -639,78 +639,78 @@ public class AwsConstruct extends AbstractConstruct {
      */
     public static void main(String[] args) {
         System.out.println(format("""
-                                          
-                                          for VPC_ID in $(%s) ; do {
-                                             echo Destroying $VPC_ID
-                                             echo destroying service and ingress...
-                                              kubectl patch service jupyter-lb      -p '{"metadata":{"finalizers":null}}'  --type=merge
-                                              kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":null}}'  --type=merge
-                                              %s
-                                              for LB in $(aws elbv2 describe-load-balancers  --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text) ; do {
-                                                aws elbv2 delete-load-balancer  --load-balancer-arn $LB
-                                              } done
-                                              echo destroying internet gateways...
-                                              for igw in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=$VPC_ID --query 'InternetGateways[].InternetGatewayId' --output text); do { 
-                                                echo $igw
-                                                aws ec2 detach-internet-gateway --internet-gateway-id $igw --vpc-id $VPC_ID; 
-                                                aws ec2 delete-internet-gateway --internet-gateway-id $igw; 
-                                              } done; 
-                                              echo VPC endpoints...
-                                              aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=$VPC_ID --query 'VpcEndpoints[].VpcEndpointId' --output text | \\ 
-                                                xargs -r aws ec2 delete-vpc-endpoints --vpc-endpoint-ids; 
-                                              echo NAT gateways...
-                                              aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=$VPC_ID --query 'NatGateways[].NatGatewayId' --output text | \\
-                                                xargs -r -n1 aws ec2 delete-nat-gateway --nat-gateway-id; 
-                                              echo network interfaces...
-                                              aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkInterfaces[].NetworkInterfaceId' --output text | \\ 
-                                                xargs -r -n1 aws ec2 delete-network-interface --network-interface-id;
-                                              echo ELBs
-                                              for SUBNET_ID in $(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID  --query 'Subnets[].{Id:SubnetId}' --output text) ; do { 
-                                                for ELB in $(aws elb describe-load-balancers --query 'LoadBalancerDescriptions[?Subnets.contains(@, `'"$SUBNET_ID"'`)].LoadBalancerName' --output text) ; do {
-                                                  echo $ELB
-                                                  aws elb delete-load-balancer --load-balancer-name  $ELB
-                                                } done
-                                              } done   
-                                              echo subnets...
-                                              for subnet in $(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[].SubnetId' --output text); do {
-                                                echo $SUBNET_ID ; 
-                                                aws ec2 delete-subnet --subnet-id $subnet; 
-                                              } done; 
-                                              echo routes tables...
-                                              for rtb in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID --query 'RouteTables[].RouteTableId' --output text); do {
-                                                for ASSOC in $(aws ec2 describe-route-tables --route-table-ids $rtb --query "RouteTables[0].Associations[0].RouteTableAssociationId" --output text); do {
-                                                  aws ec2 disassociate-route-table   --association-id $ASSOC ;
-                                                } done
-                                                if ! aws ec2 describe-route-tables --route-table-ids $rtb --query 'RouteTables[].Associations[?Main].Main' --output text | grep -q True; then 
-                                                  aws ec2 delete-route-table --route-table-id $rtb; 
-                                                fi; 
-                                              } done; 
-                                              echo security groups...
-                                              for sg in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do { 
-                                                aws ec2 delete-security-group --group-id $sg; 
-                                              } done; 
-                                              echo network ACLs
-                                              for nacl in $(aws ec2 describe-network-acls --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' --output text); do { 
-                                                aws ec2 delete-network-acl --network-acl-id $nacl; 
-                                              } done; 
-                                              echo and the VPC
-                                              aws ec2 delete-vpc --vpc-id $VPC_ID
-                                          } done
-                                          
-                                          for ROLE_NAME in $(echo "cdktf-eks-cluster-role" "cdktf-eks-nodegroup-role" "AmazonEKSLoadBalancerControllerRole") ; do {
-                                             echo $ROLE_NAME ;
-                                             for ARN in $(aws iam list-attached-role-policies --role-name $ROLE_NAME --query 'AttachedPolicies[*].PolicyArn' --output text) ; do {
-                                                 aws iam detach-role-policy --role-name $ROLE_NAME --policy-arn $ARN
-                                             } done
-                                             for PROFILE in $(aws iam list-instance-profiles-for-role --query 'AttachedPolicies[*].PolicyArn' --role-name $ROLE_NAME --query "InstanceProfiles[].InstanceProfileName"   --output text) ; do {
-                                                 aws iam remove-role-from-instance-profile --instance-profile-name $PROFILE --role-name $ROLE_NAME
-                                             } done
-                                             aws iam delete-role --role-name  $ROLE_NAME
-                                          } done
-                                          
-                                          aws iam delete-policy --policy-arn arn:aws:iam::123456789012:policy/EKS-Secret-Access-Policy
-                                          
-                                          """,
+          \u001B[31m
+          for VPC_ID in $(%s) ; do {
+             echo Destroying $VPC_ID
+             echo destroying service and ingress...
+              kubectl patch service jupyter-lb      -p '{"metadata":{"finalizers":null}}'  --type=merge
+              kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":null}}'  --type=merge
+              %s
+              for LB in $(aws elbv2 describe-load-balancers  --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text) ; do {
+                aws elbv2 delete-load-balancer  --load-balancer-arn $LB
+              } done
+              echo destroying internet gateways...
+              for igw in $(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=$VPC_ID --query 'InternetGateways[].InternetGatewayId' --output text); do { 
+                echo $igw
+                aws ec2 detach-internet-gateway --internet-gateway-id $igw --vpc-id $VPC_ID; 
+                aws ec2 delete-internet-gateway --internet-gateway-id $igw; 
+              } done; 
+              echo VPC endpoints...
+              aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=$VPC_ID --query 'VpcEndpoints[].VpcEndpointId' --output text | \\ 
+                xargs -r aws ec2 delete-vpc-endpoints --vpc-endpoint-ids; 
+              echo NAT gateways...
+              aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=$VPC_ID --query 'NatGateways[].NatGatewayId' --output text | \\
+                xargs -r -n1 aws ec2 delete-nat-gateway --nat-gateway-id; 
+              echo network interfaces...
+              aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkInterfaces[].NetworkInterfaceId' --output text | \\ 
+                xargs -r -n1 aws ec2 delete-network-interface --network-interface-id;
+              echo ELBs
+              for SUBNET_ID in $(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID  --query 'Subnets[].{Id:SubnetId}' --output text) ; do { 
+                for ELB in $(aws elb describe-load-balancers --query 'LoadBalancerDescriptions[?Subnets.contains(@, `'"$SUBNET_ID"'`)].LoadBalancerName' --output text) ; do {
+                  echo $ELB
+                  aws elb delete-load-balancer --load-balancer-name  $ELB
+                } done
+              } done   
+              echo subnets...
+              for subnet in $(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID --query 'Subnets[].SubnetId' --output text); do {
+                echo $SUBNET_ID ; 
+                aws ec2 delete-subnet --subnet-id $subnet; 
+              } done; 
+              echo routes tables...
+              for rtb in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID --query 'RouteTables[].RouteTableId' --output text); do {
+                for ASSOC in $(aws ec2 describe-route-tables --route-table-ids $rtb --query "RouteTables[0].Associations[0].RouteTableAssociationId" --output text); do {
+                  aws ec2 disassociate-route-table   --association-id $ASSOC ;
+                } done
+                if ! aws ec2 describe-route-tables --route-table-ids $rtb --query 'RouteTables[].Associations[?Main].Main' --output text | grep -q True; then 
+                  aws ec2 delete-route-table --route-table-id $rtb; 
+                fi; 
+              } done; 
+              echo security groups...
+              for sg in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do { 
+                aws ec2 delete-security-group --group-id $sg; 
+              } done; 
+              echo network ACLs
+              for nacl in $(aws ec2 describe-network-acls --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' --output text); do { 
+                aws ec2 delete-network-acl --network-acl-id $nacl; 
+              } done; 
+              echo and the VPC
+              aws ec2 delete-vpc --vpc-id $VPC_ID
+          } done
+          
+          for ROLE_NAME in $(echo "cdktf-eks-cluster-role" "cdktf-eks-nodegroup-role" "AmazonEKSLoadBalancerControllerRole") ; do {
+             echo $ROLE_NAME ;
+             for ARN in $(aws iam list-attached-role-policies --role-name $ROLE_NAME --query 'AttachedPolicies[*].PolicyArn' --output text) ; do {
+                 aws iam detach-role-policy --role-name $ROLE_NAME --policy-arn $ARN
+             } done
+             for PROFILE in $(aws iam list-instance-profiles-for-role --query 'AttachedPolicies[*].PolicyArn' --role-name $ROLE_NAME --query "InstanceProfiles[].InstanceProfileName"   --output text) ; do {
+                 aws iam remove-role-from-instance-profile --instance-profile-name $PROFILE --role-name $ROLE_NAME
+             } done
+             aws iam delete-role --role-name  $ROLE_NAME
+          } done
+          
+          aws iam delete-policy --policy-arn arn:aws:iam::123456789012:policy/EKS-Secret-Access-Policy
+          \u001B[0m
+          """,
                                   getVPCsCommand(),
                                   cleanEksCommand()
                                  ));

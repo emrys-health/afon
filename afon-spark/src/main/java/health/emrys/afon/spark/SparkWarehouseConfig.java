@@ -42,6 +42,10 @@ public class SparkWarehouseConfig {
         this(accessToken, clientId, clientSecret, "localhost:8181");
     }
 
+    public String getAccessToken() {
+        return accessToken;
+    }
+
     public SparkConf sparkConf() throws IOException {
         return sparkConf(4);
     }

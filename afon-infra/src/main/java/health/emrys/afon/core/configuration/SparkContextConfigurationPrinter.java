@@ -17,6 +17,7 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 import static java.lang.String.format;
+import static java.lang.String.valueOf;
 
 /**
  * This generates the PySpark code you can run in Jupyter.
@@ -86,62 +87,77 @@ public class SparkContextConfigurationPrinter {
     }
 
     public void printSparkConfig() {
-
-        System.out.println("""
-                                   from pyspark.sql import SparkSession
-                                   
-                                   spark = (SparkSession.builder\s
-                                       .appName("practice")\s
-                                       .master("spark://emrys-master-svc:7077")\s
-                                       .config("spark.driver.host", "jupyter-internal")\s
-                                       .config("spark.driver.port", "7078")
-                                   """);
-
-        for (Map.Entry<String, String> entry : polarisConfig.sparkConfigStatics().entrySet()) {
-            System.out.println(format("    .config(\"%s\", f\"%s\")", entry.getKey(), entry.getValue()));
-        }
-        System.out.println();
-
-        for (AfonProperties.SupportedCloudsEnum cloudProvider : AfonProperties.SupportedCloudsEnum.values()) {
-            Map<String, String> configs = polarisConfig.sparkConfigs(cloudProvider);
-            for (Map.Entry<String, String> entry : configs.entrySet()) {
-                System.out.println(format("    .config(\"%s\", f\"%s\")", entry.getKey(), entry.getValue()));
-            }
-            System.out.println();
-        }
-
-        StringBuffer szb = new StringBuffer("com.google.guava:guava:33.4.0-jre,org.apache.hadoop:hadoop-aws:3.4.2,");
-        addDependencies(szb, new String[]{"google-cloud-storage",}, "com.google.cloud", "2.57.0");
-        szb.append("software.amazon.awssdk:bundle:2.34.6,");
-        szb.append("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0"); // our docker image uses Spark 2.12
         String tableName = tableName();
-        System.out.println(format("""
-                                          .config("spark.jars.packages", "%s")
-                                          .config("spark.driver.userClassPathFirst", "true")
-                                          .config("spark.executor.userClassPathFirst", "true")
-                                          """, szb));
+        System.out.println("\u001B[32m");
         System.out.println("""
-                                       .getOrCreate()
-                                           )        
-                                   print("Setup complete.");
-                                   
-                                   df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
-                                   print("Initialized test data")
-                                   """);
+           from pyspark.sql import SparkSession
+           
+           spark = SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002").getOrCreate()
+            
+           print("session created")
 
-        System.out.println(format("""
-                                          az_namespace = "azure.acceptancetests"
-                                          az_fqn = f"{az_namespace}.%s"
-                                          
-                                          spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {az_namespace}")
-                                          print(f"Created namespace {az_namespace}")
-                                          
-                                          spark.sql(f"CREATE TABLE {az_fqn} (name String, num Integer) USING iceberg")
-                                          df_test.writeTo(az_fqn).append()
-                                          """, tableName));
+           df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
+           print("Initialized test data")
+           """);
+
         System.out.println(awsSmokeTest(tableName));
         System.out.println(gcpSmokeTest(tableName));
+        System.out.println(azureSmokeTest(tableName));
 
+        System.out.println("\u001B[34m");
+        System.out.println(format("""
+                                   CREATE OR REPLACE CATALOG INTEGRATION polaris_int
+                                       CATALOG_SOURCE = POLARIS
+                                       TABLE_FORMAT = ICEBERG
+                                       REST_CONFIG = (
+                                           CATALOG_URI = 'https://emryspolaris.click/api/catalog/',
+                                           CATALOG_NAME = 'aws'
+                                           )
+                                       REST_AUTHENTICATION = (
+                                           TYPE = BEARER
+                                           BEARER_TOKEN = '%s'
+                                       )
+                                       ENABLED = TRUE;
+                                   
+                                   CREATE OR REPLACE EXTERNAL VOLUME emrys_s3
+                                     STORAGE_LOCATIONS = (
+                                       ( NAME = 'eu-west-2'
+                                         STORAGE_PROVIDER = 'S3'
+                                         STORAGE_BASE_URL = 's3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/'
+                                         STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/S3ReadWriteRoleSF2'
+                                       )
+                                     )
+                                     ALLOW_WRITES = FALSE;
+                                   
+                                   USE DATABASE SNOWFLAKE_LEARNING_DB;
+                                   
+                                   CREATE OR REPLACE ICEBERG TABLE aws_acceptance_Test
+                                     EXTERNAL_VOLUME = emrys_s3
+                                     CATALOG = polaris_int
+                                     CATALOG_NAMESPACE = 'acceptancetests'
+                                     CATALOG_TABLE_NAME = 'AwsAccessSpec251117511401'
+                                     ;
+                                   
+                                   SELECT * FROM aws_acceptance_Test;
+                                   
+                                   DROP TABLE aws_acceptance_Test;
+                                   """, polarisConfig.getAccessToken()));
+
+        System.out.println("\u001B[0m");
+
+    }
+
+    private static @NotNull String azureSmokeTest(String tableName) {
+        return format("""
+                              az_namespace = "azure.acceptancetests"
+                              az_fqn = f"{az_namespace}.%s"
+                              
+                              spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {az_namespace}")
+                              print(f"Created namespace {az_namespace}")
+                              
+                              spark.sql(f"CREATE TABLE {az_fqn} (name String, num Integer) USING iceberg")
+                              df_test.writeTo(az_fqn).append()
+                              """, tableName);
     }
 
     private static @NotNull String awsSmokeTest(String tableName) {

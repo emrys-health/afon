@@ -60,21 +60,10 @@ In all cloud providers, deleting the Polaris deployment is fine.
 However, destroying the whole stack in AWS is problematic.
 It appears that there are lingering AWS infrastructure components.
 Run `health.emrys.afon.cdk.AwsConstruct` to print out helpful command lines.
-In particular, this should blatt everything:
+In particular, the output of this script should blatt everything:
 
 ```shell
-export VPC=$(aws ec2 describe-vpcs   --query "Vpcs[?Tags[?Key=='Name' && Value=='cdktf-eks-vpc']].VpcId"   --output text)
-
-eksctl delete cluster --name spark-cluster --region eu-west-2
-
-for SN in $(aws ec2 describe-network-interfaces --filters Name=vpc-id,Values=$VPC --region eu-west-2 --query 'NetworkInterfaces[*].[SubnetId]' --output text) ; do {
-    echo $SN ;
-    aws ec2 delete-subnet --subnet-id $SN --region $REGION ;
-} done
-
-aws ec2 delete-vpc --vpc-id $VPC
-
-aws iam delete-role --role-name  cdktf-eks-cluster-role
+mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsConstruct exec:java
 ```
 
 ### Registering a table with Polaris
