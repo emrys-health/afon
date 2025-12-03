@@ -149,6 +149,9 @@ public class SparkContextConfigurationPrinter {
 
     private static @NotNull String azureSmokeTest(String tableName) {
         return format("""
+                              #
+                              # AZURE
+                              #
                               az_namespace = "azure.acceptancetests"
                               az_fqn = f"{az_namespace}.%s"
                               
@@ -157,11 +160,17 @@ public class SparkContextConfigurationPrinter {
                               
                               spark.sql(f"CREATE TABLE {az_fqn} (name String, num Integer) USING iceberg")
                               df_test.writeTo(az_fqn).append()
-                              """, tableName);
+                              
+                              df_read = spark.read.table(f"{az_namespace}.%s")
+                              df_read.show()
+                              """, tableName, tableName);
     }
 
     private static @NotNull String awsSmokeTest(String tableName) {
         return format("""
+                              #
+                              # AWS
+                              #
                               aws_namespace = "aws.acceptancetests"
                               aws_fqn = f"{aws_namespace}.%s"
                               spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {aws_namespace}")
@@ -169,11 +178,17 @@ public class SparkContextConfigurationPrinter {
                               
                               df_test.writeTo(aws_fqn).create()
                               print(f"Wrote {aws_fqn} to AWS")
-                              """, tableName);
+                              
+                              df_read = spark.read.table(f"{aws_namespace}.%s")
+                              df_read.show()
+                              """, tableName, tableName);
     }
 
     private static @NotNull String gcpSmokeTest(String tableName) {
         return format("""
+                              #
+                              # GCP
+                              #
                               gcp_namespace = "gcp.acceptancetests"
                               gcp_fqn = f"{gcp_namespace}.%s"
                               spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {gcp_namespace}")
@@ -181,7 +196,10 @@ public class SparkContextConfigurationPrinter {
                               
                               df_test.writeTo(gcp_fqn).create()
                               print(f"Wrote {gcp_fqn} to GCP")
-                              """, tableName);
+                              
+                              df_read = spark.read.table(f"{gcp_namespace}.%s")
+                              df_read.show()
+                              """, tableName, tableName);
     }
 
     private static void addDependencies(StringBuffer szb, String[] dependencies, String groupId, String version) {
