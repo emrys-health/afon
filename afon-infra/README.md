@@ -15,7 +15,7 @@ There, you can run `tofu apply` (or `tofu destroy` if you want to tear the stack
 
 ### Deployment #1
 
-Run the classes for creating markup to create just Polaris by running (in the `afon-infra` directory):
+Run the classes for creating HCL to create just Polaris by running (in the `afon-infra` directory):
 
 `mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsKubernetesPolaris exec:java`
 
@@ -52,6 +52,40 @@ So, run `tofu apply -auto-approve`.
 *Why is this a two step process?*
 Spark needs to Polaris to be up and running before we can configure it since Polaris generates keys at runtime.
 
+### What now?
+
+You probably want to see Jupyter or need the Polaris access token if you use Snowflake.
+So, run:
+
+```shell
+mvn -Dexec.mainClass=health.emrys.afon.infra.InfraExplorer exec:java
+```
+
+and for some suggests as to what to execute, running this:
+
+```shell
+mvn -Dexec.mainClass=health.emrys.afon.core.configuration.SparkContextConfigurationPrinter exec:java
+```
+
+will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
+
+### Registering a table with Polaris
+
+When a new version of Polaris is started up, it has nothing in it.
+So, create the warehouses with:
+
+```shell
+mvn -Dexec.mainClass=health.emrys.afon.infra.ClusterPolarisConfiguration exec:java
+```
+
+and register tables with something like:
+
+```shell
+mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
+```
+
+or similar.
+
 # Future improvements
 
 ### Tearing down the AWS environment
@@ -65,23 +99,6 @@ In particular, the output of this script should blatt everything:
 ```shell
 mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsConstruct exec:java
 ```
-
-### Registering a table with Polaris
-
-When a new version of Polaris is started up, it has nothing in it.
-So, create the warehouases with:
-
-```shell
-mvn -Dexec.mainClass=health.emrys.afon.infra.ClusterPolarisConfiguration exec:java
-```
-
-and register tables with something like:
-
-```shell
-mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
-```
-
-or similar.
 
 ### Addressing the 2-step Spark deployment
 
