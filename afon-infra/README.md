@@ -27,6 +27,12 @@ for each cloud provider.
 
 Note that the credentials in your `env.properties` are used by the deployed Polaris.
 
+You can examine the status of a table using the `curl` command aimed at your Polaris endpoint.
+For example:
+```shell
+curl -X GET "https://emryspolaris.click/api/catalog/v1/aws/namespaces/acceptancetests/tables/AwsAccessSpec251117511401" -H "Authorization: Bearer ${ACCESS_TOKEN}"  | jq
+```
+
 ### Deployment #2
 
 If you want to create config for the whole stack in AWS, run:

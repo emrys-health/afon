@@ -45,7 +45,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
 
     public AwsWholeStack(final Construct scope, final String id) {
         super(scope, id);
-        Service       jupyterLB     = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
+        Service jupyterLB = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
 //        List<Service> loadBalancers = List.of(polarisLB, jupyterLB);
         List<Service> loadBalancers = List.of(jupyterLB); // no long exposing HTTP Polaris
 
@@ -70,16 +70,17 @@ class AwsWholeStack extends AwsKubernetesPolaris {
     private Service deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName, IamRole loadBalancerRole) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
-        DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer.builder()
-                                                                                                  .name("jupyter")
-                                                                                                  .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1")
-                                                                                                  .build();
-        var jupyterDeployment = DeploymentUtils.deploy(this,
-                                                       eksDependOn,
-                                                       jupyterLabels,
-                                                       List.of(jupyterContainer),
-                                                       List.of(),
-                                                       "jupyter");
+        DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer
+                .builder()
+                .name("jupyter")
+                .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1")
+                .build();
+        DeploymentUtils.deploy(this,
+                               eksDependOn,
+                               jupyterLabels,
+                               List.of(jupyterContainer),
+                               List.of(),
+                               "jupyter");
 
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
         lbDependencies.add(loadBalancerRole);
