@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.manifest.Manifest;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -14,10 +15,7 @@ import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.infra.Defaults.*;
@@ -111,7 +109,9 @@ public class SparkClusterDeployment extends AwsWholeStack {
     }
 
     private void sparkExternalService(List<Resource> eksDependOn) {
-        String subnetIds = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
+        String                          subnetIds      = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
+        ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
+        lbDependencies.add(cloudProvider.loadBalancerRole);
         Service.Builder.create(this, SPARK_SERVICE_NAME)
                        .metadata(ServiceMetadata.builder()
                                                 .name(SPARK_SERVICE_NAME)
@@ -120,9 +120,11 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                                                "spark.operator/name", "spark-kubernetes-operator",
                                                                "spark.operator/spark-cluster-name", "prod"
                                                               ))
-                                                .annotations(Map.of("service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds))
+                                                .annotations(Map.of(
+                                                        "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
+                                                        "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
                                                 .build())
-                       .dependsOn(eksDependOn)
+                       .dependsOn(lbDependencies)
                        .spec(ServiceSpec.builder()
                                         .selector(Map.of(
                                                 "spark-role", "master"))
