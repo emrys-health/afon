@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+<!--    <parent>-->
+<!--        <groupId>health.emrys</groupId>-->
+<!--        <artifactId>Afon</artifactId>-->
+<!--        <version>0.1</version>-->
+<!--    </parent>-->
+
+    <groupId>health.emrys</groupId>
+    <artifactId>afon-spark-connect</artifactId>
+    <version>${parent.version}</version>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spark.version>4.0.1</spark.version>
+        <scala.compat.version>2.13</scala.compat.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-core_${scala.compat.version}</artifactId>
+            <version>${spark.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-hive_${scala.compat.version}</artifactId>
+            <version>${spark.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-catalyst_${scala.compat.version}</artifactId>
+            <version>${spark.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-connect_${scala.compat.version}</artifactId>
+            <version>${spark.version}</version>
+        </dependency>
+    </dependencies>
+
+
+</project>
