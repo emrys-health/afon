@@ -46,7 +46,6 @@ class AwsWholeStack extends AwsKubernetesPolaris {
     public AwsWholeStack(final Construct scope, final String id) {
         super(scope, id);
         Service jupyterLB = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
-//        List<Service> loadBalancers = List.of(polarisLB, jupyterLB);
         List<Service> loadBalancers = List.of(jupyterLB); // no long exposing HTTP Polaris
 
         // 6. Configure the Helm Provider
