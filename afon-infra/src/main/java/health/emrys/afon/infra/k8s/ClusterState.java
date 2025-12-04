@@ -22,8 +22,10 @@ public class ClusterState implements AutoCloseable {
 
     public ClusterState() throws IOException, ApiException, IncorrectConfigException {
         k8sClient = new GenericK8sClient();
-        V1Pod polarisPod = k8sClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME);
-        accessToken = new PolarisCredentialGrabber().getCredentials(k8sClient.getLogsOf(polarisPod.getMetadata().getName()));
+        V1Pod  polarisPod = k8sClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME);
+        String podName    = polarisPod.getMetadata().getName();
+        logger.info("Pod Name: {}", podName);
+        accessToken = new PolarisCredentialGrabber().getCredentials(k8sClient.getLogsOf(podName));
         polarisHost = k8sClient.getIngressExpectingOnlyOneFor(POLARIS_SERVICE_NAME);
         logger.info("Polaris is available to the outside world at: {}", polarisHost);
     }

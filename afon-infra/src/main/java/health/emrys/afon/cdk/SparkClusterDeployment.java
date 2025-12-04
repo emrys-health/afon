@@ -89,7 +89,8 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                                 "resources", Map.of(
                                                         "limits", Map.of("ephemeralStorage", "4Gi"),
                                                         "requests", Map.of("ephemeralStorage", "2Gi")
-                                                                   )
+                                                                   ),
+                                                "restartPolicy", "Always"
                                                       )
                                                          )
                                             )
