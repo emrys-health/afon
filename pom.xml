@@ -47,6 +47,7 @@
         <module>afon-iceberg</module>
         <module>afon-polaris</module>
         <module>afon-spark</module>
+        <module>afon-spark-connect</module>
         <module>afon-snowflake</module>
     </modules>
 
