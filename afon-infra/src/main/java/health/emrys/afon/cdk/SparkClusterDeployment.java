@@ -10,6 +10,10 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.core.configuration.SparkContextConfigurationPrinter;
+import health.emrys.afon.infra.EmrysCloud;
+import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.spark.SparkWarehouseConfig;
+import io.kubernetes.client.openapi.ApiException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -167,7 +171,6 @@ public class SparkClusterDeployment extends AwsWholeStack {
                 "spark.kubernetes.authenticate.driver.serviceAccountName", serviceAccountName
                           );
         var second = Map.of(
-                "spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
                 "spark.driver.allowMultipleContexts", "true",
                 "spark.sql.iceberg.planning.preserve-data-grouping", "true",
                 "spark.sql.sources.v2.bucketing.enabled", "true",
@@ -177,22 +180,32 @@ public class SparkClusterDeployment extends AwsWholeStack {
                 "spark.executor.userClassPathFirst", "true",
                 "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
                            );
-        var toReturn = new HashMap<String, String>();
         try {
-            SparkContextConfigurationPrinter app           = SparkContextConfigurationPrinter.createSparkConf();
-            var                              polarisConfig = app.getPolarisConfig();
-            for (AfonProperties.SupportedCloudsEnum cloudProvider : AfonProperties.SupportedCloudsEnum.values()) {
-                Map<String, String> configs = polarisConfig.sparkConfigs(cloudProvider);
-                for (Map.Entry<String, String> entry : configs.entrySet()) {
-                    toReturn.put(entry.getKey(), entry.getValue());
-                }
-            }
-        } catch (IOException e) {
+            Map<String, String> toReturn = sparkCloudProperties();
+            toReturn.putAll(first);
+            toReturn.putAll(second);
+            return toReturn;
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
 
-        toReturn.putAll(first);
-        toReturn.putAll(second);
+    public static @NotNull Map<String, String> sparkCloudProperties() throws IncorrectConfigException, IOException, ApiException {
+        var toReturn = new HashMap<String, String>();
+        toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
+        EmrysCloud emrysCloud = new EmrysCloud();
+        SparkWarehouseConfig sparkWarehouseConfig = new SparkWarehouseConfig(
+                emrysCloud.getAccessToken(),
+                emrysCloud.getPolarisId(),
+                emrysCloud.getPolarisSecret(),
+                emrysCloud.getPolarisHost()
+        );
+        for (AfonProperties.SupportedCloudsEnum cloudProvider : AfonProperties.SupportedCloudsEnum.values()) {
+            Map<String, String> configs = sparkWarehouseConfig.sparkConfigs(cloudProvider);
+            for (Map.Entry<String, String> entry : configs.entrySet()) {
+                toReturn.put(entry.getKey(), entry.getValue());
+            }
+        }
         return toReturn;
     }
 
