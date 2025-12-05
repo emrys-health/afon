@@ -23,16 +23,27 @@ public class SparkWarehouseConfig {
     private final String clientId;
     private final String clientSecret;
     private final String host;
+    private final String polarisProtocol;
+
+    public SparkWarehouseConfig(
+            String accessToken,
+            String clientId,
+            String clientSecret,
+            String host,
+            String polarisProtocol) {
+        this.accessToken     = accessToken;
+        this.clientId        = clientId;
+        this.clientSecret    = clientSecret;
+        this.host            = host;
+        this.polarisProtocol = polarisProtocol;
+    }
 
     public SparkWarehouseConfig(
             String accessToken,
             String clientId,
             String clientSecret,
             String host) {
-        this.accessToken  = accessToken;
-        this.clientId     = clientId;
-        this.clientSecret = clientSecret;
-        this.host         = host;
+        this(accessToken, clientId, clientSecret, host, "http");
     }
 
     public SparkWarehouseConfig(
@@ -74,7 +85,7 @@ public class SparkWarehouseConfig {
 
     public Map<String, String> sparkConfigs(SupportedCloudsEnum sparkCatalog) {
         Map conf = new HashMap<String, String>();
-        conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("http://%s/api/catalog", host)); // TODO not necessarily localhost
+        conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol, host));
         conf.put(format("spark.sql.catalog.%s.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);

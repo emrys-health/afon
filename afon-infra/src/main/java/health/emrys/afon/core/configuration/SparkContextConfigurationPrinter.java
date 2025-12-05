@@ -2,6 +2,7 @@ package health.emrys.afon.core.configuration;
 
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.infra.EmrysCloud;
 import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -34,51 +35,21 @@ public class SparkContextConfigurationPrinter {
 
     public static final void main(String[] args) {
         try {
-            var app = createSparkConf();
+            var app = new SparkContextConfigurationPrinter(new EmrysCloud());
             app.printSparkConfig();
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static SparkContextConfigurationPrinter createSparkConf() throws IOException {
-        AfonPropertiesLoader             loader     = new AfonPropertiesLoader();
-        Properties                       properties = loader.getProperties();
-        SparkContextConfigurationPrinter app        = null;
-        try {
-            ClusterState clusterState    = new ClusterState();
-            String       accessToken     = clusterState.getCredentials();
-            String       polarisEndpoint = clusterState.getPolarisHost();
-            logger.info("Polaris endpoint: {}", polarisEndpoint);
-
-            app = createDynamicConfig(accessToken,
-                                      properties,
-                                      polarisEndpoint);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return app;
-    }
-
-    private static SparkContextConfigurationPrinter createDynamicConfig(String creds,
-                                                                        Properties properties,
-                                                                        String polarisEndpoint) {
-        Properties props       = add(creds, properties);
-        props.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisEndpoint);
-        var        client      = new AfonPolarisClient(props, "https");
-        String     accessToken = client.getAccessToken();
-        return new SparkContextConfigurationPrinter(props, accessToken);
-    }
-
     private final SparkWarehouseConfig polarisConfig;
 
-    public SparkContextConfigurationPrinter(Properties props, String accessToken) {
+    public SparkContextConfigurationPrinter(EmrysCloud emrysCloud) {
         polarisConfig = new SparkWarehouseConfig(
-                accessToken,
-                AfonProperties.POLARIS_ID.getValueFrom(props),
-                AfonProperties.POLARIS_SECRET.getValueFrom(props),
-                POLARIS_ENDPOINT.getValueFrom(props)
+                emrysCloud.getAccessToken(),
+                emrysCloud.getPolarisId(),
+                emrysCloud.getPolarisSecret(),
+                emrysCloud.getPolarisHost()
         );
     }
 
@@ -90,15 +61,15 @@ public class SparkContextConfigurationPrinter {
         String tableName = tableName();
         System.out.println("\u001B[32m");
         System.out.println("""
-           from pyspark.sql import SparkSession
-           
-           spark = SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002").getOrCreate()
-            
-           print("session created")
-
-           df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
-           print("Initialized test data")
-           """);
+                                   from pyspark.sql import SparkSession
+                                   
+                                   spark = SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002").getOrCreate()
+                                   
+                                   print("session created")
+                                   
+                                   df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
+                                   print("Initialized test data")
+                                   """);
 
         System.out.println(awsSmokeTest(tableName));
         System.out.println(gcpSmokeTest(tableName));
@@ -106,42 +77,42 @@ public class SparkContextConfigurationPrinter {
 
         System.out.println("\u001B[34m");
         System.out.println(format("""
-                                   CREATE OR REPLACE CATALOG INTEGRATION polaris_int
-                                       CATALOG_SOURCE = POLARIS
-                                       TABLE_FORMAT = ICEBERG
-                                       REST_CONFIG = (
-                                           CATALOG_URI = 'https://emryspolaris.click/api/catalog/',
-                                           CATALOG_NAME = 'aws'
-                                           )
-                                       REST_AUTHENTICATION = (
-                                           TYPE = BEARER
-                                           BEARER_TOKEN = '%s'
-                                       )
-                                       ENABLED = TRUE;
-                                   
-                                   CREATE OR REPLACE EXTERNAL VOLUME emrys_s3
-                                     STORAGE_LOCATIONS = (
-                                       ( NAME = 'eu-west-2'
-                                         STORAGE_PROVIDER = 'S3'
-                                         STORAGE_BASE_URL = 's3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/'
-                                         STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::418295715997:role/S3ReadWriteRoleSF2'
-                                       )
-                                     )
-                                     ALLOW_WRITES = FALSE;
-                                   
-                                   USE DATABASE SNOWFLAKE_LEARNING_DB;
-                                   
-                                   CREATE OR REPLACE ICEBERG TABLE aws_acceptance_Test
-                                     EXTERNAL_VOLUME = emrys_s3
-                                     CATALOG = polaris_int
-                                     CATALOG_NAMESPACE = 'acceptancetests'
-                                     CATALOG_TABLE_NAME = 'AwsAccessSpec251117511401'
-                                     ;
-                                   
-                                   SELECT * FROM aws_acceptance_Test;
-                                   
-                                   DROP TABLE aws_acceptance_Test;
-                                   """, polarisConfig.getAccessToken()));
+                                          CREATE OR REPLACE CATALOG INTEGRATION polaris_int
+                                              CATALOG_SOURCE = POLARIS
+                                              TABLE_FORMAT = ICEBERG
+                                              REST_CONFIG = (
+                                                  CATALOG_URI = 'https://emryspolaris.click/api/catalog/',
+                                                  CATALOG_NAME = 'aws'
+                                                  )
+                                              REST_AUTHENTICATION = (
+                                                  TYPE = BEARER
+                                                  BEARER_TOKEN = '%s'
+                                              )
+                                              ENABLED = TRUE;
+                                          
+                                          CREATE OR REPLACE EXTERNAL VOLUME emrys_s3
+                                            STORAGE_LOCATIONS = (
+                                              ( NAME = 'eu-west-2'
+                                                STORAGE_PROVIDER = 'S3'
+                                                STORAGE_BASE_URL = 's3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/'
+                                                STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::418295715997:role/S3ReadWriteRoleSF2'
+                                              )
+                                            )
+                                            ALLOW_WRITES = FALSE;
+                                          
+                                          USE DATABASE SNOWFLAKE_LEARNING_DB;
+                                          
+                                          CREATE OR REPLACE ICEBERG TABLE aws_acceptance_Test
+                                            EXTERNAL_VOLUME = emrys_s3
+                                            CATALOG = polaris_int
+                                            CATALOG_NAMESPACE = 'acceptancetests'
+                                            CATALOG_TABLE_NAME = 'AwsAccessSpec251117511401'
+                                            ;
+                                          
+                                          SELECT * FROM aws_acceptance_Test;
+                                          
+                                          DROP TABLE aws_acceptance_Test;
+                                          """, polarisConfig.getAccessToken()));
 
         System.out.println("\u001B[0m");
 
