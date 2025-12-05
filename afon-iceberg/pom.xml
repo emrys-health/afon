@@ -17,6 +17,8 @@
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
+        <spark.compat.version>3.5</spark.compat.version>
+        <spark.version>${spark.compat.version}.0</spark.version>
     </properties>
 
     <dependencies>
@@ -38,11 +40,6 @@
             <version>12.22.0</version>
             <scope>compile</scope>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>org.apache.polaris</groupId>-->
-<!--            <artifactId>polaris-core</artifactId>-->
-<!--            <version>${polaris.version}</version>-->
-<!--        </dependency>-->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-azure</artifactId>
