@@ -48,9 +48,9 @@ public class SmokeTest {
         try (Connection conn = DriverManager.getConnection(url, props);
              Statement stmt = conn.createStatement()) {
 
-            ResultSet rs = stmt.executeQuery("SELECT current_version()");
+            ResultSet rs = stmt.executeQuery("SELECT * from aws_acceptance_Test");
             while (rs.next()) {
-                System.out.println("Snowflake version: " + rs.getString(1));
+                System.out.println("id: " + rs.getString(1));
             }
         }
 
