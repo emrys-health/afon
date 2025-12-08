@@ -10,7 +10,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.wordspec.AnyWordSpec
 
 /**
- * See Python and Scala code at https://spark.apache.org/docs/latest/ml-features.html#vectorassembler
+ * See Python and Scala code at https://spark.apache.org/docs/latest/ml-guide.html
  */
 class SampleDataSpec extends AnyWordSpec with GivenWhenThen {
 
