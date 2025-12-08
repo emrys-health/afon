@@ -13,6 +13,36 @@ It creates the input for Terraform/Tofu.
 After the Java is run, run `cd ./cdktf.out/stacks/YOUR_DEPLOYMENT`.
 There, you can run `tofu apply` (or `tofu destroy` if you want to tear the stack down).
 
+### Important
+
+Some of the services take a few minutes to become live.
+This is unavoidable.
+
+For instance, domain names need to propagate.
+You should see the Polaris ingress before Terraform has completed with something like:
+
+```shell
+$ kubectl get ingress
+NAME              CLASS   HOSTS                ADDRESS                                                                  PORTS   AGE
+polaris-ingress   alb     emryspolaris.click   k8s-default-polarisi-2f4263fc44-1173884799.eu-west-2.elb.amazonaws.com   80      14m
+```
+
+However, its domwain name my take a few minutes to propagate around the internet. 
+Check that with:
+
+```shell
+dig A emryspolaris.click +short
+```
+
+Similarly, the Spark Connect container must download a lot of JARs before being ready to run. 
+See its status with:
+
+```shell
+kubectl logs spark-connector-0-driver
+```
+
+(This last one could potentially be mitigated...)
+
 ### Deployment #1
 
 Run the classes for creating HCL to create just Polaris by running (in the `afon-infra` directory):
