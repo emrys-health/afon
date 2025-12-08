@@ -160,6 +160,8 @@ public class AwsConstruct extends AbstractConstruct {
 
         final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
 
+        // this appears to be necessary to release Calico on destroy:
+        // kubectl --kubeconfig ~/.kube/config  patch installation default -p '{"metadata":{"finalizers":[]}}' --type=merge
         cluster = EksCluster.Builder.create(this, "eksCluster")
                                     .name(CLUSTER_NAME)
                                     .roleArn(eksClusterRole.getArn())
@@ -168,8 +170,8 @@ public class AwsConstruct extends AbstractConstruct {
                                     .version("1.31")
                                     .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                     .dependsOn(List.of(eksClusterRole,
-                                                       publicSubnet1, publicSubnet2, igw, eksClusterPolicy,
-                                                       subnet2Association, subnet1Association))
+                                                       eksClusterPolicy
+                                                      ))
                                     .tags(Map.of("Name", "cdktf-eks")).build();
 
         // if one depends_on this, then the cluster should be running
