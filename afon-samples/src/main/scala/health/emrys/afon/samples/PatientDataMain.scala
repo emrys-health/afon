@@ -29,6 +29,7 @@ object PatientDataMain {
   val logger = org.slf4j.LoggerFactory.getLogger(classOf[PatientDataMain])
 
   def main(array: Array[String]): Unit = {
+    Thread.sleep(Int.MaxValue)
     val spark: SparkSession = initSpark
     val cluster = new ClusterPolarisConfiguration(new AfonPropertiesLoader().getProperties);
     logger.info("Initializing Polaris")
