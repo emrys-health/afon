@@ -35,10 +35,6 @@ public class ClusterState implements AutoCloseable {
         return accessToken;
     }
 
-    public String getPolarisEndpoint() {
-        return format("%s:8181", polarisHost);
-    }
-
     public String getPolarisHost() {
         return polarisHost;
     }
