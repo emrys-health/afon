@@ -53,7 +53,7 @@ public class ClusterPolarisConfiguration implements AutoCloseable {
         return props;
     }
 
-    public void initializePolaris() throws ApiException, IncorrectConfigException, IOException {
+    public void initializePolaris() throws IncorrectConfigException, IOException {
         polarisClient.createAllCatalogs(properties, state.getCredentials());
     }
 
