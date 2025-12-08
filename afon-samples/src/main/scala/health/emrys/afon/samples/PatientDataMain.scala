@@ -9,8 +9,6 @@ import health.emrys.afon.spark.SparkWarehouseConfig
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 
-import scala.util.Random
-
 case class Patient(
                     id: Long,
                     age: Int
@@ -21,18 +19,24 @@ case class Occupancy(
                       numDays: Int
                     )
 
+class PatientDataMain
 
 object PatientDataMain {
 
   val NAMESPACE       = "samples2"
   val PATIENTS_TABLE  = "patients"
   val OCCUPANCY_TABLE = "occupancy"
+  val logger = org.slf4j.LoggerFactory.getLogger(classOf[PatientDataMain])
 
   def main(array: Array[String]): Unit = {
     val spark: SparkSession = initSpark
     val cluster = new ClusterPolarisConfiguration(new AfonPropertiesLoader().getProperties);
+    logger.info("Initializing Polaris")
     cluster.initializePolaris()
+    logger.info("Creating data")
     createData(spark, 10000)
+    logger.info("Closing down Spark")
+    spark.stop()
   }
 
   private def createData(spark: SparkSession, n: Int): Unit = {
