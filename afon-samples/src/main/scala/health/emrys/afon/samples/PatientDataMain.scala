@@ -31,7 +31,7 @@ object PatientDataMain {
   def main(array: Array[String]): Unit = {
     val spark: SparkSession = initSpark
     val cluster = new ClusterPolarisConfiguration(new AfonPropertiesLoader().getProperties);
-//    cluster.initializePolaris() TODO restore me
+    cluster.initializePolaris()
     createData(spark, 10000)
   }
 
