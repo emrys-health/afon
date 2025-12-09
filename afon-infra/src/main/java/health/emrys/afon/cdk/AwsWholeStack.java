@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.infra.Defaults.*;
 
 /***
@@ -41,11 +42,12 @@ import static health.emrys.afon.infra.Defaults.*;
  */
 class AwsWholeStack extends AwsKubernetesPolaris {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
+    static final Logger logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
+    static final String NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
 
     public AwsWholeStack(final Construct scope, final String id) {
         super(scope, id);
-        Service jupyterLB = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
+        Service       jupyterLB     = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
         List<Service> loadBalancers = List.of(jupyterLB); // no long exposing HTTP Polaris
 
         // 6. Configure the Helm Provider
@@ -251,6 +253,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                        .disableCrdHooks(true)
                        .disableWebhooks(true)
                        .forceUpdate(true)
+                       .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS))
                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                        .repository("https://docs.tigera.io/calico/charts")
                        .namespace("tigera-operator") // Standard namespace for the operator
