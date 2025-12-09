@@ -49,6 +49,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.AwsKubernetesPolaris.POLARIS_INTERNAL;
+import static health.emrys.afon.cdk.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
+import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.infra.Defaults.AWS_REGION;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
@@ -160,12 +162,7 @@ public class AwsConstruct extends AbstractConstruct {
                                     .vpcConfig(vpcConfig)
 //                                    .provisioners(destroyELBs())
                                     .version("1.31")
-                                    .provisioners(List.of(LocalExecProvisioner
-                                                                  .builder()
-                                                                  .type("local-exec")
-                                                                  .when("destroy")
-                                                                  .command("kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge")
-                                                                  .build()))
+                                    .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS))
                                     .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                     .dependsOn(List.of(eksClusterRole,
                                                        eksClusterPolicy
@@ -558,20 +555,12 @@ public class AwsConstruct extends AbstractConstruct {
     }
 
     public static @NotNull List<LocalExecProvisioner> destroySGsAndVPC() {
-        return List.of(
-                LocalExecProvisioner.builder()
-                                    .type("local-exec")
-                                    .when("destroy")
-                                    .command(
-                                            format("""
-                                                           %s
-                                                           %s
-                                                           """,
-                                                   getVPCCommand(),
-                                                   cleanSecurityGroupsCommand("$VPC"))
-                                            )
-                                    .build()
-                      );
+        return uponDestroyRun(format("""
+                                             %s
+                                             %s
+                                             """,
+                                     getVPCCommand(),
+                                     cleanSecurityGroupsCommand("$VPC")));
     }
 
     private static @NotNull String cleanSecurityGroupsCommand(String vpcId) {

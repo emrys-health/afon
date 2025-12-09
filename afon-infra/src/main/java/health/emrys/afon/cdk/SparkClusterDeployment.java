@@ -22,11 +22,13 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.infra.Defaults.*;
 
 public class SparkClusterDeployment extends AwsWholeStack {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(SparkClusterDeployment.class);
+    static final         Logger logger                 = org.slf4j.LoggerFactory.getLogger(SparkClusterDeployment.class);
+    private static final String NO_SPARK_LB_FINALIZERS = "kubectl patch service spark-master-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
 
     public SparkClusterDeployment(@NotNull Construct scope, @NotNull String id) {
         super(scope, id);
@@ -129,6 +131,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                                         "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
                                                 .build())
                        .dependsOn(lbDependencies)
+                       .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
                        .spec(ServiceSpec.builder()
                                         .selector(Map.of(
                                                 "spark-role", "master"))

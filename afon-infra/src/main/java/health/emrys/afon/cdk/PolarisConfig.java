@@ -16,22 +16,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.POLARIS_SERVICE_NAME;
 import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
 
-    private static final String              SECRET_NAME      = "my-app-secret";
-    private static final String              POLARIS_ENV_FILE = "polaris_env.sh";
-    private static final String              GCP_CRED_FILE    = "service-account.json";
-    private static final String              SECRETS_DIR      = "/etc/app-secrets";
-    public static final ServiceSpecPort POLARIS_PORTS = ServiceSpecPort.builder()
-                                                                       .name("web")
-                                                                       .port(8181)
-                                                                       .targetPort("8181")
-                                                                       .protocol("TCP")
-                                                                       .build();
+    private static final String              SECRET_NAME           = "my-app-secret";
+    private static final String              POLARIS_ENV_FILE      = "polaris_env.sh";
+    private static final String              GCP_CRED_FILE         = "service-account.json";
+    private static final String              SECRETS_DIR           = "/etc/app-secrets";
+    private static final String              NO_POLARIS_FINALIZERS = "kubectl patch ingress polaris-ingress -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
+    public static final  ServiceSpecPort     POLARIS_PORTS         = ServiceSpecPort.builder()
+                                                                                    .name("web")
+                                                                                    .port(8181)
+                                                                                    .targetPort("8181")
+                                                                                    .protocol("TCP")
+                                                                                    .build();
     protected            Map<String, String> polarisLabels;
 
     public PolarisConfig(@NotNull Construct scope, @NotNull String id, CloudProvider cloudProvider) {
@@ -128,6 +130,7 @@ public class PolarisConfig extends Construct {
                                                        .name(POLARIS_SERVICE_NAME)
                                                        .build())
                               .dependsOn(List.of(polarisDeployment))
+                              .provisioners(uponDestroyRun(NO_POLARIS_FINALIZERS))
                               .spec(ServiceSpec.builder()
                                                .selector(polarisLabels)
                                                .type("LoadBalancer")
