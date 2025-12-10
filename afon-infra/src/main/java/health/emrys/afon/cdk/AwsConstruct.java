@@ -155,15 +155,16 @@ public class AwsConstruct extends AbstractConstruct {
         final DataAwsIamPolicy eksClusterPolicy = DataAwsIamPolicy.Builder.create(this, "eksClusterPolicy")
                                                                           .name("AmazonEKSClusterPolicy").build();
 
-        IamRolePolicyAttachment.Builder.create(this, "eksClusterRoleAttachment")
-                                       .policyArn(eksClusterPolicy.getArn())
-                                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+        IamRolePolicyAttachment roleAttachment = IamRolePolicyAttachment
+                .Builder.create(this, "eksClusterRoleAttachment")
+                        .policyArn(eksClusterPolicy.getArn())
+                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
 //                                        .dependsOn(List.of(eksClusterRole))
 //                                       .provisioners(uponDestroyRun("eksctl delete cluster --name spark-cluster --region eu-west-2"))
-                                       .provisioners(uponDestroyRun(
-                                               "aws iam detach-role-policy --role-name cdktf-eks-cluster-role --policy-arn arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicyCurl",
-                                               "aws iam detach-role-policy --role-name cdktf-eks-cluster-role --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"))
-                                       .role(eksClusterRole.getName()).build();
+                        .provisioners(uponDestroyRun(
+                                "aws iam detach-role-policy --role-name cdktf-eks-cluster-role --policy-arn arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicyCurl",
+                                "aws iam detach-role-policy --role-name cdktf-eks-cluster-role --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"))
+                        .role(eksClusterRole.getName()).build();
 
         final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
 
@@ -177,9 +178,7 @@ public class AwsConstruct extends AbstractConstruct {
                                     .version("1.31")
                                     .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS))
                                     .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                    .dependsOn(List.of(eksClusterRole,
-                                                       eksClusterPolicy
-                                                      ))
+                                    .dependsOn(List.of(roleAttachment))
                                     .tags(Map.of("Name", "cdktf-eks")).build();
 
         // if one depends_on this, then the cluster should be running

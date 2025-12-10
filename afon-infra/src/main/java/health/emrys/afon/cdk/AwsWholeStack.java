@@ -51,10 +51,11 @@ class AwsWholeStack extends AwsKubernetesPolaris {
         Service       jupyterLB     = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
         List<Service> loadBalancers = List.of(jupyterLB); // no long exposing HTTP Polaris
 
-        // 6. Configure the Helm Provider
-        HelmProvider.Builder.create(this, "helm").build();
+        HelmProvider helm = HelmProvider.Builder.create(this, "helm").build();
 
-        calico(List.of(cloudProvider.newKubeConfig));
+        deployPrometheus(cloudProvider.getDependables());
+
+        calico(cloudProvider.getDependables());
 
         csiSecretsDriver(cloudProvider.getDependables());
 
@@ -67,6 +68,44 @@ class AwsWholeStack extends AwsKubernetesPolaris {
 
         cloudProvider.configureLoadBalancerDestroy(loadBalancers);
         SparkConfig sparkConfig = new SparkConfig(this, "sparkop", cloudProvider.getDependables());
+    }
+
+    /**
+     * Create an SSH tunnel with:
+     * kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090
+     * and run:
+     * curl -g 'http://localhost:9090/api/v1/query?query=sum(rate(container_network_receive_bytes_total[5m]))' | jq
+     * to see how much data has been ingressed
+     * @param eksDependOn
+     */
+    private void deployPrometheus(List<@NotNull ITerraformDependable> eksDependOn) {
+        // Configuration Overrides for the Helm Chart
+        // We use the ReleaseSet.builder() for the `set` block in Terraform
+        final List<ReleaseSet> chartOverrides = List.of(
+                ReleaseSet.builder()
+                          .name("grafana.persistence.enabled")
+                          .value("false") // Disable Grafana persistence for simplicity
+                          .build(),
+                ReleaseSet.builder()
+                          .name("prometheus.prometheusSpec.storageRetention")
+                          .value("7d") // Keep metrics for 7 days
+                          .build()
+                                                       );
+
+        // Install the kube-prometheus-stack Helm chart
+        Release.Builder.create(this, "prometheusRelease")
+                       .name("kube-prometheus-stack")
+                       .chart("kube-prometheus-stack")
+                       .repository("https://prometheus-community.github.io/helm-charts")
+                       .version("51.8.0") // Specify a version for consistency
+
+                       // Reference the namespace created above
+                       .namespace("default")
+                       .set(chartOverrides)
+
+                       // Ensure the release depends on the namespace being created first
+                       .dependsOn(eksDependOn)
+                       .build();
     }
 
     private Service deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName, IamRole loadBalancerRole) {
