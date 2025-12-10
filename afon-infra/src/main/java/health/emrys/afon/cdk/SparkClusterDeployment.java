@@ -27,8 +27,8 @@ import static health.emrys.afon.infra.Defaults.*;
 
 public class SparkClusterDeployment extends AwsWholeStack {
 
-    static final         Logger logger                 = org.slf4j.LoggerFactory.getLogger(SparkClusterDeployment.class);
-    private static final String NO_SPARK_LB_FINALIZERS = "kubectl patch service spark-master-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
+    static final Logger logger                 = org.slf4j.LoggerFactory.getLogger(SparkClusterDeployment.class);
+    static final String NO_SPARK_LB_FINALIZERS = "kubectl patch service spark-master-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
 
     public SparkClusterDeployment(@NotNull Construct scope, @NotNull String id) {
         super(scope, id);

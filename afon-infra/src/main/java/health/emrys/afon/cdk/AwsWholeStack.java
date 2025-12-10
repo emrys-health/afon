@@ -6,6 +6,7 @@ import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
+import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -53,7 +54,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
         // 6. Configure the Helm Provider
         HelmProvider.Builder.create(this, "helm").build();
 
-        calico(cloudProvider.getDependables());
+        calico(List.of(cloudProvider.newKubeConfig));
 
         csiSecretsDriver(cloudProvider.getDependables());
 
@@ -253,7 +254,14 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                        .disableCrdHooks(true)
                        .disableWebhooks(true)
                        .forceUpdate(true)
-                       .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS))
+                       .recreatePods(false)
+                       .set(List.of(
+                               ReleaseSet.builder().name("crds.install").value("true").build(),
+                               ReleaseSet.builder().name("crds.cleanup").value("false").build()
+                                   ))
+                       .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS,
+                                                    "kubectl delete ns tigera-operator --force --grace-period=0",
+                                                    "for CRD in $(kubectl get crds | grep -E 'calico|tigera|spark' | awk '{print $1}') ; do { kubectl delete crd $CRD ; } done"))
                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                        .repository("https://docs.tigera.io/calico/charts")
                        .namespace("tigera-operator") // Standard namespace for the operator

@@ -143,6 +143,7 @@ In particular, the output of this script should blatt everything:
 ```shell
 mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsConstruct exec:java
 ```
+*Note:* Run it twice!
 
 ### Addressing the 2-step Spark deployment
 
