@@ -51,6 +51,8 @@ import java.util.stream.Collectors;
 import static health.emrys.afon.cdk.AwsKubernetesPolaris.POLARIS_INTERNAL;
 import static health.emrys.afon.cdk.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
+import static health.emrys.afon.cdk.SparkClusterDeployment.NO_SPARK_LB_FINALIZERS;
 import static health.emrys.afon.infra.Defaults.AWS_REGION;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
@@ -58,12 +60,14 @@ import static java.lang.String.format;
 public class AwsConstruct extends AbstractConstruct {
     public static final String                     VPC_NAME           = "cdktf-eks-vpc";
     public static final String                     CLUSTER_POLICY_ARN = "arn:aws:iam::123456789012:policy/AWSLoadBalancerControllerIAMPolicyCurl"; // TODO remove 'Curl'
-    private final       DataAwsEksClusterAuth      eksAuthData;
+    final static        String                     NO_JUPYTER_LB      = "kubectl patch service jupyter-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
+    final               DataAwsEksClusterAuth      eksAuthData;
     private final       EksCluster                 cluster;
     private final       List<ITerraformDependable> eksDependOn;
     private final       List<String>               subnetIds;
     final               Vpc                        vpc;
     final               IamRole                    loadBalancerRole;
+    final               Resource                   newKubeConfig;
 
     AwsConstruct(final Construct scope, final String id) {
         super(scope, id);
@@ -84,7 +88,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                                   .recoveryWindowInDays(0)
                                                                   .build();
 
-        // --- 2. VPC and Networking Setup (Same as before) ---
+        // TODO Vpc needs to depend on the security groups
         vpc = Vpc.Builder.create(this, "eksVpc")
                          .cidrBlock("10.0.0.0/16")
                          .enableDnsSupport(true)
@@ -97,11 +101,14 @@ public class AwsConstruct extends AbstractConstruct {
                                                            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                                            .tags(Map.of("Name", "cdktf-eks-igw")).build();
 
+        // TODO subnets need to depend on the load balancer
         final Subnet publicSubnet1 = Subnet.Builder.create(this, "publicSubnet1")
                                                    .vpcId(vpc.getId())
                                                    .cidrBlock("10.0.1.0/24")
                                                    .availabilityZone(AWS_REGION + "a")
                                                    .mapPublicIpOnLaunch(true)
+                                                   .dependsOn(List.of(igw))
+                                                   .provisioners(uponDestroyRun(cleanELBs()))
                                                    .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                                    .tags(Map.of("Name", "cdktf-eks-public-1")).build();
 
@@ -110,6 +117,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                    .cidrBlock("10.0.2.0/24")
                                                    .availabilityZone(AWS_REGION + "b")
                                                    .mapPublicIpOnLaunch(true)
+                                                   .dependsOn(List.of(igw))
                                                    .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                                    .tags(Map.of("Name", "cdktf-eks-public-2")).build();
 
@@ -150,6 +158,11 @@ public class AwsConstruct extends AbstractConstruct {
         IamRolePolicyAttachment.Builder.create(this, "eksClusterRoleAttachment")
                                        .policyArn(eksClusterPolicy.getArn())
                                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+//                                        .dependsOn(List.of(eksClusterRole))
+//                                       .provisioners(uponDestroyRun("eksctl delete cluster --name spark-cluster --region eu-west-2"))
+                                       .provisioners(uponDestroyRun(
+                                               "aws iam detach-role-policy --role-name cdktf-eks-cluster-role --policy-arn arn:aws:iam::123456789012:policy/AWSLoadBalancerControllerIAMPolicyCurl",
+                                               "aws iam detach-role-policy --role-name cdktf-eks-cluster-role --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"))
                                        .role(eksClusterRole.getName()).build();
 
         final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
@@ -193,6 +206,7 @@ public class AwsConstruct extends AbstractConstruct {
                 ] }""";
         final IamRole nodeGroupRole = IamRole.Builder.create(this, "eksNodeGroupRole")
                                                      .name("cdktf-eks-nodegroup-role")
+                                                     .provisioners(uponDestroyRun("eksctl delete cluster --name spark-cluster --region eu-west-2"))
                                                      .assumeRolePolicy(workerAssumeRolePolicy).build();
 
         // ** NEW STEP: Create Custom IAM Policy referencing the Secret ARN **
@@ -256,21 +270,21 @@ public class AwsConstruct extends AbstractConstruct {
                                                                                  .maxSize(3.0)
                                                                                  .build();
 
-        Resource newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater")
-                                                 .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
-                                                 .provisioners(List.of(
-                                                         LocalExecProvisioner.builder()
-                                                                             .when("create") // Run only when the resource is created
-                                                                             .command(format(
-                                                                                              "aws eks update-kubeconfig --name %s --region %s",
-                                                                                              CLUSTER_NAME,
-                                                                                              AWS_REGION)
-                                                                                     )
-                                                                             .type("local-exec")
-                                                                             .build()
-                                                                      ))
-                                                 .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                 .build();
+        newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater")
+                                        .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
+                                        .provisioners(List.of(
+                                                LocalExecProvisioner.builder()
+                                                                    .when("create") // Run only when the resource is created
+                                                                    .command(format(
+                                                                                     "aws eks update-kubeconfig --name %s --region %s",
+                                                                                     CLUSTER_NAME,
+                                                                                     AWS_REGION)
+                                                                            )
+                                                                    .type("local-exec")
+                                                                    .build()
+                                                             ))
+                                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                                        .build();
 
         eksDependOn = List.of(newKubeConfig, cluster, eksAuthData);
 
@@ -380,6 +394,10 @@ public class AwsConstruct extends AbstractConstruct {
                                                                       "eks.amazonaws.com/role-arn", loadBalancerRole.getArn()
                                                                                  ))
                                                               .build())
+                              .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS,
+//                                                           NO_SPARK_LB_FINALIZERS,
+                                                           NO_JUPYTER_LB,
+                                                           NO_POLARIS_FINALIZERS))
                               .build();
         return serviceAccountName;
     }
@@ -545,12 +563,10 @@ public class AwsConstruct extends AbstractConstruct {
                         // Ensure this runs only after the K8s Services are destroyed by Terraform
                         .dependsOn(loadBalancers)
                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-//                        .provisioners(destroyELBs())
                         .build();
         Resource.Builder.create(this, "cleanupSecurityGroups")
                         .dependsOn(loadBalancers)
                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-//                        .provisioners(destroySGsAndVPC())
                         .build();
     }
 
@@ -569,8 +585,18 @@ public class AwsConstruct extends AbstractConstruct {
                               for SG_ID in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=%s --region %s --query 'SecurityGroups[*].[GroupId]' --output text --no-cli-pager); do { 
                                 echo $SG_ID ;  
                                 aws ec2 delete-security-group --group-id $SG_ID || true 
-                              } done
-                              """, vpcId, AWS_REGION);
+                              } done""", vpcId, AWS_REGION);
+    }
+
+    private static @NotNull String cleanELBs() {
+        return format("""
+                              %s
+                              for LB in $(aws elbv2 describe-load-balancers  --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text) ; do {
+                                 echo $LB
+                                 aws elbv2 delete-load-balancer  --load-balancer-arn $LB
+                               } done
+                              """,
+                      getVPCCommand());
     }
 
     private static @NotNull String getVPCCommand() {
@@ -583,14 +609,6 @@ public class AwsConstruct extends AbstractConstruct {
                       VPC_NAME);
     }
 
-    private static String deleteRoutAssociations() {
-        return format("""
-                              for ASSOC in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC --region %s --query "RouteTables[*].Associations[*].RouteTableAssociationId"  --output text) ; do {
-                                 echo Association $ASSOC;
-                                 aws ec2 disassociate-route-table --association-id $ASSOC || true ;
-                              } done
-                              """, AWS_REGION);
-    }
 
     @Override
     public List<ITerraformDependable> getDependables() {
@@ -636,6 +654,7 @@ public class AwsConstruct extends AbstractConstruct {
                                               kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":null}}'  --type=merge
                                               %s
                                               for LB in $(aws elbv2 describe-load-balancers  --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text) ; do {
+                                                echo $LB
                                                 aws elbv2 delete-load-balancer  --load-balancer-arn $LB
                                               } done
                                               echo destroying internet gateways...
@@ -668,18 +687,22 @@ public class AwsConstruct extends AbstractConstruct {
                                               echo routes tables...
                                               for rtb in $(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID --query 'RouteTables[].RouteTableId' --output text); do {
                                                 for ASSOC in $(aws ec2 describe-route-tables --route-table-ids $rtb --query "RouteTables[0].Associations[0].RouteTableAssociationId" --output text); do {
+                                                  echo $rdb $ASSOC
                                                   aws ec2 disassociate-route-table   --association-id $ASSOC ;
                                                 } done
-                                                if ! aws ec2 describe-route-tables --route-table-ids $rtb --query 'RouteTables[].Associations[?Main].Main' --output text | grep -q True; then 
+                                                if ! aws ec2 describe-route-tables --route-table-ids $rtb --query 'RouteTables[].Associations[?Main].Main' --output text | grep -q True; then
+                                                  echo $rdb 
                                                   aws ec2 delete-route-table --route-table-id $rtb; 
                                                 fi; 
                                               } done; 
                                               echo security groups...
-                                              for sg in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do { 
+                                              for sg in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do {
+                                                echo $sg 
                                                 aws ec2 delete-security-group --group-id $sg; 
                                               } done; 
                                               echo network ACLs
-                                              for nacl in $(aws ec2 describe-network-acls --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' --output text); do { 
+                                              for nacl in $(aws ec2 describe-network-acls --filters Name=vpc-id,Values=$VPC_ID --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' --output text); do {
+                                                echo $nacl 
                                                 aws ec2 delete-network-acl --network-acl-id $nacl; 
                                               } done; 
                                               echo and the VPC

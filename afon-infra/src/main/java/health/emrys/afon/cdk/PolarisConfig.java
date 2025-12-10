@@ -27,13 +27,13 @@ public class PolarisConfig extends Construct {
     private static final String              POLARIS_ENV_FILE      = "polaris_env.sh";
     private static final String              GCP_CRED_FILE         = "service-account.json";
     private static final String              SECRETS_DIR           = "/etc/app-secrets";
-    private static final String              NO_POLARIS_FINALIZERS = "kubectl patch ingress polaris-ingress -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
     public static final  ServiceSpecPort     POLARIS_PORTS         = ServiceSpecPort.builder()
                                                                                     .name("web")
                                                                                     .port(8181)
                                                                                     .targetPort("8181")
                                                                                     .protocol("TCP")
                                                                                     .build();
+    static final         String              NO_POLARIS_FINALIZERS = "kubectl patch ingress polaris-ingress -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
     protected            Map<String, String> polarisLabels;
 
     public PolarisConfig(@NotNull Construct scope, @NotNull String id, CloudProvider cloudProvider) {
