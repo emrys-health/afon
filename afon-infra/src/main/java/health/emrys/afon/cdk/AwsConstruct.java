@@ -285,7 +285,7 @@ public class AwsConstruct extends AbstractConstruct {
                                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                         .build();
 
-        eksDependOn = List.of(newKubeConfig, cluster, eksAuthData);
+        eksDependOn = List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2);
 
         EksNodeGroup.Builder.create(this, "eksNodeGroup")
                             .clusterName(cluster.getName())
