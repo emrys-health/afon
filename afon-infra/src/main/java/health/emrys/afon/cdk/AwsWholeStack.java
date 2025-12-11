@@ -77,20 +77,24 @@ class AwsWholeStack extends AwsKubernetesPolaris {
     }
 
     protected void unregisterCRDs() {
+        unregisterCRDs(List.of(calico));
+    }
+
+    protected void unregisterCRDs(List<? extends ITerraformDependable> dependsOn) {
         Resource.Builder.create(this, "cleanupCRDs")
-                        .dependsOn(List.of(calico))
+                        .dependsOn(dependsOn)
                         .provisioners(uponDestroyRun(
                                 """
-                                        for i in {1..5}; do {
+                                        for i in {1..6}; do {
                                             echo iteration $i
                                             
                                             for CRD in $(kubectl get crds | awk '{print $1}') ; do {
                                              echo $CRD
-                                             timeout 30s kubectl patch crd $CRD --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' || echo could not patch $CRD 
-                                             timeout 30s kubectl delete crd $CRD  || echo could not delete $CRD
+                                             timeout 60s kubectl patch crd $CRD --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' || echo could not patch $CRD 
+                                             timeout 60s kubectl delete crd $CRD  || echo could not delete $CRD
                                             } done & 
                                             
-                                            sleep 30
+                                            sleep 90
                                         } done
                                         """
                                                     ))
