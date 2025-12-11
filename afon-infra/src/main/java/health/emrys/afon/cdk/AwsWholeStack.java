@@ -22,6 +22,7 @@ import software.constructs.Construct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.infra.Defaults.*;
@@ -48,16 +49,19 @@ class AwsWholeStack extends AwsKubernetesPolaris {
 
     public AwsWholeStack(final Construct scope, final String id) {
         super(scope, id);
-        Service       jupyterLB     = deployJupyter(cloudProvider.getDependables(), SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
-        List<Service> loadBalancers = List.of(jupyterLB); // no long exposing HTTP Polaris
+        List<ITerraformDependable> dependables   = cloudProvider.getDependables();
+        Service                    jupyterLB     = deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
+        List<Service>              loadBalancers = List.of(jupyterLB); // no long exposing HTTP Polaris
 
         HelmProvider helm = HelmProvider.Builder.create(this, "helm").build();
 
-        deployPrometheus(cloudProvider.getDependables());
+        List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
+        dependablesAndLoadBalancers.addAll(loadBalancers);
+        deployPrometheus(dependablesAndLoadBalancers);
 
-        calico(cloudProvider.getDependables());
+        calico(dependables);
 
-        csiSecretsDriver(cloudProvider.getDependables());
+        csiSecretsDriver(dependables);
 
         ServiceAccount.Builder.create(this, "sparkApplicationSa")
                               .metadata(ServiceAccountMetadata.builder()
@@ -67,7 +71,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                               .build();
 
         cloudProvider.configureLoadBalancerDestroy(loadBalancers);
-        SparkConfig sparkConfig = new SparkConfig(this, "sparkop", cloudProvider.getDependables());
+        SparkConfig sparkConfig = new SparkConfig(this, "sparkop", dependables);
     }
 
     /**
@@ -102,6 +106,9 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                        // Reference the namespace created above
                        .namespace("default")
                        .set(chartOverrides)
+                       .timeout(600)
+                       .atomic(true)
+                       .forceUpdate(true)
 
                        // Ensure the release depends on the namespace being created first
                        .dependsOn(eksDependOn)
@@ -125,9 +132,18 @@ class AwsWholeStack extends AwsKubernetesPolaris {
 
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
         lbDependencies.add(loadBalancerRole);
+        String subnetIds = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
+        Map<String, String> albAnnotations = Map.of(
+//                "kubernetes.io/role/elb", "1",
+//                "kubernetes.io/ingress.class", "alb",
+                "service.beta.kubernetes.io/aws-load-balancer-scheme", "internet-facing",
+                "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
+                "service.beta.kubernetes.io/aws-load-balancer-internal", "false"
+                );
         Service loadbalancer = Service.Builder.create(this, JUPYTER_SERVICE_NAME)
                                               .metadata(ServiceMetadata.builder()
                                                                        .name(JUPYTER_SERVICE_NAME)
+                                                                       .annotations(albAnnotations)
                                                                        .build())
                                               .dependsOn(lbDependencies)
                                               .spec(ServiceSpec.builder()
