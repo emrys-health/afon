@@ -15,6 +15,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
+import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -44,22 +45,21 @@ import static health.emrys.afon.infra.Defaults.*;
  */
 class AwsWholeStack extends AwsKubernetesPolaris {
 
-    static final Logger logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
-    static final String NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
+    static final    Logger  logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
+    static final    String  NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
+    protected final Release calico;
+    protected final List<Service> loadBalancers;
 
     public AwsWholeStack(final Construct scope, final String id) {
         super(scope, id);
         List<ITerraformDependable> dependables   = cloudProvider.getDependables();
-        Service                    jupyterLB     = deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
-        List<Service>              loadBalancers = List.of(jupyterLB); // no long exposing HTTP Polaris
+        Service       jupyterLB     = deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
+        // no long exposing HTTP Polaris
+        loadBalancers = List.of(jupyterLB);
 
         HelmProvider helm = HelmProvider.Builder.create(this, "helm").build();
 
-        List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
-        dependablesAndLoadBalancers.addAll(loadBalancers);
-        deployPrometheus(dependablesAndLoadBalancers);
-
-        calico(dependables);
+        calico = calico(dependables);
 
         csiSecretsDriver(dependables);
 
@@ -72,47 +72,30 @@ class AwsWholeStack extends AwsKubernetesPolaris {
 
         cloudProvider.configureLoadBalancerDestroy(loadBalancers);
         SparkConfig sparkConfig = new SparkConfig(this, "sparkop", dependables);
+
+        unregisterCRDs();
     }
 
-    /**
-     * Create an SSH tunnel with:
-     * kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090
-     * and run:
-     * curl -g 'http://localhost:9090/api/v1/query?query=sum(rate(container_network_receive_bytes_total[5m]))' | jq
-     * to see how much data has been ingressed
-     * @param eksDependOn
-     */
-    private void deployPrometheus(List<@NotNull ITerraformDependable> eksDependOn) {
-        // Configuration Overrides for the Helm Chart
-        // We use the ReleaseSet.builder() for the `set` block in Terraform
-        final List<ReleaseSet> chartOverrides = List.of(
-                ReleaseSet.builder()
-                          .name("grafana.persistence.enabled")
-                          .value("false") // Disable Grafana persistence for simplicity
-                          .build(),
-                ReleaseSet.builder()
-                          .name("prometheus.prometheusSpec.storageRetention")
-                          .value("7d") // Keep metrics for 7 days
-                          .build()
-                                                       );
-
-        // Install the kube-prometheus-stack Helm chart
-        Release.Builder.create(this, "prometheusRelease")
-                       .name("kube-prometheus-stack")
-                       .chart("kube-prometheus-stack")
-                       .repository("https://prometheus-community.github.io/helm-charts")
-                       .version("51.8.0") // Specify a version for consistency
-
-                       // Reference the namespace created above
-                       .namespace("default")
-                       .set(chartOverrides)
-                       .timeout(600)
-                       .atomic(true)
-                       .forceUpdate(true)
-
-                       // Ensure the release depends on the namespace being created first
-                       .dependsOn(eksDependOn)
-                       .build();
+    protected void unregisterCRDs() {
+        Resource.Builder.create(this, "cleanupCRDs")
+                        .dependsOn(List.of(calico))
+                        .provisioners(uponDestroyRun(
+                                """
+                                        for i in {1..5}; do {
+                                            echo iteration $i
+                                            
+                                            for CRD in $(kubectl get crds | awk '{print $1}') ; do {
+                                             echo $CRD
+                                             timeout 30s kubectl patch crd $CRD --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' || echo could not patch $CRD 
+                                             timeout 30s kubectl delete crd $CRD  || echo could not delete $CRD
+                                            } done & 
+                                            
+                                            sleep 30
+                                        } done
+                                        """
+                                                    ))
+                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                        .build();
     }
 
     private Service deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName, IamRole loadBalancerRole) {
@@ -139,7 +122,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                 "service.beta.kubernetes.io/aws-load-balancer-scheme", "internet-facing",
                 "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
                 "service.beta.kubernetes.io/aws-load-balancer-internal", "false"
-                );
+                                                   );
         Service loadbalancer = Service.Builder.create(this, JUPYTER_SERVICE_NAME)
                                               .metadata(ServiceMetadata.builder()
                                                                        .name(JUPYTER_SERVICE_NAME)
@@ -293,7 +276,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                                   ).build();
     }
 
-    private void calico(List<@NotNull ITerraformDependable> eksDependOn) {
+    private Release calico(List<@NotNull ITerraformDependable> eksDependOn) {
         /* This is still timing out after 10 minutes with:
 │ Error: Error uninstalling release
 │
@@ -301,30 +284,30 @@ class AwsWholeStack extends AwsKubernetesPolaris {
 ╵
         running tofu destroy a second time works.
          */
-        Release.Builder.create(this, "calicoOperator")
-                       .name("tigera-operator")
-                       .dependsOn(eksDependOn)
-                       .chart("tigera-operator")
-                       .cleanupOnFail(true)
-                       .disableCrdHooks(true)
-                       .disableWebhooks(true)
-                       .forceUpdate(true)
-                       .recreatePods(false)
-                       .set(List.of(
-                               ReleaseSet.builder().name("crds.install").value("true").build(),
-                               ReleaseSet.builder().name("crds.cleanup").value("false").build()
-                                   ))
-                       .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS,
-                                                    "kubectl delete ns tigera-operator --force --grace-period=0",
-                                                    "for CRD in $(kubectl get crds | grep -E 'calico|tigera|spark' | awk '{print $1}') ; do { kubectl delete crd $CRD ; } done"))
-                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                       .repository("https://docs.tigera.io/calico/charts")
-                       .namespace("tigera-operator") // Standard namespace for the operator
-                       .createNamespace(true)
-                       .version("3.31.0") // Using a recent stable version
-                       .atomic(true)
-                       .timeout(900)
-                       .build();
+        return Release.Builder.create(this, "calicoOperator")
+                              .name("tigera-operator")
+                              .dependsOn(eksDependOn)
+                              .chart("tigera-operator")
+                              .cleanupOnFail(true)
+                              .disableCrdHooks(true)
+                              .disableWebhooks(true)
+                              .forceUpdate(true)
+                              .recreatePods(false)
+                              .set(List.of(
+                                      ReleaseSet.builder().name("crds.install").value("true").build(),
+                                      ReleaseSet.builder().name("crds.cleanup").value("false").build()
+                                          ))
+                              .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS,
+                                                           "kubectl delete ns tigera-operator --force --grace-period=0"
+                                                          ))
+                              .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                              .repository("https://docs.tigera.io/calico/charts")
+                              .namespace("tigera-operator") // Standard namespace for the operator
+                              .createNamespace(true)
+                              .version("3.31.0") // Using a recent stable version
+                              .atomic(true)
+                              .timeout(600)
+                              .build();
     }
 
     private void csiSecretsDriver(List<@NotNull ITerraformDependable> eksDependOn) {
