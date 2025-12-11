@@ -9,7 +9,6 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.core.configuration.SparkContextConfigurationPrinter;
 import health.emrys.afon.infra.EmrysCloud;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -110,15 +109,18 @@ public class SparkClusterDeployment extends AwsWholeStack {
                         .dependsOn(eksDependOn)
                         .build();
 
-        sparkExternalService(eksDependOn);
+        Service sparkLB = sparkExternalService(eksDependOn);
 
+        unregisterCRDs(List.of(calico, sparkLB));
     }
 
-    private void sparkExternalService(List<Resource> eksDependOn) {
+    @Override protected void unregisterCRDs() { }
+
+    private Service sparkExternalService(List<Resource> eksDependOn) {
         String                          subnetIds      = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
         lbDependencies.add(cloudProvider.loadBalancerRole);
-        Service.Builder.create(this, SPARK_SERVICE_NAME)
+        return Service.Builder.create(this, SPARK_SERVICE_NAME)
                        .metadata(ServiceMetadata.builder()
                                                 .name(SPARK_SERVICE_NAME)
                                                 .labels(Map.of("spark-role", "master",
