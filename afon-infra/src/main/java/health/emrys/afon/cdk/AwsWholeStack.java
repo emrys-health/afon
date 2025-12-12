@@ -85,16 +85,16 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                         .dependsOn(dependsOn)
                         .provisioners(uponDestroyRun(
                                 """
-                                        for i in {1..6}; do {
+                                        for i in {1..5}; do {
                                             echo iteration $i
                                             
-                                            for CRD in $(kubectl get crds | awk '{print $1}') ; do {
+                                            for CRD in $(kubectl get crds | awk '{print $1}' | grep -v spark) ; do {
                                              echo $CRD
-                                             timeout 60s kubectl patch crd $CRD --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' || echo could not patch $CRD 
-                                             timeout 60s kubectl delete crd $CRD  || echo could not delete $CRD
+                                             timeout 30s kubectl patch crd $CRD --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' || echo could not patch $CRD 
+                                             timeout 30s kubectl delete crd $CRD  --force || echo could not delete $CRD
                                             } done & 
                                             
-                                            sleep 90
+                                            sleep 60
                                         } done
                                         """
                                                     ))
