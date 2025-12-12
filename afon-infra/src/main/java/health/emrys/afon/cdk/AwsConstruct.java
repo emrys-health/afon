@@ -205,7 +205,7 @@ public class AwsConstruct extends AbstractConstruct {
                 ] }""";
         final IamRole nodeGroupRole = IamRole.Builder.create(this, "eksNodeGroupRole")
                                                      .name("cdktf-eks-nodegroup-role")
-                                                     .provisioners(uponDestroyRun("eksctl delete cluster --name spark-cluster --region eu-west-2"))
+//                                                     .provisioners(uponDestroyRun("eksctl delete cluster --name spark-cluster --region eu-west-2"))
                                                      .assumeRolePolicy(workerAssumeRolePolicy).build();
 
         // ** NEW STEP: Create Custom IAM Policy referencing the Secret ARN **

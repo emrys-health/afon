@@ -31,9 +31,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
 
     public SparkClusterDeployment(@NotNull Construct scope, @NotNull String id) {
         super(scope, id);
-        String         sparkConnectorName      = SPARK_CONNECTOR_NAME;
-        String         sparkServiceAccountName = SPARK_SERVICE_ACCOUNT_NAME;
-        List<Resource> eksDependOn             = List.of();
+        List<ITerraformDependable> eksDependOn = cloudProvider.getDependables();
 
         final Map<String, Object> sparkClusterManifest = Map.of(
                 "apiVersion", "spark.apache.org/v1alpha1",
@@ -67,7 +65,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
                 "apiVersion", "spark.apache.org/v1",
                 "kind", "SparkApplication",
                 "metadata", Map.of(
-                        "name", sparkConnectorName,
+                        "name", SPARK_CONNECTOR_NAME,
                         "namespace", "default"
                         /*
                         This barfs with:
@@ -102,64 +100,74 @@ public class SparkClusterDeployment extends AwsWholeStack {
 
         Manifest.Builder.create(this, "sparkClusterManifest")
                         .manifest(sparkClusterManifest)
+                        .provisioners(uponDestroyRun(
+                                "kubectl delete statefulset emrys-master --force --grace-period=0",
+                                "kubectl delete statefulset emrys-worker --force --grace-period=0",
+                                "kubectl patch sparkclusters emrys  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
+                                                    ))
                         .dependsOn(eksDependOn)
                         .build();
         Manifest.Builder.create(this, "sparkConnectManifest")
                         .manifest(sparkConnectManifest)
                         .dependsOn(eksDependOn)
+                        .provisioners(uponDestroyRun(
+                                "kubectl patch sparkapplication spark-connector  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
+                                                    ))
                         .build();
 
-        Service sparkLB = sparkExternalService(eksDependOn);
+        Service sparkLB = sparkExternalService(List.of());
 
         unregisterCRDs(List.of(calico, sparkLB));
     }
 
-    @Override protected void unregisterCRDs() { }
+    @Override
+    protected void unregisterCRDs() {
+    }
 
     private Service sparkExternalService(List<Resource> eksDependOn) {
         String                          subnetIds      = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
         lbDependencies.add(cloudProvider.loadBalancerRole);
         return Service.Builder.create(this, SPARK_SERVICE_NAME)
-                       .metadata(ServiceMetadata.builder()
-                                                .name(SPARK_SERVICE_NAME)
-                                                .labels(Map.of("spark-role", "master",
-                                                               "spark-version", "4.0.1",
-                                                               "spark.operator/name", "spark-kubernetes-operator",
-                                                               "spark.operator/spark-cluster-name", "prod"
-                                                              ))
-                                                .annotations(Map.of(
-                                                        "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
-                                                        "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
-                                                .build())
-                       .dependsOn(lbDependencies)
-                       .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
-                       .spec(ServiceSpec.builder()
-                                        .selector(Map.of(
-                                                "spark-role", "master"))
-                                        .type("LoadBalancer")
-                                        .port(List.of(
-                                                ServiceSpecPort.builder()
-                                                               .name("web")
-                                                               .port(8080) // Port the load balancer listens on
-                                                               .targetPort("web") // Port the container is listening on
-                                                               .protocol("TCP")
-                                                               .build(),
-                                                ServiceSpecPort.builder()
-                                                               .name("spark")
-                                                               .port(7077) // Port the load balancer listens on
-                                                               .targetPort("7077") // Port the container is listening on
-                                                               .protocol("TCP")
-                                                               .build(),
-                                                ServiceSpecPort.builder()
-                                                               .name("rest")
-                                                               .port(6066) // Port the load balancer listens on
-                                                               .targetPort("rest") // Port the container is listening on
-                                                               .protocol("TCP")
-                                                               .build()
-                                                     ))
-                                        .build())
-                       .build();
+                              .metadata(ServiceMetadata.builder()
+                                                       .name(SPARK_SERVICE_NAME)
+                                                       .labels(Map.of("spark-role", "master",
+                                                                      "spark-version", "4.0.1",
+                                                                      "spark.operator/name", "spark-kubernetes-operator",
+                                                                      "spark.operator/spark-cluster-name", "prod"
+                                                                     ))
+                                                       .annotations(Map.of(
+                                                               "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
+                                                               "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
+                                                       .build())
+                              .dependsOn(lbDependencies)
+                              .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
+                              .spec(ServiceSpec.builder()
+                                               .selector(Map.of(
+                                                       "spark-role", "master"))
+                                               .type("LoadBalancer")
+                                               .port(List.of(
+                                                       ServiceSpecPort.builder()
+                                                                      .name("web")
+                                                                      .port(8080) // Port the load balancer listens on
+                                                                      .targetPort("web") // Port the container is listening on
+                                                                      .protocol("TCP")
+                                                                      .build(),
+                                                       ServiceSpecPort.builder()
+                                                                      .name("spark")
+                                                                      .port(7077) // Port the load balancer listens on
+                                                                      .targetPort("7077") // Port the container is listening on
+                                                                      .protocol("TCP")
+                                                                      .build(),
+                                                       ServiceSpecPort.builder()
+                                                                      .name("rest")
+                                                                      .port(6066) // Port the load balancer listens on
+                                                                      .targetPort("rest") // Port the container is listening on
+                                                                      .protocol("TCP")
+                                                                      .build()
+                                                            ))
+                                               .build())
+                              .build();
     }
 
     private Map<String, String> sparkConfig(String serviceAccountName) {
