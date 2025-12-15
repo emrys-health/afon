@@ -19,7 +19,7 @@ for each cloud provider. Then run:
 ```shell
 cd cdktf.out/stacks/jupyter-deployment
 tofu init
-tofu apply -auto-approve -target=aws_eks_cluster.spark-cluster
+tofu apply -target=aws_eks_cluster.jupyter-deployment_eksCluster_74A46137 --auto-approve
 tofu apply -auto-approve
 ````
 
