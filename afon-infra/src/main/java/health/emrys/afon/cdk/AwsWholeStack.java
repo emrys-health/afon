@@ -49,6 +49,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
     static final    String  NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
     protected final Release calico;
     protected final List<Service> loadBalancers;
+    private String DELETE_CRDS;
 
     public AwsWholeStack(final Construct scope, final String id) {
         super(scope, id);
@@ -81,24 +82,25 @@ class AwsWholeStack extends AwsKubernetesPolaris {
     }
 
     protected void unregisterCRDs(List<? extends ITerraformDependable> dependsOn) {
+        DELETE_CRDS = """
+                for i in {1..5}; do {
+                    echo iteration $i
+                
+                    for CRD in $(kubectl get crds | awk '{print $1}' | grep -v spark) ; do {
+                     echo $CRD
+                     timeout 30s kubectl patch crd $CRD --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' || echo could not patch $CRD 
+                     timeout 30s kubectl delete crd $CRD  --force || echo could not delete $CRD
+                    } done & 
+                
+                    sleep 60
+                } done
+                """;
         Resource.Builder.create(this, "cleanupCRDs")
                         .dependsOn(dependsOn)
-                        .provisioners(uponDestroyRun(
-                                """
-                                        for i in {1..5}; do {
-                                            echo iteration $i
-                                            
-                                            for CRD in $(kubectl get crds | awk '{print $1}' | grep -v spark) ; do {
-                                             echo $CRD
-                                             timeout 30s kubectl patch crd $CRD --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' || echo could not patch $CRD 
-                                             timeout 30s kubectl delete crd $CRD  --force || echo could not delete $CRD
-                                            } done & 
-                                            
-                                            sleep 60
-                                        } done
-                                        """
-                                                    ))
-                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                        .provisioners(uponDestroyRun(DELETE_CRDS))
+                        .build();
+        Resource.Builder.create(this, "cleanupCRDsNoDeps")
+                        .provisioners(uponDestroyRun(DELETE_CRDS))
                         .build();
     }
 
