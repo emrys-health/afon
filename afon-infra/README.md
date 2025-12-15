@@ -18,6 +18,7 @@ Run the classes for creating HCL to create just Polaris by running (in the `afon
 for each cloud provider. Then run: 
 ```shell
 cd cdktf.out/stacks/jupyter-deployment
+tofu apply -auto-approve -target=aws_eks_cluster.spark-cluster
 tofu apply -auto-approve
 ````
 
@@ -143,7 +144,7 @@ In particular, the output of this script should blatt everything:
 ```shell
 mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsConstruct exec:java
 ```
-*Note:* Run it twice!
+*Note:* Run the output twice!
 
 ### Addressing the 2-step Spark deployment
 
