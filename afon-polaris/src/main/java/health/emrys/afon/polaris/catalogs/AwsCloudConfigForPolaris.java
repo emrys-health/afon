@@ -22,16 +22,18 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
     @Override
     public String catalogConfig() throws IncorrectConfigException {
-        StorageConfigInfo storageConfigInfo = new AwsStorageConfigInfo(
-                roleArn,
-                null,
-                null,
-                region,
-                StorageConfigInfo.StorageTypeEnum.S3,
-                List.of(bucket)
-        );
-        Catalog catalog = createCatalog(bucket, storageConfigInfo);
+        Catalog catalog = createCatalog(bucket, getStorageConfigInfo());
         return toJson(new CreateCatalogRequest(catalog));
+    }
+
+    public AwsStorageConfigInfo getStorageConfigInfo() {
+        return AwsStorageConfigInfo
+                .builder()
+                .setRoleArn(roleArn)
+                .setAllowedLocations(List.of(bucket))
+                .setRegion(region)
+                .setStorageType(StorageConfigInfo.StorageTypeEnum.S3)
+                .build();
     }
 
     @Override
