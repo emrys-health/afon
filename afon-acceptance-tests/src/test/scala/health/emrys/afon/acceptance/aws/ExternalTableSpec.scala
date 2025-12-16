@@ -1,18 +1,12 @@
 package health.emrys.afon.acceptance.aws
 
-import health.emrys.afon.config.AfonProperties.AWS_REGION
-import health.emrys.afon.config.{AfonProperties, AfonPropertiesLoader}
+import health.emrys.afon.config.AfonProperties.{AWS_S3_BUCKET_NAME, AWS_S3_EXTERNAL_BUCKET_NAME}
+import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{AwsCloudConfigForPolaris, JsonMaker}
 import health.emrys.afon.polaris.comms.PolarisConfigurer
-import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
-import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
-import org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum
-import org.apache.polaris.core.admin.model.{AuthenticationParameters, AwsStorageConfigInfo, Catalog, CatalogProperties, ConnectionConfigInfo, CreateCatalogRequest, ExternalCatalog, GcpStorageConfigInfo, ServiceIdentityInfo, StorageConfigInfo}
+import org.apache.polaris.core.admin.model.{Catalog, CatalogProperties, CreateCatalogRequest}
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
-
-import java.util
-import java.util.List
 
 class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
@@ -20,39 +14,19 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
   val accessToken = AcceptanceTestConfig.instance.getAccessToken()
 
   "An external table" should {
-    "be visible by our Polaris" ignore {
+    "be visible by our Polaris" in {
       val properties = new AfonPropertiesLoader().getProperties
-      val uri: String = String.format("https://glue.%s.amazonaws.com", AWS_REGION.getValueFrom(properties))
-      val authenticationParameters = new AuthenticationParameters(AuthenticationTypeEnum.BEARER)
-      val serviceIdentity = new ServiceIdentityInfo(ServiceIdentityInfo.IdentityTypeEnum.AWS_IAM) // Huh? Only seems to be one kind
-      val connectionConfig = new ConnectionConfigInfo(ConnectionTypeEnum.ICEBERG_REST,
-        uri,
-        authenticationParameters,
-        serviceIdentity)
+      val externalBucket = AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)
+      properties.setProperty(AWS_S3_BUCKET_NAME.getPropertyName, externalBucket)
+      Given(f"a bucket called $externalBucket")
+
 
       val externalCatalogProperties = CatalogProperties
         .builder()
-        .setDefaultBaseLocation("s3://emrys-afon-bucket/acceptancetests/smoketesttable251106221055/")
+        .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
         .build()
 
-//      val gcsServiceAccount: String = ???
-//      val allowedLocations: util.List[String] = List.of()
-//      val gcpExternalStorageConfig = new GcpStorageConfigInfo(gcsServiceAccount,
-//        StorageTypeEnum.GCS,
-//        allowedLocations)
-
       val externalStorageConfig = new AwsCloudConfigForPolaris(properties).getStorageConfigInfo()
-
-      val externalCatalog = ExternalCatalog
-        .builder
-        .setType(Catalog.TypeEnum.EXTERNAL)
-        .setName("federatedCatalogName")
-        .setConnectionConfigInfo(connectionConfig)
-        .setCreateTimestamp(System.currentTimeMillis())
-        .setLastUpdateTimestamp(System.currentTimeMillis())
-        .setProperties(externalCatalogProperties)
-        .setStorageConfigInfo(externalStorageConfig)
-        .build
 
       val jsonMaker = new JsonMaker()
       println(accessToken)
@@ -65,13 +39,17 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
         null,
         externalStorageConfig)
 
-      val response = client.postJsonCall(PolarisConfigurer.getCreateCatalogURI,
-        jsonMaker.toJson(new CreateCatalogRequest(catalog)),
-//        jsonMaker.toJson(new CreateCatalogRequest(externalCatalog)),
-//        new AwsCloudConfigForPolaris(properties).catalogConfig(),
+      val json = jsonMaker.toJson(new CreateCatalogRequest(catalog))
+
+      When(f"Polaris is called with payload:\n$json")
+
+      val response = client.postJsonCall(
+        PolarisConfigurer.getCreateCatalogURI,
+        json,
         accessToken)
       val responseCode = response.getCode
       println(response)
+      Then("the response is HTTP 2XX")
       assert(responseCode / 100 == 2)
     }
   }
