@@ -16,11 +16,12 @@ public class AfonProperties {
     public static final String ENV_PROPERTIES_FILE     = "env.properties";
 
     // AWS
-    public static final AfonProperty AWS_S3_BUCKET_NAME    = new AfonProperty("AWS_S3_BUCKET_NAME");
-    public static final AfonProperty AWS_S3_ROLE_ARN       = new AfonProperty("AWS_S3_ROLE_ARN");
-    public static final AfonProperty AWS_REGION            = new AfonProperty("AWS_REGION");
-    public static final AfonProperty AWS_ACCESS_KEY_ID     = new AfonProperty("AWS_ACCESS_KEY_ID");
-    public static final AfonProperty AWS_SECRET_ACCESS_KEY = new AfonProperty("AWS_SECRET_ACCESS_KEY");
+    public static final AfonProperty AWS_S3_BUCKET_NAME          = new AfonProperty("AWS_S3_BUCKET_NAME");
+    public static final AfonProperty AWS_S3_EXTERNAL_BUCKET_NAME = new AfonProperty("AWS_S3_EXTERNAL_BUCKET_NAME");
+    public static final AfonProperty AWS_S3_ROLE_ARN             = new AfonProperty("AWS_S3_ROLE_ARN");
+    public static final AfonProperty AWS_REGION                  = new AfonProperty("AWS_REGION");
+    public static final AfonProperty AWS_ACCESS_KEY_ID           = new AfonProperty("AWS_ACCESS_KEY_ID");
+    public static final AfonProperty AWS_SECRET_ACCESS_KEY       = new AfonProperty("AWS_SECRET_ACCESS_KEY");
 
     // GCP
     public static final AfonProperty GCP_BUCKET_NAME                = new AfonProperty("GCP_BUCKET_NAME");
