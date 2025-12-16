@@ -1,15 +1,13 @@
 package health.emrys.afon.acceptance.aws
 
-import health.emrys.afon.config.AfonProperties.{AWS_S3_BUCKET_NAME, AWS_S3_EXTERNAL_BUCKET_NAME}
+import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_BUCKET_NAME, AWS_S3_EXTERNAL_BUCKET_NAME}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{AwsCloudConfigForPolaris, JsonMaker}
 import health.emrys.afon.polaris.comms.PolarisConfigurer
-import org.apache.polaris.core.admin.model.{AuthenticationParameters, AwsStorageConfigInfo, BearerAuthenticationParameters, Catalog, CatalogProperties, ConnectionConfigInfo, CreateCatalogRequest, ExternalCatalog, GcpStorageConfigInfo, ServiceIdentityInfo, StorageConfigInfo}
-import org.scalatest.GivenWhenThen
-import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_BUCKET_NAME, AWS_S3_EXTERNAL_BUCKET_NAME}
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
-import org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum
+import org.apache.polaris.core.admin.model._
+import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
@@ -30,7 +28,7 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
         .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
         .build()
 
-      val uri: String = String.format("https://glue.%s.amazonaws.com", AWS_REGION.getValueFrom(properties))
+      val uri: String = String.format("https://glue.%s.amazonaws.com/iceberg", AWS_REGION.getValueFrom(properties))
       val authenticationParameters = new BearerAuthenticationParameters(accessToken, AuthenticationTypeEnum.BEARER)
 
       val externalStorageConfig: AwsStorageConfigInfo = new AwsCloudConfigForPolaris(properties).getStorageConfigInfo()
@@ -40,7 +38,7 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
       val catalog =
       new ExternalCatalog(
-        new ConnectionConfigInfo(ConnectionTypeEnum.HIVE, uri, authenticationParameters, null),
+        new ConnectionConfigInfo(ConnectionTypeEnum.ICEBERG_REST, uri, authenticationParameters, null),
         Catalog.TypeEnum.EXTERNAL,
         "federatedCatalogName",
         externalCatalogProperties,
