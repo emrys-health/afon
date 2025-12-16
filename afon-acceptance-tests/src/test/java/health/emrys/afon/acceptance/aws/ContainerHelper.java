@@ -41,7 +41,8 @@ public class ContainerHelper {
             String googleCreds   = GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties);
             String polarisId     = POLARIS_ID.getValueFrom(properties);
             String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
-            myContainer = new GenericContainer<>("apache/polaris:1.1.0-incubating")
+            myContainer = new GenericContainer<>("apache/polaris:1.2.0-incubating")
+                    .withCommand("sh", "-c", "cd /deployments && java -D\"polaris.features.\\\"SUPPORTED_CATALOG_CONNECTION_TYPES\\\"=[\\\"ICEBERG_REST\\\", \\\"HIVE\\\"]\" -D\"polaris.features.\\\"ENABLE_CATALOG_FEDERATION\\\"=true\" -XX:MaxRAMPercentage=80.0 -XX:+UseParallelGC -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=20 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -XX:+ExitOnOutOfMemoryError -cp . -jar /deployments/quarkus-run.jar")
                     // AWS
                     .withEnv(AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties))
                     .withEnv(AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties))
