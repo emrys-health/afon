@@ -4,8 +4,12 @@ import health.emrys.afon.config.AfonProperties.{AWS_S3_BUCKET_NAME, AWS_S3_EXTER
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{AwsCloudConfigForPolaris, JsonMaker}
 import health.emrys.afon.polaris.comms.PolarisConfigurer
-import org.apache.polaris.core.admin.model.{Catalog, CatalogProperties, CreateCatalogRequest}
+import org.apache.polaris.core.admin.model.{AuthenticationParameters, AwsStorageConfigInfo, BearerAuthenticationParameters, Catalog, CatalogProperties, ConnectionConfigInfo, CreateCatalogRequest, ExternalCatalog, GcpStorageConfigInfo, ServiceIdentityInfo, StorageConfigInfo}
 import org.scalatest.GivenWhenThen
+import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_BUCKET_NAME, AWS_S3_EXTERNAL_BUCKET_NAME}
+import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
+import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
+import org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
@@ -26,18 +30,25 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
         .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
         .build()
 
-      val externalStorageConfig = new AwsCloudConfigForPolaris(properties).getStorageConfigInfo()
+      val uri: String = String.format("https://glue.%s.amazonaws.com", AWS_REGION.getValueFrom(properties))
+      val authenticationParameters = new BearerAuthenticationParameters(accessToken, AuthenticationTypeEnum.BEARER)
+
+      val externalStorageConfig: AwsStorageConfigInfo = new AwsCloudConfigForPolaris(properties).getStorageConfigInfo()
 
       val jsonMaker = new JsonMaker()
       println(accessToken)
 
-      val catalog = new Catalog(Catalog.TypeEnum.EXTERNAL,
+      val catalog =
+      new ExternalCatalog(
+        new ConnectionConfigInfo(ConnectionTypeEnum.HIVE, uri, authenticationParameters, null),
+        Catalog.TypeEnum.EXTERNAL,
         "federatedCatalogName",
         externalCatalogProperties,
-        System.currentTimeMillis,
-        System.currentTimeMillis,
+        System.currentTimeMillis(),
+        System.currentTimeMillis(),
         null,
         externalStorageConfig)
+
 
       val json = jsonMaker.toJson(new CreateCatalogRequest(catalog))
 
@@ -50,7 +61,7 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
       val responseCode = response.getCode
       println(response)
       Then("the response is HTTP 2XX")
-      assert(responseCode / 100 == 2)
+      assert(responseCode / 100 == 2) // || responseCode == 409) // remove that 409
     }
   }
 
