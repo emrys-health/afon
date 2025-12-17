@@ -7,6 +7,7 @@ import org.apache.spark.sql.internal.StaticSQLConf$;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -62,13 +63,18 @@ public class SparkWarehouseConfig {
     }
 
     public SparkConf sparkConf(int cores) throws IOException {
+        String[] catalogNames = Arrays.stream(SupportedCloudsEnum.values()).map(x -> x.toString()).toArray(String[]::new);
+        return sparkConf(cores, catalogNames);
+    }
+
+    public SparkConf sparkConf(int cores, String... values) throws IOException {
         String tmpDir = Files.createTempDirectory("SparkForTesting").toString();
         SparkConf sparkConf = new SparkConf()
                 .setMaster(format("local[%d]", cores))
                 .setAppName("Tests")
                 .setSparkHome(tmpDir)
                 .set(WAREHOUSE_PATH, tmpDir);
-        for (SupportedCloudsEnum cloudProvider : SupportedCloudsEnum.values()) {
+        for (String cloudProvider : values) {
             configureWith(sparkConfigs(cloudProvider), sparkConf);
         }
 
@@ -77,13 +83,17 @@ public class SparkWarehouseConfig {
         return sparkConf;
     }
 
-    private static void configureWith(Map<String, String> sparkProperties, SparkConf sparkConf) {
+    public static void configureWith(Map<String, String> sparkProperties, SparkConf sparkConf) {
         sparkProperties.entrySet().stream().forEach(entry -> {
             sparkConf.set(entry.getKey(), entry.getValue());
         });
     }
 
     public Map<String, String> sparkConfigs(SupportedCloudsEnum sparkCatalog) {
+        return sparkConfigs(sparkCatalog.toString());
+    }
+
+    public Map<String, String> sparkConfigs(String sparkCatalog) {
         Map conf = new HashMap<String, String>();
         conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol, host));
         conf.put(format("spark.sql.catalog.%s.token", sparkCatalog), accessToken);
