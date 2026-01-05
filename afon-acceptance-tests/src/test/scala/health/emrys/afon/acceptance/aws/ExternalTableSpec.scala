@@ -13,6 +13,8 @@ import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
+import java.util.Properties
+
 /**
  * This needs:
 
@@ -98,48 +100,15 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
   val REST_CODE_RESOURCE_CREATED = 201
 
   "An external table" should {
-    val properties = new AfonPropertiesLoader().getProperties
-    val externalBucket = AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)
+    val properties        = new AfonPropertiesLoader().getProperties
+    val externalBucket    = AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)
     properties.setProperty(AWS_S3_BUCKET_NAME.getPropertyName, externalBucket)
-    val config =  new AwsCloudConfigForPolaris(properties)
+    val config            = new AwsCloudConfigForPolaris(properties)
+    val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     "be visible by our Polaris" in {
       Given(f"a bucket called $externalBucket")
-      val externalCatalogProperties = CatalogProperties
-        .builder()
-        .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
-        .build()
 
-      val region = AWS_REGION.getValueFrom(properties)
-      val uri: String = String.format("https://glue.%s.amazonaws.com/iceberg", region)
-      val authenticationParameters = //new BearerAuthenticationParameters(accessToken, AuthenticationTypeEnum.BEARER)
-        new SigV4AuthenticationParameters(
-          "arn:aws:iam::123456789012:role/GlueIcebergRole",
-          null,
-          null,
-          region,
-          "glue",
-            AuthenticationTypeEnum.SIGV4
-      )
-
-      val externalStorageConfig: AwsStorageConfigInfo = config.getStorageConfigInfo()
-
-      val jsonMaker = new JsonMaker()
-      println(accessToken)
-
-      val catalog =
-        new ExternalCatalog(
-          new ConnectionConfigInfo(ConnectionTypeEnum.ICEBERG_REST, uri, authenticationParameters, null),
-          Catalog.TypeEnum.EXTERNAL,
-          FEDERATED_CATALOG_NAME,
-          externalCatalogProperties,
-          System.currentTimeMillis(),
-          System.currentTimeMillis(),
-          null,
-          externalStorageConfig)
-
-
-      val json = jsonMaker.toJson(new CreateCatalogRequest(catalog))
-
+      val json: String = externalCatalogJson(properties, externalBucket, config)
       When(f"Polaris is called with payload:\n$json")
 
       val response = client.postJsonCall(
@@ -147,19 +116,10 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
         json,
         accessToken)
       val responseCode = response.getCode
-      println(response)
-      Then("the response is HTTP 2XX")
+      Then("the response is HTTP 2XX indicating the external catalog was created")
       assert(responseCode / 100 == 2) // || responseCode == 409) // remove that 409
     }
-    "be told about the catalog admin grants" in {
-      Given(s"a Polaris endpoint at ${client.getEndpoint}")
-      val uri  = getCatalogAdminGrantsURI(FEDERATED_CATALOG_NAME)
-      val json = config.catalogAdminGrants
-      When(s"we call '$uri' with payload:\n$json")
-      val response = client.putJsonCall(uri, json, accessToken)
-      Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
-      assert(response.getCode == REST_CODE_RESOURCE_CREATED)
-    }
+    "be told about the catalog admin grants" in grantCatalogAdmin()
     "be told about the catalog roles" in {
       Given(s"a Polaris endpoint at ${client.getEndpoint}")
       val uri  = getCatalogRolesURI(FEDERATED_CATALOG_NAME)
@@ -183,4 +143,40 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
   }
 
 
+  private def externalCatalogJson(properties: Properties, externalBucket: String, config: AwsCloudConfigForPolaris) = {
+    val externalCatalogProperties = CatalogProperties
+      .builder()
+      .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
+      .build()
+
+    val region = AWS_REGION.getValueFrom(properties)
+    val uri: String = String.format("https://glue.%s.amazonaws.com/iceberg", region)
+    val authenticationParameters =
+      new SigV4AuthenticationParameters(
+        "arn:aws:iam::123456789012:role/GlueIcebergRole",
+        null,
+        null,
+        region,
+        "glue",
+        AuthenticationTypeEnum.SIGV4
+      )
+
+    val externalStorageConfig: AwsStorageConfigInfo = config.getStorageConfigInfo()
+
+    val jsonMaker = new JsonMaker()
+
+    val catalog =
+      new ExternalCatalog(
+        new ConnectionConfigInfo(ConnectionTypeEnum.ICEBERG_REST, uri, authenticationParameters, null),
+        Catalog.TypeEnum.EXTERNAL,
+        FEDERATED_CATALOG_NAME,
+        externalCatalogProperties,
+        System.currentTimeMillis(),
+        System.currentTimeMillis(),
+        null,
+        externalStorageConfig)
+
+    val json = jsonMaker.toJson(new CreateCatalogRequest(catalog))
+    json
+  }
 }
