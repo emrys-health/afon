@@ -5,6 +5,13 @@ There are two.
 1. Just Polaris. This contains everything that is needed to vend credentials. We have deployments for all three cloud providers.
 2. The whole stack (Jupyter and Spark in addition to Polaris). At the moment, this is just available for AWS. More coming soon.
 
+**Note** if you really fowl things up, you'll leave the environment in an unstable state. 
+
+The best thing to do then is to run `AwsConstruct` (see *Tearing down the environment* below) and execute the shell script it outputs.
+
+And if all else fails. go to the [AWS VPCs](https://eu-west-2.console.aws.amazon.com/vpcconsole/home?region=eu-west-2#vpcs:)
+and delete everything by hand.
+
 ### Deployment #1
 
 Run the classes for creating HCL to create just Polaris by running (in the `afon-infra` directory):
