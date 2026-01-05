@@ -169,7 +169,7 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
       Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
       assert(response.getCode == REST_CODE_RESOURCE_CREATED)
     }
-    "can be queries via Spark" ignore {
+    "can be queries via Spark" in {
       val sparkConf = sparkWarehouse.sparkConf(4, FEDERATED_CATALOG_NAME)
       val spark: SparkSession = SparkSession
         .builder()
