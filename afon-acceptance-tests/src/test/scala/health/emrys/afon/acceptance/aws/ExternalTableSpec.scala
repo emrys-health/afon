@@ -106,23 +106,25 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
     val config            = new AwsCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
-    "be visible by our Polaris" in {
+
+    "be visible to our Polaris" in {
       Given(f"a bucket called $externalBucket")
 
       val json: String = externalCatalogJson(properties, externalBucket, config)
-      When(f"Polaris is called with payload:\n$json")
+      val uri: String  = PolarisConfigurer.getCreateCatalogURI
+      When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
       val response = client.postJsonCall(
-        PolarisConfigurer.getCreateCatalogURI,
+        uri,
         json,
         accessToken)
       val responseCode = response.getCode
       Then("the response is HTTP 2XX indicating the external catalog was created")
-      assert(responseCode / 100 == 2) // || responseCode == 409) // remove that 409
+      assert(responseCode / 100 == 2)
     }
-    "be told about the catalog admin grants" in grantCatalogAdmin()
-    "be told about the catalog roles" in catalogRoles()
-    "can be queries via Spark" in {
+    "be given catalog admin grants" in grantCatalogAdmin()
+    "be given the catalog roles" in catalogRoles()
+    "can be queried via Spark" in {
       val sparkConf = sparkWarehouse.sparkConf(4, FEDERATED_CATALOG_NAME)
       val spark: SparkSession = SparkSession
         .builder()
@@ -136,7 +138,7 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
   }
 
 
-  private def externalCatalogJson(properties: Properties, externalBucket: String, config: AwsCloudConfigForPolaris) = {
+  private def externalCatalogJson(properties: Properties, externalBucket: String, config: AwsCloudConfigForPolaris): String = {
     val externalCatalogProperties = CatalogProperties
       .builder()
       .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
@@ -169,7 +171,6 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
         null,
         externalStorageConfig)
 
-    val json = jsonMaker.toJson(new CreateCatalogRequest(catalog))
-    json
+    jsonMaker.toJson(new CreateCatalogRequest(catalog))
   }
 }
