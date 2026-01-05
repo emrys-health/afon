@@ -5,15 +5,12 @@ import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_BUCKET_NAME, 
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{AwsCloudConfigForPolaris, JsonMaker}
 import health.emrys.afon.polaris.comms.PolarisConfigurer
-import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCatalogAdminGrantsURI, getCatalogRolesURI}
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
 import org.apache.polaris.core.admin.model._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
-
-import java.util.Properties
 
 /**
  * You'll need to run `scripts/aws/create_federated_permissions.sh` for your user (ph1ll1phenry is hardcoded) first.
@@ -56,29 +53,32 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
     "be given catalog admin grants" in grantCatalogAdmin()
     "be given the catalog roles" in catalogRoles()
     "can be queried via Spark" in {
+      Given(f"a namespace called $FEDERATED_CATALOG_NAME")
       val sparkConf = sparkWarehouse.sparkConf(4, FEDERATED_CATALOG_NAME)
       val spark: SparkSession = SparkSession
         .builder()
         .config(sparkConf)
         .getOrCreate()
 
-      spark.sql(s"CREATE NAMESPACE IF NOT EXISTS $FEDERATED_CATALOG_NAME.$sparkNamespace")
-
+      val nsSQL = s"CREATE NAMESPACE IF NOT EXISTS $FEDERATED_CATALOG_NAME.$sparkNamespace"
       val sql = String.format("SELECT * FROM %s.%s.%s", FEDERATED_CATALOG_NAME, sparkNamespace, tableName)
+      When(f"we execute:\n$nsSQL\n$sql")
+      spark.sql(nsSQL)
+
+      Then("we can query the table")
       spark.sql(sql).show()
     }
   }
 
 
   private def externalCatalogJson(region: String, externalBucket: String, config: AwsCloudConfigForPolaris): String = {
-    val externalCatalogProperties = CatalogProperties
+    val bucketProperties = CatalogProperties
       .builder()
       .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
       .build()
 
 
-    val uri: String = String.format("https://glue.%s.amazonaws.com/iceberg", region)
-    val authenticationParameters =
+    val glueIcebergRole =
       new SigV4AuthenticationParameters(
         "arn:aws:iam::418295715997:role/GlueIcebergRole",
         null,
@@ -88,22 +88,24 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
         AuthenticationTypeEnum.SIGV4
       )
 
-    val externalStorageConfig: AwsStorageConfigInfo = config.getStorageConfigInfo()
-
-    val jsonMaker = new JsonMaker()
+    val connectionInfo = new ConnectionConfigInfo(
+      ConnectionTypeEnum.ICEBERG_REST,
+      f"https://glue.$region.amazonaws.com/iceberg",
+      glueIcebergRole,
+      null)
 
     val catalog =
       new ExternalCatalog(
-        new ConnectionConfigInfo(ConnectionTypeEnum.ICEBERG_REST, uri, authenticationParameters, null),
+        connectionInfo,
         Catalog.TypeEnum.EXTERNAL,
         FEDERATED_CATALOG_NAME,
-        externalCatalogProperties,
+        bucketProperties,
         System.currentTimeMillis(),
         System.currentTimeMillis(),
         null,
-        externalStorageConfig)
+        config.getStorageConfigInfo())
 
-    jsonMaker.toJson(new CreateCatalogRequest(catalog))
+    new JsonMaker().toJson(new CreateCatalogRequest(catalog))
   }
 }
 
