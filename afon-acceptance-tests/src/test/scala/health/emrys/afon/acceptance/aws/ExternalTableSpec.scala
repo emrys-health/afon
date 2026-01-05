@@ -105,6 +105,7 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
     properties.setProperty(AWS_S3_BUCKET_NAME.getPropertyName, externalBucket)
     val config            = new AwsCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
+    val catalogRoles      = new CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
     "be visible by our Polaris" in {
       Given(f"a bucket called $externalBucket")
 
@@ -120,15 +121,7 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
       assert(responseCode / 100 == 2) // || responseCode == 409) // remove that 409
     }
     "be told about the catalog admin grants" in grantCatalogAdmin()
-    "be told about the catalog roles" in {
-      Given(s"a Polaris endpoint at ${client.getEndpoint}")
-      val uri  = getCatalogRolesURI(FEDERATED_CATALOG_NAME)
-      val json = config.catalogRoles
-      When(s"we call '$uri' with payload:\n$json")
-      val response = client.putJsonCall(uri, json, accessToken)
-      Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
-      assert(response.getCode == REST_CODE_RESOURCE_CREATED)
-    }
+    "be told about the catalog roles" in catalogRoles()
     "can be queries via Spark" in {
       val sparkConf = sparkWarehouse.sparkConf(4, FEDERATED_CATALOG_NAME)
       val spark: SparkSession = SparkSession
