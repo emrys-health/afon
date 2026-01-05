@@ -97,7 +97,6 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
   val accessToken = AcceptanceTestConfig.instance.getAccessToken()
 
   val FEDERATED_CATALOG_NAME = "federatedCatalogName"
-  val REST_CODE_RESOURCE_CREATED = 201
 
   "An external table" should {
     val properties        = new AfonPropertiesLoader().getProperties
@@ -106,11 +105,16 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
     val config            = new AwsCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
+    val tableName         = "DatumAccTest2"
+    val sparkNamespace    = "ph_glue_iceberg_db"
+    val awsRegion         = AWS_REGION.getValueFrom(properties)
 
     "be visible to our Polaris" in {
-      Given(f"a bucket called $externalBucket")
+      Given(f"a bucket called $externalBucket and somebody has run the command:\n${ExternalTableSpec.glueCmdLine(
+        sparkNamespace, tableName, awsRegion, externalBucket
+      )}")
 
-      val json: String = externalCatalogJson(properties, externalBucket, config)
+      val json: String = externalCatalogJson(awsRegion, externalBucket, config)
       val uri: String  = PolarisConfigurer.getCreateCatalogURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
@@ -130,21 +134,22 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
         .builder()
         .config(sparkConf)
         .getOrCreate()
-      val ns = "ph_glue_iceberg_db"
-      spark.sql(s"CREATE NAMESPACE IF NOT EXISTS $FEDERATED_CATALOG_NAME.$ns")
-      val sql = String.format("SELECT * FROM %s.%s.%s", FEDERATED_CATALOG_NAME, ns, "DatumAccTest2")
+
+      spark.sql(s"CREATE NAMESPACE IF NOT EXISTS $FEDERATED_CATALOG_NAME.$sparkNamespace")
+
+      val sql = String.format("SELECT * FROM %s.%s.%s", FEDERATED_CATALOG_NAME, sparkNamespace, tableName)
       spark.sql(sql).show()
     }
   }
 
 
-  private def externalCatalogJson(properties: Properties, externalBucket: String, config: AwsCloudConfigForPolaris): String = {
+  private def externalCatalogJson(region: String, externalBucket: String, config: AwsCloudConfigForPolaris): String = {
     val externalCatalogProperties = CatalogProperties
       .builder()
       .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
       .build()
 
-    val region = AWS_REGION.getValueFrom(properties)
+
     val uri: String = String.format("https://glue.%s.amazonaws.com/iceberg", region)
     val authenticationParameters =
       new SigV4AuthenticationParameters(
@@ -173,4 +178,50 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
     jsonMaker.toJson(new CreateCatalogRequest(catalog))
   }
+}
+
+object ExternalTableSpec {
+  def glueCmdLine(dbName: String,
+                  tblName: String,
+                  region: String,
+                  bucket: String): String = String.format(
+    """
+      |aws glue create-table --database-name %s --table-input '
+      |   {
+      |     "Name": "%s",
+      |     "TableType": "EXTERNAL_TABLE",
+      |     "StorageDescriptor": {
+      |     "Location": "s3://%s/AwsAccessSpec251117511401/",
+      |     "Columns": [
+      |       { "Name": "id", "Type": "int" },
+      |       { "Name": "label", "Type": "string" },
+      |       { "Name": "partitionKey", "Type": "bigint" },
+      |       { "Name": "date", "Type": "date" },
+      |       { "Name": "timestamp", "Type": "timestamp" },
+      |       { "Name": "randomInt", "Type": "int" }
+      |     ],
+      |     "SerdeInfo": {
+      |      "SerializationLibrary": "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"
+      |     }
+      |     },
+      |     "Parameters": {
+      |       "iceberg.table.default.namespace": "%s"
+      |      }
+      |   }'     --open-table-format-input '
+      |   {
+      |     "IcebergInput": {
+      |       "MetadataOperation": "CREATE",
+      |       "Version": "2"
+      |     }
+      |   }'     --region %s
+      |""".stripMargin,
+    dbName, tblName, bucket, dbName, region
+  )
+
+  def main(args: Array[String]): Unit = println(glueCmdLine(
+    "ph_glue_iceberg_db",
+    "DatumAccTest2",
+    "eu-west-2",
+    "emrys-afon-bucket-2",
+  ))
 }
