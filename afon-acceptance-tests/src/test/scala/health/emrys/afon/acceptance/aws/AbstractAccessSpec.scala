@@ -14,6 +14,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   val FULL_NAMESPACE = s"${cloudProvider}.$namespace"
 
   def config: CloudConfigForPolaris
+  val GrantCatalogAdmin = new CatalogAdminGrant(this, config)
 
   protected def createTableAndPopulate(): Unit = {
     spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).create()
@@ -34,15 +35,10 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val response = client.getCall(uriGet, accessToken)
       assert(response.getCode == 200)
     }
-    "be told about the catalog admin grants" in {
-      Given(s"a Polaris endpoint at ${client.getEndpoint}")
-      val uri  = getCatalogAdminGrantsURI(config.warehouseName())
-      val json = config.catalogAdminGrants
-      When(s"we call '$uri' with payload:\n$json")
-      val response = client.putJsonCall(uri, json, accessToken)
-      Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
-      assert(response.getCode == REST_CODE_RESOURCE_CREATED)
-    }
+
+
+    "be told about the catalog admin grants" in GrantCatalogAdmin()
+
     "be told about the catalog roles" in {
       Given(s"a Polaris endpoint at ${client.getEndpoint}")
       val uri  = getCatalogRolesURI(config.warehouseName())
