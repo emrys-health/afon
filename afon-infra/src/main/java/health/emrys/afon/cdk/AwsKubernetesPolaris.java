@@ -2,6 +2,7 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -29,6 +30,8 @@ public class AwsKubernetesPolaris extends TerraformStack {
         super(scope, id);
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
+        // HelmProvider.Builder.create(this, "helm")
+        //                     .build();
 
         cloudProvider = new AwsConstruct(this, id);
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
