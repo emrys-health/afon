@@ -13,7 +13,7 @@ import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 /**
- * You'll need to run `scripts/aws/create_federated_permissions.sh` for your user (ph1ll1phenry is hardcoded) first.
+ * You'll need to run `scripts/aws/create_federated_permissions.sh` first if it's not been done already.
  */
 class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
@@ -76,7 +76,6 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
       .builder()
       .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
       .build()
-
 
     val glueIcebergRole =
       new SigV4AuthenticationParameters(
