@@ -12,7 +12,7 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.*;
 import static java.lang.String.format;
 
-public class AzureCloudConfigForPolaris extends CloudConfigForPolaris{
+public class AzureCloudConfigForPolaris extends CloudConfigForPolaris {
     private final String bucket;
     private final String tenant;
     private final String multiTenantAppName;
@@ -20,16 +20,22 @@ public class AzureCloudConfigForPolaris extends CloudConfigForPolaris{
 
     public AzureCloudConfigForPolaris(Properties properties) {
         super(new JsonMaker());
-        String bucketName = AZURE_BUCKET.getValueFrom(properties);
+        String bucketName     = AZURE_BUCKET.getValueFrom(properties);
         String storageAccount = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
-        this.bucket = format("abfss://%s@%s.dfs.core.windows.net", bucketName, storageAccount);
-        this.tenant = AZURE_TENANT_ID.getValueFrom(properties);
+        this.bucket             = format("abfss://%s@%s.dfs.core.windows.net", bucketName, storageAccount);
+        this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);
         this.multiTenantAppName = AZURE_CLIENT_ID.getValueFrom(properties);
-        this.clientId = AZURE_CLIENT_ID.getValueFrom(properties);
+        this.clientId           = AZURE_CLIENT_ID.getValueFrom(properties);
     }
 
     @Override
     public String catalogConfig() throws IncorrectConfigException {
+        StorageConfigInfo storageConfigInfo = getStorageConfigInfo();
+        Catalog catalog = createCatalog(bucket, storageConfigInfo);
+        return toJson(new CreateCatalogRequest(catalog));
+    }
+
+    public StorageConfigInfo getStorageConfigInfo() {
         StorageConfigInfo storageConfigInfo = new AzureStorageConfigInfo(
                 tenant,
                 multiTenantAppName,
@@ -37,9 +43,10 @@ public class AzureCloudConfigForPolaris extends CloudConfigForPolaris{
                 StorageConfigInfo.StorageTypeEnum.AZURE,
                 List.of(bucket)
         );
-        Catalog catalog = createCatalog(bucket, storageConfigInfo);
-        return toJson(new CreateCatalogRequest(catalog));
+        return storageConfigInfo;
     }
+
+    public String getBucketUri() { return bucket; }
 
     @Override
     public String warehouseName() {
