@@ -79,4 +79,5 @@ AZURE_CLIENT_ID=
 # this was output with: az ad app credential reset --id $AZURE_CLIENT_ID
 AZURE_TENANT_ID=
 AZURE_CLIENT_SECRET=
+DATABRICKS_TOKEN=
 ````
