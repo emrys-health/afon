@@ -28,14 +28,14 @@ class DBxExternalTableSpec extends SpecPretifier with GivenWhenThen {
   "An external table" should {
     val properties        = new AfonPropertiesLoader().getProperties
     val externalBucket    = AZURE_BUCKET.getValueFrom(properties)
-    properties.setProperty(AZURE_BUCKET.getPropertyName, externalBucket)
+    properties.setProperty(AZURE_BUCKET.getPropertyName, externalBucket + "Fake") // TODO get a proper bucket we can use for federation
     val config            = new AzureCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
     val tableName         = "diamonds"
     val sparkNamespace    = "ph_glue_iceberg_db"
 
-    "be visible to our Polaris" ignore {
+    "be visible to our Polaris" in {
       Given(f"a Unity catalog called $FEDERATED_CATALOG_NAME already exists")
       val databricksToken = DATABRICKS_TOKEN.getValueFrom(properties)
       val json: String = externalCatalogJson(config, databricksToken)
@@ -50,9 +50,9 @@ class DBxExternalTableSpec extends SpecPretifier with GivenWhenThen {
       Then(s"the response code ($responseCode) is HTTP 2XX indicating the external catalog was created or 409 indicating it already exists")
       assert(responseCode / 100 == 2 || responseCode == 409)
     }
-    "be given catalog admin grants" ignore grantCatalogAdmin()
-    "be given the catalog roles" ignore catalogRoles()
-    "can be queried via Spark" ignore {
+    "be given catalog admin grants" in grantCatalogAdmin()
+    "be given the catalog roles" in catalogRoles()
+    "can be queried via Spark" in {
       Given(f"a namespace called $FEDERATED_CATALOG_NAME")
       val sparkConf = sparkWarehouse.sparkConf(4, FEDERATED_CATALOG_NAME)
       val spark: SparkSession = SparkSession
