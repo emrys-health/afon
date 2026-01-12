@@ -1,13 +1,15 @@
 package health.emrys.afon.acceptance.aws
 
+import health.emrys.afon.config.AfonProperties
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
-object GcpRest {
+object GcpRest extends SpecHelper {
 
   def main(args: Array[String]): Unit = {
     println(s"Using GOOGLE_APPLICATION_CREDENTIALS = ${System.getenv("GOOGLE_APPLICATION_CREDENTIALS")}")
-    val catalog_name = "CATALOG_NAME"
+    val catalog_name = SupportedCloudsEnum.GCP.toString
     val spark = SparkSession.builder.config(new SparkConf().setMaster("local[2]").setAppName("Tests")
         .set(f"spark.sql.catalog.$catalog_name", "org.apache.iceberg.spark.SparkCatalog")
         .set(f"spark.sql.catalog.$catalog_name.type", "rest")
@@ -21,10 +23,14 @@ object GcpRest {
         .set("spark.sql.defaultCatalog", catalog_name))
       .getOrCreate()
 
-      val namespace = "ph_namespace"
+      val namespace = "acceptancetests"
       spark.sql("SHOW NAMESPACES IN emrys_afon_core").show()
       spark.sql(f"CREATE NAMESPACE IF NOT EXISTS $namespace;")
       spark.sql(f"USE $namespace")
-      println("finished without error...")
+
+    spark.createDataFrame(syntheticData(10)).writeTo(tableNameFQN).create()
+    println("finished without error...")
   }
+
+  override def cloudProvider: AfonProperties.SupportedCloudsEnum = SupportedCloudsEnum.GCP
 }
