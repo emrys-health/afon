@@ -15,7 +15,7 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 /**
  * You'll need to run `scripts/aws/create_federated_permissions.sh` first if it's not been done already.
  */
-class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
+class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
 
   val client = AcceptanceTestConfig.instance.getPolarisClient
   val accessToken = AcceptanceTestConfig.instance.getAccessToken()
@@ -34,7 +34,7 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
     val awsRegion         = AWS_REGION.getValueFrom(properties)
 
     "be visible to our Polaris" in {
-      Given(f"a bucket called $externalBucket and somebody has run the command:\n${ExternalTableSpec.glueCmdLine(
+      Given(f"a bucket called $externalBucket and somebody has run the command:\n${ExternalGlueTableSpec.glueCmdLine(
         sparkNamespace, tableName, awsRegion, externalBucket
       )}")
 
@@ -108,7 +108,7 @@ class ExternalTableSpec extends SpecPretifier with GivenWhenThen {
   }
 }
 
-object ExternalTableSpec {
+object ExternalGlueTableSpec {
   def glueCmdLine(dbName: String,
                   tblName: String,
                   region: String,
