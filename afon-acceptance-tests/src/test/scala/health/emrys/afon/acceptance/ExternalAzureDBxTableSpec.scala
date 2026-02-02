@@ -18,7 +18,7 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
  * Test Databricks is actually ready to receive calls with:
  * curl -X GET   https://adb-7405611337270626.6.azuredatabricks.net/api/2.1/unity-catalog/iceberg-rest/v1/catalogs/phdbx/namespaces/default   -H "Authorization: Bearer $DATABRICKS_TOKEN"
  */
-class DBxExternalTableSpec extends SpecPretifier with GivenWhenThen {
+class ExternalAzureDBxTableSpec extends SpecPretifier with GivenWhenThen {
 
   val client      = AcceptanceTestConfig.instance.getPolarisClient
   val accessToken = AcceptanceTestConfig.instance.getAccessToken()
