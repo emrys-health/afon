@@ -1,6 +1,6 @@
-package health.emrys.afon.acceptance.aws
+package health.emrys.afon.acceptance
 
-import health.emrys.afon.acceptance.aws.SparkHelper.sparkWarehouse
+import SparkHelper.sparkWarehouse
 import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_BUCKET_NAME, AWS_S3_EXTERNAL_BUCKET_NAME}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{AwsCloudConfigForPolaris, JsonMaker}

@@ -1,6 +1,6 @@
-package health.emrys.afon.acceptance.aws
+package health.emrys.afon.acceptance
 
-import health.emrys.afon.acceptance.aws.SparkHelper.{namespace, sparkWarehouse}
+import SparkHelper.{namespace, sparkWarehouse}
 import health.emrys.afon.config.AfonProperties
 import uk.co.odinconsultants.documentation_utils.Datum
 

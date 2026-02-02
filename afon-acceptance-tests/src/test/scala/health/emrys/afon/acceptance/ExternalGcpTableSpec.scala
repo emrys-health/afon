@@ -1,6 +1,6 @@
-package health.emrys.afon.acceptance.aws
+package health.emrys.afon.acceptance
 
-import health.emrys.afon.acceptance.aws.SparkHelper.sparkWarehouse
+import SparkHelper.sparkWarehouse
 import health.emrys.afon.config.AfonProperties.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{GoogleCloudConfigForPolaris, JsonMaker}
@@ -47,7 +47,7 @@ class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
     }
     "be given catalog admin grants" in grantCatalogAdmin()
     "be given the catalog roles" in catalogRoles()
-    "can be queried via Spark" ignore { // to work, this needs this Polaris JIRA to be fixed https://github.com/apache/polaris/issues/3451
+    "can be queried via Spark" ignore { // to work, this needs this Polaris issue to be fixed https://github.com/apache/polaris/issues/3451
       Given(f"a namespace called $FEDERATED_CATALOG_NAME")
       val sparkConf = sparkWarehouse.sparkConf(4, FEDERATED_CATALOG_NAME)
 

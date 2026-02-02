@@ -1,4 +1,4 @@
-package health.emrys.afon.acceptance.aws
+package health.emrys.afon.acceptance
 
 import health.emrys.afon.config.AfonProperties
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris

@@ -1,6 +1,6 @@
-package health.emrys.afon.acceptance.aws
+package health.emrys.afon.acceptance
 
-import health.emrys.afon.acceptance.aws.SparkHelper.spark
+import SparkHelper.spark
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import uk.co.odinconsultants.documentation_utils.Datum
