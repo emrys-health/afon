@@ -1,6 +1,6 @@
-package health.emrys.afon.acceptance.aws
+package health.emrys.afon.acceptance
 
-import health.emrys.afon.acceptance.aws.SparkHelper.sparkWarehouse
+import SparkHelper.sparkWarehouse
 import health.emrys.afon.config.AfonProperties.{AZURE_BUCKET, DATABRICKS_TOKEN}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, JsonMaker}

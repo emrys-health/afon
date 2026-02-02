@@ -1,7 +1,6 @@
-package health.emrys.afon.acceptance.aws;
+package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.PolarisConstants;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;

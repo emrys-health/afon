@@ -1,6 +1,6 @@
-package health.emrys.afon.acceptance.aws
+package health.emrys.afon.acceptance
 
-import health.emrys.afon.acceptance.aws.SparkHelper.{namespace, spark}
+import SparkHelper.{namespace, spark}
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCatalogAdminGrantsURI, getCatalogRolesURI, getCreateCatalogURI}
 import org.scalatest.GivenWhenThen

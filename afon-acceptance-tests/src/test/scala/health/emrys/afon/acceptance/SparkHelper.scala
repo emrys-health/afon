@@ -1,6 +1,6 @@
-package health.emrys.afon.acceptance.aws
+package health.emrys.afon.acceptance
 
-import health.emrys.afon.acceptance.aws.AcceptanceTestConfig.instance
+import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
 import health.emrys.afon.spark.SparkWarehouseConfig
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
