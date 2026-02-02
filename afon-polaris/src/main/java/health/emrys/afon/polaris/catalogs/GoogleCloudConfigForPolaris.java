@@ -1,7 +1,8 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.AfonProperties;
-import org.apache.polaris.core.admin.model.*;
+import org.apache.polaris.core.admin.model.Catalog;
+import org.apache.polaris.core.admin.model.CreateCatalogRequest;
+import org.apache.polaris.core.admin.model.GcpStorageConfigInfo;
 
 import java.util.List;
 import java.util.Properties;
@@ -22,9 +23,12 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
 
     @Override
     public String catalogConfig() throws IncorrectConfigException {
-        StorageConfigInfo storageConfigInfo = new GcpStorageConfigInfo(serviceAccount, GCS, List.of(bucket));
-        Catalog catalog = createCatalog(bucket, storageConfigInfo);
+        Catalog catalog = createCatalog(bucket, getStorageConfigInfo());
         return toJson(new CreateCatalogRequest(catalog));
+    }
+
+    public GcpStorageConfigInfo getStorageConfigInfo() {
+        return new GcpStorageConfigInfo(serviceAccount, GCS, List.of(bucket));
     }
 
     @Override
