@@ -28,7 +28,7 @@ class ExternalAzureDBxTableSpec extends SpecPretifier with GivenWhenThen {
   "An external table" should {
     val properties        = new AfonPropertiesLoader().getProperties
     val externalBucket    = AZURE_BUCKET.getValueFrom(properties)
-    properties.setProperty(AZURE_BUCKET.getPropertyName, externalBucket + "Fake") // TODO get a proper bucket we can use for federation
+    properties.setProperty(AZURE_BUCKET.getPropertyName, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
     val config            = new AzureCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
@@ -75,7 +75,7 @@ class ExternalAzureDBxTableSpec extends SpecPretifier with GivenWhenThen {
     val bucketProperties = CatalogProperties
       .builder()
 //      .setDefaultBaseLocation(config.getBucketUri) // needs to be different to any other Polaris knows about
-      .setDefaultBaseLocation("abfss://unity-catalog-storage@dbstorageipvnyon4atfem.dfs.core.windows.net/7405611337270626/__unitystorage/catalogs") // needs to be different to any other Polaris knows about
+      .setDefaultBaseLocation("abfss://unity-catalog-storage@dbstorageipvnyon4atfem.dfs.core.windows.net/7405611337270626/__unitystorage/catalogs/92a89c86-f5de-4c3c-9fd0-2f0bc68b5888/tables/c8316ca8-4aa3-4b04-8248-fa560bba8463")
       .build()
 
     val dbToken =
