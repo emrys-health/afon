@@ -26,10 +26,6 @@ class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
   "An external GCP table" should {
 
     val properties        = new AfonPropertiesLoader().getProperties
-//    properties.setProperty(GCP_BUCKET_NAME.getPropertyName,"emrys_afon_core_2")
-//    properties.remove(GOOGLE_APPLICATION_CREDENTIALS.getPropertyName)
-//    properties.setProperty(GCP_SERVICE_ACCOUNT.getPropertyName,"764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com")
-//    print("properties = " + properties)
     val config            = new GoogleCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
@@ -55,11 +51,6 @@ class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
 
     val sparkNamespace = "ph_namespace"
     val sparkConf = sparkWarehouse.sparkConf(4, FEDERATED_CATALOG_NAME)
-    //      sparkConf.set(f"spark.sql.catalog.$FEDERATED_CATALOG_NAME.header.x-goog-user-project", "fjords-450014")
-    //      sparkConf.set(f"spark.sql.catalog.$FEDERATED_CATALOG_NAME.warehouse", "gs://emrys_afon_core_2")
-    //      System.setProperty("GOOGLE_APPLICATION_CREDENTIALS",
-    //        """{ "type": "service_account", "project_id": "fjords-450014", "private_key_id": "***REMOVED***", "private_key": "-----BEGIN PRIVATE KEY-----REMOVED-----END PRIVATE KEY-----\n", "client_email": "my-vendable-sa@fjords-450014.iam.gserviceaccount.com", "client_id": "103905077815523834346", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token", "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs", "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/my-vendable-sa%40fjords-450014.iam.gserviceaccount.com", "universe_domain": "googleapis.com", "quota_project_id": "fjords-450014" }""");
-    //      println(s"Using GOOGLE_APPLICATION_CREDENTIALS = ${System.getenv("GOOGLE_APPLICATION_CREDENTIALS")}")
     val spark: SparkSession = SparkSession
       .builder()
       .config(sparkConf)
@@ -91,9 +82,6 @@ class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
       .setDefaultBaseLocation(f"gs://$BUCKET") // TODO make configurable
       .build()
 
-    // causes HTTP 400 invalid_grant on the Polaris/GCP side for /home/henryp/.config/gcloud_works2/application_default_credentials.json
-//    val clientId = "764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com" //my-vendable-sa@fjords-450014.iam.gserviceaccount.com" // from GCP props
-//    val clientSecret = "***REMOVED***" //GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties)    val clientId = "764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com" //my-vendable-sa@fjords-450014.iam.gserviceaccount.com" // from GCP props
     val scopes = java.util.List.of[String](
       GoogleAuthManager.DEFAULT_SCOPES
     )
