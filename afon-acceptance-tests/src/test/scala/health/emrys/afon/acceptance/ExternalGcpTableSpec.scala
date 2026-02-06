@@ -77,9 +77,10 @@ class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
   // Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
   private def externalCatalogJson(properties: Properties): String = {
     val config = new GoogleCloudConfigForPolaris(properties)
+    val warehouse = f"gs://$BUCKET"
     val bucketProperties = CatalogProperties
       .builder()
-      .setDefaultBaseLocation(f"gs://$BUCKET") // TODO make configurable
+      .setDefaultBaseLocation(warehouse) // TODO make configurable
       .build()
 
     val scopes = java.util.List.of[String](
@@ -96,7 +97,8 @@ class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
         AuthenticationTypeEnum.OAUTH // OAuth leads to: Malformed request: Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
       )
 
-    val connectionInfo = new ConnectionConfigInfo(
+    val connectionInfo = new IcebergRestConnectionConfigInfo(
+      warehouse,
       ConnectionTypeEnum.ICEBERG_REST,
       "https://biglake.googleapis.com/iceberg/v1/restcatalog",
       authenticationParameters,
