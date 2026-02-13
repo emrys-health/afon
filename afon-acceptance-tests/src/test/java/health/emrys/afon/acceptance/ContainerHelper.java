@@ -48,6 +48,7 @@ public class ContainerHelper {
                     // AWS
                     .withEnv(AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties))
                     .withEnv(AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties))
+                    .withEnv(AWS_REGION.getPropertyName(), AWS_REGION.getValueFrom(properties))
                     // Azure
                     .withEnv(AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties))
                     .withEnv(AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties))
