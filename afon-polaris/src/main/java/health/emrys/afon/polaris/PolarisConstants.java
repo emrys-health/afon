@@ -1,24 +1,44 @@
 package health.emrys.afon.polaris;
 
+import health.emrys.afon.config.AfonProperty;
+
+import java.util.Set;
+
+import static health.emrys.afon.config.AfonProperties.*;
+
 public class PolarisConstants {
 
-    public static final int DEBUG_PORT = 5006;
+  public static final int DEBUG_PORT = 5006;
 
-    public static final String POLARIS_CMD = String.format("""
-            cd /deployments && java 
-            -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:%d
-            -D"polaris.features.\\"SUPPORTED_CATALOG_CONNECTION_TYPES\\"=[\\"ICEBERG_REST\\", \\"HIVE\\"]" 
-            -D"polaris.features.\\"ENABLE_CATALOG_FEDERATION\\"=true" 
-            -XX:MaxRAMPercentage=80.0 
-            -XX:+UseParallelGC 
-            -XX:MinHeapFreeRatio=10 
-            -XX:MaxHeapFreeRatio=20 
-            -XX:GCTimeRatio=4 
-            -XX:AdaptiveSizePolicyWeight=90 
-            -XX:+ExitOnOutOfMemoryError 
-            -cp . 
-            -jar /deployments/quarkus-run.jar""", DEBUG_PORT).replaceAll("\\s+", " ").trim();
+  public static final String POLARIS_CMD
+      = String.format("""
+                          cd /deployments && java 
+                          -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:%d
+                          -D"polaris.features.\\"SUPPORTED_CATALOG_CONNECTION_TYPES\\"=[\\"ICEBERG_REST\\", \\"HIVE\\"]" 
+                          -D"polaris.features.\\"ENABLE_CATALOG_FEDERATION\\"=true" 
+                          -XX:MaxRAMPercentage=80.0 
+                          -XX:+UseParallelGC 
+                          -XX:MinHeapFreeRatio=10 
+                          -XX:MaxHeapFreeRatio=20 
+                          -XX:GCTimeRatio=4 
+                          -XX:AdaptiveSizePolicyWeight=90 
+                          -XX:+ExitOnOutOfMemoryError 
+                          -cp . 
+                          -jar /deployments/quarkus-run.jar""", DEBUG_PORT).replaceAll("\\s+", " ").trim();
 
-    public static final String POLARIS_IMAGE_NAME = "apache/polaris:1.3.0-incubating";
+  public static final String POLARIS_IMAGE_NAME = "apache/polaris:1.3.0-incubating";
+
+  public static final Set<AfonProperty> POLARIS_PROPERTIES
+      = Set.of(
+      AWS_ACCESS_KEY_ID,
+      AWS_SECRET_ACCESS_KEY,
+      AWS_REGION,
+      AZURE_CLIENT_SECRET,
+      AZURE_CLIENT_ID,
+      AZURE_TENANT_ID,
+      POLARIS_ID,
+      POLARIS_SECRET
+              );
+
 
 }
