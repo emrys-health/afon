@@ -12,13 +12,17 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.POLARIS_SERVICE_NAME;
+import static health.emrys.afon.polaris.PolarisConstants.POLARIS_IMAGE_NAME;
+import static health.emrys.afon.polaris.PolarisConstants.POLARIS_PROPERTIES;
 import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
@@ -59,28 +63,21 @@ public class PolarisConfig extends Construct {
         return properties;
     }
 
-    private static String getProviderCredentials(Properties properties) {
-
+    static String getProviderCredentials(Properties properties) {
+        List<String> exports = POLARIS_PROPERTIES
+            .stream()
+            .map(x ->  format("export %s=%s", x.getPropertyName(), x.getValueFrom(properties)))
+            .sorted()
+            .toList();
         return format("""
-                              export POLARIS_ID=root
-                              export POLARIS_SECRET=s3cr3t
-                              
-                              export %s=%s
-                              export %s=%s
-                              export %s=%s
-                              export %s=%s
-                              export %s=%s
+                              %s
                               export %s='%s'
                               
                               export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL=DEBUG
                               export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL=DEBUG
                               export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL=INFO
                               """,
-                      AWS_ACCESS_KEY_ID.getPropertyName(), AWS_ACCESS_KEY_ID.getValueFrom(properties),
-                      AWS_SECRET_ACCESS_KEY.getPropertyName(), AWS_SECRET_ACCESS_KEY.getValueFrom(properties),
-                      AZURE_CLIENT_ID.getPropertyName(), AZURE_CLIENT_ID.getValueFrom(properties),
-                      AZURE_TENANT_ID.getPropertyName(), AZURE_TENANT_ID.getValueFrom(properties),
-                      AZURE_CLIENT_SECRET.getPropertyName(), AZURE_CLIENT_SECRET.getValueFrom(properties),
+                      String.join("\n", exports),
                       GOOGLE_APPLICATION_CREDENTIALS.getPropertyName(), SECRETS_DIR + "/" + GCP_CRED_FILE
                      );
     }
@@ -107,7 +104,7 @@ public class PolarisConfig extends Construct {
                                                SECRETS_DIR, POLARIS_ENV_FILE));
         DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer.builder()
                                                                                                   .name("polaris")
-                                                                                                  .image("apache/polaris:1.1.0-incubating")
+                                                                                                  .image(POLARIS_IMAGE_NAME)
 //                                                                                                  .env(envVars)
                                                                                                   .command(commands)
                                                                                                   .volumeMount(mounts)
