@@ -5,6 +5,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
@@ -58,7 +59,26 @@ class AwsWholeStack extends AwsKubernetesPolaris {
         // no long exposing HTTP Polaris
         loadBalancers = List.of(jupyterLB);
 
-        HelmProvider helm = HelmProvider.Builder.create(this, "helm").build();
+        HelmProvider helm = HelmProvider.Builder.create(this, "helm")
+                .kubernetes(HelmProviderKubernetes.builder()
+                        .host(cloudProvider.getClusterEndpoint())
+                        .clusterCaCertificate(com.hashicorp.cdktf.Fn.base64decode(cloudProvider.getBase64CertData()))
+                        .token(cloudProvider.getToken())
+                        .build())
+                .build();
+//        HelmProvider helm = HelmProvider.Builder.create(this, "helm").build();
+        this.addOverride("terraform.required_providers.aws", Map.of(
+            "source", "hashicorp/aws",
+            "version", "6.27.0"   // 👈 Pin exact version
+                                                                    ));
+        this.addOverride("terraform.required_providers.helm", Map.of(
+            "source", "hashicorp/helm",
+            "version", "3.1.1"   // 👈 Pin exact version
+                                                                    ));
+        this.addOverride("terraform.required_providers.kubernetes", Map.of(
+            "source", "hashicorp/kubernetes",
+            "version", "3.0.1"   // 👈 Pin exact version
+                                                                    ));
 
         calico = calico(dependables);
 
@@ -294,6 +314,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                               .name("tigera-operator")
                               .dependsOn(eksDependOn)
                               .chart("tigera-operator")
+                              .version("v3.28.0")
                               .cleanupOnFail(true)
                               .disableCrdHooks(true)
                               .disableWebhooks(true)
@@ -322,6 +343,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                        .name("csi-secrets-store") // The release name
                        .chart("secrets-store-csi-driver") // The chart name within the repository
+                       .version("1.5.4")
                        .repository("https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts")
                        .namespace("kube-system") // Target Kubernetes namespace
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize

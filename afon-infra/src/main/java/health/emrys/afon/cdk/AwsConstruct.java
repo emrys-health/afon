@@ -444,6 +444,7 @@ public class AwsConstruct extends AbstractConstruct {
                               .dependsOn(dependencies)
                               .name(serviceAccountName + "-chart")
                               .chart("aws-load-balancer-controller")
+                              .version("1.17.0")
                               .repository("https://aws.github.io/eks-charts")
                               .namespace("kube-system")
                               .timeout(600)
