@@ -66,7 +66,7 @@ You should see Polaris and Jupyter.
 Relax, dear reader. 
 For this, we need to run:
 
-`mvn -Dexec.mainClass=health.emrys.afon.cdk.SparkClusterDeployment exec:java`
+`mvn compile -Dexec.mainClass=health.emrys.afon.cdk.SparkClusterDeployment exec:java`
 
 In the same directory, you'll see a new `cdk.tf.json`. 
 So, run `tofu apply -auto-approve` again.

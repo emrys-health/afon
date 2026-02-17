@@ -170,6 +170,12 @@ public class SparkClusterDeployment extends AwsWholeStack {
                               .build();
     }
 
+    /**
+     * Turned all Spark logging on. Probably too much. But watch the SQL executed with:
+     * <code>
+     * kubectl logs -f spark-connector-0-driver  | egrep -i 'SparkSqlParser|iceberg'
+     * </code>
+     */
     private Map<String, String> sparkConfig(String serviceAccountName) {
         var first = Map.of(
                 "spark.kubernetes.container.image", "apache/spark:4.0.1",
@@ -216,10 +222,9 @@ public class SparkClusterDeployment extends AwsWholeStack {
         );
         for (AfonProperties.SupportedCloudsEnum cloudProvider : AfonProperties.SupportedCloudsEnum.values()) {
             Map<String, String> configs = sparkWarehouseConfig.sparkConfigs(cloudProvider);
-            for (Map.Entry<String, String> entry : configs.entrySet()) {
-                toReturn.put(entry.getKey(), entry.getValue());
-            }
+            toReturn.putAll(configs);
         }
+        toReturn.putAll(sparkWarehouseConfig.sparkConfigs("federatedCatalogName")); // taken from afon.properties
         return toReturn;
     }
 
