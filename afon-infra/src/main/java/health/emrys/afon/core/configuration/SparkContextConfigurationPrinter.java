@@ -129,7 +129,7 @@ public class SparkContextConfigurationPrinter {
                               spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {az_namespace}")
                               print(f"Created namespace {az_namespace}")
                               
-                              spark.sql(f"CREATE TABLE {az_fqn} (name String, num Integer) USING iceberg")
+                              spark.sql(f"CREATE TABLE IF NOT EXISTS {az_fqn} (name String, num Integer) USING iceberg")
                               df_test.writeTo(az_fqn).append()
                               
                               df_read = spark.read.table(f"{az_namespace}.%s")
