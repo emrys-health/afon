@@ -2,6 +2,7 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
+import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
@@ -21,6 +22,11 @@ public class SparkConfig extends Construct {
                                                       .repository("https://apache.github.io/spark-kubernetes-operator")
                                                       .namespace("default")
                                                       .atomic(true)
+                                                      .set(List.of(
+                                                              ReleaseSet.builder()
+                                                                        .name("operatorConfiguration.log4j2\\.properties")
+                                                                        .value("rootLogger.level=DEBUG")
+                                                                        .build()))
                                                       .dependsOn(eksDependOn) // Depend on EKS Auth
                                                       .build();
         /*
