@@ -88,8 +88,8 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                 "podTemplateSpec", Map.of(
                                         "spec", Map.of(
                                                 "resources", Map.of(
-                                                        "limits", Map.of("ephemeralStorage", "4Gi"),
-                                                        "requests", Map.of("ephemeralStorage", "2Gi")
+                                                        "limits", Map.of("ephemeralStorage", "16Gi"),
+                                                        "requests", Map.of("ephemeralStorage", "8Gi")
                                                                    ),
                                                 "restartPolicy", "Always"
                                                       )
@@ -188,7 +188,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
                 "spark.sql.iceberg.planning.preserve-data-grouping", "true",
                 "spark.sql.sources.v2.bucketing.enabled", "true",
                 "spark.sql.sources.bucketing.enabled", "true",
-                "spark.jars.packages", "com.google.guava:guava:33.4.0-jre,org.apache.hadoop:hadoop-aws:3.4.2,com.google.cloud:google-cloud-storage:2.57.0,software.amazon.awssdk:bundle:2.34.6,org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.0",
+                "spark.jars.packages", "com.google.guava:guava:33.4.0-jre,org.apache.hadoop:hadoop-aws:3.4.2,com.google.cloud:google-cloud-storage:2.57.0,software.amazon.awssdk:bundle:2.34.6,org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.0,org.apache.hadoop:hadoop-azure:3.3.4",
                 "spark.driver.userClassPathFirst", "true",
                 "spark.executor.userClassPathFirst", "true",
                 "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
