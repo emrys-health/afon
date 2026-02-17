@@ -13,11 +13,17 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
     private final String bucket;
     private final String region;
 
-    public AwsCloudConfigForPolaris(Properties properties) {
+    protected AwsCloudConfigForPolaris(String roleArn, String bucket, String region) {
         super(new JsonMaker());
-        this.roleArn       = AWS_S3_ROLE_ARN.getValueFrom(properties);
-        this.bucket        = "s3a://" + AWS_S3_BUCKET_NAME.getValueFrom(properties);
-        this.region        = AWS_REGION.getValueFrom(properties);
+        this.roleArn = roleArn;
+        this.bucket  = bucket;
+        this.region  = region;
+    }
+
+    public AwsCloudConfigForPolaris(Properties properties) {
+        this(AWS_S3_ROLE_ARN.getValueFrom(properties),
+             "s3a://" + AWS_S3_BUCKET_NAME.getValueFrom(properties),
+             AWS_REGION.getValueFrom(properties));
     }
 
     @Override
@@ -39,6 +45,18 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
     @Override
     public String warehouseName() {
         return SupportedCloudsEnum.AWS.toString();
+    }
+
+    public String getRoleArn() {
+        return roleArn;
+    }
+
+    public String getBucket() {
+        return bucket;
+    }
+
+    public String getRegion() {
+        return region;
     }
 
     @Override
