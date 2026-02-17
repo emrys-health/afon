@@ -42,6 +42,7 @@ public class PolarisConfigureMain {
                 new AwsCloudConfigForPolaris(properties),
                 new GoogleCloudConfigForPolaris(properties),
                 new AzureCloudConfigForPolaris(properties),
+                new GlueCloudConfigForPolaris(properties),
                 };
         for (CloudConfigForPolaris config : configs) {
             logger.info("Configuring {}", config.warehouseName());
