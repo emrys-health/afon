@@ -19,6 +19,8 @@ public class AfonProperties {
     public static final AfonProperty AWS_S3_BUCKET_NAME          = new AfonProperty("AWS_S3_BUCKET_NAME");
     public static final AfonProperty AWS_S3_EXTERNAL_BUCKET_NAME = new AfonProperty("AWS_S3_EXTERNAL_BUCKET_NAME");
     public static final AfonProperty AWS_S3_ROLE_ARN             = new AfonProperty("AWS_S3_ROLE_ARN");
+    public static final AfonProperty GLUE_S3_ROLE_ARN            = new AfonProperty("GLUE_S3_ROLE_ARN");
+    public static final AfonProperty GLUE_CATALOG_NAME           = new AfonProperty("GLUE_CATALOG_NAME");
     public static final AfonProperty AWS_REGION                  = new AfonProperty("AWS_REGION");
     public static final AfonProperty AWS_ACCESS_KEY_ID           = new AfonProperty("AWS_ACCESS_KEY_ID");
     public static final AfonProperty AWS_SECRET_ACCESS_KEY       = new AfonProperty("AWS_SECRET_ACCESS_KEY");

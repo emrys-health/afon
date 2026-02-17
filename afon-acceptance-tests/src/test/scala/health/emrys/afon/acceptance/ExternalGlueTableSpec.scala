@@ -1,13 +1,10 @@
 package health.emrys.afon.acceptance
 
-import SparkHelper.sparkWarehouse
-import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_BUCKET_NAME, AWS_S3_EXTERNAL_BUCKET_NAME}
+import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
+import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_BUCKET_NAME, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
 import health.emrys.afon.config.AfonPropertiesLoader
-import health.emrys.afon.polaris.catalogs.{AwsCloudConfigForPolaris, JsonMaker}
+import health.emrys.afon.polaris.catalogs.{AwsCloudConfigForPolaris, GlueCloudConfigForPolaris}
 import health.emrys.afon.polaris.comms.PolarisConfigurer
-import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
-import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
-import org.apache.polaris.core.admin.model._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
@@ -20,15 +17,13 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
   val client = AcceptanceTestConfig.instance.getPolarisClient
   val accessToken = AcceptanceTestConfig.instance.getAccessToken()
 
-  val FEDERATED_CATALOG_NAME = "federatedCatalogName"
-
   "An external table" should {
     val properties        = new AfonPropertiesLoader().getProperties
+    val glueCatalogName   = GLUE_CATALOG_NAME.getValueFrom(properties)
     val externalBucket    = AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)
-    properties.setProperty(AWS_S3_BUCKET_NAME.getPropertyName, externalBucket)
-    val config            = new AwsCloudConfigForPolaris(properties)
-    val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
-    val catalogRoles      = new CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
+    val config            = new GlueCloudConfigForPolaris(properties)
+    val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(config.warehouseName()))
+    val catalogRoles      = new CatalogRoles(this, config, Some(config.warehouseName))
     val tableName         = "DatumAccTest2"
     val sparkNamespace    = "ph_glue_iceberg_db"
     val awsRegion         = AWS_REGION.getValueFrom(properties)
@@ -38,7 +33,7 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
         sparkNamespace, tableName, awsRegion, externalBucket
       )}")
 
-      val json: String = externalCatalogJson(awsRegion, externalBucket, config)
+      val json: String = config.catalogConfig()
       val uri: String  = PolarisConfigurer.getCreateCatalogURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
@@ -53,15 +48,15 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
     "be given catalog admin grants" in grantCatalogAdmin()
     "be given the catalog roles" in catalogRoles()
     "can be queried via Spark" in {
-      Given(f"a namespace called $FEDERATED_CATALOG_NAME")
-      val sparkConf = sparkWarehouse.sparkConf(4, FEDERATED_CATALOG_NAME)
+      Given(f"a namespace called $glueCatalogName")
+      val sparkConf = sparkWarehouse.sparkConf(4, glueCatalogName)
       val spark: SparkSession = SparkSession
         .builder()
         .config(sparkConf)
         .getOrCreate()
 
-      val nsSQL = s"CREATE NAMESPACE IF NOT EXISTS $FEDERATED_CATALOG_NAME.$sparkNamespace"
-      val sql = String.format("SELECT * FROM %s.%s.%s", FEDERATED_CATALOG_NAME, sparkNamespace, tableName)
+      val nsSQL = s"CREATE NAMESPACE IF NOT EXISTS $glueCatalogName.$sparkNamespace"
+      val sql = String.format("SELECT * FROM %s.%s.%s", glueCatalogName, sparkNamespace, tableName)
       When(f"we execute:\n$nsSQL\n$sql")
       spark.sql(nsSQL)
 
@@ -70,42 +65,6 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
     }
   }
 
-
-  private def externalCatalogJson(region: String, externalBucket: String, config: AwsCloudConfigForPolaris): String = {
-    val bucketProperties = CatalogProperties
-      .builder()
-      .setDefaultBaseLocation(f"s3a://$externalBucket") // needs to be different to any other Polaris knows about
-      .build()
-
-    val glueIcebergRole =
-      new SigV4AuthenticationParameters(
-        "arn:aws:iam::418295715997:role/GlueIcebergRole",
-        null,
-        null,
-        region,
-        "glue",
-        AuthenticationTypeEnum.SIGV4
-      )
-
-    val connectionInfo = new ConnectionConfigInfo(
-      ConnectionTypeEnum.ICEBERG_REST,
-      f"https://glue.$region.amazonaws.com/iceberg",
-      glueIcebergRole,
-      null)
-
-    val catalog =
-      new ExternalCatalog(
-        connectionInfo,
-        Catalog.TypeEnum.EXTERNAL,
-        FEDERATED_CATALOG_NAME,
-        bucketProperties,
-        System.currentTimeMillis(),
-        System.currentTimeMillis(),
-        null,
-        config.getStorageConfigInfo())
-
-    new JsonMaker().toJson(new CreateCatalogRequest(catalog))
-  }
 }
 
 object ExternalGlueTableSpec {
