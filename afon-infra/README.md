@@ -26,7 +26,7 @@ for each cloud provider. Then run:
 ```shell
 cd cdktf.out/stacks/jupyter-deployment
 tofu init
-tofu apply -target=aws_eks_cluster.jupyter-deployment_eksCluster_74A46137 --auto-approve
+tofu apply -target=data.aws_eks_cluster_auth.$(grep -oE 'jupyter-deployment_eksClusterAuthData_[A-Z0-9]*' cdk.tf.json | head -1) --auto-approve
 tofu apply -auto-approve
 ````
 
@@ -45,7 +45,16 @@ If you want to create config for the whole stack in AWS, run:
 `mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsWholeStack exec:java`
 
 This will output your `cdk.tf.json` file.
-Run it with `tofu apply -auto-approve` if you are happy with it.
+Run it with:
+```shell
+tofu apply -target=data.aws_eks_cluster_auth.$(grep -oE 'jupyter-deployment_eksClusterAuthData_[A-Z0-9]*' cdk.tf.json | head -1) --auto-approve
+tofu apply -auto-approve
+```
+if you are happy with it.
+
+Note the two step process is because Helm needs the K8s cluster up and running before the TF manifest can be deployed.
+This is an inconvenient bug.
+
 (If it's being run for the first time, you must run `tofu init` first).
 After about 10 minutes, you should have a working cluster.
 Check this by running `kubectl get pods`. 
