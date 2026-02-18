@@ -74,6 +74,20 @@ public class SparkContextConfigurationPrinter {
         System.out.println(awsSmokeTest(tableName));
         System.out.println(gcpSmokeTest(tableName));
         System.out.println(azureSmokeTest(tableName));
+        System.out.println(String.format("""
+                               spark.sql("CREATE NAMESPACE IF NOT EXISTS federatedCatalogName.ph_glue_iceberg_db")
+                               spark.read.table("federatedCatalogName.ph_glue_iceberg_db.DatumAccTest2").show()
+                               
+                               df_gcp = spark.read.table(f"{gcp_namespace}.%s")
+                               df_azure = spark.read.table(f"{az_namespace}.%s")
+                               df_aws = spark.read.table(f"{aws_namespace}.%s")
+                               df_joined = (
+                                   df_gcp
+                                   .join(df_azure, on="name", how="inner")
+                                   .join(df_aws, on="name", how="inner")
+                               )
+                               df_joined.show()
+                               """, tableName, tableName, tableName));
 
         System.out.println("\u001B[34m");
         System.out.println(format("""

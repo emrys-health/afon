@@ -62,6 +62,17 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
 
       Then("we can query the table")
       spark.sql(sql).show()
+      And(
+        f"""
+          |this result is the same as if we had run:
+          |
+          |aws athena start-query-execution \\
+          |  --query-string "SELECT * FROM ${glueCatalogName}.${tableName} LIMIT 10;" \\
+          |  --query-execution-context Database=${glueCatalogName} \\
+          |  --result-configuration OutputLocation=${externalBucket}/AwsAccessSpec251117511401/
+          |aws athena get-query-execution --query-execution-id QUERY_ID_FROM_ABOVE
+          |aws s3 cp OUTPUT_LOCATION_FROM_ABOVE -
+          |""".stripMargin)
     }
   }
 
