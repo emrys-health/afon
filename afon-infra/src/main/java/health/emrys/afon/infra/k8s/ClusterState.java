@@ -15,6 +15,7 @@ import static java.lang.String.format;
 public class ClusterState implements AutoCloseable {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterState.class);
+    public static final String ACCESS_TOKEN_SYS_PROP = "ACCESS_TOKEN";
 
     private final String           accessToken;
     private final GenericK8sClient k8sClient;
@@ -25,7 +26,13 @@ public class ClusterState implements AutoCloseable {
         V1Pod  polarisPod = k8sClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME);
         String podName    = polarisPod.getMetadata().getName();
         logger.info("Pod Name: {}", podName);
-        accessToken = new PolarisCredentialGrabber().getCredentials(k8sClient.getLogsOf(podName));
+        String tokenFromSysProp = System.getProperty(ACCESS_TOKEN_SYS_PROP);
+        if (tokenFromSysProp == null) {
+            logger.info("Access Token not set as the system property " + ACCESS_TOKEN_SYS_PROP);
+            accessToken = new PolarisCredentialGrabber().getCredentials(k8sClient.getLogsOf(podName));
+        } else {
+            accessToken = tokenFromSysProp;
+        }
         polarisHost = k8sClient.getIngressExpectingOnlyOneFor(POLARIS_SERVICE_NAME);
         logger.info("Polaris is available to the outside world at: {}", polarisHost);
     }

@@ -1,15 +1,20 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class PrometheusClusterDeploy extends SparkClusterDeployment {
+
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(PrometheusClusterDeploy.class);
+
     public PrometheusClusterDeploy(@NotNull Construct scope, @NotNull String id) {
         super(scope, id);
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
@@ -58,5 +63,16 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
                        // Ensure the release depends on the namespace being created first
                        .dependsOn(eksDependOn)
                        .build();
+    }
+
+    public static void main(String[] args) {
+        logger.info("Creating JSON for Prometheus");
+        final App app = new App();
+        try {
+            new PrometheusClusterDeploy(app, AwsKubernetesPolaris.ID);
+            app.synth();
+        } catch (RuntimeException e) {
+            logAndThrow(e);
+        }
     }
 }
