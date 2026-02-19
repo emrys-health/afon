@@ -1,7 +1,7 @@
 This file documents *what* the infrastructure is and *why* we chose it.
 See the [REAMDME](./README.md) file for *how* to create the infrastructure.
 
-A healthy K8s cluster **on AWS** should look something like this:
+A healthy Emrys K8s cluster **on AWS** should look something like this:
 ```shell
 $ kubectl get pods -A
 NAMESPACE         NAME                                                  READY   STATUS    RESTARTS   AGE
@@ -84,4 +84,14 @@ When Emrys offers services to the outside world (for example, Jupyter and Polari
 But how does K8s tell the outside world how to access it? 
 Well, if the K8s cluster lives in AWS, it can use AWS load balancers and these pods co-ordinate that.
 
+The pods beginning with `aws-node-*` assign IP addresses to the others. 
+These IP addresses are valid outside the K8s cluster but only within the AWS VPC.
+
+The `coredns-*` and `kube-proxy-*` pods are standard in K8s and manage the domain name and traffic routing **within** the cluster.
+
+## The `tigera-operator` and `calico-system`
+
+The `tigera-operator-*` pod manages Calico, the network controller for traffic within the K8s cluster. 
+It's thanks to Calico that we can limit network traffic out of the cluster and stop exfiltration. 
+The network constraint code currently lives [here](./src/main/java/health/emrys/afon/cdk/AwsWholeStack.java)
 
