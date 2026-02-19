@@ -10,6 +10,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.infra.EmrysCloud;
+import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import io.kubernetes.client.openapi.ApiException;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.infra.Defaults.*;
+import static health.emrys.afon.infra.k8s.ClusterState.ACCESS_TOKEN_SYS_PROP;
 
 public class SparkClusterDeployment extends AwsWholeStack {
 
@@ -229,6 +231,32 @@ public class SparkClusterDeployment extends AwsWholeStack {
     }
 
     public static void main(String[] args) {
+        try {
+            createSparkDeploymentTerraformFile();
+        } catch (RuntimeException e) {
+            logAndThrow(e);
+        }
+    }
+
+    static void logAndThrow(RuntimeException e) {
+        logger.error(
+            String.format("""
+                It's possible that Kubernetes has not retained all the Polaris logs after they became too large
+                Check if this is the case and if so, get the token (it should look like XXX:YYY - note the colon)
+                and run this again with:
+                
+                    mvn compile exec:java -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy -D%s=XXX:YYY
+                
+                and I'll use that token rather than trying to get it from the cluster.
+                You can get this from either the compressed logs on the Polaris container or running or if
+                the connector is already up and running, use:
+                
+                    kubectl get sparkapplications spark-connector -o yaml
+                """, ACCESS_TOKEN_SYS_PROP), e);
+        throw new RuntimeException(e);
+    }
+
+    private static void createSparkDeploymentTerraformFile() {
         logger.info("Creating JSON for a Spark cluster");
         final App app = new App();
         new SparkClusterDeployment(app, AwsKubernetesPolaris.ID);

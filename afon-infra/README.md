@@ -141,6 +141,11 @@ mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegis
 
 or similar.
 
+Add Prometheus for traffic volume monitoring,
+
+```shell
+mvn compile exec:java -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy
+```
 
 # What the Java code does
 
@@ -163,7 +168,6 @@ In particular, the output of this script should blatt everything:
 ```shell
 mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsConstruct exec:java
 ```
-*Note:* Run the output twice!
 
 ### Addressing the 2-step Spark deployment
 
