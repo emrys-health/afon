@@ -75,9 +75,6 @@ public class SparkContextConfigurationPrinter {
         System.out.println(gcpSmokeTest(tableName));
         System.out.println(azureSmokeTest(tableName));
         System.out.println(String.format("""
-                               spark.sql("CREATE NAMESPACE IF NOT EXISTS federatedCatalogName.ph_glue_iceberg_db")
-                               spark.read.table("federatedCatalogName.ph_glue_iceberg_db.DatumAccTest2").show()
-                               
                                df_gcp = spark.read.table(f"{gcp_namespace}.%s")
                                df_azure = spark.read.table(f"{az_namespace}.%s")
                                df_aws = spark.read.table(f"{aws_namespace}.%s")
@@ -88,6 +85,23 @@ public class SparkContextConfigurationPrinter {
                                )
                                df_joined.show()
                                """, tableName, tableName, tableName));
+        System.out.println("""
+                               spark.sql("CREATE NAMESPACE IF NOT EXISTS federatedCatalogName.ph_glue_iceberg_db")
+                               df_glue = spark.read.table("federatedCatalogName.ph_glue_iceberg_db.DatumAccTest2")
+                               df_glue.show()
+                               
+                               from datetime import date, datetime
+                               df_glue_new = spark.createDataFrame([[1, "label", 2, date(2025, 1, 1), datetime(2025, 1, 1, 10, 30, 0), 42]], ["id", "label", "partitionkey", "date", "timestamp", "randomint"])
+                               df_glue_new.writeTo("federatedCatalogName.ph_glue_iceberg_db.DatumAccTest2").append()
+                               print("finished")
+                               
+                               from pyspark.sql.functions import col
+                               df_joined = (
+                                   df_gcp
+                                   .join(df_glue, col("num") == col("id"), how="inner")
+                               )
+                               df_joined.show()
+                               """);
 
         System.out.println("\u001B[34m");
         System.out.println(format("""
