@@ -1,6 +1,8 @@
 This file documents *what* the infrastructure is and *why* we chose it.
 See the [REAMDME](./README.md) file for *how* to create the infrastructure.
 
+# Pods
+
 A healthy Emrys K8s cluster **on AWS** should look something like this:
 ```shell
 $ kubectl get pods -A
@@ -94,4 +96,18 @@ The `coredns-*` and `kube-proxy-*` pods are standard in K8s and manage the domai
 The `tigera-operator-*` pod manages Calico, the network controller for traffic within the K8s cluster. 
 It's thanks to Calico that we can limit network traffic out of the cluster and stop exfiltration. 
 The network constraint code currently lives [here](./src/main/java/health/emrys/afon/cdk/AwsWholeStack.java)
+
+# Security
+
+Raw tokens are passed between Polaris and clients calling it.
+Therefore, communication must be encrypted.
+Note that in an HTTPS handshake, the client must call a hard-coded list of Certificate Authorities to check the domain
+belongs to who is says it does. 
+For this, we need obviously need a registered domain not just an IP address of a domain name Kubernetes has assigned.
+
+To make AWS aware of it, we need to annotate the Kubernetes Ingress with details that the ALB (AWS Load Balancer) pods
+pick up and use to manipulate the AWS infra outside of our Kubernetes.
+Go to the [Route 53](https://us-east-1.console.aws.amazon.com/route53/v2/hostedzones?region=eu-west-2#) page in the Amazon 
+console to claim and manage the actual domain.
+
 
