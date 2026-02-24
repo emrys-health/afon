@@ -38,7 +38,7 @@ public class AzureConstruct extends AbstractConstruct {
 
         // --- Configuration Constants ---
         final String RESOURCE_GROUP_NAME = "afon_resource_group_aks";
-        final String KUBERNETES_VERSION  = "1.31";
+        final String KUBERNETES_VERSION  = "1.34";
         // -------------------------------
 
         // Authentication should be handled via environment variables (AZURE_CLIENT_ID, etc.)
