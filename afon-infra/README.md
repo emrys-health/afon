@@ -18,11 +18,11 @@ Run the classes for creating HCL to create just Polaris by running (in the `afon
 
 Note that the above will fail as AwsKubernetesPolaris.java is missing an initialised HelmProvider (adding in this will then break the second deployment. For now I would ignore this deployment and focus on the second one.
 
-`mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsKubernetesPolaris exec:java`
+`mvn compile -Dexec.mainClass=health.emrys.afon.cdk.AwsKubernetesPolaris exec:java`
 
-`mvn -Dexec.mainClass=health.emrys.afon.cdk.AzureKubernetesPolaris exec:java`
+`mvn compile -Dexec.mainClass=health.emrys.afon.cdk.AzureKubernetesPolaris exec:java`
 
-`mvn -Dexec.mainClass=health.emrys.afon.cdk.GcpKubernetesPolaris exec:java`
+`mvn compile -Dexec.mainClass=health.emrys.afon.cdk.GcpKubernetesPolaris exec:java`
 
 for each cloud provider. Then run: 
 ```shell
