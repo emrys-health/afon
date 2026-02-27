@@ -1,37 +1,43 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.ITerraformDependable;
-import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
+import com.hashicorp.cdktf.providers.azurerm.data_azurerm_dns_zone.DataAzurermDnsZone;
+import com.hashicorp.cdktf.providers.azurerm.data_azurerm_dns_zone.DataAzurermDnsZoneConfig;
+import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecord;
+import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecordConfig;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import software.constructs.Construct;
 
 import java.util.List;
 
 public class AzureKubernetesPolaris extends AzureKubernetesStack {
+
+    private static final String DOMAIN_NAME = "emryspolarisazure.click";
+
     public AzureKubernetesPolaris(Construct scope, String id) {
         super(scope, id);
-        KubernetesProvider kubernetes = KubernetesProvider.Builder.create(this, "kubernetes-local")
-                                  .configPath("~/.kube/config")
-                                  .build();
+        PolarisConfig polarisConfig  = new PolarisConfig(this, "polaris", cloudProvider);
+        Service       polarisService = polarisConfig.deployPolaris(cloudProvider.getDependables());
+        configureDns(polarisService);
+    }
 
-        CloudProvider localCloud = new CloudProvider() {
+    private static final String DNS_RESOURCE_GROUP = "afon_resource_group";
 
-            @Override
-            public List<ITerraformDependable> getDependables() {
-                return List.of();
-            }
+    private void configureDns(Service polarisService) {
+        DataAzurermDnsZone dnsZone = DataAzurermDnsZone.Builder.create(this, "dns-zone")
+                        .name(DOMAIN_NAME)
+                        .resourceGroupName(DNS_RESOURCE_GROUP)
+                        .build();
 
-            @Override
-            public void configureLoadBalancerDestroy(List<Service> loadBalancers) { }
-
-            @Override
-            public KubernetesProvider configureK8s() {
-                return null;
-            }
-        };
-        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", localCloud);
-        polarisConfig.deployPolaris(List.of());
+        new DnsARecord(this, "polaris-dns", DnsARecordConfig.builder()
+                .name("@")
+                .zoneName(dnsZone.getName())
+                .resourceGroupName(DNS_RESOURCE_GROUP)
+                .ttl(300)
+                .records(List.of(
+                        polarisService.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getIp()
+                ))
+                .build());
     }
 
     public static void main(String[] args) {

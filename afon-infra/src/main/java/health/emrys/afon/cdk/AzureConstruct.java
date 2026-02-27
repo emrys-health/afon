@@ -1,8 +1,8 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
-import com.hashicorp.cdktf.providers.azurerm.data_azurerm_kubernetes_cluster.DataAzurermKubernetesCluster;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesCluster;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterDefaultNodePool;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterIdentity;
@@ -49,8 +49,7 @@ public class AzureConstruct extends AbstractConstruct {
     private static final String DNS_SERVICE_IP       = "10.2.0.10";
     private static final String SUBSCRIPTION_ID      = "ffae1297-4c57-47e0-9a89-5583b97835cf";
 
-    private final KubernetesCluster            aksCluster;
-    private final DataAzurermKubernetesCluster aksData;
+    private final KubernetesCluster aksCluster;
 
     public AzureConstruct(@NotNull Construct scope, @NotNull String id) {
         super(scope, id);
@@ -59,10 +58,6 @@ public class AzureConstruct extends AbstractConstruct {
         UserAssignedIdentity identity      = createIdentity(resourceGroup);
         Subnet               nodeSubnet    = createNetworking(resourceGroup, identity);
         aksCluster = createCluster(resourceGroup, nodeSubnet, identity);
-        aksData    = DataAzurermKubernetesCluster.Builder.create(this, "aks-data")
-                                                         .name(aksCluster.getName())
-                                                         .resourceGroupName(aksCluster.getResourceGroupName())
-                                                         .build();
     }
 
     // -------------------------------------------------------------------------
@@ -225,19 +220,24 @@ public class AzureConstruct extends AbstractConstruct {
     // -------------------------------------------------------------------------
 
     @Override
-    protected String getBase64CertData() {
-        return aksCluster.getKubeConfig().get(0).getClusterCaCertificate();
+    public KubernetesProvider configureK8s() {
+        var cfg = aksCluster.getKubeConfig().get(0);
+        return KubernetesProvider.Builder.create(this, "kubernetes")
+                                         .host(cfg.getHost())
+                                         .clusterCaCertificate(Fn.base64decode(cfg.getClusterCaCertificate()))
+                                         .clientCertificate(Fn.base64decode(cfg.getClientCertificate()))
+                                         .clientKey(Fn.base64decode(cfg.getClientKey()))
+                                         .build();
     }
 
     @Override
-    protected String getClusterEndpoint() {
-        return aksCluster.getKubeConfig().get(0).getHost();
-    }
+    protected String getBase64CertData()  { return aksCluster.getKubeConfig().get(0).getClusterCaCertificate(); }
 
     @Override
-    protected String getToken() {
-        return aksData.getKubeAdminConfig().get(0).getPassword();
-    }
+    protected String getClusterEndpoint() { return aksCluster.getKubeConfig().get(0).getHost(); }
+
+    @Override
+    protected String getToken()           { throw new UnsupportedOperationException("Use configureK8s()"); }
 
     // -------------------------------------------------------------------------
     // CloudProvider implementation
@@ -245,7 +245,7 @@ public class AzureConstruct extends AbstractConstruct {
 
     @Override
     public List<ITerraformDependable> getDependables() {
-        return List.of();
+        return List.of(aksCluster);
     }
 
     @Override
