@@ -179,3 +179,15 @@ If its metastore credentials were [persistent](https://github.com/emrys-health/a
 The idea in GitOps is that we check Terraform code into Git.
 However, our Terraform can contain confidential details. 
 If we are to adopt GitOps, we need to pull this sensitive data out.
+
+# Domain Names
+
+The domain names were bought from AWS using their Route53 service.
+
+To delegate responsibility of where to point `emryspolarisazure.click`, run:
+
+```shell
+az network dns zone create  --resource-group afon_resource_group  --name emryspolarisazure.click
+```
+(Note AWS expects the trailing period to be removed)
+
