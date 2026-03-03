@@ -19,6 +19,17 @@ public class CdkUtils {
                                           ).toList();
     }
 
+    static @NotNull List<LocalExecProvisioner> uponCreateRun(String... commands) {
+        return Arrays.stream(commands).map(command ->
+                                                   LocalExecProvisioner
+                                                           .builder()
+                                                           .type("local-exec")
+                                                           .when("create")
+                                                           .command(command)
+                                                           .build()
+                                          ).toList();
+    }
+
     private static final String addingOrClauseIfNecessary(String command) {
         if (!(command.endsWith("\n") || command.endsWith("\r"))) {
             return command + " || echo FAILED";

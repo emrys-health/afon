@@ -106,12 +106,24 @@ public class PolarisConfig extends Construct {
                                         "-c",
                                         format("source %s/%s && /opt/jboss/container/java/run/run-java.sh",
                                                SECRETS_DIR, POLARIS_ENV_FILE));
+        DeploymentSpecTemplateSpecContainerReadinessProbe readinessProbe =
+                DeploymentSpecTemplateSpecContainerReadinessProbe.builder()
+                        .httpGet(DeploymentSpecTemplateSpecContainerReadinessProbeHttpGet.builder()
+                                .path("/q/health")
+                                .port("8182")
+                                .build())
+                        .initialDelaySeconds(30)
+                        .periodSeconds(10)
+                        .failureThreshold(6)
+                        .build();
+
         DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer.builder()
                                                                                                   .name("polaris")
                                                                                                   .image(POLARIS_IMAGE_NAME)
 //                                                                                                  .env(envVars)
                                                                                                   .command(commands)
                                                                                                   .volumeMount(mounts)
+                                                                                                  .readinessProbe(readinessProbe)
                                                                                                   .build();
         polarisLabels = Map.of("app", "polaris");
         var polarisDeployment = DeploymentUtils.deploy(
