@@ -350,6 +350,10 @@ public class AzureConstruct extends AbstractConstruct {
                 .createNamespace(true)
                 .timeout(600)
                 .atomic(true)
+                .set(List.of(ReleaseSet.builder()
+                        .name("controller.service.annotations.service\\.beta\\.kubernetes\\.io/azure-load-balancer-health-probe-request-path")
+                        .value("/healthz")
+                        .build()))
                 .build();
     }
 
