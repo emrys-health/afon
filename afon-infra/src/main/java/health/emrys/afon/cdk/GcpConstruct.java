@@ -233,7 +233,7 @@ public class GcpConstruct extends AbstractConstruct {
     // Ingress controller + TLS (mirroring AzureConstruct)
     // -------------------------------------------------------------------------
 
-    private synchronized HelmProvider configureHelm() {
+    synchronized HelmProvider configureHelm() {
         if (helmProvider == null) {
             HelmProviderKubernetesExec helmPlugin = HelmProviderKubernetesExec.builder()
                                                                          .apiVersion("client.authentication.k8s.io/v1beta1")
@@ -250,58 +250,4 @@ public class GcpConstruct extends AbstractConstruct {
         return helmProvider;
     }
 
-    public Release installNginxIngress() {
-        return Release.Builder.create(this, "nginx-ingress")
-                .provider(configureHelm())
-                .dependsOn(List.of(gkeCluster))
-                .name("nginx-ingress")
-                .chart("ingress-nginx")
-                .repository("https://kubernetes.github.io/ingress-nginx")
-                .namespace("ingress-nginx")
-                .createNamespace(true)
-                .timeout(600)
-                .atomic(true)
-                .build();
-    }
-
-    /**
-     * Installs cert-manager and creates a Let's Encrypt ClusterIssuer.
-     * The ClusterIssuer is applied via a local_exec provisioner rather than
-     * kubernetes_manifest, which would contact the API server during plan
-     * (before cert-manager's CRDs are registered) and fail with
-     * "Failed to construct REST client".
-     */
-    public Release installCertManager() {
-        String clusterIssuerYaml = format("""
-                kubectl apply -f - <<'YAML'
-                apiVersion: cert-manager.io/v1
-                kind: ClusterIssuer
-                metadata:
-                  name: letsencrypt-prod
-                spec:
-                  acme:
-                    server: https://acme-v02.api.letsencrypt.org/directory
-                    email: %s
-                    privateKeySecretRef:
-                      name: letsencrypt-prod
-                    solvers:
-                    - http01:
-                        ingress:
-                          class: nginx
-                YAML""", ACME_EMAIL);
-
-        return Release.Builder.create(this, "cert-manager")
-                .provider(configureHelm())
-                .dependsOn(List.of(gkeCluster))
-                .name("cert-manager")
-                .chart("cert-manager")
-                .repository("https://charts.jetstack.io")
-                .namespace("cert-manager")
-                .createNamespace(true)
-                .timeout(300)
-                .atomic(true)
-                .set(List.of(ReleaseSet.builder().name("crds.enabled").value("true").build()))
-                .provisioners(CdkUtils.uponCreateRun(clusterIssuerYaml))
-                .build();
-    }
 }
