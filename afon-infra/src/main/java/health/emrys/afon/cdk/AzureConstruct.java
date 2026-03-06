@@ -3,11 +3,7 @@ package health.emrys.afon.cdk;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
-import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesCluster;
-import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterDefaultNodePool;
-import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterIdentity;
-import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterNetworkProfile;
-import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.KubernetesClusterTimeouts;
+import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.*;
 import com.hashicorp.cdktf.providers.azurerm.network_security_group.NetworkSecurityGroup;
 import com.hashicorp.cdktf.providers.azurerm.network_security_group.NetworkSecurityGroupConfig;
 import com.hashicorp.cdktf.providers.azurerm.network_security_group.NetworkSecurityGroupSecurityRule;
@@ -15,12 +11,12 @@ import com.hashicorp.cdktf.providers.azurerm.provider.AzurermProvider;
 import com.hashicorp.cdktf.providers.azurerm.provider.AzurermProviderFeatures;
 import com.hashicorp.cdktf.providers.azurerm.role_assignment.RoleAssignment;
 import com.hashicorp.cdktf.providers.azurerm.role_assignment.RoleAssignmentConfig;
-import com.hashicorp.cdktf.providers.azurerm.user_assigned_identity.UserAssignedIdentity;
-import com.hashicorp.cdktf.providers.azurerm.user_assigned_identity.UserAssignedIdentityConfig;
 import com.hashicorp.cdktf.providers.azurerm.subnet.Subnet;
 import com.hashicorp.cdktf.providers.azurerm.subnet.SubnetConfig;
 import com.hashicorp.cdktf.providers.azurerm.subnet_network_security_group_association.SubnetNetworkSecurityGroupAssociation;
 import com.hashicorp.cdktf.providers.azurerm.subnet_network_security_group_association.SubnetNetworkSecurityGroupAssociationConfig;
+import com.hashicorp.cdktf.providers.azurerm.user_assigned_identity.UserAssignedIdentity;
+import com.hashicorp.cdktf.providers.azurerm.user_assigned_identity.UserAssignedIdentityConfig;
 import com.hashicorp.cdktf.providers.azurerm.virtual_network.VirtualNetwork;
 import com.hashicorp.cdktf.providers.azurerm.virtual_network.VirtualNetworkConfig;
 import com.hashicorp.cdktf.providers.azurestack.provider.AzurestackProvider;
@@ -38,7 +34,6 @@ import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
 import java.util.List;
-import java.util.Map;
 
 import static health.emrys.afon.infra.Defaults.AZURE_REGION;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
@@ -53,7 +48,6 @@ public class AzureConstruct extends AbstractConstruct {
     private static final String SERVICE_CIDR         = "10.2.0.0/16";
     private static final String DNS_SERVICE_IP       = "10.2.0.10";
     private static final String SUBSCRIPTION_ID      = "ffae1297-4c57-47e0-9a89-5583b97835cf";
-    private static final String ACME_EMAIL           = "admin@emryspolarisazure.click";
 
     private final KubernetesCluster aksCluster;
     private KubernetesProvider      k8sProvider;
@@ -324,7 +318,7 @@ public class AzureConstruct extends AbstractConstruct {
     // Ingress controller + TLS
     // -------------------------------------------------------------------------
 
-    private synchronized HelmProvider configureHelm() {
+    synchronized HelmProvider configureHelm() {
         if (helmProvider == null) {
             var cfg = aksCluster.getKubeConfig().get(0);
             helmProvider = HelmProvider.Builder.create(this, "helm")
@@ -354,47 +348,6 @@ public class AzureConstruct extends AbstractConstruct {
                         .name("controller.service.annotations.service\\.beta\\.kubernetes\\.io/azure-load-balancer-health-probe-request-path")
                         .value("/healthz")
                         .build()))
-                .build();
-    }
-
-    /**
-     * Installs cert-manager and creates a Let's Encrypt ClusterIssuer.
-     * The ClusterIssuer is applied via a local_exec provisioner rather than
-     * kubernetes_manifest, which would contact the API server during plan
-     * (before cert-manager's CRDs are registered) and fail with
-     * "Failed to construct REST client".
-     */
-    public Release installCertManager() {
-        String clusterIssuerYaml = format("""
-                kubectl apply -f - <<'YAML'
-                apiVersion: cert-manager.io/v1
-                kind: ClusterIssuer
-                metadata:
-                  name: letsencrypt-prod
-                spec:
-                  acme:
-                    server: https://acme-v02.api.letsencrypt.org/directory
-                    email: %s
-                    privateKeySecretRef:
-                      name: letsencrypt-prod
-                    solvers:
-                    - http01:
-                        ingress:
-                          class: nginx
-                YAML""", ACME_EMAIL);
-
-        return Release.Builder.create(this, "cert-manager")
-                .provider(configureHelm())
-                .dependsOn(List.of(aksCluster))
-                .name("cert-manager")
-                .chart("cert-manager")
-                .repository("https://charts.jetstack.io")
-                .namespace("cert-manager")
-                .createNamespace(true)
-                .timeout(300)
-                .atomic(true)
-                .set(List.of(ReleaseSet.builder().name("crds.enabled").value("true").build()))
-                .provisioners(CdkUtils.uponCreateRun(clusterIssuerYaml))
                 .build();
     }
 }

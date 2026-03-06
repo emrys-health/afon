@@ -1,9 +1,11 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_dns_zone.DataAzurermDnsZone;
 import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecord;
 import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecordConfig;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
@@ -41,10 +43,13 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
                                       .build();
             }
         };
-        Release   nginxRelease    = cloudProvider.installNginxIngress();
-        Release   certManager     = cloudProvider.installCertManager();
+        var                        util         = new TFUtils(this, DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT, POLARIS_INTERNAL);
+        HelmProvider               helm         = cloudProvider.configureHelm();
+        List<ITerraformDependable> dependables  = cloudProvider.getDependables();
+        Map<String, String>        annotations  = Map.of("controller.service.annotations.service\\.beta\\.kubernetes\\.io/azure-load-balancer-health-probe-request-path", "/healthz");
+        Release                    nginxRelease = util.installNginxIngress(this, helm, dependables, annotations);
+        Release                    certManager  = util.installCertManager(this, helm, dependables);
         Service   internalService = polarisConfig.deployPolaris(cloudProvider.getDependables());
-        var       util            = new TFUtils(this, DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT, POLARIS_INTERNAL);
         IngressV1 ingress         = util.createIngress(List.of(nginxRelease, certManager, internalService));
         configureDns(ingress);
     }
