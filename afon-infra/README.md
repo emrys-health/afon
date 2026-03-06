@@ -22,13 +22,12 @@ Note that the above will fail as AwsKubernetesPolaris.java is missing an initial
 
 `mvn compile -Dexec.mainClass=health.emrys.afon.cdk.AzureKubernetesPolaris exec:java`
 
-`mvn compile -Dexec.mainClass=health.emrys.afon.cdk.GcpPolarisStack exec:java`
+`mvn compile -Dexec.mainClass=health.emrys.afon.cdk.GcpKubernetesPolaris exec:java`
 
 for each cloud provider. Then run: 
 ```shell
-cd cdktf.out/stacks/jupyter-deployment
+cd cdktf.out/stacks/[STACK_NAME]
 tofu init
-tofu apply -target=data.aws_eks_cluster_auth.$(grep -oE 'jupyter-deployment_eksClusterAuthData_[A-Z0-9]*' cdk.tf.json | head -1) --auto-approve
 tofu apply -auto-approve
 ````
 
@@ -39,6 +38,44 @@ For example:
 ```shell
 curl -X GET "https://emryspolaris.click/api/catalog/v1/aws/namespaces/acceptancetests/tables/AwsAccessSpec251117511401" -H "Authorization: Bearer ${ACCESS_TOKEN}"  | jq
 ```
+
+#### Domain names
+
+I've bought (from AWS Route 53) the names:
+```
+emryspolaris.click
+emryspolarisgcp.click
+emryspolarisazure.click
+```
+Pointing the domain names at an IP address in Kubernetes is easy in AWS as the whole thing is integrated.
+It's a bit harder in Azure and GCP.
+In each case, you have to update Route53's nameservers to the respective cloud's nameservers.
+Then, the Kubernetes cluster for that cloud can point the domain name at its own ingress.
+
+#### GCP
+
+GCP assumes that the managed zone exists:
+```shell
+$ gcloud dns managed-zones describe polaris-zone --project=afon-core
+cloudLoggingConfig:
+  kind: dns#managedZoneCloudLoggingConfig
+creationTime: '2026-03-06T13:59:46.276Z'
+description: Managed by Terraform
+dnsName: emryspolarisgcp.click.
+id: '3399931746996979034'
+kind: dns#managedZone
+labels:
+  goog-terraform-provisioned: 'true'
+name: polaris-zone
+nameServers:
+- ns-cloud-c1.googledomains.com.
+- ns-cloud-c2.googledomains.com.
+- ns-cloud-c3.googledomains.com.
+- ns-cloud-c4.googledomains.com.
+visibility: public
+```
+You can get Tofu to generate this for you but the nameservers change on every run and 
+you have to update your domain registry (we use AWS Route53). 
 
 ### Deployment #2
 
