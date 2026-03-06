@@ -18,8 +18,6 @@ import com.hashicorp.cdktf.providers.google.provider.GoogleProviderConfig;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
-import com.hashicorp.cdktf.providers.helm.release.Release;
-import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -52,8 +50,6 @@ public class GcpConstruct extends AbstractConstruct {
      * gcloud projects list --format="table(projectId,name)"
      */
     private final String PROJECT_ID = "afon-core";
-
-    private static final String ACME_EMAIL = "admin@emryspolarisgcp.click";
 
     private final ContainerCluster  gkeCluster;
     private       KubernetesProvider k8sProvider;
