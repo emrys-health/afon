@@ -1,10 +1,12 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZone;
 import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZoneConfig;
 import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSet;
 import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSetConfig;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
@@ -43,11 +45,13 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
                     .build();
             }
         };
-        Release   nginxRelease    = cloudProvider.installNginxIngress();
-        Release   certManager     = cloudProvider.installCertManager();
-        Service   internalService = polarisConfig.deployPolaris(cloudProvider.getDependables());
-        var       util            = new TFUtils(this, DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT, POLARIS_INTERNAL);
-        IngressV1 ingress         = util.createIngress(List.of(nginxRelease, certManager, internalService));
+        var                        util            = new TFUtils(this, DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT, POLARIS_INTERNAL);
+        HelmProvider               helm            = cloudProvider.configureHelm();
+        List<ITerraformDependable> dependables     = cloudProvider.getDependables();
+        Release                    nginxRelease    = util.installNginxIngress(this, helm, dependables, null);
+        Release                    certManager     = util.installCertManager(this, helm, dependables);
+        Service                    internalService = polarisConfig.deployPolaris(dependables);
+        IngressV1                  ingress         = util.createIngress(List.of(nginxRelease, certManager, internalService));
         configureDns(ingress);
     }
 

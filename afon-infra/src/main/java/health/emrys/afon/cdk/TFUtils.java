@@ -83,8 +83,9 @@ public class TFUtils {
 
     public Release installNginxIngress(Construct construct,
                                        HelmProvider helmProvider,
-                                       final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn) {
-        return Release.Builder.create(construct, "nginx-ingress")
+                                       final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
+                                       Map<String, String> annotations) {
+        var builder = Release.Builder.create(construct, "nginx-ingress")
                               .provider(helmProvider)
                               .dependsOn(dependsOn)
                               .name("nginx-ingress")
@@ -93,12 +94,16 @@ public class TFUtils {
                               .namespace("ingress-nginx")
                               .createNamespace(true)
                               .timeout(600)
-                              .atomic(true)
-                              .set(List.of(ReleaseSet.builder()
-                                                     .name("controller.service.annotations.service\\.beta\\.kubernetes\\.io/azure-load-balancer-health-probe-request-path")
-                                                     .value("/healthz")
-                                                     .build()))
-                              .build();
+                              .atomic(true);
+        if (annotations != null && !annotations.isEmpty()) {
+            var releaseSetBuilder = ReleaseSet.builder();
+            annotations.forEach((name, value) -> {
+                releaseSetBuilder.name(name);
+                releaseSetBuilder.value(value);
+            });
+            builder.set(List.of(releaseSetBuilder.build()));
+        }
+        return builder.build();
     }
 
     /**
