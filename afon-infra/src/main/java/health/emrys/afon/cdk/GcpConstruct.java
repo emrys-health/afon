@@ -1,31 +1,51 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.google.compute_network.ComputeNetwork;
 import com.hashicorp.cdktf.providers.google.compute_network.ComputeNetworkConfig;
+import com.hashicorp.cdktf.providers.google.compute_router.ComputeRouter;
+import com.hashicorp.cdktf.providers.google.compute_router.ComputeRouterConfig;
+import com.hashicorp.cdktf.providers.google.compute_router_nat.ComputeRouterNat;
+import com.hashicorp.cdktf.providers.google.compute_router_nat.ComputeRouterNatConfig;
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetwork;
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkConfig;
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkSecondaryIpRange;
 import com.hashicorp.cdktf.providers.google.container_cluster.*;
-import com.hashicorp.cdktf.providers.google.data_google_client_config.DataGoogleClientConfig;
 import com.hashicorp.cdktf.providers.google.provider.GoogleProvider;
 import com.hashicorp.cdktf.providers.google.provider.GoogleProviderConfig;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
+import com.hashicorp.cdktf.providers.helm.release.Release;
+import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import software.constructs.Construct;
 
+import java.io.IOException;
 import java.util.List;
 
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static health.emrys.afon.infra.Defaults.GCP_REGION;
+import static java.lang.String.format;
 
 /**
+ * Authentication: runs {@code gcloud auth print-access-token} at synthesis time to
+ * read a fresh OAuth2 token from {@code $HOME/.config/gcloud} without going through
+ * the OAuth2 refresh flow (which triggers RAPT on Workspace accounts).
+ * The token is valid for 1 hour, so synthesis and apply must complete within that window.
+ *
+ * The Kubernetes and Helm providers use gke-gcloud-auth-plugin, which fetches
+ * tokens on demand without going through the refresh flow.
+ * Install with: gcloud components install gke-gcloud-auth-plugin
+ *
  * If you need to destroy by hand, run:
- * gcloud container clusters delete $CLUSTER_NAME  --zone=$REGION  --project afon-core
+ *   gcloud container clusters delete $CLUSTER_NAME --region=$REGION --project afon-core
  */
 public class GcpConstruct extends AbstractConstruct {
-
-    private final       ContainerCluster gkeCluster;
 
     /**
      * Generate with:
@@ -33,23 +53,35 @@ public class GcpConstruct extends AbstractConstruct {
      */
     private final String PROJECT_ID = "afon-core";
 
+    private static final String ACME_EMAIL = "admin@emryspolarisgcp.click";
+
+    private final ContainerCluster  gkeCluster;
+    private       KubernetesProvider k8sProvider;
+    private       HelmProvider       helmProvider;
+
     GcpConstruct(final Construct scope, final String id, String projectID) {
         super(scope, id);
-        // 1. Configure Google Provider
+        String clusterName = CLUSTER_NAME;
+        String vpcName     = "gke-private-vpc";
+        String subnetName  = "gke-private-subnet";
+
+        // Reads a fresh access token from ~/.config/gcloud via gcloud CLI.
+        // This avoids the OAuth2 refresh flow that triggers RAPT on Workspace accounts.
         new GoogleProvider(this, "google", GoogleProviderConfig.builder()
                                                                .project(projectID)
                                                                .region(GCP_REGION).zone("europe-west2-a")
+                                                               .accessToken(printGcloudAccessToken())
                                                                .build());
 
         // 2. Create the GKE Cluster
         ComputeNetwork vpc = new ComputeNetwork(this, "vpc", ComputeNetworkConfig.builder()
-                                                                                 .name("gke-private-vpc")
+                                                                                 .name(vpcName)
                                                                                  .autoCreateSubnetworks(false)
                                                                                  .build());
 
         ComputeSubnetworkConfig subnetworkConfig = ComputeSubnetworkConfig
                 .builder()
-                .name("gke-private-subnet")
+                .name(subnetName)
                 .ipCidrRange("10.10.0.0/24")
                 .region(GCP_REGION)
                 .network(vpc.getName())
@@ -68,34 +100,45 @@ public class GcpConstruct extends AbstractConstruct {
                 .build();
         ComputeSubnetwork subnet = new ComputeSubnetwork(this, "subnet", subnetworkConfig);
 
-        // It's best practice to disable the default node pool to manage node pools separately.
+        // Cloud NAT: gives private nodes outbound internet access so they can
+        // pull images from external registries (registry.k8s.io, Docker Hub, etc.)
+        ComputeRouter router = new ComputeRouter(this, "router", ComputeRouterConfig.builder()
+                .name("gke-router")
+                .region(GCP_REGION)
+                .network(vpc.getName())
+                .build());
+        new ComputeRouterNat(this, "nat", ComputeRouterNatConfig.builder()
+                .name("gke-nat")
+                .router(router.getName())
+                .region(GCP_REGION)
+                .natIpAllocateOption("AUTO_ONLY")
+                .sourceSubnetworkIpRangesToNat("ALL_SUBNETWORKS_ALL_IP_RANGES")
+                .build());
 
-        String gcloudCommand = String.format(
+        String gcloudCommand = format(
                 "gcloud container clusters get-credentials %s --region %s --project %s",
-                CLUSTER_NAME,
-                GCP_REGION,
-                PROJECT_ID
-                                            );
+                clusterName, GCP_REGION, PROJECT_ID);
         // This refreshes your local K8s config
         LocalExecProvisioner refreshCredentials = LocalExecProvisioner
                 .builder()
                 .command(gcloudCommand)
-                // Optionally specify the interpreter for security/compatibility
                 .interpreter(List.of("/bin/bash", "-c"))
                 .type("local-exec")
                 .build();
         ContainerClusterConfig clusterConfig = ContainerClusterConfig
                 .builder()
-                .name(CLUSTER_NAME)
+                .name(clusterName)
                 .location(GCP_REGION)
                 .network(vpc.getName())
                 .subnetwork(subnet.getName())
                 .networkingMode("VPC_NATIVE")
                 .initialNodeCount(1)
+                .nodeLocations(List.of("europe-west2-a", "europe-west2-b"))
                 .removeDefaultNodePool(false)
+                .timeouts(ContainerClusterTimeouts.builder().create("20m").build())
                 .privateClusterConfig(ContainerClusterPrivateClusterConfig.builder()
-                                                                          .enablePrivateEndpoint(false) // Allows admin access via public endpoint (consumes 1 IP)
-                                                                          .enablePrivateNodes(true)     // 🔑 KEY: Ensures all node pools are private by default
+                                                                          .enablePrivateEndpoint(false) // Allows admin access via public endpoint
+                                                                          .enablePrivateNodes(true)     // All node pools are private by default
                                                                           .masterIpv4CidrBlock("172.16.0.0/28")
                                                                           .build())
                 .masterAuth(ContainerClusterMasterAuth
@@ -114,12 +157,15 @@ public class GcpConstruct extends AbstractConstruct {
         com.hashicorp.cdktf.TerraformOutput.Builder.create(this, "gkeEndpoint")
                                                    .value(gkeCluster.getEndpoint())
                                                    .build();
-
     }
+
+    // -------------------------------------------------------------------------
+    // AbstractConstruct implementation
+    // -------------------------------------------------------------------------
 
     @Override
     public List<ITerraformDependable> getDependables() {
-        return List.of();
+        return List.of(gkeCluster);
     }
 
     @Override
@@ -129,17 +175,133 @@ public class GcpConstruct extends AbstractConstruct {
 
     @Override
     public String getClusterEndpoint() {
-        return gkeCluster.getEndpoint();
+        return "https://" + gkeCluster.getEndpoint();
     }
 
     @Override
     public String getToken() {
-        DataGoogleClientConfig clientConfig = new DataGoogleClientConfig(this, "currentClient");
-        return clientConfig.getAccessToken();
+        throw new UnsupportedOperationException("GCP uses gke-gcloud-auth-plugin; call configureK8s()");
+    }
+
+    /**
+     * Uses gke-gcloud-auth-plugin instead of a static token so that credentials
+     * are fetched on demand during apply without going through the OAuth2 refresh
+     * flow (which triggers RAPT on Google Workspace accounts).
+     */
+    @Override
+    public synchronized KubernetesProvider configureK8s() {
+        if (k8sProvider == null) {
+            k8sProvider = KubernetesProvider.Builder.create(this, "kubernetes")
+                    .host(getClusterEndpoint())
+                    .clusterCaCertificate(Fn.base64decode(gkeCluster.getMasterAuth().getClusterCaCertificate()))
+                    .exec(List.of(KubernetesProviderExec.builder()
+                            .apiVersion("client.authentication.k8s.io/v1beta1")
+                            .command("gke-gcloud-auth-plugin")
+                            .build()))
+                    .build();
+        }
+        return k8sProvider;
     }
 
     @Override
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
         throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    /**
+     * Reads a short-lived access token from {@code ~/.config/gcloud} by invoking
+     * {@code gcloud auth print-access-token}.  This avoids the OAuth2 refresh flow
+     * that triggers RAPT on Google Workspace accounts.
+     */
+    private static String printGcloudAccessToken() {
+        try {
+            Process p = new ProcessBuilder("gcloud", "auth", "print-access-token")
+                    .redirectErrorStream(true)
+                    .start();
+            String token = new String(p.getInputStream().readAllBytes()).trim();
+            int rc = p.waitFor();
+            if (rc != 0 || token.isEmpty()) {
+                throw new RuntimeException("gcloud auth print-access-token failed (exit " + rc + "): " + token);
+            }
+            return token;
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Failed to read gcloud access token from ~/.config/gcloud", e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Ingress controller + TLS (mirroring AzureConstruct)
+    // -------------------------------------------------------------------------
+
+    private synchronized HelmProvider configureHelm() {
+        if (helmProvider == null) {
+            HelmProviderKubernetesExec helmPlugin = HelmProviderKubernetesExec.builder()
+                                                                         .apiVersion("client.authentication.k8s.io/v1beta1")
+                                                                         .command("gke-gcloud-auth-plugin")
+                                                                         .build();
+            helmProvider = HelmProvider.Builder.create(this, "helm")
+                                               .kubernetes(HelmProviderKubernetes.builder()
+                            .host(getClusterEndpoint())
+                            .clusterCaCertificate(Fn.base64decode(gkeCluster.getMasterAuth().getClusterCaCertificate()))
+                            .exec(helmPlugin)
+                            .build())
+                                               .build();
+        }
+        return helmProvider;
+    }
+
+    public Release installNginxIngress() {
+        return Release.Builder.create(this, "nginx-ingress")
+                .provider(configureHelm())
+                .dependsOn(List.of(gkeCluster))
+                .name("nginx-ingress")
+                .chart("ingress-nginx")
+                .repository("https://kubernetes.github.io/ingress-nginx")
+                .namespace("ingress-nginx")
+                .createNamespace(true)
+                .timeout(600)
+                .atomic(true)
+                .build();
+    }
+
+    /**
+     * Installs cert-manager and creates a Let's Encrypt ClusterIssuer.
+     * The ClusterIssuer is applied via a local_exec provisioner rather than
+     * kubernetes_manifest, which would contact the API server during plan
+     * (before cert-manager's CRDs are registered) and fail with
+     * "Failed to construct REST client".
+     */
+    public Release installCertManager() {
+        String clusterIssuerYaml = format("""
+                kubectl apply -f - <<'YAML'
+                apiVersion: cert-manager.io/v1
+                kind: ClusterIssuer
+                metadata:
+                  name: letsencrypt-prod
+                spec:
+                  acme:
+                    server: https://acme-v02.api.letsencrypt.org/directory
+                    email: %s
+                    privateKeySecretRef:
+                      name: letsencrypt-prod
+                    solvers:
+                    - http01:
+                        ingress:
+                          class: nginx
+                YAML""", ACME_EMAIL);
+
+        return Release.Builder.create(this, "cert-manager")
+                .provider(configureHelm())
+                .dependsOn(List.of(gkeCluster))
+                .name("cert-manager")
+                .chart("cert-manager")
+                .repository("https://charts.jetstack.io")
+                .namespace("cert-manager")
+                .createNamespace(true)
+                .timeout(300)
+                .atomic(true)
+                .set(List.of(ReleaseSet.builder().name("crds.enabled").value("true").build()))
+                .provisioners(CdkUtils.uponCreateRun(clusterIssuerYaml))
+                .build();
     }
 }
