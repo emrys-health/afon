@@ -2,9 +2,8 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformResource;
-import com.hashicorp.cdktf.TerraformResourceLifecycle;
-import com.hashicorp.cdktf.providers.google.dns_managed_zone.DnsManagedZone;
-import com.hashicorp.cdktf.providers.google.dns_managed_zone.DnsManagedZoneConfig;
+import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZone;
+import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZoneConfig;
 import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSet;
 import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSetConfig;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -109,11 +108,10 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
     }
 
     private void configureDns(IngressV1 ingress) {
-        DnsManagedZone zone = new DnsManagedZone(this, "dns-zone", DnsManagedZoneConfig.builder()
-                .name(DNS_ZONE_NAME)
-                .dnsName(DOMAIN_NAME + ".")
-                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(true).build())
-                .build());
+        DataGoogleDnsManagedZone zone = new DataGoogleDnsManagedZone(this, "dns-zone",
+                DataGoogleDnsManagedZoneConfig.builder()
+                        .name(DNS_ZONE_NAME)
+                        .build());
 
         new DnsRecordSet(this, "polaris-dns", DnsRecordSetConfig.builder()
                 .name(DOMAIN_NAME + ".")
