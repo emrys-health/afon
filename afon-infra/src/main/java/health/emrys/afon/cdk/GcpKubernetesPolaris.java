@@ -2,6 +2,7 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformResource;
+import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.google.dns_managed_zone.DnsManagedZone;
 import com.hashicorp.cdktf.providers.google.dns_managed_zone.DnsManagedZoneConfig;
 import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSet;
@@ -111,6 +112,7 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
         DnsManagedZone zone = new DnsManagedZone(this, "dns-zone", DnsManagedZoneConfig.builder()
                 .name(DNS_ZONE_NAME)
                 .dnsName(DOMAIN_NAME + ".")
+                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(true).build())
                 .build());
 
         new DnsRecordSet(this, "polaris-dns", DnsRecordSetConfig.builder()
