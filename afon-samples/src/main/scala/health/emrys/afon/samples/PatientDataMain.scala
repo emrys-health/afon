@@ -3,6 +3,7 @@ package health.emrys.afon.samples
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum._
 import health.emrys.afon.config.AfonPropertiesLoader
+import health.emrys.afon.infra.checks.CloudSpark
 import health.emrys.afon.infra.{ClusterPolarisConfiguration, EmrysCloud}
 import health.emrys.afon.samples.SampleData.{occupancyDataset, patientDataset}
 import health.emrys.afon.spark.SparkWarehouseConfig
@@ -57,17 +58,7 @@ object PatientDataMain {
   }
 
   private def initSpark(): SparkSession = {
-    val emrysCloud = new EmrysCloud()
-    val sparkWarehouse = new SparkWarehouseConfig(
-      emrysCloud.getAccessToken,
-      emrysCloud.getPolarisId,
-      emrysCloud.getPolarisSecret,
-      emrysCloud.getPolarisHost,
-      "https"
-    );
-    val sc: SparkContext = SparkContext.getOrCreate(sparkWarehouse.sparkConf())
-    SparkSession
-      .builder()
-      .getOrCreate()
+    val cloudSpark = new CloudSpark()
+    cloudSpark.localSparkClusterPolaris()
   }
 }

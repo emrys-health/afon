@@ -1,15 +1,17 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.AfonProperties;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import org.jspecify.annotations.NonNull;
 
+import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 
 public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
+    public static final String EXTERNAL_AZURE_WAREHOUSE_NAME = SupportedCloudsEnum.AZURE + "_EXTERNAL";
+
     private final @NonNull String bucketUrl;
     private final @NonNull String tenant;
     private final @NonNull String multiTenantAppName;
@@ -23,6 +25,11 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
         this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);
         this.multiTenantAppName = AZURE_CLIENT_ID.getValueFrom(properties);
         this.clientId           = AZURE_CLIENT_ID.getValueFrom(properties);
+    }
+
+    @Override
+    protected List<String> getScopes() {
+        return List.of(bucketUrl);
     }
 
     @Override
@@ -40,6 +47,6 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
     }
 
     public String warehouseName() {
-        return AfonProperties.SupportedCloudsEnum.AZURE + "_EXTERNAL";
+        return EXTERNAL_AZURE_WAREHOUSE_NAME;
     }
 }

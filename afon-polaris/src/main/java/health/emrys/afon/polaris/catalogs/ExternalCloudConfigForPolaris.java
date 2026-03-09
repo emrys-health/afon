@@ -4,6 +4,7 @@ import health.emrys.afon.config.AfonProperties;
 import org.apache.polaris.core.admin.model.*;
 import org.jspecify.annotations.NonNull;
 
+import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.polaris.comms.AfonPolarisClient.getTokenUri;
@@ -25,6 +26,7 @@ abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolari
             .setClientId(clientId)
             .setClientSecret(secret)
             .setTokenUri(getTokenUri(getEndpoint()))
+            .setScopes(getScopes())
             .build();
 
         CatalogProperties bucketProperties = CatalogProperties
@@ -50,6 +52,8 @@ abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolari
                 getStorageConfigInfo());
         return toJson(catalog);
     }
+
+    protected abstract List<String> getScopes();
 
     protected abstract @NonNull String getEndpoint();
 

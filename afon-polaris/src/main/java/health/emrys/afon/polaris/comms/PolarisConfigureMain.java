@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 
 public class PolarisConfigureMain {
@@ -36,14 +37,28 @@ public class PolarisConfigureMain {
         }
     }
 
+    public void createExternalCatalogs(Properties properties,
+                                       String credentials) throws IncorrectConfigException, IOException {
+        Properties externalProperties = new Properties();
+        externalProperties.putAll(properties);
+        CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
+                new ExternalAzureCloudConfigForPolaris(properties),
+                };
+        createCatalogs(properties, credentials, configs);
+    }
     public void createAllCatalogs(Properties properties, String credentials) throws IncorrectConfigException, IOException {
-        properties = add(credentials, properties);
         CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
                 new AwsCloudConfigForPolaris(properties),
                 new GoogleCloudConfigForPolaris(properties),
                 new AzureCloudConfigForPolaris(properties),
                 new GlueCloudConfigForPolaris(properties),
+                new ExternalAzureCloudConfigForPolaris(properties),
                 };
+        createCatalogs(properties, credentials, configs);
+    }
+
+    private void createCatalogs(Properties properties, String credentials, CloudConfigForPolaris[] configs) throws IOException, IncorrectConfigException {
+        properties = add(credentials, properties);
         for (CloudConfigForPolaris config : configs) {
             logger.info("Configuring {}", config.warehouseName());
             var responses = callPolaris(properties, config);
