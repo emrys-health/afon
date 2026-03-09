@@ -150,7 +150,7 @@ You probably want to see Jupyter or need the Polaris access token if you use Sno
 So, run:
 
 ```shell
-mvn -Dexec.mainClass=health.emrys.afon.infra.InfraExplorer exec:java
+mvn -Dexec.mainClass=health.emrys.afon.infra.AwsInfraExplorerrer exec:java
 ```
 
 and for some suggests as to what to execute, running this:

@@ -49,7 +49,7 @@ public class ClusterPolarisConfiguration implements AutoCloseable {
 
     public Properties getClusterProperties() {
         var props = new Properties();
-        properties.entrySet().stream().forEach(entry -> props.setProperty(entry.getKey().toString(), entry.getValue().toString()));
+        props.putAll(properties);
         return props;
     }
 
