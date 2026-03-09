@@ -12,19 +12,7 @@ The scripts then live in `./scripts` for each cloud provider.
 
 # Configuring the environment
 
-After you have created the K8s cluster using `./scripts/aws/create_k8.sh` and the cluster is up and running, you must:
-
-1. Configure Polaris. This is done by running the Java class, `health.emrys.afon.infra.ClusterPolarisConfiguration`.
-2. To get the URLs for the Jupyter and Spark GUIs, run `health.emrys.afon.infra.InfraExplorer`
-3. To generate PySpark code that will act like a smoke test, run `health.emrys.afon.core.configuration.SparkContextConfigurationPrinter`
-
-Note that there is an [Iceberg issue with Azure](https://github.com/apache/iceberg/issues/14069).
-This is [patched](afon-iceberg/src/main/java/org/apache/iceberg/azure/adlsv2/VendedAdlsCredentialProvider.java) in the
-Azure [integration test](afon-acceptance-tests/src/test/scala/health/emrys/afon/acceptance/aws/AzureAccessSpec.scala)
-but not in the Spark/Kubernetes environment.
-
-None of these scripts take any arguments. 
-They query the Kubernetes cluster (using defaults) to find what they need.
+See the [infra notes](afon-infra/README.md). 
 
 Note that the Spark Docker image has been slightly modified (see `scripts/docker/spark/Dockerfile`).
 This is to ensure that the samve verion of Python (3.11) is used as the Jupyter notebook.
