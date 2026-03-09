@@ -6,6 +6,7 @@ import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEn
 import org.apache.polaris.core.admin.model.*;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.getStorageConfigInfo;
 
 public class GlueCloudConfigForPolaris extends AwsCloudConfigForPolaris {
 
@@ -22,7 +23,7 @@ public class GlueCloudConfigForPolaris extends AwsCloudConfigForPolaris {
     public String catalogConfig() throws IncorrectConfigException {
         CatalogProperties bucketProperties = CatalogProperties
             .builder()
-            .setDefaultBaseLocation(getBucket()) // needs to be different to any other Polaris knows about
+            .setDefaultBaseLocation(getBucketUrl()) // needs to be different to any other Polaris knows about
             .build();
 
         SigV4AuthenticationParameters glueIcebergRole =
@@ -50,7 +51,7 @@ public class GlueCloudConfigForPolaris extends AwsCloudConfigForPolaris {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 null,
-                super.getStorageConfigInfo());
+                getStorageConfigInfo(getRoleArn(), getBucketUrl(), getRegion()));
 
         return toJson(new CreateCatalogRequest(catalog));
     }

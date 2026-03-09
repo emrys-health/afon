@@ -56,8 +56,6 @@ public class PolarisRegisterMain {
     }
 
     private static void createTable(PolarisRegisterMainConfig conf, AfonPolarisClient client) throws IOException {
-        //            ImmutableRegisterTableRequest request = ImmutableRegisterTableRequest
-//                    .builder().name(conf.table).metadataLocation(conf.metadata).build();
         String uri = format("/api/catalog/v1/%s/namespaces/%s/register", conf.catalog, conf.namespace);
         String json = format("""
                                      {

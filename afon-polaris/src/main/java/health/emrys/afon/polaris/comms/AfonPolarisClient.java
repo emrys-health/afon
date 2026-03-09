@@ -10,6 +10,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicClassicHttpRequest;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -33,6 +34,10 @@ public class AfonPolarisClient {
     private final String clientId;
     private final String clientSecret;
 
+    public static @NonNull String getTokenUri(String endpoint) {
+        return format("%s/api/catalog/v1/oauth/tokens", endpoint);
+    }
+
     public AfonPolarisClient(Properties properties) {
         this(properties, "http");
     }
@@ -50,7 +55,7 @@ public class AfonPolarisClient {
     }
 
     public String getAccessToken() throws RuntimeException {
-        String uri = format("%s/api/catalog/v1/oauth/tokens", endpoint);
+        String uri = getTokenUri(endpoint);
         logger.info("Calling " + uri);
         HttpPost post = new HttpPost(uri);
         post.setHeader(CONTENT_TYPE, "application/x-www-form-urlencoded");
