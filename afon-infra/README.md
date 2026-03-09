@@ -175,6 +175,9 @@ and register tables with something like:
 ```shell
 mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
 ```
+```shell
+mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args='AZURE acceptancetests smoketesttable260217491351 abfss://acceptancetests/smoketesttable260217491351/metadata/00001-f8272499-8e3d-4588-8365-b99ffaee794e.metadata.json'
+```
 
 or similar.
 

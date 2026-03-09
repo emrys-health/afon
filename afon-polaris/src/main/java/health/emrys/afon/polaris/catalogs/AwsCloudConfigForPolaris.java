@@ -2,10 +2,11 @@ package health.emrys.afon.polaris.catalogs;
 
 import org.apache.polaris.core.admin.model.*;
 
-import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.getStorageConfigInfo;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 
 public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
@@ -22,24 +23,14 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
     public AwsCloudConfigForPolaris(Properties properties) {
         this(AWS_S3_ROLE_ARN.getValueFrom(properties),
-             "s3a://" + AWS_S3_BUCKET_NAME.getValueFrom(properties),
+             bucketToUrl(AWS_S3_BUCKET_NAME.getValueFrom(properties)),
              AWS_REGION.getValueFrom(properties));
     }
 
     @Override
     public String catalogConfig() throws IncorrectConfigException {
-        Catalog catalog = createCatalog(bucket, getStorageConfigInfo());
+        Catalog catalog = createCatalog(bucket, getStorageConfigInfo(roleArn, bucket, region));
         return toJson(new CreateCatalogRequest(catalog));
-    }
-
-    public AwsStorageConfigInfo getStorageConfigInfo() {
-        return AwsStorageConfigInfo
-                .builder()
-                .setRoleArn(roleArn)
-                .setAllowedLocations(List.of(bucket))
-                .setRegion(region)
-                .setStorageType(StorageConfigInfo.StorageTypeEnum.S3)
-                .build();
     }
 
     @Override
@@ -51,7 +42,7 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
         return roleArn;
     }
 
-    public String getBucket() {
+    public String getBucketUrl() {
         return bucket;
     }
 
