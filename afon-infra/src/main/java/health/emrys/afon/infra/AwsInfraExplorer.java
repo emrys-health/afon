@@ -10,15 +10,15 @@ import java.util.Properties;
 
 import static health.emrys.afon.infra.Defaults.*;
 
-public class InfraExplorer {
+public class AwsInfraExplorer {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(InfraExplorer.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsInfraExplorer.class);
 
     public static final void main(String[] args) {
         String clusterName = CLUSTER_NAME;
         logger.info("Exploring infra. I'm assuming that cluster {} is up and running...", clusterName);
-        Properties    properties = new AfonPropertiesLoader().getProperties();
-        InfraExplorer app        = new InfraExplorer();
+        Properties       properties = new AfonPropertiesLoader().getProperties();
+        AwsInfraExplorer app        = new AwsInfraExplorer();
         try {
             app.printJupyterDetails(clusterName, properties, JUPYTER_SERVICE_NAME);
             app.printSparkDetails(clusterName, properties, SPARK_SERVICE_NAME);
@@ -29,7 +29,7 @@ public class InfraExplorer {
 
     private final LogParser logParser;
 
-    public InfraExplorer() {
+    public AwsInfraExplorer() {
         logParser = new LogParser();
     }
 
