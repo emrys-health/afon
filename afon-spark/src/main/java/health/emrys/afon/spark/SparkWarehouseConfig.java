@@ -1,5 +1,6 @@
 package health.emrys.afon.spark;
 
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.SQLConf$;
@@ -16,6 +17,7 @@ import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 
 public class SparkWarehouseConfig {
 
+    public static final String[] SUPPORTED_CLOUD_NAMES = Arrays.stream(SupportedCloudsEnum.values()).map(x -> x.toString()).toArray(String[]::new);
     private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
     private final String DEFAULT_CATALOG          = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
     private final String WAREHOUSE_PATH           = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
@@ -63,8 +65,7 @@ public class SparkWarehouseConfig {
     }
 
     public SparkConf sparkConf(int cores) throws IOException {
-        String[] catalogNames = Arrays.stream(SupportedCloudsEnum.values()).map(x -> x.toString()).toArray(String[]::new);
-        return sparkConf(cores, catalogNames);
+        return sparkConf(cores, SUPPORTED_CLOUD_NAMES);
     }
 
     public SparkConf sparkConf(int cores, String... cloudProviders) throws IOException {
