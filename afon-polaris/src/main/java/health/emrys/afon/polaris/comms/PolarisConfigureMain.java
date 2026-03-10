@@ -1,5 +1,6 @@
 package health.emrys.afon.polaris.comms;
 
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.HttpResponse;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 
@@ -81,7 +83,11 @@ public class PolarisConfigureMain {
     }
 
     public HttpResponse[] callPolaris(Properties properties, CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
-        var    client      = new AfonPolarisClient(properties, "https");
+        String protocol    = "https";
+        if (POLARIS_ENDPOINT.getValueFrom(properties).toLowerCase().contains("localhost")) {
+            protocol = "http";
+        }
+        var    client      = new AfonPolarisClient(properties, protocol);
         var    configurer  = new PolarisConfigurer(client);
         String accessToken = client.getAccessToken();
         logger.info("Access token {}", accessToken);
