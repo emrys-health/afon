@@ -84,6 +84,7 @@ public class PolarisConfigureMain {
         var    client      = new AfonPolarisClient(properties, "https");
         var    configurer  = new PolarisConfigurer(client);
         String accessToken = client.getAccessToken();
+        logger.info("Access token {}", accessToken);
         return configurer.configurCatalogFor(config, accessToken);
     }
 

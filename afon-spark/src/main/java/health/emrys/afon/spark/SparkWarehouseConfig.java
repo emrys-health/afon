@@ -1,6 +1,5 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.SQLConf$;
@@ -12,12 +11,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
 import static java.lang.String.format;
 import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 
 public class SparkWarehouseConfig {
 
     public static final String[] SUPPORTED_CLOUD_NAMES = Arrays.stream(SupportedCloudsEnum.values()).map(x -> x.toString()).toArray(String[]::new);
+
     private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
     private final String DEFAULT_CATALOG          = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
     private final String WAREHOUSE_PATH           = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
@@ -103,8 +104,8 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
         conf.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
         conf.put(format("spark.sql.catalog.%s.oauth2.token", sparkCatalog), accessToken);
-        conf.put(format("spark.sql.catalog.%s.rest.auth.oauth2.scope", sparkCatalog), "PRINCIPAL_ROLE:ALL");
-        conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), "PRINCIPAL_ROLE:ALL");
+        conf.put(format("spark.sql.catalog.%s.rest.auth.oauth2.scope", sparkCatalog), OAUTH_SCOPE);
+        conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), OAUTH_SCOPE);
         conf.put(format("spark.sql.catalog.%s.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
         conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol, host));

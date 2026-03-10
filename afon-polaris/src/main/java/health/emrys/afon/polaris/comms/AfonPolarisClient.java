@@ -1,6 +1,7 @@
 package health.emrys.afon.polaris.comms;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -73,6 +74,16 @@ public class AfonPolarisClient {
         return endpoint;
     }
 
+    public ClassicHttpResponse delete(String uri, String accessToken) throws IOException {
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            HttpDelete          delete  = new HttpDelete(endpoint + uri);
+            addAccessTokenToHeaders(delete, accessToken);
+            ClassicHttpResponse response = (ClassicHttpResponse) client.execute(delete);
+            logger.info(format("%s:%d", delete, response.getCode()));
+            return response;
+        }
+    }
+
     public ClassicHttpResponse putJsonCall(String uri,
                                            String json,
                                            String accessToken) throws IOException {
@@ -91,7 +102,7 @@ public class AfonPolarisClient {
                                        String accessToken) throws IOException {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpGet request = new HttpGet(endpoint + uri);
-            request.setHeader("Authorization", "Bearer " + accessToken);
+            addAccessTokenToHeaders(request, accessToken);
             ClassicHttpResponse response = client.execute(request);
             logger.info(format("%s:%d", request, response.getCode()));
             return response;
@@ -101,10 +112,14 @@ public class AfonPolarisClient {
     private ClassicHttpResponse makeCallWithToken(String payload,
                                                   BasicClassicHttpRequest post,
                                                   String accessToken) throws IOException {
-        post.setHeader("Authorization", "Bearer " + accessToken);
+        addAccessTokenToHeaders(post, accessToken);
         post.setHeader("Accept", "application/json");
         post.setHeader(CONTENT_TYPE, "application/json");
         return makeCall(payload, post);
+    }
+
+    private static void addAccessTokenToHeaders(BasicClassicHttpRequest request, String accessToken) {
+        request.setHeader("Authorization", "Bearer " + accessToken);
     }
 
     private static String parseAccessToken(ClassicHttpResponse response) throws IOException {

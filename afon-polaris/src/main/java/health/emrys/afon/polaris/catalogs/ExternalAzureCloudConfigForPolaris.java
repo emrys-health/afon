@@ -8,6 +8,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
+import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
 
 public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
     public static final String EXTERNAL_AZURE_WAREHOUSE_NAME = SupportedCloudsEnum.AZURE + "_EXTERNAL";
@@ -29,7 +30,7 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
 
     @Override
     protected List<String> getScopes() {
-        return List.of(bucketUrl);
+        return List.of(OAUTH_SCOPE);
     }
 
     @Override
