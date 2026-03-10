@@ -46,7 +46,10 @@ public class AfonProperties {
     public static final AfonProperty POLARIS_ENDPOINT = new AfonProperty("POLARIS_ENDPOINT");
 
     public enum SupportedCloudsEnum {
-        AWS("aws"), GCP("gcp"), AZURE("azure");
+        AWS("aws"),
+        GCP("gcp"),
+        AZURE_EXTERNAL("azure_external"),
+        AZURE("azure");
 
         private String value;
 

@@ -24,6 +24,10 @@ public class PolarisConfigurer {
         return format("/api/management/v1/catalogs/%s/catalog-roles/catalog_admin/grants", warehouseName);
     }
 
+    public static String getDeleteURI(String warehouseName) {
+        return format("/api/management/v1/catalogs/%s", warehouseName);
+    }
+
     public PolarisConfigurer(AfonPolarisClient client) {
         this.client = client;
     }
@@ -34,6 +38,7 @@ public class PolarisConfigurer {
     public HttpResponse[] configurCatalogFor(CloudConfigForPolaris config, String accessToken) throws IOException, IncorrectConfigException {
         String warehouseName = config.warehouseName();
         return new HttpResponse[]{
+                client.delete(getDeleteURI(warehouseName), accessToken),
                 client.postJsonCall(getCreateCatalogURI(),
                                     config.catalogConfig(),
                                     accessToken),

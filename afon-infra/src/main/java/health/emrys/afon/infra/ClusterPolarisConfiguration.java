@@ -4,11 +4,7 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.k8s.ClusterState;
-import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.polaris.catalogs.*;
 import health.emrys.afon.polaris.comms.PolarisConfigureMain;
 import io.kubernetes.client.openapi.ApiException;
 import org.slf4j.Logger;
@@ -32,7 +28,8 @@ public class ClusterPolarisConfiguration implements AutoCloseable {
         CLOUD_TO_PROVIDER = Map.of(
         SupportedCloudsEnum.AWS, AwsCloudConfigForPolaris::new,
         SupportedCloudsEnum.AZURE, AzureCloudConfigForPolaris::new,
-        SupportedCloudsEnum.GCP, GoogleCloudConfigForPolaris::new
+        SupportedCloudsEnum.GCP, GoogleCloudConfigForPolaris::new,
+        SupportedCloudsEnum.AZURE_EXTERNAL, ExternalAzureCloudConfigForPolaris::new
         );
 
     private final PolarisConfigureMain polarisClient;
