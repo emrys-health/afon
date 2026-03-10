@@ -57,7 +57,7 @@ public class PolarisConfigureMain {
         createCatalogs(properties, credentials, configs);
     }
 
-    private void createCatalogs(Properties properties, String credentials, CloudConfigForPolaris[] configs) throws IOException, IncorrectConfigException {
+    public void createCatalogs(Properties properties, String credentials, CloudConfigForPolaris[] configs) throws IOException, IncorrectConfigException {
         properties = add(credentials, properties);
         for (CloudConfigForPolaris config : configs) {
             logger.info("Configuring {}", config.warehouseName());

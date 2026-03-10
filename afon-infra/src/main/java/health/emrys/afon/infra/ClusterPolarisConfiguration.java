@@ -1,16 +1,22 @@
 package health.emrys.afon.infra;
 
 import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.k8s.ClusterState;
+import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
+import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
+import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
+import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.PolarisConfigureMain;
 import io.kubernetes.client.openapi.ApiException;
-import org.apache.polaris.core.config.PolarisConfiguration;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Properties;
+import java.util.function.Function;
 
 import static java.lang.String.format;
 
@@ -22,6 +28,13 @@ public class ClusterPolarisConfiguration implements AutoCloseable {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
+    private static final Map<SupportedCloudsEnum, Function<Properties, CloudConfigForPolaris>>
+        CLOUD_TO_PROVIDER = Map.of(
+        SupportedCloudsEnum.AWS, AwsCloudConfigForPolaris::new,
+        SupportedCloudsEnum.AZURE, AzureCloudConfigForPolaris::new,
+        SupportedCloudsEnum.GCP, GoogleCloudConfigForPolaris::new
+        );
+
     private final PolarisConfigureMain polarisClient;
     private final ClusterState         state;
 
@@ -29,7 +42,13 @@ public class ClusterPolarisConfiguration implements AutoCloseable {
         Properties properties = new AfonPropertiesLoader().getProperties();
         try {
             try (ClusterPolarisConfiguration app = new ClusterPolarisConfiguration(properties)) {
-                app.initializePolaris();
+                if (args.length == 0) {
+                    app.initializePolaris();
+                } else {
+                    SupportedCloudsEnum cloud = SupportedCloudsEnum.valueOf(args[0]);
+                    CloudConfigForPolaris cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
+                    app.initializePolaris(new CloudConfigForPolaris[]{cloudConfig});
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -55,6 +74,10 @@ public class ClusterPolarisConfiguration implements AutoCloseable {
 
     public void initializePolaris() throws IncorrectConfigException, IOException {
         polarisClient.createAllCatalogs(properties, state.getCredentials());
+    }
+
+    public void initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
+        polarisClient.createCatalogs(properties, state.getCredentials(), configs);
     }
 
     public ClusterState getClusterState() {
