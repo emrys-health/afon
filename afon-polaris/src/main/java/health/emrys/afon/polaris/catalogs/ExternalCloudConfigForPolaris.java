@@ -36,7 +36,7 @@ abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolari
 
         ConnectionConfigInfo connectionInfo = new ConnectionConfigInfo(
             ConnectionConfigInfo.ConnectionTypeEnum.ICEBERG_REST,
-            getEndpoint(),
+            getEndpoint() + "/api/catalog/",
             cnxnParams,
             null);
 
