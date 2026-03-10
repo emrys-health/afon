@@ -109,7 +109,7 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
         conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol, host));
-        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), sparkCatalog.toString()); // this is the Polaris catalog name
+        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), sparkCatalog); // this is the Polaris catalog name
         return Map.copyOf(conf);
     }
 

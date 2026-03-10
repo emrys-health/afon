@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.function.Function;
 
+import static health.emrys.afon.config.AfonPropertiesLoader.add;
 import static java.lang.String.format;
 
 /**
@@ -41,15 +42,26 @@ public class ClusterPolarisConfiguration implements AutoCloseable {
             try (ClusterPolarisConfiguration app = new ClusterPolarisConfiguration(properties)) {
                 if (args.length == 0) {
                     app.initializePolaris();
-                } else {
+                } else if (args.length == 1) {
                     SupportedCloudsEnum cloud = SupportedCloudsEnum.valueOf(args[0]);
-                    CloudConfigForPolaris cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
-                    app.initializePolaris(new CloudConfigForPolaris[]{cloudConfig});
+                    app.initialize(cloud, properties);
+                } else if (args.length == 2) {
+                    SupportedCloudsEnum cloud = SupportedCloudsEnum.valueOf(args[0]);
+                    Properties external = new Properties();
+                    external.putAll(properties);
+                    String credential = args[1];
+                    logger.info("Credential: " + credential);
+                    app.initialize(cloud, add(credential, external));
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void initialize(SupportedCloudsEnum cloud, Properties properties) throws IncorrectConfigException, IOException {
+        CloudConfigForPolaris cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
+        initializePolaris(new CloudConfigForPolaris[]{cloudConfig});
     }
 
     private final Properties properties;
