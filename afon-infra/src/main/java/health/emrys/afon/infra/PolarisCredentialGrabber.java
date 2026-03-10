@@ -12,9 +12,8 @@ public class PolarisCredentialGrabber {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCredentialGrabber.class);
 
     public static void main(String[] args) {
-        Properties properties = new AfonPropertiesLoader().getProperties();
         try {
-            var          clusterConfig     = new ClusterPolarisConfiguration(properties);
+            var          clusterConfig     = new ClusterPolarisConfiguration();
             ClusterState clusterState      = clusterConfig.getClusterState();
             Properties   clusterProperties = AfonPropertiesLoader.add(clusterState.getCredentials(), clusterConfig.getClusterProperties());
             var          client            = new AfonPolarisClient(clusterProperties, "https");
