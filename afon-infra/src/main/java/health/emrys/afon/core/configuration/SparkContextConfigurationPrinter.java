@@ -32,6 +32,9 @@ import static java.lang.String.valueOf;
 public class SparkContextConfigurationPrinter {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(SparkContextConfigurationPrinter.class);
+    private final String polarisId;
+    private final String polarisSecret;
+    private final String polarisHost;
 
     public static final void main(String[] args) {
         try {
@@ -45,11 +48,14 @@ public class SparkContextConfigurationPrinter {
     private final SparkWarehouseConfig polarisConfig;
 
     public SparkContextConfigurationPrinter(EmrysCloud emrysCloud) {
+        polarisId     = emrysCloud.getPolarisId();
+        polarisSecret = emrysCloud.getPolarisSecret();
+        polarisHost   = emrysCloud.getPolarisHost();
         polarisConfig = new SparkWarehouseConfig(
                 emrysCloud.getAccessToken(),
-                emrysCloud.getPolarisId(),
-                emrysCloud.getPolarisSecret(),
-                emrysCloud.getPolarisHost()
+                polarisId,
+                polarisSecret,
+                polarisHost
         );
     }
 
@@ -142,6 +148,32 @@ public class SparkContextConfigurationPrinter {
                                           DROP TABLE aws_acceptance_Test;
                                           """, polarisConfig.getAccessToken()));
 
+        System.out.println(format("""
+                               -- attempt to get Snowflake to use vended crednetials:
+                               CREATE OR REPLACE CATALOG INTEGRATION polaris_aws
+                                 CATALOG_SOURCE = POLARIS
+                                 TABLE_FORMAT = ICEBERG
+                                 CATALOG_NAMESPACE = 'acceptancetests'
+                                 REST_CONFIG = (
+                                   CATALOG_URI = 'https://%s/api/catalog/',
+                                   CATALOG_NAME = 'aws'
+                                   ACCESS_DELEGATION_MODE = VENDED_CREDENTIALS
+                                 )
+                                 REST_AUTHENTICATION = (
+                                       TYPE = OAUTH
+                                   OAUTH_CLIENT_ID = '%s'
+                                   OAUTH_CLIENT_SECRET = '%s'
+                                   OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
+                                 )
+                                 ENABLED = TRUE;
+                               """, polarisHost, polarisId, polarisSecret));
+        System.out.println(format("""
+                                      CREATE OR REPLACE ICEBERG TABLE my_iceberg_table
+                                        CATALOG = 'polaris_aws'
+                                        CATALOG_TABLE_NAME = 'AwsAccessSpec251117511401'
+                                        CATALOG_NAMESPACE = 'acceptancetests'
+                                        REPLACE_INVALID_CHARACTERS = TRUE
+                                      """));
         System.out.println("\u001B[0m");
 
     }

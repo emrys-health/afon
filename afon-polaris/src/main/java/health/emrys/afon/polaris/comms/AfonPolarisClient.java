@@ -61,6 +61,7 @@ public class AfonPolarisClient {
         HttpPost post = new HttpPost(uri);
         post.setHeader(CONTENT_TYPE, "application/x-www-form-urlencoded");
         post.setHeader("Polaris-Realm", "POLARIS");
+        logger.info("client id = {}, secret = {}", clientId, clientSecret);
         String body = format("grant_type=client_credentials&client_id=%s&client_secret=%s&scope=PRINCIPAL_ROLE:ALL", clientId, clientSecret);
         try {
             ClassicHttpResponse response = makeCall(body, post);
