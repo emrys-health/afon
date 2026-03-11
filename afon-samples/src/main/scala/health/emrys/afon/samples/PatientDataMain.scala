@@ -2,12 +2,9 @@ package health.emrys.afon.samples
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum._
-import health.emrys.afon.config.AfonPropertiesLoader
-import health.emrys.afon.infra.checks.CloudSpark
-import health.emrys.afon.infra.{ClusterPolarisConfiguration, EmrysCloud}
+import health.emrys.afon.infra.ClusterPolarisConfiguration
+import health.emrys.afon.infra.checks.SparkSessionFactory
 import health.emrys.afon.samples.SampleData.{occupancyDataset, patientDataset}
-import health.emrys.afon.spark.SparkWarehouseConfig
-import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 
 case class Patient(
@@ -31,7 +28,7 @@ object PatientDataMain {
 
   def main(array: Array[String]): Unit = {
     val spark: SparkSession = initSpark
-    val cluster = new ClusterPolarisConfiguration(new AfonPropertiesLoader().getProperties);
+    val cluster = new ClusterPolarisConfiguration();
     logger.info("Initializing Polaris")
     cluster.initializePolaris()
     logger.info("Creating data")
@@ -58,7 +55,6 @@ object PatientDataMain {
   }
 
   private def initSpark(): SparkSession = {
-    val cloudSpark = new CloudSpark()
-    cloudSpark.localSparkClusterPolaris()
+    SparkSessionFactory.localSparkClusterPolaris
   }
 }

@@ -29,6 +29,11 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
     }
 
     @Override
+    protected String getRemoteCatalogName() {
+        return SupportedCloudsEnum.AZURE.toString();
+    }
+
+    @Override
     protected List<String> getScopes() {
         return List.of(OAUTH_SCOPE);
     }

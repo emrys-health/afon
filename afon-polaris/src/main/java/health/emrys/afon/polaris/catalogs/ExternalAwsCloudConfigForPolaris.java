@@ -24,6 +24,11 @@ public class ExternalAwsCloudConfigForPolaris extends ExternalCloudConfigForPola
     }
 
     @Override
+    protected String getRemoteCatalogName() {
+        return SupportedCloudsEnum.AWS.toString();
+    }
+
+    @Override
     protected List<String> getScopes() {
         return List.of();
     }
