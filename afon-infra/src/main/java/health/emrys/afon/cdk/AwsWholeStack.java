@@ -137,8 +137,15 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                 .name("jupyter")
                 .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1")
                 .env(List.of(
-                        DeploymentSpecTemplateSpecContainerEnv.builder().name("JUPYTER_TOKEN").value("").build(),
-                        DeploymentSpecTemplateSpecContainerEnv.builder().name("JUPYTER_PASSWORD").value("").build()
+                        // Disable Jupyter's built-in auth so oauth2-proxy is the sole gate.
+                        // NOTEBOOK_ARGS is read by start-notebook.sh and forwarded to the server,
+                        // avoiding the need to override the tini entrypoint / CMD.
+                        // Both NotebookApp (classic) and ServerApp (Jupyter >= 7) flags are included
+                        // so this works regardless of which server the image uses.
+                        DeploymentSpecTemplateSpecContainerEnv.builder()
+                                .name("NOTEBOOK_ARGS")
+                                .value("--NotebookApp.token= --NotebookApp.password= --ServerApp.token= --ServerApp.password_required=False")
+                                .build()
                     ))
                 .build();
         DeploymentUtils.deploy(this,
