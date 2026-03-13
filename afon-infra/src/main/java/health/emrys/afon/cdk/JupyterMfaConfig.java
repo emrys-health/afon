@@ -125,7 +125,7 @@ class JupyterMfaConfig {
                        .dependsOn(deps)
                        .spec(ServiceSpec.builder()
                                         .selector(PROXY_LABELS)
-                                        .type("ClusterIP")
+                                        .type("NodePort")
                                         .port(List.of(ServiceSpecPort.builder()
                                                                       .name("http")
                                                                       .port(PROXY_PORT)

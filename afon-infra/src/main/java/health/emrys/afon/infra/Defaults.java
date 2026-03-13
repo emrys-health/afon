@@ -8,6 +8,7 @@ public interface Defaults {
     String AZURE_REGION = "uksouth";
 
     String JUPYTER_SERVICE_NAME = "jupyter-lb";
+    String JUPYTER_DOMAIN       = "emrysjupyter.click";
 
     String POLARIS_POD_NAME     = "polaris";
     String POLARIS_SERVICE_NAME = "polaris-ingress";
