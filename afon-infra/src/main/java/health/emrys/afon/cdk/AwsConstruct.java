@@ -68,6 +68,7 @@ public class AwsConstruct extends AbstractConstruct {
     final               Vpc                        vpc;
     final               IamRole                    loadBalancerRole;
     final               Resource                   newKubeConfig;
+    private             Release                    lbRelease;
 
     AwsConstruct(final Construct scope, final String id) {
         super(scope, id);
@@ -322,9 +323,11 @@ public class AwsConstruct extends AbstractConstruct {
                                        .policyArn(CLUSTER_POLICY_ARN)
                                        .role(eksClusterRole.getName())
                                        .build();
-        Release release = configureIngress(scope, loadBalancerRole);
+        lbRelease = configureIngress(scope, loadBalancerRole);
 
-        IngressV1 ingress = createHttpsIngress("arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
+        IngressV1 ingress = createHttpsIngress("polaris-https-ingress",
+                                               "polaris-ingress",
+                                               "arn:aws:acm:eu-west-2:418295715997:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
                                                "emryspolaris.click",
                                                POLARIS_INTERNAL,
                                                8181,
@@ -341,19 +344,30 @@ public class AwsConstruct extends AbstractConstruct {
         // 2. Create the Alias A Record
         // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
         // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
-        configureDNS(release, ingress);
+        configureDNS("IngressAliasRecord", "Z06847223IC61YVGEH6HR", "emryspolaris.click", lbRelease, ingress);
     }
 
-    private void configureDNS(Release release, IngressV1 ingress) {
-        new Route53Record(this, "IngressAliasRecord", Route53RecordConfig
+    /**
+     * Creates a Route 53 Alias A record pointing {@code domainName} at the ALB provisioned by
+     * the given Ingress. The ELB hosted zone ID {@code "ZHURV8PSTC4K8"} is fixed for eu-west-2.
+     *
+     * @param constructId   unique CDKTF construct ID for this record
+     * @param r53ZoneId     the Route 53 hosted zone ID that owns {@code domainName}
+     * @param domainName    the domain to point at the ALB (e.g. {@code "emrysjupyter.click"})
+     * @param release       Helm release the record should depend on
+     * @param ingress       IngressV1 whose ALB hostname is used as the alias target
+     */
+    public void configureDNS(String constructId, String r53ZoneId, String domainName,
+                              Release release, IngressV1 ingress) {
+        new Route53Record(this, constructId, Route53RecordConfig
                 .builder()
-                .zoneId("Z06847223IC61YVGEH6HR")
-                .name("emryspolaris.click")
-                .type("A") // Use 'A' for an Alias to the ingress hostname
+                .zoneId(r53ZoneId)
+                .name(domainName)
+                .type("A")
                 .dependsOn(List.of(release))
                 .alias(Route53RecordAlias.builder()
-                                         .name(ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getHostname())           // The load balancer hostname from your Ingress
-                                         .zoneId("ZHURV8PSTC4K8") // hard coded that maps to eu-west-2
+                                         .name(ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getHostname())
+                                         .zoneId("ZHURV8PSTC4K8") // ELB hosted zone ID for eu-west-2
                                          .evaluateTargetHealth(true)
                                          .build())
                 .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
@@ -459,6 +473,8 @@ public class AwsConstruct extends AbstractConstruct {
     }
 
     public IngressV1 createHttpsIngress(
+            final String constructId,
+            final String ingressName,
             final String certArn,
             final String hostName,
             final String serviceName,
@@ -509,10 +525,10 @@ public class AwsConstruct extends AbstractConstruct {
                                                                          .build()))
                 .build();
         // kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":[]}}' --type=merge
-        IngressV1 ingress = IngressV1.Builder.create(this, "polaris-https-ingress")
+        IngressV1 ingress = IngressV1.Builder.create(this, constructId)
                                              .provider(kubernetesProvider)
                                              .metadata(IngressV1Metadata.builder()
-                                                                        .name("polaris-ingress")
+                                                                        .name(ingressName)
                                                                         .namespace("default") // Change if your service is in a different namespace
                                                                         .annotations(albAnnotations)
                                                                         .build())
@@ -550,6 +566,10 @@ public class AwsConstruct extends AbstractConstruct {
         // (Optional) Ignore future controller-added finalizers so deletes never block
 //        ingress.addOverride("lifecycle.ignore_changes", Collections.singletonList("metadata.0.finalizers"));
         return ingress;
+    }
+
+    public Release getLbRelease() {
+        return lbRelease;
     }
 
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {

@@ -3,7 +3,10 @@ package health.emrys.afon.cdk;
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.TerraformVariable;
+import com.hashicorp.cdktf.TerraformVariableConfig;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
+import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -56,9 +59,8 @@ class AwsWholeStack extends AwsKubernetesPolaris {
     public AwsWholeStack(final Construct scope, final String id) {
         super(scope, id);
         List<ITerraformDependable> dependables   = cloudProvider.getDependables();
-        Service       jupyterLB     = deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
-        // no long exposing HTTP Polaris
-        loadBalancers = List.of(jupyterLB);
+        deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
+        loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
         HelmProvider helm = HelmProvider.Builder.create(this, "helm")
                 .kubernetes(HelmProviderKubernetes.builder()
@@ -125,7 +127,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                         .build();
     }
 
-    private Service deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName, IamRole loadBalancerRole) {
+    private void deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName, IamRole loadBalancerRole) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
         // Disable Jupyter's built-in token/password auth via env vars — oauth2-proxy handles authentication.
@@ -170,36 +172,41 @@ class AwsWholeStack extends AwsKubernetesPolaris {
         proxyDeps.add(jupyterWeb);
         new JupyterMfaConfig(this, proxyDeps, "http://jupyter-web:8888");
 
-        // The public LoadBalancer now targets oauth2-proxy, not Jupyter directly.
-        ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
-        lbDependencies.add(loadBalancerRole);
-        String subnetIds = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
-        Map<String, String> albAnnotations = Map.of(
-//                "kubernetes.io/role/elb", "1",
-//                "kubernetes.io/ingress.class", "alb",
-                "service.beta.kubernetes.io/aws-load-balancer-scheme", "internet-facing",
-                "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
-                "service.beta.kubernetes.io/aws-load-balancer-internal", "false"
-                                                   );
-        Service loadbalancer = Service.Builder.create(this, JUPYTER_SERVICE_NAME)
-                                              .metadata(ServiceMetadata.builder()
-                                                                       .name(JUPYTER_SERVICE_NAME)
-                                                                       .annotations(albAnnotations)
-                                                                       .build())
-                                              .dependsOn(lbDependencies)
-                                              .spec(ServiceSpec.builder()
-                                                               .selector(JupyterMfaConfig.PROXY_LABELS) // routes to oauth2-proxy
-                                                               .type("LoadBalancer")
-                                                               .port(List.of(
-                                                                       ServiceSpecPort.builder()
-                                                                                      .name("web")
-                                                                                      .port(80) // public port
-                                                                                      .targetPort(String.valueOf(JupyterMfaConfig.PROXY_PORT))
-                                                                                      .protocol("TCP")
-                                                                                      .build()
-                                                                            ))
-                                                               .build())
-                                              .build();
+        // this for AWS jupyter is: arn:aws:acm:eu-west-2:418295715997:certificate/8f58f850-3756-40d4-b7b5-499124f150e3
+
+        // ACM certificate ARN for emrysjupyter.click — provision it manually in ACM and pass via:
+        //   export TF_VAR_jupyter_cert_arn=arn:aws:acm:eu-west-2:<account-id>:certificate/<id>
+        TerraformVariable certArn = new TerraformVariable(this, "jupyter_cert_arn",
+                TerraformVariableConfig.builder()
+                                       .type("string")
+                                       .description("ACM certificate ARN for " + JUPYTER_DOMAIN)
+                                       .build());
+
+        // for emrysjupyter.click, this is Z03165251T5B540VMLNST
+        // run aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click to see
+
+        // Route 53 hosted zone ID for emrysjupyter.click — find it in the AWS console or via:
+        //   aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click
+        //   export TF_VAR_jupyter_r53_zone_id=Z...
+        TerraformVariable r53ZoneId = new TerraformVariable(this, "jupyter_r53_zone_id",
+                TerraformVariableConfig.builder()
+                                       .type("string")
+                                       .description("Route 53 hosted zone ID for " + JUPYTER_DOMAIN)
+                                       .build());
+
+        // ALB ingress: terminates HTTPS at the load balancer, routes to oauth2-proxy ClusterIP.
+        // Traffic flow: internet → ALB (443) → oauth2-proxy:4180 → jupyter-web:8888 → Jupyter pod
+        IngressV1 ingress = cloudProvider.createHttpsIngress(
+                "jupyter-https-ingress",
+                "jupyter-ingress",
+                certArn.getStringValue(),
+                JUPYTER_DOMAIN,
+                JupyterMfaConfig.PROXY_SVC_NAME,
+                JupyterMfaConfig.PROXY_PORT,
+                cloudProvider.getSubnetIds());
+
+        cloudProvider.configureDNS("JupyterAliasRecord", r53ZoneId.getStringValue(),
+                                   JUPYTER_DOMAIN, cloudProvider.getLbRelease(), ingress);
 
         Service.Builder.create(this, "jupyter-internal")
                        .metadata(ServiceMetadata.builder()
@@ -226,8 +233,6 @@ class AwsWholeStack extends AwsKubernetesPolaris {
 
 
         networkPolicies(jupyterLabels, sparkConnectorName);
-
-        return loadbalancer;
     }
 
 
