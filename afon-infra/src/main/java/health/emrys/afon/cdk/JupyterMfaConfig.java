@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static health.emrys.afon.infra.Defaults.JUPYTER_DOMAIN;
+import static java.lang.String.format;
+
 /**
  * Deploys oauth2-proxy in front of Jupyter to enforce MFA via an OIDC identity provider.
  *
@@ -101,9 +104,10 @@ class JupyterMfaConfig {
                         "--email-domain=*",                                // restrict to e.g. --email-domain=yourdomain.com
                         "--upstream=" + jupyterUpstreamUrl,
                         "--http-address=0.0.0.0:" + PROXY_PORT,
-                        "--cookie-secure=false",                           // set true when TLS terminates at this proxy
+                        "--cookie-secure=true",                           // set true when TLS terminates at this proxy
                         "--skip-provider-button=false",
-                        "--ping-path=/ping"
+                        "--ping-path=/ping",
+                        format("--redirect-url=https://%s/oauth2/callback", JUPYTER_DOMAIN)
                      ))
                 .env(List.of(
                         envFromSecret("OAUTH2_PROXY_CLIENT_ID",     SECRET_NAME, "client-id"),
