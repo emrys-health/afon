@@ -9,6 +9,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -127,10 +128,16 @@ class AwsWholeStack extends AwsKubernetesPolaris {
     private Service deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName, IamRole loadBalancerRole) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
+        // Disable Jupyter's built-in token/password auth via env vars — oauth2-proxy handles authentication.
+        // Using env vars avoids overriding the container CMD (which would break the tini entrypoint).
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("jupyter")
                 .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1")
+                .env(List.of(
+                        DeploymentSpecTemplateSpecContainerEnv.builder().name("JUPYTER_TOKEN").value("").build(),
+                        DeploymentSpecTemplateSpecContainerEnv.builder().name("JUPYTER_PASSWORD").value("").build()
+                    ))
                 .build();
         DeploymentUtils.deploy(this,
                                eksDependOn,
@@ -139,6 +146,31 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                                List.of(),
                                "jupyter");
 
+        // Internal ClusterIP so oauth2-proxy can reach the Jupyter web UI.
+        Service jupyterWeb = Service.Builder.create(this, "jupyter-web")
+                                            .metadata(ServiceMetadata.builder()
+                                                                      .name("jupyter-web")
+                                                                      .namespace("default")
+                                                                      .build())
+                                            .dependsOn(eksDependOn)
+                                            .spec(ServiceSpec.builder()
+                                                             .selector(jupyterLabels)
+                                                             .type("ClusterIP")
+                                                             .port(List.of(ServiceSpecPort.builder()
+                                                                                          .name("web")
+                                                                                          .port(8888)
+                                                                                          .targetPort("8888")
+                                                                                          .protocol("TCP")
+                                                                                          .build()))
+                                                             .build())
+                                            .build();
+
+        // Deploy oauth2-proxy pointing at the Jupyter web ClusterIP service.
+        List<ITerraformDependable> proxyDeps = new ArrayList<>(eksDependOn);
+        proxyDeps.add(jupyterWeb);
+        new JupyterMfaConfig(this, proxyDeps, "http://jupyter-web:8888");
+
+        // The public LoadBalancer now targets oauth2-proxy, not Jupyter directly.
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
         lbDependencies.add(loadBalancerRole);
         String subnetIds = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
@@ -156,13 +188,13 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                                                                        .build())
                                               .dependsOn(lbDependencies)
                                               .spec(ServiceSpec.builder()
-                                                               .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
+                                                               .selector(JupyterMfaConfig.PROXY_LABELS) // routes to oauth2-proxy
                                                                .type("LoadBalancer")
                                                                .port(List.of(
                                                                        ServiceSpecPort.builder()
                                                                                       .name("web")
-                                                                                      .port(8888) // Port the load balancer listens on
-                                                                                      .targetPort("8888") // Port the container is listening on
+                                                                                      .port(80) // public port
+                                                                                      .targetPort(String.valueOf(JupyterMfaConfig.PROXY_PORT))
                                                                                       .protocol("TCP")
                                                                                       .build()
                                                                             ))
