@@ -37,7 +37,13 @@ public class PolarisConfig extends Construct {
                                                                                     .targetPort("8181")
                                                                                     .protocol("TCP")
                                                                                     .build();
-    static final         String              NO_POLARIS_FINALIZERS = "kubectl patch ingress polaris-ingress -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
+    static final         String              NO_POLARIS_FINALIZERS = finalizeIngress("polaris-ingress");
+    static final         String              NO_JUPYTER_FINALIZERS = finalizeIngress("jupyter-ingress");
+
+    private static String finalizeIngress(String service) {
+        return format("kubectl patch ingress %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
+    }
+
     protected            Map<String, String> polarisLabels;
 
     public PolarisConfig(@NotNull Construct scope, @NotNull String id, CloudProvider cloudProvider) {
