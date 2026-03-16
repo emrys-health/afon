@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
 import static health.emrys.afon.cdk.AwsKubernetesPolaris.POLARIS_INTERNAL;
 import static health.emrys.afon.cdk.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
 import static health.emrys.afon.cdk.SparkClusterDeployment.NO_SPARK_LB_FINALIZERS;
 import static health.emrys.afon.infra.Defaults.AWS_REGION;
@@ -408,9 +409,9 @@ public class AwsConstruct extends AbstractConstruct {
                                                                                  ))
                                                               .build())
                               .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS,
-//                                                           NO_SPARK_LB_FINALIZERS,
                                                            NO_JUPYTER_LB,
-                                                           NO_POLARIS_FINALIZERS))
+                                                           NO_POLARIS_FINALIZERS,
+                                                           NO_JUPYTER_FINALIZERS))
                               .build();
         return serviceAccountName;
     }

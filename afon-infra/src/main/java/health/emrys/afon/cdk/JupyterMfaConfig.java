@@ -13,12 +13,15 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.JUPYTER_DOMAIN;
 import static java.lang.String.format;
 
@@ -61,27 +64,8 @@ class JupyterMfaConfig {
     private static final String SECRET_NAME = "oauth2-proxy-secret";
 
     JupyterMfaConfig(Construct scope, List<ITerraformDependable> dependsOn, String jupyterUpstreamUrl) {
-        TerraformVariable clientId = new TerraformVariable(scope, "oauth2_client_id",
-                TerraformVariableConfig.builder()
-                                       .type("string")
-                                       .sensitive(true)
-                                       .description("OAuth2 client ID from your OIDC provider (e.g. Google Cloud Console)")
-                                       .build());
-
-        TerraformVariable clientSecret = new TerraformVariable(scope, "oauth2_client_secret",
-                TerraformVariableConfig.builder()
-                                       .type("string")
-                                       .sensitive(true)
-                                       .description("OAuth2 client secret from your OIDC provider")
-                                       .build());
-
-        TerraformVariable cookieSecret = new TerraformVariable(scope, "oauth2_cookie_secret",
-                TerraformVariableConfig.builder()
-                                       .type("string")
-                                       .sensitive(true)
-                                       .description("32-byte base64 string for cookie encryption — " +
-                                                     "generate with: openssl rand -base64 32 | tr -- '+/' '-_'")
-                                       .build());
+        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
+        Properties           properties = loader.getProperties();
 
         Secret oauthSecret = Secret.Builder.create(scope, "oauth2ProxySecret")
                                            .metadata(SecretMetadata.builder()
@@ -89,9 +73,9 @@ class JupyterMfaConfig {
                                                                     .namespace("default")
                                                                     .build())
                                            .data(Map.of(
-                                                   "client-id",     clientId.getStringValue(),
-                                                   "client-secret", clientSecret.getStringValue(),
-                                                   "cookie-secret", cookieSecret.getStringValue()
+                                                   "client-id",     OAUTH2_CLIENT_ID.getValueFrom(properties),
+                                                   "client-secret", OAUTH2_CLIENT_SECRET.getValueFrom(properties),
+                                                   "cookie-secret", OAUTH2_COOKIE_SECRET.getValueFrom(properties)
                                                        ))
                                            .build();
 

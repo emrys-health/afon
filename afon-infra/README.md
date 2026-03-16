@@ -81,7 +81,7 @@ you have to update your domain registry (we use AWS Route53).
 
 If you want to create config for the whole stack in AWS, run:
 
-`mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsWholeStack exec:java`
+`mvn compile -Dexec.mainClass=health.emrys.afon.cdk.AwsWholeStack exec:java`
 
 This will output your `cdk.tf.json` file.
 Run it with:

@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.infra.Defaults.*;
 
 /***
@@ -127,7 +128,9 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                         .build();
     }
 
-    private void deployJupyter(List<ITerraformDependable> eksDependOn, String sparkConnectorName, IamRole loadBalancerRole) {
+    private void deployJupyter(List<ITerraformDependable> eksDependOn,
+                               String sparkConnectorName,
+                               IamRole loadBalancerRole) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
         // Disable Jupyter's built-in token/password auth via env vars — oauth2-proxy handles authentication.
@@ -162,6 +165,7 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                                                                       .namespace("default")
                                                                       .build())
                                             .dependsOn(eksDependOn)
+                                            .provisioners(uponDestroyRun(NO_JUPYTER_FINALIZERS))
                                             .spec(ServiceSpec.builder()
                                                              .selector(jupyterLabels)
                                                              .type("ClusterIP")
@@ -179,40 +183,22 @@ class AwsWholeStack extends AwsKubernetesPolaris {
         proxyDeps.add(jupyterWeb);
         new JupyterMfaConfig(this, proxyDeps, "http://jupyter-web:8888");
 
-        // this for AWS jupyter is: arn:aws:acm:eu-west-2:418295715997:certificate/8f58f850-3756-40d4-b7b5-499124f150e3
-
-        // ACM certificate ARN for emrysjupyter.click — provision it manually in ACM and pass via:
-        //   export TF_VAR_jupyter_cert_arn=arn:aws:acm:eu-west-2:<account-id>:certificate/<id>
-        TerraformVariable certArn = new TerraformVariable(this, "jupyter_cert_arn",
-                TerraformVariableConfig.builder()
-                                       .type("string")
-                                       .description("ACM certificate ARN for " + JUPYTER_DOMAIN)
-                                       .build());
-
         // for emrysjupyter.click, this is Z03165251T5B540VMLNST
         // run aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click to see
-
-        // Route 53 hosted zone ID for emrysjupyter.click — find it in the AWS console or via:
-        //   aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click
-        //   export TF_VAR_jupyter_r53_zone_id=Z...
-        TerraformVariable r53ZoneId = new TerraformVariable(this, "jupyter_r53_zone_id",
-                TerraformVariableConfig.builder()
-                                       .type("string")
-                                       .description("Route 53 hosted zone ID for " + JUPYTER_DOMAIN)
-                                       .build());
 
         // ALB ingress: terminates HTTPS at the load balancer, routes to oauth2-proxy ClusterIP.
         // Traffic flow: internet → ALB (443) → oauth2-proxy:4180 → jupyter-web:8888 → Jupyter pod
         IngressV1 ingress = cloudProvider.createHttpsIngress(
                 "jupyter-https-ingress",
                 "jupyter-ingress",
-                certArn.getStringValue(),
+                "arn:aws:acm:eu-west-2:418295715997:certificate/8f58f850-3756-40d4-b7b5-499124f150e3",
                 JUPYTER_DOMAIN,
                 JupyterMfaConfig.PROXY_SVC_NAME,
                 JupyterMfaConfig.PROXY_PORT,
                 cloudProvider.getSubnetIds());
 
-        cloudProvider.configureDNS("JupyterAliasRecord", r53ZoneId.getStringValue(),
+        cloudProvider.configureDNS("JupyterAliasRecord",
+                                   "Z03165251T5B540VMLNST", // aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click
                                    JUPYTER_DOMAIN, cloudProvider.getLbRelease(), ingress);
 
         Service.Builder.create(this, "jupyter-internal")
