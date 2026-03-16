@@ -61,7 +61,7 @@ import static java.lang.String.format;
 public class AwsConstruct extends AbstractConstruct {
     public static final String                     VPC_NAME           = "cdktf-eks-vpc";
     public static final String                     CLUSTER_POLICY_ARN = "arn:aws:iam::418295715997:policy/AWSLoadBalancerControllerIAMPolicyCurl"; // TODO remove 'Curl'
-    final static        String                     NO_JUPYTER_LB      = "kubectl patch service jupyter-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
+    final static        String                     NO_JUPYTER_LB      = "kubectl patch service jupyter-web -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
     final               DataAwsEksClusterAuth      eksAuthData;
     private final       EksCluster                 cluster;
     private final       List<ITerraformDependable> eksDependOn;
@@ -671,8 +671,10 @@ public class AwsConstruct extends AbstractConstruct {
                                           for VPC_ID in $(%s) ; do {
                                              echo Destroying $VPC_ID
                                              echo destroying service and ingress...
-                                              kubectl patch service jupyter-lb      -p '{"metadata":{"finalizers":null}}'  --type=merge
-                                              kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":null}}'  --type=merge
+                                              %s
+                                              %s
+                                              %s
+                                              %s
                                               %s
                                               for LB in $(aws elbv2 describe-load-balancers  --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text) ; do {
                                                 echo $LB
@@ -744,6 +746,10 @@ public class AwsConstruct extends AbstractConstruct {
                                           aws iam delete-policy --policy-arn arn:aws:iam::418295715997:policy/EKS-Secret-Access-Policy
                                           \u001B[0m
                                           """,
+                                  NO_POLARIS_FINALIZERS,
+                                  NO_JUPYTER_FINALIZERS,
+                                  NO_JUPYTER_LB,
+                                  NO_SPARK_LB_FINALIZERS,
                                   getVPCsCommand(),
                                   cleanEksCommand()
                                  ));
