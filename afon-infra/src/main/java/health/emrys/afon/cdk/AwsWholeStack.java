@@ -159,9 +159,9 @@ class AwsWholeStack extends AwsKubernetesPolaris {
                                "jupyter");
 
         // Internal ClusterIP so oauth2-proxy can reach the Jupyter web UI.
-        Service jupyterWeb = Service.Builder.create(this, "jupyter-web")
+        Service jupyterWeb = Service.Builder.create(this, JUPYTER_SERVICE_NAME)
                                             .metadata(ServiceMetadata.builder()
-                                                                      .name("jupyter-web")
+                                                                      .name(JUPYTER_SERVICE_NAME)
                                                                       .namespace("default")
                                                                       .build())
                                             .dependsOn(eksDependOn)

@@ -7,7 +7,7 @@ public interface Defaults {
     String GCP_REGION   = "europe-west2";
     String AZURE_REGION = "uksouth";
 
-    String JUPYTER_SERVICE_NAME = "jupyter-lb";
+    String JUPYTER_SERVICE_NAME = "jupyter-web";
     String JUPYTER_DOMAIN       = "emrysjupyter.click";
 
     String POLARIS_POD_NAME     = "polaris";

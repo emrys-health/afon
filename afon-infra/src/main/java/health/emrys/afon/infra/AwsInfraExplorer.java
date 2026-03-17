@@ -20,7 +20,7 @@ public class AwsInfraExplorer {
         Properties       properties = new AfonPropertiesLoader().getProperties();
         AwsInfraExplorer app        = new AwsInfraExplorer();
         try {
-            app.printJupyterDetails(clusterName, properties, JUPYTER_SERVICE_NAME);
+//            app.printJupyterDetails(clusterName, properties, JUPYTER_SERVICE_NAME); // don't use service for Jupyter any more
             app.printSparkDetails(clusterName, properties, SPARK_SERVICE_NAME);
         } catch (Exception e) {
             e.printStackTrace();

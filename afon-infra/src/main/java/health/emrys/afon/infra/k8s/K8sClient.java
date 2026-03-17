@@ -56,11 +56,11 @@ public class K8sClient {
     public String getServiceExpectingOnlyOneFor(String serviceName) throws ApiException, IncorrectConfigException {
         Optional<List<String>> optionalIngress = getServiceFor(serviceName);
         if (!optionalIngress.isPresent()) {
-            throw new IncorrectConfigException(format("No service called '{}'", serviceName));
+            throw new IncorrectConfigException(format("No service called '%s'", serviceName));
         }
         List<String> polarisIngress = optionalIngress.get();
         if (polarisIngress.size() != 1) {
-            throw new IncorrectConfigException(format("Was expecting 1 service address but got {}", polarisIngress.toString()));
+            throw new IncorrectConfigException(format("Was expecting 1 service address but got %s", polarisIngress.toString()));
         }
         String polarisHost = polarisIngress.get(0);
         return polarisHost;
@@ -68,6 +68,7 @@ public class K8sClient {
 
     public Optional<List<String>> getServiceFor(String serviceName) throws ApiException {
         for (V1Service service : listServices()) {
+            logger.info("Service: {}", service.getMetadata().getName());
             if (service.getMetadata().getName().equals(serviceName)) {
                 List<V1LoadBalancerIngress> ingress = service.getStatus().getLoadBalancer().getIngress();
                 var serviceNames = ingress.stream().map(x -> getEndpoint(x)).collect(Collectors.toList());
