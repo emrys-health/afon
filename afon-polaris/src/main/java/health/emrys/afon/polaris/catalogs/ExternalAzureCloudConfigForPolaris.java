@@ -10,6 +10,11 @@ import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
 
+/**
+ * This helps to create a catalog called SupportedCloudsEnum.AZURE_EXTERNAL_BUCKET
+ * in whichever Polaris is the current that points to a remove catalog called
+ * SupportedCloudsEnum.AZURE in emryspolarisazure.click
+ */
 public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
     public static final String EXTERNAL_AZURE_WAREHOUSE_NAME = SupportedCloudsEnum.AZURE + "_EXTERNAL";
 

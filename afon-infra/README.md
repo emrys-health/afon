@@ -101,7 +101,9 @@ You should see Polaris and Jupyter.
 
 "But where is Spark?" I hear you gasp. 
 Relax, dear reader. 
-For this, we need to run:
+For this, we need to run the following. 
+*NOTE* wait for the domain names to propagate first (see the `dig` command below).
+This can take 1-10 minutes.
 
 `mvn compile -Dexec.mainClass=health.emrys.afon.cdk.SparkClusterDeployment exec:java`
 

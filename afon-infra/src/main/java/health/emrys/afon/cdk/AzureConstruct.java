@@ -332,22 +332,4 @@ public class AzureConstruct extends AbstractConstruct {
         }
         return helmProvider;
     }
-
-    public Release installNginxIngress() {
-        return Release.Builder.create(this, "nginx-ingress")
-                .provider(configureHelm())
-                .dependsOn(List.of(aksCluster))
-                .name("nginx-ingress")
-                .chart("ingress-nginx")
-                .repository("https://kubernetes.github.io/ingress-nginx")
-                .namespace("ingress-nginx")
-                .createNamespace(true)
-                .timeout(600)
-                .atomic(true)
-                .set(List.of(ReleaseSet.builder()
-                        .name("controller.service.annotations.service\\.beta\\.kubernetes\\.io/azure-load-balancer-health-probe-request-path")
-                        .value("/healthz")
-                        .build()))
-                .build();
-    }
 }

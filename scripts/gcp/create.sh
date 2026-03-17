@@ -17,3 +17,13 @@ gcloud iam service-accounts add-iam-policy-binding \
     --project fjords-450014
 gcloud iam service-accounts get-iam-policy my-vendable-sa@fjords-450014.iam.gserviceaccount.com
 
+# Needed when we move to Polaris 1.4
+gcloud services enable iam.googleapis.com --project=fjords-450014
+gcloud services enable iamcredentials.googleapis.com --project=fjords-450014
+gcloud services enable serviceusage.googleapis.com --project=fjords-450014
+gcloud services enable storage.googleapis.com --project=fjords-450014
+gcloud projects add-iam-policy-binding fjords-450014 --member='serviceAccount:my-vendable-sa@fjords-450014.iam.gserviceaccount.com' --role='roles/storage.objectViewer'
+gcloud projects add-iam-policy-binding fjords-450014 \
+    --member="serviceAccount:my-vendable-sa@fjords-450014.iam.gserviceaccount.com" \
+    --role="roles/serviceusage.serviceUsageConsumer"
+
