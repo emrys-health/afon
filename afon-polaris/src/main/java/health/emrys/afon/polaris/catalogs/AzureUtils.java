@@ -14,13 +14,14 @@ public class AzureUtils {
                                                          String multiTenantAppName,
                                                          String bucketUrl,
                                                          String clientId) {
-        return new AzureStorageConfigInfo(
-            tenant,
-            multiTenantAppName,
-            format("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=%s&response_type=code&redirect_uri=http://localhost:3000/redirect&response_mode=query&scope=https://graph.microsoft.com/.default&state=12345", clientId), // not sure about this one....
-            StorageConfigInfo.StorageTypeEnum.AZURE,
-            List.of(bucketUrl)
-        );
+        return AzureStorageConfigInfo
+            .builder()
+            .setTenantId(tenant)
+            .setMultiTenantAppName(multiTenantAppName)
+            .setStorageType(StorageConfigInfo.StorageTypeEnum.AZURE)
+            .setAllowedLocations(List.of(bucketUrl))
+            .setConsentUrl(format("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=%s&response_type=code&redirect_uri=http://localhost:3000/redirect&response_mode=query&scope=https://graph.microsoft.com/.default&state=12345", clientId)) // not sure about this one....
+            .build();
     }
 
     static @NonNull String bucketUrl(String bucketName, String storageAccount) {
