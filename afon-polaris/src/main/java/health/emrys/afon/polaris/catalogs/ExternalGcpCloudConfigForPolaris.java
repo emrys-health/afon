@@ -1,0 +1,52 @@
+package health.emrys.afon.polaris.catalogs;
+
+import health.emrys.afon.config.AfonProperties;
+import org.apache.polaris.core.admin.model.StorageConfigInfo;
+import org.jspecify.annotations.NonNull;
+
+import java.util.List;
+import java.util.Properties;
+
+import static health.emrys.afon.config.AfonProperties.GCP_EXTERNAL_BUCKET_NAME;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP_EXTERNAL;
+import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
+
+public class ExternalGcpCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
+    private final String bucket;
+
+    public ExternalGcpCloudConfigForPolaris(Properties properties) {
+        super(properties);
+        this.bucket         = "gs://" + GCP_EXTERNAL_BUCKET_NAME.getValueFrom(properties);
+    }
+
+    @Override
+    protected String getRemoteCatalogName() {
+        return GCP.toString();
+    }
+
+    @Override
+    protected List<String> getScopes() {
+        return List.of(OAUTH_SCOPE);
+    }
+
+    @Override
+    protected @NonNull String getEndpoint() {
+        return "https://emryspolarisgcp.click";
+    }
+
+    @Override
+    protected @NonNull String getBucketUrl() {
+        return bucket;
+    }
+
+    @Override
+    protected @NonNull StorageConfigInfo getStorageConfigInfo() {
+        return null;
+    }
+
+    @Override
+    public String warehouseName() {
+        return GCP_EXTERNAL.toString();
+    }
+}
