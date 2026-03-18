@@ -1,6 +1,5 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.AfonProperties;
 import org.apache.polaris.core.admin.model.GcpStorageConfigInfo;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import org.jspecify.annotations.NonNull;
@@ -8,7 +7,7 @@ import org.jspecify.annotations.NonNull;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.GCP_EXTERNAL_BUCKET_NAME;
+import static health.emrys.afon.config.AfonProperties.GCP_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperties.GCP_SERVICE_ACCOUNT;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP_EXTERNAL;
@@ -21,7 +20,7 @@ public class ExternalGcpCloudConfigForPolaris extends ExternalCloudConfigForPola
 
     public ExternalGcpCloudConfigForPolaris(Properties properties) {
         super(properties);
-        this.bucket         = "gs://" + GCP_EXTERNAL_BUCKET_NAME.getValueFrom(properties);
+        this.bucket         = "gs://" + GCP_BUCKET_NAME.getValueFrom(properties);
         this.serviceAccount = GCP_SERVICE_ACCOUNT.getValueFrom(properties);
     }
 

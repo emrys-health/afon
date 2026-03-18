@@ -1,6 +1,5 @@
 package health.emrys.afon.infra;
 
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.polaris.catalogs.*;
 import health.emrys.afon.polaris.comms.PolarisConfigureMain;
@@ -43,7 +42,7 @@ public abstract class AbstractPolarisConfiguration {
             app.initialize(cloud, app.properties);
         } else if (args.length == 2) {
             SupportedCloudsEnum cloud    = SupportedCloudsEnum.valueOf(args[0]);
-            Properties                         external = new Properties();
+            Properties          external = new Properties();
             external.putAll(app.properties);
             String credential = args[1];
             logger.info("Credential: " + credential);

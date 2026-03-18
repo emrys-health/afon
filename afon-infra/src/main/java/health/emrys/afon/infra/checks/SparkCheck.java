@@ -1,9 +1,20 @@
 package health.emrys.afon.infra.checks;
 
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.slf4j.Logger;
 
+import java.util.Arrays;
+import java.util.List;
+
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP_EXTERNAL;
 import static health.emrys.afon.infra.checks.SparkSessionFactory.localSparkClusterPolaris;
 import static health.emrys.afon.polaris.catalogs.ExternalAzureCloudConfigForPolaris.EXTERNAL_AZURE_WAREHOUSE_NAME;
 import static java.lang.String.format;
@@ -16,16 +27,22 @@ public class SparkCheck {
     public static void main(String[] args) {
         try {
             SparkCheck   app            = new SparkCheck();
-            String       warehouse      = EXTERNAL_AZURE_WAREHOUSE_NAME;
-            String[]     warehouseNames = {warehouse};
             SparkSession spark          = null;
-            if (args.length == 0) {
+            String       warehouse      = null;
+            String       namespace      = "namespaceph";
+            if (args.length == 1) {
+                warehouse                   = args[0];
+                String[]     warehouseNames = {warehouse};
                 spark = localSparkClusterPolaris(warehouseNames);
             } else {
-                String            polarisId     = args[0];
-                String            polarisSecret = args[1];
-                String            polarisHost   = args[2];
-                String            protocol      = "http";
+                warehouse                       = args[0];
+                String            polarisId     = args[1];
+                String            polarisSecret = args[2];
+                String            polarisHost   = args[3];
+                if (args.length > 4) {
+                    namespace = args[4];
+                }
+                String            protocol      = "https";
                 AfonPolarisClient polaris       = new AfonPolarisClient(protocol + "://" + polarisHost, polarisId, polarisSecret);
                 SparkSessionFactory factory = new SparkSessionFactory(
                     polaris.getAccessToken(),
@@ -33,21 +50,34 @@ public class SparkCheck {
                     polarisSecret,
                     polarisHost,
                     protocol,
-                    warehouseNames
+                    new String[]{warehouse}
                 );
                 spark = factory.createSparkSession();
             }
-            app.talkTo(spark, warehouse);
+            app.talkTo(spark, warehouse, namespace);
             logger.info("Finished without error");
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }
     }
 
-    public void talkTo(SparkSession spark, String warehouse) {
-        String namespaceSql = format("CREATE NAMESPACE IF NOT EXISTS %s.%s", warehouse, "namespaceph");
-        logger.info("Executing: " + namespaceSql);
+    public void talkTo(SparkSession spark, String warehouse, String namespace) {
+        String namespaceSql = format("CREATE NAMESPACE IF NOT EXISTS %s.%s", warehouse, namespace);
+        logger.info("Executing: {}", namespaceSql);
         spark.sql(namespaceSql);
+        List<Row> rows = Arrays.asList(
+            RowFactory.create("apple"),
+            RowFactory.create("banana"),
+            RowFactory.create("cherry")
+                                      );
+
+        StructType schema = new StructType(new StructField[]{
+            new StructField("value", DataTypes.StringType, false, Metadata.empty())
+        });
+        Dataset<Row> df = spark.createDataFrame(rows, schema);
+        df.write()
+          .mode("overwrite")   // or "append"
+          .saveAsTable(warehouse + "." + namespace + ".test_table");
     }
 
 }

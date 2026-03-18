@@ -6,12 +6,16 @@ import health.emrys.afon.spark.SparkWarehouseConfig;
 import io.kubernetes.client.openapi.ApiException;
 import org.apache.spark.SparkContext;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 
 import static health.emrys.afon.spark.SparkWarehouseConfig.SUPPORTED_CLOUD_NAMES;
+import static org.slf4j.LoggerFactory.getLogger;
 
 public class SparkSessionFactory {
+
+    private static final Logger logger = getLogger(SparkSessionFactory.class);
 
     public static SparkSession localSparkClusterPolaris() throws IncorrectConfigException, IOException, ApiException {
         return localSparkClusterPolaris(SUPPORTED_CLOUD_NAMES);
@@ -43,6 +47,8 @@ public class SparkSessionFactory {
         this.polarisHost    = polarisHost;
         this.protocol       = protocol;
         this.warehouseNames = warehouseNames;
+        logger.info("polarisId = {}, polarisSecret = {}, polarisHost = {}, warehouseNames = {}, accessToken = {}",
+                    polarisId, polarisSecret, polarisHost, warehouseNames, accessToken);
     }
 
     public SparkSession createSparkSession() throws IOException {
