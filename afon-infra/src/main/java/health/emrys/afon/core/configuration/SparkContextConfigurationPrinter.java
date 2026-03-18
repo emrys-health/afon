@@ -1,6 +1,7 @@
 package health.emrys.afon.core.configuration;
 
 import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.EmrysCloud;
 import health.emrys.afon.infra.k8s.ClusterState;
@@ -16,6 +17,8 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 import static java.lang.String.format;
 import static java.lang.String.valueOf;
@@ -110,43 +113,8 @@ public class SparkContextConfigurationPrinter {
                                """);
 
         System.out.println("\u001B[34m");
-        System.out.println(format("""
-                                          CREATE OR REPLACE CATALOG INTEGRATION polaris_int
-                                              CATALOG_SOURCE = POLARIS
-                                              TABLE_FORMAT = ICEBERG
-                                              REST_CONFIG = (
-                                                  CATALOG_URI = 'https://emryspolaris.click/api/catalog/',
-                                                  CATALOG_NAME = 'aws'
-                                                  )
-                                              REST_AUTHENTICATION = (
-                                                  TYPE = BEARER
-                                                  BEARER_TOKEN = '%s'
-                                              )
-                                              ENABLED = TRUE;
-                                          
-                                          CREATE OR REPLACE EXTERNAL VOLUME emrys_s3
-                                            STORAGE_LOCATIONS = (
-                                              ( NAME = 'eu-west-2'
-                                                STORAGE_PROVIDER = 'S3'
-                                                STORAGE_BASE_URL = 's3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/'
-                                                STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/S3ReadWriteRoleSF2'
-                                              )
-                                            )
-                                            ALLOW_WRITES = FALSE;
-                                          
-                                          USE DATABASE SNOWFLAKE_LEARNING_DB;
-                                          
-                                          CREATE OR REPLACE ICEBERG TABLE aws_acceptance_Test
-                                            EXTERNAL_VOLUME = emrys_s3
-                                            CATALOG = polaris_int
-                                            CATALOG_NAMESPACE = 'acceptancetests'
-                                            CATALOG_TABLE_NAME = 'AwsAccessSpec251117511401'
-                                            ;
-                                          
-                                          SELECT * FROM aws_acceptance_Test;
-                                          
-                                          DROP TABLE aws_acceptance_Test;
-                                          """, polarisConfig.getAccessToken()));
+        System.out.println(snowflakeSql(AZURE, "smoketesttable260217491351"));
+        System.out.println(snowflakeSql(GCP, "smoketesttable260318240929"));
 
         System.out.println(format("""
                                -- attempt to get Snowflake to use vended crednetials:
@@ -176,6 +144,37 @@ public class SparkContextConfigurationPrinter {
                                       """));
         System.out.println("\u001B[0m");
 
+    }
+
+    private String snowflakeSql(SupportedCloudsEnum cloud, String catalog_table) {
+        String catalog = "iceberg_" + cloud.name();
+        String table = format("my_%s_table", cloud.name());
+        return format("""
+                          CREATE OR REPLACE CATALOG INTEGRATION %s
+                            CATALOG_SOURCE = ICEBERG_REST
+                            TABLE_FORMAT = ICEBERG
+                            REST_CONFIG = (
+                              CATALOG_URI = 'https://%s/api/catalog/',
+                              CATALOG_NAME = '%s'
+                              ACCESS_DELEGATION_MODE = VENDED_CREDENTIALS
+                            )
+                            REST_AUTHENTICATION = (
+                                  TYPE = BEARER
+                                  BEARER_TOKEN = '%s'
+                            )
+                            ENABLED = TRUE;
+                          
+                          USE DATABASE SNOWFLAKE_LEARNING_DB;
+                          
+                          CREATE OR REPLACE ICEBERG TABLE %s
+                                                           CATALOG = '%s'
+                                                           CATALOG_TABLE_NAME = '%s'
+                                                           CATALOG_NAMESPACE = 'acceptancetests'
+                                                           REPLACE_INVALID_CHARACTERS = TRUE;
+                          
+                          select * from %s;
+                          """, catalog, polarisHost, cloud, polarisConfig.getAccessToken(),
+                              table, catalog, catalog_table, table);
     }
 
     private static @NotNull String azureSmokeTest(String tableName) {
