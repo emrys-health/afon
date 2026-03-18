@@ -1,14 +1,8 @@
 package health.emrys.afon.core.configuration;
 
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
-import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 
@@ -33,7 +27,4 @@ public class PolarisRegisterMain {
             logger.error("Could not register table", e);
         }
     }
-
-
-
 }
