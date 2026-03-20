@@ -103,7 +103,7 @@ You should see Polaris and Jupyter.
 Relax, dear reader. 
 For this, we need to run the following. 
 *NOTE* wait for the domain names to propagate first (see the `dig` command below).
-This can take 1-10 minutes.
+This can take 1-15 minutes.
 
 `mvn compile -Dexec.mainClass=health.emrys.afon.cdk.SparkClusterDeployment exec:java`
 
@@ -187,6 +187,27 @@ Add Prometheus for traffic volume monitoring,
 
 ```shell
 mvn compile exec:java -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy
+```
+
+Then use port-forwarding to talk to Prometheus with something like:
+```shell
+kubectl port-forward svc/kube-prometheus-stack-prometheus 9090
+```
+
+Now we can see how much network, say, `spark-connector-0-driver` has used with:
+
+```shell
+curl -G http://localhost:9090/api/v1/query   --data-urlencode 'query=sum by (pod) (rate(container_network_receive_bytes_total{pod="spark-connector-0-driver"}[5m]))'
+```
+
+The Grafana GUI is also available in a similar way by running 
+`kubectl port-forward service/kube-prometheus-stack-grafana 8080:80` 
+and opening your browswer at `localhost:8080`. 
+However, note that you won't be able to load any pre-made dashboards, we'll need to punch a hole in the firewall.  
+
+Also, to get the passwords, run `kubectl get secrets` and for the password you want (say, `kube-prometheus-stack-grafana`), run:
+```shell
+kubectl get secret --namespace  default kube-prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
 ```
 
 # What the Java code does
