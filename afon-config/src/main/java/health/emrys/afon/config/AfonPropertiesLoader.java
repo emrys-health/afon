@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class AfonPropertiesLoader {
@@ -61,6 +60,11 @@ public class AfonPropertiesLoader {
             props.load(new FileInputStream(filename));
             logger.info("{} has {} items", filename, props.size());
             properties.putAll(props);
+        }
+        for (String property: AfonProperty.getAllProperties()) {
+            if (System.getProperty(property) != null) {
+                properties.put(property, System.getProperty(property));
+            }
         }
     }
 
