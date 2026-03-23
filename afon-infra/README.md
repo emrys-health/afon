@@ -180,6 +180,9 @@ mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegis
 ```shell
 mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args='AZURE acceptancetests smoketesttable260217491351 abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable260217491351/metadata/00001-f8272499-8e3d-4588-8365-b99ffaee794e.metadata.json'
 ```
+```shell
+mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args='GCP acceptancetests smoketesttable260318240929 gs://emrys_afon_core/acceptancetests/smoketesttable260318240929/metadata/00000-c78f2d73-c473-4286-a6c1-5e4515c7bc40.metadata.json'
+```
 
 or similar.
 

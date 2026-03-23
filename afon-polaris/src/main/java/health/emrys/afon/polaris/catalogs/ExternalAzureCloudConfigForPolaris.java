@@ -16,8 +16,6 @@ import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
  * SupportedCloudsEnum.AZURE in emryspolarisazure.click
  */
 public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
-    public static final String EXTERNAL_AZURE_WAREHOUSE_NAME = SupportedCloudsEnum.AZURE + "_EXTERNAL";
-
     private final @NonNull String bucketUrl;
     private final @NonNull String tenant;
     private final @NonNull String multiTenantAppName;
@@ -58,6 +56,6 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
     }
 
     public String warehouseName() {
-        return EXTERNAL_AZURE_WAREHOUSE_NAME;
+        return SupportedCloudsEnum.AZURE_EXTERNAL.toString();
     }
 }

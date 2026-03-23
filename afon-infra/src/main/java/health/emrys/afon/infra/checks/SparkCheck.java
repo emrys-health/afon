@@ -14,9 +14,7 @@ import org.slf4j.Logger;
 import java.util.Arrays;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP_EXTERNAL;
 import static health.emrys.afon.infra.checks.SparkSessionFactory.localSparkClusterPolaris;
-import static health.emrys.afon.polaris.catalogs.ExternalAzureCloudConfigForPolaris.EXTERNAL_AZURE_WAREHOUSE_NAME;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -74,10 +72,12 @@ public class SparkCheck {
         StructType schema = new StructType(new StructField[]{
             new StructField("value", DataTypes.StringType, false, Metadata.empty())
         });
+        String       fqn = warehouse + "." + namespace + ".test_table";
+        logger.info("Writing to: {}", fqn);
         Dataset<Row> df = spark.createDataFrame(rows, schema);
         df.write()
           .mode("overwrite")   // or "append"
-          .saveAsTable(warehouse + "." + namespace + ".test_table");
+          .saveAsTable(fqn);
     }
 
 }

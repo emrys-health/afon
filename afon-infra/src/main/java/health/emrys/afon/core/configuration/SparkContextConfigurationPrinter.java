@@ -211,7 +211,9 @@ public class SparkContextConfigurationPrinter {
                               
                               df_read = spark.read.table(f"{aws_namespace}.%s")
                               df_read.show()
-                              """, tableName, tableName);
+                              
+                              spark.sql(f"SELECT * FROM {aws_namespace}.%s").show()
+                              """, tableName, tableName, tableName);
     }
 
     private static @NotNull String gcpSmokeTest(String tableName) {
