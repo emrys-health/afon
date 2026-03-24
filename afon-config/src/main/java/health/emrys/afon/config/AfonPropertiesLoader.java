@@ -15,6 +15,15 @@ public class AfonPropertiesLoader {
     private static final Logger logger = getLogger(AfonPropertiesLoader.class);
     private static final List<String> PROPERTY_FILES = List.of(PROJECT_PROPERTIES_FILE, ENV_PROPERTIES_FILE);
 
+    static {
+        try {
+            logger.info("Initializing properties");
+            Class.forName(AfonProperties.class.getName());
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private final Properties properties;
 
     public static Properties add(String credentials, Properties properties) {
@@ -63,6 +72,7 @@ public class AfonPropertiesLoader {
         }
         for (String property: AfonProperty.getAllProperties()) {
             if (System.getProperty(property) != null) {
+                logger.info("Using the environment variables to define property '{}'", property);
                 properties.put(property, System.getProperty(property));
             }
         }
