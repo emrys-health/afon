@@ -114,6 +114,12 @@
             <artifactId>cdktf-provider-null</artifactId>
             <version>11.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>ch.vorburger.exec</groupId>
+            <artifactId>exec</artifactId>
+            <version>3.3.2</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
     
 </project>
