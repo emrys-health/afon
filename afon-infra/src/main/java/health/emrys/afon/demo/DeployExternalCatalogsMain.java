@@ -5,8 +5,11 @@ import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.infra.ClusterPolarisConfiguration;
+import health.emrys.afon.infra.LocalPolarisConfiguration;
 import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.apache.commons.io.file.PathUtils;
@@ -21,6 +24,10 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperties.AZURE_BUCKET;
+import static health.emrys.afon.config.AfonProperties.AZURE_EXTERNAL_BUCKET;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
 
 public class DeployExternalCatalogsMain {
 
@@ -55,10 +62,31 @@ public class DeployExternalCatalogsMain {
         startCloud(cdktfPath(AzureKubernetesPolaris.ID));
     });
     public static final Step AZ_POLARIS_FOREIGN_CATALOG = new Step("az_foreign", () -> {
-        var          clusterConfig     = new ClusterPolarisConfiguration();
-        ClusterState clusterState      = clusterConfig.getClusterState();
-        log.info("Polaris credential: {}", clusterState.getCredentials());
+        useAzureKubernetes();
+        ClusterPolarisConfiguration        config       = new ClusterPolarisConfiguration();
+        Properties                         properties   = new AfonPropertiesLoader().getProperties();
+        // swap the buckets
+        properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(properties));
+        config.initialize(AZURE, properties);
     });
+    public static final Step AZ_POLARIS_EXTERNAL_AWS = new Step("az_external_aws", () -> {
+        useAzureKubernetes();
+        var                         clusterConfig   = new ClusterPolarisConfiguration();
+        ClusterState                clusterState    = clusterConfig.getClusterState();
+        String                      credential      = clusterState.getCredentials();
+        Properties                  properties      = AfonPropertiesLoader.add(credential, new AfonPropertiesLoader().getProperties());
+        useAwsKubernetes();
+        ClusterPolarisConfiguration config          = new ClusterPolarisConfiguration();
+        config.initialize(AZURE_EXTERNAL, properties);
+    });
+
+    private static void useAwsKubernetes() throws ManagedProcessException {
+        run("kubectl", null, "config", "use-context", "arn:aws:eks:eu-west-2:418295715997:cluster/spark-cluster");
+    }
+    private static void useAzureKubernetes() throws ManagedProcessException {
+        run("kubectl", null, "config", "use-context", "spark-cluster");
+    }
+
     public static Step waitFor(String domain) {
         return new Step("waitFor" + domain.substring(domain.indexOf('.')), () -> {
             boolean resolved    = false;
@@ -88,7 +116,8 @@ public class DeployExternalCatalogsMain {
         CLEAN_AZ,
         AZ_POLARIS,
         waitFor(AZURE_DOMAIN_NAME),
-        AZ_POLARIS_FOREIGN_CATALOG
+        AZ_POLARIS_FOREIGN_CATALOG,
+        AZ_POLARIS_EXTERNAL_AWS
                  );
 
     private static @NonNull Path deleteStack(String id) throws IOException {
@@ -112,8 +141,10 @@ public class DeployExternalCatalogsMain {
         for (String cmd : commands) {
             pb.addArgument(cmd);
         }
-        pb.setWorkingDirectory(path.toFile())
-          .setDestroyOnShutdown(true)
+        if (path != null) {
+            pb.setWorkingDirectory(path.toFile());
+        }
+        pb.setDestroyOnShutdown(true)
           .addStdOut(System.out)
           .addStdErr(System.err)
           .setConsoleBufferMaxLines(7000);
