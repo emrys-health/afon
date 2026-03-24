@@ -4,8 +4,6 @@ import org.slf4j.Logger;
 
 import java.util.List;
 
-import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
-import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
 import static health.emrys.afon.demo.Steps.*;
 
 public class DeployExternalCatalogsMain {
@@ -16,12 +14,13 @@ public class DeployExternalCatalogsMain {
         = List.of(
         CLEAN_AWS,
         AWS_POLARIS,
-        waitFor(AWS_POLARIS_DOMAIN_NAME),
+        WAIT_FOR_AWS_POLARIS,
         CLEAN_AZ,
         AZ_POLARIS,
-        waitFor(AZURE_DOMAIN_NAME),
+        WAIT_FOR_AZ_POLARIS,
         AZ_POLARIS_FOREIGN_CATALOG,
-        AZ_POLARIS_EXTERNAL_AWS
+        AZ_POLARIS_EXTERNAL_AWS,
+        CHECK_AWS_TO_AZURE_EXTERNAL
                  );
 
     public static void main(String[] args) {
@@ -48,6 +47,7 @@ public class DeployExternalCatalogsMain {
             log.info("Running step {}", step.name);
             step.function.run();
         }
+        log.info("Successfully ran steps\n{}", String.join("\n", steps.stream().map(x -> x.name).toList()));
     }
 
 }

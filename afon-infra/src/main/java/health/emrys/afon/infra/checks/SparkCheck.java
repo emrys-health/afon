@@ -11,6 +11,7 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.slf4j.Logger;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -40,23 +41,32 @@ public class SparkCheck {
                 if (args.length > 4) {
                     namespace = args[4];
                 }
-                String            protocol      = "https";
-                AfonPolarisClient polaris       = new AfonPolarisClient(protocol + "://" + polarisHost, polarisId, polarisSecret);
-                SparkSessionFactory factory = new SparkSessionFactory(
-                    polaris.getAccessToken(),
-                    polarisId,
-                    polarisSecret,
-                    polarisHost,
-                    protocol,
-                    new String[]{warehouse}
-                );
-                spark = factory.createSparkSession();
+                spark = app.sparkSessionUsing(polarisHost, polarisId, polarisSecret, warehouse);
             }
             app.talkTo(spark, warehouse, namespace);
             logger.info("Finished without error");
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }
+    }
+
+    public SparkSession sparkSessionUsing(String polarisHost,
+                                          String polarisId,
+                                          String polarisSecret,
+                                          String warehouse) throws IOException {
+        SparkSession      spark;
+        String            protocol = "https";
+        AfonPolarisClient polaris  = new AfonPolarisClient(protocol + "://" + polarisHost, polarisId, polarisSecret);
+        SparkSessionFactory factory = new SparkSessionFactory(
+            polaris.getAccessToken(),
+            polarisId,
+            polarisSecret,
+            polarisHost,
+            protocol,
+            new String[]{warehouse}
+        );
+        spark = factory.createSparkSession();
+        return spark;
     }
 
     public void talkTo(SparkSession spark, String warehouse, String namespace) {
