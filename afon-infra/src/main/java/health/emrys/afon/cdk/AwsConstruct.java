@@ -59,9 +59,10 @@ import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
 public class AwsConstruct extends AbstractConstruct {
-    public static final String                     VPC_NAME           = "cdktf-eks-vpc";
-    public static final String                     CLUSTER_POLICY_ARN = "arn:aws:iam::123456789012:policy/AWSLoadBalancerControllerIAMPolicyCurl"; // TODO remove 'Curl'
-    final static        String                     NO_JUPYTER_LB      = "kubectl patch service jupyter-web -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
+    public static final String                     VPC_NAME                 = "cdktf-eks-vpc";
+    public static final String                     CLUSTER_POLICY_ARN       = "arn:aws:iam::123456789012:policy/AWSLoadBalancerControllerIAMPolicyCurl"; // TODO remove 'Curl'
+    public static final String                     AWS_POLARIS_DOMAIN_NAME  = "emryspolaris.click";
+    final static        String                     NO_JUPYTER_LB            = "kubectl patch service jupyter-web -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
     final               DataAwsEksClusterAuth      eksAuthData;
     private final       EksCluster                 cluster;
     private final       List<ITerraformDependable> eksDependOn;
@@ -329,7 +330,7 @@ public class AwsConstruct extends AbstractConstruct {
         IngressV1 ingress = createHttpsIngress("polaris-https-ingress",
                                                "polaris-ingress",
                                                "arn:aws:acm:eu-west-2:123456789012:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
-                                               "emryspolaris.click",
+                                               AWS_POLARIS_DOMAIN_NAME,
                                                POLARIS_INTERNAL,
                                                8181,
                                                subnetIds
@@ -345,7 +346,7 @@ public class AwsConstruct extends AbstractConstruct {
         // 2. Create the Alias A Record
         // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
         // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
-        configureDNS("IngressAliasRecord", "Z06847223IC61YVGEH6HR", "emryspolaris.click", lbRelease, ingress);
+        configureDNS("IngressAliasRecord", "Z06847223IC61YVGEH6HR", AWS_POLARIS_DOMAIN_NAME, lbRelease, ingress);
     }
 
     /**

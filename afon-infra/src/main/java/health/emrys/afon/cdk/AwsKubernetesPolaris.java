@@ -15,7 +15,9 @@ import software.constructs.Construct;
 import java.util.List;
 import java.util.Map;
 
-public class AwsKubernetesPolaris extends TerraformStack {
+import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
+
+public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsKubernetesPolaris.class);
 
@@ -62,5 +64,15 @@ public class AwsKubernetesPolaris extends TerraformStack {
         new AwsKubernetesPolaris(app, ID);
         app.synth();
         logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu -apply");
+    }
+
+    @Override
+    public String getId() {
+        return ID;
+    }
+
+    @Override
+    public String getPolarisDomainName() {
+        return AWS_POLARIS_DOMAIN_NAME;
     }
 }
