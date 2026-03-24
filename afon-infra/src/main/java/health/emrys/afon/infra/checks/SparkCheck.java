@@ -72,9 +72,15 @@ public class SparkCheck {
         StructType schema = new StructType(new StructField[]{
             new StructField("value", DataTypes.StringType, false, Metadata.empty())
         });
-        String       fqn = warehouse + "." + namespace + ".test_table";
+        String table     = "test_table";
+        String fqn       = warehouse + "." + namespace + "." + table;
         logger.info("Writing to: {}", fqn);
         Dataset<Row> df = spark.createDataFrame(rows, schema);
+
+        String createTableSql = format("CREATE TABLE IF NOT EXISTS %s (value String) USING iceberg ", fqn);
+        logger.info("Executing: {}", createTableSql);
+        spark.sql(createTableSql);
+
         df.write()
           .mode("overwrite")   // or "append"
           .saveAsTable(fqn);
