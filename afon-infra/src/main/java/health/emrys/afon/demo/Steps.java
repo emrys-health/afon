@@ -57,7 +57,7 @@ public class Steps {
         Properties                  properties = new AfonPropertiesLoader().getProperties();
         // swap the buckets
         properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(properties));
-        config.initialize(AZURE, properties);
+        checkResponses(config.initialize(AZURE, properties));
     });
 
     public static final Step AZ_POLARIS_EXTERNAL_AWS = new Step("az_external_aws", () -> {
@@ -65,7 +65,13 @@ public class Steps {
         Properties                  properties = propertiesForCurrentCluster();
         useAwsKubernetes();
         ClusterPolarisConfiguration config     = new ClusterPolarisConfiguration();
-        config.initialize(AZURE_EXTERNAL, properties);
+        checkResponses(config.initialize(AZURE_EXTERNAL, properties));
+    });
+
+    public static final Step AWS_ALL_CATALOGS = new Step("aws_all_catalogs", () -> {
+        useAwsKubernetes();
+        ClusterPolarisConfiguration config     = new ClusterPolarisConfiguration();
+        checkResponses(config.initializePolaris());
     });
 
     private static @NonNull Properties propertiesForCurrentCluster() throws IncorrectConfigException, IOException, ApiException {
@@ -92,10 +98,13 @@ public class Steps {
                           "namespaceph");
     });
 
-    private void checkResponses(List<HttpResponse> responses) {
-        List<HttpResponse> badResponses = responses.stream().filter(x -> x.getCode() / 100 != 2).toList();
-        if (!badResponses.isEmpty()) {
-            throw new RuntimeException(badResponses.toString());
+    private static void checkResponses(List<HttpResponse> responses) {
+        log.info("HTTP responses = {}", responses);
+        if (responses != null && !responses.isEmpty()) {
+            List<HttpResponse> badResponses = responses.stream().filter(x -> x.getCode() / 100 != 2).toList();
+            if (!badResponses.isEmpty()) {
+                throw new RuntimeException(badResponses.toString());
+            }
         }
     }
     private static void useAwsKubernetes() throws ManagedProcessException {
@@ -106,10 +115,11 @@ public class Steps {
     }
 
     private static Step waitFor(String domain) {
-        return new Step("waitFor" + domain.substring(domain.indexOf('.')), () -> {
+        return new Step("waitFor_" + domain.substring(0, domain.indexOf('.')), () -> {
             boolean resolved    = false;
             long    start       = System.currentTimeMillis();
             int     timeout     = 900_000;
+            log.info("Checking DNS for {}", domain);
             while (!resolved && System.currentTimeMillis() - start < timeout) {
                 try {
                     InetAddress[] addresses = InetAddress.getAllByName(domain);

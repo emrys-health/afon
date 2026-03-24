@@ -1,5 +1,6 @@
 package health.emrys.afon.demo;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.util.List;
@@ -18,12 +19,14 @@ public class DeployExternalCatalogsMain {
         CLEAN_AZ,
         AZ_POLARIS,
         WAIT_FOR_AZ_POLARIS,
+        AWS_ALL_CATALOGS,
         AZ_POLARIS_FOREIGN_CATALOG,
         AZ_POLARIS_EXTERNAL_AWS,
         CHECK_AWS_TO_AZURE_EXTERNAL
                  );
 
     public static void main(String[] args) {
+        log.info("Steps:\n{}", humanReadable(steps));
         DeployExternalCatalogsMain app = new DeployExternalCatalogsMain();
         try {
             if (args.length == 0) {
@@ -47,7 +50,11 @@ public class DeployExternalCatalogsMain {
             log.info("Running step {}", step.name);
             step.function.run();
         }
-        log.info("Successfully ran steps\n{}", String.join("\n", steps.stream().map(x -> x.name).toList()));
+        log.info("Successfully ran steps\n{}", humanReadable(steps));
+    }
+
+    private static @NonNull String humanReadable(List<Step> steps) {
+        return String.join("\n", steps.stream().map(x -> x.name).toList());
     }
 
 }

@@ -48,7 +48,7 @@ public class PolarisConfigureMain {
                 };
         createCatalogs(properties, credentials, configs);
     }
-    public void createAllCatalogs(Properties properties, String credentials) throws IncorrectConfigException, IOException {
+    public List<HttpResponse> createAllCatalogs(Properties properties, String credentials) throws IncorrectConfigException, IOException {
         CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
                 new AwsCloudConfigForPolaris(properties),
                 new GoogleCloudConfigForPolaris(properties),
@@ -56,7 +56,7 @@ public class PolarisConfigureMain {
                 new GlueCloudConfigForPolaris(properties),
                 new ExternalAzureCloudConfigForPolaris(properties),
                 };
-        createCatalogs(properties, credentials, configs);
+        return createCatalogs(properties, credentials, configs);
     }
 
     public List<HttpResponse> createCatalogs(Properties properties, String credentials, CloudConfigForPolaris[] configs) throws IOException, IncorrectConfigException {
