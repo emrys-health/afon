@@ -9,12 +9,14 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.ClusterPolarisConfiguration;
 import health.emrys.afon.infra.k8s.ClusterState;
 import org.apache.commons.io.file.PathUtils;
+import org.apache.hc.core5.http.HttpResponse;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.AZURE_BUCKET;
@@ -58,7 +60,12 @@ public class Steps {
         ClusterPolarisConfiguration config          = new ClusterPolarisConfiguration();
         config.initialize(AZURE_EXTERNAL, properties);
     });
-
+    private void checkResponses(List<HttpResponse> responses) {
+        List<HttpResponse> badResponses = responses.stream().filter(x -> x.getCode() / 100 != 2).toList();
+        if (!badResponses.isEmpty()) {
+            throw new RuntimeException(badResponses.toString());
+        }
+    }
     private static void useAwsKubernetes() throws ManagedProcessException {
         run("kubectl", null, "config", "use-context", "arn:aws:eks:eu-west-2:123456789012:cluster/spark-cluster");
     }

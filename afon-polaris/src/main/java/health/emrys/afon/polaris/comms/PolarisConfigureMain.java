@@ -1,17 +1,17 @@
 package health.emrys.afon.polaris.comms;
 
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 
 public class PolarisConfigureMain {
@@ -59,13 +59,16 @@ public class PolarisConfigureMain {
         createCatalogs(properties, credentials, configs);
     }
 
-    public void createCatalogs(Properties properties, String credentials, CloudConfigForPolaris[] configs) throws IOException, IncorrectConfigException {
+    public List<HttpResponse> createCatalogs(Properties properties, String credentials, CloudConfigForPolaris[] configs) throws IOException, IncorrectConfigException {
+        List<HttpResponse> allResponses = new ArrayList<>();
         properties = add(credentials, properties);
         for (CloudConfigForPolaris config : configs) {
             logger.info("Configuring {}", config.warehouseName());
-            var responses = callPolaris(properties, config);
+            HttpResponse[] responses = callPolaris(properties, config);
             Arrays.stream(responses).forEach(PolarisConfigureMain::logIfProblem);
+            allResponses.addAll(Arrays.asList(responses));
         }
+        return allResponses;
     }
 
     private static void logIfProblem(HttpResponse response) {
