@@ -20,7 +20,7 @@ import java.util.Map;
 
 public class GcpKubernetesPolaris extends GcpKubernetesStack {
 
-    private static final String DOMAIN_NAME      = "emryspolarisgcp.click";
+    public  static final String GCP_DOMAIN_NAME  = "emryspolarisgcp.click";
     private static final String DNS_ZONE_NAME    = "polaris-zone";
     private static final String POLARIS_INTERNAL = "polaris-internal";
     private static final String TLS_SECRET_NAME  = "polaris-tls";
@@ -45,7 +45,7 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
                     .build();
             }
         };
-        var                        util            = new TFUtils(this, DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT, POLARIS_INTERNAL);
+        var                        util            = new TFUtils(this, GCP_DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT, POLARIS_INTERNAL);
         HelmProvider               helm            = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables     = cloudProvider.getDependables();
         Release                    nginxRelease    = util.installNginxIngress(this, helm, dependables, null);
@@ -63,7 +63,7 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
                                                                                                    .build());
 
         new DnsRecordSet(this, "polaris-dns", DnsRecordSetConfig.builder()
-                                                                .name(DOMAIN_NAME + ".")
+                                                                .name(GCP_DOMAIN_NAME + ".")
                                                                 .type("A")
                                                                 .ttl(300)
                                                                 .managedZone(zone.getName())
