@@ -5,6 +5,14 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 
+/**
+ * You can use this class to talk to instances that are not in the cluster with:
+ * <pre>
+ mvn -DPOLARIS_ENDPOINT=emryspolarisazure.click -Dexec.mainClass=health.emrys.afon.infra.LocalPolarisConfiguration exec:java -Dexec.args="AZURE_EXTERNAL POLARIS_ID:POLARIS_SECRET"
+ * </pre>
+ * although you will need to point your K8s current environment at the cloud and run
+ * PolarisCredentialGrabber to get the POLARIS_ID and POLARIS_SECRET.
+ */
 public class LocalPolarisConfiguration extends AbstractPolarisConfiguration {
 
     public static void main(String[] args) throws Exception {
