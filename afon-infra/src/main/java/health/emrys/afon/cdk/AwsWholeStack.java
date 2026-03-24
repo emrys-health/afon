@@ -49,7 +49,7 @@ import static health.emrys.afon.infra.Defaults.*;
  * </UL>
  * when you run the output
  */
-class AwsWholeStack extends AwsKubernetesPolaris {
+public class AwsWholeStack extends AwsKubernetesPolaris {
 
     static final    Logger  logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
     static final    String  NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";

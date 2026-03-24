@@ -19,8 +19,8 @@ public class AwsKubernetesPolaris extends TerraformStack {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsKubernetesPolaris.class);
 
-    protected static final String ID               = "jupyter-deployment";
-    public static final    String POLARIS_INTERNAL = "polaris-internal";
+    public static final String ID               = "jupyter-deployment";
+    public static final String POLARIS_INTERNAL = "polaris-internal";
 
     protected final PolarisConfig     polarisConfig;
     protected final AwsConstruct      cloudProvider;
