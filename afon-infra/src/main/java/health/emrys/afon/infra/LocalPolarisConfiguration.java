@@ -2,6 +2,8 @@ package health.emrys.afon.infra;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
 
+import java.util.Properties;
+
 import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 
@@ -23,7 +25,11 @@ public class LocalPolarisConfiguration extends AbstractPolarisConfiguration {
     private final String credentials;
 
     LocalPolarisConfiguration() {
-        super(new AfonPropertiesLoader().getProperties());
+        this(new AfonPropertiesLoader().getProperties());
+    }
+
+    public LocalPolarisConfiguration(Properties properties) {
+        super(properties);
         credentials = POLARIS_ID.getValueFrom(properties) + ":" +  POLARIS_SECRET.getValueFrom(properties);
     }
 
