@@ -37,8 +37,8 @@ public class PolarisConfigurer {
      */
     public HttpResponse[] configurCatalogFor(CloudConfigForPolaris config, String accessToken) throws IOException, IncorrectConfigException {
         String warehouseName = config.warehouseName();
+        client.delete(getDeleteURI(warehouseName), accessToken); // this failing is expected if there is no catalog
         return new HttpResponse[]{
-                client.delete(getDeleteURI(warehouseName), accessToken),
                 client.postJsonCall(getCreateCatalogURI(),
                                     config.catalogConfig(),
                                     accessToken),

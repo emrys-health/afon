@@ -3,9 +3,11 @@ package health.emrys.afon.infra;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.polaris.catalogs.*;
 import health.emrys.afon.polaris.comms.PolarisConfigureMain;
+import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.function.Function;
@@ -50,17 +52,17 @@ public abstract class AbstractPolarisConfiguration {
         }
     }
 
-    public void initialize(SupportedCloudsEnum cloud, Properties properties) throws IncorrectConfigException, IOException {
+    public List<HttpResponse> initialize(SupportedCloudsEnum cloud, Properties properties) throws IncorrectConfigException, IOException {
         CloudConfigForPolaris cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
-        initializePolaris(new CloudConfigForPolaris[]{cloudConfig});
+        return initializePolaris(new CloudConfigForPolaris[]{cloudConfig});
     }
 
     public void initializePolaris() throws IncorrectConfigException, IOException {
         polarisClient.createAllCatalogs(properties, getCredentials());
     }
 
-    public void initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
-        polarisClient.createCatalogs(properties, getCredentials(), configs);
+    public List<HttpResponse> initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
+        return polarisClient.createCatalogs(properties, getCredentials(), configs);
     }
 
     abstract protected String getCredentials();

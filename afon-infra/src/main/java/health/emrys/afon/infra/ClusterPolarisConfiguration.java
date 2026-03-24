@@ -7,9 +7,11 @@ import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.PolarisConfigureMain;
 import io.kubernetes.client.openapi.ApiException;
+import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Properties;
 
 import static java.lang.String.format;
@@ -54,8 +56,9 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
         polarisClient.createAllCatalogs(properties, getCredentials());
     }
 
-    public void initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
+    public List<HttpResponse> initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
         polarisClient.createCatalogs(properties, getCredentials(), configs);
+        return null;
     }
 
     protected String getCredentials() {
