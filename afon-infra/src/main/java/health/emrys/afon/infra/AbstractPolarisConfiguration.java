@@ -57,8 +57,8 @@ public abstract class AbstractPolarisConfiguration {
         return initializePolaris(new CloudConfigForPolaris[]{cloudConfig});
     }
 
-    public void initializePolaris() throws IncorrectConfigException, IOException {
-        polarisClient.createAllCatalogs(properties, getCredentials());
+    public List<HttpResponse> initializePolaris() throws IncorrectConfigException, IOException {
+        return polarisClient.createAllCatalogs(properties, getCredentials());
     }
 
     public List<HttpResponse> initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {

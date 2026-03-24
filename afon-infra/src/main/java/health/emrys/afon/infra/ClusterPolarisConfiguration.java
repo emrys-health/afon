@@ -52,8 +52,8 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
         return props;
     }
 
-    public void initializePolaris() throws IncorrectConfigException, IOException {
-        polarisClient.createAllCatalogs(properties, getCredentials());
+    public List<HttpResponse> initializePolaris() throws IncorrectConfigException, IOException {
+        return polarisClient.createAllCatalogs(properties, getCredentials());
     }
 
     public List<HttpResponse> initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
