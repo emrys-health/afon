@@ -3,11 +3,15 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
+import health.emrys.afon.cdk.AwsConstruct;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.ClusterPolarisConfiguration;
+import health.emrys.afon.infra.checks.SparkCheck;
 import health.emrys.afon.infra.k8s.ClusterState;
+import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import io.kubernetes.client.openapi.ApiException;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.hc.core5.http.HttpResponse;
 import org.jspecify.annotations.NonNull;
@@ -19,8 +23,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.AZURE_BUCKET;
-import static health.emrys.afon.config.AfonProperties.AZURE_EXTERNAL_BUCKET;
+import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
+import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
 
@@ -31,17 +36,21 @@ public class Steps {
     public static final Step CLEAN_AWS   = new Step("clean_aws", () -> {
         deleteStack(AwsWholeStack.ID);
     });
+
     public static final Step AWS_POLARIS = new Step("aws_polaris", () -> {
         AwsWholeStack.main(new String[]{});
         startCloud(cdktfPath(AwsWholeStack.ID));
     });
+
     public static final Step CLEAN_AZ    = new Step("clean_az", () -> {
         deleteStack(AzureKubernetesPolaris.ID);
     });
+
     public static final Step AZ_POLARIS  = new Step("az_polaris", () -> {
         AzureKubernetesPolaris.main(new String[]{});
         startCloud(cdktfPath(AzureKubernetesPolaris.ID));
     });
+
     public static final Step AZ_POLARIS_FOREIGN_CATALOG = new Step("az_foreign", () -> {
         useAzureKubernetes();
         ClusterPolarisConfiguration config     = new ClusterPolarisConfiguration();
@@ -50,16 +59,39 @@ public class Steps {
         properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(properties));
         config.initialize(AZURE, properties);
     });
+
     public static final Step AZ_POLARIS_EXTERNAL_AWS = new Step("az_external_aws", () -> {
         useAzureKubernetes();
+        Properties                  properties = propertiesForCurrentCluster();
+        useAwsKubernetes();
+        ClusterPolarisConfiguration config     = new ClusterPolarisConfiguration();
+        config.initialize(AZURE_EXTERNAL, properties);
+    });
+
+    private static @NonNull Properties propertiesForCurrentCluster() throws IncorrectConfigException, IOException, ApiException {
         var          clusterConfig = new ClusterPolarisConfiguration();
         ClusterState clusterState  = clusterConfig.getClusterState();
         String       credential    = clusterState.getCredentials();
-        Properties                  properties      = AfonPropertiesLoader.add(credential, new AfonPropertiesLoader().getProperties());
+        Properties   properties    = AfonPropertiesLoader.add(credential, new AfonPropertiesLoader().getProperties());
+        return properties;
+    }
+
+    public static final Step WAIT_FOR_AWS_POLARIS = Steps.waitFor(AWS_POLARIS_DOMAIN_NAME);
+
+    public static final Step WAIT_FOR_AZ_POLARIS  = Steps.waitFor(AZURE_DOMAIN_NAME);
+
+    public static final Step CHECK_AWS_TO_AZURE_EXTERNAL = new Step("az_external_aws_check", () -> {
         useAwsKubernetes();
-        ClusterPolarisConfiguration config          = new ClusterPolarisConfiguration();
-        config.initialize(AZURE_EXTERNAL, properties);
+        Properties properties = propertiesForCurrentCluster();
+        SparkCheck sparkCheck = new SparkCheck();
+        sparkCheck.talkTo(sparkCheck.sparkSessionUsing(AWS_POLARIS_DOMAIN_NAME,
+                                                       POLARIS_ID.getValueFrom(properties),
+                                                       POLARIS_SECRET.getValueFrom(properties),
+                                                       AZURE_EXTERNAL.toString()),
+                          AZURE_EXTERNAL.toString(),
+                          "namespaceph");
     });
+
     private void checkResponses(List<HttpResponse> responses) {
         List<HttpResponse> badResponses = responses.stream().filter(x -> x.getCode() / 100 != 2).toList();
         if (!badResponses.isEmpty()) {
@@ -73,7 +105,7 @@ public class Steps {
         run("kubectl", null, "config", "use-context", "spark-cluster");
     }
 
-    public static Step waitFor(String domain) {
+    private static Step waitFor(String domain) {
         return new Step("waitFor" + domain.substring(domain.indexOf('.')), () -> {
             boolean resolved    = false;
             long    start       = System.currentTimeMillis();
