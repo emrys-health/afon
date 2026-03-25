@@ -45,9 +45,6 @@ public class PolarisConfigurer {
                 client.putJsonCall(getCatalogAdminGrantsURI(warehouseName),
                                    config.catalogAdminGrants(),
                                    accessToken),
-                client.putJsonCall(getCatalogRolesURI(warehouseName),
-                                   config.catalogRoles(),
-                                   accessToken)
         };
     }
 }
