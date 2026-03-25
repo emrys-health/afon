@@ -3,9 +3,7 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
-import health.emrys.afon.cdk.AwsConstruct;
-import health.emrys.afon.cdk.AwsWholeStack;
-import health.emrys.afon.cdk.AzureKubernetesPolaris;
+import health.emrys.afon.cdk.*;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.ClusterPolarisConfiguration;
 import health.emrys.afon.infra.checks.SparkCheck;
@@ -19,6 +17,7 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
@@ -40,6 +39,16 @@ public class Steps {
     public static final Step AWS_POLARIS = new Step("aws_polaris", () -> {
         AwsWholeStack.main(new String[]{});
         startCloud(cdktfPath(AwsWholeStack.ID));
+    });
+
+    public static final Step AWS_SPARK = new Step("aws_spark", () -> {
+        SparkClusterDeployment.main(new String[]{});
+        startCloud(cdktfPath(SparkClusterDeployment.ID));
+    });
+
+    public static final Step AWS_PROMETHEUS = new Step("aws_prometheus", () -> {
+        PrometheusClusterDeploy.main(new String[]{});
+        startCloud(cdktfPath(PrometheusClusterDeploy.ID));
     });
 
     public static final Step CLEAN_AZ    = new Step("clean_az", () -> {
@@ -116,24 +125,33 @@ public class Steps {
 
     private static Step waitFor(String domain) {
         return new Step("waitFor_" + domain.substring(0, domain.indexOf('.')), () -> {
-            boolean resolved    = false;
-            long    start       = System.currentTimeMillis();
-            int     timeout     = 900_000;
+            boolean stopResolving   = false;
+            long    start           = System.currentTimeMillis();
+            int     timeout         = 900_000;
             log.info("Checking DNS for {}", domain);
-            while (!resolved && System.currentTimeMillis() - start < timeout) {
+            while (!stopResolving && System.currentTimeMillis() - start < timeout) {
                 try {
                     InetAddress[] addresses = InetAddress.getAllByName(domain);
-                    resolved = addresses != null && addresses.length > 0;
-                    if (!resolved) {
-                        int pause = 1000;
-                        log.info("Waiting {}s for cloud state to be resolved. Timeout = ", pause/1000, timeout/1000);
-                        Thread.sleep(pause);
+                    stopResolving = addresses != null && addresses.length > 0;
+                    if (!stopResolving) {
+                        stopResolving = isWaitingInterrupted(timeout);
                     }
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+                } catch (UnknownHostException e) {
+                    stopResolving = isWaitingInterrupted(timeout);
                 }
             }
         });
+    }
+
+    private static boolean isWaitingInterrupted(int timeout) {
+        int pause = 1000;
+        log.info("Waiting {}s for cloud state to be resolved. Timeout = ", pause/1000, timeout /1000);
+        try {
+            Thread.sleep(pause);
+        } catch (InterruptedException e) {
+            return true;
+        }
+        return false;
     }
 
     private static @NonNull Path deleteStack(String id) throws IOException {
