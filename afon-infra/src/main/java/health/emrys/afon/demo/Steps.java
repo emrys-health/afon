@@ -144,8 +144,8 @@ public class Steps {
     }
 
     private static boolean isWaitingInterrupted(int timeout) {
-        int pause = 1000;
-        log.info("Waiting {}s for cloud state to be resolved. Timeout = ", pause/1000, timeout /1000);
+        int pause = 5000;
+        log.info("Waiting {}s. Timeout = ", pause/1000, timeout /1000);
         try {
             Thread.sleep(pause);
         } catch (InterruptedException e) {
