@@ -747,11 +747,11 @@ public class AwsConstruct extends AbstractConstruct {
                                           aws iam delete-policy --policy-arn arn:aws:iam::418295715997:policy/EKS-Secret-Access-Policy
                                           \u001B[0m
                                           """,
+                                  getVPCsCommand(),
                                   NO_POLARIS_FINALIZERS,
                                   NO_JUPYTER_FINALIZERS,
                                   NO_JUPYTER_LB,
                                   NO_SPARK_LB_FINALIZERS,
-                                  getVPCsCommand(),
                                   cleanEksCommand()
                                  ));
     }
