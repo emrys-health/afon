@@ -19,7 +19,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -55,7 +55,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
     protected final List<Service> loadBalancers;
     private String DELETE_CRDS;
 
-    public AwsWholeStack(final Construct scope, final AfonProperties.SupportedCloudsEnum id) {
+    public AwsWholeStack(final Construct scope, final SupportedCloudsEnum id) {
         super(scope, id);
         List<ITerraformDependable> dependables   = cloudProvider.getDependables();
         deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);

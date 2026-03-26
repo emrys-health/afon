@@ -9,6 +9,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.AWS_REGION;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 
 public class ExternalAwsCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
@@ -25,7 +26,7 @@ public class ExternalAwsCloudConfigForPolaris extends ExternalCloudConfigForPola
 
     @Override
     protected String getRemoteCatalogName() {
-        return SupportedCloudsEnum.AWS.toString();
+        return AWS.toString();
     }
 
     @Override
@@ -50,6 +51,6 @@ public class ExternalAwsCloudConfigForPolaris extends ExternalCloudConfigForPola
 
     @Override
     public String warehouseName() {
-        return AfonProperties.SupportedCloudsEnum.AWS + "_EXTERNAL";
+        return AWS + "_EXTERNAL";
     }
 }

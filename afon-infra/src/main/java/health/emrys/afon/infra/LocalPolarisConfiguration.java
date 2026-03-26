@@ -1,6 +1,5 @@
 package health.emrys.afon.infra;
 
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 
 import java.util.Properties;

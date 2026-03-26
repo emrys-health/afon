@@ -28,7 +28,6 @@ import com.hashicorp.cdktf.providers.aws.route_table.RouteTable;
 import com.hashicorp.cdktf.providers.aws.route_table.RouteTableRoute;
 import com.hashicorp.cdktf.providers.aws.route_table_association.RouteTableAssociation;
 import com.hashicorp.cdktf.providers.aws.secretsmanager_secret.SecretsmanagerSecret;
-import com.hashicorp.cdktf.providers.aws.secretsmanager_secret_version.SecretsmanagerSecretVersion;
 import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
 import com.hashicorp.cdktf.providers.helm.release.Release;

@@ -1,6 +1,5 @@
 package health.emrys.afon.infra.checks;
 
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.infra.ClusterCredentials;
 import health.emrys.afon.infra.PolarisClusterCredentials;

@@ -4,7 +4,6 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;

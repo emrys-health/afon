@@ -1,6 +1,6 @@
 package health.emrys.afon.core.configuration;
 
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
@@ -15,10 +15,10 @@ public class RegisterTableConfig {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(RegisterTableConfig.class);
 
-    private final AfonProperties.SupportedCloudsEnum catalog;
-    private final String                             namespace;
-    private final String                             table;
-    private final String                             metadata;
+    private final SupportedCloudsEnum catalog;
+    private final String              namespace;
+    private final String              table;
+    private final String              metadata;
 
     RegisterTableConfig(String[] args) {
         if (args.length != 4) {
@@ -28,7 +28,7 @@ public class RegisterTableConfig {
                                                           was provided with %d arguments: %s 
                                                           """, args.length, Arrays.stream(args).collect(Collectors.joining(" "))));
         }
-        catalog   = AfonProperties.SupportedCloudsEnum.valueOf(args[0]);
+        catalog   = SupportedCloudsEnum.valueOf(args[0]);
         namespace = args[1];
         table     = args[2];
         metadata  = args[3];

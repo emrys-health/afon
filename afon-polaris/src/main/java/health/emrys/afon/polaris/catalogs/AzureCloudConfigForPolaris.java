@@ -8,6 +8,7 @@ import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 
 public class AzureCloudConfigForPolaris extends CloudConfigForPolaris {
@@ -41,6 +42,6 @@ public class AzureCloudConfigForPolaris extends CloudConfigForPolaris {
 
     @Override
     public String warehouseName() {
-        return AfonProperties.SupportedCloudsEnum.AZURE.toString();
+        return AZURE.toString();
     }
 }
