@@ -17,6 +17,15 @@ See the [infra notes](afon-infra/README.md).
 Note that the Spark Docker image has been slightly modified (see `scripts/docker/spark/Dockerfile`).
 This is to ensure that the samve verion of Python (3.11) is used as the Jupyter notebook.
 
+Note that this is a one-off job of bootstrapping the Postgres database where Polaris persists the metadata.
+You need to run:
+```shell
+docker run --rm -it   --env="polaris.persistence.type=relational-jdbc"   --env="quarkus.datasource.username=postgres"   --env="quarkus.datasource.password=$POLARIS_DB_PASSWORD"   --env="quarkus.datasource.jdbc.url=jdbc:postgresql://$POLARIS_DB_HOST:5432/polaris_db_aws"   apache/polaris-admin-tool:latest bootstrap -r POLARIS -c POLARIS,root,$POLARIS_SECRET
+docker run --rm -it   --env="polaris.persistence.type=relational-jdbc"   --env="quarkus.datasource.username=postgres"   --env="quarkus.datasource.password=$POLARIS_DB_PASSWORD"   --env="quarkus.datasource.jdbc.url=jdbc:postgresql://$POLARIS_DB_HOST:5432/polaris_db_azure" apache/polaris-admin-tool:latest bootstrap -r POLARIS -c POLARIS,root,$POLARIS_SECRET
+docker run --rm -it   --env="polaris.persistence.type=relational-jdbc"   --env="quarkus.datasource.username=postgres"   --env="quarkus.datasource.password=$POLARIS_DB_PASSWORD"   --env="quarkus.datasource.jdbc.url=jdbc:postgresql://$POLARIS_DB_HOST:5432/polaris_db_gcp"   apache/polaris-admin-tool:latest bootstrap -r POLARIS -c POLARIS,root,$POLARIS_SECRET
+```
+See below for the value of those environment variables.
+
 # Running the Java code
 
 The project is built with Maven using:
