@@ -50,6 +50,9 @@ public class AfonProperties {
     public static final AfonProperty OAUTH2_CLIENT_SECRET = new AfonProperty("OAUTH2_CLIENT_SECRET");
     public static final AfonProperty OAUTH2_COOKIE_SECRET = new AfonProperty("OAUTH2_COOKIE_SECRET");
 
+    public static final AfonProperty POLARIS_DB_PASSWORD  = new AfonProperty("POLARIS_DB_PASSWORD");
+    public static final AfonProperty POLARIS_DB_HOST  = new AfonProperty("POLARIS_DB_HOST");
+
     public enum SupportedCloudsEnum {
         AWS("aws"),
         GCP("gcp"),

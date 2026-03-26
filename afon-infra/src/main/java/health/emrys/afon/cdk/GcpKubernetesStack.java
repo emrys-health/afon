@@ -6,10 +6,11 @@ import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import software.constructs.Construct;
 
 import static health.emrys.afon.cdk.GcpKubernetesPolaris.GCP_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
 
 class GcpKubernetesStack extends TerraformStack implements EmrysCloud {
 
-    public static final String ID = "gcp-k8s-polaris";
+    public static final String ID = GCP.toString();
     protected final GcpConstruct cloudProvider;
 
     public GcpKubernetesStack(final Construct scope, final String id) {

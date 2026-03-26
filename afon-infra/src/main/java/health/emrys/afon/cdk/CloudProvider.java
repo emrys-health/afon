@@ -14,4 +14,6 @@ public interface CloudProvider {
 
     KubernetesProvider configureK8s();
 
+    String getId();
+
 }

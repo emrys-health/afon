@@ -6,10 +6,16 @@ import software.constructs.Construct;
 
 abstract class AbstractConstruct extends Construct implements CloudProvider {
 
-    private KubernetesProvider kubernetesProvider;
+    private final @NotNull String             id;
+    private                KubernetesProvider kubernetesProvider;
 
     public AbstractConstruct(@NotNull Construct scope, @NotNull String id) {
         super(scope, id);
+        this.id = id;
+    }
+
+    public String getId() {
+        return id;
     }
 
     public synchronized KubernetesProvider configureK8s() {

@@ -17,7 +17,7 @@ class PolarisConfigTest {
     public void testConfigScript() throws IOException {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
-        String               script     = PolarisConfig.getProviderCredentials(properties);
+        String               script     = PolarisConfig.getProviderCredentials(properties, "test");
         logger.info("\n" + script);
         PolarisConstants.POLARIS_PROPERTIES
             .forEach(x -> {
