@@ -52,6 +52,10 @@ public abstract class AbstractPolarisConfiguration {
         }
     }
 
+    public List<HttpResponse> initialize(SupportedCloudsEnum cloud) throws IncorrectConfigException, IOException {
+        return initialize(cloud, properties);
+    }
+
     public List<HttpResponse> initialize(SupportedCloudsEnum cloud, Properties properties) throws IncorrectConfigException, IOException {
         CloudConfigForPolaris cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
         return initializePolaris(new CloudConfigForPolaris[]{cloudConfig});

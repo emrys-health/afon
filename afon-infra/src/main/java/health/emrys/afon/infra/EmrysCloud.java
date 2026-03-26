@@ -13,7 +13,13 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 
-public class EmrysCloud {
+/**
+ * This class gets the credenital from the logs.
+ * Now we're using Postgres, the credential is stored there not
+ * generated every time Polaris starts.
+ */
+@Deprecated
+public class EmrysCloud implements ClusterCredentials {
 
     private final String            accessToken;
     private final AfonPolarisClient client;
@@ -21,6 +27,7 @@ public class EmrysCloud {
     private final String            polarisSecret;
     private final ClusterState      clusterState;
 
+    @Deprecated
     public EmrysCloud() throws IncorrectConfigException, IOException, ApiException {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
@@ -33,18 +40,22 @@ public class EmrysCloud {
         accessToken   = client.getAccessToken();
     }
 
+    @Override
     public String getAccessToken() {
         return accessToken;
     }
 
+    @Override
     public String getPolarisId() {
         return polarisId;
     }
 
+    @Override
     public String getPolarisSecret() {
         return polarisSecret;
     }
 
+    @Override
     public String getPolarisHost() {
         return clusterState.getPolarisHost();
     }
