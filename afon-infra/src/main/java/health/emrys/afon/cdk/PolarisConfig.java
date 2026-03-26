@@ -57,7 +57,7 @@ public class PolarisConfig extends Construct {
         Secret.Builder.create(this, "mySecret")
                       .dependsOn(cloudProvider.getDependables())
                       .metadata(SecretMetadata.builder().name(SECRET_NAME).build())
-                      .data(Map.of(POLARIS_ENV_FILE, getProviderCredentials(properties),
+                      .data(Map.of(POLARIS_ENV_FILE, getProviderCredentials(properties, cloudProvider.getId()),
                                    GCP_CRED_FILE, GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties)))
                       .type("Opaque")
                       .build();
@@ -69,13 +69,26 @@ public class PolarisConfig extends Construct {
         return properties;
     }
 
-    static String getProviderCredentials(Properties properties) {
+    static String getProviderCredentials(Properties properties,
+                                         String deploymentId) {
         List<String> exports = POLARIS_PROPERTIES
             .stream()
             .map(x ->  format("export %s=%s", x.getPropertyName(), x.getValueFrom(properties)))
             .sorted()
             .toList();
-        return format("""
+
+        String pgConfig = format("""
+                              export POLARIS_PERSISTENCE_TYPE="relational-jdbc"
+                              export QUARKUS_DATASOURCE_JDBC_URL="jdbc:postgresql://%s:5432/polaris_db_%s"
+                              export QUARKUS_DATASOURCE_USERNAME=postgres
+                              export QUARKUS_DATASOURCE_PASSWORD=%s
+                              
+                                     """,
+                                 POLARIS_DB_HOST.getValueFrom(properties),
+                                 deploymentId,
+                                 POLARIS_DB_PASSWORD.getValueFrom(properties));
+
+        return pgConfig + format("""
                               %s
                               export %s='%s'
                               
@@ -162,6 +175,6 @@ public class PolarisConfig extends Construct {
     }
 
     public static final void main(String[] unused) {
-        System.out.println(PolarisConfig.getProviderCredentials(appProperties()));
+        System.out.println(PolarisConfig.getProviderCredentials(appProperties(), "test"));
     }
 }

@@ -2,7 +2,6 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
-import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -16,12 +15,13 @@ import java.util.List;
 import java.util.Map;
 
 import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
 
 public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsKubernetesPolaris.class);
 
-    public static final String ID               = "jupyter-deployment";
+    public static final String ID               = AWS.toString();
     public static final String POLARIS_INTERNAL = "polaris-internal";
 
     protected final PolarisConfig     polarisConfig;
