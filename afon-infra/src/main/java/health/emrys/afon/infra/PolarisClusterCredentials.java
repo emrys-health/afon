@@ -11,9 +11,7 @@ import java.util.Properties;
 import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
 import static health.emrys.afon.cdk.GcpKubernetesPolaris.GCP_DOMAIN_NAME;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 
 public class PolarisClusterCredentials implements ClusterCredentials {
 

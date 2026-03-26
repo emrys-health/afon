@@ -3,7 +3,7 @@ package health.emrys.afon.cdk;
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import software.constructs.Construct;
 
 import static health.emrys.afon.cdk.GcpKubernetesPolaris.GCP_DOMAIN_NAME;
@@ -11,8 +11,8 @@ import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
 
 class GcpKubernetesStack extends TerraformStack implements EmrysCloud {
 
-    public static final AfonProperties.SupportedCloudsEnum ID = GCP;
-    protected final     GcpConstruct                       cloudProvider;
+    public static final SupportedCloudsEnum ID = GCP;
+    protected final     GcpConstruct        cloudProvider;
 
     public GcpKubernetesStack(final Construct scope, final String id) {
         super(scope, id);
@@ -27,7 +27,7 @@ class GcpKubernetesStack extends TerraformStack implements EmrysCloud {
     }
 
     @Override
-    public AfonProperties.SupportedCloudsEnum getId() {
+    public SupportedCloudsEnum getId() {
         return ID;
     }
 

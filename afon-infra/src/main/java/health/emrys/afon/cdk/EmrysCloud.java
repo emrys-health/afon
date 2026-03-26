@@ -1,9 +1,9 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 
 public interface EmrysCloud {
-    AfonProperties.SupportedCloudsEnum getId();
+    SupportedCloudsEnum getId();
 
     String getPolarisDomainName();
 }

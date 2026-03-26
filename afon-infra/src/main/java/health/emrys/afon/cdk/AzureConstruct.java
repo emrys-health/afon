@@ -25,8 +25,6 @@ import com.hashicorp.cdktf.providers.azurestack.resource_group.ResourceGroup;
 import com.hashicorp.cdktf.providers.azurestack.resource_group.ResourceGroupConfig;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
-import com.hashicorp.cdktf.providers.helm.release.Release;
-import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;

@@ -10,7 +10,6 @@ import java.io.IOException;
 
 import static health.emrys.afon.infra.Defaults.POLARIS_POD_NAME;
 import static health.emrys.afon.infra.Defaults.POLARIS_SERVICE_NAME;
-import static java.lang.String.format;
 
 public class ClusterState implements AutoCloseable {
 

@@ -8,7 +8,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.Properties;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PolarisConfigTest {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisConfigTest.class);

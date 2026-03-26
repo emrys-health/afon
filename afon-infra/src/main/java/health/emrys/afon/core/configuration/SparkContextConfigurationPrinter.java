@@ -2,7 +2,6 @@ package health.emrys.afon.core.configuration;
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.infra.ClusterCredentials;
-import health.emrys.afon.infra.EmrysCloud;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -12,6 +11,7 @@ import java.time.format.DateTimeFormatter;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
+import static health.emrys.afon.infra.PolarisClusterCredentials.createClusterCredentials;
 import static java.lang.String.format;
 
 /**
@@ -32,7 +32,12 @@ public class SparkContextConfigurationPrinter {
 
     public static final void main(String[] args) {
         try {
-            var app = new SparkContextConfigurationPrinter(new EmrysCloud());
+            SupportedCloudsEnum polarisCloud = SupportedCloudsEnum.AWS;
+            if (args.length > 0) {
+                polarisCloud = SupportedCloudsEnum.valueOf(args[0]);
+            }
+            ClusterCredentials  emrysCloud = createClusterCredentials(polarisCloud);
+            var                 app        = new SparkContextConfigurationPrinter(emrysCloud);
             app.printSparkConfig();
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -51,10 +56,6 @@ public class SparkContextConfigurationPrinter {
                 polarisSecret,
                 polarisHost
         );
-    }
-
-    public SparkWarehouseConfig getPolarisConfig() {
-        return polarisConfig;
     }
 
     public void printSparkConfig() {

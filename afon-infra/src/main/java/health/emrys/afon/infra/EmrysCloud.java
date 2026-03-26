@@ -10,7 +10,7 @@ import io.kubernetes.client.openapi.ApiException;
 import java.io.IOException;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 
 /**

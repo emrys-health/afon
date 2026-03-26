@@ -8,7 +8,8 @@ import org.slf4j.Logger;
 
 import java.util.Properties;
 
-import static health.emrys.afon.infra.Defaults.*;
+import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
+import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_NAME;
 
 public class AwsInfraExplorer {
 

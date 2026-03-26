@@ -1,6 +1,5 @@
 package health.emrys.afon.infra.checks;
 
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -16,7 +15,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
-import static health.emrys.afon.infra.checks.SparkSessionFactory.localSparkClusterPolaris;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
