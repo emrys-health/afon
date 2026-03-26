@@ -1,11 +1,11 @@
 package health.emrys.afon.infra;
 
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperties.*;
 
 /**
  * You can use this class to talk to instances that are not in the cluster with:
@@ -26,6 +26,11 @@ public class LocalPolarisConfiguration extends AbstractPolarisConfiguration {
 
     LocalPolarisConfiguration() {
         this(new AfonPropertiesLoader().getProperties());
+    }
+
+    public LocalPolarisConfiguration(String host) {
+        this(new AfonPropertiesLoader().getProperties());
+        properties.put(POLARIS_ENDPOINT.getPropertyName(), host);
     }
 
     public LocalPolarisConfiguration(Properties properties) {

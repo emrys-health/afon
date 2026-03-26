@@ -1,27 +1,18 @@
 package health.emrys.afon.core.configuration;
 
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.infra.ClusterCredentials;
 import health.emrys.afon.infra.EmrysCloud;
-import health.emrys.afon.infra.k8s.ClusterState;
-import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Map;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
-import static health.emrys.afon.config.AfonPropertiesLoader.add;
 import static java.lang.String.format;
-import static java.lang.String.valueOf;
 
 /**
  * This generates the PySpark code you can run in Jupyter.
@@ -50,7 +41,7 @@ public class SparkContextConfigurationPrinter {
 
     private final SparkWarehouseConfig polarisConfig;
 
-    public SparkContextConfigurationPrinter(EmrysCloud emrysCloud) {
+    public SparkContextConfigurationPrinter(ClusterCredentials emrysCloud) {
         polarisId     = emrysCloud.getPolarisId();
         polarisSecret = emrysCloud.getPolarisSecret();
         polarisHost   = emrysCloud.getPolarisHost();

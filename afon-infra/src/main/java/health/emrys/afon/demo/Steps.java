@@ -6,6 +6,7 @@ import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.*;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.ClusterPolarisConfiguration;
+import health.emrys.afon.infra.LocalPolarisConfiguration;
 import health.emrys.afon.infra.checks.SparkCheck;
 import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
@@ -61,43 +62,34 @@ public class Steps {
     });
 
     public static final Step AZ_POLARIS_FOREIGN_CATALOG = new Step("az_foreign", () -> {
-        useAzureKubernetes();
-        ClusterPolarisConfiguration config     = new ClusterPolarisConfiguration();
-        Properties                  properties = new AfonPropertiesLoader().getProperties();
+        LocalPolarisConfiguration config     = new LocalPolarisConfiguration(AZURE_DOMAIN_NAME);
+        Properties                properties = appProperties();
         // swap the buckets
         properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(properties));
         checkResponses(config.initialize(AZURE, properties));
     });
 
+    private static Properties appProperties() {
+        return new AfonPropertiesLoader().getProperties();
+    }
+
     public static final Step AZ_POLARIS_EXTERNAL_AWS = new Step("az_external_aws", () -> {
-        useAzureKubernetes();
-        Properties                  properties = propertiesForCurrentCluster();
-        useAwsKubernetes();
-        ClusterPolarisConfiguration config     = new ClusterPolarisConfiguration();
-        checkResponses(config.initialize(AZURE_EXTERNAL, properties));
+        LocalPolarisConfiguration config     = new LocalPolarisConfiguration(AZURE_DOMAIN_NAME);
+        checkResponses(config.initialize(AZURE_EXTERNAL));
     });
 
     public static final Step AWS_ALL_CATALOGS = new Step("aws_all_catalogs", () -> {
-        useAwsKubernetes();
-        ClusterPolarisConfiguration config     = new ClusterPolarisConfiguration();
+        LocalPolarisConfiguration config     = new LocalPolarisConfiguration(AWS_POLARIS_DOMAIN_NAME);
         checkResponses(config.initializePolaris());
     });
-
-    private static @NonNull Properties propertiesForCurrentCluster() throws IncorrectConfigException, IOException, ApiException {
-        var          clusterConfig = new ClusterPolarisConfiguration();
-        ClusterState clusterState  = clusterConfig.getClusterState();
-        String       credential    = clusterState.getCredentials();
-        Properties   properties    = AfonPropertiesLoader.add(credential, new AfonPropertiesLoader().getProperties());
-        return properties;
-    }
 
     public static final Step WAIT_FOR_AWS_POLARIS = Steps.waitFor(AWS_POLARIS_DOMAIN_NAME);
 
     public static final Step WAIT_FOR_AZ_POLARIS  = Steps.waitFor(AZURE_DOMAIN_NAME);
 
     public static final Step CHECK_AWS_TO_AZURE_EXTERNAL = new Step("az_external_aws_check", () -> {
-        useAwsKubernetes();
-        Properties properties = propertiesForCurrentCluster();
+        Properties properties = appProperties();
+        properties.put(POLARIS_ENDPOINT.getPropertyName(), AZURE_DOMAIN_NAME);
         SparkCheck sparkCheck = new SparkCheck();
         sparkCheck.talkTo(sparkCheck.sparkSessionUsing(AWS_POLARIS_DOMAIN_NAME,
                                                        POLARIS_ID.getValueFrom(properties),
@@ -154,15 +146,15 @@ public class Steps {
         return false;
     }
 
-    private static @NonNull Path deleteStack(String id) throws IOException {
+    private static @NonNull Path deleteStack(SupportedCloudsEnum id) throws IOException {
         Path toDelete = cdktfPath(id);
         log.info("Deleting {}", toDelete);
         PathUtils.delete(toDelete);
         return toDelete;
     }
 
-    private static @NonNull Path cdktfPath(String id) {
-        return Path.of("cdktf.out", "stacks", id);
+    private static @NonNull Path cdktfPath(SupportedCloudsEnum id) {
+        return Path.of("cdktf.out", "stacks", id.toString());
     }
 
     private static void startCloud(Path jsonDirectory) throws ManagedProcessException {

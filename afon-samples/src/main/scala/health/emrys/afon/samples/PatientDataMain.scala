@@ -55,6 +55,6 @@ object PatientDataMain {
   }
 
   private def initSpark(): SparkSession = {
-    SparkSessionFactory.localSparkClusterPolaris
+    SparkSessionFactory.localSparkClusterPolaris(SupportedCloudsEnum.AWS)  // AWS for argument's sake...
   }
 }

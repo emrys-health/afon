@@ -1,6 +1,9 @@
 package health.emrys.afon.infra.checks;
 
-import health.emrys.afon.infra.EmrysCloud;
+import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.infra.ClusterCredentials;
+import health.emrys.afon.infra.PolarisClusterCredentials;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import io.kubernetes.client.openapi.ApiException;
@@ -17,12 +20,14 @@ public class SparkSessionFactory {
 
     private static final Logger logger = getLogger(SparkSessionFactory.class);
 
-    public static SparkSession localSparkClusterPolaris() throws IncorrectConfigException, IOException, ApiException {
-        return localSparkClusterPolaris(SUPPORTED_CLOUD_NAMES);
+    public static SparkSession localSparkClusterPolaris(SupportedCloudsEnum polarisCloud) throws IncorrectConfigException, IOException, ApiException {
+        return localSparkClusterPolaris(SUPPORTED_CLOUD_NAMES, polarisCloud);
     }
 
-    public static SparkSession localSparkClusterPolaris(String[] warehouseNames) throws IncorrectConfigException, IOException, ApiException {
-        EmrysCloud emrysCloud = new EmrysCloud();
+    public static SparkSession localSparkClusterPolaris(String[] warehouseNames,
+                                                        SupportedCloudsEnum polarisCloud)
+    throws IOException {
+        ClusterCredentials emrysCloud = PolarisClusterCredentials.createClusterCredentials(polarisCloud);
         return new SparkSessionFactory(
             emrysCloud.getAccessToken(),
             emrysCloud.getPolarisId(),

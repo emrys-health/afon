@@ -4,6 +4,8 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
+import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -15,7 +17,7 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PrometheusClusterDeploy.class);
 
-    public PrometheusClusterDeploy(@NotNull Construct scope, @NotNull String id) {
+    public PrometheusClusterDeploy(@NotNull Construct scope, @NotNull SupportedCloudsEnum id) {
         super(scope, id);
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
         dependablesAndLoadBalancers.addAll(loadBalancers);

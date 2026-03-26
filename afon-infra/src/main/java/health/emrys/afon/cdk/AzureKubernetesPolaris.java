@@ -73,7 +73,7 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AzureKubernetesPolaris(app, ID);
+        new AzureKubernetesPolaris(app, ID.toString());
         app.synth();
     }
 }

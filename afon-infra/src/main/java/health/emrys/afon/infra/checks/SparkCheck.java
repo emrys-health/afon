@@ -1,5 +1,6 @@
 package health.emrys.afon.infra.checks;
 
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -29,11 +30,7 @@ public class SparkCheck {
             SparkSession spark          = null;
             String       warehouse      = null;
             String       namespace      = "namespaceph";
-            if (args.length == 1) {
-                warehouse                   = args[0];
-                String[]     warehouseNames = {warehouse};
-                spark = localSparkClusterPolaris(warehouseNames);
-            } else {
+            if (args.length == 4) {
                 warehouse                       = args[0];
                 String            polarisId     = args[1];
                 String            polarisSecret = args[2];

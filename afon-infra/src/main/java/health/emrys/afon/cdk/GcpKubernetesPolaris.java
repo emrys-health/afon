@@ -75,7 +75,7 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new GcpKubernetesPolaris(app, ID);
+        new GcpKubernetesPolaris(app, ID.toString());
         app.synth();
     }
 }

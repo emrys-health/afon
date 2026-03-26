@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 
 import java.util.Properties;
 
+@Deprecated()
 public class PolarisCredentialGrabber {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCredentialGrabber.class);

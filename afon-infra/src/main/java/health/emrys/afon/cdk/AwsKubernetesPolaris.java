@@ -7,6 +7,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
+import health.emrys.afon.config.AfonProperties;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -21,21 +22,21 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsKubernetesPolaris.class);
 
-    public static final String ID               = AWS.toString();
-    public static final String POLARIS_INTERNAL = "polaris-internal";
+    public static final AfonProperties.SupportedCloudsEnum ID               = AWS;
+    public static final String                             POLARIS_INTERNAL = "polaris-internal";
 
     protected final PolarisConfig     polarisConfig;
     protected final AwsConstruct      cloudProvider;
     protected final Service           polarisLB;
 
-    public AwsKubernetesPolaris(@NotNull Construct scope, @NotNull String id) {
-        super(scope, id);
+    public AwsKubernetesPolaris(@NotNull Construct scope, AfonProperties.SupportedCloudsEnum id) {
+        super(scope, id.toString());
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
         // HelmProvider.Builder.create(this, "helm")
         //                     .build();
 
-        cloudProvider = new AwsConstruct(this, id);
+        cloudProvider = new AwsConstruct(this, id.toString());
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
             protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
                 return null; // no longer using an external service
@@ -67,7 +68,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
     }
 
     @Override
-    public String getId() {
+    public AfonProperties.SupportedCloudsEnum getId() {
         return ID;
     }
 

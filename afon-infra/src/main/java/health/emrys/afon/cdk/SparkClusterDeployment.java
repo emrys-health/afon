@@ -8,9 +8,9 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.infra.EmrysCloud;
-import health.emrys.afon.infra.k8s.ClusterState;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.infra.ClusterCredentials;
+import health.emrys.afon.infra.PolarisClusterCredentials;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import io.kubernetes.client.openapi.ApiException;
@@ -19,7 +19,10 @@ import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
@@ -31,7 +34,8 @@ public class SparkClusterDeployment extends AwsWholeStack {
     static final Logger logger                 = org.slf4j.LoggerFactory.getLogger(SparkClusterDeployment.class);
     static final String NO_SPARK_LB_FINALIZERS = "kubectl patch service spark-master-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
 
-    public SparkClusterDeployment(@NotNull Construct scope, @NotNull String id) {
+    public SparkClusterDeployment(@NotNull Construct scope,
+                                  @NotNull SupportedCloudsEnum id) {
         super(scope, id);
         List<ITerraformDependable> eksDependOn = cloudProvider.getDependables();
 
@@ -85,7 +89,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                 "sparkVersion", "4.0.1"
                                                  ),
                         "mainClass", "org.apache.spark.sql.connect.service.SparkConnectServer",
-                        "sparkConf", sparkConfig(SPARK_SERVICE_ACCOUNT_NAME),
+                        "sparkConf", sparkConfig(SPARK_SERVICE_ACCOUNT_NAME, id),
                         "driverSpec", Map.of(
                                 "podTemplateSpec", Map.of(
                                         "spec", Map.of(
@@ -178,7 +182,8 @@ public class SparkClusterDeployment extends AwsWholeStack {
      * kubectl logs -f spark-connector-0-driver  | egrep -i 'SparkSqlParser|iceberg'
      * </code>
      */
-    private Map<String, String> sparkConfig(String serviceAccountName) {
+    private Map<String, String> sparkConfig(String serviceAccountName,
+                                            SupportedCloudsEnum id) {
         var first = Map.of(
                 "spark.kubernetes.container.image", "apache/spark:4.0.1",
                 "spark.master.ui.title", "Prod Spark Cluster",
@@ -203,7 +208,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
                 "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
                            );
         try {
-            Map<String, String> toReturn = sparkCloudProperties();
+            Map<String, String> toReturn = sparkCloudProperties(id);
             toReturn.putAll(first);
             toReturn.putAll(second);
             return toReturn;
@@ -212,17 +217,17 @@ public class SparkClusterDeployment extends AwsWholeStack {
         }
     }
 
-    public static @NotNull Map<String, String> sparkCloudProperties() throws IncorrectConfigException, IOException, ApiException {
+    public static @NotNull Map<String, String> sparkCloudProperties(SupportedCloudsEnum id) throws IncorrectConfigException, IOException, ApiException {
         var toReturn = new HashMap<String, String>();
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        EmrysCloud emrysCloud = new EmrysCloud();
+        ClusterCredentials emrysCloud = PolarisClusterCredentials.createClusterCredentials(id);
         SparkWarehouseConfig sparkWarehouseConfig = new SparkWarehouseConfig(
                 emrysCloud.getAccessToken(),
                 emrysCloud.getPolarisId(),
                 emrysCloud.getPolarisSecret(),
                 emrysCloud.getPolarisHost()
         );
-        for (AfonProperties.SupportedCloudsEnum cloudProvider : AfonProperties.SupportedCloudsEnum.values()) {
+        for (SupportedCloudsEnum cloudProvider : SupportedCloudsEnum.values()) {
             Map<String, String> configs = sparkWarehouseConfig.sparkConfigs(cloudProvider);
             toReturn.putAll(configs);
         }
