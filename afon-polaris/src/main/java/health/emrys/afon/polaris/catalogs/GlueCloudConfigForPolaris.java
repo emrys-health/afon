@@ -6,6 +6,7 @@ import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEn
 import org.apache.polaris.core.admin.model.*;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.getStorageConfigInfo;
 
 public class GlueCloudConfigForPolaris extends AwsCloudConfigForPolaris {
@@ -14,7 +15,7 @@ public class GlueCloudConfigForPolaris extends AwsCloudConfigForPolaris {
 
     public GlueCloudConfigForPolaris(Properties properties) {
         super(GLUE_S3_ROLE_ARN.getValueFrom(properties),
-              "s3a://" + AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties),
+              bucketToUrl(AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)),
               AWS_REGION.getValueFrom(properties));
         this.warehouseName = GLUE_CATALOG_NAME.getValueFrom(properties);
     }
