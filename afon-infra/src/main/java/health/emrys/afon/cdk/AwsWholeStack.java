@@ -27,7 +27,9 @@ import software.constructs.Construct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
+import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.infra.Defaults.*;
@@ -363,6 +365,18 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                               .atomic(true)
                               .timeout(600)
                               .build();
+
+        // kube-proxy must not run alongside Cilium's kube-proxy replacement — BPF and iptables
+        // service routing conflict, breaking ClusterIP services (including CoreDNS).
+        Resource.Builder.create(this, "disableKubeProxy")
+                        .dependsOn(List.of(ciliumRelease))
+                        .provisioners(Stream.concat(
+                                uponCreateRun("kubectl -n kube-system patch daemonset kube-proxy -p '{\"spec\":{\"template\":{\"spec\":{\"nodeSelector\":{\"non-existing\":\"true\"}}}}}'").stream(),
+                                uponDestroyRun("kubectl -n kube-system patch daemonset kube-proxy -p '{\"spec\":{\"template\":{\"spec\":{\"nodeSelector\":{\"kubernetes.io/os\":\"linux\"}}}}}'").stream()
+                        ).toList())
+                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                        .build();
+        return ciliumRelease;
     }
 
     private void csiSecretsDriver(List<@NotNull ITerraformDependable> eksDependOn) {
@@ -375,7 +389,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                        .repository("https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts")
                        .namespace("kube-system") // Target Kubernetes namespace
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
-                       .atomic(true) // If installation fails, completely uninstall the release
+                       .atomic(false) // If installation fails, completely uninstall the release
                        .build();
     }
 
