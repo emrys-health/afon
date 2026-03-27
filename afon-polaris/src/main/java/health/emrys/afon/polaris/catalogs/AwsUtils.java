@@ -20,7 +20,7 @@ public class AwsUtils {
     }
 
     public static String bucketToUrl(String bucketName) {
-        return "s3a://" + bucketName;
+        return "s3://" + bucketName;
     }
 
 }
