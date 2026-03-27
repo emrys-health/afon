@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowBucketEmrysAfonBucketList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::emrys-afon-bucket"
+    },
+    {
+      "Sid": "AllowBucketEmrysAfonBucketObjects",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:::emrys-afon-bucket/*"
+    },
+    {
+      "Sid": "AllowBucketEmrysAfonBucket2List",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::emrys-afon-bucket-2"
+    },
+    {
+      "Sid": "AllowBucketEmrysAfonBucket2Objects",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:::emrys-afon-bucket-2/*"
+    }
+  ]
+}
