@@ -9,6 +9,7 @@ import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 
 public class AcceptanceTestConfig {
 
@@ -35,7 +36,16 @@ public class AcceptanceTestConfig {
         ContainerHelper.instance.start(properties);
         this.polarisClient              = new AfonPolarisClient(properties);
         this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
-        this.awsForbidden               = new AwsCloudConfigForPolaris(properties, AWS_S3_BUCKET_NAME_FORBIDDEN);
+        this.awsForbidden               = new AwsCloudConfigForPolaris(properties) {
+            @Override
+            public String getBucketUrl() {
+                return bucketToUrl(AWS_S3_BUCKET_NAME_FORBIDDEN.getValueFrom(properties));
+            }
+            @Override
+            public String warehouseName() {
+                return SupportedCloudsEnum.AWS_FORBIDDEN.toString();
+            }
+        };
         this.gcpCloudConfigForPolaris   = new GoogleCloudConfigForPolaris(properties);
         this.azureCloudConfigForPolaris = new AzureCloudConfigForPolaris(properties);
     }

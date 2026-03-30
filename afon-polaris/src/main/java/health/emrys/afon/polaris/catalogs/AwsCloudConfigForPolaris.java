@@ -1,13 +1,14 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.AfonProperty;
-import org.apache.polaris.core.admin.model.*;
+import org.apache.polaris.core.admin.model.AwsStorageConfigInfo;
+import org.apache.polaris.core.admin.model.Catalog;
+import org.apache.polaris.core.admin.model.CreateCatalogRequest;
 
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.polaris.catalogs.AwsUtils.getStorageConfigInfo;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.getStorageConfigInfo;
 
 public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
@@ -22,12 +23,6 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
         this.region  = region;
     }
 
-    public AwsCloudConfigForPolaris(Properties properties, AfonProperty bucket) {
-        this(AWS_S3_ROLE_ARN.getValueFrom(properties),
-             bucketToUrl(bucket.getValueFrom(properties)),
-             AWS_REGION.getValueFrom(properties));
-    }
-
     public AwsCloudConfigForPolaris(Properties properties) {
         this(AWS_S3_ROLE_ARN.getValueFrom(properties),
              bucketToUrl(AWS_S3_BUCKET_NAME.getValueFrom(properties)),
@@ -36,7 +31,8 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
     @Override
     public String catalogConfig() throws IncorrectConfigException {
-        Catalog catalog = createCatalog(bucket, getStorageConfigInfo(roleArn, bucket, region));
+        AwsStorageConfigInfo storageConfigInfo = getStorageConfigInfo(roleArn, getBucketUrl(), region);
+        Catalog              catalog           = createCatalog(getBucketUrl(), storageConfigInfo);
         return toJson(new CreateCatalogRequest(catalog));
     }
 
@@ -62,7 +58,7 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
         return "AwsCloudConfigForPolaris{" +
                 "warehouseName='" + warehouseName() + '\'' +
                 ", roleArn='" + roleArn + '\'' +
-                ", bucket='" + bucket + '\'' +
+                ", bucket='" + getBucketUrl() + '\'' +
                 ", region='" + region + '\'' +
                 '}';
     }
