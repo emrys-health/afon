@@ -56,6 +56,7 @@ public class AfonProperties {
 
     public enum SupportedCloudsEnum {
         AWS("aws"),
+        AWS_FORBIDDEN("aws_forbidden"),
         GCP("gcp"),
         AZURE_EXTERNAL("azure_external"),
         GCP_EXTERNAL("gcp_external"),
