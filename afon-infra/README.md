@@ -86,7 +86,6 @@ If you want to create config for the whole stack in AWS, run:
 This will output your `cdk.tf.json` file.
 Run it with:
 ```shell
-tofu apply -target=data.aws_eks_cluster_auth.$(grep -oE 'jupyter-deployment_eksClusterAuthData_[A-Z0-9]*' cdk.tf.json | head -1) --auto-approve && \
 tofu apply -auto-approve
 ```
 if you are happy with it.
