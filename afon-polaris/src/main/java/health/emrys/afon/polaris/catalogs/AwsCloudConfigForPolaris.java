@@ -1,5 +1,6 @@
 package health.emrys.afon.polaris.catalogs;
 
+import health.emrys.afon.config.AfonProperty;
 import org.apache.polaris.core.admin.model.*;
 
 import java.util.Properties;
@@ -19,6 +20,12 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
         this.roleArn = roleArn;
         this.bucket  = bucket;
         this.region  = region;
+    }
+
+    public AwsCloudConfigForPolaris(Properties properties, AfonProperty bucket) {
+        this(AWS_S3_ROLE_ARN.getValueFrom(properties),
+             bucketToUrl(bucket.getValueFrom(properties)),
+             AWS_REGION.getValueFrom(properties));
     }
 
     public AwsCloudConfigForPolaris(Properties properties) {

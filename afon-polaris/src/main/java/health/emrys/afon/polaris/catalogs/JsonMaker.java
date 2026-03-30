@@ -5,13 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import health.emrys.afon.config.AfonPropertiesLoader;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
-
-import static health.emrys.afon.config.AfonProperties.PROJECT_PROPERTIES_FILE;
-
 public class JsonMaker {
     /**
      * For testing the config JSON only.
