@@ -5,12 +5,10 @@ import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
-import health.emrys.afon.polaris.comms.PolarisConfigurer;
 
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperties.*;
 
 public class AcceptanceTestConfig {
 
@@ -27,7 +25,8 @@ public class AcceptanceTestConfig {
     private final String                      clientSecret;
     private final Properties                  properties;
     private final GoogleCloudConfigForPolaris gcpCloudConfigForPolaris;
-    private final AzureCloudConfigForPolaris azureCloudConfigForPolaris;
+    private final AzureCloudConfigForPolaris  azureCloudConfigForPolaris;
+    private final AwsCloudConfigForPolaris    awsForbidden;
 
     private AcceptanceTestConfig(Properties properties) {
         this.clientId     = POLARIS_ID.getValueFrom(properties);
@@ -36,24 +35,9 @@ public class AcceptanceTestConfig {
         ContainerHelper.instance.start(properties);
         this.polarisClient              = new AfonPolarisClient(properties);
         this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
+        this.awsForbidden               = new AwsCloudConfigForPolaris(properties, AWS_S3_BUCKET_NAME_FORBIDDEN);
         this.gcpCloudConfigForPolaris   = new GoogleCloudConfigForPolaris(properties);
         this.azureCloudConfigForPolaris = new AzureCloudConfigForPolaris(properties);
-    }
-
-    /**
-     * This initializes Polaris completely.
-     */
-    public void initializePolaris() {
-        try {
-            var configurer = new PolarisConfigurer(polarisClient);
-            configurer.configurCatalogFor(awsCloudConfigForPolaris, getAccessToken());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public Properties getProperties() {
-        return new Properties(properties);
     }
 
     public AfonPolarisClient getPolarisClient() {
@@ -82,5 +66,9 @@ public class AcceptanceTestConfig {
 
     public AzureCloudConfigForPolaris getAzureCloudConfigForPolaris() {
         return azureCloudConfigForPolaris;
+    }
+
+    public AwsCloudConfigForPolaris getAwsForbidden() {
+        return awsForbidden;
     }
 }
