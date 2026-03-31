@@ -34,10 +34,11 @@ public class AfonProperties {
     public static final AfonProperty GOOGLE_APPLICATION_CREDENTIALS = new AfonProperty("GOOGLE_APPLICATION_CREDENTIALS");
 
     // AZURE
-    public static final AfonProperty AZURE_BUCKET          = new AfonProperty("AZURE_BUCKET");
-    public static final AfonProperty AZURE_EXTERNAL_BUCKET = new AfonProperty("AZURE_EXTERNAL_BUCKET");
-    public static final AfonProperty AZURE_STORAGE_ACCOUNT = new AfonProperty("AZURE_STORAGE_ACCOUNT");
-    public static final AfonProperty DATABRICKS_TOKEN      = new AfonProperty("DATABRICKS_TOKEN");
+    public static final AfonProperty AZURE_BUCKET             = new AfonProperty("AZURE_BUCKET");
+    public static final AfonProperty AZURE_BUCKET_FORBIDDEN   = new AfonProperty("AZURE_BUCKET_FORBIDDEN");
+    public static final AfonProperty AZURE_EXTERNAL_BUCKET    = new AfonProperty("AZURE_EXTERNAL_BUCKET");
+    public static final AfonProperty AZURE_STORAGE_ACCOUNT    = new AfonProperty("AZURE_STORAGE_ACCOUNT");
+    public static final AfonProperty DATABRICKS_TOKEN         = new AfonProperty("DATABRICKS_TOKEN");
 
     // needed by Polaris:
     public static final AfonProperty AZURE_TENANT_ID       = new AfonProperty("AZURE_TENANT_ID");
@@ -58,11 +59,13 @@ public class AfonProperties {
     public enum SupportedCloudsEnum {
         AWS("aws"),
         AWS_FORBIDDEN("aws_forbidden"),
+        AZURE_EXTERNAL("azure_external"),
+        AZURE_FORBIDDEN("azure_forbidden"),
+        AZURE("azure"),
         GCP("gcp"),
         GCP_FORBIDDEN("gcp_forbidden"),
-        AZURE_EXTERNAL("azure_external"),
-        GCP_EXTERNAL("gcp_external"),
-        AZURE("azure");
+        GCP_EXTERNAL("gcp_external")
+        ;
 
         private String value;
 

@@ -10,6 +10,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
+import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 
 public class AcceptanceTestConfig {
 
@@ -20,15 +21,16 @@ public class AcceptanceTestConfig {
         instance = new AcceptanceTestConfig(loader.getProperties());
     }
 
-    private final AwsCloudConfigForPolaris    awsCloudConfigForPolaris;
     private final AfonPolarisClient           polarisClient;
+    private final AwsCloudConfigForPolaris    awsCloudConfigForPolaris;
+    private final AwsCloudConfigForPolaris    awsForbidden;
+    private final AzureCloudConfigForPolaris  azureCloudConfigForPolaris;
+    private final AzureCloudConfigForPolaris  azureForbidden;
+    private final GoogleCloudConfigForPolaris gcpCloudConfigForPolaris;
+    private final GoogleCloudConfigForPolaris gcpForbidden;
     private final String                      clientId;
     private final String                      clientSecret;
     private final Properties                  properties;
-    private final GoogleCloudConfigForPolaris gcpCloudConfigForPolaris;
-    private final AzureCloudConfigForPolaris  azureCloudConfigForPolaris;
-    private final AwsCloudConfigForPolaris    awsForbidden;
-    private final GoogleCloudConfigForPolaris gcpForbidden;
 
     private AcceptanceTestConfig(Properties properties) {
         this.clientId     = POLARIS_ID.getValueFrom(properties);
@@ -59,6 +61,16 @@ public class AcceptanceTestConfig {
         };
         this.gcpCloudConfigForPolaris   = new GoogleCloudConfigForPolaris(properties);
         this.azureCloudConfigForPolaris = new AzureCloudConfigForPolaris(properties);
+        this.azureForbidden = new AzureCloudConfigForPolaris(properties){
+            public String warehouseName() {
+                return SupportedCloudsEnum.AZURE_FORBIDDEN.toString();
+            }
+            @Override
+            public String getBucketUrl() {
+                return bucketUrl(AZURE_BUCKET_FORBIDDEN.getValueFrom(properties),
+                                 AZURE_STORAGE_ACCOUNT.getValueFrom(properties));
+            }
+        };
     }
 
     public AfonPolarisClient getPolarisClient() {
@@ -96,5 +108,10 @@ public class AcceptanceTestConfig {
     public GoogleCloudConfigForPolaris getGcpForbidden() {
       return gcpForbidden;
     }
+
+    public AzureCloudConfigForPolaris getAzureForbidden() {
+        return azureForbidden;
+    }
+
 
 }
