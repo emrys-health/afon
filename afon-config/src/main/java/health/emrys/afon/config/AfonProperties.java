@@ -28,6 +28,7 @@ public class AfonProperties {
 
     // GCP
     public static final AfonProperty GCP_BUCKET_NAME                = new AfonProperty("GCP_BUCKET_NAME");
+    public static final AfonProperty GCP_BUCKET_NAME_FORBIDDEN      = new AfonProperty("GCP_BUCKET_NAME_FORBIDDEN");
     public static final AfonProperty GCP_EXTERNAL_BUCKET_NAME       = new AfonProperty("GCP_EXTERNAL_BUCKET_NAME");
     public static final AfonProperty GCP_SERVICE_ACCOUNT            = new AfonProperty("GCP_SERVICE_ACCOUNT");
     public static final AfonProperty GOOGLE_APPLICATION_CREDENTIALS = new AfonProperty("GOOGLE_APPLICATION_CREDENTIALS");
@@ -58,6 +59,7 @@ public class AfonProperties {
         AWS("aws"),
         AWS_FORBIDDEN("aws_forbidden"),
         GCP("gcp"),
+        GCP_FORBIDDEN("gcp_forbidden"),
         AZURE_EXTERNAL("azure_external"),
         GCP_EXTERNAL("gcp_external"),
         AZURE("azure");

@@ -10,6 +10,8 @@ gcloud iam service-accounts add-iam-policy-binding external-sa@fjords-450014.iam
 gcloud auth application-default login --impersonate-service-account=external-sa@fjords-450014.iam.gserviceaccount.com && \
 gcloud storage buckets add-iam-policy-binding gs://emrys_afon_core_2  --member="serviceAccount:external-sa@fjords-450014.iam.gserviceaccount.com"  --role="roles/storage.objectAdmin"
 
+gcloud storage buckets create "gs://emrys_afon_core_forbidden" --location=europe-west2
+
 gcloud iam service-accounts add-iam-policy-binding \
     my-vendable-sa@fjords-450014.iam.gserviceaccount.com \
     --member="serviceAccount:blirc-600159231093-i76b@gcp-sa-biglakerestcatalog.iam.gserviceaccount.com" \
