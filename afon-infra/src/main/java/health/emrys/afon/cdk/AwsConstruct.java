@@ -7,7 +7,6 @@ import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
-import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterVpcConfig;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroup;
@@ -50,6 +49,7 @@ import java.util.stream.Collectors;
 import static health.emrys.afon.cdk.AwsKubernetesPolaris.POLARIS_INTERNAL;
 import static health.emrys.afon.cdk.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
 import static health.emrys.afon.cdk.SparkClusterDeployment.NO_SPARK_LB_FINALIZERS;
@@ -70,9 +70,11 @@ public class AwsConstruct extends AbstractConstruct {
     final               IamRole                    loadBalancerRole;
     final               Resource                   newKubeConfig;
     private             Release                    lbRelease;
+    private final       Construct                  outerScope;
 
     AwsConstruct(final Construct scope, final String id) {
         super(scope, id);
+        this.outerScope = scope;
         // --- AWS Provider Configuration (Required for EKS Addon) ---
         // 1. Configure the AWS Provider
         AwsProvider.Builder.create(this, "aws")
@@ -300,17 +302,9 @@ public class AwsConstruct extends AbstractConstruct {
                             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                             .tags(Map.of("Name", "cdktf-eks-nodegroup")).build();
 
-        // 2. Define or update the EKS Addon (e.g., 'coredns')
-        EksAddon.Builder.create(this, "vpc-cni")
-                        .clusterName(CLUSTER_NAME)
-                        .region(AWS_REGION)
-                        .addonName("vpc-cni")
-                        .dependsOn(eksDependOn)
-                        // Setting resolveConflicts to OVERWRITE forces the update even if manual changes exist
-                        .resolveConflictsOnUpdate("OVERWRITE")
-                        .resolveConflictsOnCreate("OVERWRITE")
-                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                        .build();
+        // vpc-cni addon removed: Cilium ENI mode is a complete replacement for vpc-cni.
+        // Keeping the EKS addon caused EKS to continuously overwrite Cilium's no-op patch
+        // to aws-node (resolveConflictsOnUpdate=OVERWRITE), breaking pod internet connectivity.
 
         String trustPolicy = """
                 ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::123456789012:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
@@ -324,7 +318,16 @@ public class AwsConstruct extends AbstractConstruct {
                                        .policyArn(CLUSTER_POLICY_ARN)
                                        .role(eksClusterRole.getName())
                                        .build();
-        lbRelease = configureIngress(scope, loadBalancerRole);
+    }
+
+    /**
+     * Installs the AWS Load Balancer Controller and the Polaris HTTPS ingress + DNS record.
+     * Separated from the constructor so callers can inject Cilium / kube-proxy-disabled
+     * resources as extra dependencies, ensuring pods are never scheduled before Cilium's
+     * BPF programs are initialised on every node.
+     */
+    public void installLbcAndIngress(List<ITerraformDependable> extraDeps) {
+        lbRelease = configureIngress(outerScope, loadBalancerRole, extraDeps);
 
         IngressV1 ingress = createHttpsIngress("polaris-https-ingress",
                                                "polaris-ingress",
@@ -332,19 +335,8 @@ public class AwsConstruct extends AbstractConstruct {
                                                AWS_POLARIS_DOMAIN_NAME,
                                                POLARIS_INTERNAL,
                                                8181,
-                                               subnetIds
-                                              );
+                                               subnetIds);
 
-//        final DataAwsRoute53Zone hostedZone = DataAwsRoute53Zone
-//                .Builder.create(this, "HostedZoneLookup")
-//                        .name("emryspolaris.click.") // Must end with a period
-//                        .privateZone(false).count(6)
-//                        .build();
-
-
-        // 2. Create the Alias A Record
-        // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
-        // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
         configureDNS("IngressAliasRecord", "Z06847223IC61YVGEH6HR", AWS_POLARIS_DOMAIN_NAME, lbRelease, ingress);
     }
 
@@ -375,10 +367,10 @@ public class AwsConstruct extends AbstractConstruct {
                 .build());
     }
 
-    private Release configureIngress(Construct scope, IamRole loadBalancerRole) {
+    private Release configureIngress(Construct scope, IamRole loadBalancerRole, List<ITerraformDependable> extraDeps) {
         String serviceAccountName = configureServiceAccount(scope, loadBalancerRole);
 
-        return helmInstallLoadBalancer(serviceAccountName, loadBalancerRole);
+        return helmInstallLoadBalancer(serviceAccountName, loadBalancerRole, extraDeps);
     }
 
     private @NotNull String configureServiceAccount(Construct scope, IamRole loadBalancerRole) {
@@ -452,9 +444,10 @@ public class AwsConstruct extends AbstractConstruct {
         return clusterData;
     }
 
-    private Release helmInstallLoadBalancer(String serviceAccountName, IamRole loadBalancerRole) {
+    private Release helmInstallLoadBalancer(String serviceAccountName, IamRole loadBalancerRole, List<ITerraformDependable> extraDeps) {
         ArrayList<ITerraformDependable> dependencies = new ArrayList(eksDependOn);
         dependencies.add(loadBalancerRole);
+        dependencies.addAll(extraDeps);
         return Release.Builder.create(this, "aws-load-balancer")
                               .dependsOn(dependencies)
                               .name(serviceAccountName + "-chart")
@@ -462,8 +455,8 @@ public class AwsConstruct extends AbstractConstruct {
                               .version("1.17.0")
                               .repository("https://aws.github.io/eks-charts")
                               .namespace("kube-system")
-                              .timeout(600)
-                              .atomic(true)
+                              .timeout(1200)
+                              .atomic(false)
                               .set(List.of(
                                       ReleaseSet.builder().name("clusterName").value(CLUSTER_NAME).build(),
                                       ReleaseSet.builder().name("serviceAccount.create").value("false").build(),
@@ -562,10 +555,24 @@ public class AwsConstruct extends AbstractConstruct {
 //                                                   .ignoreChanges(List.of("status"))
                                                                 .build())
                                              .waitForLoadBalancer(true)
+                                             .dependsOn(lbRelease != null ? List.of(lbRelease) : List.of())
                                              .build();
-//        ingress.addOverride("metadata.finalizers", Collections.emptyList());
-        // (Optional) Ignore future controller-added finalizers so deletes never block
-//        ingress.addOverride("lifecycle.ignore_changes", Collections.singletonList("metadata.0.finalizers"));
+        // Patch finalizers before the ingress is deleted so tofu destroy doesn't hang.
+        // Depends on BOTH the ingress and the LBC Helm release so that on destroy this null
+        // resource is torn down first: it deletes the validating webhook and clears the ingress
+        // finalizer before Helm tries to uninstall the controller.  Without the lbRelease
+        // dependency, Terraform can destroy the Helm release in parallel with this cleanup,
+        // and Helm times out because the webhook is still blocking API calls.
+        List<ITerraformDependable> finalizerDeps = lbRelease != null
+                ? List.of(ingress, lbRelease)
+                : List.of(ingress);
+        Resource.Builder.create(this, constructId + "-finalizer")
+                        .dependsOn(finalizerDeps)
+                        .provisioners(uponDestroyRun(
+                                "kubectl delete validatingwebhookconfiguration aws-load-balancer-webhook --ignore-not-found=true",
+                                "kubectl patch ingress " + ingressName + " -n default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge"))
+                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                        .build();
         return ingress;
     }
 

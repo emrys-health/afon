@@ -27,7 +27,9 @@ import software.constructs.Construct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
+import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.infra.Defaults.*;
@@ -51,15 +53,10 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
     static final    Logger  logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
     static final    String  NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
-    protected final Release calico;
-    protected final List<Service> loadBalancers;
     private String DELETE_CRDS;
 
     public AwsWholeStack(final Construct scope, final SupportedCloudsEnum id) {
         super(scope, id);
-        List<ITerraformDependable> dependables   = cloudProvider.getDependables();
-        deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
-        loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
         HelmProvider helm = HelmProvider.Builder.create(this, "helm")
                 .kubernetes(HelmProviderKubernetes.builder()
@@ -82,10 +79,6 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
             "version", "3.0.1"   // 👈 Pin exact version
                                                                     ));
 
-        calico = calico(dependables);
-
-        csiSecretsDriver(dependables);
-
         ServiceAccount.Builder.create(this, "sparkApplicationSa")
                               .metadata(ServiceAccountMetadata.builder()
                                                               .name(SPARK_SERVICE_ACCOUNT_NAME)
@@ -94,7 +87,8 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                               .build();
 
         cloudProvider.configureLoadBalancerDestroy(loadBalancers);
-        SparkConfig sparkConfig = new SparkConfig(this, "sparkop", dependables);
+        deployJupyter(afterCilium, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
+        SparkConfig sparkConfig = new SparkConfig(this, "sparkop", afterCilium);
 
         unregisterCRDs();
     }
@@ -250,11 +244,11 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                                                                  .matchLabels(Map.of("k8s-app", "kube-dns"))
                                                                  .build())
                 .build();
-        String bbcNews = "151.101.0.0/16";
+        String google = "192.178.0.0/15";
         List<NetworkPolicySpecEgressTo> allowedIPs = List.of(
                 NetworkPolicySpecEgressTo.builder()
                                          .ipBlock(NetworkPolicySpecEgressToIpBlock.builder()
-                                                                                  .cidr(bbcNews)
+                                                                                  .cidr(google)
                                                                                   .build())
                                          .build()
                                                             );
@@ -328,55 +322,6 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                                                            )
                                                     .build()
                                   ).build();
-    }
-
-    private Release calico(List<@NotNull ITerraformDependable> eksDependOn) {
-        /* This is still timing out after 10 minutes with:
-│ Error: Error uninstalling release
-│
-│ Unable to uninstall Helm release tigera-operator: uninstallation completed with 1 error(s): context deadline exceeded
-╵
-        running tofu destroy a second time works.
-         */
-        return Release.Builder.create(this, "calicoOperator")
-                              .name("tigera-operator")
-                              .dependsOn(eksDependOn)
-                              .chart("tigera-operator")
-                              .version("v3.28.0")
-                              .cleanupOnFail(true)
-                              .disableCrdHooks(true)
-                              .disableWebhooks(true)
-                              .forceUpdate(true)
-                              .recreatePods(false)
-                              .set(List.of(
-                                      ReleaseSet.builder().name("crds.install").value("true").build(),
-                                      ReleaseSet.builder().name("crds.cleanup").value("false").build()
-                                          ))
-                              .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS,
-                                                           "kubectl delete ns tigera-operator --force --grace-period=0"
-                                                          ))
-                              .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                              .repository("https://docs.tigera.io/calico/charts")
-                              .namespace("tigera-operator") // Standard namespace for the operator
-                              .createNamespace(true)
-                              .version("3.31.0") // Using a recent stable version
-                              .atomic(true)
-                              .timeout(600)
-                              .build();
-    }
-
-    private void csiSecretsDriver(List<@NotNull ITerraformDependable> eksDependOn) {
-        Release.Builder.create(this, "secrets-store-csi-driver")
-                       .dependsOn(eksDependOn)
-                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                       .name("csi-secrets-store") // The release name
-                       .chart("secrets-store-csi-driver") // The chart name within the repository
-                       .version("1.5.4")
-                       .repository("https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts")
-                       .namespace("kube-system") // Target Kubernetes namespace
-                       .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
-                       .atomic(true) // If installation fails, completely uninstall the release
-                       .build();
     }
 
     public static void main(String[] args) {

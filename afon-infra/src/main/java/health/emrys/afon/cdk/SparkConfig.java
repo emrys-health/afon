@@ -28,7 +28,7 @@ public class SparkConfig extends Construct {
                                                       .version("1.4.0")
                                                       .repository("https://apache.github.io/spark-kubernetes-operator")
                                                       .namespace("default")
-                                                      .atomic(true)
+                                                      .atomic(false)
                                                       .set(List.of(
                                                               ReleaseSet.builder()
                                                                         .name("operatorConfiguration.log4j2\\.properties")
