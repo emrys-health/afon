@@ -7,7 +7,7 @@ import uk.co.odinconsultants.documentation_utils.Datum
 
 import java.lang.reflect.Field
 
-class AzureAccessSpec extends AbstractAccessSpec {
+class AzureAccessSpec extends AbstractAccessSpec with AzureTableCreation {
 
   override def config: CloudConfigForPolaris = AcceptanceTestConfig.instance.getAzureCloudConfigForPolaris
 
@@ -18,12 +18,4 @@ class AzureAccessSpec extends AbstractAccessSpec {
     spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).append()
   }
 
-  def createDatumTable(tableName: String): String = {
-    val fields: String = classOf[Datum].getDeclaredFields
-      .map { field: Field =>
-        s"${field.getName} ${field.getType.getSimpleName}"
-      }
-      .mkString(",\n")
-    s"""CREATE TABLE $tableName ($fields) USING iceberg""".stripMargin
-  }
 }

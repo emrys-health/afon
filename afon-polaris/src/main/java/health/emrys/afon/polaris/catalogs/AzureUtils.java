@@ -24,7 +24,7 @@ public class AzureUtils {
             .build();
     }
 
-    static @NonNull String bucketUrl(String bucketName, String storageAccount) {
+    public static @NonNull String bucketUrl(String bucketName, String storageAccount) {
         return format("abfss://%s@%s.dfs.core.windows.net", bucketName, storageAccount);
     }
 }

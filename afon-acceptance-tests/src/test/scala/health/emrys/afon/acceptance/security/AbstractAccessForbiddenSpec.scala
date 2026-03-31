@@ -55,10 +55,17 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
       assert(response.getCode == 200)
       val fqn = s"$FULL_NAMESPACE.$tableName"
       When(s"we write $NUM_ROWS rows of data to a table in that namespace called '$fqn'")
-      intercept[org.apache.spark.SparkException] {
-        spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(fqn).create()
-      }
-      Then("an exception is thrown because access is forbidden")
+      val expectedX = createTableAndPopulate(fqn)
+      Then(
+        s"""an exception (${expectedX.getClass.getName}) is thrown because access is forbidden.
+           |Cause is ${expectedX.getCause}
+           |""".stripMargin)
+    }
+  }
+
+  protected def createTableAndPopulate(fqn: String): Exception = {
+    intercept[org.apache.spark.SparkException] {
+      spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(fqn).create()
     }
   }
 }
