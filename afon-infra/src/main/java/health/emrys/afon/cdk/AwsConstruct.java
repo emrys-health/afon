@@ -7,6 +7,7 @@ import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
+import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterVpcConfig;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroup;
@@ -48,7 +49,6 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.AwsKubernetesPolaris.POLARIS_INTERNAL;
 import static health.emrys.afon.cdk.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
-import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
@@ -300,9 +300,17 @@ public class AwsConstruct extends AbstractConstruct {
                             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                             .tags(Map.of("Name", "cdktf-eks-nodegroup")).build();
 
-        // vpc-cni addon removed: Cilium ENI mode is a complete replacement for vpc-cni.
-        // Keeping the EKS addon caused EKS to continuously overwrite Cilium's no-op patch
-        // to aws-node (resolveConflictsOnUpdate=OVERWRITE), breaking pod internet connectivity.
+        // 2. Define or update the EKS Addon (e.g., 'coredns')
+        EksAddon.Builder.create(this, "vpc-cni")
+                        .clusterName(CLUSTER_NAME)
+                        .region(AWS_REGION)
+                        .addonName("vpc-cni")
+                        .dependsOn(eksDependOn)
+                        // Setting resolveConflicts to OVERWRITE forces the update even if manual changes exist
+                        .resolveConflictsOnUpdate("OVERWRITE")
+                        .resolveConflictsOnCreate("OVERWRITE")
+                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                        .build();
 
         String trustPolicy = """
                 ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::123456789012:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
@@ -454,8 +462,8 @@ public class AwsConstruct extends AbstractConstruct {
                               .version("1.17.0")
                               .repository("https://aws.github.io/eks-charts")
                               .namespace("kube-system")
-                              .timeout(1200)
-                              .atomic(false)
+                              .timeout(600)
+                              .atomic(true)
                               .set(List.of(
                                       ReleaseSet.builder().name("clusterName").value(CLUSTER_NAME).build(),
                                       ReleaseSet.builder().name("serviceAccount.create").value("false").build(),
@@ -555,18 +563,9 @@ public class AwsConstruct extends AbstractConstruct {
                                                                 .build())
                                              .waitForLoadBalancer(true)
                                              .build();
-        // Patch finalizers before the ingress is deleted so tofu destroy doesn't hang.
-        // The null resource depends on the ingress, so Terraform destroys it first (running
-        // the patch), then deletes the ingress.
-        // Delete the ALB validating webhook first — if the ALB controller is still running its
-        // webhook blocks the patch; --ignore-not-found=true makes this safe if already gone.
-        Resource.Builder.create(this, constructId + "-finalizer")
-                        .dependsOn(List.of(ingress))
-                        .provisioners(uponDestroyRun(
-                                "kubectl delete validatingwebhookconfiguration aws-load-balancer-webhook --ignore-not-found=true",
-                                "kubectl patch ingress " + ingressName + " -n default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge"))
-                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                        .build();
+//        ingress.addOverride("metadata.finalizers", Collections.emptyList());
+        // (Optional) Ignore future controller-added finalizers so deletes never block
+//        ingress.addOverride("lifecycle.ignore_changes", Collections.singletonList("metadata.0.finalizers"));
         return ingress;
     }
 
