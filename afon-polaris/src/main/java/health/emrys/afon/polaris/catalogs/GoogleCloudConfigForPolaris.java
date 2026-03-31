@@ -3,6 +3,7 @@ package health.emrys.afon.polaris.catalogs;
 import org.apache.polaris.core.admin.model.Catalog;
 import org.apache.polaris.core.admin.model.CreateCatalogRequest;
 import org.apache.polaris.core.admin.model.GcpStorageConfigInfo;
+import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 import java.util.Properties;
@@ -17,22 +18,31 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
 
     public GoogleCloudConfigForPolaris(Properties properties) {
         super(new JsonMaker());
-        this.bucket         = "gs://" + GCP_BUCKET_NAME.getValueFrom(properties);
-        this.serviceAccount = GCP_SERVICE_ACCOUNT.getValueFrom(properties);
+      this.bucket         = toBucketUri(GCP_BUCKET_NAME.getValueFrom(properties));
+      this.serviceAccount = GCP_SERVICE_ACCOUNT.getValueFrom(properties);
     }
 
-    @Override
+  public static @NonNull String toBucketUri(String bucketName) {
+    return "gs://" + bucketName;
+  }
+
+  @Override
     public String catalogConfig() throws IncorrectConfigException {
-        Catalog catalog = createCatalog(bucket, getStorageConfigInfo());
+        Catalog catalog = createCatalog(getBucket(), getStorageConfigInfo());
         return toJson(new CreateCatalogRequest(catalog));
     }
 
     public GcpStorageConfigInfo getStorageConfigInfo() {
-        return new GcpStorageConfigInfo(serviceAccount, GCS, List.of(bucket));
+        return new GcpStorageConfigInfo(serviceAccount, GCS, List.of(getBucket()));
     }
 
     @Override
     public String warehouseName() {
         return SupportedCloudsEnum.GCP.toString();
     }
+
+    public String getBucket() {
+      return bucket;
+    }
+
 }

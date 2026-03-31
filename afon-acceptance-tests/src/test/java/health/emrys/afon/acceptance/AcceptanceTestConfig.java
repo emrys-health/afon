@@ -28,6 +28,7 @@ public class AcceptanceTestConfig {
     private final GoogleCloudConfigForPolaris gcpCloudConfigForPolaris;
     private final AzureCloudConfigForPolaris  azureCloudConfigForPolaris;
     private final AwsCloudConfigForPolaris    awsForbidden;
+    private final GoogleCloudConfigForPolaris gcpForbidden;
 
     private AcceptanceTestConfig(Properties properties) {
         this.clientId     = POLARIS_ID.getValueFrom(properties);
@@ -44,6 +45,16 @@ public class AcceptanceTestConfig {
             @Override
             public String warehouseName() {
                 return SupportedCloudsEnum.AWS_FORBIDDEN.toString();
+            }
+        };
+        this.gcpForbidden = new GoogleCloudConfigForPolaris(properties) {
+            @Override
+            public String warehouseName() {
+              return SupportedCloudsEnum.GCP_FORBIDDEN.toString();
+            }
+            @Override
+            public String getBucket() {
+              return toBucketUri(GCP_BUCKET_NAME_FORBIDDEN.getValueFrom(properties));
             }
         };
         this.gcpCloudConfigForPolaris   = new GoogleCloudConfigForPolaris(properties);
@@ -81,4 +92,9 @@ public class AcceptanceTestConfig {
     public AwsCloudConfigForPolaris getAwsForbidden() {
         return awsForbidden;
     }
+
+    public GoogleCloudConfigForPolaris getGcpForbidden() {
+      return gcpForbidden;
+    }
+
 }
