@@ -1,6 +1,7 @@
-package health.emrys.afon.acceptance
+package health.emrys.afon.acceptance.security
 
 import health.emrys.afon.acceptance.SparkHelper.spark
+import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant, CatalogRoles, FileHelper, SpecHelper}
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS_FORBIDDEN
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
@@ -25,7 +26,7 @@ class AwsAccessForbiddenSpec extends SpecPretifier with GivenWhenThen with SpecH
   "Polaris" should {
     "be told about the catalog" in {
       val uri = getCreateCatalogURI
-      Given(s"a Polaris endpoint at ${client.getEndpoint}")
+      Given(s"an admin has set up the environment with:\n" + readEnvSetup())
       val json = config.catalogConfig
       When(s"we call $uri with payload:\n$json")
       client.postJsonCall(uri, json, accessToken)
@@ -39,6 +40,10 @@ class AwsAccessForbiddenSpec extends SpecPretifier with GivenWhenThen with SpecH
     "be told about the catalog admin grants" in GrantCatalogAdmin()
 
     "be told about the catalog roles" in CatalogRoles()
+  }
+
+  def readEnvSetup(): String = {
+    FileHelper.readFromRoot("scripts/aws/create.sh")
   }
 
   s"A table" should {
