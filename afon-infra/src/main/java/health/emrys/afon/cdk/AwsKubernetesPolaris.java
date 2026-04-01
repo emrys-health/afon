@@ -38,7 +38,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
     protected final PolarisConfig     polarisConfig;
     protected final AwsConstruct      cloudProvider;
     protected final Service       polarisLB;
-    protected final Release       calico;
+    protected final Release       cilium;
     protected final List<Service> loadBalancers;
     protected final List<ITerraformDependable> afterCilium;
     protected       Resource      disableKubeProxy;
@@ -56,9 +56,9 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
         // must depend on disableKubeProxy so its pods are never created before Cilium's BPF
         // programs are initialised on every node (which caused CrashLoopBackOff on first apply).
         List<ITerraformDependable> dependables = new ArrayList<>();
-        calico      = calico(cloudProvider.getDependables());
+        cilium = cilium(cloudProvider.getDependables());
         dependables.add(disableKubeProxy);
-        dependables.add(calico);
+        dependables.add(cilium);
         afterCilium = dependables;
 
         csiSecretsDriver(dependables);
@@ -91,7 +91,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
     }
 
 
-    private Release calico(List<@NotNull ITerraformDependable> eksDependOn) {
+    private Release cilium(List<@NotNull ITerraformDependable> eksDependOn) {
         /* This is still timing out after 10 minutes with:
 │ Error: Error uninstalling release
 │

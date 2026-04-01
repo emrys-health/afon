@@ -6,8 +6,6 @@ import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
-import com.hashicorp.cdktf.providers.helm.release.Release;
-import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
@@ -20,16 +18,13 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
-import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.infra.Defaults.*;
@@ -94,7 +89,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
     }
 
     protected void unregisterCRDs() {
-        unregisterCRDs(List.of(calico));
+        unregisterCRDs(List.of(cilium));
     }
 
     protected void unregisterCRDs(List<? extends ITerraformDependable> dependsOn) {

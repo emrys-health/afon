@@ -125,7 +125,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
 
         Service sparkLB = sparkExternalService(List.of());
 
-        unregisterCRDs(List.of(calico, sparkLB));
+        unregisterCRDs(List.of(cilium, sparkLB));
     }
 
     @Override
