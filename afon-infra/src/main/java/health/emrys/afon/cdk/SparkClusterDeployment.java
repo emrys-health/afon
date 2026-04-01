@@ -37,7 +37,9 @@ public class SparkClusterDeployment extends AwsWholeStack {
     public SparkClusterDeployment(@NotNull Construct scope,
                                   @NotNull SupportedCloudsEnum id) {
         super(scope, id);
-        List<ITerraformDependable> eksDependOn = cloudProvider.getDependables();
+        List<ITerraformDependable> eksDependOn = new ArrayList<>();
+        eksDependOn.addAll(cloudProvider.getDependables());
+        eksDependOn.addAll(afterCilium);
 
         final Map<String, Object> sparkClusterManifest = Map.of(
                 "apiVersion", "spark.apache.org/v1alpha1",

@@ -569,7 +569,12 @@ public class AwsConstruct extends AbstractConstruct {
         Resource.Builder.create(this, constructId + "-finalizer")
                         .dependsOn(finalizerDeps)
                         .provisioners(uponDestroyRun(
-                                "kubectl delete validatingwebhookconfiguration aws-load-balancer-webhook --ignore-not-found=true",
+                                // Remove LBC webhooks so Helm can delete the controller's resources cleanly.
+                                "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer | xargs -r kubectl delete --ignore-not-found=true",
+                                "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer | xargs -r kubectl delete --ignore-not-found=true",
+                                // Strip finalizers.elbv2.k8s.aws/resources from TargetGroupBindings so Helm
+                                // can delete them — the LBC controller won't be running to process them.
+                                "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
                                 "kubectl patch ingress " + ingressName + " -n default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge"))
                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                         .build();
