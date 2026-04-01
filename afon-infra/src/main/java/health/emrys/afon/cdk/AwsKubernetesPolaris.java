@@ -1,12 +1,19 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.TerraformStack;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderConfig;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
+import com.hashicorp.cdktf.providers.helm.release.Release;
+import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
+import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -33,9 +40,6 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
         super(scope, id.toString());
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
-        // HelmProvider.Builder.create(this, "helm")
-        //                     .build();
-
         cloudProvider = new AwsConstruct(this, id.toString());
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
             protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
