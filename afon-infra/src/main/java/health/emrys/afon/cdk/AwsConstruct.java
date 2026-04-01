@@ -335,7 +335,13 @@ public class AwsConstruct extends AbstractConstruct {
                                             // 2. EKS-Specific Networking (ENI Mode)
                                             createValue("eni.enabled", "true"),
                                             createValue("ipam.mode", "eni"),
-                                            createValue("egressMasqueradeInterfaces", "eth0"),
+                                            createValue("routingMode", "native"),
+                                            // BPF masquerade is required: kubeProxyReplacement uses bpf_redirect
+                                            // to forward pod egress directly to the ENI, bypassing iptables
+                                            // POSTROUTING — so iptables MASQUERADE never fires.
+                                            createValue("bpf.masquerade", "true"),
+                                            createValue("enableIPv4Masquerade", "true"),
+                                            createValue("ipv4NativeRoutingCIDR", vpc.getCidrBlock()),
 
                                             // 3. Solving the "Pending" Issue (Tolerations)
                                             // This allows Cilium to run even if the node is "NotReady"
