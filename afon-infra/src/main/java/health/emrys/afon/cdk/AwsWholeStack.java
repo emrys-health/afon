@@ -51,7 +51,6 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
     static final    Logger  logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
     static final    String  NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
-    protected final Release calico;
     protected final List<Service> loadBalancers;
     private String DELETE_CRDS;
 
@@ -82,7 +81,6 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
             "version", "3.0.1"   // 👈 Pin exact version
                                                                     ));
 
-        calico = calico(dependables);
 
         csiSecretsDriver(dependables);
 
@@ -100,7 +98,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
     }
 
     protected void unregisterCRDs() {
-        unregisterCRDs(List.of(calico));
+//        unregisterCRDs(List.of(calico));
     }
 
     protected void unregisterCRDs(List<? extends ITerraformDependable> dependsOn) {
