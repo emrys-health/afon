@@ -27,6 +27,16 @@ public class PolarisConfigurer {
     public static String getDeleteURI(String warehouseName) {
         return format("/api/management/v1/catalogs/%s", warehouseName);
     }
+    public static String getDeleteNamespaceURI(String warehouseName,
+                                               String namespace) {
+        return format("/api/catalog/v1/%s/namespaces/%s", warehouseName, namespace);
+    }
+    public static String getDeleteTableURI(String warehouseName,
+                                           String namespace,
+                                           String tableName) {
+        return format("/api/catalog/v1/%s/namespaces/%s/tables/%s",
+                      warehouseName, namespace, tableName);
+    }
 
     public PolarisConfigurer(AfonPolarisClient client) {
         this.client = client;
