@@ -63,11 +63,13 @@ public class AfonPolarisClient {
         post.setHeader("Polaris-Realm", "POLARIS");
         logger.info("client id = {}, secret = {}", clientId, clientSecret);
         String body = format("grant_type=client_credentials&client_id=%s&client_secret=***REMOVED***", clientId, clientSecret);
+        String content = "Can't read response content";
         try {
             ClassicHttpResponse response = makeCall(body, post);
+            content = response.getEntity().getContent().toString();
             return parseAccessToken(response);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException(content, e);
         }
     }
 
