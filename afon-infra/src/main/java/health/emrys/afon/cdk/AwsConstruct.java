@@ -390,6 +390,18 @@ public class AwsConstruct extends AbstractConstruct {
 //                        .build();
 
 
+        // Destroy-time cleanup: must run before lbRelease is uninstalled so the LBC
+        // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
+        Resource.Builder.create(this, "lbc-destroy-cleanup")
+                        .dependsOn(List.of(ingress, lbRelease))
+                        .provisioners(uponDestroyRun(
+                                "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer | xargs -r kubectl delete --ignore-not-found=true",
+                                "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer | xargs -r kubectl delete --ignore-not-found=true",
+                                "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
+                                "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true"))
+                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                        .build();
+
         // 2. Create the Alias A Record
         // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
         // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
