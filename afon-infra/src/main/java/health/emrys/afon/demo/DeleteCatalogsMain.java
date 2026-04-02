@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 
-import static health.emrys.afon.polaris.comms.PolarisConfigurer.getDeleteURI;
+import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
 
 public class DeleteCatalogsMain {
 
@@ -19,10 +19,15 @@ public class DeleteCatalogsMain {
         DeleteCatalogsMain app = new DeleteCatalogsMain();
         if (args.length == 0) {
             app.deleteAll();
-        } else {
-          for (String arg : args) {
-              app.delete(arg);
-          }
+        } else if  (args.length == 1) {
+            String uri = getDeleteURI(args[0]);
+            app.delete(uri);
+        } else if  (args.length == 2) {
+            String uri = getDeleteNamespaceURI(args[0], args[1]);
+            app.delete(uri);
+        } else if  (args.length == 3) {
+            String uri = getDeleteTableURI(args[0], args[1], args[2]);
+            app.delete(uri);
         }
     }
 
@@ -35,16 +40,17 @@ public class DeleteCatalogsMain {
     private void deleteAll() {
         for (SupportedCloudsEnum warehouse: SupportedCloudsEnum.values()) {
             String warehouseName = warehouse.toString();
-            delete(warehouseName);
+            String uri = getDeleteURI(warehouseName);
+            delete(uri);
         }
     }
 
-    private void delete(String warehouseName) {
-        logger.info(String.format("Deleting catalog %s", warehouseName));
+    private void delete(String uri) {
+        logger.info(String.format("Deleting catalog %s", uri));
         try {
-            client.delete(getDeleteURI(warehouseName), accessToken);
+            client.delete(uri, accessToken);
         } catch (IOException e) {
-            logger.error("Error while deleting catalog " + warehouseName, e);
+            logger.error("Error while deleting catalog " + uri, e);
         }
     }
 

@@ -14,6 +14,8 @@ import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
@@ -80,9 +82,26 @@ public class AfonPolarisClient {
             HttpDelete          delete  = new HttpDelete(endpoint + uri);
             addAccessTokenToHeaders(delete, accessToken);
             ClassicHttpResponse response = (ClassicHttpResponse) client.execute(delete);
-            logger.info(format("%s:%d", delete, response.getCode()));
+            String              content  = readContent(response);
+            logger.info("{}:{}:{}", delete, response.getCode(), content);
             return response;
         }
+    }
+
+    private static @NonNull String readContent(ClassicHttpResponse response) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ByteArrayInputStream  bais = null;
+        try {
+            if (response.getEntity() != null) {
+                response.getEntity().writeTo(baos);
+                bais = new ByteArrayInputStream(baos.toByteArray());
+                return new String(bais.readAllBytes());
+            }
+        }  finally {
+            if (bais != null) bais.close();
+            baos.close();
+        }
+        return "NO CONTENT";
     }
 
     public ClassicHttpResponse putJsonCall(String uri,
