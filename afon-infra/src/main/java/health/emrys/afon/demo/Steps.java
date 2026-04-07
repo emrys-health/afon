@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
@@ -109,6 +110,27 @@ public class Steps {
                           AZURE_EXTERNAL.toString(),
                           EXTERNAL_NAMESPACE);
     });
+
+    public static final Step PREPARE_TOFU = new Step("prepare_tofu", () -> {
+        deleteTerraformIn(".");
+        deleteTerraformIn("..");
+    });
+
+    private static void deleteTerraformIn(String directory) throws IOException {
+        Files.list(Path.of(directory)).filter(x -> x.getFileName().toString().startsWith("terraform.")).forEach(
+            x -> {
+                delete(x);
+            });
+    }
+
+    private static void delete(Path x) {
+        log.info("Deleting {}", x);
+        try {
+            Files.deleteIfExists(x);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     private static void checkResponses(List<HttpResponse> responses) {
         log.info("HTTP responses = {}", responses);
