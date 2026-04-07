@@ -123,7 +123,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
 
         Service sparkLB = sparkExternalService(List.of());
 
-        unregisterCRDs(List.of(calico, sparkLB));
+        unregisterCRDs(List.of(sparkLB));
     }
 
     @Override
@@ -244,20 +244,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
     }
 
     static void logAndThrow(RuntimeException e) {
-        logger.error(
-            String.format("""
-                It's possible that Kubernetes has not retained all the Polaris logs after they became too large
-                Check if this is the case and if so, get the token (it should look like XXX:YYY - note the colon)
-                and run this again with:
-                
-                    mvn compile exec:java -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy -D%s=XXX:YYY
-                
-                and I'll use that token rather than trying to get it from the cluster.
-                You can get this from either the compressed logs on the Polaris container or running or if
-                the connector is already up and running, use:
-                
-                    kubectl get sparkapplications spark-connector -o yaml
-                """, ACCESS_TOKEN_SYS_PROP), e);
+        logger.error(e.toString());
         throw new RuntimeException(e);
     }
 
