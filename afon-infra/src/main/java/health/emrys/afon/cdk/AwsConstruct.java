@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
@@ -11,6 +12,7 @@ import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterVpcConfig;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroup;
+import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroupLaunchTemplate;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroupScalingConfig;
 import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidConnectProvider;
 import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidConnectProviderConfig;
@@ -30,6 +32,9 @@ import com.hashicorp.cdktf.providers.aws.route_table_association.RouteTableAssoc
 import com.hashicorp.cdktf.providers.aws.secretsmanager_secret.SecretsmanagerSecret;
 import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderConfig;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
@@ -41,14 +46,12 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.AwsKubernetesPolaris.POLARIS_INTERNAL;
 import static health.emrys.afon.cdk.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
+import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
@@ -286,31 +289,76 @@ public class AwsConstruct extends AbstractConstruct {
                                                              ))
                                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                         .build();
+        EksNodeGroup nodeGroup = EksNodeGroup.Builder.create(this, "eksNodeGroup")
+                                                 .clusterName(cluster.getName())
+                                                 .nodeGroupName("default-ng")
+                                                 .subnetIds(subnetIds)
+                                                 .nodeRoleArn(nodeGroupRole.getArn())
+                                                 .instanceTypes(List.of("t3.medium"))
+                                                 .scalingConfig(scalingConfig)
+                                                 .dependsOn(List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2))
+                                                 .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                                                 .tags(Map.of("Name", "cdktf-eks-nodegroup")).build();
 
-        eksDependOn = List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2);
 
-        EksNodeGroup.Builder.create(this, "eksNodeGroup")
-                            .clusterName(cluster.getName())
-                            .nodeGroupName("default-ng")
-                            .subnetIds(subnetIds)
-                            .nodeRoleArn(nodeGroupRole.getArn())
-                            .instanceTypes(List.of("t3.medium"))
-                            .scalingConfig(scalingConfig)
-                            .dependsOn(eksDependOn)
-                            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                            .tags(Map.of("Name", "cdktf-eks-nodegroup")).build();
+        String clusterEndpoint = cluster.getEndpoint();
 
-        // 2. Define or update the EKS Addon (e.g., 'coredns')
-        EksAddon.Builder.create(this, "vpc-cni")
-                        .clusterName(CLUSTER_NAME)
-                        .region(AWS_REGION)
-                        .addonName("vpc-cni")
-                        .dependsOn(eksDependOn)
-                        // Setting resolveConflicts to OVERWRITE forces the update even if manual changes exist
-                        .resolveConflictsOnUpdate("OVERWRITE")
-                        .resolveConflictsOnCreate("OVERWRITE")
-                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                        .build();
+
+        String apiHost = Fn.replace(clusterEndpoint, "https://", "");
+        // 1. Initialize Helm Provider
+//        new HelmProvider(this, "helmcilium", HelmProviderConfig.builder().alias("helmcilium")
+//                                                               .kubernetes(HelmProviderKubernetes.builder()
+//                                                                                                 .configPath("~/.kube/config") // Path to your 3-node cluster config
+//                                                                                                 .build())
+//                                                               .build());
+
+        // 2. Deploy Cilium with Kube-Proxy Replacement
+        Release cilium = Release.Builder.create(this, "cilium")
+                                       .name("cilium")
+                                       .repository("https://helm.cilium.io/")
+                                       .chart("cilium")
+                                       .namespace("kube-system")
+                                        .dependsOn(List.of(nodeGroup))
+                                        .provisioners(uponCreateRun("kubectl delete ds aws-node -n kube-system  || echo no aws-node",
+                                                                    "kubectl delete ds kube-proxy -n kube-system || echo no kube-proxy",
+                                                                    format("aws eks delete-addon --cluster-name %s --addon-name vpc-cni || echo no vpc-cni", CLUSTER_NAME),
+                                                                    format("aws eks delete-addon --cluster-name %s --addon-name kube-proxy || echo no kube-proxy", CLUSTER_NAME)))
+                                       .version("1.15.0") // Use the latest stable version
+
+                                       // Set the specific values to kill kube-proxy dependency
+                                        .set(java.util.List.of(
+                                            // 1. Connectivity to EKS Control Plane
+                                            createValue("kubeProxyReplacement", "true"),
+                                            createValue("k8sServiceHost", apiHost),
+                                            createValue("k8sServicePort", "443"),
+
+                                            // 2. EKS-Specific Networking (ENI Mode)
+                                            createValue("eni.enabled", "true"),
+                                            createValue("ipam.mode", "eni"),
+                                            createValue("routingMode", "native"),
+                                            // BPF masquerade is required: kubeProxyReplacement uses bpf_redirect
+                                            // to forward pod egress directly to the ENI, bypassing iptables
+                                            // POSTROUTING — so iptables MASQUERADE never fires.
+                                            createValue("bpf.masquerade", "true"),
+                                            createValue("enableIPv4Masquerade", "true"),
+                                            createValue("ipv4NativeRoutingCIDR", vpc.getCidrBlock()),
+
+                                            // 3. Solving the "Pending" Issue (Tolerations)
+                                            // This allows Cilium to run even if the node is "NotReady"
+                                            createValue("tolerations[0].operator", "Exists"),
+                                            createValue("tolerations[0].effect", "NoSchedule"),
+
+                                            // Also apply to the operator so it can manage the pods
+                                            createValue("operator.tolerations[0].operator", "Exists"),
+                                            createValue("operator.tolerations[0].effect", "NoSchedule")
+                                                              ))
+                                       .build();
+
+        eksDependOn = List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2, cilium);
+
+        // vpc-cni addon removed: Cilium ENI mode is a complete replacement for vpc-cni.
+        // Keeping the EKS addon caused EKS to continuously overwrite Cilium's no-op patch
+        // to aws-node (resolveConflictsOnUpdate=OVERWRITE), breaking pod internet connectivity.
 
         String trustPolicy = """
                 ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::418295715997:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
@@ -342,10 +390,29 @@ public class AwsConstruct extends AbstractConstruct {
 //                        .build();
 
 
+        // Destroy-time cleanup: must run before lbRelease is uninstalled so the LBC
+        // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
+        Resource.Builder.create(this, "lbc-destroy-cleanup")
+                        .dependsOn(List.of(ingress, lbRelease))
+                        .provisioners(uponDestroyRun(
+                                "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer | xargs -r kubectl delete --ignore-not-found=true",
+                                "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer | xargs -r kubectl delete --ignore-not-found=true",
+                                "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
+                                "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true"))
+                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                        .build();
+
         // 2. Create the Alias A Record
         // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
         // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
         configureDNS("IngressAliasRecord", "Z06847223IC61YVGEH6HR", AWS_POLARIS_DOMAIN_NAME, lbRelease, ingress);
+    }
+
+    private static ReleaseSet createValue(String name, String value) {
+        return ReleaseSet.builder()
+                         .name(name)
+                         .value(value)
+                         .build();
     }
 
     /**
