@@ -1,6 +1,8 @@
 package health.emrys.afon.polaris.comms;
 
+import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -55,7 +57,33 @@ public class AfonPolarisClient {
         this.clientSecret = ***REMOVED***
     }
 
+    /**
+     * Odd. This con sometimes receive a HTTP 503 even though the Polaris server logs HTTP 200.
+     */
     public String getAccessToken() throws RuntimeException {
+        int attempt = 3;
+        IOException lastException = null;
+        while (attempt > 0) {
+            try {
+                return callAccessToken();
+            } catch (IOException e) {
+                lastException = e;
+                logger.error(e.toString());
+                if (attempt-- > 0) {
+                    try {
+                        int millis = 5000;
+                        logger.info("Sleeping {}ms before retry...",  millis);
+                        Thread.sleep(millis);
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            }
+        }
+        throw new RuntimeException(lastException);
+    }
+
+    public String callAccessToken() throws IOException {
         String uri = getTokenUri(endpoint);
         logger.info("Calling " + uri);
         HttpPost post = new HttpPost(uri);
@@ -63,14 +91,8 @@ public class AfonPolarisClient {
         post.setHeader("Polaris-Realm", "POLARIS");
         logger.info("client id = {}, secret = {}", clientId, clientSecret);
         String body = format("grant_type=client_credentials&client_id=%s&client_secret=***REMOVED***", clientId, clientSecret);
-        String content = "Can't read response content";
-        try {
-            ClassicHttpResponse response = makeCall(body, post);
-            content = response.getEntity().getContent().toString();
-            return parseAccessToken(response);
-        } catch (Exception e) {
-            throw new RuntimeException(content, e);
-        }
+        ClassicHttpResponse response = makeCall(body, post);
+        return parseAccessToken(response);
     }
 
     public String getEndpoint() {
@@ -126,7 +148,8 @@ public class AfonPolarisClient {
     }
 
     private static String parseAccessToken(ClassicHttpResponse response) throws IOException {
-        ObjectMapper        mapper                  = new ObjectMapper();
+        ObjectMapper        mapper                  = JsonMapper
+            .builder().enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION).build();
         Map<String, Object> tokenResponse           = mapper.readValue(response.getEntity().getContent(), Map.class);
         String              accessTokenFromResponse = (String) tokenResponse.get("access_token");
         return accessTokenFromResponse;
