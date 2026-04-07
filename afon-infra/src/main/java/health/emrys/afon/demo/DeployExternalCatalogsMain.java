@@ -20,6 +20,7 @@ public class DeployExternalCatalogsMain {
 
     private static final List<Step> steps
         = List.of(
+        PREPARE_TOFU,
         CLEAN_AWS,
         AWS_POLARIS,
         WAIT_FOR_AWS_POLARIS,
