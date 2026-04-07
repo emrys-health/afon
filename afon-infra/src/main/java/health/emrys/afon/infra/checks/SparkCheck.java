@@ -20,6 +20,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 public class SparkCheck {
 
+    public static final String TABLE = "test_table";
     private static final Logger logger = getLogger(SparkCheck.class);
 
     public static void main(String[] args) {
@@ -77,8 +78,7 @@ public class SparkCheck {
         StructType schema = new StructType(new StructField[]{
             new StructField("value", DataTypes.StringType, false, Metadata.empty())
         });
-        String table     = "test_table";
-        String fqn       = warehouse + "." + namespace + "." + table;
+        String fqn   = warehouse + "." + namespace + "." + TABLE;
         logger.info("Writing to: {}", fqn);
         Dataset<Row> df = spark.createDataFrame(rows, schema);
 
