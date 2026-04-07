@@ -47,6 +47,12 @@ public class AfonPolarisClient {
         this(properties, "http");
     }
 
+    public AfonPolarisClient(String httpsHost, Properties properties) {
+        this(format("https://%s", httpsHost),
+             POLARIS_ID.getValueFrom(properties),
+             POLARIS_SECRET.getValueFrom(properties));
+    }
+
     public AfonPolarisClient(Properties properties, String protocol) {
         this(format("%s://%s", protocol, POLARIS_ENDPOINT.getValueFrom(properties)),
              POLARIS_ID.getValueFrom(properties),

@@ -10,6 +10,7 @@ import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.LocalPolarisConfiguration;
 import health.emrys.afon.infra.checks.SparkCheck;
+import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.hc.core5.http.HttpResponse;
 import org.jspecify.annotations.NonNull;
@@ -27,10 +28,14 @@ import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
+import static health.emrys.afon.polaris.comms.PolarisConfigurer.getDeleteNamespaceURI;
+import static health.emrys.afon.polaris.comms.PolarisConfigurer.getDeleteTableURI;
 
 public class Steps {
 
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(Steps.class);
+
+    public static final String EXTERNAL_NAMESPACE = "namespaceph";
 
     public static final Step CLEAN_AWS   = new Step("clean_aws", () -> {
         deleteStack(AwsWholeStack.ID);
@@ -58,6 +63,13 @@ public class Steps {
     public static final Step AZ_POLARIS  = new Step("az_polaris", () -> {
         AzureKubernetesPolaris.main(new String[]{});
         startCloud(cdktfPath(AzureKubernetesPolaris.ID));
+    });
+
+    public static final Step AZ_POLARIS_CLEAN_FOREIGN_CATALOG = new Step("az_foreign_clean", () -> {
+        var client = new AfonPolarisClient(AZURE_DOMAIN_NAME, appProperties());
+        String accessToken = client.getAccessToken();
+        client.delete(getDeleteTableURI("azure", EXTERNAL_NAMESPACE, SparkCheck.TABLE), accessToken);
+        client.delete(getDeleteNamespaceURI("azure", EXTERNAL_NAMESPACE), accessToken);
     });
 
     public static final Step AZ_POLARIS_FOREIGN_CATALOG = new Step("az_foreign", () -> {
@@ -95,7 +107,7 @@ public class Steps {
                                                        POLARIS_SECRET.getValueFrom(properties),
                                                        AZURE_EXTERNAL.toString()),
                           AZURE_EXTERNAL.toString(),
-                          "namespaceph");
+                          EXTERNAL_NAMESPACE);
     });
 
     private static void checkResponses(List<HttpResponse> responses) {

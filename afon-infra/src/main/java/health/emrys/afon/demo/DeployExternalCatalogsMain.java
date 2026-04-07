@@ -29,6 +29,7 @@ public class DeployExternalCatalogsMain {
         AZ_POLARIS,
         WAIT_FOR_AZ_POLARIS,
         AWS_ALL_CATALOGS,
+        AZ_POLARIS_CLEAN_FOREIGN_CATALOG,
         AZ_POLARIS_FOREIGN_CATALOG,
         AZ_POLARIS_EXTERNAL_AWS,
         CHECK_AWS_TO_AZURE_EXTERNAL
