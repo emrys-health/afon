@@ -76,8 +76,12 @@ GOOGLE_APPLICATION_CREDENTIALS=
 
 # Get AZURE_CLIENT_ID with: az ad app list --display-name AfonMultiTenantApp --query "[].appId" -o tsv
 AZURE_CLIENT_ID=
+
+# DON'T RUN THIS COMMAND UNLESS YOU ARE HAPPY TO BLAT THE TESTS DUE TO RESET CREDENTIALS
 # this was output with: az ad app credential reset --id $AZURE_CLIENT_ID
+
 AZURE_TENANT_ID=
 AZURE_CLIENT_SECRET=
-***REMOVED***
-````
+
+# Get token with databricks tokens create --lifetime-seconds 31536000 --comment "YOUR COMMENT"
+DATABRICKS_TOKEN=
