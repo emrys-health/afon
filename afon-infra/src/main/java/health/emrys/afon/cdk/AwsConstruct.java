@@ -173,8 +173,6 @@ public class AwsConstruct extends AbstractConstruct {
 
         final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
 
-        // this appears to be necessary to release Calico on destroy:
-        // kubectl --kubeconfig ~/.kube/config  patch installation default -p '{"metadata":{"finalizers":[]}}' --type=merge
         cluster = EksCluster.Builder.create(this, "eksCluster")
                                     .name(CLUSTER_NAME)
                                     .roleArn(eksClusterRole.getArn())

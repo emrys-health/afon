@@ -17,6 +17,7 @@ import java.util.Properties;
 import static java.lang.String.format;
 
 /**
+ * Finds the Polaris endpoint from interrogating the Kubernetes cluster.
  * Configures the AWS Polaris instance so Spark can talk to it.
  * It basically registers the clouds storage locations.
  */

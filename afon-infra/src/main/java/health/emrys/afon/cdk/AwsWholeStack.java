@@ -224,7 +224,6 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         networkPolicies(jupyterLabels, sparkConnectorName);
     }
 
-
     private void networkPolicies(Map<String, String> labels, String sparkConnectorName) {
         // 5.1. Define a NetworkPolicy to control egress traffic for the Deployment
         List<NetworkPolicySpecEgressPorts> dnsPorts = List.of(
@@ -326,41 +325,6 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                                                            )
                                                     .build()
                                   ).build();
-    }
-
-    private Release calico(List<@NotNull ITerraformDependable> eksDependOn) {
-        /* This is still timing out after 10 minutes with:
-│ Error: Error uninstalling release
-│
-│ Unable to uninstall Helm release tigera-operator: uninstallation completed with 1 error(s): context deadline exceeded
-╵
-        running tofu destroy a second time works.
-         */
-        return Release.Builder.create(this, "calicoOperator")
-                              .name("tigera-operator")
-                              .dependsOn(eksDependOn)
-                              .chart("tigera-operator")
-                              .version("v3.28.0")
-                              .cleanupOnFail(true)
-                              .disableCrdHooks(true)
-                              .disableWebhooks(true)
-                              .forceUpdate(true)
-                              .recreatePods(false)
-                              .set(List.of(
-                                      ReleaseSet.builder().name("crds.install").value("true").build(),
-                                      ReleaseSet.builder().name("crds.cleanup").value("false").build()
-                                          ))
-                              .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS,
-                                                           "kubectl delete ns tigera-operator --force --grace-period=0"
-                                                          ))
-                              .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                              .repository("https://docs.tigera.io/calico/charts")
-                              .namespace("tigera-operator") // Standard namespace for the operator
-                              .createNamespace(true)
-                              .version("3.31.0") // Using a recent stable version
-                              .atomic(true)
-                              .timeout(600)
-                              .build();
     }
 
     private void csiSecretsDriver(List<@NotNull ITerraformDependable> eksDependOn) {

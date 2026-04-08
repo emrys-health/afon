@@ -8,7 +8,7 @@ import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.PrometheusClusterDeploy;
 import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.LocalPolarisConfiguration;
+import health.emrys.afon.infra.EndpointPolarisConfiguration;
 import health.emrys.afon.infra.checks.SparkCheck;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.apache.commons.io.file.PathUtils;
@@ -74,8 +74,8 @@ public class Steps {
     });
 
     public static final Step AZ_POLARIS_FOREIGN_CATALOG = new Step("az_foreign", () -> {
-        LocalPolarisConfiguration config     = new LocalPolarisConfiguration(AZURE_DOMAIN_NAME);
-        Properties                properties = appProperties();
+        EndpointPolarisConfiguration config     = new EndpointPolarisConfiguration(AZURE_DOMAIN_NAME);
+        Properties                   properties = appProperties();
         // swap the buckets
         properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(properties));
         checkResponses(config.initialize(AZURE, properties));
@@ -86,12 +86,12 @@ public class Steps {
     }
 
     public static final Step AZ_POLARIS_EXTERNAL_AWS = new Step("az_external_aws", () -> {
-        LocalPolarisConfiguration config     = new LocalPolarisConfiguration(AZURE_DOMAIN_NAME);
+        EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(AZURE_DOMAIN_NAME);
         checkResponses(config.initialize(AZURE_EXTERNAL));
     });
 
     public static final Step AWS_ALL_CATALOGS = new Step("aws_all_catalogs", () -> {
-        LocalPolarisConfiguration config     = new LocalPolarisConfiguration(AWS_POLARIS_DOMAIN_NAME);
+        EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(AWS_POLARIS_DOMAIN_NAME);
         checkResponses(config.initializePolaris());
     });
 
@@ -181,8 +181,15 @@ public class Steps {
 
     private static @NonNull Path deleteStack(SupportedCloudsEnum id) throws IOException {
         Path toDelete = cdktfPath(id);
-        log.info("Deleting {}", toDelete);
-        PathUtils.delete(toDelete);
+        if (toDelete.toFile().exists()) {
+            log.info("Stopping {} if it's running already...", toDelete);
+            run("tofu", toDelete, "destroy", "--auto-approve");
+
+            log.info("Deleting {}", toDelete);
+            PathUtils.delete(toDelete);
+        } else {
+            log.info("Directory {} does not exist so starting afresh", toDelete);
+        }
         return toDelete;
     }
 
