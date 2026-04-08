@@ -25,7 +25,7 @@ public class DeployExternalCatalogsMain {
         AWS_POLARIS,
         WAIT_FOR_AWS_POLARIS,
         AWS_SPARK,
-        AWS_PROMETHEUS,
+//        AWS_PROMETHEUS,
         CLEAN_AZ,
         AZ_POLARIS,
         WAIT_FOR_AZ_POLARIS,
