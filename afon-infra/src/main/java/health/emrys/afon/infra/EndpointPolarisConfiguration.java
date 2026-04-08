@@ -7,32 +7,33 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.*;
 
 /**
+ * Given an endpoint, this class proxies Polaris.
  * You can use this class to talk to instances that are not in the cluster with:
  * <pre>
- mvn -DPOLARIS_ENDPOINT=emryspolarisazure.click -Dexec.mainClass=health.emrys.afon.infra.LocalPolarisConfiguration exec:java -Dexec.args="AZURE_EXTERNAL POLARIS_ID:POLARIS_SECRET"
+ mvn -DPOLARIS_ENDPOINT=emryspolarisazure.click -Dexec.mainClass=health.emrys.afon.infra.EndpointPolarisConfiguration exec:java -Dexec.args="AZURE_EXTERNAL POLARIS_ID:POLARIS_SECRET"
  * </pre>
  * although you will need to point your K8s current environment at the cloud and run
  * PolarisCredentialGrabber to get the POLARIS_ID and POLARIS_SECRET.
  */
-public class LocalPolarisConfiguration extends AbstractPolarisConfiguration {
+public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration {
 
     public static void main(String[] args) throws Exception {
-        LocalPolarisConfiguration app = new LocalPolarisConfiguration();
+        EndpointPolarisConfiguration app = new EndpointPolarisConfiguration();
         parse(args, app);
     }
 
     private final String credentials;
 
-    LocalPolarisConfiguration() {
+    EndpointPolarisConfiguration() {
         this(new AfonPropertiesLoader().getProperties());
     }
 
-    public LocalPolarisConfiguration(String host) {
+    public EndpointPolarisConfiguration(String host) {
         this(new AfonPropertiesLoader().getProperties());
         properties.put(POLARIS_ENDPOINT.getPropertyName(), host);
     }
 
-    public LocalPolarisConfiguration(Properties properties) {
+    public EndpointPolarisConfiguration(Properties properties) {
         super(properties);
         credentials = POLARIS_ID.getValueFrom(properties) + ":" +  POLARIS_SECRET.getValueFrom(properties);
     }
