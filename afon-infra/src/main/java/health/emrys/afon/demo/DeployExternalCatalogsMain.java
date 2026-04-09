@@ -5,8 +5,6 @@ import org.slf4j.Logger;
 
 import java.util.List;
 
-import static health.emrys.afon.demo.Steps.*;
-
 /**
  * This sets the cloud environments up just as they were for the TDA demo of 23/3/26.
  * The main thing is:
@@ -20,19 +18,19 @@ public class DeployExternalCatalogsMain {
 
     private static final List<Step> steps(Steps steps) {
         return List.of(
-            steps.PREPARE_TOFU(),
-            steps.CLEAN_AWS(),
-            steps.AWS_POLARIS(),
-            steps.WAIT_FOR_AWS_POLARIS(),
-            steps.AWS_SPARK(),
-            steps.CLEAN_AZ(),
-            steps.AZ_POLARIS(),
-            steps.WAIT_FOR_AZ_POLARIS(),
-            steps.AWS_ALL_CATALOGS(),
-            steps.AZ_POLARIS_CLEAN_FOREIGN_CATALOG(),
-            steps.AZ_POLARIS_FOREIGN_CATALOG(),
-            steps.AZ_POLARIS_EXTERNAL_AWS(),
-            steps.CHECK_AWS_TO_AZURE_EXTERNAL()
+            steps.prepareTofu(),
+            steps.cleanLocalAws(),
+            steps.deployAwsPolaris(),
+            steps.waitForAwsPolaris(),
+            steps.deployAwsSpark(),
+            steps.cleanLocalAzure(),
+            steps.deployAzurePolaris(),
+            steps.waitForAzurePolaris(),
+            steps.initializeAllCatalogsInAws(),
+            steps.purgeForeignCatalogFromAzure(),
+            steps.createAzureCatalogInAzure(),
+            steps.createExternalAzureCatalogInAzure(),
+            steps.checkLocalSparkTalksToAzureViaAws()
                 );
     }
 
