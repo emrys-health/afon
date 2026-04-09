@@ -18,25 +18,26 @@ public class DeployExternalCatalogsMain {
 
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(DeployExternalCatalogsMain.class);
 
-    private static final List<Step> steps
-        = List.of(
-        PREPARE_TOFU,
-        CLEAN_AWS,
-        AWS_POLARIS,
-        WAIT_FOR_AWS_POLARIS,
-        AWS_SPARK,
-//        AWS_PROMETHEUS,
-        CLEAN_AZ,
-        AZ_POLARIS,
-        WAIT_FOR_AZ_POLARIS,
-        AWS_ALL_CATALOGS,
-        AZ_POLARIS_CLEAN_FOREIGN_CATALOG,
-        AZ_POLARIS_FOREIGN_CATALOG,
-        AZ_POLARIS_EXTERNAL_AWS,
-        CHECK_AWS_TO_AZURE_EXTERNAL
-                 );
+    private static final List<Step> steps(Steps steps) {
+        return List.of(
+            steps.PREPARE_TOFU(),
+            steps.CLEAN_AWS(),
+            steps.AWS_POLARIS(),
+            steps.WAIT_FOR_AWS_POLARIS(),
+            steps.AWS_SPARK(),
+            steps.CLEAN_AZ(),
+            steps.AZ_POLARIS(),
+            steps.WAIT_FOR_AZ_POLARIS(),
+            steps.AWS_ALL_CATALOGS(),
+            steps.AZ_POLARIS_CLEAN_FOREIGN_CATALOG(),
+            steps.AZ_POLARIS_FOREIGN_CATALOG(),
+            steps.AZ_POLARIS_EXTERNAL_AWS(),
+            steps.CHECK_AWS_TO_AZURE_EXTERNAL()
+                );
+    }
 
     public static void main(String[] args) {
+        List<Step> steps = steps(new Steps(new StepActions()));
         log.info("Steps:\n{}", humanReadable(steps));
         DeployExternalCatalogsMain app = new DeployExternalCatalogsMain();
         try {
