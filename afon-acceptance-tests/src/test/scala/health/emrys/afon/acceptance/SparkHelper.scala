@@ -8,9 +8,9 @@ import org.apache.spark.sql.SparkSession
 object SparkHelper {
   val namespace = "acceptancetests"
   val sparkWarehouse = new SparkWarehouseConfig(
-    instance.getAccessToken,
     instance.getClientId,
-    instance.getClientSecret);
+    instance.getClientSecret,
+    "localhost:8181");
   val sc: SparkContext = SparkContext.getOrCreate(sparkWarehouse.sparkConf())
   val spark: SparkSession = SparkSession
     .builder()

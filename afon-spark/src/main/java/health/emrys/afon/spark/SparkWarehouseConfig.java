@@ -23,19 +23,16 @@ public class SparkWarehouseConfig {
     private final String DEFAULT_CATALOG          = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
     private final String WAREHOUSE_PATH           = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
 
-    private final String accessToken;
     private final String clientId;
     private final String clientSecret;
     private final String host;
     private final String polarisProtocol;
 
     public SparkWarehouseConfig(
-            String accessToken,
             String clientId,
             String clientSecret,
             String host,
             String polarisProtocol) {
-        this.accessToken     = accessToken;
         this.clientId        = clientId;
         this.clientSecret    = ***REMOVED***
         this.host            = host;
@@ -43,22 +40,10 @@ public class SparkWarehouseConfig {
     }
 
     public SparkWarehouseConfig(
-            String accessToken,
             String clientId,
             String clientSecret,
             String host) {
-        this(accessToken, clientId, clientSecret, host, "http");
-    }
-
-    public SparkWarehouseConfig(
-            String accessToken,
-            String clientId,
-            String clientSecret) {
-        this(accessToken, clientId, clientSecret, "localhost:8181");
-    }
-
-    public String getAccessToken() {
-        return accessToken;
+        this(clientId, clientSecret, host, "http");
     }
 
     public SparkConf sparkConf() throws IOException {
@@ -103,10 +88,8 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.client_secret", sparkCatalog), clientSecret);
         conf.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
         conf.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
-        conf.put(format("spark.sql.catalog.%s.oauth2.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s.rest.auth.oauth2.scope", sparkCatalog), OAUTH_SCOPE);
         conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), OAUTH_SCOPE);
-        conf.put(format("spark.sql.catalog.%s.token", sparkCatalog), accessToken);
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
         conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol, host));
         conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), sparkCatalog); // this is the Polaris catalog name
