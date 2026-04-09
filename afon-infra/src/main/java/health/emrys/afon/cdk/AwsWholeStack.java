@@ -52,6 +52,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
     static final    Logger  logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
     static final    String  NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
     protected final List<Service> loadBalancers;
+    protected final SparkConfig   sparkOperatorConfig;
     private String DELETE_CRDS;
 
     public AwsWholeStack(final Construct scope, final SupportedCloudsEnum id) {
@@ -92,7 +93,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                               .build();
 
         cloudProvider.configureLoadBalancerDestroy(loadBalancers);
-        SparkConfig sparkConfig = new SparkConfig(this, "sparkop", dependables);
+        sparkOperatorConfig = new SparkConfig(this, "sparkop", dependables);
 
         unregisterCRDs();
     }

@@ -17,6 +17,8 @@ import java.util.List;
 
 public class SparkConfig extends Construct {
 
+    public final ClusterRoleBindingV1 operatorReady;
+
     public SparkConfig(@NotNull Construct scope,
                        @NotNull String id,
                        List<? extends ITerraformDependable> eksDependOn) {
@@ -50,7 +52,7 @@ public class SparkConfig extends Construct {
                         .build()))
                 .dependsOn(List.of(sparkOperatorRelease))
                 .build();
-        ClusterRoleBindingV1.Builder.create(this, "sparkOperatorLeasesBinding")
+        operatorReady = ClusterRoleBindingV1.Builder.create(this, "sparkOperatorLeasesBinding")
                 .metadata(ClusterRoleBindingV1Metadata.builder()
                         .name("spark-operator-leases")
                         .build())
