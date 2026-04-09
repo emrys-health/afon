@@ -6,10 +6,12 @@ interface ThrowableRunnable {
 
 public class Step {
     final String            name;
+    final String            description;
     final ThrowableRunnable function;
 
-    Step(String name, ThrowableRunnable function) {
-        this.name     = name;
-        this.function = function;
+    Step(String name, String description, ThrowableRunnable function) {
+        this.name        = name;
+        this.description = description;
+        this.function    = function;
     }
 }
