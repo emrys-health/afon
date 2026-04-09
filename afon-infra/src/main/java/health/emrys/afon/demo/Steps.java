@@ -31,6 +31,7 @@ import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
 import static health.emrys.afon.polaris.comms.PolarisConfigurer.getDeleteNamespaceURI;
 import static health.emrys.afon.polaris.comms.PolarisConfigurer.getDeleteTableURI;
+import static java.lang.String.format;
 
 public class Steps {
 
@@ -38,42 +39,60 @@ public class Steps {
 
     public static final String EXTERNAL_NAMESPACE = "namespaceph";
 
-    public static final Step CLEAN_AWS   = new Step("clean_aws", () -> {
+    public static final Step CLEAN_AWS   = new Step("clean_aws",
+                                                    "clean the local AWS directory",
+                                                    () -> {
         deleteStack(AwsWholeStack.ID);
     });
 
-    public static final Step AWS_POLARIS = new Step("aws_polaris", () -> {
+    public static final Step AWS_POLARIS = new Step("aws_polaris",
+                                                    "deploy Polaris in AWS",
+                                                    () -> {
         AwsWholeStack.main(new String[]{});
         startCloud(cdktfPath(AwsWholeStack.ID));
     });
 
-    public static final Step AWS_SPARK = new Step("aws_spark", () -> {
+    public static final Step AWS_SPARK = new Step("aws_spark",
+                                                  "deploy Spark in AWS",
+                                                  () -> {
         SparkClusterDeployment.main(new String[]{});
         startCloud(cdktfPath(SparkClusterDeployment.ID));
     });
 
-    public static final Step AWS_PROMETHEUS = new Step("aws_prometheus", () -> {
+    public static final Step AWS_PROMETHEUS = new Step("aws_prometheus",
+                                                       "deploy Prometheus in AWS",
+                                                       () -> {
         PrometheusClusterDeploy.main(new String[]{});
         startCloud(cdktfPath(PrometheusClusterDeploy.ID));
     });
 
-    public static final Step CLEAN_AZ    = new Step("clean_az", () -> {
+    public static final Step CLEAN_AZ    = new Step("clean_az",
+                                                    "clean the local Azure directory",
+                                                    () -> {
         deleteStack(AzureKubernetesPolaris.ID);
     });
 
-    public static final Step AZ_POLARIS  = new Step("az_polaris", () -> {
+    public static final Step AZ_POLARIS  = new Step("az_polaris",
+                                                    "deploy Polaris in Azure",
+                                                    () -> {
         AzureKubernetesPolaris.main(new String[]{});
         startCloud(cdktfPath(AzureKubernetesPolaris.ID));
     });
 
-    public static final Step AZ_POLARIS_CLEAN_FOREIGN_CATALOG = new Step("az_foreign_clean", () -> {
+    public static final Step AZ_POLARIS_CLEAN_FOREIGN_CATALOG
+        = new Step("az_foreign_clean",
+                   format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, AZURE_DOMAIN_NAME),
+                   () -> {
         var client = new AfonPolarisClient(AZURE_DOMAIN_NAME, appProperties());
         String accessToken = client.getAccessToken();
         client.delete(getDeleteTableURI("azure", EXTERNAL_NAMESPACE, SparkCheck.TABLE), accessToken);
         client.delete(getDeleteNamespaceURI("azure", EXTERNAL_NAMESPACE), accessToken);
     });
 
-    public static final Step AZ_POLARIS_FOREIGN_CATALOG = new Step("az_foreign", () -> {
+    public static final Step AZ_POLARIS_FOREIGN_CATALOG
+        = new Step("az_foreign",
+                   format("Create a catalog in the Polaris at %s", AZURE_DOMAIN_NAME),
+                   () -> {
         EndpointPolarisConfiguration config     = new EndpointPolarisConfiguration(AZURE_DOMAIN_NAME);
         Properties                   properties = appProperties();
         // swap the buckets
@@ -85,12 +104,17 @@ public class Steps {
         return new AfonPropertiesLoader().getProperties();
     }
 
-    public static final Step AZ_POLARIS_EXTERNAL_AWS = new Step("az_external_aws", () -> {
+    public static final Step AZ_POLARIS_EXTERNAL_AWS
+        = new Step("az_external_aws",
+                   format("configure a catalog called %s in the Polaris called %s", AZURE_EXTERNAL, AZURE_DOMAIN_NAME),
+                   () -> {
         EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(AZURE_DOMAIN_NAME);
         checkResponses(config.initialize(AZURE_EXTERNAL));
     });
 
-    public static final Step AWS_ALL_CATALOGS = new Step("aws_all_catalogs", () -> {
+    public static final Step AWS_ALL_CATALOGS = new Step("aws_all_catalogs",
+                                                         "configure all the the catalogs in Polaris at "+ AWS_POLARIS_DOMAIN_NAME,
+                                                         () -> {
         EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(AWS_POLARIS_DOMAIN_NAME);
         checkResponses(config.initializePolaris());
     });
@@ -99,7 +123,10 @@ public class Steps {
 
     public static final Step WAIT_FOR_AZ_POLARIS  = Steps.waitFor(AZURE_DOMAIN_NAME);
 
-    public static final Step CHECK_AWS_TO_AZURE_EXTERNAL = new Step("az_external_aws_check", () -> {
+    public static final Step CHECK_AWS_TO_AZURE_EXTERNAL =
+        new Step("az_external_aws_check",
+                 format("run Spark locally such that it talks to %s which defers to %s", AWS_POLARIS_DOMAIN_NAME, AZURE_DOMAIN_NAME),
+                 () -> {
         Properties properties = appProperties();
         properties.put(POLARIS_ENDPOINT.getPropertyName(), AZURE_DOMAIN_NAME);
         SparkCheck sparkCheck = new SparkCheck();
@@ -111,7 +138,9 @@ public class Steps {
                           EXTERNAL_NAMESPACE);
     });
 
-    public static final Step PREPARE_TOFU = new Step("prepare_tofu", () -> {
+    public static final Step PREPARE_TOFU = new Step("prepare_tofu",
+                                                     "delete old, local Tofu state files",
+                                                     () -> {
         deleteTerraformIn(".");
         deleteTerraformIn("..");
     });
@@ -149,7 +178,9 @@ public class Steps {
     }
 
     private static Step waitFor(String domain) {
-        return new Step("waitFor_" + domain.substring(0, domain.indexOf('.')), () -> {
+        return new Step("waitFor_" + domain.substring(0, domain.indexOf('.')),
+                        "wait for internet DNS servers to recognise " + domain,
+                        () -> {
             boolean stopResolving   = false;
             long    start           = System.currentTimeMillis();
             int     timeout         = 900_000;
