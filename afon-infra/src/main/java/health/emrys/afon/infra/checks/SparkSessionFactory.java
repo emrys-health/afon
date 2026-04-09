@@ -28,7 +28,6 @@ public class SparkSessionFactory {
     throws IOException {
         ClusterCredentials emrysCloud = PolarisClusterCredentials.createClusterCredentials(polarisCloud);
         return new SparkSessionFactory(
-            emrysCloud.getAccessToken(),
             emrysCloud.getPolarisId(),
             emrysCloud.getPolarisSecret(),
             emrysCloud.getPolarisHost(),
@@ -37,27 +36,24 @@ public class SparkSessionFactory {
         ).createSparkSession();
     }
 
-    private final String accessToken;
     private final String polarisId;
     private final String polarisSecret;
     private final String polarisHost;
     private final String protocol;
     private final String[] warehouseNames;
 
-    SparkSessionFactory(String accessToken, String polarisId, String polarisSecret, String polarisHost, String protocol, String[] warehouseNames) {
-        this.accessToken    = accessToken;
+    SparkSessionFactory(String polarisId, String polarisSecret, String polarisHost, String protocol, String[] warehouseNames) {
         this.polarisId      = polarisId;
         this.polarisSecret  = polarisSecret;
         this.polarisHost    = polarisHost;
         this.protocol       = protocol;
         this.warehouseNames = warehouseNames;
-        logger.info("polarisId = {}, polarisSecret = {}, polarisHost = {}, warehouseNames = {}, accessToken = {}",
-                    polarisId, polarisSecret, polarisHost, warehouseNames, accessToken);
+        logger.info("polarisId = {}, polarisSecret = {}, polarisHost = {}, warehouseNames = {}",
+                    polarisId, polarisSecret, polarisHost, warehouseNames);
     }
 
     public SparkSession createSparkSession() throws IOException {
         SparkWarehouseConfig sparkWarehouse = new SparkWarehouseConfig(
-            accessToken,
             polarisId,
             polarisSecret,
             polarisHost,

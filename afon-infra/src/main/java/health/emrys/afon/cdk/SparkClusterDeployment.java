@@ -9,6 +9,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.ClusterCredentials;
 import health.emrys.afon.infra.PolarisClusterCredentials;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
@@ -19,13 +20,12 @@ import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 import static health.emrys.afon.infra.Defaults.*;
 import static health.emrys.afon.infra.k8s.ClusterState.ACCESS_TOKEN_SYS_PROP;
 
@@ -220,12 +220,9 @@ public class SparkClusterDeployment extends AwsWholeStack {
     public static @NotNull Map<String, String> sparkCloudProperties(SupportedCloudsEnum id) throws IncorrectConfigException, IOException, ApiException {
         var toReturn = new HashMap<String, String>();
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        ClusterCredentials emrysCloud = PolarisClusterCredentials.createClusterCredentials(id);
+        Properties properties = new AfonPropertiesLoader().getProperties();
         SparkWarehouseConfig sparkWarehouseConfig = new SparkWarehouseConfig(
-                emrysCloud.getAccessToken(),
-                emrysCloud.getPolarisId(),
-                emrysCloud.getPolarisSecret(),
-                emrysCloud.getPolarisHost()
+            POLARIS_ID.getValueFrom(properties),  POLARIS_SECRET.getValueFrom(properties), "emryspolaris.click" // TODO don't hard code
         );
         for (SupportedCloudsEnum cloudProvider : SupportedCloudsEnum.values()) {
             Map<String, String> configs = sparkWarehouseConfig.sparkConfigs(cloudProvider);

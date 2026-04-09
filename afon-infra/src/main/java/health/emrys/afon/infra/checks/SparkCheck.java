@@ -54,7 +54,6 @@ public class SparkCheck {
         String            protocol = "https";
         AfonPolarisClient polaris  = new AfonPolarisClient(protocol + "://" + polarisHost, polarisId, polarisSecret);
         SparkSessionFactory factory = new SparkSessionFactory(
-            polaris.getAccessToken(),
             polarisId,
             polarisSecret,
             polarisHost,

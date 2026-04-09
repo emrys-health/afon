@@ -430,6 +430,7 @@ public class AwsConstruct extends AbstractConstruct {
                 .zoneId(r53ZoneId)
                 .name(domainName)
                 .type("A")
+                .allowOverwrite(true)
                 .dependsOn(List.of(release))
                 .alias(Route53RecordAlias.builder()
                                          .name(ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getHostname())
@@ -809,6 +810,8 @@ public class AwsConstruct extends AbstractConstruct {
                                           } done
                                           
                                           aws iam delete-policy --policy-arn arn:aws:iam::418295715997:policy/EKS-Secret-Access-Policy
+                                          
+                                          aws --region eu-west-2 secretsmanager  delete-secret --secret-id cdktf-app-config-secret --force-delete-without-recovery
                                           \u001B[0m
                                           """,
                                   getVPCsCommand(),

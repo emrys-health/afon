@@ -1,6 +1,7 @@
 package health.emrys.afon.core.configuration;
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.ClusterCredentials;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import org.jetbrains.annotations.NotNull;
@@ -8,7 +9,10 @@ import org.slf4j.Logger;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
 import static health.emrys.afon.infra.PolarisClusterCredentials.createClusterCredentials;
@@ -51,7 +55,6 @@ public class SparkContextConfigurationPrinter {
         polarisSecret = emrysCloud.getPolarisSecret();
         polarisHost   = emrysCloud.getPolarisHost();
         polarisConfig = new SparkWarehouseConfig(
-                emrysCloud.getAccessToken(),
                 polarisId,
                 polarisSecret,
                 polarisHost
@@ -141,6 +144,7 @@ public class SparkContextConfigurationPrinter {
     private String snowflakeSql(SupportedCloudsEnum cloud, String catalog_table) {
         String catalog = "iceberg_" + cloud.name();
         String table = format("my_%s_table", cloud.name());
+        Properties properties = new AfonPropertiesLoader().getProperties();
         return format("""
                           CREATE OR REPLACE CATALOG INTEGRATION %s
                             CATALOG_SOURCE = ICEBERG_REST
@@ -151,9 +155,11 @@ public class SparkContextConfigurationPrinter {
                               ACCESS_DELEGATION_MODE = VENDED_CREDENTIALS
                             )
                             REST_AUTHENTICATION = (
-                                  TYPE = BEARER
-                                  BEARER_TOKEN = '%s'
-                            )
+                                TYPE = OAUTH
+                                OAUTH_CLIENT_ID = '%s'
+                                OAUTH_CLIENT_SECRET = '%s'
+                                OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
+                              )
                             ENABLED = TRUE;
                           
                           USE DATABASE SNOWFLAKE_LEARNING_DB;
@@ -165,7 +171,8 @@ public class SparkContextConfigurationPrinter {
                                                            REPLACE_INVALID_CHARACTERS = TRUE;
                           
                           select * from %s;
-                          """, catalog, polarisHost, cloud, polarisConfig.getAccessToken(),
+                          """, catalog, polarisHost, cloud,
+                              POLARIS_ID.getValueFrom(properties),  POLARIS_SECRET.getValueFrom(properties),
                               table, catalog, catalog_table, table);
     }
 
