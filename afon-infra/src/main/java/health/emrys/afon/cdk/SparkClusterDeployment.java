@@ -1,8 +1,9 @@
 package health.emrys.afon.cdk;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
-import com.hashicorp.cdktf.providers.kubernetes.manifest.Manifest;
+import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
@@ -10,8 +11,6 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.ClusterCredentials;
-import health.emrys.afon.infra.PolarisClusterCredentials;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import io.kubernetes.client.openapi.ApiException;
@@ -23,11 +22,11 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 import static health.emrys.afon.infra.Defaults.*;
-import static health.emrys.afon.infra.k8s.ClusterState.ACCESS_TOKEN_SYS_PROP;
 
 public class SparkClusterDeployment extends AwsWholeStack {
 
@@ -37,7 +36,8 @@ public class SparkClusterDeployment extends AwsWholeStack {
     public SparkClusterDeployment(@NotNull Construct scope,
                                   @NotNull SupportedCloudsEnum id) {
         super(scope, id);
-        List<ITerraformDependable> eksDependOn = cloudProvider.getDependables();
+        List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
+        eksDependOn.add(sparkOperatorConfig.operatorReady);
 
         final Map<String, Object> sparkClusterManifest = Map.of(
                 "apiVersion", "spark.apache.org/v1alpha1",
@@ -104,24 +104,40 @@ public class SparkClusterDeployment extends AwsWholeStack {
                               )
                                                                );
 
-        Manifest.Builder.create(this, "sparkClusterManifest")
-                        .manifest(sparkClusterManifest)
-                        .provisioners(uponDestroyRun(
-                                "kubectl delete statefulset emrys-master --force --grace-period=0",
-                                "kubectl delete statefulset emrys-worker --force --grace-period=0",
-                                "kubectl patch sparkclusters emrys  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
-                                                    ))
-                        .dependsOn(eksDependOn)
-                        .build();
-        Manifest.Builder.create(this, "sparkConnectManifest")
-                        .manifest(sparkConnectManifest)
-                        .dependsOn(eksDependOn)
-                        .provisioners(uponDestroyRun(
-                                "kubectl patch sparkapplication spark-connector  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
-                                                    ))
-                        .build();
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            String sparkClusterJson    = mapper.writeValueAsString(sparkClusterManifest);
+            String sparkConnectJson    = mapper.writeValueAsString(sparkConnectManifest);
+            List<LocalExecProvisioner> clusterProvisionersCreate  = uponCreateRun("echo '" + sparkClusterJson + "' | kubectl apply -f -");
+            List<LocalExecProvisioner> clusterProvisionersDestroy = uponDestroyRun(
+                    "kubectl delete statefulset emrys-master --force --grace-period=0",
+                    "kubectl delete statefulset emrys-worker --force --grace-period=0",
+                    "kubectl patch sparkclusters emrys  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
+            );
+            List<LocalExecProvisioner> allClusterProvisioners = new java.util.ArrayList<>();
+            allClusterProvisioners.addAll(clusterProvisionersCreate);
+            allClusterProvisioners.addAll(clusterProvisionersDestroy);
+            Resource.Builder.create(this, "sparkClusterManifest")
+                            .provisioners(allClusterProvisioners)
+                            .dependsOn(eksDependOn)
+                            .build();
 
-        Service sparkLB = sparkExternalService(List.of());
+            List<LocalExecProvisioner> connectProvisionersCreate  = uponCreateRun("echo '" + sparkConnectJson + "' | kubectl apply -f -");
+            List<LocalExecProvisioner> connectProvisionersDestroy = uponDestroyRun(
+                    "kubectl patch sparkapplication spark-connector  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
+            );
+            List<LocalExecProvisioner> allConnectProvisioners = new java.util.ArrayList<>();
+            allConnectProvisioners.addAll(connectProvisionersCreate);
+            allConnectProvisioners.addAll(connectProvisionersDestroy);
+            Resource.Builder.create(this, "sparkConnectManifest")
+                            .provisioners(allConnectProvisioners)
+                            .dependsOn(eksDependOn)
+                            .build();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize manifest to JSON", e);
+        }
+
+        Service sparkLB = sparkExternalService(eksDependOn);
 
         unregisterCRDs(List.of(sparkLB));
     }
@@ -130,7 +146,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
     protected void unregisterCRDs() {
     }
 
-    private Service sparkExternalService(List<Resource> eksDependOn) {
+    private Service sparkExternalService(List<ITerraformDependable> eksDependOn) {
         String                          subnetIds      = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
         lbDependencies.add(cloudProvider.loadBalancerRole);
