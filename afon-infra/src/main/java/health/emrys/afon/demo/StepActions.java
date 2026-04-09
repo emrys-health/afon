@@ -3,6 +3,9 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
+import health.emrys.afon.cdk.AwsWholeStack;
+import health.emrys.afon.cdk.AzureKubernetesPolaris;
+import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -81,6 +84,21 @@ public class StepActions {
 
     public @NonNull Path cdktfPath(SupportedCloudsEnum id) {
         return Path.of("cdktf.out", "stacks", id.toString());
+    }
+
+    public void startAzurePolaris() throws ManagedProcessException {
+        AzureKubernetesPolaris.main(new String[]{});
+        startCloud(cdktfPath(AzureKubernetesPolaris.ID));
+    }
+
+    public void startSparkClusterInAws() throws ManagedProcessException {
+        SparkClusterDeployment.main(new String[]{});
+        startCloud(cdktfPath(SparkClusterDeployment.ID));
+    }
+
+    public void startAwsPolaris() throws ManagedProcessException {
+        AwsWholeStack.main(new String[]{});
+        startCloud(cdktfPath(AwsWholeStack.ID));
     }
 
     public void startCloud(Path jsonDirectory) throws ManagedProcessException {
