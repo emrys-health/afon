@@ -33,36 +33,19 @@ public class Steps {
     public Step cleanLocalAws() {
         return new Step("clean_aws",
                         "clean the local AWS directory",
-                        () -> {
-                            actions.deleteStack(AwsWholeStack.ID);
-                        });
+                        () -> actions.deleteStack(AwsWholeStack.ID));
     }
 
     public Step deployAwsPolaris() {
         return new Step("aws_polaris",
                         "deploy Polaris in AWS",
-                        () -> {
-                            AwsWholeStack.main(new String[]{});
-                            actions.startCloud(actions.cdktfPath(AwsWholeStack.ID));
-                        });
+                        () -> actions.startAwsPolaris());
     }
 
     public Step deployAwsSpark() {
         return new Step("aws_spark",
                         "deploy Spark in AWS",
-                        () -> {
-                            SparkClusterDeployment.main(new String[]{});
-                            actions.startCloud(actions.cdktfPath(SparkClusterDeployment.ID));
-                        });
-    }
-
-    public Step AWS_PROMETHEUS() {
-        return new Step("aws_prometheus",
-                 "deploy Prometheus in AWS",
-                 () -> {
-                     PrometheusClusterDeploy.main(new String[]{});
-                     actions.startCloud(actions.cdktfPath(PrometheusClusterDeploy.ID));
-                 });
+                        () -> actions.startSparkClusterInAws());
     }
 
     public Step cleanLocalAzure() {
@@ -76,10 +59,7 @@ public class Steps {
     public Step deployAzurePolaris() {
         return new Step("az_polaris",
                  "deploy Polaris in Azure",
-                 () -> {
-                     AzureKubernetesPolaris.main(new String[]{});
-                     actions.startCloud(actions.cdktfPath(AzureKubernetesPolaris.ID));
-                 });
+                 () -> actions.startAzurePolaris());
     }
 
     public Step purgeForeignCatalogFromAzure() {
