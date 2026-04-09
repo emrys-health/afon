@@ -16,8 +16,6 @@ import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
-import static health.emrys.afon.polaris.comms.PolarisConfigurer.getDeleteNamespaceURI;
-import static health.emrys.afon.polaris.comms.PolarisConfigurer.getDeleteTableURI;
 import static java.lang.String.format;
 
 public class Steps {
@@ -32,7 +30,7 @@ public class Steps {
         this.actions = actions;
     }
 
-    public Step CLEAN_AWS() {
+    public Step cleanLocalAws() {
         return new Step("clean_aws",
                         "clean the local AWS directory",
                         () -> {
@@ -40,7 +38,7 @@ public class Steps {
                         });
     }
 
-    public Step AWS_POLARIS() {
+    public Step deployAwsPolaris() {
         return new Step("aws_polaris",
                         "deploy Polaris in AWS",
                         () -> {
@@ -49,7 +47,7 @@ public class Steps {
                         });
     }
 
-    public Step AWS_SPARK() {
+    public Step deployAwsSpark() {
         return new Step("aws_spark",
                         "deploy Spark in AWS",
                         () -> {
@@ -67,7 +65,7 @@ public class Steps {
                  });
     }
 
-    public Step CLEAN_AZ() {
+    public Step cleanLocalAzure() {
         return new Step("clean_az",
                         "clean the local Azure directory",
                         () -> {
@@ -75,7 +73,7 @@ public class Steps {
                         });
     }
 
-    public Step AZ_POLARIS() {
+    public Step deployAzurePolaris() {
         return new Step("az_polaris",
                  "deploy Polaris in Azure",
                  () -> {
@@ -84,13 +82,13 @@ public class Steps {
                  });
     }
 
-    public Step AZ_POLARIS_CLEAN_FOREIGN_CATALOG() {
+    public Step purgeForeignCatalogFromAzure() {
         return new Step("az_foreign_clean",
                         format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, AZURE_DOMAIN_NAME),
                         () -> actions.clean(AZURE_DOMAIN_NAME, EXTERNAL_NAMESPACE, SparkCheck.TABLE));
     }
 
-    public Step AZ_POLARIS_FOREIGN_CATALOG() {
+    public Step createAzureCatalogInAzure() {
         return new Step("az_foreign",
                         format("Create a catalog in the Polaris at %s", AZURE_DOMAIN_NAME),
                         () -> {
@@ -101,32 +99,31 @@ public class Steps {
                         });
     }
 
-
     private static Properties appProperties() {
         return new AfonPropertiesLoader().getProperties();
     }
 
-    public Step AZ_POLARIS_EXTERNAL_AWS() {
+    public Step createExternalAzureCatalogInAzure() {
         return new Step("az_external_aws",
                         format("configure a catalog called %s in the Polaris called %s", AZURE_EXTERNAL, AZURE_DOMAIN_NAME),
                         () -> actions.createSingleCatalogsFor(AZURE_DOMAIN_NAME, AZURE_EXTERNAL));
     }
 
-    public Step AWS_ALL_CATALOGS() {
+    public Step initializeAllCatalogsInAws() {
         return new Step("aws_all_catalogs",
                  "configure all the the catalogs in Polaris at "+ AWS_POLARIS_DOMAIN_NAME,
                  () -> actions.createAllCatalogsFor(AWS_POLARIS_DOMAIN_NAME));
     }
 
-    public Step WAIT_FOR_AWS_POLARIS() {
+    public Step waitForAwsPolaris() {
         return actions.waitFor(AWS_POLARIS_DOMAIN_NAME);
     }
 
-    public Step WAIT_FOR_AZ_POLARIS() {
+    public Step waitForAzurePolaris() {
         return actions.waitFor(AZURE_DOMAIN_NAME);
     }
 
-    public Step CHECK_AWS_TO_AZURE_EXTERNAL() {
+    public Step checkLocalSparkTalksToAzureViaAws() {
         return new Step("az_external_aws_check",
                         format("run Spark locally such that it talks to %s which defers to %s", AWS_POLARIS_DOMAIN_NAME, AZURE_DOMAIN_NAME),
                         () -> {
@@ -142,7 +139,7 @@ public class Steps {
                         });
     }
 
-    public Step PREPARE_TOFU() {
+    public Step prepareTofu() {
         return new Step("prepare_tofu",
                  "delete old, local Tofu state files",
                  () -> {
@@ -157,4 +154,4 @@ public class Steps {
     private void useAzureKubernetes() throws ManagedProcessException {
         actions.run("kubectl", null, "config", "use-context", "spark-cluster");
     }
-}
+ }
