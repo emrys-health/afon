@@ -1,27 +1,14 @@
 package health.emrys.afon.demo;
 
-import ch.vorburger.exec.ManagedProcess;
-import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.PrometheusClusterDeploy;
 import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.EndpointPolarisConfiguration;
 import health.emrys.afon.infra.checks.SparkCheck;
-import health.emrys.afon.polaris.comms.AfonPolarisClient;
-import org.apache.commons.io.file.PathUtils;
-import org.apache.hc.core5.http.HttpResponse;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
@@ -39,217 +26,135 @@ public class Steps {
 
     public static final String EXTERNAL_NAMESPACE = "namespaceph";
 
-    public static final Step CLEAN_AWS   = new Step("clean_aws",
-                                                    "clean the local AWS directory",
-                                                    () -> {
-        deleteStack(AwsWholeStack.ID);
-    });
+    private final StepActions actions;
 
-    public static final Step AWS_POLARIS = new Step("aws_polaris",
-                                                    "deploy Polaris in AWS",
-                                                    () -> {
-        AwsWholeStack.main(new String[]{});
-        startCloud(cdktfPath(AwsWholeStack.ID));
-    });
+    public Steps(StepActions actions) {
+        this.actions = actions;
+    }
 
-    public static final Step AWS_SPARK = new Step("aws_spark",
-                                                  "deploy Spark in AWS",
-                                                  () -> {
-        SparkClusterDeployment.main(new String[]{});
-        startCloud(cdktfPath(SparkClusterDeployment.ID));
-    });
+    public Step CLEAN_AWS() {
+        return new Step("clean_aws",
+                        "clean the local AWS directory",
+                        () -> {
+                            actions.deleteStack(AwsWholeStack.ID);
+                        });
+    }
 
-    public static final Step AWS_PROMETHEUS = new Step("aws_prometheus",
-                                                       "deploy Prometheus in AWS",
-                                                       () -> {
-        PrometheusClusterDeploy.main(new String[]{});
-        startCloud(cdktfPath(PrometheusClusterDeploy.ID));
-    });
+    public Step AWS_POLARIS() {
+        return new Step("aws_polaris",
+                        "deploy Polaris in AWS",
+                        () -> {
+                            AwsWholeStack.main(new String[]{});
+                            actions.startCloud(actions.cdktfPath(AwsWholeStack.ID));
+                        });
+    }
 
-    public static final Step CLEAN_AZ    = new Step("clean_az",
-                                                    "clean the local Azure directory",
-                                                    () -> {
-        deleteStack(AzureKubernetesPolaris.ID);
-    });
+    public Step AWS_SPARK() {
+        return new Step("aws_spark",
+                        "deploy Spark in AWS",
+                        () -> {
+                            SparkClusterDeployment.main(new String[]{});
+                            actions.startCloud(actions.cdktfPath(SparkClusterDeployment.ID));
+                        });
+    }
 
-    public static final Step AZ_POLARIS  = new Step("az_polaris",
-                                                    "deploy Polaris in Azure",
-                                                    () -> {
-        AzureKubernetesPolaris.main(new String[]{});
-        startCloud(cdktfPath(AzureKubernetesPolaris.ID));
-    });
+    public Step AWS_PROMETHEUS() {
+        return new Step("aws_prometheus",
+                 "deploy Prometheus in AWS",
+                 () -> {
+                     PrometheusClusterDeploy.main(new String[]{});
+                     actions.startCloud(actions.cdktfPath(PrometheusClusterDeploy.ID));
+                 });
+    }
 
-    public static final Step AZ_POLARIS_CLEAN_FOREIGN_CATALOG
-        = new Step("az_foreign_clean",
-                   format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, AZURE_DOMAIN_NAME),
-                   () -> {
-        var client = new AfonPolarisClient(AZURE_DOMAIN_NAME, appProperties());
-        String accessToken = client.getAccessToken();
-        client.delete(getDeleteTableURI("azure", EXTERNAL_NAMESPACE, SparkCheck.TABLE), accessToken);
-        client.delete(getDeleteNamespaceURI("azure", EXTERNAL_NAMESPACE), accessToken);
-    });
+    public Step CLEAN_AZ() {
+        return new Step("clean_az",
+                        "clean the local Azure directory",
+                        () -> {
+                            actions.deleteStack(AzureKubernetesPolaris.ID);
+                        });
+    }
 
-    public static final Step AZ_POLARIS_FOREIGN_CATALOG
-        = new Step("az_foreign",
-                   format("Create a catalog in the Polaris at %s", AZURE_DOMAIN_NAME),
-                   () -> {
-        EndpointPolarisConfiguration config     = new EndpointPolarisConfiguration(AZURE_DOMAIN_NAME);
-        Properties                   properties = appProperties();
-        // swap the buckets
-        properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(properties));
-        checkResponses(config.initialize(AZURE, properties));
-    });
+    public Step AZ_POLARIS() {
+        return new Step("az_polaris",
+                 "deploy Polaris in Azure",
+                 () -> {
+                     AzureKubernetesPolaris.main(new String[]{});
+                     actions.startCloud(actions.cdktfPath(AzureKubernetesPolaris.ID));
+                 });
+    }
+
+    public Step AZ_POLARIS_CLEAN_FOREIGN_CATALOG() {
+        return new Step("az_foreign_clean",
+                        format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, AZURE_DOMAIN_NAME),
+                        () -> actions.clean(AZURE_DOMAIN_NAME, EXTERNAL_NAMESPACE, SparkCheck.TABLE));
+    }
+
+    public Step AZ_POLARIS_FOREIGN_CATALOG() {
+        return new Step("az_foreign",
+                        format("Create a catalog in the Polaris at %s", AZURE_DOMAIN_NAME),
+                        () -> {
+                            // swap the buckets
+                            Properties                   properties = appProperties();
+                            properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(properties));
+                            actions.createSingleCatalogsFor(AZURE_DOMAIN_NAME, AZURE, properties);
+                        });
+    }
+
 
     private static Properties appProperties() {
         return new AfonPropertiesLoader().getProperties();
     }
 
-    public static final Step AZ_POLARIS_EXTERNAL_AWS
-        = new Step("az_external_aws",
-                   format("configure a catalog called %s in the Polaris called %s", AZURE_EXTERNAL, AZURE_DOMAIN_NAME),
-                   () -> {
-        EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(AZURE_DOMAIN_NAME);
-        checkResponses(config.initialize(AZURE_EXTERNAL));
-    });
-
-    public static final Step AWS_ALL_CATALOGS = new Step("aws_all_catalogs",
-                                                         "configure all the the catalogs in Polaris at "+ AWS_POLARIS_DOMAIN_NAME,
-                                                         () -> {
-        EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(AWS_POLARIS_DOMAIN_NAME);
-        checkResponses(config.initializePolaris());
-    });
-
-    public static final Step WAIT_FOR_AWS_POLARIS = Steps.waitFor(AWS_POLARIS_DOMAIN_NAME);
-
-    public static final Step WAIT_FOR_AZ_POLARIS  = Steps.waitFor(AZURE_DOMAIN_NAME);
-
-    public static final Step CHECK_AWS_TO_AZURE_EXTERNAL =
-        new Step("az_external_aws_check",
-                 format("run Spark locally such that it talks to %s which defers to %s", AWS_POLARIS_DOMAIN_NAME, AZURE_DOMAIN_NAME),
-                 () -> {
-        Properties properties = appProperties();
-        properties.put(POLARIS_ENDPOINT.getPropertyName(), AZURE_DOMAIN_NAME);
-        SparkCheck sparkCheck = new SparkCheck();
-        sparkCheck.talkTo(sparkCheck.sparkSessionUsing(AWS_POLARIS_DOMAIN_NAME,
-                                                       POLARIS_ID.getValueFrom(properties),
-                                                       POLARIS_SECRET.getValueFrom(properties),
-                                                       AZURE_EXTERNAL.toString()),
-                          AZURE_EXTERNAL.toString(),
-                          EXTERNAL_NAMESPACE);
-    });
-
-    public static final Step PREPARE_TOFU = new Step("prepare_tofu",
-                                                     "delete old, local Tofu state files",
-                                                     () -> {
-        deleteTerraformIn(".");
-        deleteTerraformIn("..");
-    });
-
-    private static void deleteTerraformIn(String directory) throws IOException {
-        Files.list(Path.of(directory)).filter(x -> x.getFileName().toString().startsWith("terraform.")).forEach(
-            x -> {
-                delete(x);
-            });
+    public Step AZ_POLARIS_EXTERNAL_AWS() {
+        return new Step("az_external_aws",
+                        format("configure a catalog called %s in the Polaris called %s", AZURE_EXTERNAL, AZURE_DOMAIN_NAME),
+                        () -> actions.createSingleCatalogsFor(AZURE_DOMAIN_NAME, AZURE_EXTERNAL));
     }
 
-    private static void delete(Path x) {
-        log.info("Deleting {}", x);
-        try {
-            Files.deleteIfExists(x);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public Step AWS_ALL_CATALOGS() {
+        return new Step("aws_all_catalogs",
+                 "configure all the the catalogs in Polaris at "+ AWS_POLARIS_DOMAIN_NAME,
+                 () -> actions.createAllCatalogsFor(AWS_POLARIS_DOMAIN_NAME));
     }
 
-    private static void checkResponses(List<HttpResponse> responses) {
-        log.info("HTTP responses = {}", responses);
-        if (responses != null && !responses.isEmpty()) {
-            List<HttpResponse> badResponses = responses.stream().filter(x -> x.getCode() / 100 != 2).toList();
-            if (!badResponses.isEmpty()) {
-                throw new RuntimeException(badResponses.toString());
-            }
-        }
-    }
-    private static void useAwsKubernetes() throws ManagedProcessException {
-        run("kubectl", null, "config", "use-context", "arn:aws:eks:eu-west-2:123456789012:cluster/spark-cluster");
-    }
-    private static void useAzureKubernetes() throws ManagedProcessException {
-        run("kubectl", null, "config", "use-context", "spark-cluster");
+    public Step WAIT_FOR_AWS_POLARIS() {
+        return actions.waitFor(AWS_POLARIS_DOMAIN_NAME);
     }
 
-    private static Step waitFor(String domain) {
-        return new Step("waitFor_" + domain.substring(0, domain.indexOf('.')),
-                        "wait for internet DNS servers to recognise " + domain,
+    public Step WAIT_FOR_AZ_POLARIS() {
+        return actions.waitFor(AZURE_DOMAIN_NAME);
+    }
+
+    public Step CHECK_AWS_TO_AZURE_EXTERNAL() {
+        return new Step("az_external_aws_check",
+                        format("run Spark locally such that it talks to %s which defers to %s", AWS_POLARIS_DOMAIN_NAME, AZURE_DOMAIN_NAME),
                         () -> {
-            boolean stopResolving   = false;
-            long    start           = System.currentTimeMillis();
-            int     timeout         = 900_000;
-            log.info("Checking DNS for {}", domain);
-            while (!stopResolving && System.currentTimeMillis() - start < timeout) {
-                try {
-                    InetAddress[] addresses = InetAddress.getAllByName(domain);
-                    stopResolving = addresses != null && addresses.length > 0;
-                    if (!stopResolving) {
-                        stopResolving = isWaitingInterrupted(timeout);
-                    }
-                } catch (UnknownHostException e) {
-                    stopResolving = isWaitingInterrupted(timeout);
-                }
-            }
-        });
+                            Properties properties = appProperties();
+                            properties.put(POLARIS_ENDPOINT.getPropertyName(), AZURE_DOMAIN_NAME);
+                            SparkCheck sparkCheck = new SparkCheck();
+                            sparkCheck.talkTo(sparkCheck.sparkSessionUsing(AWS_POLARIS_DOMAIN_NAME,
+                                                                           POLARIS_ID.getValueFrom(properties),
+                                                                           POLARIS_SECRET.getValueFrom(properties),
+                                                                           AZURE_EXTERNAL.toString()),
+                                              AZURE_EXTERNAL.toString(),
+                                              EXTERNAL_NAMESPACE);
+                        });
     }
 
-    private static boolean isWaitingInterrupted(int timeout) {
-        int pause = 5000;
-        log.info("Waiting {}s. Maximum = {}s", pause/1000, timeout /1000);
-        try {
-            Thread.sleep(pause);
-        } catch (InterruptedException e) {
-            return true;
-        }
-        return false;
+    public Step PREPARE_TOFU() {
+        return new Step("prepare_tofu",
+                 "delete old, local Tofu state files",
+                 () -> {
+                     actions.deleteTerraformIn(".");
+                     actions.deleteTerraformIn("..");
+                 });
     }
 
-    private static @NonNull Path deleteStack(SupportedCloudsEnum id) throws IOException {
-        Path toDelete = cdktfPath(id);
-        if (toDelete.toFile().exists()) {
-            log.info("Stopping {} if it's running already...", toDelete);
-            run("tofu", toDelete, "destroy", "--auto-approve");
-
-            log.info("Deleting {}", toDelete);
-            PathUtils.delete(toDelete);
-        } else {
-            log.info("Directory {} does not exist so starting afresh", toDelete);
-        }
-        return toDelete;
+    private void useAwsKubernetes() throws ManagedProcessException {
+        actions.run("kubectl", null, "config", "use-context", "arn:aws:eks:eu-west-2:123456789012:cluster/spark-cluster");
     }
-
-    private static @NonNull Path cdktfPath(SupportedCloudsEnum id) {
-        return Path.of("cdktf.out", "stacks", id.toString());
+    private void useAzureKubernetes() throws ManagedProcessException {
+        actions.run("kubectl", null, "config", "use-context", "spark-cluster");
     }
-
-    private static void startCloud(Path jsonDirectory) throws ManagedProcessException {
-        run("tofu", jsonDirectory, "init");
-        run("tofu", jsonDirectory, "apply", "--auto-approve");
-    }
-
-    private static void run(String command, Path path, String... commands) throws ManagedProcessException {
-        ManagedProcessBuilder pb = new ManagedProcessBuilder(command);
-        for (String cmd : commands) {
-            pb.addArgument(cmd);
-        }
-        if (path != null) {
-            pb.setWorkingDirectory(path.toFile());
-        }
-        pb.setDestroyOnShutdown(true)
-          .addStdOut(System.out)
-          .addStdErr(System.err)
-          .setConsoleBufferMaxLines(7000);
-        ManagedProcess p = pb.build();
-        p.start();
-        p.isAlive();
-        p.waitForExit();
-        log.info("Command {} finished with value {}", command, p.exitValue());
-    }
-
 }
