@@ -112,6 +112,13 @@ So, run `tofu apply -auto-approve` again.
 *Why is this a two step process?*
 Spark needs to Polaris to be up and running before we can configure it since Polaris generates keys at runtime.
 
+### Deploying the demo
+
+To deploy the environment (as of the demo to the advising team, 23/3/26) then run this:
+
+`mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain exec:exec`
+
+
 ### Important
 
 Some of the services take a few minutes to become live.
