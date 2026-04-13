@@ -107,7 +107,7 @@ public class StepActions {
 
     public void executeMainOf(Class clazz, String[] args) throws Exception {
         Method main = clazz.getDeclaredMethod("main", String[].class);
-        main.invoke(null, args);
+        main.invoke(null, (Object)args);
     }
 
     private void generateTerraformFor(Class<?> clazz) throws ManagedProcessException {

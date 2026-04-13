@@ -7,12 +7,12 @@ import java.util.List;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-public class DeployFullStackAws implements DocumentMetadata {
+public class DocumentFullStackAws implements DocumentMetadata {
 
-    private static final Logger log = getLogger(DeployFullStackAws.class);
+    private static final Logger log = getLogger(DocumentFullStackAws.class);
 
     public static void main(String[] args) throws IOException {
-        new Documenter(new DeployFullStackAws()).writeDocumentation();
+        new Documenter(new DocumentFullStackAws()).writeDocumentation();
     }
 
     @Override
