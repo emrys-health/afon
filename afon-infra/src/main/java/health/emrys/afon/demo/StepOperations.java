@@ -16,15 +16,15 @@ import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
 import static java.lang.String.format;
 
-public class Steps {
+public class StepOperations {
 
-    private static final Logger log = org.slf4j.LoggerFactory.getLogger(Steps.class);
+    private static final Logger log = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
 
     public static final String EXTERNAL_NAMESPACE = "namespaceph";
 
     private final StepActions actions;
 
-    public Steps(StepActions actions) {
+    public StepOperations(StepActions actions) {
         this.actions = actions;
     }
 
