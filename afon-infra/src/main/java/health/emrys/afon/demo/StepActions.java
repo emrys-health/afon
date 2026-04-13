@@ -78,7 +78,7 @@ public class StepActions {
             run("tofu", toDelete, "destroy", "--auto-approve");
 
             log.info("Deleting {}", toDelete);
-            PathUtils.delete(toDelete);
+            delete(toDelete);
         } else {
             log.info("Directory {} does not exist so starting afresh", toDelete);
         }
@@ -206,7 +206,7 @@ public class StepActions {
     public void delete(Path x) {
         log.info("Deleting {}", x);
         try {
-            Files.deleteIfExists(x);
+            PathUtils.delete(x);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
