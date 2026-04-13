@@ -3,8 +3,6 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
-import health.emrys.afon.cdk.PrometheusClusterDeploy;
-import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.checks.SparkCheck;
 import org.slf4j.Logger;
@@ -65,7 +63,7 @@ public class Steps {
     public Step purgeForeignCatalogFromAzure() {
         return new Step("az_foreign_clean",
                         format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, AZURE_DOMAIN_NAME),
-                        () -> actions.clean(AZURE_DOMAIN_NAME, EXTERNAL_NAMESPACE, SparkCheck.TABLE));
+                        () -> actions.clean(AZURE_DOMAIN_NAME, AZURE, EXTERNAL_NAMESPACE, SparkCheck.TABLE));
     }
 
     public Step createAzureCatalogInAzure() {

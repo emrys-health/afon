@@ -108,6 +108,7 @@ public class AfonPolarisClient {
     }
 
     public ClassicHttpResponse delete(String uri, String accessToken) throws IOException {
+        logger.info("Deleting with uri {}", uri);
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpDelete          delete  = new HttpDelete(endpoint + uri);
             addAccessTokenToHeaders(delete, accessToken);

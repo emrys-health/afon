@@ -12,6 +12,10 @@ public class PolarisConfigurer {
 
     private final AfonPolarisClient client;
 
+    public static String listTables(String warehouseName, String namespace) {
+        return format("/api/catalog/v1/%s/namespaces/%s/tables/", warehouseName, namespace);
+    }
+
     public static String getCatalogRolesURI(String warehouseName) {
         return format("/api/management/v1/principal-roles/service_admin/catalog-roles/%s", warehouseName);
     }
