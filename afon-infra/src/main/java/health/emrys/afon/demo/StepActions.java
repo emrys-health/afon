@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.demo.Steps.EXTERNAL_NAMESPACE;
+import static health.emrys.afon.demo.StepOperations.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
 

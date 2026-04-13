@@ -20,7 +20,7 @@ public class StepRunner {
     }
 
     void runSteps(List<Step> steps) {
-        log.info("Steps:\n{}", humanReadable(steps));
+        log.info("StepOperations:\n{}", humanReadable(steps));
         try {
             for (Step step : steps) {
                 log.info("Running step {}", step.name);

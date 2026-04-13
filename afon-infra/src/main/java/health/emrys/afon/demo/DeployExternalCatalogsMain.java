@@ -1,6 +1,5 @@
 package health.emrys.afon.demo;
 
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -17,24 +16,24 @@ public class DeployExternalCatalogsMain {
 
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(DeployExternalCatalogsMain.class);
 
-    private static final List<Step> steps(Steps steps) {
+    private static final List<Step> steps(StepOperations stepOperations) {
         List<Step> stackSteps = new ArrayList<>();
-        stackSteps.add(steps.prepareTofu());
-        stackSteps.addAll(DeployAwsFulltStackMain.steps(steps));
+        stackSteps.add(stepOperations.prepareTofu());
+        stackSteps.addAll(DeployAwsFulltStackMain.steps(stepOperations));
         stackSteps.addAll(List.of(
-            steps.cleanLocalAzure(),
-            steps.deployAzurePolaris(),
-            steps.waitForAzurePolaris(),
-            steps.purgeForeignCatalogFromAzure(),
-            steps.createAzureCatalogInAzure(),
-            steps.createExternalAzureCatalogInAzure(),
-            steps.checkLocalSparkTalksToAzureViaAws()
+            stepOperations.cleanLocalAzure(),
+            stepOperations.deployAzurePolaris(),
+            stepOperations.waitForAzurePolaris(),
+            stepOperations.purgeForeignCatalogFromAzure(),
+            stepOperations.createAzureCatalogInAzure(),
+            stepOperations.createExternalAzureCatalogInAzure(),
+            stepOperations.checkLocalSparkTalksToAzureViaAws()
                 ));
         return stackSteps;
     }
 
     public static void main(String[] args) {
-        List<Step> steps = steps(new Steps(new StepActions()));
+        List<Step> steps = steps(new StepOperations(new StepActions()));
         StepRunner app = new StepRunner();
         if (args.length == 0) {
             app.runSteps(steps);
