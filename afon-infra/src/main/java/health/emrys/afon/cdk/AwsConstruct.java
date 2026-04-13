@@ -390,13 +390,16 @@ public class AwsConstruct extends AbstractConstruct {
 
         // Destroy-time cleanup: must run before lbRelease is uninstalled so the LBC
         // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
+        // The explicit helm uninstall --no-hooks pre-empts Terraform's own Helm destroy,
+        // which fails when webhooks/finalizers interfere. Helm treats "release not found" as success.
         Resource.Builder.create(this, "lbc-destroy-cleanup")
                         .dependsOn(List.of(ingress, lbRelease))
                         .provisioners(uponDestroyRun(
                                 "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer | xargs -r kubectl delete --ignore-not-found=true",
                                 "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer | xargs -r kubectl delete --ignore-not-found=true",
                                 "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
-                                "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true"))
+                                "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true",
+                                "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null || true"))
                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                         .build();
 
@@ -678,10 +681,20 @@ public class AwsConstruct extends AbstractConstruct {
     private static @NotNull String cleanELBs() {
         return format("""
                               %s
-                              for LB in $(aws elbv2 describe-load-balancers  --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text) ; do {
-                                 echo $LB
-                                 aws elbv2 delete-load-balancer  --load-balancer-arn $LB
-                               } done
+                              for LB in $(aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text) ; do
+                                echo "Deleting LB $LB"
+                                aws elbv2 delete-load-balancer --load-balancer-arn $LB
+                              done
+                              for ENI in $(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC" --query "NetworkInterfaces[?RequesterManaged==\\`false\\`].NetworkInterfaceId" --output text) ; do
+                                ATTACHMENT=$(aws ec2 describe-network-interfaces --network-interface-ids $ENI --query "NetworkInterfaces[0].Attachment.AttachmentId" --output text 2>/dev/null)
+                                if [ -n "$ATTACHMENT" ] && [ "$ATTACHMENT" != "None" ] && [ "$ATTACHMENT" != "null" ]; then
+                                  echo "Force-detaching $ENI (attachment $ATTACHMENT)"
+                                  aws ec2 detach-network-interface --attachment-id $ATTACHMENT --force 2>/dev/null || true
+                                  aws ec2 wait network-interface-available --network-interface-ids $ENI 2>/dev/null || true
+                                fi
+                                echo "Deleting ENI $ENI"
+                                aws ec2 delete-network-interface --network-interface-id $ENI 2>/dev/null || true
+                              done
                               """,
                       getVPCCommand());
     }
