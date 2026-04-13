@@ -3,6 +3,7 @@ package health.emrys.afon.demo;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -17,54 +18,30 @@ public class DeployExternalCatalogsMain {
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(DeployExternalCatalogsMain.class);
 
     private static final List<Step> steps(Steps steps) {
-        return List.of(
-            steps.prepareTofu(),
-            steps.cleanLocalAws(),
-            steps.deployAwsPolaris(),
-            steps.waitForAwsPolaris(),
-            steps.deployAwsSpark(),
+        List<Step> stackSteps = new ArrayList<>();
+        stackSteps.add(steps.prepareTofu());
+        stackSteps.addAll(DeployAwsFulltStackMain.steps(steps));
+        stackSteps.addAll(List.of(
             steps.cleanLocalAzure(),
             steps.deployAzurePolaris(),
             steps.waitForAzurePolaris(),
-            steps.initializeAllCatalogsInAws(),
             steps.purgeForeignCatalogFromAzure(),
             steps.createAzureCatalogInAzure(),
             steps.createExternalAzureCatalogInAzure(),
             steps.checkLocalSparkTalksToAzureViaAws()
-                );
+                ));
+        return stackSteps;
     }
 
     public static void main(String[] args) {
         List<Step> steps = steps(new Steps(new StepActions()));
-        log.info("Steps:\n{}", humanReadable(steps));
-        DeployExternalCatalogsMain app = new DeployExternalCatalogsMain();
-        try {
-            if (args.length == 0) {
-                app.runSteps(steps);
-            } else {
-                String step  = args[0];
-                int    index = steps.stream().map(s -> s.name).toList().lastIndexOf(step);
-                if (index == -1) {
-                    log.error("Step {} not found", step);
-                } else {
-                    app.runSteps(steps.subList(index, steps.size()));
-                }
-            }
-        } catch (Exception e) {
-            log.error("FAILED: " + e.getMessage(), e);
+        StepRunner app = new StepRunner();
+        if (args.length == 0) {
+            app.runSteps(steps);
+        } else {
+            String firstStep  = args[0];
+            app.runFrom(steps, firstStep);
         }
-    }
-
-    private void runSteps(List<Step> steps) throws Exception {
-        for (Step step : steps) {
-            log.info("Running step {}", step.name);
-            step.function.run();
-        }
-        log.info("Successfully ran steps\n{}", humanReadable(steps));
-    }
-
-    private static @NonNull String humanReadable(List<Step> steps) {
-        return String.join("\n", steps.stream().map(x -> x.name).toList());
     }
 
 }

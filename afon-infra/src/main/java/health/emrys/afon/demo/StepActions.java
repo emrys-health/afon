@@ -6,11 +6,14 @@ import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.SparkClusterDeployment;
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.EndpointPolarisConfiguration;
-import health.emrys.afon.infra.checks.SparkCheck;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.apache.commons.io.file.PathUtils;
@@ -26,10 +29,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
-import static health.emrys.afon.polaris.comms.PolarisConfigurer.getDeleteNamespaceURI;
-import static health.emrys.afon.polaris.comms.PolarisConfigurer.getDeleteTableURI;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
+import static health.emrys.afon.demo.Steps.EXTERNAL_NAMESPACE;
+import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
+import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
 
 public class StepActions {
 
@@ -39,9 +42,9 @@ public class StepActions {
         return new Step("waitFor_" + domain.substring(0, domain.indexOf('.')),
                         "wait for internet DNS servers to recognise " + domain,
                         () -> {
-                            boolean stopResolving   = false;
-                            long    start           = System.currentTimeMillis();
-                            int     timeout         = 900_000;
+                            boolean stopResolving = false;
+                            long    start         = System.currentTimeMillis();
+                            int     timeout       = 900_000;
                             log.info("Checking DNS for {}", domain);
                             while (!stopResolving && System.currentTimeMillis() - start < timeout) {
                                 try {
@@ -59,7 +62,7 @@ public class StepActions {
 
     private boolean isWaitingInterrupted(int timeout) {
         int pause = 5000;
-        log.info("Waiting {}s. Maximum = {}s", pause/1000, timeout /1000);
+        log.info("Waiting {}s. Maximum = {}s", pause / 1000, timeout / 1000);
         try {
             Thread.sleep(pause);
         } catch (InterruptedException e) {
@@ -87,18 +90,37 @@ public class StepActions {
     }
 
     public void startAzurePolaris() throws ManagedProcessException {
-        AzureKubernetesPolaris.main(new String[]{});
+        try {
+            generateTerraformFor(AzureKubernetesPolaris.class);
+        } catch (ManagedProcessException e) {
+            log.info("Maven failed. Will try calling class in this process");
+            AzureKubernetesPolaris.main(new String[]{});
+        }
         startCloud(cdktfPath(AzureKubernetesPolaris.ID));
     }
 
     public void startSparkClusterInAws() throws ManagedProcessException {
-        SparkClusterDeployment.main(new String[]{});
+        try {
+            generateTerraformFor(SparkClusterDeployment.class);
+        } catch (ManagedProcessException e) {
+            log.info("Maven failed. Will try calling class in this process");
+            SparkClusterDeployment.main(new String[]{});
+        }
         startCloud(cdktfPath(SparkClusterDeployment.ID));
     }
 
     public void startAwsPolaris() throws ManagedProcessException {
-        AwsWholeStack.main(new String[]{});
+        try {
+            generateTerraformFor(AwsWholeStack.class);
+        } catch (ManagedProcessException e) {
+            log.info("Maven failed. Will try calling class in this process");
+            AwsWholeStack.main(new String[]{});
+        }
         startCloud(cdktfPath(AwsWholeStack.ID));
+    }
+
+    private void generateTerraformFor(Class<?> clazz) throws ManagedProcessException {
+        run("mvn", null, String.format("compile -Dexec.mainClass=%s exec:java", clazz.getName()));
     }
 
     public void startCloud(Path jsonDirectory) throws ManagedProcessException {
@@ -106,11 +128,53 @@ public class StepActions {
         run("tofu", jsonDirectory, "apply", "--auto-approve");
     }
 
-    public void clean(String domainName, String namespace, String table) throws IOException {
+    public void clean(String domainName,
+                      SupportedCloudsEnum warehouse,
+                      String namespace,
+                      String table) throws IOException {
+        log.info("Attempting to delete table {} in warehouse {} from namespace {} in {}",
+                 table, warehouse, namespace, domainName);
         var    client      = new AfonPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
         String accessToken = client.getAccessToken();
-        client.delete(getDeleteTableURI("azure", namespace, table), accessToken);
-        client.delete(getDeleteNamespaceURI("azure", namespace), accessToken);
+        client.delete(getDeleteTableURI(warehouse.toString(), namespace, table), accessToken);
+        client.delete(getDeleteNamespaceURI(warehouse.toString(), namespace), accessToken);
+    }
+
+    public void purgeAcceptanceTests(String domainName) {
+        purgeRecursivelyForAllCatalogs(domainName, ACCEPTANCE_TEST_NAMESPACE);
+    }
+
+    private void purgeRecursivelyForAllCatalogs(String domainName, String namespace) {
+        log.info("Deleting namespace {} from {} for all warehouses if they're present",
+                 namespace, domainName);
+        var client = new AfonPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
+
+        for (SupportedCloudsEnum warehouse : List.of(AZURE, AWS, GCP)) {
+            try {
+                purgeAllTablesIn(domainName, warehouse, client, namespace);
+            } catch (IOException | ParseException e) {
+                log.warn("Failed to delete {} namespace in catalog {} in {}. Ignoring and continuing.",
+                         namespace, warehouse, domainName);
+            }
+        }
+    }
+
+    private void purgeAllTablesIn(String domainName,
+                                  SupportedCloudsEnum warehouse,
+                                  AfonPolarisClient client,
+                                  String namespace) throws IOException, ParseException {
+        ObjectMapper        mapper      = new ObjectMapper();
+        String              accessToken = client.getAccessToken();
+        ClassicHttpResponse response    = client.getCall(listTables(warehouse.toString(), namespace), accessToken);
+        JsonNode            root        = mapper.readTree(EntityUtils.toString(response.getEntity()));
+        JsonNode            identifiers = root.get("identifiers");
+
+        if (identifiers != null && identifiers.isArray()) {
+            for (JsonNode node : identifiers) {
+                String table = node.get("name").toString();
+                clean(domainName, warehouse, namespace, table.replace("\"", ""));
+            }
+        }
     }
 
     public void run(String command, Path path, String... commands) throws ManagedProcessException {
@@ -162,6 +226,8 @@ public class StepActions {
     }
 
     public void createAllCatalogsFor(String domainName) throws IncorrectConfigException, IOException {
+        purgeAcceptanceTests(domainName);
+        purgeRecursivelyForAllCatalogs(domainName, EXTERNAL_NAMESPACE);
         EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(domainName);
         checkResponses(config.initializePolaris());
     }
