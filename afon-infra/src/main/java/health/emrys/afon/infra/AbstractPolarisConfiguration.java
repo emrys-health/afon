@@ -52,6 +52,16 @@ public abstract class AbstractPolarisConfiguration {
         }
     }
 
+    public void checkResponses(List<HttpResponse> responses) {
+        logger.info("HTTP responses = {}", responses);
+        if (responses != null && !responses.isEmpty()) {
+            List<HttpResponse> badResponses = responses.stream().filter(x -> x.getCode() / 100 != 2).toList();
+            if (!badResponses.isEmpty()) {
+                throw new RuntimeException(badResponses.toString());
+            }
+        }
+    }
+
     public List<HttpResponse> initialize(SupportedCloudsEnum cloud) throws IncorrectConfigException, IOException {
         return initialize(cloud, properties);
     }
