@@ -4,6 +4,7 @@ import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.infra.PurgeAndPopulatePolaris;
 import health.emrys.afon.infra.checks.SparkCheck;
 import org.slf4j.Logger;
 
@@ -63,7 +64,8 @@ public class StepOperations {
     public Step purgeForeignCatalogFromAzure() {
         return new Step("az_foreign_clean",
                         format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, AZURE_DOMAIN_NAME),
-                        () -> actions.clean(AZURE_DOMAIN_NAME, AZURE, EXTERNAL_NAMESPACE, SparkCheck.TABLE));
+                        () -> actions.executeMainOf(PurgeAndPopulatePolaris.class,
+                                                    new String[] { AZURE_DOMAIN_NAME, AZURE.toString(), EXTERNAL_NAMESPACE, SparkCheck.TABLE}));
     }
 
     public Step createAzureCatalogInAzure() {
@@ -90,7 +92,8 @@ public class StepOperations {
     public Step initializeAllCatalogsInAws() {
         return new Step("aws_all_catalogs",
                  "configure all the the catalogs in Polaris at "+ AWS_POLARIS_DOMAIN_NAME,
-                 () -> actions.createAllCatalogsFor(AWS_POLARIS_DOMAIN_NAME));
+                 () -> actions.executeMainOf(PurgeAndPopulatePolaris.class,
+                                             new String[] { AWS_POLARIS_DOMAIN_NAME} ));
     }
 
     public Step waitForAwsPolaris() {

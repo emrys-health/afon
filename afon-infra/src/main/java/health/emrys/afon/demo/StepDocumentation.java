@@ -62,4 +62,15 @@ public class StepDocumentation extends StepActions {
                            """, directory));
         out.flush();
     }
+
+    @Override
+    public void executeMainOf(Class clazz, String[] args) throws Exception {
+        String argLine = "";
+        if (args != null && args.length > 0) {
+            argLine = format("-Dexec.args=\"%s\"", String.join(" ", args));
+        }
+        run("mvn",
+            null,
+            format("compile -Dexec.mainClass=%s %s exec:java", clazz.getName(), argLine));
+    }
 }
