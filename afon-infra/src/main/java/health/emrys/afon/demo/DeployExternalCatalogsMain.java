@@ -18,7 +18,6 @@ public class DeployExternalCatalogsMain {
 
     public static final List<Step> steps(StepOperations stepOperations) {
         List<Step> stackSteps = new ArrayList<>();
-        stackSteps.add(stepOperations.prepareTofu());
         stackSteps.addAll(DeployFullStackAwsMain.steps(stepOperations));
         stackSteps.addAll(List.of(
             stepOperations.cleanLocalAzure(),

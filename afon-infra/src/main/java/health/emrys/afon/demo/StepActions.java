@@ -8,7 +8,6 @@ import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.infra.EndpointPolarisConfiguration;
-import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -19,7 +18,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
@@ -75,6 +73,7 @@ public class StepActions {
         } else {
             log.info("Directory {} does not exist so starting afresh", toDelete);
         }
+        deleteTerraformStateFiles(id);
         return toDelete;
     }
 
@@ -97,10 +96,23 @@ public class StepActions {
         startCloud(cdktfPath(AwsWholeStack.ID));
     }
 
-    public void executeMainOf(Class clazz, String[] args) throws Exception {
-        log.info("Running {} with arguments {}", clazz.getName(), String.join(" ", args));
-        Method main = clazz.getDeclaredMethod("main", String[].class);
-        main.invoke(null, (Object)args);
+    private void executeMainOf(Class clazz, String[] args) throws Exception {
+        executeMainOf(clazz, args, new Properties());
+    }
+
+    public void executeMainOf(Class clazz, String[] args, Properties overrides) throws Exception {
+        log.info("Running {} with arguments {} and overrides {}",
+                 clazz.getName(),
+                 String.join(" ", args),
+                 overrides);
+
+        Properties original = saveAndSetSystem(overrides);
+        try {
+            Method main = clazz.getDeclaredMethod("main", String[].class);
+            main.invoke(null, (Object)args);
+        } finally {
+            restoreSystemProperties(overrides, original);
+        }
     }
 
     public void startCloud(Path jsonDirectory) throws ManagedProcessException {
@@ -127,9 +139,16 @@ public class StepActions {
         log.info("Command {} finished with value {}", command, p.exitValue());
     }
 
-    public void deleteTerraformIn(String directory) throws IOException {
-        Files.list(Path.of(directory)).filter(x -> x.getFileName().toString().startsWith(TERRAFORM_STATE_FILE_PATTERN)).forEach(
-            x -> {
+    public void deleteTerraformStateFiles(SupportedCloudsEnum id) throws IOException {
+        deleteTerraformIn(".", id);
+        deleteTerraformIn("..", id);
+    }
+    
+    private void deleteTerraformIn(String directory,
+                                   SupportedCloudsEnum id) throws IOException {
+        Files.list(Path.of(directory))
+             .filter(x -> x.getFileName().toString().startsWith(TERRAFORM_STATE_FILE_PATTERN + id))
+             .forEach(x -> {
                 delete(x);
             });
     }
@@ -147,12 +166,9 @@ public class StepActions {
                                         SupportedCloudsEnum catalog,
                                         Properties properties) throws Exception {
         properties.put(POLARIS_ENDPOINT.getPropertyName(), domainName);
-        Properties original = saveAndSetSystem(properties);
-        try {
-            executeMainOf(EndpointPolarisConfiguration.class, new String[] {catalog.name()});
-        } finally {
-            restoreSystemProperties(properties, original);
-        }
+        executeMainOf(EndpointPolarisConfiguration.class,
+                      new String[] {catalog.name()},
+                      properties);
     }
 
     private static void restoreSystemProperties(Properties properties, Properties original) {

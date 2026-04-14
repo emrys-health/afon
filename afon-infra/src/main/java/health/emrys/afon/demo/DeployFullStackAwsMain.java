@@ -5,7 +5,6 @@ import java.util.List;
 public class DeployFullStackAwsMain {
     static final List<Step> steps(StepOperations stepOperations) {
         return List.of(
-            stepOperations.prepareTofu(),
             stepOperations.cleanLocalAws(),
             stepOperations.deployAwsPolaris(),
             stepOperations.waitForAwsPolaris(),
