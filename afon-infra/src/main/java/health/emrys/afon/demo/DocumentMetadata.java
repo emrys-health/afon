@@ -8,4 +8,6 @@ public interface DocumentMetadata {
     String getFilename();
 
     List<Step> steps(StepOperations stepOperations);
+
+    String getFurtherNotes();
 }

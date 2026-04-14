@@ -4,6 +4,7 @@ import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.infra.Defaults;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
 import health.emrys.afon.infra.checks.SparkCheck;
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
+import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static health.emrys.afon.infra.checks.SparkCheck.EXTERNAL_NAMESPACE;
 import static java.lang.String.format;
 
@@ -31,7 +33,16 @@ public class StepOperations {
     public Step cleanLocalAws() {
         return new Step("clean_aws",
                         "clean the local AWS directory",
-                        () -> actions.deleteStack(AwsWholeStack.ID));
+                        () -> {
+            try {
+                actions.deleteStack(AwsWholeStack.ID);
+            } catch (Exception ex) {
+                log.error(format("""
+                              You may need to run:
+                              
+                              aws eks update-kubeconfig --region %s --name %s
+                              """, Defaults.AWS_REGION, CLUSTER_NAME), ex);
+            }});
     }
 
     public Step deployAwsPolaris() {
@@ -69,7 +80,7 @@ public class StepOperations {
 
     public Step createAzureCatalogInAzure() {
         return new Step("az_foreign",
-                        format("Create a catalog in the Polaris at %s", AZURE_DOMAIN_NAME),
+                        format("Create a catalog in the Polaris at `%s`", AZURE_DOMAIN_NAME),
                         () -> {
                             // swap the buckets
                             Properties                   properties = new Properties();
@@ -84,7 +95,7 @@ public class StepOperations {
 
     public Step createExternalAzureCatalogInAzure() {
         return new Step("az_external_aws",
-                        format("configure a catalog called %s in the Polaris called %s", AZURE_EXTERNAL, AZURE_DOMAIN_NAME),
+                        format("configure a catalog called `%s` in the Polaris at `%s`", AZURE_EXTERNAL, AZURE_DOMAIN_NAME),
                         () -> actions.createSingleCatalogsFor(AZURE_DOMAIN_NAME, AZURE_EXTERNAL));
     }
 

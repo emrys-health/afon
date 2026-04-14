@@ -1,19 +1,27 @@
 package health.emrys.afon.demo;
 
 import ch.vorburger.exec.ManagedProcessException;
+import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.file.Path;
-import java.util.Arrays;
 
 import static java.lang.String.format;
-import static java.util.stream.Collectors.joining;
 
 public class StepDocumentation extends StepActions {
 
     private final PrintWriter out;
+
+    public static @NonNull String mvnArgumentsToRun(Class clazz, String[] args) {
+        String argLine = "";
+        if (args != null && args.length > 0) {
+            argLine = format("-Dexec.args=\"%s\"", String.join(" ", args));
+        }
+        String fullArgs = format("compile -Dexec.mainClass=%s %s exec:java", clazz.getName(), argLine);
+        return fullArgs;
+    }
 
     public StepDocumentation(OutputStream out) {
         this.out = new PrintWriter(out);
@@ -65,12 +73,9 @@ public class StepDocumentation extends StepActions {
 
     @Override
     public void executeMainOf(Class clazz, String[] args) throws Exception {
-        String argLine = "";
-        if (args != null && args.length > 0) {
-            argLine = format("-Dexec.args=\"%s\"", String.join(" ", args));
-        }
+        String fullArgs = mvnArgumentsToRun(clazz, args);
         run("mvn",
             null,
-            format("compile -Dexec.mainClass=%s %s exec:java", clazz.getName(), argLine));
+            fullArgs);
     }
 }
