@@ -24,6 +24,8 @@ public class StepOperations {
 
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
 
+    private static final Properties NO_ENV_VARIABLES = new Properties();
+
     private final StepActions actions;
 
     public StepOperations(StepActions actions) {
@@ -75,7 +77,8 @@ public class StepOperations {
         return new Step("az_foreign_clean",
                         format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, AZURE_DOMAIN_NAME),
                         () -> actions.executeMainOf(PurgeAndPopulatePolaris.class,
-                                                    new String[] { AZURE_DOMAIN_NAME, AZURE.name(), EXTERNAL_NAMESPACE, SparkCheck.TABLE}));
+                                                    new String[] { AZURE_DOMAIN_NAME, AZURE.name(), EXTERNAL_NAMESPACE, SparkCheck.TABLE},
+                                                    NO_ENV_VARIABLES));
     }
 
     public Step createAzureCatalogInAzure() {
@@ -103,7 +106,8 @@ public class StepOperations {
         return new Step("aws_all_catalogs",
                  "configure all the the catalogs in Polaris at "+ AWS_POLARIS_DOMAIN_NAME,
                  () -> actions.executeMainOf(PurgeAndPopulatePolaris.class,
-                                             new String[] { AWS_POLARIS_DOMAIN_NAME} ));
+                                             new String[] { AWS_POLARIS_DOMAIN_NAME} ,
+                                             NO_ENV_VARIABLES));
     }
 
     public Step waitForAwsPolaris() {
@@ -124,17 +128,9 @@ public class StepOperations {
                                                                 POLARIS_ID.getValueFrom(properties),
                                                                 POLARIS_SECRET.getValueFrom(properties),
                                                                 AWS_POLARIS_DOMAIN_NAME
-                                                                });
+                                                                },
+                                                  NO_ENV_VARIABLES);
                         });
-    }
-
-    public Step prepareTofu() {
-        return new Step("prepare_tofu",
-                 "delete old, local Tofu state files",
-                 () -> {
-                     actions.deleteTerraformIn(".");
-                     actions.deleteTerraformIn("..");
-                 });
     }
 
     private void useAwsKubernetes() throws ManagedProcessException {

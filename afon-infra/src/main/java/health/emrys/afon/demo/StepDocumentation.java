@@ -1,12 +1,15 @@
 package health.emrys.afon.demo;
 
 import ch.vorburger.exec.ManagedProcessException;
+import health.emrys.afon.config.AfonProperties;
 import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.file.Path;
+import java.util.Properties;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 
@@ -14,13 +17,27 @@ public class StepDocumentation extends StepActions {
 
     private final PrintWriter out;
 
-    public static @NonNull String mvnArgumentsToRun(Class clazz, String[] args) {
+    public static @NonNull String mvnArgumentsToRun(Class clazz,
+                                                    String[] args) {
+        return mvnArgumentsToRun(clazz, args, new Properties());
+    }
+
+
+    public static @NonNull String mvnArgumentsToRun(Class clazz,
+                                                    String[] args,
+                                                    Properties overrides) {
         String argLine = "";
         if (args != null && args.length > 0) {
             argLine = format("-Dexec.args=\"%s\"", String.join(" ", args));
         }
-        String fullArgs = format("compile -Dexec.mainClass=%s %s exec:java", clazz.getName(), argLine);
-        return fullArgs;
+        String overridesArgLine = "";
+        if (overrides != null && overrides.size() > 0) {
+            overridesArgLine = overrides.entrySet().stream().map(x ->
+                format("-D%s=%s ", x.getKey(), x.getValue())
+                ).collect(Collectors.joining());
+        }
+        return format("%s compile -Dexec.mainClass=%s %s exec:java",
+                      overridesArgLine, clazz.getName(), argLine);
     }
 
     public StepDocumentation(OutputStream out) {
@@ -64,16 +81,16 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public void deleteTerraformIn(String directory) throws IOException {
+    public void deleteTerraformStateFiles(AfonProperties.SupportedCloudsEnum id) throws IOException {
         out.println(format("""
-                           Delete `%s/%s*`
-                           """, directory, TERRAFORM_STATE_FILE_PATTERN));
+                           Delete `%s*`
+                           """, TERRAFORM_STATE_FILE_PATTERN));
         out.flush();
     }
 
     @Override
-    public void executeMainOf(Class clazz, String[] args) throws Exception {
-        String fullArgs = mvnArgumentsToRun(clazz, args);
+    public void executeMainOf(Class clazz, String[] args, Properties overrides) throws Exception {
+        String fullArgs = mvnArgumentsToRun(clazz, args, overrides);
         run("mvn",
             null,
             fullArgs);
