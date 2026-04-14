@@ -39,15 +39,6 @@ public class PolarisConfigureMain {
         }
     }
 
-    public void createExternalCatalogs(Properties properties,
-                                       String credentials) throws IncorrectConfigException, IOException {
-        Properties externalProperties = new Properties();
-        externalProperties.putAll(properties);
-        CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
-                new ExternalAzureCloudConfigForPolaris(properties),
-                };
-        createCatalogs(properties, credentials, configs);
-    }
     public List<HttpResponse> createAllCatalogs(Properties properties, String credentials) throws IncorrectConfigException, IOException {
         CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
                 new AwsCloudConfigForPolaris(properties),

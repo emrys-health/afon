@@ -37,6 +37,7 @@ public abstract class AbstractPolarisConfiguration {
     protected static void parse(String[] args,
                                 AbstractPolarisConfiguration app)
     throws IncorrectConfigException, IOException {
+        logger.info("Calling {} with arguments {}", app.getClass().getSimpleName(), String.join(" ", args));
         if (args.length == 0) {
             app.initializePolaris();
         } else if (args.length == 1) {
@@ -52,7 +53,7 @@ public abstract class AbstractPolarisConfiguration {
         }
     }
 
-    public void checkResponses(List<HttpResponse> responses) {
+    public List<HttpResponse> checkResponses(List<HttpResponse> responses) {
         logger.info("HTTP responses = {}", responses);
         if (responses != null && !responses.isEmpty()) {
             List<HttpResponse> badResponses = responses.stream().filter(x -> x.getCode() / 100 != 2).toList();
@@ -60,6 +61,7 @@ public abstract class AbstractPolarisConfiguration {
                 throw new RuntimeException(badResponses.toString());
             }
         }
+        return responses;
     }
 
     public List<HttpResponse> initialize(SupportedCloudsEnum cloud) throws IncorrectConfigException, IOException {
@@ -72,11 +74,11 @@ public abstract class AbstractPolarisConfiguration {
     }
 
     public List<HttpResponse> initializePolaris() throws IncorrectConfigException, IOException {
-        return polarisClient.createAllCatalogs(properties, getCredentials());
+        return checkResponses(polarisClient.createAllCatalogs(properties, getCredentials()));
     }
 
     public List<HttpResponse> initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
-        return polarisClient.createCatalogs(properties, getCredentials(), configs);
+        return checkResponses(polarisClient.createCatalogs(properties, getCredentials(), configs));
     }
 
     abstract protected String getCredentials();

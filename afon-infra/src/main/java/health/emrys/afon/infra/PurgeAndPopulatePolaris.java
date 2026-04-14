@@ -2,7 +2,6 @@ package health.emrys.afon.infra;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
@@ -16,7 +15,7 @@ import java.io.IOException;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.demo.StepOperations.EXTERNAL_NAMESPACE;
+import static health.emrys.afon.infra.checks.SparkCheck.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -25,17 +24,13 @@ public class PurgeAndPopulatePolaris {
 
     private static final Logger log = getLogger(PurgeAndPopulatePolaris.class);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         String host = args[0];
-        try {
-            PurgeAndPopulatePolaris app = new PurgeAndPopulatePolaris(host);
-            if (args.length == 1) {
-                app.createAllCatalogsFor();
-            } else if (args.length == 4) {
-                app.clean(SupportedCloudsEnum.valueOf(args[1]), args[2], args[3]);
-            }
-        } catch (Exception e) {
-            log.error("Could not purge and populate " + host, e);
+        PurgeAndPopulatePolaris app = new PurgeAndPopulatePolaris(host);
+        if (args.length == 1) {
+            app.createAllCatalogsFor();
+        } else if (args.length == 4) {
+            app.clean(SupportedCloudsEnum.valueOf(args[1]), args[2], args[3]);
         }
     }
 
@@ -49,7 +44,7 @@ public class PurgeAndPopulatePolaris {
         purgeAcceptanceTests(domainName);
         purgeRecursivelyForAllCatalogs(domainName, EXTERNAL_NAMESPACE);
         EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(domainName);
-        config.checkResponses(config.initializePolaris());
+        config.initializePolaris();
     }
 
     public void clean(SupportedCloudsEnum warehouse,
