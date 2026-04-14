@@ -27,6 +27,6 @@ public class DocumentFullStackAws implements DocumentMetadata {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return DeployAwsFulltStackMain.steps(stepOperations);
+        return DeployFullStackAwsMain.steps(stepOperations);
     }
 }
