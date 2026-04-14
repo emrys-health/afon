@@ -16,10 +16,10 @@ public class DeployExternalCatalogsMain {
 
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(DeployExternalCatalogsMain.class);
 
-    private static final List<Step> steps(StepOperations stepOperations) {
+    public static final List<Step> steps(StepOperations stepOperations) {
         List<Step> stackSteps = new ArrayList<>();
         stackSteps.add(stepOperations.prepareTofu());
-        stackSteps.addAll(DeployAwsFulltStackMain.steps(stepOperations));
+        stackSteps.addAll(DeployFullStackAwsMain.steps(stepOperations));
         stackSteps.addAll(List.of(
             stepOperations.cleanLocalAzure(),
             stepOperations.deployAzurePolaris(),

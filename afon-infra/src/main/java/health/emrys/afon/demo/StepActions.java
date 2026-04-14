@@ -3,21 +3,13 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
-import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.EndpointPolarisConfiguration;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import org.apache.commons.io.file.PathUtils;
-import org.apache.hc.core5.http.ClassicHttpResponse;
-import org.apache.hc.core5.http.HttpResponse;
-import org.apache.hc.core5.http.ParseException;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -27,12 +19,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
-import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class StepActions {
