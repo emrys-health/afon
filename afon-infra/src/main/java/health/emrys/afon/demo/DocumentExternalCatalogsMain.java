@@ -7,16 +7,16 @@ import java.util.List;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-public class DocumentExternalCatalogs implements DocumentMetadata {
+public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
 
-    private static final Logger log = getLogger(DocumentExternalCatalogs.class);
+    private static final Logger log = getLogger(DocumentExternalCatalogsMain.class);
 
     public static void main(String[] args) throws IOException {
-        new Documenter(new DocumentExternalCatalogs()).writeDocumentation();
+        new Documenter(new DocumentExternalCatalogsMain()).writeDocumentation();
     }
 
     @Override
-    public String getDescription() {
+    public String getSupplementaryIntro() {
         return "Local Spark calls AWS Polaris that defers to Azure Polaris.";
     }
 
