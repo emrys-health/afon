@@ -20,6 +20,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 public class SparkCheck {
 
+    public static final String EXTERNAL_NAMESPACE = "namespaceph";
     public static final String TABLE = "test_table";
     private static final Logger logger = getLogger(SparkCheck.class);
 
@@ -28,7 +29,7 @@ public class SparkCheck {
             SparkCheck   app            = new SparkCheck();
             SparkSession spark          = null;
             String       warehouse      = null;
-            String       namespace      = "namespaceph";
+            String       namespace      = EXTERNAL_NAMESPACE;
             if (args.length == 4) {
                 warehouse                       = args[0];
                 String            polarisId     = args[1];

@@ -40,7 +40,7 @@ import static java.lang.String.format;
 public class AzureConstruct extends AbstractConstruct {
 
     private static final String RESOURCE_GROUP_NAME = "afon_resource_group_aks";
-    private static final String KUBERNETES_VERSION   = "1.32";
+    private static final String KUBERNETES_VERSION   = "1.33";
     private static final String VNET_CIDR            = "10.1.0.0/16";
     private static final String SUBNET_CIDR          = "10.1.1.0/24";
     private static final String SERVICE_CIDR         = "10.2.0.0/16";

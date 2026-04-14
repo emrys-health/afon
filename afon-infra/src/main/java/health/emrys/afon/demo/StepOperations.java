@@ -15,13 +15,12 @@ import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
+import static health.emrys.afon.infra.checks.SparkCheck.EXTERNAL_NAMESPACE;
 import static java.lang.String.format;
 
 public class StepOperations {
 
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
-
-    public static final String EXTERNAL_NAMESPACE = "namespaceph";
 
     private final StepActions actions;
 
@@ -65,7 +64,7 @@ public class StepOperations {
         return new Step("az_foreign_clean",
                         format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, AZURE_DOMAIN_NAME),
                         () -> actions.executeMainOf(PurgeAndPopulatePolaris.class,
-                                                    new String[] { AZURE_DOMAIN_NAME, AZURE.toString(), EXTERNAL_NAMESPACE, SparkCheck.TABLE}));
+                                                    new String[] { AZURE_DOMAIN_NAME, AZURE.name(), EXTERNAL_NAMESPACE, SparkCheck.TABLE}));
     }
 
     public Step createAzureCatalogInAzure() {
@@ -73,8 +72,8 @@ public class StepOperations {
                         format("Create a catalog in the Polaris at %s", AZURE_DOMAIN_NAME),
                         () -> {
                             // swap the buckets
-                            Properties                   properties = appProperties();
-                            properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(properties));
+                            Properties                   properties = new Properties();
+                            properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(appProperties()));
                             actions.createSingleCatalogsFor(AZURE_DOMAIN_NAME, AZURE, properties);
                         });
     }
@@ -109,14 +108,12 @@ public class StepOperations {
                         format("run Spark locally such that it talks to %s which defers to %s", AWS_POLARIS_DOMAIN_NAME, AZURE_DOMAIN_NAME),
                         () -> {
                             Properties properties = appProperties();
-                            properties.put(POLARIS_ENDPOINT.getPropertyName(), AZURE_DOMAIN_NAME);
-                            SparkCheck sparkCheck = new SparkCheck();
-                            sparkCheck.talkTo(sparkCheck.sparkSessionUsing(AWS_POLARIS_DOMAIN_NAME,
-                                                                           POLARIS_ID.getValueFrom(properties),
-                                                                           POLARIS_SECRET.getValueFrom(properties),
-                                                                           AZURE_EXTERNAL.toString()),
-                                              AZURE_EXTERNAL.toString(),
-                                              EXTERNAL_NAMESPACE);
+                            actions.executeMainOf(SparkCheck.class,
+                                                  new String[] {AZURE_EXTERNAL.toString(),
+                                                                POLARIS_ID.getValueFrom(properties),
+                                                                POLARIS_SECRET.getValueFrom(properties),
+                                                                AWS_POLARIS_DOMAIN_NAME
+                                                                });
                         });
     }
 

@@ -37,7 +37,7 @@ public class StepDocumentation extends StepActions {
                                ```shell
                                %s %s
                                ```
-                               """, command, Arrays.stream(commands).collect(joining())));
+                               """, command, String.join(" ", commands)));
         out.flush();
     }
 
@@ -58,8 +58,8 @@ public class StepDocumentation extends StepActions {
     @Override
     public void deleteTerraformIn(String directory) throws IOException {
         out.println(format("""
-                           Delete the directory `%s`
-                           """, directory));
+                           Delete `%s/%s*`
+                           """, directory, TERRAFORM_STATE_FILE_PATTERN));
         out.flush();
     }
 

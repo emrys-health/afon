@@ -19,13 +19,16 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class StepActions {
 
     private static final Logger log = getLogger(StepActions.class);
+    public static final String TERRAFORM_STATE_FILE_PATTERN = "terraform.";
 
     public Step waitFor(String domain) {
         return new Step("waitFor_" + domain.substring(0, domain.indexOf('.')),
@@ -64,6 +67,7 @@ public class StepActions {
         Path toDelete = cdktfPath(id);
         if (toDelete.toFile().exists()) {
             log.info("Stopping {} if it's running already...", toDelete);
+            run("tofu", toDelete, "init");
             run("tofu", toDelete, "destroy", "--auto-approve");
 
             log.info("Deleting {}", toDelete);
@@ -94,12 +98,9 @@ public class StepActions {
     }
 
     public void executeMainOf(Class clazz, String[] args) throws Exception {
+        log.info("Running {} with arguments {}", clazz.getName(), String.join(" ", args));
         Method main = clazz.getDeclaredMethod("main", String[].class);
         main.invoke(null, (Object)args);
-    }
-
-    private void generateTerraformFor(Class<?> clazz) throws ManagedProcessException {
-        run("mvn", null, String.format("compile -Dexec.mainClass=%s exec:java", clazz.getName()));
     }
 
     public void startCloud(Path jsonDirectory) throws ManagedProcessException {
@@ -127,7 +128,7 @@ public class StepActions {
     }
 
     public void deleteTerraformIn(String directory) throws IOException {
-        Files.list(Path.of(directory)).filter(x -> x.getFileName().toString().startsWith("terraform.")).forEach(
+        Files.list(Path.of(directory)).filter(x -> x.getFileName().toString().startsWith(TERRAFORM_STATE_FILE_PATTERN)).forEach(
             x -> {
                 delete(x);
             });
@@ -144,18 +145,47 @@ public class StepActions {
 
     public void createSingleCatalogsFor(String domainName,
                                         SupportedCloudsEnum catalog,
-                                        Properties properties) throws IncorrectConfigException, IOException {
-        EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(domainName);
-        config.checkResponses(config.initialize(catalog, properties));
+                                        Properties properties) throws Exception {
+        properties.put(POLARIS_ENDPOINT.getPropertyName(), domainName);
+        Properties original = saveAndSetSystem(properties);
+        try {
+            executeMainOf(EndpointPolarisConfiguration.class, new String[] {catalog.name()});
+        } finally {
+            restoreSystemProperties(properties, original);
+        }
+    }
+
+    private static void restoreSystemProperties(Properties properties, Properties original) {
+        properties.keySet().forEach(propKey -> {
+            String key   = propKey.toString();
+            String value = original.getProperty(key);
+            log.info("Restoring system property {} = {}", key, value);
+            if (value != null) {
+                System.setProperty(key, value);
+            }  else {
+                System.clearProperty(key);
+            }
+        });
+    }
+
+    private static @NonNull Properties saveAndSetSystem(Properties properties) {
+        Properties original = new Properties();
+        properties.keySet().forEach(mapKey -> {
+            String key          = mapKey.toString();
+            String systemProp   = System.getProperty(key);
+            if (systemProp != null) {
+                original.put(key, systemProp);
+            }
+            String value = properties.getProperty(key);
+            log.info("Setting system property {} = {}", key, value);
+            System.setProperty(key, value);
+        });
+        return original;
     }
 
     public void createSingleCatalogsFor(String domainName,
-                                        SupportedCloudsEnum catalog) throws IncorrectConfigException, IOException {
-        EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(domainName);
-        config.checkResponses(config.initialize(catalog));
+                                        SupportedCloudsEnum catalog) throws Exception {
+        createSingleCatalogsFor(domainName, catalog, new Properties());
     }
-
-
-
 
 }
