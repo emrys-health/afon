@@ -9,6 +9,16 @@ public class StepRunner {
 
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(StepRunner.class);
 
+    public void run(StepsProvider stepsProvider, String[] args) {
+        List<Step> steps = stepsProvider.stepsUsing(new StepOperations(new StepActions()));
+        if (args.length == 0) {
+            runSteps(steps);
+        } else {
+            String firstStep  = args[0];
+            runFrom(steps, firstStep);
+        }
+    }
+
     void runFrom(List<Step> steps, String firstStepToRun) {
         log.info("Running everything from {} (inclusive) onwards out of {}", steps, humanReadable(steps));
         int    index = steps.stream().map(s -> s.name).toList().lastIndexOf(firstStepToRun);

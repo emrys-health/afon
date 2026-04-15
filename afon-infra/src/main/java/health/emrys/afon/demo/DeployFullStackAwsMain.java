@@ -13,8 +13,8 @@ public class DeployFullStackAwsMain {
                       );
     }
     public static void main(String[] args) {
-        List<Step> steps = steps(new StepOperations(new StepActions()));
         StepRunner app = new StepRunner();
+        List<Step> steps = steps(new StepOperations(new StepActions()));
         if (args.length == 0) {
             app.runSteps(steps);
         } else {
