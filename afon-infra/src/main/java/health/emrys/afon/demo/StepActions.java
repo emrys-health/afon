@@ -34,7 +34,7 @@ public class StepActions {
                         () -> {
                             boolean stopResolving = false;
                             long    start         = System.currentTimeMillis();
-                            int     timeout       = 900_000;
+                            int     timeout       = 1_200_000;
                             log.info("Checking DNS for {}", domain);
                             while (!stopResolving && System.currentTimeMillis() - start < timeout) {
                                 try {
@@ -64,10 +64,7 @@ public class StepActions {
     public @NonNull Path deleteStack(SupportedCloudsEnum id) throws IOException {
         Path toDelete = cdktfPath(id);
         if (toDelete.toFile().exists()) {
-            log.info("Stopping {} if it's running already...", toDelete);
-            run("tofu", toDelete, "init");
-            run("tofu", toDelete, "destroy", "--auto-approve");
-
+            attemptGracefulDestroy(toDelete);
             log.info("Deleting {}", toDelete);
             delete(toDelete);
         } else {
@@ -75,6 +72,16 @@ public class StepActions {
         }
         deleteTerraformStateFiles(id);
         return toDelete;
+    }
+
+    private void attemptGracefulDestroy(Path path) {
+        try {
+            log.info("Stopping {} if it's running already...", path);
+            run("tofu", path, "init");
+            run("tofu", path, "destroy", "--auto-approve");
+        } catch (Exception e) {
+            log.error("Failed to call tofu destroy in " + path, e);
+        }
     }
 
     public @NonNull Path cdktfPath(SupportedCloudsEnum id) {
@@ -147,7 +154,11 @@ public class StepActions {
     private void deleteTerraformIn(String directory,
                                    SupportedCloudsEnum id) throws IOException {
         Files.list(Path.of(directory))
-             .filter(x -> x.getFileName().toString().startsWith(TERRAFORM_STATE_FILE_PATTERN + id))
+             .filter(x -> {
+                 String fileName = x.getFileName().toString();
+                 return fileName.startsWith(TERRAFORM_STATE_FILE_PATTERN + id)
+                     && fileName.endsWith(".tfstate");
+             })
              .forEach(x -> {
                 delete(x);
             });

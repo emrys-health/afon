@@ -29,4 +29,44 @@ public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
     public List<Step> steps(StepOperations stepOperations) {
         return DeployExternalCatalogsMain.steps(stepOperations);
     }
+
+    @Override
+    public String getFurtherNotes() {
+        return """
+            # Problems destroying the stack?
+            If the domain name points at a Kubernetes service that's not longer there, run:
+            ```shell
+            az network dns record-set a delete \\
+              --resource-group afon_resource_group \\
+              --zone-name emryspolarisazure.click \\
+              --name "@" \\
+              --yes
+            ```
+            
+            If you see an error like:
+            ```
+            │ Error: A resource with the ID "/subscriptions/ffae1297-4c57-47e0-9a89-5583b97835cf/resourceGroups/afon_resource_group_aks" already exists - to be managed via Terraform this resource needs to be imported into the State. Please see the resource documentation for "azurestack_resource_group" for more information.
+            │\s
+            │   with azurestack_resource_group.XXX,
+            │   on cdk.tf.json line 330, in resource.azurestack_resource_group.XXX:
+            ```
+            you need to run
+            ```shell
+            tofu import azurestack_resource_group.XXX /subscriptions/ffae1297-4c57-47e0-9a89-5583b97835cf/resourceGroups/afon_resource_group_aks
+            ```
+            replacing XXX with whatever was being used.
+            
+            Alternatively, you can delete it with:
+            ```shell
+            az group delete \\
+              --name afon_resource_group_aks \\
+              --yes \\
+              --no-wait
+            ```
+            and it will be created again on the next run.
+            
+            If all else fails, destroy the Kubernetes cluster directly in the 
+            [Azure console](https://portal.azure.com/#view/Microsoft_Azure_KubernetesFleet/KubernetesHub.MenuView/~/clusters)
+            """;
+    }
 }
