@@ -20,7 +20,7 @@ public class StepRunner {
     }
 
     void runFrom(List<Step> steps, String firstStepToRun) {
-        log.info("Running everything from {} (inclusive) onwards out of {}", steps, humanReadable(steps));
+        log.info("Running everything from {} (inclusive) onwards out of {}", humanReadable(steps), firstStepToRun);
         int    index = steps.stream().map(s -> s.name).toList().lastIndexOf(firstStepToRun);
         if (index == -1) {
             log.error("Step {} not found", firstStepToRun);

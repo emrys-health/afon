@@ -17,9 +17,9 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
             mvnDeploy = format("""
                 To run the actual deployment, run:
                 ```shell
-                mvn %s
+                mvn %s -Pdemo
                 ```
-                """, mvnArgumentsToRun(clazz, null));
+                """, mvnArgumentsToRun(clazz, null, "exec"));
         } catch (ClassNotFoundException e) {
             log.warn("Cannot find the deployment class for " + this.getClass().getSimpleName(), e);
         }
@@ -33,7 +33,7 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
             %s
             
             %s
-            """, mvnArgumentsToRun(this.getClass(), null),
+            """, mvnArgumentsToRun(this.getClass(), null, "java"),
                              mvnDeploy,
                              getSupplementaryIntro());
     }
