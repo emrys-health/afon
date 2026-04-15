@@ -17,7 +17,10 @@ public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
 
     @Override
     public String getSupplementaryIntro() {
-        return "Local Spark calls AWS Polaris that defers to Azure Polaris.";
+        return """
+            Local Spark calls AWS Polaris that defers to Azure Polaris.
+            This sets the cloud environments up just as they were for the TDA demo of 23/3/26.
+            """;
     }
 
     @Override

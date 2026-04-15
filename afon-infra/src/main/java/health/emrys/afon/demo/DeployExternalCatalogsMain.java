@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * This sets the cloud environments up just as they were for the TDA demo of 23/3/26.
  * The main thing is:
- * - we have all teh catalogs in AWS plus the external one that talks to:
+ * - we have all the catalogs in AWS plus the external one that talks to:
  * - an Azure Polaris with an Azure catalog
  * - a smoke test that ensures that Spark (running locally) can talk to the AWS catalog that is a proxy for the Azure one
  */
