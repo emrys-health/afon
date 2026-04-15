@@ -69,18 +69,15 @@ public class StepOperations {
     }
 
     public Step cleanLocalAzure() {
-        return new Step("clean_az",
-                        "clean the local Azure directory (if it exists)",
-                        () -> {
-                            actions.deleteStack(AzureKubernetesPolaris.ID);
-                        });
+        return cleanLocal(AzureKubernetesPolaris.ID);
     }
 
-    public Step cleanLocalGcp() {
-        return new Step("clean_gcp",
-                        "clean the local GCP directory (if it exists)",
+    @NonNull
+    public Step cleanLocal(SupportedCloudsEnum id) {
+        return new Step("clean_" + id,
+                        format("clean the local %s directory (if it exists)", id),
                         () -> {
-                            actions.deleteStack(GcpKubernetesPolaris.ID);
+                            actions.deleteStack(id);
                         });
     }
 
@@ -113,13 +110,18 @@ public class StepOperations {
     }
 
     public Step createAzureCatalogInAzure() {
-        return new Step("az_foreign",
-                        format("Create a catalog in the Polaris at `%s`", AZURE_DOMAIN_NAME),
+        String domainName = AZURE_DOMAIN_NAME;
+        return createAzureCatalogIn(domainName);
+    }
+
+    public @NonNull Step createAzureCatalogIn(String domainName) {
+        return new Step("foreign_catalog_in_" + machineNameFrom(domainName),
+                        format("Create a catalog in the Polaris at `%s`", domainName),
                         () -> {
                             // swap the buckets
-                            Properties                   properties = new Properties();
+                            Properties properties = new Properties();
                             properties.setProperty(AZURE_BUCKET.getPropertyName(), AZURE_EXTERNAL_BUCKET.getValueFrom(appProperties()));
-                            actions.createSingleCatalogsFor(AZURE_DOMAIN_NAME, AZURE, properties);
+                            actions.createSingleCatalogsFor(domainName, AZURE, properties);
                         });
     }
 
@@ -128,9 +130,13 @@ public class StepOperations {
     }
 
     public Step createExternalAzureCatalogInAzure() {
-        return new Step("az_external_aws",
-                        format("configure a catalog called `%s` in the Polaris at `%s`", AZURE_EXTERNAL, AZURE_DOMAIN_NAME),
-                        () -> actions.createSingleCatalogsFor(AZURE_DOMAIN_NAME, AZURE_EXTERNAL));
+        return createExternalAzureCatalogIn(AZURE_DOMAIN_NAME);
+    }
+
+    public @NonNull Step createExternalAzureCatalogIn(String domainName) {
+        return new Step("external_aws_in_" + machineNameFrom(domainName),
+                        format("configure a catalog called `%s` in the Polaris at `%s`", AZURE_EXTERNAL, domainName),
+                        () -> actions.createSingleCatalogsFor(domainName, AZURE_EXTERNAL));
     }
 
     public Step initializeAllCatalogsInAws() {
@@ -154,8 +160,8 @@ public class StepOperations {
         return actions.waitFor(AZURE_DOMAIN_NAME);
     }
 
-    public Step waitForGcpPolaris() {
-        return actions.waitFor(GCP_DOMAIN_NAME);
+    public Step waitFor(String domainName) {
+        return actions.waitFor(domainName);
     }
 
     public Step checkLocalSparkTalksToAzureViaAws() {
