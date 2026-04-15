@@ -18,14 +18,16 @@ public class StepDocumentation extends StepActions {
     private final PrintWriter out;
 
     public static @NonNull String mvnArgumentsToRun(Class clazz,
-                                                    String[] args) {
-        return mvnArgumentsToRun(clazz, args, new Properties());
+                                                    String[] args,
+                                                    String command) {
+        return mvnArgumentsToRun(clazz, args, new Properties(), command);
     }
 
 
     public static @NonNull String mvnArgumentsToRun(Class clazz,
                                                     String[] args,
-                                                    Properties overrides) {
+                                                    Properties overrides,
+                                                    String command) {
         String argLine = "";
         if (args != null && args.length > 0) {
             argLine = format("-Dexec.args=\"%s\"", String.join(" ", args));
@@ -36,8 +38,8 @@ public class StepDocumentation extends StepActions {
                 format("-D%s=%s ", x.getKey(), x.getValue())
                 ).collect(Collectors.joining());
         }
-        return format("%s compile -Dexec.mainClass=%s %s exec:java",
-                      overridesArgLine, clazz.getName(), argLine);
+        return format("%s compile -Dexec.mainClass=%s %s exec:%s",
+                      overridesArgLine, clazz.getName(), argLine, command);
     }
 
     public StepDocumentation(OutputStream out) {
@@ -90,7 +92,7 @@ public class StepDocumentation extends StepActions {
 
     @Override
     public void executeMainOf(Class clazz, String[] args, Properties overrides) throws Exception {
-        String fullArgs = mvnArgumentsToRun(clazz, args, overrides);
+        String fullArgs = mvnArgumentsToRun(clazz, args, overrides, "java");
         run("mvn",
             null,
             fullArgs);

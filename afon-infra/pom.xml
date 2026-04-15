@@ -136,13 +136,6 @@
                         <version>3.1.0</version>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-<!--                            <arguments>-->
-<!--                                <argument>@jvm-args.txt</argument>-->
-<!--                                <argument>-classpath</argument>-->
-<!--                                <classpath />-->
-<!--                                <argument>${exec.mainClass}</argument>-->
-<!--                                <argument>${exec.args}</argument>-->
-<!--                            </arguments>-->
                             <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
                         </configuration>
                     </plugin>
