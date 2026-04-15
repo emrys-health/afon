@@ -46,7 +46,12 @@ public class ExternalGcpCloudConfigForPolaris extends ExternalCloudConfigForPola
 
     @Override
     protected @NonNull StorageConfigInfo getStorageConfigInfo() {
-        return new GcpStorageConfigInfo(serviceAccount, GCS, List.of(bucket));
+        return GcpStorageConfigInfo
+            .builder()
+            .setGcsServiceAccount(serviceAccount)
+            .setStorageType(GCS)
+            .setAllowedLocations(List.of(bucket))
+            .build();
     }
 
     @Override

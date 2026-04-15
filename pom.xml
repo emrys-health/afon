@@ -38,7 +38,7 @@
         <documentation_utils.version>0.11</documentation_utils.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <polaris.version>1.4.0-incubating-SNAPSHOT</polaris.version>
+        <polaris.version>1.4.0-SNAPSHOT</polaris.version>
     </properties>
 
     <modules>
@@ -202,5 +202,17 @@
         </snapshotRepository>
     </distributionManagement>
 
+    <repositories>
+        <repository>
+            <id>apache-snapshots</id>
+            <url>https://repository.apache.org/content/groups/snapshots/</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+        </repository>
+    </repositories>
 
 </project>
