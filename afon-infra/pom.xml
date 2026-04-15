@@ -16,6 +16,7 @@
 
     <properties>
         <aws.java.sdk.version>2.34.6</aws.java.sdk.version>
+        <exec.args></exec.args>
     </properties>
 
     <dependencyManagement>
