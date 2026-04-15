@@ -3,6 +3,7 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
+import health.emrys.afon.cdk.GcpKubernetesPolaris;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.Defaults;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
@@ -34,7 +35,7 @@ public class StepOperations {
 
     public Step cleanLocalAws() {
         return new Step("clean_aws",
-                        "clean the local AWS directory",
+                        "clean the local AWS directory (if it exists)",
                         () -> {
             try {
                 actions.deleteStack(AwsWholeStack.ID);
@@ -59,11 +60,25 @@ public class StepOperations {
                         () -> actions.startSparkClusterInAws());
     }
 
+    public Step deployGcpPolaris() {
+        return new Step("gcp_polaris",
+                        "deploy Spark in AWS",
+                        () -> actions.startGcpPolaris());
+    }
+
     public Step cleanLocalAzure() {
         return new Step("clean_az",
-                        "clean the local Azure directory",
+                        "clean the local Azure directory (if it exists)",
                         () -> {
                             actions.deleteStack(AzureKubernetesPolaris.ID);
+                        });
+    }
+
+    public Step cleanLocalGcp() {
+        return new Step("clean_gcp",
+                        "clean the local GCP directory (if it exists)",
+                        () -> {
+                            actions.deleteStack(GcpKubernetesPolaris.ID);
                         });
     }
 
