@@ -33,7 +33,12 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
     }
 
     public GcpStorageConfigInfo getStorageConfigInfo() {
-        return new GcpStorageConfigInfo(serviceAccount, GCS, List.of(getBucket()));
+        return GcpStorageConfigInfo
+            .builder()
+            .setGcsServiceAccount(serviceAccount)
+            .setStorageType(GCS)
+            .setAllowedLocations(List.of(getBucket()))
+            .build();
     }
 
     @Override
