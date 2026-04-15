@@ -8,12 +8,14 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.Defaults;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
 import health.emrys.afon.infra.checks.SparkCheck;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
+import static health.emrys.afon.cdk.GcpKubernetesPolaris.GCP_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
@@ -62,7 +64,7 @@ public class StepOperations {
 
     public Step deployGcpPolaris() {
         return new Step("gcp_polaris",
-                        "deploy Spark in AWS",
+                        "deploy Polaris in GCP",
                         () -> actions.startGcpPolaris());
     }
 
@@ -89,11 +91,25 @@ public class StepOperations {
     }
 
     public Step purgeForeignCatalogFromAzure() {
-        return new Step("az_foreign_clean",
-                        format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, AZURE_DOMAIN_NAME),
+        return purgeForeignCatalogFrom(AZURE_DOMAIN_NAME, AZURE);
+    }
+
+    public @NonNull Step purgeForeignCatalogFrom(String domainName,
+                                                  SupportedCloudsEnum catalog) {
+        String name = machineNameFrom(domainName);
+        return new Step(name + "_foreign_clean",
+                        format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, domainName),
                         () -> actions.executeMainOf(PurgeAndPopulatePolaris.class,
-                                                    new String[] { AZURE_DOMAIN_NAME, AZURE.name(), EXTERNAL_NAMESPACE, SparkCheck.TABLE},
+                                                    new String[]{domainName, catalog.name(), EXTERNAL_NAMESPACE, SparkCheck.TABLE},
                                                     NO_ENV_VARIABLES));
+    }
+
+    private static @NonNull String machineNameFrom(String domainName) {
+        String name = domainName;
+        if (domainName.contains(".")) {
+            name = domainName.substring(0, domainName.indexOf("."));
+        }
+        return name;
     }
 
     public Step createAzureCatalogInAzure() {
@@ -118,11 +134,16 @@ public class StepOperations {
     }
 
     public Step initializeAllCatalogsInAws() {
-        return new Step("aws_all_catalogs",
-                 "configure all the the catalogs in Polaris at "+ AWS_POLARIS_DOMAIN_NAME,
-                 () -> actions.executeMainOf(PurgeAndPopulatePolaris.class,
-                                             new String[] { AWS_POLARIS_DOMAIN_NAME} ,
-                                             NO_ENV_VARIABLES));
+        return initializeAllCatalogsIn(AWS_POLARIS_DOMAIN_NAME);
+    }
+
+    @NonNull
+    public Step initializeAllCatalogsIn(String domainName) {
+        return new Step("all_catalogs_in_" + machineNameFrom(domainName),
+                        "configure all the the catalogs in Polaris at " + domainName,
+                        () -> actions.executeMainOf(PurgeAndPopulatePolaris.class,
+                                                    new String[]{domainName},
+                                                    NO_ENV_VARIABLES));
     }
 
     public Step waitForAwsPolaris() {
@@ -131,6 +152,10 @@ public class StepOperations {
 
     public Step waitForAzurePolaris() {
         return actions.waitFor(AZURE_DOMAIN_NAME);
+    }
+
+    public Step waitForGcpPolaris() {
+        return actions.waitFor(GCP_DOMAIN_NAME);
     }
 
     public Step checkLocalSparkTalksToAzureViaAws() {
