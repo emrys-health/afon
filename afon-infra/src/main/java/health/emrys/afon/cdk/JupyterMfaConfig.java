@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.infra.Defaults.JUPYTER_DOMAIN;
 import static java.lang.String.format;
 
 /**
@@ -61,7 +60,10 @@ class JupyterMfaConfig {
 
     private static final String SECRET_NAME = "oauth2-proxy-secret";
 
-    JupyterMfaConfig(Construct scope, List<ITerraformDependable> dependsOn, String jupyterUpstreamUrl) {
+    JupyterMfaConfig(Construct scope,
+                     List<ITerraformDependable> dependsOn,
+                     String jupyterUpstreamUrl,
+                     String jupyterDomain) {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
 
@@ -89,7 +91,7 @@ class JupyterMfaConfig {
                         "--cookie-secure=true",                           // set true when TLS terminates at this proxy
                         "--skip-provider-button=false",
                         "--ping-path=/ping",
-                        format("--redirect-url=https://%s/oauth2/callback", JUPYTER_DOMAIN)
+                        format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)
                      ))
                 .env(List.of(
                         envFromSecret("OAUTH2_PROXY_CLIENT_ID",     SECRET_NAME, "client-id"),

@@ -3,7 +3,6 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.Defaults;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
@@ -30,10 +29,15 @@ public class StepOperations {
     private final StepActions actions;
 
     private final String awsPolarisDomainName;
+    private final String awsAccountId;
+    private final String region;
 
     public StepOperations(StepActions actions) {
         this.actions              = actions;
-        this.awsPolarisDomainName = AWS_POLARIS_DOMAIN_NAME.getValueFrom(appProperties());
+        Properties properties = appProperties();
+        this.awsPolarisDomainName = AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
+        this.awsAccountId         = AWS_ACCOUNT_ID.getValueFrom(properties);
+        this.region               = AWS_REGION.getValueFrom(properties);
     }
 
     public Step cleanLocalAws() {
@@ -47,7 +51,7 @@ public class StepOperations {
                               You may need to run:
                               
                               aws eks update-kubeconfig --region %s --name %s
-                              """, Defaults.AWS_REGION, CLUSTER_NAME), ex);
+                              """, region, CLUSTER_NAME), ex);
             }});
     }
 
@@ -181,7 +185,8 @@ public class StepOperations {
     }
 
     private void useAwsKubernetes() throws ManagedProcessException {
-        actions.run("kubectl", null, "config", "use-context", "arn:aws:eks:eu-west-2:123456789012:cluster/spark-cluster");
+        String context = format("arn:aws:eks:%s:%s:cluster/spark-cluster", region, awsAccountId);
+        actions.run("kubectl", null, "config", "use-context", context);
     }
     private void useAzureKubernetes() throws ManagedProcessException {
         actions.run("kubectl", null, "config", "use-context", "spark-cluster");
