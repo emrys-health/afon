@@ -32,27 +32,33 @@ import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
 import java.util.List;
+import java.util.Properties;
 
-import static health.emrys.afon.infra.Defaults.AZURE_REGION;
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
 public class AzureConstruct extends AbstractConstruct {
 
-    private static final String RESOURCE_GROUP_NAME = "afon_resource_group_aks";
     private static final String KUBERNETES_VERSION   = "1.33";
     private static final String VNET_CIDR            = "10.1.0.0/16";
     private static final String SUBNET_CIDR          = "10.1.1.0/24";
     private static final String SERVICE_CIDR         = "10.2.0.0/16";
     private static final String DNS_SERVICE_IP       = "10.2.0.10";
-    private static final String SUBSCRIPTION_ID      = "ffae1297-4c57-47e0-9a89-5583b97835cf";
+    private final String             resourceGroup;
+    private final String             subscriptionId;
+    private final String             region;
+    private final KubernetesCluster  aksCluster;
+    private       KubernetesProvider k8sProvider;
+    private       HelmProvider       helmProvider;
 
-    private final KubernetesCluster aksCluster;
-    private KubernetesProvider      k8sProvider;
-    private HelmProvider            helmProvider;
-
-    public AzureConstruct(@NotNull Construct scope, @NotNull String id) {
+    public AzureConstruct(@NotNull Construct scope,
+                          @NotNull String id,
+                          Properties properties) {
         super(scope, id);
+        resourceGroup  = AZURE_RESOURCE_GROUP.getValueFrom(properties);
+        subscriptionId = AZURE_SUBSCRIPTION.getValueFrom(properties);
+        this.region = AZURE_REGION.getValueFrom(properties);
         configureProviders();
         ResourceGroup        resourceGroup = createResourceGroup();
         UserAssignedIdentity identity      = createIdentity(resourceGroup);
@@ -68,11 +74,11 @@ public class AzureConstruct extends AbstractConstruct {
         NullProvider.Builder.create(this, "null").build();
         AzurestackProvider.Builder.create(this, "azurestack")
                                   .features(AzurestackProviderFeatures.builder().build())
-                                  .metadataHost(AZURE_REGION)
+                                  .metadataHost(region)
                                   .build();
         AzurermProvider.Builder.create(this, "azurerm")
                                .features(List.of(AzurermProviderFeatures.builder().build()))
-                               .subscriptionId(SUBSCRIPTION_ID)
+                               .subscriptionId(subscriptionId)
                                .build();
     }
 
@@ -82,8 +88,8 @@ public class AzureConstruct extends AbstractConstruct {
 
     private ResourceGroup createResourceGroup() {
         return new ResourceGroup(this, "aks-rg", ResourceGroupConfig.builder()
-                .name(RESOURCE_GROUP_NAME)
-                .location(AZURE_REGION)
+                .name(resourceGroup)
+                .location(region)
                 .build());
     }
 
@@ -330,4 +336,9 @@ public class AzureConstruct extends AbstractConstruct {
         }
         return helmProvider;
     }
+
+    public String getResourceGroup() {
+        return resourceGroup;
+    }
+
 }
