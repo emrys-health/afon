@@ -7,7 +7,6 @@ import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
-import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
@@ -20,6 +19,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -27,6 +27,7 @@ import software.constructs.Construct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
@@ -55,8 +56,10 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
     protected final SparkConfig   sparkOperatorConfig;
     private String DELETE_CRDS;
 
-    public AwsWholeStack(final Construct scope, final SupportedCloudsEnum id) {
-        super(scope, id);
+    public AwsWholeStack(final Construct scope,
+                         final SupportedCloudsEnum id,
+                         final Properties properties) {
+        super(scope, id, properties);
         List<ITerraformDependable> dependables   = cloudProvider.getDependables();
         deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
@@ -344,7 +347,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsWholeStack(app, ID);
+        new AwsWholeStack(app, ID, new AfonPropertiesLoader().getProperties());
         app.synth();
         logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu -apply");
     }
