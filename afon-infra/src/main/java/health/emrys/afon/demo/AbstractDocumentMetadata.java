@@ -32,7 +32,7 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                 List<Step>     steps        = ((StepsProvider) o).stepsUsing(dummyOps);
                 String[]       stepArray    = steps.stream().map(x -> x.name).toArray(String[]::new);
                 if (stepArray.length > 0) {
-                    mvnDeploy = format("""
+                    stepInstructions = format("""
                     
                     The steps to run are:
                     1. %s
@@ -40,6 +40,8 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                     If the job fails on a given step, you can add this switch to the mvn command above:
                     
                     `-Dexec.args="STEP_FROM_LIST_ABOVE"`
+                    
+                    and the steps will continue starting at that one.
                     """, String.join(("\n1. "), stepArray));
                 }
             }
