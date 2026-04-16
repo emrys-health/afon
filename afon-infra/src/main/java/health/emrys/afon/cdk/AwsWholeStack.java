@@ -31,7 +31,9 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
+import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DOMAIN;
 import static health.emrys.afon.infra.Defaults.*;
+import static java.lang.String.format;
 
 /***
  * Creates the markup to create the full stack in AWS.
@@ -54,12 +56,14 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
     static final    String  NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge";
     protected final List<Service> loadBalancers;
     protected final SparkConfig   sparkOperatorConfig;
+    private final   String jupyterDomain;
     private String DELETE_CRDS;
 
     public AwsWholeStack(final Construct scope,
                          final SupportedCloudsEnum id,
                          final Properties properties) {
         super(scope, id, properties);
+        this.jupyterDomain = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
         List<ITerraformDependable> dependables   = cloudProvider.getDependables();
         deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
@@ -181,7 +185,10 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         // Deploy oauth2-proxy pointing at the Jupyter web ClusterIP service.
         List<ITerraformDependable> proxyDeps = new ArrayList<>(eksDependOn);
         proxyDeps.add(jupyterWeb);
-        new JupyterMfaConfig(this, proxyDeps, "http://jupyter-web:8888");
+        new JupyterMfaConfig(this,
+                             proxyDeps,
+                             "http://jupyter-web:8888",
+                             jupyterDomain);
 
         // for emrysjupyter.click, this is Z03165251T5B540VMLNST
         // run aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click to see
@@ -191,15 +198,17 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         IngressV1 ingress = cloudProvider.createHttpsIngress(
                 "jupyter-https-ingress",
                 "jupyter-ingress",
-                "arn:aws:acm:eu-west-2:418295715997:certificate/8f58f850-3756-40d4-b7b5-499124f150e3",
-                JUPYTER_DOMAIN,
+                format("arn:aws:acm:%s:%s:certificate/8f58f850-3756-40d4-b7b5-499124f150e3",
+                       cloudProvider.getRegion(),
+                       cloudProvider.getAccountId()),
+                jupyterDomain,
                 JupyterMfaConfig.PROXY_SVC_NAME,
                 JupyterMfaConfig.PROXY_PORT,
                 cloudProvider.getSubnetIds());
 
         cloudProvider.configureDNS("JupyterAliasRecord",
                                    "Z03165251T5B540VMLNST", // aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click
-                                   JUPYTER_DOMAIN, cloudProvider.getLbRelease(), ingress);
+                                   jupyterDomain, cloudProvider.getLbRelease(), ingress);
 
         Service.Builder.create(this, "jupyter-internal")
                        .metadata(ServiceMetadata.builder()

@@ -3,12 +3,10 @@ package health.emrys.afon.infra;
 public interface Defaults {
 
     String CLUSTER_NAME = "spark-cluster";
-    String AWS_REGION   = "eu-west-2";
     String GCP_REGION   = "europe-west2";
     String AZURE_REGION = "uksouth";
 
     String JUPYTER_SERVICE_NAME = "jupyter-web";
-    String JUPYTER_DOMAIN       = "emrysjupyter.click";
 
     String POLARIS_POD_NAME     = "polaris";
     String POLARIS_SERVICE_NAME = "polaris-ingress";

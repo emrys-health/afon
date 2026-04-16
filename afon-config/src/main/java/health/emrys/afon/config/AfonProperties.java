@@ -26,6 +26,9 @@ public class AfonProperties {
     public static final AfonProperty AWS_SECRET_ACCESS_KEY          = new AfonProperty("AWS_SECRET_ACCESS_KEY");
     public static final AfonProperty AWS_S3_BUCKET_NAME_FORBIDDEN   = new AfonProperty("AWS_S3_BUCKET_NAME_FORBIDDEN");
     public static final AfonProperty AWS_POLARIS_DOMAIN_NAME        = new AfonProperty("AWS_POLARIS_DOMAIN_NAME");
+    public static final AfonProperty AWS_ACCOUNT_ID                 = new AfonProperty("AWS_ACCOUNT_ID");
+    public static final AfonProperty AWS_ZONE_ID                    = new AfonProperty("AWS_ZONE_ID");
+    public static final AfonProperty AWS_JUPYTER_DOMAIN             = new AfonProperty("AWS_JUPYTER_DOMAIN");
 
     // GCP
     public static final AfonProperty GCP_BUCKET_NAME                = new AfonProperty("GCP_BUCKET_NAME");
