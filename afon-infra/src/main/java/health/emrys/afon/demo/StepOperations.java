@@ -4,7 +4,6 @@ import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.Defaults;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
 import health.emrys.afon.infra.checks.SparkCheck;
 import org.jspecify.annotations.NonNull;
@@ -12,7 +11,6 @@ import org.slf4j.Logger;
 
 import java.util.Properties;
 
-import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
@@ -31,13 +29,15 @@ public class StepOperations {
     private final String awsPolarisDomainName;
     private final String awsAccountId;
     private final String region;
+    private final String azurePolarisDomainName;
 
     public StepOperations(StepActions actions) {
-        this.actions              = actions;
-        Properties properties = appProperties();
-        this.awsPolarisDomainName = AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
-        this.awsAccountId         = AWS_ACCOUNT_ID.getValueFrom(properties);
-        this.region               = AWS_REGION.getValueFrom(properties);
+        this.actions                = actions;
+        Properties properties       = appProperties();
+        this.awsPolarisDomainName   = AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
+        this.awsAccountId           = AWS_ACCOUNT_ID.getValueFrom(properties);
+        this.region                 = AWS_REGION.getValueFrom(properties);
+        this.azurePolarisDomainName = AZURE_DOMAIN_NAME.getValueFrom(properties);
     }
 
     public Step cleanLocalAws() {
@@ -93,7 +93,7 @@ public class StepOperations {
     }
 
     public Step purgeForeignCatalogFromAzure() {
-        return purgeForeignCatalogFrom(AZURE_DOMAIN_NAME, AZURE);
+        return purgeForeignCatalogFrom(azurePolarisDomainName, AZURE);
     }
 
     public @NonNull Step purgeForeignCatalogFrom(String domainName,
@@ -115,8 +115,7 @@ public class StepOperations {
     }
 
     public Step createAzureCatalogInAzure() {
-        String domainName = AZURE_DOMAIN_NAME;
-        return createAzureCatalogIn(domainName);
+        return createAzureCatalogIn(azurePolarisDomainName);
     }
 
     public @NonNull Step createAzureCatalogIn(String domainName) {
@@ -135,7 +134,7 @@ public class StepOperations {
     }
 
     public Step createExternalAzureCatalogInAzure() {
-        return createExternalAzureCatalogIn(AZURE_DOMAIN_NAME);
+        return createExternalAzureCatalogIn(azurePolarisDomainName);
     }
 
     public @NonNull Step createExternalAzureCatalogIn(String domainName) {
@@ -162,7 +161,7 @@ public class StepOperations {
     }
 
     public Step waitForAzurePolaris() {
-        return actions.waitFor(AZURE_DOMAIN_NAME);
+        return actions.waitFor(azurePolarisDomainName);
     }
 
     public Step waitFor(String domainName) {

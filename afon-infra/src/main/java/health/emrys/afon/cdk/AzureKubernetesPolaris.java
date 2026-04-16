@@ -23,7 +23,6 @@ import static health.emrys.afon.config.AfonProperties.AZURE_RESOURCE_GROUP;
 
 public class AzureKubernetesPolaris extends AzureKubernetesStack {
 
-    public  static final String AZURE_DOMAIN_NAME  = "emryspolarisazure.click";
     private static final String POLARIS_INTERNAL   = "polaris-internal";
     private static final String TLS_SECRET_NAME    = "polaris-tls";
     private static final int    POLARIS_PORT       = 8181;
@@ -48,7 +47,7 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
                                       .build();
             }
         };
-        var                        util         = new TFUtils(this, AZURE_DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT, POLARIS_INTERNAL);
+        var                        util         = new TFUtils(this, azurePolarisDomainName, TLS_SECRET_NAME, POLARIS_PORT, POLARIS_INTERNAL);
         HelmProvider               helm         = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables  = cloudProvider.getDependables();
         Map<String, String>        annotations  = Map.of("controller.service.annotations.service\\.beta\\.kubernetes\\.io/azure-load-balancer-health-probe-request-path", "/healthz");
@@ -61,7 +60,7 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
 
     private void configureDns(IngressV1 ingress) {
         DataAzurermDnsZone dnsZone = DataAzurermDnsZone.Builder.create(this, "dns-zone")
-                                                               .name(AZURE_DOMAIN_NAME)
+                                                               .name(azurePolarisDomainName)
                                                                .resourceGroupName(cloudProvider.getResourceGroup())
                                                                .build();
 
