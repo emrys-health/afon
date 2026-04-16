@@ -85,8 +85,8 @@ public class StepDocumentation extends StepActions {
     @Override
     public void deleteTerraformStateFiles(AfonProperties.SupportedCloudsEnum id) throws IOException {
         out.println(format("""
-                           Delete `%s*`
-                           """, TERRAFORM_STATE_FILE_PATTERN));
+                           Delete `./%s%s*`
+                           """, TERRAFORM_STATE_FILE_PATTERN, id));
         out.flush();
     }
 

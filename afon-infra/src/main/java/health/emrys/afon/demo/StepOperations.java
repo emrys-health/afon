@@ -3,7 +3,6 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
-import health.emrys.afon.cdk.GcpKubernetesPolaris;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.Defaults;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
@@ -15,7 +14,6 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
-import static health.emrys.afon.cdk.GcpKubernetesPolaris.GCP_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
