@@ -12,7 +12,7 @@ import java.util.List;
  * - an Azure Polaris with an Azure catalog
  * - a smoke test that ensures that Spark (running locally) can talk to the AWS catalog that is a proxy for the Azure one
  */
-public class DeployExternalCatalogsMain {
+public class DeployExternalCatalogsMain implements StepsProvider {
 
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(DeployExternalCatalogsMain.class);
 
@@ -42,4 +42,8 @@ public class DeployExternalCatalogsMain {
         }
     }
 
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
+        return steps(stepOperations);
+    }
 }
