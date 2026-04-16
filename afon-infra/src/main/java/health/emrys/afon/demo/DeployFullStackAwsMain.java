@@ -2,7 +2,7 @@ package health.emrys.afon.demo;
 
 import java.util.List;
 
-public class DeployFullStackAwsMain {
+public class DeployFullStackAwsMain implements StepsProvider {
     static final List<Step> steps(StepOperations stepOperations) {
         return List.of(
             stepOperations.cleanLocalAws(),
@@ -21,5 +21,10 @@ public class DeployFullStackAwsMain {
             String firstStep  = args[0];
             app.runFrom(steps, firstStep);
         }
+    }
+
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
+        return steps(stepOperations);
     }
 }
