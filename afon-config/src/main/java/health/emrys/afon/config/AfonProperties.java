@@ -38,6 +38,9 @@ public class AfonProperties {
     public static final AfonProperty GOOGLE_APPLICATION_CREDENTIALS = new AfonProperty("GOOGLE_APPLICATION_CREDENTIALS");
 
     // AZURE
+    public static final AfonProperty AZURE_SUBSCRIPTION       = new AfonProperty("AZURE_SUBSCRIPTION");
+    public static final AfonProperty AZURE_REGION             = new AfonProperty("AZURE_REGION");
+    public static final AfonProperty AZURE_RESOURCE_GROUP     = new AfonProperty("AZURE_RESOURCE_GROUP");
     public static final AfonProperty AZURE_BUCKET             = new AfonProperty("AZURE_BUCKET");
     public static final AfonProperty AZURE_BUCKET_FORBIDDEN   = new AfonProperty("AZURE_BUCKET_FORBIDDEN");
     public static final AfonProperty AZURE_EXTERNAL_BUCKET    = new AfonProperty("AZURE_EXTERNAL_BUCKET");
