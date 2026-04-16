@@ -3,6 +3,7 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.Defaults;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
@@ -12,7 +13,6 @@ import org.slf4j.Logger;
 
 import java.util.Properties;
 
-import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
@@ -29,8 +29,11 @@ public class StepOperations {
 
     private final StepActions actions;
 
+    private final String awsPolarisDomainName;
+
     public StepOperations(StepActions actions) {
-        this.actions = actions;
+        this.actions              = actions;
+        this.awsPolarisDomainName = AWS_POLARIS_DOMAIN_NAME.getValueFrom(appProperties());
     }
 
     public Step cleanLocalAws() {
@@ -138,7 +141,7 @@ public class StepOperations {
     }
 
     public Step initializeAllCatalogsInAws() {
-        return initializeAllCatalogsIn(AWS_POLARIS_DOMAIN_NAME);
+        return initializeAllCatalogsIn(awsPolarisDomainName);
     }
 
     @NonNull
@@ -151,7 +154,7 @@ public class StepOperations {
     }
 
     public Step waitForAwsPolaris() {
-        return actions.waitFor(AWS_POLARIS_DOMAIN_NAME);
+        return actions.waitFor(awsPolarisDomainName);
     }
 
     public Step waitForAzurePolaris() {
@@ -164,14 +167,14 @@ public class StepOperations {
 
     public Step checkLocalSparkTalksToAzureViaAws() {
         return new Step("az_external_aws_check",
-                        format("run Spark locally such that it talks to %s which defers to %s", AWS_POLARIS_DOMAIN_NAME, AZURE_DOMAIN_NAME),
+                        format("run Spark locally such that it talks to %s which defers to %s", awsPolarisDomainName, AZURE_DOMAIN_NAME),
                         () -> {
                             Properties properties = appProperties();
                             actions.executeMainOf(SparkCheck.class,
                                                   new String[] {AZURE_EXTERNAL.toString(),
                                                                 POLARIS_ID.getValueFrom(properties),
                                                                 POLARIS_SECRET.getValueFrom(properties),
-                                                                AWS_POLARIS_DOMAIN_NAME
+                                                                awsPolarisDomainName
                                                                 },
                                                   NO_ENV_VARIABLES);
                         });

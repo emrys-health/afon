@@ -15,14 +15,15 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
-import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
 
 public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
@@ -36,11 +37,13 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
     protected final AwsConstruct      cloudProvider;
     protected final Service           polarisLB;
 
-    public AwsKubernetesPolaris(@NotNull Construct scope, SupportedCloudsEnum id) {
+    public AwsKubernetesPolaris(@NotNull Construct scope,
+                                SupportedCloudsEnum id,
+                                Properties properties) {
         super(scope, id.toString());
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
-        cloudProvider = new AwsConstruct(this, id.toString());
+        cloudProvider = new AwsConstruct(this, id.toString(), properties);
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
             protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
                 return null; // no longer using an external service
@@ -66,7 +69,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsKubernetesPolaris(app, ID);
+        new AwsKubernetesPolaris(app, ID, new AfonPropertiesLoader().getProperties());
         app.synth();
         logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu -apply");
     }
@@ -78,6 +81,6 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
 
     @Override
     public String getPolarisDomainName() {
-        return AWS_POLARIS_DOMAIN_NAME;
+        return cloudProvider.getPolarisDomainName();
     }
 }

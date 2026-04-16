@@ -5,19 +5,23 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 public class PrometheusClusterDeploy extends SparkClusterDeployment {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PrometheusClusterDeploy.class);
 
-    public PrometheusClusterDeploy(@NotNull Construct scope, @NotNull SupportedCloudsEnum id) {
-        super(scope, id);
+    public PrometheusClusterDeploy(@NotNull Construct scope,
+                                   @NotNull SupportedCloudsEnum id,
+                                   Properties properties) {
+        super(scope, id, properties);
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
         dependablesAndLoadBalancers.addAll(loadBalancers);
         deployPrometheus(dependablesAndLoadBalancers);
@@ -70,7 +74,7 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
         logger.info("Creating JSON for Prometheus");
         final App app = new App();
         try {
-            new PrometheusClusterDeploy(app, AwsKubernetesPolaris.ID);
+            new PrometheusClusterDeploy(app, AwsKubernetesPolaris.ID, new AfonPropertiesLoader().getProperties());
             app.synth();
         } catch (RuntimeException e) {
             logAndThrow(e);

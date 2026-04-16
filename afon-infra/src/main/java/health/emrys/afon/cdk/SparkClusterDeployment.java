@@ -24,8 +24,7 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.*;
 
 public class SparkClusterDeployment extends AwsWholeStack {
@@ -34,8 +33,9 @@ public class SparkClusterDeployment extends AwsWholeStack {
     static final String NO_SPARK_LB_FINALIZERS = "kubectl patch service spark-master-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
 
     public SparkClusterDeployment(@NotNull Construct scope,
-                                  @NotNull SupportedCloudsEnum id) {
-        super(scope, id);
+                                  @NotNull SupportedCloudsEnum id,
+                                  Properties properties) {
+        super(scope, id, properties);
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
 
@@ -238,7 +238,9 @@ public class SparkClusterDeployment extends AwsWholeStack {
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
         Properties properties = new AfonPropertiesLoader().getProperties();
         SparkWarehouseConfig sparkWarehouseConfig = new SparkWarehouseConfig(
-            POLARIS_ID.getValueFrom(properties),  POLARIS_SECRET.getValueFrom(properties), "emryspolaris.click" // TODO don't hard code
+            POLARIS_ID.getValueFrom(properties),
+            POLARIS_SECRET.getValueFrom(properties),
+            AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties)
         );
         for (SupportedCloudsEnum cloudProvider : SupportedCloudsEnum.values()) {
             Map<String, String> configs = sparkWarehouseConfig.sparkConfigs(cloudProvider);
@@ -264,7 +266,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
     private static void createSparkDeploymentTerraformFile() {
         logger.info("Creating JSON for a Spark cluster");
         final App app = new App();
-        new SparkClusterDeployment(app, AwsKubernetesPolaris.ID);
+        new SparkClusterDeployment(app, AwsKubernetesPolaris.ID, new AfonPropertiesLoader().getProperties());
         app.synth();
     }
 

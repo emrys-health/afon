@@ -8,30 +8,26 @@ import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.cdk.AwsConstruct.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.cdk.AzureKubernetesPolaris.AZURE_DOMAIN_NAME;
 import static health.emrys.afon.cdk.GcpKubernetesPolaris.GCP_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 
 public class PolarisClusterCredentials implements ClusterCredentials {
 
+    private static final Properties properties = new AfonPropertiesLoader().getProperties();
     private static final Map<SupportedCloudsEnum, String> POLARIS_HOST_FOR
-        = Map.of(AWS, AWS_POLARIS_DOMAIN_NAME,
+        = Map.of(AWS, AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties),
                  AZURE, AZURE_DOMAIN_NAME,
                  GCP, GCP_DOMAIN_NAME);
+
 
     public static ClusterCredentials createClusterCredentials(SupportedCloudsEnum cloud) {
         return new PolarisClusterCredentials(POLARIS_HOST_FOR.get(cloud));
     }
-
-
-    private final Properties properties;
     private final String accessToken;
 
     public PolarisClusterCredentials(String host) {
-        properties = new AfonPropertiesLoader().getProperties();
-        properties.put(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), host);
-        accessToken = new AfonPolarisClient(properties, "https").getAccessToken();
+        accessToken = new AfonPolarisClient(host, properties).getAccessToken();
     }
 
     @Override
