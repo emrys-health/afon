@@ -31,7 +31,7 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
         this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);
         this.multiTenantAppName = AZURE_CLIENT_ID.getValueFrom(properties);
         this.clientId           = AZURE_CLIENT_ID.getValueFrom(properties);
-        this.domainName         = AfonProperties.AZURE_DOMAIN_NAME.getValueFrom(properties);
+        this.domainName         = "https://" + AfonProperties.AZURE_DOMAIN_NAME.getValueFrom(properties);
     }
 
     @Override
