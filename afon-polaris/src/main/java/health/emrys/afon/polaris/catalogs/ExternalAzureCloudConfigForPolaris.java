@@ -1,5 +1,6 @@
 package health.emrys.afon.polaris.catalogs;
 
+import health.emrys.afon.config.AfonProperties;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import org.jspecify.annotations.NonNull;
 
@@ -20,6 +21,7 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
     private final @NonNull String tenant;
     private final @NonNull String multiTenantAppName;
     private final @NonNull String clientId;
+    private final @NonNull String domainName;
 
     public ExternalAzureCloudConfigForPolaris(Properties properties) {
         super(properties);
@@ -29,6 +31,7 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
         this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);
         this.multiTenantAppName = AZURE_CLIENT_ID.getValueFrom(properties);
         this.clientId           = AZURE_CLIENT_ID.getValueFrom(properties);
+        this.domainName         = AfonProperties.AZURE_DOMAIN_NAME.getValueFrom(properties);
     }
 
     @Override
@@ -43,7 +46,7 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
 
     @Override
     protected @NonNull String getEndpoint() {
-        return "https://emryspolarisazure.click"; // TODO don't hardcode
+        return domainName;
     }
 
     @Override
