@@ -12,24 +12,28 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.AZURE_RESOURCE_GROUP;
-
 public class AzureKubernetesPolaris extends AzureKubernetesStack {
+
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AzureKubernetesStack.class);
 
     private static final String POLARIS_INTERNAL   = "polaris-internal";
     private static final String TLS_SECRET_NAME    = "polaris-tls";
     private static final int    POLARIS_PORT       = 8181;
+    private final String resourceGroup;
 
     public AzureKubernetesPolaris(Construct scope, String id,
                                   Properties properties) {
         super(scope, id, properties);
+        resourceGroup = AfonProperties.AZURE_RESOURCE_GROUP.getValueFrom(properties);
 
         PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
             @Override
@@ -61,13 +65,13 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
     private void configureDns(IngressV1 ingress) {
         DataAzurermDnsZone dnsZone = DataAzurermDnsZone.Builder.create(this, "dns-zone")
                                                                .name(azurePolarisDomainName)
-                                                               .resourceGroupName(cloudProvider.getResourceGroup())
+                                                               .resourceGroupName(resourceGroup)
                                                                .build();
 
         new DnsARecord(this, "polaris-dns", DnsARecordConfig.builder()
                                                             .name("@")
                                                             .zoneName(dnsZone.getName())
-                                                            .resourceGroupName(cloudProvider.getResourceGroup())
+                                                            .resourceGroupName(resourceGroup)
                                                             .ttl(300)
                                                             .records(List.of(
                                                                 ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getIp()

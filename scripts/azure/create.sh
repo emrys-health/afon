@@ -29,4 +29,4 @@ az role assignment create  --role "Storage Blob Delegator" --assignee $APP_ID --
 echo "Environment created. Now put these details in your Polaris environment variables:"
 az ad app credential reset --id $APP_ID
 
-
+az network dns zone create  --resource-group $AZURE_RESOURCE_GROUP  --name $AZURE_DOMAIN_NAME

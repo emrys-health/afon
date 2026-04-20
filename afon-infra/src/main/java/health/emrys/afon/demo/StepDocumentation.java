@@ -53,7 +53,7 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public void run(String command, Path path, String... commands) throws ManagedProcessException {
+    public void run(String command, Path path, OutputStream stdOut, String... commands) throws ManagedProcessException {
         if (path != null) {
             out.println(format("In `%s` ", path));
         } else {
