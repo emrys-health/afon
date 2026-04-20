@@ -14,6 +14,7 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -130,10 +131,15 @@ public class StepActions {
 
     public void startCloud(Path jsonDirectory) throws ManagedProcessException {
         run("tofu", jsonDirectory, "init");
-        run("tofu", jsonDirectory, "apply", "--auto-approve");
+        OutputStream suppressedStdOut = OutputStream.nullOutputStream();
+        run("tofu", jsonDirectory, suppressedStdOut, "apply", "--auto-approve");
     }
 
     public void run(String command, Path path, String... commands) throws ManagedProcessException {
+        run(command, path, System.out, commands);
+    }
+
+    public void run(String command, Path path, OutputStream stdOut, String... commands) throws ManagedProcessException {
         ManagedProcessBuilder pb = new ManagedProcessBuilder(command);
         for (String cmd : commands) {
             pb.addArgument(cmd);
@@ -142,7 +148,7 @@ public class StepActions {
             pb.setWorkingDirectory(path.toFile());
         }
         pb.setDestroyOnShutdown(true)
-          .addStdOut(System.out)
+          .addStdOut(stdOut)
           .addStdErr(System.err)
           .setConsoleBufferMaxLines(7000);
         ManagedProcess p = pb.build();
