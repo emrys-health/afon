@@ -56,7 +56,7 @@ public class AzureConstruct extends AbstractConstruct {
                           @NotNull String id,
                           Properties properties) {
         super(scope, id);
-        resourceGroup  = AZURE_RESOURCE_GROUP.getValueFrom(properties);
+        resourceGroup  = AZURE_AKS_RESOURCE_GROUP.getValueFrom(properties);
         subscriptionId = AZURE_SUBSCRIPTION.getValueFrom(properties);
         this.region = AZURE_REGION.getValueFrom(properties);
         configureProviders();
@@ -335,10 +335,6 @@ public class AzureConstruct extends AbstractConstruct {
                     .build();
         }
         return helmProvider;
-    }
-
-    public String getResourceGroup() {
-        return resourceGroup;
     }
 
 }
