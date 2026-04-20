@@ -33,7 +33,7 @@ public class StepRunner {
         log.info("StepOperations:\n{}", humanReadable(steps));
         try {
             for (Step step : steps) {
-                log.info("Running step {}", step.name);
+                log.info("\u001B[32mRunning step {}\u001B[0m", step.name);
                 step.function.run();
             }
             log.info("Successfully ran steps\n{}", humanReadable(steps));
