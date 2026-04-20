@@ -58,6 +58,9 @@ public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
             tofu import azurestack_resource_group.XXX /subscriptions/ffae1297-4c57-47e0-9a89-5583b97835cf/resourceGroups/afon_resource_group_aks
             ```
             replacing XXX with whatever was being used.
+            If that import fails with something like `│ Error: Invalid provider configuration` then
+            temporarily comment out the offending providers (the offending lines in the json will be given)
+            and try again. 
             
             Alternatively, you can delete it with:
             ```shell
