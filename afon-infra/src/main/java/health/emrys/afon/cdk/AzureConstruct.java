@@ -249,6 +249,9 @@ public class AzureConstruct extends AbstractConstruct {
                 .loadBalancerSku("standard")
                 .serviceCidr(SERVICE_CIDR)
                 .dnsServiceIp(DNS_SERVICE_IP)
+                .networkPlugin("azure")
+                .networkDataPlane("cilium")
+                .networkPluginMode("overlay")
                 .build();
 
         LocalExecProvisioner updateCredentials = LocalExecProvisioner.builder()
