@@ -3,6 +3,7 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
 import health.emrys.afon.infra.checks.SparkCheck;
@@ -29,6 +30,7 @@ public class StepOperations {
     private final String awsAccountId;
     private final String region;
     private final String azurePolarisDomainName;
+    private final String clusterName;
 
     public StepOperations(StepActions actions) {
         this.actions                = actions;
@@ -37,6 +39,7 @@ public class StepOperations {
         this.awsAccountId           = AWS_ACCOUNT_ID.getValueFrom(properties);
         this.region                 = AWS_REGION.getValueFrom(properties);
         this.azurePolarisDomainName = AZURE_DOMAIN_NAME.getValueFrom(properties);
+        this.clusterName            = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
     }
 
     public Step cleanLocalAws() {
@@ -49,8 +52,8 @@ public class StepOperations {
                 log.error(format("""
                               You may need to run:
                               
-                              aws eks update-kubeconfig --region %s --name spark-cluster
-                              """, region), ex);
+                              aws eks update-kubeconfig --region %s --name %s
+                              """, region, clusterName), ex);
             }});
     }
 
@@ -183,10 +186,10 @@ public class StepOperations {
     }
 
     private void useAwsKubernetes() throws ManagedProcessException {
-        String context = format("arn:aws:eks:%s:%s:cluster/spark-cluster", region, awsAccountId);
+        String context = format("arn:aws:eks:%s:%s:cluster/%s", region, awsAccountId, clusterName);
         actions.run("kubectl", null, "config", "use-context", context);
     }
     private void useAzureKubernetes() throws ManagedProcessException {
-        actions.run("kubectl", null, "config", "use-context", "spark-cluster");
+        actions.run("kubectl", null, "config", "use-context", clusterName);
     }
  }
