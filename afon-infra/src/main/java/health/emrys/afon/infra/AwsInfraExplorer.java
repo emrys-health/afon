@@ -1,5 +1,6 @@
 package health.emrys.afon.infra;
 
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.k8s.EksInfoClient;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
@@ -8,7 +9,6 @@ import org.slf4j.Logger;
 
 import java.util.Properties;
 
-import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_NAME;
 
 public class AwsInfraExplorer {
@@ -16,9 +16,9 @@ public class AwsInfraExplorer {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsInfraExplorer.class);
 
     public static final void main(String[] args) {
-        String clusterName = CLUSTER_NAME;
-        logger.info("Exploring infra. I'm assuming that cluster {} is up and running...", clusterName);
         Properties       properties = new AfonPropertiesLoader().getProperties();
+        String clusterName          = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+        logger.info("Exploring infra. I'm assuming that cluster {} is up and running...", clusterName);
         AwsInfraExplorer app        = new AwsInfraExplorer();
         try {
 //            app.printJupyterDetails(clusterName, properties, JUPYTER_SERVICE_NAME); // don't use service for Jupyter any more

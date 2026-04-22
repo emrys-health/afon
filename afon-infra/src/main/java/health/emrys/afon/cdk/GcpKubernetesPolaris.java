@@ -13,10 +13,12 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 public class GcpKubernetesPolaris extends GcpKubernetesStack {
 
@@ -26,8 +28,8 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
     private static final String TLS_SECRET_NAME  = "polaris-tls";
     private static final int    POLARIS_PORT     = 8181;
 
-    public GcpKubernetesPolaris(Construct scope, String id) {
-        super(scope, id);
+    public GcpKubernetesPolaris(Construct scope, String id, Properties properties) {
+        super(scope, id, properties);
         PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
             @Override
             protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
@@ -75,7 +77,8 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new GcpKubernetesPolaris(app, ID.toString());
+        Properties properties = new AfonPropertiesLoader().getProperties();
+        new GcpKubernetesPolaris(app, ID.toString(), properties);
         app.synth();
     }
 }

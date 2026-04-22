@@ -14,7 +14,6 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
-import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static health.emrys.afon.infra.checks.SparkCheck.EXTERNAL_NAMESPACE;
 import static java.lang.String.format;
 
@@ -50,8 +49,8 @@ public class StepOperations {
                 log.error(format("""
                               You may need to run:
                               
-                              aws eks update-kubeconfig --region %s --name %s
-                              """, region, CLUSTER_NAME), ex);
+                              aws eks update-kubeconfig --region %s --name spark-cluster
+                              """, region), ex);
             }});
     }
 

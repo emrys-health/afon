@@ -16,14 +16,14 @@ import software.amazon.awssdk.services.eks.model.DescribeClusterResponse;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 
 public class EksInfoClient extends K8sClient {
 
     static final  Logger logger = org.slf4j.LoggerFactory.getLogger(EksInfoClient.class);
 
     public static void main(String[] args) {
-        EksInfoClient app = new EksInfoClient(CLUSTER_NAME, new AfonPropertiesLoader().getProperties());
+        Properties    properties = new AfonPropertiesLoader().getProperties();
+        EksInfoClient app        = new EksInfoClient(CLUSTER_NAME.getValueFrom(properties), properties);
         app.smokeTest();
     }
 
