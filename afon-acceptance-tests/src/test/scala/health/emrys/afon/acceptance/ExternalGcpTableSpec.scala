@@ -102,7 +102,8 @@ class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
       ConnectionTypeEnum.ICEBERG_REST,
       "https://biglake.googleapis.com/iceberg/v1/restcatalog",
       authenticationParameters,
-      null)
+      null,
+      java.util.Map.of())
 
     val catalog =
       new ExternalCatalog(
