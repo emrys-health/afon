@@ -1,5 +1,6 @@
 package health.emrys.afon.polaris.catalogs;
 
+import java.util.Map;
 import java.util.Properties;
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum;
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum;
@@ -41,7 +42,8 @@ public class GlueCloudConfigForPolaris extends AwsCloudConfigForPolaris {
             ConnectionTypeEnum.ICEBERG_REST,
             "https://glue." + getRegion() + ".amazonaws.com/iceberg",
             glueIcebergRole,
-            null);
+            null,
+            Map.of());
 
         ExternalCatalog catalog =
             new ExternalCatalog(

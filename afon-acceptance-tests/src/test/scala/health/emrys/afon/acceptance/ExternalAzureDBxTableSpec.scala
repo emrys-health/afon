@@ -86,7 +86,8 @@ class ExternalAzureDBxTableSpec extends SpecPretifier with GivenWhenThen {
       ConnectionTypeEnum.ICEBERG_REST,
       f"https://adb-7405611337270626.6.azuredatabricks.net/api/2.1/unity-catalog/iceberg-rest/",
       dbToken,
-      null)
+      null,
+      java.util.Map.of())
 
     val catalog =
       new ExternalCatalog(

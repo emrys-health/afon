@@ -5,6 +5,7 @@ import org.apache.polaris.core.admin.model.*;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.polaris.comms.AfonPolarisClient.getTokenUri;
@@ -39,7 +40,8 @@ abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolari
             ConnectionConfigInfo.ConnectionTypeEnum.ICEBERG_REST,
             getEndpoint() + "/api/catalog/",
             cnxnParams,
-            null);
+            null,
+            Map.of());
 
         ExternalCatalog catalog =
             new ExternalCatalog(
