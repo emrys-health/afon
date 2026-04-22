@@ -66,3 +66,26 @@ OAUTH2_COOKIE_SECRET=
 POLARIS_DB_PASSWORD=
 POLARIS_DB_HOST=
 ````
+
+
+### Running the demo
+
+Run the following to build and install the project:
+
+```shell
+mvn clean install
+```
+
+```shell
+cd afon-infra
+```
+
+```shell
+mvn  compile -Dexec.mainClass=health.emrys.afon.demo.DocumentExternalCatalogsMain  exec:java
+```
+
+Once that has run you should be able to open the readme for your infrastructure setup at 
+
+```shell
+cat afon-core/afon-infra/target/aws_azure_external_catalogs.md
+```
