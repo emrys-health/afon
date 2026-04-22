@@ -54,7 +54,6 @@ import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
 import static health.emrys.afon.cdk.SparkClusterDeployment.NO_SPARK_LB_FINALIZERS;
 import static health.emrys.afon.config.AfonProperties.AWS_ACCOUNT_ID;
-import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
 public class AwsConstruct extends AbstractConstruct {
@@ -71,6 +70,7 @@ public class AwsConstruct extends AbstractConstruct {
     private final        String                     accountId;
     private final        String                     region;
     private final        String                     zone_id;
+    private final        String                     clusterName;
     final                Vpc                        vpc;
     final                IamRole                    loadBalancerRole;
     final                Resource                   newKubeConfig;
@@ -78,6 +78,8 @@ public class AwsConstruct extends AbstractConstruct {
 
     AwsConstruct(final Construct scope, final String id, Properties properties) {
         super(scope, id);
+
+        clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
 
         this.polarisDomainName  = AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
         this.accountId          = AWS_ACCOUNT_ID.getValueFrom(properties);
@@ -187,7 +189,7 @@ public class AwsConstruct extends AbstractConstruct {
         final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
 
         cluster = EksCluster.Builder.create(this, "eksCluster")
-                                    .name(CLUSTER_NAME)
+                                    .name(clusterName)
                                     .roleArn(eksClusterRole.getArn())
                                     .vpcConfig(vpcConfig)
 //                                    .provisioners(destroyELBs())
@@ -297,7 +299,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                                 .command(format(
                                                                              "aws eks update-kubeconfig --name %s " +
                                                                                  "--region %s",
-                                                                             CLUSTER_NAME,
+                                                                             clusterName,
                                                                              region)
                                                                         )
                                                                 .type("local-exec")
@@ -343,9 +345,9 @@ public class AwsConstruct extends AbstractConstruct {
                                             "kubectl delete ds aws-node -n kube-system  || echo no aws-node",
                                             "kubectl delete ds kube-proxy -n kube-system || echo no kube-proxy",
                                             format("aws eks delete-addon --cluster-name %s --addon-name vpc-cni || " +
-                                                       "echo no vpc-cni", CLUSTER_NAME),
+                                                       "echo no vpc-cni", clusterName),
                                             format("aws eks delete-addon --cluster-name %s --addon-name kube-proxy ||" +
-                                                       " echo no kube-proxy", CLUSTER_NAME)))
+                                                       " echo no kube-proxy", clusterName)))
                                         .version("1.15.0") // Use the latest stable version
 
                                         // Set the specific values to kill kube-proxy dependency
@@ -535,7 +537,7 @@ public class AwsConstruct extends AbstractConstruct {
             DataAwsEksClusterConfig.
                 builder()
                 .dependsOn(eksDependOn)
-                .name(CLUSTER_NAME)
+                .name(clusterName)
                 .build());
 
         // Extract the OIDC Issuer URL from the cluster data
@@ -559,7 +561,7 @@ public class AwsConstruct extends AbstractConstruct {
 //                .thumbprintList(List.of("9e99a48a9960b14926cc7f3b02e22da2b0e791e8"))
 
             // Optional: Tag the resource
-            .tags(Map.of("Name", CLUSTER_NAME + "-oidc-provider"))
+            .tags(Map.of("Name", clusterName + "-oidc-provider"))
             .build();
         new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig);
         return clusterData;
@@ -578,7 +580,7 @@ public class AwsConstruct extends AbstractConstruct {
                               .timeout(600)
                               .atomic(true)
                               .set(List.of(
-                                  ReleaseSet.builder().name("clusterName").value(CLUSTER_NAME).build(),
+                                  ReleaseSet.builder().name("clusterName").value(clusterName).build(),
                                   ReleaseSet.builder().name("serviceAccount.create").value("false").build(),
                                   ReleaseSet.builder().name("vpcId").value(vpc.getId()).build(),
                                   ReleaseSet.builder().name("serviceAccount.name").value(serviceAccountName).build()
@@ -793,7 +795,7 @@ create_before_destroy.
     }
 
     private static @NotNull String cleanEksCommand() {
-        return format("eksctl delete cluster --name %s --region eu-west-2", CLUSTER_NAME);
+        return format("eksctl delete cluster --name spark-cluster --region eu-west-2");
     }
 
     /**

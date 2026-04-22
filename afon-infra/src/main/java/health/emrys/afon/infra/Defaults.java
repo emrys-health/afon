@@ -2,7 +2,6 @@ package health.emrys.afon.infra;
 
 public interface Defaults {
 
-    String CLUSTER_NAME = "spark-cluster";
     String GCP_REGION   = "europe-west2";
 
     String JUPYTER_SERVICE_NAME = "jupyter-web";

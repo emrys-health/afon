@@ -28,6 +28,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
+import health.emrys.afon.config.AfonProperties;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
@@ -35,7 +36,6 @@ import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.infra.Defaults.CLUSTER_NAME;
 import static java.lang.String.format;
 
 public class AzureConstruct extends AbstractConstruct {
@@ -49,6 +49,7 @@ public class AzureConstruct extends AbstractConstruct {
     private final String             subscriptionId;
     private final String             region;
     private final KubernetesCluster  aksCluster;
+    private final String clusterName;
     private       KubernetesProvider k8sProvider;
     private       HelmProvider       helmProvider;
 
@@ -56,6 +57,7 @@ public class AzureConstruct extends AbstractConstruct {
                           @NotNull String id,
                           Properties properties) {
         super(scope, id);
+        clusterName    = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
         resourceGroup  = AZURE_AKS_RESOURCE_GROUP.getValueFrom(properties);
         subscriptionId = AZURE_SUBSCRIPTION.getValueFrom(properties);
         this.region = AZURE_REGION.getValueFrom(properties);
@@ -257,15 +259,15 @@ public class AzureConstruct extends AbstractConstruct {
         LocalExecProvisioner updateCredentials = LocalExecProvisioner.builder()
                 .when("create")
                 .command(format("az aks get-credentials --resource-group %s --name %s --overwrite-existing",
-                                resourceGroup.getName(), CLUSTER_NAME))
+                                resourceGroup.getName(), clusterName))
                 .type("local-exec")
                 .build();
 
         return KubernetesCluster.Builder.create(this, "aks")
-                                        .name(CLUSTER_NAME)
+                                        .name(clusterName)
                                         .location(resourceGroup.getLocation())
                                         .resourceGroupName(resourceGroup.getName())
-                                        .dnsPrefix(CLUSTER_NAME)
+                                        .dnsPrefix(clusterName)
                                         .kubernetesVersion(KUBERNETES_VERSION)
                                         .defaultNodePool(nodePool)
                                         .identity(KubernetesClusterIdentity.builder()

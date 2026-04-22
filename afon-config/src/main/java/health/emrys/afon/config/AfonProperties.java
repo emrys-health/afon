@@ -15,6 +15,7 @@ public class AfonProperties {
      */
     public static final String ENV_PROPERTIES_FILE     = "env.properties";
 
+    public static final AfonProperty CLUSTER_NAME             = new AfonProperty("CLUSTER_NAME");
     // AWS
     public static final AfonProperty AWS_S3_BUCKET_NAME             = new AfonProperty("AWS_S3_BUCKET_NAME");
     public static final AfonProperty AWS_S3_EXTERNAL_BUCKET_NAME    = new AfonProperty("AWS_S3_EXTERNAL_BUCKET_NAME");
