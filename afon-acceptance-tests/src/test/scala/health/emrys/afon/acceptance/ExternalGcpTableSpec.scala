@@ -97,13 +97,12 @@ class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
         AuthenticationTypeEnum.OAUTH // OAuth leads to: Malformed request: Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
       )
 
-    val connectionInfo = new IcebergRestConnectionConfigInfo(
-      warehouse,
-      ConnectionTypeEnum.ICEBERG_REST,
-      "https://biglake.googleapis.com/iceberg/v1/restcatalog",
-      authenticationParameters,
-      null,
-      java.util.Map.of())
+    val connectionInfo = IcebergRestConnectionConfigInfo.builder()
+      .setRemoteCatalogName(warehouse)
+      .setConnectionType(ConnectionTypeEnum.ICEBERG_REST)
+      .setUri("https://biglake.googleapis.com/iceberg/v1/restcatalog")
+      .setAuthenticationParameters(authenticationParameters)
+      .build()
 
     val catalog =
       new ExternalCatalog(
