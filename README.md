@@ -70,6 +70,7 @@ POLARIS_DB_HOST=
 
 ### Running the demo
 
+
 Run the following to build and install the project:
 
 ```shell
@@ -89,3 +90,5 @@ Once that has run you should be able to open the readme for your infrastructure 
 ```shell
 cat afon-core/afon-infra/target/aws_azure_external_catalogs.md
 ```
+
+This will require a cluster to be up and running already
