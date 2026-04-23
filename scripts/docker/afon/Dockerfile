@@ -1,0 +1,42 @@
+FROM ubuntu:22.04
+
+ARG TOFU_VERSION=1.11.6
+ARG AWS_CLI_VERSION=2.30.1
+
+ARG JAVA_VERSION=17
+ARG MAVEN_VERSION=3.9.15
+
+ENV JAVA_HOME=/opt/java
+ENV MAVEN_HOME=/opt/maven
+ENV PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    tar \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN curl -L https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse \
+    -o openjdk.tar.gz \
+ && mkdir -p $JAVA_HOME \
+ && tar -xzf openjdk.tar.gz -C $JAVA_HOME --strip-components=1 \
+ && rm openjdk.tar.gz
+
+RUN curl -L https://downloads.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
+    -o maven.tar.gz \
+ && mkdir -p $MAVEN_HOME \
+ && tar -xzf maven.tar.gz -C $MAVEN_HOME --strip-components=1 \
+ && rm maven.tar.gz
+
+RUN apt-get update && apt-get install -y curl unzip \
+ && curl -L https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_amd64.zip -o tofu.zip \
+ && unzip tofu.zip \
+ && mv tofu /usr/local/bin/ \
+ && chmod +x /usr/local/bin/tofu \
+ && rm tofu.zip
+
+RUN apt-get update && apt-get install -y curl unzip \
+ && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWS_CLI_VERSION}.zip" -o "awscliv2.zip" \
+ && unzip awscliv2.zip \
+ && ./aws/install \
+ && rm -rf aws awscliv2.zip
