@@ -1,6 +1,40 @@
 # afon-core
 Core project required to deploy infrastructure across clouds that enables secure cross cloud querying
 
+## Developer Prerequisites
+
+You'll need to have the following installed:
+- AWS CLI
+- Azure CLI
+- GCloud CLI
+- Docker
+- Maven
+- Java 17
+- OpenTofu
+- Kubernetes CLI (kubectl)
+
+## User Prerequisites
+
+You'll need to have the following installed:
+- Docker
+- Cloud provider CLI (AWS, Azure, GCP)
+
+## Infrastructure
+
+#### Domain names
+
+To facilitate cross cloud querying, we need to be able to access the Polaris servers from different clouds.
+To do this, we need to set up domain names that point to the respective cloud's ingress.
+
+```
+emryspolaris.click
+emryspolarisgcp.click
+emryspolarisazure.click
+```
+This is not currently automated, so you'll need to set up the domain names manually. 
+
+### Running the demo
+
 # Running the scripts
 
 You'll need to define the environment variables first with:
@@ -8,68 +42,41 @@ You'll need to define the environment variables first with:
 . ./afon.properties
 ```
 
-The scripts then live in `./scripts` for each cloud provider.
-
-# Configuring the environment
-
-See the [infra notes](afon-infra/README.md). 
-
-Note that the Spark Docker image has been slightly modified (see `scripts/docker/spark/Dockerfile`).
-This is to ensure that the samve verion of Python (3.11) is used as the Jupyter notebook.
-
-Note that this is a one-off job of bootstrapping the Postgres database where Polaris persists the metadata.
-You need to run:
-```shell
-docker run --rm -it   --env="polaris.persistence.type=relational-jdbc"   --env="quarkus.datasource.username=postgres"   --env="quarkus.datasource.password=$POLARIS_DB_PASSWORD"   --env="quarkus.datasource.jdbc.url=jdbc:postgresql://$POLARIS_DB_HOST:5432/polaris_db_aws"   apache/polaris-admin-tool:latest bootstrap -r POLARIS -c POLARIS,root,$POLARIS_SECRET
-docker run --rm -it   --env="polaris.persistence.type=relational-jdbc"   --env="quarkus.datasource.username=postgres"   --env="quarkus.datasource.password=$POLARIS_DB_PASSWORD"   --env="quarkus.datasource.jdbc.url=jdbc:postgresql://$POLARIS_DB_HOST:5432/polaris_db_azure" apache/polaris-admin-tool:latest bootstrap -r POLARIS -c POLARIS,root,$POLARIS_SECRET
-docker run --rm -it   --env="polaris.persistence.type=relational-jdbc"   --env="quarkus.datasource.username=postgres"   --env="quarkus.datasource.password=$POLARIS_DB_PASSWORD"   --env="quarkus.datasource.jdbc.url=jdbc:postgresql://$POLARIS_DB_HOST:5432/polaris_db_gcp"   apache/polaris-admin-tool:latest bootstrap -r POLARIS -c POLARIS,root,$POLARIS_SECRET
 ```
-See below for the value of those environment variables.
+CLUSTER_NAME=will-spark-cluster
 
-# Running the Java code
+AWS_S3_EXTERNAL_BUCKET_NAME=
+AWS_S3_BUCKET_NAME=
+AWS_S3_BUCKET_NAME_FORBIDDEN=
+AWS_S3_ROLE_ARN=a
+AWS_REGION=
+AWS_POLARIS_DOMAIN_NAME=
+AWS_JUPYTER_DOMAIN=
+AWS_ACCOUNT_ID=
+AWS_ZONE_ID=
 
-The project is built with Maven using:
+GLUE_S3_ROLE_ARN=
+GLUE_CATALOG_NAME=
 
-```shell
-mvn clean install
+GCP_BUCKET_NAME=
+GCP_BUCKET_NAME_FORBIDDEN=
+GCP_EXTERNAL_BUCKET_NAME=
+GCP_SERVICE_ACCOUNT=
+
+AZURE_EXTERNAL_BUCKET=
+AZURE_BUCKET_FORBIDDEN=
+AZURE_BUCKET=
+AZURE_STORAGE_ACCOUNT=
+AZURE_SUBSCRIPTION=
+AZURE_REGION=
+AZURE_RESOURCE_GROUP=
+AZURE_AKS_RESOURCE_GROUP=
+AZURE_DOMAIN_NAME=
+
+POLARIS_ID=
+POLARIS_SECRET=
+POLARIS_ENDPOINT=
 ```
-
-*NOTE* that this will run the integration tests that talk to your cloud providers.
-This means you must have an `env.properties` file in the top level directory of the project.
-You must copy-and-paste the credentials (or the paths to them) into this file manually. 
-It *must not be checked in* for security reasons. 
-The file `env.properties` is listed in .gitignore to try and prevent this.
-
-
-This is the (redacted) contents of my own file so you know what to add:
-
-```shell
-~/Code/Emrys/afon-core$ cat env.properties | perl -pe s/=.*/=/g
-# AWS
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-
-# This is your ~/.config/gcloud/application_default_credentials.json with the newlines removed
-GOOGLE_APPLICATION_CREDENTIALS=
-
-# Get AZURE_CLIENT_ID with: az ad app list --display-name AfonMultiTenantApp --query "[].appId" -o tsv
-AZURE_CLIENT_ID=
-# this was output with: az ad app credential reset --id $AZURE_CLIENT_ID
-AZURE_TENANT_ID=
-AZURE_CLIENT_SECRET=
-DATABRICKS_TOKEN=
-
-# Infra properties
-OAUTH2_CLIENT_ID=
-OAUTH2_CLIENT_SECRET=
-OAUTH2_COOKIE_SECRET=
-POLARIS_DB_PASSWORD=
-POLARIS_DB_HOST=
-````
-
-
-### Running the demo
-
 
 Run the following to build and install the project:
 
@@ -91,4 +98,13 @@ Once that has run you should be able to open the readme for your infrastructure 
 cat afon-core/afon-infra/target/aws_azure_external_catalogs.md
 ```
 
-This will require a cluster to be up and running already
+and run 
+
+```shell
+mvn  compile -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain  exec:exec -Pdemo
+```
+This will deploy the external catalogs to the respective clouds, it currently takes about 45 minutes to deploy along side some integration tests
+
+You will be able to login via your own domain name e.g. https://emryspolaris.click
+
+
