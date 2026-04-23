@@ -1,6 +1,7 @@
 package health.emrys.afon.demo;
 
 import health.emrys.afon.cdk.AwsConstruct;
+import health.emrys.afon.cdk.AwsNuke;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -32,6 +33,7 @@ public class DocumentFullStackAwsMain extends AbstractDocumentMetadata {
     }
 
     public String getFurtherNotes() {
+        var nuke = new AwsNuke();
         return String.format("""
             # Problems destroying the stack?
             
@@ -39,6 +41,6 @@ public class DocumentFullStackAwsMain extends AbstractDocumentMetadata {
             ```shell
             %s
             ```
-            """, AwsConstruct.cleanUpHint());
+            """, nuke.cleanUpHint());
     }
 }
