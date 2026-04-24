@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+
+NEW_USER=afon
+USER_ID=${HOST_UID:-1000}
+GROUP_ID=${HOST_GID:-1000}
+
+# Create group if needed
+if ! getent group $GROUP_ID >/dev/null; then
+    groupadd -g $GROUP_ID appgroup
+fi
+
+# Create user if needed
+if ! id -u $USER_ID >/dev/null 2>&1; then
+    useradd -m -u $USER_ID -g $GROUP_ID -s /bin/bash $NEW_USER
+fi
+
+export HOME=/home/$NEW_USER
+
+export PATH=/opt/java/bin:/opt/maven/bin:$PATH
+
+exec su -m $NEW_USER -c "PATH=$PATH exec $@"
+
+
