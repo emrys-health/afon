@@ -13,6 +13,7 @@ ENV PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH
 
 RUN apt-get update && apt-get install -y \
     curl \
+    less \
     tar \
     ca-certificates \
  && rm -rf /var/lib/apt/lists/*
