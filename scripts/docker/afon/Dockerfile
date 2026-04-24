@@ -3,13 +3,15 @@ FROM ubuntu:22.04
 ARG TOFU_VERSION=1.11.6
 ARG AWS_CLI_VERSION=2.30.1
 ARG KUBECTL_VERSION=v1.32.1
+ARG NODE_VERSION=24.12.0
 
 ARG JAVA_VERSION=17
 ARG MAVEN_VERSION=3.9.15
 
 ENV JAVA_HOME=/opt/java
 ENV MAVEN_HOME=/opt/maven
-ENV PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH
+ENV NODE_HOME=/opt/node
+ENV PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$NODE_HOME/bin:$PATH
 
 RUN apt-get update && apt-get install -y \
     curl \
@@ -45,6 +47,11 @@ RUN apt-get update && apt-get install -y curl unzip \
 
 RUN curl -L https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl \
  && chmod +x /usr/local/bin/kubectl
+
+RUN curl -L https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz -o node.tar.gz \
+ && mkdir -p /opt/node \
+ && tar -xzf node.tar.gz -C /opt/node --strip-components=1 \
+ && rm node.tar.gz
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
