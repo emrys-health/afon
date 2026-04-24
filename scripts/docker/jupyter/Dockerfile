@@ -19,5 +19,3 @@ RUN ln -s /opt/spark-4.0.1-bin-hadoop3 /usr/local/spark
 USER $NB_UID
 #RUN conda remove pyspark && conda install -c conda-forge pyspark=4.0.0
 RUN pip install --no-cache-dir pyspark==4.0.1 grpcio>=1.48.1 grpcio-status
-
-# The image is now ready to be built with: docker build -t your-pyspark4-image .
