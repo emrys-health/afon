@@ -2,6 +2,7 @@ FROM ubuntu:22.04
 
 ARG TOFU_VERSION=1.11.6
 ARG AWS_CLI_VERSION=2.30.1
+ARG KUBECTL_VERSION=v1.32.1
 
 ARG JAVA_VERSION=17
 ARG MAVEN_VERSION=3.9.15
@@ -40,6 +41,9 @@ RUN apt-get update && apt-get install -y curl unzip \
  && unzip awscliv2.zip \
  && ./aws/install \
  && rm -rf aws awscliv2.zip
+
+RUN curl -L https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl \
+ && chmod +x /usr/local/bin/kubectl
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
