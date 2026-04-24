@@ -11,6 +11,6 @@ docker build -t ph1ll1phenry/afon .
 
 To run the Docker container, run:
 ```shell
-docker run -it -v $HOME/.config/gcloud:$HOME/.config/gcloud -v $HOME/.azure:$HOME/.azure -v $HOME/.aws:$HOME/.aws  -v $HOME/Code/Emrys/afon-core/:$HOME/afon-core  -v $HOME/.m2:$HOME/.m2 -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) -e HOST_USER=$(whoami)  ph1ll1phenry/afon
+docker run -it -v $HOME/.kube:$HOME/.kube -v $HOME/.config/gcloud:$HOME/.config/gcloud -v $HOME/.azure:$HOME/.azure -v $HOME/.aws:$HOME/.aws  -v $HOME/Code/Emrys/afon-core/:$HOME/afon-core  -v $HOME/.m2:$HOME/.m2 -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) -e HOST_USER=$(whoami)  ph1ll1phenry/afon
 ```
 Note that the `$HOME/Code/Emrys/afon-core/` should point to where you have your `afon-core` code.
