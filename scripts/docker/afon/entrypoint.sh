@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-NEW_USER=afon
+NEW_USER=${HOST_USER:-afon}
 USER_ID=${HOST_UID:-1000}
 GROUP_ID=${HOST_GID:-1000}
 
