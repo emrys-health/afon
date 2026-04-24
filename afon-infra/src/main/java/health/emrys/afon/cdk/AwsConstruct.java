@@ -438,7 +438,8 @@ public class AwsConstruct extends AbstractConstruct {
                             "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}'" +
                                 " --type=merge 2>/dev/null || true",
                             "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
-                                "|| true"))
+                                "|| true",
+                            "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true"))
                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                         .build();
 
