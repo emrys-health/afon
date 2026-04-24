@@ -9,21 +9,36 @@ import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.AwsConstruct.NO_JUPYTER_LB;
-import static health.emrys.afon.cdk.AwsConstruct.VPC_NAME;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
 import static health.emrys.afon.cdk.SparkClusterDeployment.NO_SPARK_LB_FINALIZERS;
+import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
 import static java.lang.String.format;
 
 public class AwsNuke {
+
+    /**
+     * Note that EKS depends on the subnets.
+     * Once the EKS is nuked with "eksctl delete cluster", you can delete the subnets with:
+     * aws ec2 delete-subnet --subnet-id subnet-XXX
+     * then delete the whole VPC
+     */
+    public static void main(String[] args) {
+        var app = new AwsNuke();
+        System.out.println("\u001B[31m" + app.cleanUpHint() + "\u001B[0m");
+    }
+
+    private String clusterName;
+    private AwsComponentNames componentNames;
 
     public AwsNuke() {
         this(new AfonPropertiesLoader().getProperties()); // TODO get some of the values from here
     }
 
     AwsNuke(Properties properties) {
-        new AfonPropertiesLoader().getProperties(); // TODO get some of the values from here
+        clusterName = CLUSTER_NAME.getValueFrom(properties);
+        componentNames = new AwsComponentNames(properties);
     }
 
     @NotNull String cleanSecurityGroupsCommand(String vpcId) {
@@ -67,22 +82,11 @@ public class AwsNuke {
         return format(
             """
             aws ec2 describe-vpcs --query "Vpcs[?Tags[?Key=='Name' && Value=='%s']].VpcId"   --output text""",
-            VPC_NAME);
+            componentNames.getVpcId());
     }
 
     @NotNull String cleanEksCommand() {
-        return format("eksctl delete cluster --name spark-cluster --region eu-west-2");
-    }
-
-    /**
-     * Note that EKS depends on the subnets.
-     * Once the EKS is nuked with "eksctl delete cluster", you can delete the subnets with:
-     * aws ec2 delete-subnet --subnet-id subnet-XXX
-     * then delete the whole VPC
-     */
-    public static void main(String[] args) {
-        var app = new AwsNuke();
-        System.out.println("\u001B[31m" + app.cleanUpHint() + "\u001B[0m");
+        return format("eksctl delete cluster --name %s --region eu-west-2", clusterName);
     }
 
     public @NonNull String cleanUpHint() {
@@ -155,7 +159,7 @@ public class AwsNuke {
                 aws ec2 delete-vpc --vpc-id $VPC_ID
             } done
             
-            for ROLE_NAME in $(echo "cdktf-eks-cluster-role" "cdktf-eks-nodegroup-role" "AmazonEKSLoadBalancerControllerRole") ; do {
+            for ROLE_NAME in $(echo "%s" "%s" "AmazonEKSLoadBalancerControllerRole") ; do {
                echo $ROLE_NAME ;
                for ARN in $(aws iam list-attached-role-policies --role-name $ROLE_NAME --query 'AttachedPolicies[*].PolicyArn' --output text) ; do {
                    aws iam detach-role-policy --role-name $ROLE_NAME --policy-arn $ARN
@@ -166,9 +170,9 @@ public class AwsNuke {
                aws iam delete-role --role-name  $ROLE_NAME
             } done
             
-            aws iam delete-policy --policy-arn arn:aws:iam::418295715997:policy/EKS-Secret-Access-Policy
+            aws iam delete-policy --policy-arn arn:aws:iam::418295715997:policy/%s
             
-            aws --region eu-west-2 secretsmanager  delete-secret --secret-id cdktf-app-config-secret --force-delete-without-recovery
+            aws --region eu-west-2 secretsmanager  delete-secret --secret-id %s --force-delete-without-recovery
             
             """,
             getVPCsCommand(),
@@ -176,7 +180,11 @@ public class AwsNuke {
             NO_JUPYTER_FINALIZERS,
             NO_JUPYTER_LB,
             NO_SPARK_LB_FINALIZERS,
-            cleanEksCommand()
+            cleanEksCommand(),
+            componentNames.getClusterRoleName(),
+            componentNames.getNodeGroupRoleName(),
+            componentNames.getAccessPolicyName(),
+            componentNames.getSecret()
                      );
     }
 

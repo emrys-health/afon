@@ -55,13 +55,13 @@ import static health.emrys.afon.config.AfonProperties.AWS_ACCOUNT_ID;
 import static java.lang.String.format;
 
 public class AwsConstruct extends AbstractConstruct {
-    static final String VPC_NAME            = "cdktf-eks-vpc";
 
     private final        String                     clusterPolicyArn;
     final static         String NO_JUPYTER_LB = "kubectl patch service jupyter-web -p " +
         "'{\"metadata\":{\"finalizers\":null}}'  --type=merge";
-    final                DataAwsEksClusterAuth      eksAuthData;
-    private final        EksCluster                 cluster;
+    final                DataAwsEksClusterAuth eksAuthData;
+    private final        AwsComponentNames     componentNames;
+    private final        EksCluster            cluster;
     private final        List<ITerraformDependable> eksDependOn;
     private final        List<String>               subnetIds;
     private final        String                     polarisDomainName;
@@ -77,7 +77,8 @@ public class AwsConstruct extends AbstractConstruct {
 
     AwsConstruct(final Construct scope, final String id, Properties properties) {
         super(scope, id);
-        awsNuke = new AwsNuke(properties);
+        awsNuke     = new AwsNuke(properties);
+        componentNames = new AwsComponentNames(properties);
         clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
 
         this.polarisDomainName  = AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
@@ -97,7 +98,7 @@ public class AwsConstruct extends AbstractConstruct {
 
         // Create the secret container
         final var applicationSecret = SecretsmanagerSecret.Builder.create(this, "ApplicationSecret")
-                                                                  .name("cdktf-app-config-secret")
+                                                                  .name(componentNames.getSecret())
                                                                   .description("Secret containing application " +
                                                                                    "configuration or API keys for EKS.")
                                                                   .tags(Map.of("Name", "EKSAppConfig"))
@@ -110,12 +111,12 @@ public class AwsConstruct extends AbstractConstruct {
                          .enableDnsSupport(true)
                          .enableDnsHostnames(true)
                          .provisioners(awsNuke.destroySGsAndVPC())
-                         .tags(Map.of("Name", VPC_NAME)).build();
+                         .tags(Map.of("Name", componentNames.getVpcId())).build();
 
         final InternetGateway igw = InternetGateway.Builder.create(this, "vpcIgw")
                                                            .vpcId(vpc.getId())
                                                            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                           .tags(Map.of("Name", "cdktf-eks-igw")).build();
+                                                           .tags(Map.of("Name", "cdktf-eks-igw-" + clusterName)).build();
 
         // TODO subnets need to depend on the load balancer
         final Subnet publicSubnet1 = Subnet.Builder.create(this, "publicSubnet1")
@@ -126,7 +127,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                    .dependsOn(List.of(igw))
                                                    .provisioners(uponDestroyRun(awsNuke.cleanELBs()))
                                                    .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                   .tags(Map.of("Name", "cdktf-eks-public-1")).build();
+                                                   .tags(Map.of("Name", "cdktf-eks-public-1-" + clusterName)).build();
 
         final Subnet publicSubnet2 = Subnet.Builder.create(this, "publicSubnet2")
                                                    .vpcId(vpc.getId())
@@ -135,7 +136,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                    .mapPublicIpOnLaunch(true)
                                                    .dependsOn(List.of(igw))
                                                    .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                   .tags(Map.of("Name", "cdktf-eks-public-2")).build();
+                                                   .tags(Map.of("Name", "cdktf-eks-public-2-" + clusterName)).build();
 
         final RouteTableRoute route = RouteTableRoute.builder()
                                                      .cidrBlock("0.0.0.0/0")
@@ -145,7 +146,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                               .vpcId(vpc.getId())
                                                               .route(List.of(route))
                                                               .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                              .tags(Map.of("Name", "cdktf-eks-public-rt")).build();
+                                                              .tags(Map.of("Name", "cdktf-eks-public-rt-" + clusterName)).build();
 
         RouteTableAssociation subnet1Association = RouteTableAssociation.Builder.create(this, "subnet1Association")
                                                                                 .subnetId(publicSubnet1.getId())
@@ -164,7 +165,7 @@ public class AwsConstruct extends AbstractConstruct {
         final String eksAssumeRolePolicy = """
                                            {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole"}]}""";
         final IamRole eksClusterRole = IamRole.Builder.create(this, "eksClusterRole")
-                                                      .name("cdktf-eks-cluster-role")
+                                                      .name(componentNames.getClusterRoleName())
                                                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                                       .assumeRolePolicy(eksAssumeRolePolicy).build();
 
@@ -179,10 +180,11 @@ public class AwsConstruct extends AbstractConstruct {
 //                                       .provisioners(uponDestroyRun("eksctl delete cluster --name spark-cluster
 //                                       --region eu-west-2"))
                     .provisioners(uponDestroyRun(
-                        format("aws iam detach-role-policy --role-name cdktf-eks-cluster-role --policy-arn %s",
+                        format("aws iam detach-role-policy --role-name %s --policy-arn %s",
+                               componentNames.getClusterRoleName(),
                                clusterPolicyArn),
-                        "aws iam detach-role-policy --role-name cdktf-eks-cluster-role --policy-arn " +
-                            "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"))
+                        format("aws iam detach-role-policy --role-name %s --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+                               componentNames.getClusterRoleName())))
                     .role(eksClusterRole.getName()).build();
 
         final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
@@ -221,7 +223,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                   }
                                               ] }""";
         final IamRole nodeGroupRole = IamRole.Builder.create(this, "eksNodeGroupRole")
-                                                     .name("cdktf-eks-nodegroup-role")
+                                                     .name(componentNames.getNodeGroupRoleName())
 //                                                     .provisioners(uponDestroyRun("eksctl delete cluster --name
 //                                                     spark-cluster --region eu-west-2"))
                                                      .assumeRolePolicy(workerAssumeRolePolicy).build();
@@ -244,7 +246,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                                );
 
         final IamPolicy customSecretPolicy = IamPolicy.Builder.create(this, "SecretAccessPolicy")
-                                                              .name("EKS-Secret-Access-Policy")
+                                                              .name(componentNames.getAccessPolicyName())
                                                               .description("Allows EKS Node Group to read the " +
                                                                                "specific application config secret.")
                                                               .policy(customSecretPolicyDocument)
@@ -316,7 +318,7 @@ public class AwsConstruct extends AbstractConstruct {
                                                      .dependsOn(List.of(newKubeConfig, cluster, eksAuthData,
                                                                         publicSubnet1, publicSubnet2))
                                                      .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                     .tags(Map.of("Name", "cdktf-eks-nodegroup")).build();
+                                                     .tags(Map.of("Name", componentNames.getNodeGroupRoleName())).build();
 
 
         String clusterEndpoint = cluster.getEndpoint();
