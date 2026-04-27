@@ -1,10 +1,12 @@
 package health.emrys.afon.demo;
 
 import org.apache.commons.io.file.PathUtils;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.*;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -32,7 +34,7 @@ public class Documenter {
     public void writeDocumentation() {
         String fileName = documentMetadata.getFilename();
         try {
-            Path targetPath  = Path.of("target");
+            Path targetPath  = documentationPath();
             File target = targetPath.toFile();
             if (!target.exists()) {
                 log.info("Creating directory {}", target.getAbsolutePath());
@@ -47,6 +49,23 @@ public class Documenter {
         } catch (IOException e) {
             log.error("Could not write to " +  fileName, e);
         }
+    }
+
+    static @NonNull Path documentationPath() {
+        String docsDir = "docs";
+        Path   docs  = Path.of(docsDir);
+        if  (!docs.toFile().exists()) {
+            String absolutePathModule = docs.toFile().getAbsolutePath();
+            log.info("No directory '{}'. Looking in parent",
+                     absolutePathModule);
+            docs = Paths.get("").toAbsolutePath().getParent().resolve(docsDir);
+            if  (!docs.toFile().exists()) {
+                throw new RuntimeException(format("Cannot find directory {} nor {}",
+                                                  absolutePathModule,
+                                                  docs.toFile().getAbsolutePath()));
+            }
+        }
+        return docs;
     }
 
     private void writeTo(String fileName) throws IOException {
