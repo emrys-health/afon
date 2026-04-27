@@ -60,8 +60,8 @@ public class GcpConstruct extends AbstractConstruct {
     GcpConstruct(final Construct scope, final String id, String projectID, Properties properties) {
         super(scope, id);
         String clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
-        String vpcName     = "gke-private-vpc";
-        String subnetName  = "gke-private-subnet";
+        String vpcName     = "gke-private-vpc-" + clusterName;
+        String subnetName  = "gke-private-subnet-" + clusterName;
 
         // Reads a fresh access token from ~/.config/gcloud via gcloud CLI.
         // This avoids the OAuth2 refresh flow that triggers RAPT on Workspace accounts.

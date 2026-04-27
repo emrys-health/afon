@@ -58,7 +58,7 @@ public class AzureConstruct extends AbstractConstruct {
                           Properties properties) {
         super(scope, id);
         clusterName    = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
-        resourceGroup  = AZURE_AKS_RESOURCE_GROUP.getValueFrom(properties);
+        resourceGroup  = AZURE_RESOURCE_GROUP.getValueFrom(properties) + "_" + CLUSTER_NAME.getValueFrom(properties);
         subscriptionId = AZURE_SUBSCRIPTION.getValueFrom(properties);
         this.region = AZURE_REGION.getValueFrom(properties);
         configureProviders();
