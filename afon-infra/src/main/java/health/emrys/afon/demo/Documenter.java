@@ -60,7 +60,7 @@ public class Documenter {
                      absolutePathModule);
             docs = Paths.get("").toAbsolutePath().getParent().resolve(docsDir);
             if  (!docs.toFile().exists()) {
-                throw new RuntimeException(format("Cannot find directory {} nor {}",
+                throw new RuntimeException(format("Cannot find directory %s nor %s",
                                                   absolutePathModule,
                                                   docs.toFile().getAbsolutePath()));
             }
