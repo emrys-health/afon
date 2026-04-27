@@ -5,6 +5,7 @@ ARG AWS_CLI_VERSION=2.30.1
 ARG KUBECTL_VERSION=v1.32.1
 ARG NODE_VERSION=24.12.0
 ARG AZ_CLI_VERSION=2.85.0
+ARG GCLOUD_VERSION=565.0.0
 
 ARG JAVA_VERSION=17
 ARG MAVEN_VERSION=3.9.15
@@ -12,7 +13,8 @@ ARG MAVEN_VERSION=3.9.15
 ENV JAVA_HOME=/opt/java
 ENV MAVEN_HOME=/opt/maven
 ENV NODE_HOME=/opt/node
-ENV PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$NODE_HOME/bin:$PATH
+ENV GCLOUD_HOME=/opt/google-cloud-sdk
+ENV PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$NODE_HOME/bin:$GCLOUD_HOME/bin:$PATH
 
 RUN apt-get update && apt-get install -y \
     curl \
@@ -53,6 +55,11 @@ RUN curl -L https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux
  && mkdir -p /opt/node \
  && tar -xzf node.tar.gz -C /opt/node --strip-components=1 \
  && rm node.tar.gz
+
+RUN curl -L https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-x86_64.tar.gz -o gcloud.tar.gz \
+ && tar -xzf gcloud.tar.gz -C /opt \
+ && /opt/google-cloud-sdk/install.sh --quiet --usage-reporting=false --path-update=false \
+ && rm gcloud.tar.gz
 
 # Add Microsoft signing key + repo and install exact version
 RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
