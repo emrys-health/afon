@@ -4,6 +4,7 @@ ARG TOFU_VERSION=1.11.6
 ARG AWS_CLI_VERSION=2.30.1
 ARG KUBECTL_VERSION=v1.32.1
 ARG NODE_VERSION=24.12.0
+ARG AZ_CLI_VERSION=2.85.0
 
 ARG JAVA_VERSION=17
 ARG MAVEN_VERSION=3.9.15
@@ -18,7 +19,7 @@ RUN apt-get update && apt-get install -y \
     less \
     tar \
     ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+    gnupg
 
 RUN curl -L https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse \
     -o openjdk.tar.gz \
@@ -52,6 +53,14 @@ RUN curl -L https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux
  && mkdir -p /opt/node \
  && tar -xzf node.tar.gz -C /opt/node --strip-components=1 \
  && rm node.tar.gz
+
+# Add Microsoft signing key + repo and install exact version
+RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
+    | install -o root -g root -m 644 /dev/stdin /usr/share/keyrings/microsoft.gpg \
+ && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ jammy main" \
+    > /etc/apt/sources.list.d/azure-cli.list \
+ && apt-get update \
+ && apt-get install -y azure-cli=${AZ_CLI_VERSION}-1~jammy
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

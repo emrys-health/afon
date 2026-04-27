@@ -50,7 +50,7 @@ public class AfonPropertiesLoader {
             // are we running as a build?
             readProperties("../");
         } catch (IOException e) {
-            logger.warn("Could not read properties files in parent directory");
+            logger.info("Could not read properties files in parent directory. Trying in this...");
             try {
                 // ...or in the IDE?
                 readProperties("");
