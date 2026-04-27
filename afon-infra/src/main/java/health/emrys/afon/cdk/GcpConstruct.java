@@ -101,7 +101,7 @@ public class GcpConstruct extends AbstractConstruct {
         // Cloud NAT: gives private nodes outbound internet access so they can
         // pull images from external registries (registry.k8s.io, Docker Hub, etc.)
         ComputeRouter router = new ComputeRouter(this, "router", ComputeRouterConfig.builder()
-                .name("gke-router")
+                .name("gke-router-" + clusterName)
                 .region(GCP_REGION)
                 .network(vpc.getName())
                 .build());
