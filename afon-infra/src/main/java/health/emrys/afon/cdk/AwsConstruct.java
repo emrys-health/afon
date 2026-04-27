@@ -393,7 +393,7 @@ public class AwsConstruct extends AbstractConstruct {
         loadBalancerRole = new IamRole(
             scope, "AmazonEKSLoadBalancerControllerRole",
             IamRoleConfig.builder()
-                         .name("AmazonEKSLoadBalancerControllerRole")
+                         .name("AmazonEKSLoadBalancerControllerRole" + clusterName)
                          .assumeRolePolicy(trustPolicy)
                          .build());
         IamRolePolicyAttachment.Builder.create(this, "EKS-Cleanup-Policy-Attachment")
