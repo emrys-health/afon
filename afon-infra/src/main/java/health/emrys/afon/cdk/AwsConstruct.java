@@ -57,8 +57,9 @@ import static java.lang.String.format;
 public class AwsConstruct extends AbstractConstruct {
 
     private final        String                     clusterPolicyArn;
-    final static         String NO_JUPYTER_LB = "kubectl patch service jupyter-web -p " +
-        "'{\"metadata\":{\"finalizers\":null}}'  --type=merge";
+    final static         String NO_JUPYTER_LB = """
+                                                kubectl patch service jupyter-web -p \
+                                                '{"metadata":{"finalizers":null}}'  --type=merge""";
     final                DataAwsEksClusterAuth eksAuthData;
     private final        AwsComponentNames     componentNames;
     private final        EksCluster            cluster;
@@ -86,7 +87,6 @@ public class AwsConstruct extends AbstractConstruct {
         this.region             = AfonProperties.AWS_REGION.getValueFrom(properties);
         this.zone_id            = AfonProperties.AWS_ZONE_ID.getValueFrom(properties);
         clusterPolicyArn = format("arn:aws:iam::%s:policy/AWSLoadBalancerControllerIAMPolicyCurl", accountId);
-        // TODO remove 'Curl'
         // --- AWS Provider Configuration (Required for EKS Addon) ---
         // 1. Configure the AWS Provider
         AwsProvider.Builder.create(this, "aws")
@@ -105,7 +105,6 @@ public class AwsConstruct extends AbstractConstruct {
                                                                   .recoveryWindowInDays(0)
                                                                   .build();
 
-        // TODO Vpc needs to depend on the security groups
         vpc = Vpc.Builder.create(this, "eksVpc")
                          .cidrBlock("10.0.0.0/16")
                          .enableDnsSupport(true)
@@ -118,7 +117,6 @@ public class AwsConstruct extends AbstractConstruct {
                                                            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                                            .tags(Map.of("Name", "cdktf-eks-igw-" + clusterName)).build();
 
-        // TODO subnets need to depend on the load balancer
         final Subnet publicSubnet1 = Subnet.Builder.create(this, "publicSubnet1")
                                                    .vpcId(vpc.getId())
                                                    .cidrBlock("10.0.1.0/24")
@@ -176,9 +174,6 @@ public class AwsConstruct extends AbstractConstruct {
             .Builder.create(this, "eksClusterRoleAttachment")
                     .policyArn(eksClusterPolicy.getArn())
                     .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-//                                        .dependsOn(List.of(eksClusterRole))
-//                                       .provisioners(uponDestroyRun("eksctl delete cluster --name spark-cluster
-//                                       --region eu-west-2"))
                     .provisioners(uponDestroyRun(
                         format("aws iam detach-role-policy --role-name %s --policy-arn %s",
                                componentNames.getClusterRoleName(),
@@ -193,7 +188,6 @@ public class AwsConstruct extends AbstractConstruct {
                                     .name(clusterName)
                                     .roleArn(eksClusterRole.getArn())
                                     .vpcConfig(vpcConfig)
-//                                    .provisioners(destroyELBs())
                                     .version("1.31")
                                     .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS))
                                     .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
@@ -224,8 +218,6 @@ public class AwsConstruct extends AbstractConstruct {
                                               ] }""";
         final IamRole nodeGroupRole = IamRole.Builder.create(this, "eksNodeGroupRole")
                                                      .name(componentNames.getNodeGroupRoleName())
-//                                                     .provisioners(uponDestroyRun("eksctl delete cluster --name
-//                                                     spark-cluster --region eu-west-2"))
                                                      .assumeRolePolicy(workerAssumeRolePolicy).build();
 
         // ** NEW STEP: Create Custom IAM Policy referencing the Secret ARN **
@@ -325,30 +317,27 @@ public class AwsConstruct extends AbstractConstruct {
 
 
         String apiHost = Fn.replace(clusterEndpoint, "https://", "");
-        // 1. Initialize Helm Provider
-//        new HelmProvider(this, "helmcilium", HelmProviderConfig.builder().alias("helmcilium")
-//                                                               .kubernetes(HelmProviderKubernetes.builder()
-//                                                                                                 .configPath("~/
-//                                                                                                 .kube/config") //
-//                                                                                                 Path to your
-//                                                                                                 3-node cluster config
-//                                                                                                 .build())
-//                                                               .build());
 
-        // 2. Deploy Cilium with Kube-Proxy Replacement
+        // Basically, EKS assumes you want a few components that you don't need if you use Cilium
+        // vpc-cni addon removed: Cilium ENI mode is a complete replacement for vpc-cni.
+        // Keeping the EKS addon caused EKS to continuously overwrite Cilium's no-op patch
+        // to aws-node (resolveConflictsOnUpdate=OVERWRITE), breaking pod internet connectivity.
+        List<LocalExecProvisioner> onCiliumCreation = uponCreateRun(
+            "kubectl delete ds aws-node -n kube-system  || echo no aws-node",
+            "kubectl delete ds kube-proxy -n kube-system || echo no kube-proxy",
+            format(
+                "aws eks delete-addon --cluster-name %s --addon-name vpc-cni || " +
+                    "echo no vpc-cni", clusterName),
+            format(
+                "aws eks delete-addon --cluster-name %s --addon-name kube-proxy ||" +
+                    " echo no kube-proxy", clusterName));
         Release cilium = Release.Builder.create(this, "cilium")
                                         .name("cilium")
                                         .repository("https://helm.cilium.io/")
                                         .chart("cilium")
                                         .namespace("kube-system")
                                         .dependsOn(List.of(nodeGroup))
-                                        .provisioners(uponCreateRun(
-                                            "kubectl delete ds aws-node -n kube-system  || echo no aws-node",
-                                            "kubectl delete ds kube-proxy -n kube-system || echo no kube-proxy",
-                                            format("aws eks delete-addon --cluster-name %s --addon-name vpc-cni || " +
-                                                       "echo no vpc-cni", clusterName),
-                                            format("aws eks delete-addon --cluster-name %s --addon-name kube-proxy ||" +
-                                                       " echo no kube-proxy", clusterName)))
+                                        .provisioners(onCiliumCreation)
                                         .version("1.15.0") // Use the latest stable version
 
                                         // Set the specific values to kill kube-proxy dependency
@@ -382,10 +371,6 @@ public class AwsConstruct extends AbstractConstruct {
 
         eksDependOn = List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2, cilium);
 
-        // vpc-cni addon removed: Cilium ENI mode is a complete replacement for vpc-cni.
-        // Keeping the EKS addon caused EKS to continuously overwrite Cilium's no-op patch
-        // to aws-node (resolveConflictsOnUpdate=OVERWRITE), breaking pod internet connectivity.
-
         String trustPolicy = format(
             """
             ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
@@ -414,32 +399,27 @@ public class AwsConstruct extends AbstractConstruct {
             subnetIds
                                               );
 
-//        final DataAwsRoute53Zone hostedZone = DataAwsRoute53Zone
-//                .Builder.create(this, "HostedZoneLookup")
-//                        .name("emryspolaris.click.") // Must end with a period
-//                        .privateZone(false).count(6)
-//                        .build();
-
 
         // Destroy-time cleanup: must run before lbRelease is uninstalled so the LBC
         // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
         // The explicit helm uninstall --no-hooks pre-empts Terraform's own Helm destroy,
         // which fails when webhooks/finalizers interfere. Helm treats "release not found" as success.
+        List<LocalExecProvisioner> onLbcDestroy = uponDestroyRun(
+            "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer" +
+                " | xargs -r kubectl delete --ignore-not-found=true",
+            "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer |" +
+                " xargs -r kubectl delete --ignore-not-found=true",
+            "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
+                "while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p " +
+                "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
+            "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}'" +
+                " --type=merge 2>/dev/null || true",
+            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
+                "|| true",
+            "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true");
         Resource.Builder.create(this, "lbc-destroy-cleanup")
                         .dependsOn(List.of(ingress, lbRelease))
-                        .provisioners(uponDestroyRun(
-                            "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer" +
-                                " | xargs -r kubectl delete --ignore-not-found=true",
-                            "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer |" +
-                                " xargs -r kubectl delete --ignore-not-found=true",
-                            "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
-                                "while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p " +
-                                "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
-                            "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}'" +
-                                " --type=merge 2>/dev/null || true",
-                            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
-                                "|| true",
-                            "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true"))
+                        .provisioners(onLbcDestroy)
                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                         .build();
 
@@ -506,22 +486,23 @@ public class AwsConstruct extends AbstractConstruct {
                 .build());
 
 
+        Map<String, String> labels = Map.of(
+            "app.kubernetes.io/component", "controller",
+            "app.kubernetes.io/instance", "aws-load-balancer" +
+                "-controller",
+            "app.kubernetes.io/name", "aws-load-balancer" +
+                "-controller"
+                                               );
+        Map<String, String> annotations = Map.of(
+            "eks.amazonaws.com/role-arn",
+            loadBalancerRole.getArn()
+                                                );
         ServiceAccount.Builder.create(scope, serviceAccountName)
                               .metadata(ServiceAccountMetadata.builder()
                                                               .name(serviceAccountName)
                                                               .namespace("kube-system")
-                                                              .labels(Map.of( // the eksctl has also: app.kubernetes
-                                                                  // .io/managed-by=eksctl
-                                                                  "app.kubernetes.io/component", "controller",
-                                                                  "app.kubernetes.io/instance", "aws-load-balancer" +
-                                                                      "-controller",
-                                                                  "app.kubernetes.io/name", "aws-load-balancer" +
-                                                                      "-controller"
-                                                                            ))
-                                                              .annotations(Map.of(
-                                                                  "eks.amazonaws.com/role-arn",
-                                                                  loadBalancerRole.getArn()
-                                                                                 ))
+                                                              .labels(labels)
+                                                              .annotations(annotations)
                                                               .build())
                               .provisioners(uponDestroyRun(
                                   NO_INSTALLATION_FINALIZERS,
@@ -623,7 +604,6 @@ public class AwsConstruct extends AbstractConstruct {
             "alb.ingress.kubernetes.io/subnets", subnetIds.stream().collect(Collectors.joining(","))
                                                    );
 
-        // Create the Ingress
         var sslServicePort = IngressV1SpecRuleHttpPathBackendService
             .builder()
             .name(serviceName)
@@ -642,55 +622,34 @@ public class AwsConstruct extends AbstractConstruct {
                                                                      .backend(pathBackend)
                                                                      .build()))
             .build();
-        // kubectl patch ingress polaris-ingress -p '{"metadata":{"finalizers":[]}}' --type=merge
-        IngressV1 ingress = IngressV1.Builder.create(this, constructId)
-                                             .provider(kubernetesProvider)
-                                             .metadata(IngressV1Metadata.builder()
+        IngressV1Spec alb = IngressV1Spec.builder()
+                                         .ingressClassName("alb") // Explicitly set the
+                                         // ingress class
+                                         // Define the TLS configuration using the LBC's
+                                         // "ssl-redirect" action
+                                         .rule(List.of(
+                                                   IngressV1SpecRule.builder()
+                                                                    .host(hostName)
+                                                                    .http(servicePortRule)
+                                                                    .build()
+                                                      )
+                                              )
+                                         .build();
+        return IngressV1.Builder.create(this, constructId)
+                                .provider(kubernetesProvider)
+                                .metadata(IngressV1Metadata.builder()
                                                                         .name(ingressName)
                                                                         .namespace("default") // Change if your
                                                                         // service is in a different namespace
                                                                         .annotations(albAnnotations)
                                                                         .build())
-                                             .spec(IngressV1Spec.builder()
-                                                                .ingressClassName("alb") // Explicitly set the
-                                                                // ingress class
-                                                                // Define the TLS configuration using the LBC's
-                                                                // "ssl-redirect" action
-                                                                .rule(List.of(
-                                                                          // Rule 1: HTTP-to-HTTPS Redirect (Uses the
-                                                                          // annotation action)
-//                                                       IngressV1SpecRule.builder()
-//                                                                      .host(hostName)
-//                                                                      .http(IngressV1SpecRuleHttp.builder()
-//                                                                                               .path(Collections
-//                                                                                               .singletonList(https))
-//                                                                                               .build())
-//                                                                      .build(),
-
-                                                                          // Rule 2: HTTPS Traffic to Service X
-                                                                          IngressV1SpecRule.builder()
-                                                                                           .host(hostName)
-                                                                                           .http(servicePortRule)
-                                                                                           .build()
-                                                                             )
-                                                                     )
-                                                                .build())
-                                             .lifecycle(TerraformResourceLifecycle
+                                .spec(alb)
+                                .lifecycle(TerraformResourceLifecycle
                                                             .builder()
                                                             .preventDestroy(false)
-//                                                   .ignoreChanges("metadata.0.finalizers")
-                                                            // Explicitly prevents the destroy from being blocked by
-                                                            // changes in the status
-                                                            // (which is where the finalizer status is reflected in
-                                                            // the eyes of Terraform).
-//                                                   .ignoreChanges(List.of("status"))
                                                             .build())
-                                             .waitForLoadBalancer(true)
-                                             .build();
-//        ingress.addOverride("metadata.finalizers", Collections.emptyList());
-        // (Optional) Ignore future controller-added finalizers so deletes never block
-//        ingress.addOverride("lifecycle.ignore_changes", Collections.singletonList("metadata.0.finalizers"));
-        return ingress;
+                                .waitForLoadBalancer(true)
+                                .build();
     }
 
     public Release getLbRelease() {
@@ -698,14 +657,6 @@ public class AwsConstruct extends AbstractConstruct {
     }
 
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
-                /*
-        Using the VPC ID this way can lead to:
-│ Destroy-time provisioners and their connection configurations may only reference attributes of the related
-resource, via 'self', 'count.index', or 'each.key'.
-│
-│ References to other resources during the destroy phase can cause dependency cycles and interact poorly with
-create_before_destroy.
-         */
         Resource.Builder.create(this, "cleanupELBs")
                         // Ensure this runs only after the K8s Services are destroyed by Terraform
                         .dependsOn(loadBalancers)
