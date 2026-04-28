@@ -41,7 +41,11 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                     
                     `-Dexec.args="STEP_FROM_LIST_ABOVE"`
                     
-                    and the steps will continue starting at that one.
+                    and the steps will continue starting at that one and the goal should be `exec:exec` not `exec:java`.
+                    
+                    For example:
+                    
+                    `mvn compile -Pdemo -Dexec.mainClass="health.emrys.afon.demo.DeployExternalCatalogsMain"  -Dexec.args="az_external_aws_check"  exec:exec`
                     """, String.join(("\n1. "), stepArray));
                 }
             }
