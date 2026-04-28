@@ -56,37 +56,37 @@ import static java.lang.String.format;
 
 public class AwsConstruct extends AbstractConstruct {
 
-    private final        String                     clusterPolicyArn;
-    final static         String NO_JUPYTER_LB = """
-                                                kubectl patch service jupyter-web -p \
-                                                '{"metadata":{"finalizers":null}}'  --type=merge""";
-    final                DataAwsEksClusterAuth eksAuthData;
-    private final        AwsComponentNames     componentNames;
-    private final        EksCluster            cluster;
-    private final        List<ITerraformDependable> eksDependOn;
-    private final        List<String>               subnetIds;
-    private final        String                     polarisDomainName;
-    private final        String                     accountId;
-    private final        String                     region;
-    private final        String                     zone_id;
-    private final        String                     clusterName;
-    private final        AwsNuke                    awsNuke;
-    final                Vpc                        vpc;
-    final                IamRole                    loadBalancerRole;
-    final                Resource                   newKubeConfig;
-    private              Release                    lbRelease;
+    private final String                     clusterPolicyArn;
+    final static  String                     NO_JUPYTER_LB = """
+                                                             kubectl patch service jupyter-web -p \
+                                                             '{"metadata":{"finalizers":null}}'  --type=merge""";
+    final         DataAwsEksClusterAuth      eksAuthData;
+    private final AwsComponentNames          componentNames;
+    private final EksCluster                 cluster;
+    private final List<ITerraformDependable> eksDependOn;
+    private final List<String>               subnetIds;
+    private final String                     polarisDomainName;
+    private final String                     accountId;
+    private final String                     region;
+    private final String                     zone_id;
+    private final String                     clusterName;
+    private final AwsNuke                    awsNuke;
+    final         Vpc                        vpc;
+    final         IamRole                    loadBalancerRole;
+    final         Resource                   newKubeConfig;
+    private       Release                    lbRelease;
 
     AwsConstruct(final Construct scope, final String id, Properties properties) {
         super(scope, id);
-        awsNuke     = new AwsNuke(properties);
+        awsNuke        = new AwsNuke(properties);
         componentNames = new AwsComponentNames(properties);
-        clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+        clusterName    = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
 
-        this.polarisDomainName  = AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
-        this.accountId          = AWS_ACCOUNT_ID.getValueFrom(properties);
-        this.region             = AfonProperties.AWS_REGION.getValueFrom(properties);
-        this.zone_id            = AfonProperties.AWS_ZONE_ID.getValueFrom(properties);
-        clusterPolicyArn = format("arn:aws:iam::%s:policy/AWSLoadBalancerControllerIAMPolicyCurl", accountId);
+        this.polarisDomainName = AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
+        this.accountId         = AWS_ACCOUNT_ID.getValueFrom(properties);
+        this.region            = AfonProperties.AWS_REGION.getValueFrom(properties);
+        this.zone_id           = AfonProperties.AWS_ZONE_ID.getValueFrom(properties);
+        clusterPolicyArn       = format("arn:aws:iam::%s:policy/AWSLoadBalancerControllerIAMPolicyCurl", accountId);
         // --- AWS Provider Configuration (Required for EKS Addon) ---
         // 1. Configure the AWS Provider
         AwsProvider.Builder.create(this, "aws")
@@ -97,64 +97,75 @@ public class AwsConstruct extends AbstractConstruct {
         // --- 1. SECRETS MANAGER CREATION ---
 
         // Create the secret container
-        final var applicationSecret = SecretsmanagerSecret.Builder.create(this, "ApplicationSecret")
-                                                                  .name(componentNames.getSecret())
-                                                                  .description("Secret containing application " +
-                                                                                   "configuration or API keys for EKS.")
-                                                                  .tags(Map.of("Name", "EKSAppConfig"))
-                                                                  .recoveryWindowInDays(0)
-                                                                  .build();
+        final var applicationSecret = SecretsmanagerSecret.Builder
+            .create(this, "ApplicationSecret")
+            .name(componentNames.getSecret())
+            .description("Secret containing application " +
+                             "configuration or API keys for EKS.")
+            .tags(Map.of("Name", "EKSAppConfig"))
+            .recoveryWindowInDays(0)
+            .build();
 
-        vpc = Vpc.Builder.create(this, "eksVpc")
-                         .cidrBlock("10.0.0.0/16")
-                         .enableDnsSupport(true)
-                         .enableDnsHostnames(true)
-                         .provisioners(awsNuke.destroySGsAndVPC())
-                         .tags(Map.of("Name", componentNames.getVpcId())).build();
+        vpc = Vpc.Builder
+            .create(this, "eksVpc")
+            .cidrBlock("10.0.0.0/16")
+            .enableDnsSupport(true)
+            .enableDnsHostnames(true)
+            .provisioners(awsNuke.destroySGsAndVPC())
+            .tags(Map.of("Name", componentNames.getVpcId())).build();
 
-        final InternetGateway igw = InternetGateway.Builder.create(this, "vpcIgw")
-                                                           .vpcId(vpc.getId())
-                                                           .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                           .tags(Map.of("Name", "cdktf-eks-igw-" + clusterName)).build();
+        final InternetGateway igw = InternetGateway.Builder
+            .create(this, "vpcIgw")
+            .vpcId(vpc.getId())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", "cdktf-eks-igw-" + clusterName)).build();
 
-        final Subnet publicSubnet1 = Subnet.Builder.create(this, "publicSubnet1")
-                                                   .vpcId(vpc.getId())
-                                                   .cidrBlock("10.0.1.0/24")
-                                                   .availabilityZone(region + "a")
-                                                   .mapPublicIpOnLaunch(true)
-                                                   .dependsOn(List.of(igw))
-                                                   .provisioners(uponDestroyRun(awsNuke.cleanELBs()))
-                                                   .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                   .tags(Map.of("Name", "cdktf-eks-public-1-" + clusterName)).build();
+        final Subnet publicSubnet1 = Subnet.Builder
+            .create(this, "publicSubnet1")
+            .vpcId(vpc.getId())
+            .cidrBlock("10.0.1.0/24")
+            .availabilityZone(region + "a")
+            .mapPublicIpOnLaunch(true)
+            .dependsOn(List.of(igw))
+            .provisioners(uponDestroyRun(awsNuke.cleanELBs()))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", "cdktf-eks-public-1-" + clusterName)).build();
 
-        final Subnet publicSubnet2 = Subnet.Builder.create(this, "publicSubnet2")
-                                                   .vpcId(vpc.getId())
-                                                   .cidrBlock("10.0.2.0/24")
-                                                   .availabilityZone(region + "b")
-                                                   .mapPublicIpOnLaunch(true)
-                                                   .dependsOn(List.of(igw))
-                                                   .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                   .tags(Map.of("Name", "cdktf-eks-public-2-" + clusterName)).build();
+        final Subnet publicSubnet2 = Subnet.Builder
+            .create(this, "publicSubnet2")
+            .vpcId(vpc.getId())
+            .cidrBlock("10.0.2.0/24")
+            .availabilityZone(region + "b")
+            .mapPublicIpOnLaunch(true)
+            .dependsOn(List.of(igw))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", "cdktf-eks-public-2-" + clusterName)).build();
 
-        final RouteTableRoute route = RouteTableRoute.builder()
-                                                     .cidrBlock("0.0.0.0/0")
-                                                     .gatewayId(igw.getId()).build();
+        final RouteTableRoute route = RouteTableRoute
+            .builder()
+            .cidrBlock("0.0.0.0/0")
+            .gatewayId(igw.getId()).build();
 
-        final RouteTable publicRouteTable = RouteTable.Builder.create(this, "publicRouteTable")
-                                                              .vpcId(vpc.getId())
-                                                              .route(List.of(route))
-                                                              .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                              .tags(Map.of("Name", "cdktf-eks-public-rt-" + clusterName)).build();
+        final RouteTable publicRouteTable = RouteTable.Builder
+            .create(this, "publicRouteTable")
+            .vpcId(vpc.getId())
+            .route(List.of(route))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of(
+                "Name",
+                "cdktf-eks-public-rt-" + clusterName)).build();
 
-        RouteTableAssociation subnet1Association = RouteTableAssociation.Builder.create(this, "subnet1Association")
-                                                                                .subnetId(publicSubnet1.getId())
-                                                                                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                                                .routeTableId(publicRouteTable.getId()).build();
+        RouteTableAssociation subnet1Association = RouteTableAssociation.Builder
+            .create(this, "subnet1Association")
+            .subnetId(publicSubnet1.getId())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .routeTableId(publicRouteTable.getId()).build();
 
-        RouteTableAssociation subnet2Association = RouteTableAssociation.Builder.create(this, "subnet2Association")
-                                                                                .subnetId(publicSubnet2.getId())
-                                                                                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                                                .routeTableId(publicRouteTable.getId()).build();
+        RouteTableAssociation subnet2Association = RouteTableAssociation.Builder
+            .create(this, "subnet2Association")
+            .subnetId(publicSubnet2.getId())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .routeTableId(publicRouteTable.getId()).build();
 
         subnetIds = List.of(publicSubnet1.getId(), publicSubnet2.getId());
 
@@ -162,42 +173,48 @@ public class AwsConstruct extends AbstractConstruct {
 
         final String eksAssumeRolePolicy = """
                                            {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole"}]}""";
-        final IamRole eksClusterRole = IamRole.Builder.create(this, "eksClusterRole")
-                                                      .name(componentNames.getClusterRoleName())
-                                                      .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                      .assumeRolePolicy(eksAssumeRolePolicy).build();
+        final IamRole eksClusterRole = IamRole.Builder
+            .create(this, "eksClusterRole")
+            .name(componentNames.getClusterRoleName())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .assumeRolePolicy(eksAssumeRolePolicy).build();
 
         final DataAwsIamPolicy eksClusterPolicy = DataAwsIamPolicy.Builder.create(this, "eksClusterPolicy")
                                                                           .name("AmazonEKSClusterPolicy").build();
 
-        IamRolePolicyAttachment roleAttachment = IamRolePolicyAttachment
-            .Builder.create(this, "eksClusterRoleAttachment")
-                    .policyArn(eksClusterPolicy.getArn())
-                    .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                    .provisioners(uponDestroyRun(
-                        format("aws iam detach-role-policy --role-name %s --policy-arn %s",
-                               componentNames.getClusterRoleName(),
-                               clusterPolicyArn),
-                        format("aws iam detach-role-policy --role-name %s --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
-                               componentNames.getClusterRoleName())))
-                    .role(eksClusterRole.getName()).build();
+        IamRolePolicyAttachment roleAttachment = IamRolePolicyAttachment.Builder
+            .create(this, "eksClusterRoleAttachment")
+            .policyArn(eksClusterPolicy.getArn())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .provisioners(uponDestroyRun(
+                format(
+                    "aws iam detach-role-policy --role-name %s --policy-arn %s",
+                    componentNames.getClusterRoleName(),
+                    clusterPolicyArn),
+                format(
+                    "aws iam detach-role-policy --role-name %s --policy-arn " +
+                        "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+                    componentNames.getClusterRoleName())))
+            .role(eksClusterRole.getName()).build();
 
         final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
 
-        cluster = EksCluster.Builder.create(this, "eksCluster")
-                                    .name(clusterName)
-                                    .roleArn(eksClusterRole.getArn())
-                                    .vpcConfig(vpcConfig)
-                                    .version("1.31")
-                                    .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS))
-                                    .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                    .dependsOn(List.of(roleAttachment))
-                                    .tags(Map.of("Name", "cdktf-eks")).build();
+        cluster = EksCluster.Builder
+            .create(this, "eksCluster")
+            .name(clusterName)
+            .roleArn(eksClusterRole.getArn())
+            .vpcConfig(vpcConfig)
+            .version("1.31")
+            .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .dependsOn(List.of(roleAttachment))
+            .tags(Map.of("Name", "cdktf-eks")).build();
 
         // if one depends_on this, then the cluster should be running
-        eksAuthData = DataAwsEksClusterAuth.Builder.create(this, "eksClusterAuthData")
-                                                   .name(cluster.getName()) // Uses the name of the EKS cluster
-                                                   .build();
+        eksAuthData = DataAwsEksClusterAuth.Builder
+            .create(this, "eksClusterAuthData")
+            .name(cluster.getName()) // Uses the name of the EKS cluster
+            .build();
 
         final String workerAssumeRolePolicy = """
                                               {"Version":"2012-10-17",
@@ -216,9 +233,10 @@ public class AwsConstruct extends AbstractConstruct {
                                                       "Action":"sts:AssumeRole"
                                                   }
                                               ] }""";
-        final IamRole nodeGroupRole = IamRole.Builder.create(this, "eksNodeGroupRole")
-                                                     .name(componentNames.getNodeGroupRoleName())
-                                                     .assumeRolePolicy(workerAssumeRolePolicy).build();
+        final IamRole nodeGroupRole = IamRole.Builder
+            .create(this, "eksNodeGroupRole")
+            .name(componentNames.getNodeGroupRoleName())
+            .assumeRolePolicy(workerAssumeRolePolicy).build();
 
         // ** NEW STEP: Create Custom IAM Policy referencing the Secret ARN **
         // We use String.format to insert the secret's ARN dynamically into the policy JSON.
@@ -237,84 +255,97 @@ public class AwsConstruct extends AbstractConstruct {
             }""", applicationSecret.getArn()
                                                                );
 
-        final IamPolicy customSecretPolicy = IamPolicy.Builder.create(this, "SecretAccessPolicy")
-                                                              .name(componentNames.getAccessPolicyName())
-                                                              .description("Allows EKS Node Group to read the " +
-                                                                               "specific application config secret.")
-                                                              .policy(customSecretPolicyDocument)
-                                                              .build();
+        final IamPolicy customSecretPolicy = IamPolicy.Builder
+            .create(this, "SecretAccessPolicy")
+            .name(componentNames.getAccessPolicyName())
+            .description("Allows EKS Node Group to read the " +
+                             "specific application config secret.")
+            .policy(customSecretPolicyDocument)
+            .build();
 
         // ** NEW ATTACHMENT: Attach the custom secret policy to the Node Group role **
-        IamRolePolicyAttachment.Builder.create(this, "customSecretPolicyAttachment")
-                                       .policyArn(customSecretPolicy.getArn())
-                                       .role(nodeGroupRole.getName())
-                                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                       .build();
+        IamRolePolicyAttachment.Builder
+            .create(this, "customSecretPolicyAttachment")
+            .policyArn(customSecretPolicy.getArn())
+            .role(nodeGroupRole.getName())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .build();
 
         // Existing required policy attachments
-        final DataAwsIamPolicy workerNodePolicy = DataAwsIamPolicy.Builder.create(this, "workerNodePolicy")
-                                                                          .name("AmazonEKSWorkerNodePolicy").build();
-        final DataAwsIamPolicy cniPolicy = DataAwsIamPolicy.Builder.create(this, "cniPolicy")
-                                                                   .name("AmazonEKS_CNI_Policy").build();
-        final DataAwsIamPolicy containerRegistryPolicy = DataAwsIamPolicy.Builder.create(this,
-                                                                                         "containerRegistryPolicy")
-                                                                                 .name(
-                                                                                     "AmazonEC2ContainerRegistryReadOnly").build();
+        final DataAwsIamPolicy workerNodePolicy = DataAwsIamPolicy.Builder
+            .create(this, "workerNodePolicy")
+            .name("AmazonEKSWorkerNodePolicy").build();
+        final DataAwsIamPolicy cniPolicy = DataAwsIamPolicy.Builder
+            .create(this, "cniPolicy")
+            .name("AmazonEKS_CNI_Policy").build();
+        final DataAwsIamPolicy containerRegistryPolicy = DataAwsIamPolicy.Builder
+            .create(
+                this,
+                "containerRegistryPolicy")
+            .name(
+                "AmazonEC2ContainerRegistryReadOnly").build();
 
-        IamRolePolicyAttachment.Builder.create(this, "workerNodePolicyAttachment")
-                                       .policyArn(workerNodePolicy.getArn())
-                                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                       .role(nodeGroupRole.getName()).build();
+        IamRolePolicyAttachment.Builder
+            .create(this, "workerNodePolicyAttachment")
+            .policyArn(workerNodePolicy.getArn())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .role(nodeGroupRole.getName()).build();
 
-        IamRolePolicyAttachment.Builder.create(this, "cniPolicyAttachment")
-                                       .policyArn(cniPolicy.getArn())
-                                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                       .role(nodeGroupRole.getName()).build();
+        IamRolePolicyAttachment.Builder
+            .create(this, "cniPolicyAttachment")
+            .policyArn(cniPolicy.getArn())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .role(nodeGroupRole.getName()).build();
 
-        IamRolePolicyAttachment.Builder.create(this, "containerRegistryPolicyAttachment")
-                                       .policyArn(containerRegistryPolicy.getArn())
-                                       .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                       .role(nodeGroupRole.getName()).build();
+        IamRolePolicyAttachment.Builder
+            .create(this, "containerRegistryPolicyAttachment")
+            .policyArn(containerRegistryPolicy.getArn())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .role(nodeGroupRole.getName()).build();
 
         // --- 5. EKS Managed Node Group Creation (Same as before) ---
 
-        final EksNodeGroupScalingConfig scalingConfig = EksNodeGroupScalingConfig.builder()
-                                                                                 .desiredSize(3.0)
-                                                                                 .minSize(3.0)
-                                                                                 .maxSize(3.0)
-                                                                                 .build();
+        final EksNodeGroupScalingConfig scalingConfig = EksNodeGroupScalingConfig
+            .builder()
+            .desiredSize(3.0)
+            .minSize(3.0)
+            .maxSize(3.0)
+            .build();
 
+        List<LocalExecProvisioner> updateKubeConfig = List.of(
+            LocalExecProvisioner
+                .builder()
+                .when("create") // Run only when the resource is created
+                .command(format(
+                             "aws eks update-kubeconfig --name %s --region %s",
+                             clusterName,
+                             region)
+                        )
+                .type("local-exec")
+                .build()
+                                                             );
         newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater")
                                         .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
-                                        .provisioners(List.of(
-                                            LocalExecProvisioner.builder()
-                                                                .when("create") // Run only when the resource is created
-                                                                .command(format(
-                                                                             "aws eks update-kubeconfig --name %s " +
-                                                                                 "--region %s",
-                                                                             clusterName,
-                                                                             region)
-                                                                        )
-                                                                .type("local-exec")
-                                                                .build()
-                                                             ))
+                                        .provisioners(updateKubeConfig)
                                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                         .build();
-        EksNodeGroup nodeGroup = EksNodeGroup.Builder.create(this, "eksNodeGroup")
-                                                     .clusterName(cluster.getName())
-                                                     .nodeGroupName("default-ng")
-                                                     .subnetIds(subnetIds)
-                                                     .nodeRoleArn(nodeGroupRole.getArn())
-                                                     .instanceTypes(List.of("t3.medium"))
-                                                     .scalingConfig(scalingConfig)
-                                                     .dependsOn(List.of(newKubeConfig, cluster, eksAuthData,
-                                                                        publicSubnet1, publicSubnet2))
-                                                     .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                                     .tags(Map.of("Name", componentNames.getNodeGroupRoleName())).build();
+        EksNodeGroup nodeGroup = EksNodeGroup.Builder
+            .create(this, "eksNodeGroup")
+            .clusterName(cluster.getName())
+            .nodeGroupName("default-ng")
+            .subnetIds(subnetIds)
+            .nodeRoleArn(nodeGroupRole.getArn())
+            .instanceTypes(List.of("t3.medium"))
+            .scalingConfig(scalingConfig)
+            .dependsOn(List.of(
+                newKubeConfig, cluster, eksAuthData,
+                publicSubnet1, publicSubnet2))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", componentNames.getNodeGroupRoleName())).build();
 
 
         String clusterEndpoint = cluster.getEndpoint();
-        String apiHost = Fn.replace(clusterEndpoint, "https://", "");
+        String apiHost         = Fn.replace(clusterEndpoint, "https://", "");
 
         // Basically, EKS assumes you want a few components that you don't need if you use Cilium
         // vpc-cni addon removed: Cilium ENI mode is a complete replacement for vpc-cni.
@@ -329,43 +360,43 @@ public class AwsConstruct extends AbstractConstruct {
             format(
                 "aws eks delete-addon --cluster-name %s --addon-name kube-proxy ||" +
                     " echo no kube-proxy", clusterName));
-        Release cilium = Release.Builder.create(this, "cilium")
-                                        .name("cilium")
-                                        .repository("https://helm.cilium.io/")
-                                        .chart("cilium")
-                                        .namespace("kube-system")
-                                        .dependsOn(List.of(nodeGroup))
-                                        .provisioners(onCiliumCreation)
-                                        .version("1.15.0") // Use the latest stable version
+        Release cilium = Release.Builder
+            .create(this, "cilium")
+            .name("cilium")
+            .repository("https://helm.cilium.io/")
+            .chart("cilium")
+            .namespace("kube-system")
+            .dependsOn(List.of(nodeGroup))
+            .provisioners(onCiliumCreation)
+            .version("1.15.0")
+            // Set the specific values to kill kube-proxy dependency
+            .set(java.util.List.of(
+                // 1. Connectivity to EKS Control Plane
+                createValue("kubeProxyReplacement", "true"),
+                createValue("k8sServiceHost", apiHost),
+                createValue("k8sServicePort", "443"),
 
-                                        // Set the specific values to kill kube-proxy dependency
-                                        .set(java.util.List.of(
-                                            // 1. Connectivity to EKS Control Plane
-                                            createValue("kubeProxyReplacement", "true"),
-                                            createValue("k8sServiceHost", apiHost),
-                                            createValue("k8sServicePort", "443"),
+                // 2. EKS-Specific Networking (ENI Mode)
+                createValue("eni.enabled", "true"),
+                createValue("ipam.mode", "eni"),
+                createValue("routingMode", "native"),
+                // BPF masquerade is required: kubeProxyReplacement uses bpf_redirect
+                // to forward pod egress directly to the ENI, bypassing iptables
+                // POSTROUTING — so iptables MASQUERADE never fires.
+                createValue("bpf.masquerade", "true"),
+                createValue("enableIPv4Masquerade", "true"),
+                createValue("ipv4NativeRoutingCIDR", vpc.getCidrBlock()),
 
-                                            // 2. EKS-Specific Networking (ENI Mode)
-                                            createValue("eni.enabled", "true"),
-                                            createValue("ipam.mode", "eni"),
-                                            createValue("routingMode", "native"),
-                                            // BPF masquerade is required: kubeProxyReplacement uses bpf_redirect
-                                            // to forward pod egress directly to the ENI, bypassing iptables
-                                            // POSTROUTING — so iptables MASQUERADE never fires.
-                                            createValue("bpf.masquerade", "true"),
-                                            createValue("enableIPv4Masquerade", "true"),
-                                            createValue("ipv4NativeRoutingCIDR", vpc.getCidrBlock()),
+                // 3. Solving the "Pending" Issue (Tolerations)
+                // This allows Cilium to run even if the node is "NotReady"
+                createValue("tolerations[0].operator", "Exists"),
+                createValue("tolerations[0].effect", "NoSchedule"),
 
-                                            // 3. Solving the "Pending" Issue (Tolerations)
-                                            // This allows Cilium to run even if the node is "NotReady"
-                                            createValue("tolerations[0].operator", "Exists"),
-                                            createValue("tolerations[0].effect", "NoSchedule"),
-
-                                            // Also apply to the operator so it can manage the pods
-                                            createValue("operator.tolerations[0].operator", "Exists"),
-                                            createValue("operator.tolerations[0].effect", "NoSchedule")
-                                                              ))
-                                        .build();
+                // Also apply to the operator so it can manage the pods
+                createValue("operator.tolerations[0].operator", "Exists"),
+                createValue("operator.tolerations[0].effect", "NoSchedule")
+                                  ))
+            .build();
 
         eksDependOn = List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2, cilium);
 
@@ -375,22 +406,25 @@ public class AwsConstruct extends AbstractConstruct {
             """, accountId);
         loadBalancerRole = new IamRole(
             scope, "AmazonEKSLoadBalancerControllerRole",
-            IamRoleConfig.builder()
-                         .name("AmazonEKSLoadBalancerControllerRole" + clusterName)
-                         .assumeRolePolicy(trustPolicy)
-                         .build());
-        IamRolePolicyAttachment.Builder.create(this, "EKS-Cleanup-Policy-Attachment")
-                                       .policyArn(clusterPolicyArn)
-                                       .role(eksClusterRole.getName())
-                                       .build();
+            IamRoleConfig
+                .builder()
+                .name("AmazonEKSLoadBalancerControllerRole" + clusterName)
+                .assumeRolePolicy(trustPolicy)
+                .build());
+        IamRolePolicyAttachment.Builder
+            .create(this, "EKS-Cleanup-Policy-Attachment")
+            .policyArn(clusterPolicyArn)
+            .role(eksClusterRole.getName())
+            .build();
         lbRelease = configureIngress(scope, loadBalancerRole);
 
         IngressV1 ingress = createHttpsIngress(
             "polaris-https-ingress",
             "polaris-ingress",
-            format("arn:aws:acm:%s:%s:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
-                   region,
-                   accountId),
+            format(
+                "arn:aws:acm:%s:%s:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
+                region,
+                accountId),
             this.polarisDomainName,
             POLARIS_INTERNAL,
             8181,
@@ -415,11 +449,12 @@ public class AwsConstruct extends AbstractConstruct {
             "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
                 "|| true",
             "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true");
-        Resource.Builder.create(this, "lbc-destroy-cleanup")
-                        .dependsOn(List.of(ingress, lbRelease))
-                        .provisioners(onLbcDestroy)
-                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                        .build();
+        Resource.Builder
+            .create(this, "lbc-destroy-cleanup")
+            .dependsOn(List.of(ingress, lbRelease))
+            .provisioners(onLbcDestroy)
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .build();
 
         // 2. Create the Alias A Record
         // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
@@ -446,6 +481,7 @@ public class AwsConstruct extends AbstractConstruct {
      */
     public void configureDNS(String constructId, String r53ZoneId, String domainName,
                              Release release, IngressV1 ingress) {
+        String hostname = ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getHostname();
         new Route53Record(
             this, constructId, Route53RecordConfig
             .builder()
@@ -454,11 +490,12 @@ public class AwsConstruct extends AbstractConstruct {
             .type("A")
             .allowOverwrite(true)
             .dependsOn(List.of(release))
-            .alias(Route53RecordAlias.builder()
-                                     .name(ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getHostname())
-                                     .zoneId(zone_id)
-                                     .evaluateTargetHealth(true)
-                                     .build())
+            .alias(Route53RecordAlias
+                       .builder()
+                       .name(hostname)
+                       .zoneId(zone_id)
+                       .evaluateTargetHealth(true)
+                       .build())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .build());
     }
@@ -490,24 +527,26 @@ public class AwsConstruct extends AbstractConstruct {
                 "-controller",
             "app.kubernetes.io/name", "aws-load-balancer" +
                 "-controller"
-                                               );
+                                           );
         Map<String, String> annotations = Map.of(
             "eks.amazonaws.com/role-arn",
             loadBalancerRole.getArn()
                                                 );
-        ServiceAccount.Builder.create(scope, serviceAccountName)
-                              .metadata(ServiceAccountMetadata.builder()
-                                                              .name(serviceAccountName)
-                                                              .namespace("kube-system")
-                                                              .labels(labels)
-                                                              .annotations(annotations)
-                                                              .build())
-                              .provisioners(uponDestroyRun(
-                                  NO_INSTALLATION_FINALIZERS,
-                                  NO_JUPYTER_LB,
-                                  NO_POLARIS_FINALIZERS,
-                                  NO_JUPYTER_FINALIZERS))
-                              .build();
+        ServiceAccount.Builder
+            .create(scope, serviceAccountName)
+            .metadata(ServiceAccountMetadata
+                          .builder()
+                          .name(serviceAccountName)
+                          .namespace("kube-system")
+                          .labels(labels)
+                          .annotations(annotations)
+                          .build())
+            .provisioners(uponDestroyRun(
+                NO_INSTALLATION_FINALIZERS,
+                NO_JUPYTER_LB,
+                NO_POLARIS_FINALIZERS,
+                NO_JUPYTER_FINALIZERS))
+            .build();
         return serviceAccountName;
     }
 
@@ -551,22 +590,23 @@ public class AwsConstruct extends AbstractConstruct {
     private Release helmInstallLoadBalancer(String serviceAccountName, IamRole loadBalancerRole) {
         ArrayList<ITerraformDependable> dependencies = new ArrayList(eksDependOn);
         dependencies.add(loadBalancerRole);
-        return Release.Builder.create(this, "aws-load-balancer")
-                              .dependsOn(dependencies)
-                              .name(serviceAccountName + "-chart")
-                              .chart("aws-load-balancer-controller")
-                              .version("1.17.0")
-                              .repository("https://aws.github.io/eks-charts")
-                              .namespace("kube-system")
-                              .timeout(600)
-                              .atomic(true)
-                              .set(List.of(
-                                  ReleaseSet.builder().name("clusterName").value(clusterName).build(),
-                                  ReleaseSet.builder().name("serviceAccount.create").value("false").build(),
-                                  ReleaseSet.builder().name("vpcId").value(vpc.getId()).build(),
-                                  ReleaseSet.builder().name("serviceAccount.name").value(serviceAccountName).build()
-                                          ))
-                              .build();
+        return Release.Builder
+            .create(this, "aws-load-balancer")
+            .dependsOn(dependencies)
+            .name(serviceAccountName + "-chart")
+            .chart("aws-load-balancer-controller")
+            .version("1.17.0")
+            .repository("https://aws.github.io/eks-charts")
+            .namespace("kube-system")
+            .timeout(600)
+            .atomic(true)
+            .set(List.of(
+                ReleaseSet.builder().name("clusterName").value(clusterName).build(),
+                ReleaseSet.builder().name("serviceAccount.create").value("false").build(),
+                ReleaseSet.builder().name("vpcId").value(vpc.getId()).build(),
+                ReleaseSet.builder().name("serviceAccount.name").value(serviceAccountName).build()
+                        ))
+            .build();
     }
 
     public IngressV1 createHttpsIngress(
@@ -612,38 +652,43 @@ public class AwsConstruct extends AbstractConstruct {
                  ).build();
         IngressV1SpecRuleHttpPathBackend pathBackend = IngressV1SpecRuleHttpPathBackend
             .builder().service(sslServicePort).build();
-        IngressV1SpecRuleHttpPath pathRule = IngressV1SpecRuleHttpPath.builder()
-                                                                    .path("/")
-                                                                    .pathType("Prefix")
-                                                                    .backend(pathBackend)
-                                                                    .build();
+        IngressV1SpecRuleHttpPath pathRule = IngressV1SpecRuleHttpPath
+            .builder()
+            .path("/")
+            .pathType("Prefix")
+            .backend(pathBackend)
+            .build();
         IngressV1SpecRuleHttp servicePortRule = IngressV1SpecRuleHttp
             .builder()
             .path(Collections.singletonList(pathRule))
             .build();
-        IngressV1SpecRule ingressRule = IngressV1SpecRule.builder()
-                                                   .host(hostName)
-                                                   .http(servicePortRule)
-                                                   .build();
-        IngressV1Spec alb = IngressV1Spec.builder()
-                                         .ingressClassName("alb")
-                                         .rule(List.of(ingressRule))
-                                         .build();
-        IngressV1Metadata ingressMetadata = IngressV1Metadata.builder()
-                                                      .name(ingressName)
-                                                      .namespace("default")
-                                                      .annotations(albAnnotations)
-                                                      .build();
-        return IngressV1.Builder.create(this, constructId)
-                                .provider(kubernetesProvider)
-                                .metadata(ingressMetadata)
-                                .spec(alb)
-                                .lifecycle(TerraformResourceLifecycle
-                                                            .builder()
-                                                            .preventDestroy(false)
-                                                            .build())
-                                .waitForLoadBalancer(true)
-                                .build();
+        IngressV1SpecRule ingressRule = IngressV1SpecRule
+            .builder()
+            .host(hostName)
+            .http(servicePortRule)
+            .build();
+        IngressV1Spec alb = IngressV1Spec
+            .builder()
+            .ingressClassName("alb")
+            .rule(List.of(ingressRule))
+            .build();
+        IngressV1Metadata ingressMetadata = IngressV1Metadata
+            .builder()
+            .name(ingressName)
+            .namespace("default")
+            .annotations(albAnnotations)
+            .build();
+        return IngressV1.Builder
+            .create(this, constructId)
+            .provider(kubernetesProvider)
+            .metadata(ingressMetadata)
+            .spec(alb)
+            .lifecycle(TerraformResourceLifecycle
+                           .builder()
+                           .preventDestroy(false)
+                           .build())
+            .waitForLoadBalancer(true)
+            .build();
     }
 
     public Release getLbRelease() {
@@ -651,15 +696,17 @@ public class AwsConstruct extends AbstractConstruct {
     }
 
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
-        Resource.Builder.create(this, "cleanupELBs")
-                        // Ensure this runs only after the K8s Services are destroyed by Terraform
-                        .dependsOn(loadBalancers)
-                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                        .build();
-        Resource.Builder.create(this, "cleanupSecurityGroups")
-                        .dependsOn(loadBalancers)
-                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                        .build();
+        Resource.Builder
+            .create(this, "cleanupELBs")
+            // Ensure this runs only after the K8s Services are destroyed by Terraform
+            .dependsOn(loadBalancers)
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .build();
+        Resource.Builder
+            .create(this, "cleanupSecurityGroups")
+            .dependsOn(loadBalancers)
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .build();
     }
 
 
@@ -686,6 +733,7 @@ public class AwsConstruct extends AbstractConstruct {
     public String getToken() {
         return eksAuthData.getToken();
     }
+
     public String getPolarisDomainName() {
         return polarisDomainName;
     }
