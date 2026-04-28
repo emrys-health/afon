@@ -22,11 +22,12 @@ abstract class AbstractConstruct extends Construct implements CloudProvider {
         if (kubernetesProvider == null) {
             String base64CertData = getBase64CertData();
             String encodedCert    = com.hashicorp.cdktf.Fn.base64decode(base64CertData);
-            kubernetesProvider    = KubernetesProvider.Builder.create(this, "kubernetes")
-                                                           .host(getClusterEndpoint())
-                                                           .clusterCaCertificate(encodedCert)
-                                                           .token(getToken()) // Dynamically generated token
-                                                           .build();
+            kubernetesProvider = KubernetesProvider.Builder
+                .create(this, "kubernetes")
+                .host(getClusterEndpoint())
+                .clusterCaCertificate(encodedCert)
+                .token(getToken()) // Dynamically generated token
+                .build();
         }
         return kubernetesProvider;
     }
