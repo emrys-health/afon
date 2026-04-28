@@ -41,33 +41,36 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
         // Configuration Overrides for the Helm Chart
         // We use the ReleaseSet.builder() for the `set` block in Terraform
         final List<ReleaseSet> chartOverrides = List.of(
-                ReleaseSet.builder()
-                          .name("grafana.persistence.enabled")
-                          .value("false") // Disable Grafana persistence for simplicity
-                          .build(),
-                ReleaseSet.builder()
-                          .name("prometheus.prometheusSpec.storageRetention")
-                          .value("7d") // Keep metrics for 7 days
-                          .build()
+            ReleaseSet
+                .builder()
+                .name("grafana.persistence.enabled")
+                .value("false") // Disable Grafana persistence for simplicity
+                .build(),
+            ReleaseSet
+                .builder()
+                .name("prometheus.prometheusSpec.storageRetention")
+                .value("7d") // Keep metrics for 7 days
+                .build()
                                                        );
 
         // Install the kube-prometheus-stack Helm chart
-        Release.Builder.create(this, "prometheusRelease")
-                       .name("kube-prometheus-stack")
-                       .chart("kube-prometheus-stack")
-                       .repository("https://prometheus-community.github.io/helm-charts")
-                       .version("51.8.0") // Specify a version for consistency
+        Release.Builder
+            .create(this, "prometheusRelease")
+            .name("kube-prometheus-stack")
+            .chart("kube-prometheus-stack")
+            .repository("https://prometheus-community.github.io/helm-charts")
+            .version("51.8.0") // Specify a version for consistency
 
-                       // Reference the namespace created above
-                       .namespace("default")
-                       .set(chartOverrides)
-                       .timeout(600)
-                       .atomic(true)
-                       .forceUpdate(true)
+            // Reference the namespace created above
+            .namespace("default")
+            .set(chartOverrides)
+            .timeout(600)
+            .atomic(true)
+            .forceUpdate(true)
 
-                       // Ensure the release depends on the namespace being created first
-                       .dependsOn(eksDependOn)
-                       .build();
+            // Ensure the release depends on the namespace being created first
+            .dependsOn(eksDependOn)
+            .build();
     }
 
     public static void main(String[] args) {

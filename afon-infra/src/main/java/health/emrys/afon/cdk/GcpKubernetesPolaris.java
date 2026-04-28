@@ -22,7 +22,7 @@ import java.util.Properties;
 
 public class GcpKubernetesPolaris extends GcpKubernetesStack {
 
-    public  static final String GCP_DOMAIN_NAME  = "emryspolarisgcp.click";
+    public static final  String GCP_DOMAIN_NAME  = "emryspolarisgcp.click";
     private static final String DNS_ZONE_NAME    = "polaris-zone";
     private static final String POLARIS_INTERNAL = "polaris-internal";
     private static final String TLS_SECRET_NAME  = "polaris-tls";
@@ -35,48 +35,61 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
             protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
                 return Service.Builder
                     .create(GcpKubernetesPolaris.this, POLARIS_INTERNAL)
-                    .metadata(ServiceMetadata.builder()
-                                             .name(POLARIS_INTERNAL)
-                                             .build())
+                    .metadata(ServiceMetadata
+                                  .builder()
+                                  .name(POLARIS_INTERNAL)
+                                  .build())
                     .dependsOn(List.of(polarisDeployment))
-                    .spec(ServiceSpec.builder()
-                                     .selector(polarisLabels)
-                                     .type("ClusterIP")
-                                     .port(List.of(PolarisConfig.POLARIS_PORTS))
-                                     .build())
+                    .spec(ServiceSpec
+                              .builder()
+                              .selector(polarisLabels)
+                              .type("ClusterIP")
+                              .port(List.of(PolarisConfig.POLARIS_PORTS))
+                              .build())
                     .build();
             }
         };
-        var                        util            = new TFUtils(this, GCP_DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT, POLARIS_INTERNAL);
+        var util = new TFUtils(
+            this, GCP_DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT
+            , POLARIS_INTERNAL);
         HelmProvider               helm            = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables     = cloudProvider.getDependables();
         Release                    nginxRelease    = util.installNginxIngress(this, helm, dependables, null);
         Release                    certManager     = util.installCertManager(this, helm, dependables);
         Service                    internalService = polarisConfig.deployPolaris(dependables);
-        IngressV1                  ingress         = util.createIngress(List.of(nginxRelease, certManager, internalService));
+        IngressV1 ingress = util.createIngress(List.of(
+            nginxRelease,
+            certManager,
+            internalService));
         configureDns(ingress);
     }
 
 
     private void configureDns(IngressV1 ingress) {
-        DataGoogleDnsManagedZone zone = new DataGoogleDnsManagedZone(this, "dns-zone",
-                                                                     DataGoogleDnsManagedZoneConfig.builder()
-                                                                                                   .name(DNS_ZONE_NAME)
-                                                                                                   .build());
+        DataGoogleDnsManagedZone zone = new DataGoogleDnsManagedZone(
+            this,
+            "dns-zone",
+            DataGoogleDnsManagedZoneConfig
+                .builder()
+                .name(DNS_ZONE_NAME)
+                .build());
 
-        new DnsRecordSet(this, "polaris-dns", DnsRecordSetConfig.builder()
-                                                                .name(GCP_DOMAIN_NAME + ".")
-                                                                .type("A")
-                                                                .ttl(300)
-                                                                .managedZone(zone.getName())
-                                                                .rrdatas(List.of(
-                                                                    ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getIp()
-                                                                                ))
-                                                                .build());
+        String ingressIp = ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getIp();
+        new DnsRecordSet(
+            this,
+            "polaris-dns",
+            DnsRecordSetConfig
+                .builder()
+                .name(GCP_DOMAIN_NAME + ".")
+                .type("A")
+                .ttl(300)
+                .managedZone(zone.getName())
+                .rrdatas(List.of(ingressIp))
+                .build());
     }
 
     public static void main(String[] args) {
-        final App app = new App();
+        final App  app        = new App();
         Properties properties = new AfonPropertiesLoader().getProperties();
         new GcpKubernetesPolaris(app, ID.toString(), properties);
         app.synth();

@@ -142,10 +142,6 @@ public class SparkClusterDeployment extends AwsWholeStack {
         unregisterCRDs(List.of(sparkLB));
     }
 
-    @Override
-    protected void unregisterCRDs() {
-    }
-
     private Service sparkExternalService(List<ITerraformDependable> eksDependOn) {
         String                          subnetIds      = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);

@@ -22,7 +22,11 @@ public class TFUtils {
     private final String    polarisInternal;
     private final Construct construct;
 
-    public TFUtils(Construct construct, String domainName, String tlsSecretName, int polarisPort, String polarisInternal) {
+    public TFUtils(Construct construct,
+                   String domainName,
+                   String tlsSecretName,
+                   int polarisPort,
+                   String polarisInternal) {
         this.domainName      = domainName;
         this.tlsSecretName   = tlsSecretName;
         this.polarisPort     = polarisPort;
@@ -44,36 +48,40 @@ public class TFUtils {
             .builder()
             .path("/")
             .pathType("Prefix")
-            .backend(IngressV1SpecRuleHttpPathBackend.builder()
-                                                     .service(backend)
-                                                     .build())
+            .backend(IngressV1SpecRuleHttpPathBackend
+                         .builder()
+                         .service(backend)
+                         .build())
             .build();
         IngressV1SpecRule ingressV1SpecRule = IngressV1SpecRule
             .builder()
             .host(domainName)
-            .http(IngressV1SpecRuleHttp.builder()
-                                       .path(List.of(httpPath))
-                                       .build())
+            .http(IngressV1SpecRuleHttp
+                      .builder()
+                      .path(List.of(httpPath))
+                      .build())
             .build();
         IngressV1Spec nginxSpec = IngressV1Spec
             .builder()
             .ingressClassName("nginx")
             .tls(List.of(
-                IngressV1SpecTls.builder()
-                                .hosts(List.of(domainName))
-                                .secretName(tlsSecretName)
-                                .build()
+                IngressV1SpecTls
+                    .builder()
+                    .hosts(List.of(domainName))
+                    .secretName(tlsSecretName)
+                    .build()
                         ))
             .rule(List.of(ingressV1SpecRule))
             .build();
         return IngressV1.Builder
             .create(construct, POLARIS_SERVICE_NAME)
-            .metadata(IngressV1Metadata.builder()
-                                       .name(POLARIS_SERVICE_NAME)
-                                       .annotations(Map.of(
-                                           "cert-manager.io/cluster-issuer", "letsencrypt-prod"
-                                                          ))
-                                       .build())
+            .metadata(IngressV1Metadata
+                          .builder()
+                          .name(POLARIS_SERVICE_NAME)
+                          .annotations(Map.of(
+                              "cert-manager.io/cluster-issuer", "letsencrypt-prod"
+                                             ))
+                          .build())
             .dependsOn(dependencies)
             .provisioners(uponDestroyRun(PolarisConfig.NO_POLARIS_FINALIZERS))
             .spec(nginxSpec)
@@ -85,16 +93,17 @@ public class TFUtils {
                                        HelmProvider helmProvider,
                                        final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
                                        Map<String, String> annotations) {
-        var builder = Release.Builder.create(construct, "nginx-ingress")
-                              .provider(helmProvider)
-                              .dependsOn(dependsOn)
-                              .name("nginx-ingress")
-                              .chart("ingress-nginx")
-                              .repository("https://kubernetes.github.io/ingress-nginx")
-                              .namespace("ingress-nginx")
-                              .createNamespace(true)
-                              .timeout(600)
-                              .atomic(true);
+        var builder = Release.Builder
+            .create(construct, "nginx-ingress")
+            .provider(helmProvider)
+            .dependsOn(dependsOn)
+            .name("nginx-ingress")
+            .chart("ingress-nginx")
+            .repository("https://kubernetes.github.io/ingress-nginx")
+            .namespace("ingress-nginx")
+            .createNamespace(true)
+            .timeout(600)
+            .atomic(true);
         if (annotations != null && !annotations.isEmpty()) {
             var releaseSetBuilder = ReleaseSet.builder();
             annotations.forEach((name, value) -> {
@@ -116,36 +125,38 @@ public class TFUtils {
     public Release installCertManager(Construct construct,
                                       HelmProvider helmProvider,
                                       final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn) {
-        String clusterIssuerYaml = format("""
-                kubectl apply -f - <<'YAML'
-                apiVersion: cert-manager.io/v1
-                kind: ClusterIssuer
-                metadata:
+        String clusterIssuerYaml = format(
+            """
+            kubectl apply -f - <<'YAML'
+            apiVersion: cert-manager.io/v1
+            kind: ClusterIssuer
+            metadata:
+              name: letsencrypt-prod
+            spec:
+              acme:
+                server: https://acme-v02.api.letsencrypt.org/directory
+                email: admin@%s
+                privateKeySecretRef:
                   name: letsencrypt-prod
-                spec:
-                  acme:
-                    server: https://acme-v02.api.letsencrypt.org/directory
-                    email: admin@%s
-                    privateKeySecretRef:
-                      name: letsencrypt-prod
-                    solvers:
-                    - http01:
-                        ingress:
-                          class: nginx
-                YAML""", domainName);
+                solvers:
+                - http01:
+                    ingress:
+                      class: nginx
+            YAML""", domainName);
 
-        return Release.Builder.create(construct, "cert-manager")
-                              .provider(helmProvider)
-                              .dependsOn(dependsOn)
-                              .name("cert-manager")
-                              .chart("cert-manager")
-                              .repository("https://charts.jetstack.io")
-                              .namespace("cert-manager")
-                              .createNamespace(true)
-                              .timeout(300)
-                              .atomic(true)
-                              .set(List.of(ReleaseSet.builder().name("crds.enabled").value("true").build()))
-                              .provisioners(CdkUtils.uponCreateRun(clusterIssuerYaml))
-                              .build();
+        return Release.Builder
+            .create(construct, "cert-manager")
+            .provider(helmProvider)
+            .dependsOn(dependsOn)
+            .name("cert-manager")
+            .chart("cert-manager")
+            .repository("https://charts.jetstack.io")
+            .namespace("cert-manager")
+            .createNamespace(true)
+            .timeout(300)
+            .atomic(true)
+            .set(List.of(ReleaseSet.builder().name("crds.enabled").value("true").build()))
+            .provisioners(CdkUtils.uponCreateRun(clusterIssuerYaml))
+            .build();
     }
 }

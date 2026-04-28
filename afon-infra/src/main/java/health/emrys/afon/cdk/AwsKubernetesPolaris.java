@@ -26,9 +26,9 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
     public static final SupportedCloudsEnum ID               = AWS;
     public static final String              POLARIS_INTERNAL = "polaris-internal";
 
-    protected final PolarisConfig     polarisConfig;
-    protected final AwsConstruct      cloudProvider;
-    protected final Service           polarisLB;
+    protected final PolarisConfig polarisConfig;
+    protected final AwsConstruct  cloudProvider;
+    protected final Service       polarisLB;
 
     public AwsKubernetesPolaris(@NotNull Construct scope,
                                 SupportedCloudsEnum id,
@@ -43,28 +43,31 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
             }
         };
         polarisLB     = polarisConfig.deployPolaris(cloudProvider.getDependables());
-        Service.Builder.create(this, POLARIS_INTERNAL)
-                       .metadata(ServiceMetadata.builder()
-                                                .name(POLARIS_INTERNAL)
-                                                .namespace("default")
-                                                .build())
-                       .dependsOn(cloudProvider.getDependables())
-                       .spec(ServiceSpec.builder()
-                                        .selector(polarisConfig.polarisLabels) // Selects the Pods created by secretAppDeployment
-                                        .type("NodePort")
-                                        .internalTrafficPolicy("Cluster")
-//                                        .clusterIp("None")
-                                        .clusterIps(List.of())
-                                        .port(List.of(polarisConfig.POLARIS_PORTS))
-                                        .build())
-                       .build();
+        Service.Builder
+            .create(this, POLARIS_INTERNAL)
+            .metadata(ServiceMetadata
+                          .builder()
+                          .name(POLARIS_INTERNAL)
+                          .namespace("default")
+                          .build())
+            .dependsOn(cloudProvider.getDependables())
+            .spec(ServiceSpec
+                      .builder()
+                      .selector(polarisConfig.polarisLabels) // Selects the Pods created by secretAppDeployment
+                      .type("NodePort")
+                      .internalTrafficPolicy("Cluster")
+                      .clusterIps(List.of())
+                      .port(List.of(polarisConfig.POLARIS_PORTS))
+                      .build())
+            .build();
     }
 
     public static void main(String[] args) {
         final App app = new App();
         new AwsKubernetesPolaris(app, ID, new AfonPropertiesLoader().getProperties());
         app.synth();
-        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu -apply");
+        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu " +
+                        "-apply");
     }
 
     @Override

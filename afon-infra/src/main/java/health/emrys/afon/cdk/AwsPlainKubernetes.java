@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
@@ -23,18 +24,22 @@ public class AwsPlainKubernetes extends TerraformStack {
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
         AwsConstruct cloudProvider = new AwsConstruct(this, id.toString(), properties);
-        this.addOverride("terraform.required_providers.helm", Map.of(
-            "source", "hashicorp/helm",
-            "version", "3.1.1"   // 👈 Pin exact version
-                                                                    ));
-        HelmProvider helm = HelmProvider.Builder.create(this, "helm")
-                                                .kubernetes(HelmProviderKubernetes.builder()
-                                                                                  .host(cloudProvider.getClusterEndpoint())
-                                                                                  .clusterCaCertificate(com.hashicorp.cdktf.Fn.base64decode(cloudProvider.getBase64CertData()))
-                                                                                  .token(cloudProvider.getToken())
-                                                                                  .build())
-                                                .build();
+        this.addOverride(
+            "terraform.required_providers.helm", Map.of(
+                "source", "hashicorp/helm",
+                "version", "3.1.1"));
+        HelmProviderKubernetes kubernetes = HelmProviderKubernetes
+            .builder()
+            .host(cloudProvider.getClusterEndpoint())
+            .clusterCaCertificate(Fn.base64decode(cloudProvider.getBase64CertData()))
+            .token(cloudProvider.getToken())
+            .build();
+        HelmProvider helm = HelmProvider.Builder
+            .create(this, "helm")
+            .kubernetes(kubernetes)
+            .build();
     }
+
     public static void main(String[] args) {
         final App app = new App();
         new AwsPlainKubernetes(app, "demo", new AfonPropertiesLoader().getProperties());
