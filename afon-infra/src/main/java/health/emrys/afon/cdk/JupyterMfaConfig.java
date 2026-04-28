@@ -32,33 +32,14 @@ import static java.lang.String.format;
  *
  * <p>oauth2-proxy delegates authentication to an OIDC provider (default: Google). MFA is enforced
  * by the provider itself — any account with 2-Step Verification enabled will require it.
- *
- * <p><b>Before running {@code tofu apply}, export these variables:</b>
- * <pre>
- *   export TF_VAR_oauth2_client_id=&lt;your-client-id&gt;
- *   export TF_VAR_oauth2_client_secret=***REMOVED***
- *   export TF_VAR_oauth2_cookie_secret=$(openssl rand -base64 32 | tr -- '+/' '-_')
- * </pre>
- *
- * <p><b>OAuth2 app registration (Google example):</b>
- * <ol>
- *   <li>Go to Google Cloud Console → APIs &amp; Services → Credentials</li>
- *   <li>Create an OAuth 2.0 Client ID of type "Web application"</li>
- *   <li>Add authorized redirect URI: {@code http://&lt;load-balancer-hostname&gt;/oauth2/callback}</li>
- *   <li>Copy the Client ID and Client Secret into the TF_VAR_ exports above</li>
- * </ol>
- *
- * <p>To restrict access to a specific domain (e.g. your organisation), change {@code --email-domain=*}
- * to {@code --email-domain=yourdomain.com}. To use a different OIDC provider, change
- * {@code --oidc-issuer-url} and {@code --provider} accordingly.
  */
 class JupyterMfaConfig {
 
     static final int                 PROXY_PORT     = 4180;
-    static final Map<String, String> PROXY_LABELS   = Map.of("app", "oauth2-proxy");
     static final String              PROXY_SVC_NAME = "oauth2-proxy";
 
-    private static final String SECRET_NAME = "oauth2-proxy-secret";
+    private static final Map<String, String> PROXY_LABELS = Map.of("app", "oauth2-proxy");
+    private static final String              SECRET_NAME  = "oauth2-proxy-secret";
 
     JupyterMfaConfig(Construct scope,
                      List<ITerraformDependable> dependsOn,

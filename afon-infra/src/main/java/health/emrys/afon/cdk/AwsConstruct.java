@@ -314,8 +314,6 @@ public class AwsConstruct extends AbstractConstruct {
 
 
         String clusterEndpoint = cluster.getEndpoint();
-
-
         String apiHost = Fn.replace(clusterEndpoint, "https://", "");
 
         // Basically, EKS assumes you want a few components that you don't need if you use Cilium
@@ -614,35 +612,31 @@ public class AwsConstruct extends AbstractConstruct {
                  ).build();
         IngressV1SpecRuleHttpPathBackend pathBackend = IngressV1SpecRuleHttpPathBackend
             .builder().service(sslServicePort).build();
+        IngressV1SpecRuleHttpPath pathRule = IngressV1SpecRuleHttpPath.builder()
+                                                                    .path("/")
+                                                                    .pathType("Prefix")
+                                                                    .backend(pathBackend)
+                                                                    .build();
         IngressV1SpecRuleHttp servicePortRule = IngressV1SpecRuleHttp
             .builder()
-            .path(Collections.singletonList(IngressV1SpecRuleHttpPath.builder()
-                                                                     .path("/")
-                                                                     .pathType("Prefix")
-                                                                     .backend(pathBackend)
-                                                                     .build()))
+            .path(Collections.singletonList(pathRule))
             .build();
+        IngressV1SpecRule ingressRule = IngressV1SpecRule.builder()
+                                                   .host(hostName)
+                                                   .http(servicePortRule)
+                                                   .build();
         IngressV1Spec alb = IngressV1Spec.builder()
-                                         .ingressClassName("alb") // Explicitly set the
-                                         // ingress class
-                                         // Define the TLS configuration using the LBC's
-                                         // "ssl-redirect" action
-                                         .rule(List.of(
-                                                   IngressV1SpecRule.builder()
-                                                                    .host(hostName)
-                                                                    .http(servicePortRule)
-                                                                    .build()
-                                                      )
-                                              )
+                                         .ingressClassName("alb")
+                                         .rule(List.of(ingressRule))
                                          .build();
+        IngressV1Metadata ingressMetadata = IngressV1Metadata.builder()
+                                                      .name(ingressName)
+                                                      .namespace("default")
+                                                      .annotations(albAnnotations)
+                                                      .build();
         return IngressV1.Builder.create(this, constructId)
                                 .provider(kubernetesProvider)
-                                .metadata(IngressV1Metadata.builder()
-                                                                        .name(ingressName)
-                                                                        .namespace("default") // Change if your
-                                                                        // service is in a different namespace
-                                                                        .annotations(albAnnotations)
-                                                                        .build())
+                                .metadata(ingressMetadata)
                                 .spec(alb)
                                 .lifecycle(TerraformResourceLifecycle
                                                             .builder()
