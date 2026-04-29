@@ -31,9 +31,10 @@ public class StepActions {
     public static final String TERRAFORM_STATE_FILE_PATTERN = "terraform.";
 
     public Step waitFor(String domain) {
-        return new Step("waitFor_" + domain.substring(0, domain.indexOf('.')),
-                        "wait for internet DNS servers to recognise " + domain,
-                        () -> {
+        return new Step(
+            stepNameWaitingFor(domain),
+            "wait for internet DNS servers to recognise " + domain,
+            () -> {
                             boolean stopResolving = false;
                             long    start         = System.currentTimeMillis();
                             int     timeout       = 1_200_000;
@@ -50,6 +51,10 @@ public class StepActions {
                                 }
                             }
                         });
+    }
+
+    static @NonNull String stepNameWaitingFor(String domain) {
+        return "waitFor_" + domain.substring(0, domain.indexOf('.'));
     }
 
     private boolean isWaitingInterrupted(int timeout) {

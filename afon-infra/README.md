@@ -33,6 +33,7 @@ So, generate it with:
 ```shell
 mvn compile -Dexec.mainClass=health.emrys.afon.demo.DocumentFullStackAwsMain exec:java
 mvn compile -Dexec.mainClass=health.emrys.afon.demo.DocumentGcpPolarisMain exec:java
+mvn compile -Dexec.mainClass=health.emrys.afon.demo.DocumentAzurePolarisMain exec:java
 mvn compile -Dexec.mainClass=health.emrys.afon.demo.DocumentExternalCatalogsMain exec:java
 ```
 Note that `DocumentExternalCatalogsMain` deploys both AWS and Azure infra.
@@ -45,6 +46,7 @@ To actually run all the steps in each deployment above, run:
 ```shell
 mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployFullStackAwsMain exec:java
 mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployGcpPolarisMain exec:java
+mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployAzurePolarisMain exec:java
 mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain exec:java
 ```
 
