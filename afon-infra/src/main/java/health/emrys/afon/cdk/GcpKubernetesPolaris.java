@@ -20,13 +20,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.GCP_DOMAIN_NAME;
+
 public class GcpKubernetesPolaris extends GcpKubernetesStack {
 
-    public static final  String GCP_DOMAIN_NAME  = "emryspolarisgcp.click";
-    private static final String DNS_ZONE_NAME    = "polaris-zone";
+    private static final String DNS_ZONE_NAME = "polaris-zone";
     private static final String POLARIS_INTERNAL = "polaris-internal";
     private static final String TLS_SECRET_NAME  = "polaris-tls";
     private static final int    POLARIS_PORT     = 8181;
+
 
     public GcpKubernetesPolaris(Construct scope, String id, Properties properties) {
         super(scope, id, properties);
@@ -50,7 +52,7 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
             }
         };
         var util = new TFUtils(
-            this, GCP_DOMAIN_NAME, TLS_SECRET_NAME, POLARIS_PORT
+            this, gcpDomainName, TLS_SECRET_NAME, POLARIS_PORT
             , POLARIS_INTERNAL);
         HelmProvider               helm            = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables     = cloudProvider.getDependables();
@@ -80,7 +82,7 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
             "polaris-dns",
             DnsRecordSetConfig
                 .builder()
-                .name(GCP_DOMAIN_NAME + ".")
+                .name(gcpDomainName + ".")
                 .type("A")
                 .ttl(300)
                 .managedZone(zone.getName())
