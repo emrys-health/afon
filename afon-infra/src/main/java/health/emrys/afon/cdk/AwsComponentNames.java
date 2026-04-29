@@ -31,4 +31,8 @@ public class AwsComponentNames {
     public String getAccessPolicyName() {
         return "EKS-Secret-Access-Policy-" + prefix;
     }
+
+    public String getLoadBalancerRoleName() {
+        return "AmazonEKSLoadBalancerControllerRole" + prefix;
+    }
 }

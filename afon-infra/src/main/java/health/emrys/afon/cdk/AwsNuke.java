@@ -159,12 +159,14 @@ public class AwsNuke {
                 aws ec2 delete-vpc --vpc-id $VPC_ID
             } done
             
-            for ROLE_NAME in $(echo "%s" "%s" "AmazonEKSLoadBalancerControllerRole") ; do {
+            for ROLE_NAME in $(echo "%s" "%s" "%s") ; do {
                echo $ROLE_NAME ;
                for ARN in $(aws iam list-attached-role-policies --role-name $ROLE_NAME --query 'AttachedPolicies[*].PolicyArn' --output text) ; do {
+                   echo "Detaching $ROLE_NAME from $ARN"
                    aws iam detach-role-policy --role-name $ROLE_NAME --policy-arn $ARN
                } done
                for PROFILE in $(aws iam list-instance-profiles-for-role --query 'AttachedPolicies[*].PolicyArn' --role-name $ROLE_NAME --query "InstanceProfiles[].InstanceProfileName"   --output text) ; do {
+                   echo "removing $ROLE_NAME from $PROFILE"
                    aws iam remove-role-from-instance-profile --instance-profile-name $PROFILE --role-name $ROLE_NAME
                } done
                aws iam delete-role --role-name  $ROLE_NAME
@@ -183,6 +185,7 @@ public class AwsNuke {
             cleanEksCommand(),
             componentNames.getClusterRoleName(),
             componentNames.getNodeGroupRoleName(),
+            componentNames.getLoadBalancerRoleName(),
             componentNames.getAccessPolicyName(),
             componentNames.getSecret()
                      );

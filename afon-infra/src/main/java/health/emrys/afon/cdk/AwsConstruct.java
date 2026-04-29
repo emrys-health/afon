@@ -444,7 +444,7 @@ public class AwsConstruct extends AbstractConstruct {
             scope, "AmazonEKSLoadBalancerControllerRole",
             IamRoleConfig
                 .builder()
-                .name("AmazonEKSLoadBalancerControllerRole" + clusterName)
+                .name(componentNames.getLoadBalancerRoleName())
                 .assumeRolePolicy(trustPolicy)
                 .build());
         IamRolePolicyAttachment.Builder
