@@ -37,6 +37,7 @@ public class AfonProperties {
     public static final AfonProperty GCP_EXTERNAL_BUCKET_NAME       = new AfonProperty("GCP_EXTERNAL_BUCKET_NAME");
     public static final AfonProperty GCP_SERVICE_ACCOUNT            = new AfonProperty("GCP_SERVICE_ACCOUNT");
     public static final AfonProperty GOOGLE_APPLICATION_CREDENTIALS = new AfonProperty("GOOGLE_APPLICATION_CREDENTIALS");
+    public static final AfonProperty GCP_DOMAIN_NAME                = new AfonProperty("GCP_DOMAIN_NAME");
 
     // AZURE
     public static final AfonProperty AZURE_SUBSCRIPTION       = new AfonProperty("AZURE_SUBSCRIPTION");
