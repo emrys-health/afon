@@ -6,6 +6,7 @@ ARG KUBECTL_VERSION=v1.32.1
 ARG NODE_VERSION=24.12.0
 ARG AZ_CLI_VERSION=2.85.0
 ARG GCLOUD_VERSION=565.0.0
+ARG EKSCTL_VERSION=v0.215.0
 
 ARG JAVA_VERSION=17
 ARG MAVEN_VERSION=3.9.15
@@ -50,6 +51,11 @@ RUN apt-get update && apt-get install -y curl unzip \
 
 RUN curl -L https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl \
  && chmod +x /usr/local/bin/kubectl
+
+RUN curl -L "https://github.com/eksctl-io/eksctl/releases/download/${EKSCTL_VERSION}/eksctl_Linux_amd64.tar.gz" -o eksctl.tar.gz \
+ && tar -xzf eksctl.tar.gz -C /usr/local/bin eksctl \
+ && chmod +x /usr/local/bin/eksctl \
+ && rm eksctl.tar.gz
 
 RUN curl -L https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz -o node.tar.gz \
  && mkdir -p /opt/node \
