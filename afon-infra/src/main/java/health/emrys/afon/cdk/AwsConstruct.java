@@ -8,7 +8,13 @@ import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
+import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntry;
+import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntryConfig;
+import com.hashicorp.cdktf.providers.aws.eks_access_policy_association.EksAccessPolicyAssociation;
+import com.hashicorp.cdktf.providers.aws.eks_access_policy_association.EksAccessPolicyAssociationAccessScope;
+import com.hashicorp.cdktf.providers.aws.eks_access_policy_association.EksAccessPolicyAssociationConfig;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
+import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterAccessConfig;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterVpcConfig;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroup;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroupScalingConfig;
@@ -205,10 +211,40 @@ public class AwsConstruct extends AbstractConstruct {
             .roleArn(eksClusterRole.getArn())
             .vpcConfig(vpcConfig)
             .version("1.31")
+            .accessConfig(EksClusterAccessConfig.builder()
+                                                .authenticationMode("API_AND_CONFIG_MAP")
+                                                .bootstrapClusterCreatorAdminPermissions(true)
+                                                .build())
             .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .dependsOn(List.of(roleAttachment))
             .tags(Map.of("Name", "cdktf-eks")).build();
+
+        // Grant cluster-admin to every IAM principal in this AWS account so
+        // anyone with EKS IAM permissions can administer (and tofu-destroy) the cluster,
+        // not just the IAM identity that ran `tofu apply`.
+        final String accountRootArn = format("arn:aws:iam::%s:root", accountId);
+        final EksAccessEntry accountRootAccessEntry = new EksAccessEntry(
+            this, "accountRootAccessEntry",
+            EksAccessEntryConfig.builder()
+                                .clusterName(cluster.getName())
+                                .principalArn(accountRootArn)
+                                .type("STANDARD")
+                                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                                .dependsOn(List.of(cluster))
+                                .build());
+        new EksAccessPolicyAssociation(
+            this, "accountRootClusterAdmin",
+            EksAccessPolicyAssociationConfig.builder()
+                                            .clusterName(cluster.getName())
+                                            .principalArn(accountRootArn)
+                                            .policyArn("arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy")
+                                            .accessScope(EksAccessPolicyAssociationAccessScope.builder()
+                                                                                              .type("cluster")
+                                                                                              .build())
+                                            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                                            .dependsOn(List.of(accountRootAccessEntry))
+                                            .build());
 
         // if one depends_on this, then the cluster should be running
         eksAuthData = DataAwsEksClusterAuth.Builder
