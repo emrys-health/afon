@@ -1,5 +1,6 @@
 package health.emrys.afon.demo;
 
+import health.emrys.afon.cdk.AzureNuke;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -35,15 +36,11 @@ public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
 
     @Override
     public String getFurtherNotes() {
-        return """
+        return String.format("""
             # Problems destroying the stack?
             If the domain name points at a Kubernetes service that's not longer there, run:
             ```shell
-            az network dns record-set a delete \\
-              --resource-group afon_resource_group \\
-              --zone-name emryspolarisazure.click \\
-              --name "@" \\
-              --yes
+            %s
             ```
             
             If you see an error like:
@@ -73,6 +70,6 @@ public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
             
             If all else fails, destroy the Kubernetes cluster directly in the 
             [Azure console](https://portal.azure.com/#view/Microsoft_Azure_KubernetesFleet/KubernetesHub.MenuView/~/clusters)
-            """;
+            """, new AzureNuke().cleanUpHint());
     }
 }

@@ -109,10 +109,6 @@ public class StepOperations {
         return purgeForeignCatalogFrom(azurePolarisDomainName, AZURE);
     }
 
-    public Step purgeForeignCatalogFromGcp() {
-        return purgeForeignCatalogFrom(gcpPolarisDomainName, AZURE);
-    }
-
     public @NonNull Step purgeForeignCatalogFrom(String domainName,
                                                  SupportedCloudsEnum catalog) {
         String name = machineNameFrom(domainName);
@@ -164,6 +160,10 @@ public class StepOperations {
             "external_aws_in_" + machineNameFrom(domainName),
             format("configure a catalog called `%s` in the Polaris at `%s`", AZURE_EXTERNAL, domainName),
             () -> actions.createSingleCatalogsFor(domainName, AZURE_EXTERNAL));
+    }
+
+    public Step initializeAllCatalogsInAzure() {
+        return initializeAllCatalogsIn(azurePolarisDomainName);
     }
 
     public Step initializeAllCatalogsInAws() {

@@ -6,17 +6,16 @@ import java.util.List;
 
 public class DeployGcpPolarisMain implements StepsProvider {
 
-    static final List<Step> steps(StepOperations ops) {
+    static List<Step> steps(StepOperations ops) {
         return List.of(
             ops.cleanLocal(GcpKubernetesPolaris.ID),
             ops.deployGcpPolaris(),
             ops.waitForGcpPolaris(),
-            ops.initializeAllCatalogsInGcp(),
-            ops.purgeForeignCatalogFromGcp()
+            ops.initializeAllCatalogsInGcp()
                       );
     }
 
-    public static final void main(String[] args) {
+    public static void main(String[] args) {
         StepRunner app = new StepRunner();
         app.run(new DeployGcpPolarisMain(), args);
     }
