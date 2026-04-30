@@ -36,7 +36,7 @@ public class SmokeTest {
         log.info("Attempting to connect to database at {} ...", url);
         try (Connection conn = getConnection(privateKey, url);
              Statement stmt = conn.createStatement()) {
-            String sql = "SELECT * from my_azure_iceberg_table";
+            String sql = "SELECT * from my_gcp_table_id";
             log.info("Running sql {}", sql);
             ResultSet rs = stmt.executeQuery(sql);
             while (rs.next()) {
@@ -47,8 +47,7 @@ public class SmokeTest {
         log.info("Finished calling Snowflake");
     }
 
-    private Connection getConnection(PrivateKey privateKey, String url) throws SQLException, NoSuchAlgorithmException
-        , InvalidKeySpecException {
+    private Connection getConnection(PrivateKey privateKey, String url) throws SQLException {
         Properties props = new Properties();
         props.put("user", "ETL_SERVICE_USER");
         props.put("db", "SNOWFLAKE_LEARNING_DB");
@@ -56,7 +55,7 @@ public class SmokeTest {
         props.put("warehouse", "COMPUTE_WH");
         props.put("role", "ACCOUNTADMIN");
         props.put("privateKey", privateKey);
-        return DriverManager.getConnection(url);
+        return DriverManager.getConnection(url, props);
     }
 
     private PrivateKey getSnowflakePrivateKey(Properties afonProperties) throws NoSuchAlgorithmException,
