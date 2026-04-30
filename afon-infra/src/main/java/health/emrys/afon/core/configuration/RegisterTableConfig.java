@@ -21,7 +21,7 @@ public class RegisterTableConfig {
     private final String              metadata;
 
     RegisterTableConfig(String[] args) {
-        if (args.length != 4) {
+        if (args.length < 4) {
             throw new IllegalArgumentException(format("""
                                                           arguments are: 
                                                           catalog namespace table metadata_location
