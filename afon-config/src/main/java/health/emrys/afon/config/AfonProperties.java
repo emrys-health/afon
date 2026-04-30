@@ -66,6 +66,9 @@ public class AfonProperties {
     public static final AfonProperty POLARIS_DB_PASSWORD  = new AfonProperty("POLARIS_DB_PASSWORD");
     public static final AfonProperty POLARIS_DB_HOST  = new AfonProperty("POLARIS_DB_HOST");
 
+    // Snowflake
+    public static final AfonProperty SNOWFLAKE_PRIVATE_KEY  = new AfonProperty("SNOWFLAKE_PRIVATE_KEY");
+
     public enum SupportedCloudsEnum {
         AWS("aws"),
         AWS_FORBIDDEN("aws_forbidden"),
