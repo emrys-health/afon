@@ -1,0 +1,60 @@
+CREATE USER ETL_SERVICE_USER
+PASSWORD = 'temporary_password'
+LOGIN_NAME = 'ETL_SERVICE_USER'
+DEFAULT_WAREHOUSE = 'ETL_WH'
+DEFAULT_ROLE = 'ETL_ROLE'
+MUST_CHANGE_PASSWORD = FALSE;
+
+ALTER USER ETL_SERVICE_USER
+SET RSA_PUBLIC_KEY='-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1uurzpmoO+se3cKRWAmO
+KkB5+dhtYw3eqkp8FRO6eK5egf6FuV0e3a0p8OQsrUoIRa/dpuowGEhPEicsDF5w
+Z2uDmtBK6e5MUXDc7bwMq1h1PvCPC0Fx8qJyAKxq9Yxrhp7jO6nnDT+9qxF9pGCh
+kkbMldJwjwCU3gRhQbMUxsw2r3LyxgmqeMLCt6wpVINdc+6hA1Oq5JLsDdF3L86c
+pNY8dkf3zfYVtc0SmudbG2acqe+5MdqrJ03w7YqdpHXJc+gz54DUSPbUHjN4YtPR
+mtqGAePLd973QjkoP22CCVOAC24t43DgvJOLO7nqlU8wh3/HFxtE0TEgLPD/n6VV
+kQIDAQAB
+-----END PUBLIC KEY-----
+'; -- Note that this is the Public key that matches SNOWFLAKE_PRIVATE_KEY in your env.properties
+
+GRANT USAGE ON WAREHOUSE COMPUTE_WH TO USER ETL_SERVICE_USER;
+GRANT USAGE ON DATABASE SNOWFLAKE_LEARNING_DB TO USER ETL_SERVICE_USER;
+GRANT SELECT ON TABLE SNOWFLAKE_LEARNING_DB.PUBLIC.MY_AZURE_ICEBERG_TABLE TO USER ETL_SERVICE_USER;
+GRANT ROLE ACCOUNTADMIN TO USER ETL_SERVICE_USER;
+
+CREATE STORAGE INTEGRATION azure_int_external
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = AZURE
+  ENABLED = TRUE
+  STORAGE_ALLOWED_LOCATIONS = ('azure://afonstorageaccount.blob.core.windows.net/afonstorage')
+  AZURE_TENANT_ID='316c25d7-0cae-4757-af4d-9e6e091be7fd';
+
+DESC STORAGE INTEGRATION azure_int_external;
+
+CREATE EXTERNAL VOLUME azure_external_volume
+  STORAGE_LOCATIONS = (
+    (
+      NAME = 'azure_loc'
+      STORAGE_PROVIDER = 'AZURE'
+      STORAGE_BASE_URL = 'azure://afonstorageaccount.blob.core.windows.net/afonstorage/'
+      AZURE_TENANT_ID='316c25d7-0cae-4757-af4d-9e6e091be7fd'
+    )
+  );
+
+DESCRIBE EXTERNAL VOLUME azure_external_volume;
+
+USE DATABASE SNOWFLAKE_LEARNING_DB;
+
+CREATE OR REPLACE ICEBERG TABLE my_azure_iceberg_table (
+    user_id INT,
+    event_name STRING,
+    event_date DATE
+)
+  EXTERNAL_VOLUME = 'azure_external_volume'
+  CATALOG = 'SNOWFLAKE'
+  BASE_LOCATION = 'my_project_folder/';
+
+INSERT INTO my_azure_iceberg_table (user_id, event_name, event_date)
+VALUES
+    (1, 'Alice', CURRENT_TIMESTAMP()),
+    (2, 'Bob', CURRENT_TIMESTAMP());
