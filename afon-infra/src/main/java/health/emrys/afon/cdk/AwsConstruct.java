@@ -38,8 +38,11 @@ import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
+import com.hashicorp.cdktf.providers.kubernetes.config_map_v1_data.ConfigMapV1Data;
+import com.hashicorp.cdktf.providers.kubernetes.config_map_v1_data.ConfigMapV1DataMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
@@ -58,6 +61,7 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
 import static health.emrys.afon.config.AfonProperties.AWS_ACCOUNT_ID;
+import static health.emrys.afon.config.AfonProperties.AWS_AUTH_MAP_ROLES;
 import static java.lang.String.format;
 
 public class AwsConstruct extends AbstractConstruct {
@@ -81,6 +85,7 @@ public class AwsConstruct extends AbstractConstruct {
     final         IamRole                    loadBalancerRole;
     final         Resource                   newKubeConfig;
     private       Release                    lbRelease;
+    private       KubernetesProvider         awsKubernetesProvider;
 
     AwsConstruct(final Construct scope, final String id, Properties properties) {
         super(scope, id);
@@ -436,6 +441,8 @@ public class AwsConstruct extends AbstractConstruct {
 
         eksDependOn = List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2, cilium);
 
+        patchAwsAuth(properties, nodeGroupRole, nodeGroup, cilium);
+
         String trustPolicy = format(
             """
             ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
@@ -768,6 +775,87 @@ public class AwsConstruct extends AbstractConstruct {
     @Override
     public String getToken() {
         return eksAuthData.getToken();
+    }
+
+    /**
+     * Override to mint a fresh EKS bearer token per Kubernetes API call via {@code aws eks
+     * get-token}, rather than baking a one-shot token into the apply graph. The static-token
+     * approach (parent class) expires 15 min after synth and uses the cluster creator's identity,
+     * which fails on long applies and on destroy by a different IAM principal.
+     */
+    @Override
+    public synchronized KubernetesProvider configureK8s() {
+        if (awsKubernetesProvider == null) {
+            awsKubernetesProvider = KubernetesProvider.Builder
+                .create(this, "kubernetes")
+                .host(getClusterEndpoint())
+                .clusterCaCertificate(Fn.base64decode(getBase64CertData()))
+                .exec(List.of(awsGetTokenExec()))
+                .build();
+        }
+        return awsKubernetesProvider;
+    }
+
+    /**
+     * {@code aws eks get-token} exec block. Reusable for the Helm provider too.
+     */
+    public KubernetesProviderExec awsGetTokenExec() {
+        return KubernetesProviderExec.builder()
+            .apiVersion("client.authentication.k8s.io/v1beta1")
+            .command("aws")
+            .args(List.of("eks", "get-token", "--cluster-name", clusterName, "--region", region))
+            .build();
+    }
+
+    public String getClusterName() {
+        return clusterName;
+    }
+
+    /**
+     * Add cluster-admin entries to the {@code aws-auth} ConfigMap for every IAM role ARN listed in
+     * {@code AWS_AUTH_MAP_ROLES}. Each ARN is mapped to the {@code system:masters} group, so any
+     * principal able to assume one of those roles can run {@code tofu destroy} (or otherwise
+     * administer the cluster) — not just the original applier.
+     *
+     * <p>The node group role mapping is included explicitly because {@code force=true} replaces
+     * the existing {@code mapRoles} field; without it, kubelet on the worker nodes loses access
+     * and the cluster degrades.
+     */
+    private void patchAwsAuth(Properties properties,
+                              IamRole nodeGroupRole,
+                              EksNodeGroup nodeGroup,
+                              Release cilium) {
+        String configured = AWS_AUTH_MAP_ROLES.getValueFrom(properties).trim();
+        if (configured.isEmpty()) {
+            return;
+        }
+        StringBuilder mapRoles = new StringBuilder();
+        mapRoles.append("- groups:\n")
+                .append("    - system:bootstrappers\n")
+                .append("    - system:nodes\n")
+                .append("  rolearn: ").append(nodeGroupRole.getArn()).append("\n")
+                .append("  username: system:node:{{EC2PrivateDNSName}}\n");
+        int idx = 0;
+        for (String arn : configured.split(",")) {
+            String trimmed = arn.trim();
+            if (trimmed.isEmpty()) continue;
+            mapRoles.append("- rolearn: ").append(trimmed).append("\n")
+                    .append("  username: cluster-admin-").append(idx++).append("\n")
+                    .append("  groups:\n")
+                    .append("    - system:masters\n");
+        }
+        ConfigMapV1Data.Builder
+            .create(this, "awsAuthAdmins")
+            .provider(configureK8s())
+            .metadata(ConfigMapV1DataMetadata.builder()
+                                             .name("aws-auth")
+                                             .namespace("kube-system")
+                                             .build())
+            .data(Map.of("mapRoles", mapRoles.toString()))
+            .force(true)
+            .dependsOn(List.of(nodeGroup, cilium))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .build();
     }
 
     public String getPolarisDomainName() {

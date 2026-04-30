@@ -7,6 +7,7 @@ import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
@@ -72,11 +73,20 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
+        // Exec-based auth so each Helm action mints a fresh EKS bearer token via
+        // `aws eks get-token`. Avoids the 15-min token expiry and works for any IAM principal
+        // running tofu apply/destroy (not just the original creator).
+        HelmProviderKubernetesExec helmExec = HelmProviderKubernetesExec.builder()
+            .apiVersion("client.authentication.k8s.io/v1beta1")
+            .command("aws")
+            .args(List.of("eks", "get-token", "--cluster-name", cloudProvider.getClusterName(),
+                          "--region", cloudProvider.getRegion()))
+            .build();
         HelmProviderKubernetes kubernetes = HelmProviderKubernetes
             .builder()
             .host(cloudProvider.getClusterEndpoint())
             .clusterCaCertificate(Fn.base64decode(cloudProvider.getBase64CertData()))
-            .token(cloudProvider.getToken())
+            .exec(helmExec)
             .build();
         HelmProvider helm = HelmProvider.Builder
             .create(this, "helm")
