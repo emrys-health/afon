@@ -8,6 +8,7 @@ import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.GcpKubernetesPolaris;
 import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.core.configuration.LocalPolarisRegisterMain;
 import health.emrys.afon.infra.EndpointPolarisConfiguration;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -23,6 +24,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class StepActions {
@@ -113,6 +115,27 @@ public class StepActions {
     public void startAwsPolaris() throws Exception {
         executeMainOf(AwsWholeStack.class, new String[]{});
         startCloud(cdktfPath(AwsWholeStack.ID));
+    }
+
+    // AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click
+
+    /**
+     * @param storageCloud eg, GCP
+     * @param metadataLocation eg gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325-b437-20900bbcf2a3.metadata.json
+     * @param polarisDomainNAme eg emryspolaris.click
+     * @param tableName eg AwsAccessSpec
+     * @throws Exception
+     */
+    public void registerTable(SupportedCloudsEnum storageCloud,
+                              String metadataLocation,
+                              String polarisDomainNAme,
+                              String tableName) throws Exception {
+        executeMainOf(LocalPolarisRegisterMain.class,
+                      new String[]{storageCloud.name(),
+                                   ACCEPTANCE_TEST_NAMESPACE,
+                                   tableName,
+                                   metadataLocation,
+                                   polarisDomainNAme});
     }
 
     private void executeMainOf(Class clazz, String[] args) throws Exception {
