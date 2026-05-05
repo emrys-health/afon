@@ -24,6 +24,7 @@ public class StepOperations {
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
 
     private static final Properties NO_ENV_VARIABLES = new Properties();
+    public static final String POLARIS_TABLE_NAME = "sf_table";
 
     private final StepActions actions;
 
@@ -247,7 +248,7 @@ public class StepOperations {
                     "gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325" +
                         "-b437-20900bbcf2a3.metadata.json",
                     awsPolarisDomainName,
-                    "sf_table"
+                    POLARIS_TABLE_NAME
                                      );
             }
 
