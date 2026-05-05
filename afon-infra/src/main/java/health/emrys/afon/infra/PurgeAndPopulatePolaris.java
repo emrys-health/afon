@@ -56,6 +56,7 @@ public class PurgeAndPopulatePolaris {
         String accessToken = client.getAccessToken();
         client.delete(getDeleteTableURI(warehouse.toString(), namespace, table), accessToken);
         client.delete(getDeleteNamespaceURI(warehouse.toString(), namespace), accessToken);
+        client.delete(getDeleteURI(warehouse.toString()), accessToken);
     }
 
     public void purgeAcceptanceTests(String domainName) {

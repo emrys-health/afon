@@ -7,6 +7,7 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
 import health.emrys.afon.infra.checks.SparkCheck;
+import health.emrys.afon.snowflake.SmokeTest;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -14,6 +15,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
+import static health.emrys.afon.demo.DocumentSnowflakeReadingGcpViaAwsMain.SNOWFLAKE_TABLE_NAME;
 import static health.emrys.afon.infra.checks.SparkCheck.EXTERNAL_NAMESPACE;
 import static java.lang.String.format;
 
@@ -223,6 +225,16 @@ public class StepOperations {
 
     private void useAzureKubernetes() throws ManagedProcessException {
         actions.run("kubectl", null, "config", "use-context", clusterName);
+    }
+
+    public Step snowflakeReadsGcpViaPolaris() {
+        return new Step(
+            "snowflake_reads_gcp",
+            "Call Snowflake that uses AWS Polaris to get the credentials to read from GCP storage",
+            () -> {
+                actions.readFromSnowflake(SNOWFLAKE_TABLE_NAME, appProperties());
+            }
+        );
     }
 
     public Step registerGcpTableInAws() {

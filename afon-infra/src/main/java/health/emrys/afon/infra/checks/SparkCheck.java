@@ -40,7 +40,7 @@ public class SparkCheck {
                 }
                 spark = app.sparkSessionUsing(polarisHost, polarisId, polarisSecret, warehouse);
             }
-            app.talkTo(spark, warehouse, namespace);
+            app.saveTableTo(spark, warehouse, namespace);
             logger.info("Finished without error");
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
@@ -65,7 +65,7 @@ public class SparkCheck {
         return spark;
     }
 
-    public void talkTo(SparkSession spark, String warehouse, String namespace) {
+    public void saveTableTo(SparkSession spark, String warehouse, String namespace) {
         String namespaceSql = format("CREATE NAMESPACE IF NOT EXISTS %s.%s", warehouse, namespace);
         logger.info("Executing: {}", namespaceSql);
         spark.sql(namespaceSql);

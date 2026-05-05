@@ -70,6 +70,7 @@ public class AfonProperties {
     public static final AfonProperty OIDC_EMAIL_DOMAIN    = new AfonProperty("OIDC_EMAIL_DOMAIN");
 
     // Snowflake
+    public static final AfonProperty SNOWFLAKE_JDBC_URL   = new AfonProperty("SNOWFLAKE_JDBC_URL");
     public static final AfonProperty SNOWFLAKE_PRIVATE_KEY  = new AfonProperty("SNOWFLAKE_PRIVATE_KEY");
 
     public enum SupportedCloudsEnum {

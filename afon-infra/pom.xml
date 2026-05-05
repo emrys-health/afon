@@ -121,6 +121,11 @@
             <version>3.3.2</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>${parent.groupId}</groupId>
+            <artifactId>afon-snowflake</artifactId>
+            <version>${parent.version}</version>
+        </dependency>
     </dependencies>
 
     <profiles>
