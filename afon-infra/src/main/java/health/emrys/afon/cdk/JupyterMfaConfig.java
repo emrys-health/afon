@@ -68,8 +68,8 @@ class JupyterMfaConfig {
             .image("quay.io/oauth2-proxy/oauth2-proxy:v7.6.0")
             .args(List.of(
                 "--provider=oidc",
-                "--oidc-issuer-url=https://accounts.google.com",  // swap for Azure AD, GitHub, etc.
-                "--email-domain=*",                                // restrict to e.g. --email-domain=yourdomain.com
+                "--oidc-issuer-url=" + OIDC_ISSUER_URL.getValueFrom(properties),
+                "--email-domain=" + OIDC_EMAIL_DOMAIN.getValueFrom(properties),
                 "--upstream=" + jupyterUpstreamUrl,
                 "--http-address=0.0.0.0:" + PROXY_PORT,
                 "--cookie-secure=true",                           // set true when TLS terminates at this proxy

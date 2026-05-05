@@ -64,7 +64,10 @@ public class AfonProperties {
     public static final AfonProperty OAUTH2_COOKIE_SECRET = new AfonProperty("OAUTH2_COOKIE_SECRET");
 
     public static final AfonProperty POLARIS_DB_PASSWORD  = new AfonProperty("POLARIS_DB_PASSWORD");
-    public static final AfonProperty POLARIS_DB_HOST  = new AfonProperty("POLARIS_DB_HOST");
+    public static final AfonProperty POLARIS_DB_HOST      = new AfonProperty("POLARIS_DB_HOST");
+
+    public static final AfonProperty OIDC_ISSUER_URL      = new AfonProperty("OIDC_ISSUER_URL");
+    public static final AfonProperty OIDC_EMAIL_DOMAIN    = new AfonProperty("OIDC_EMAIL_DOMAIN");
 
     // Snowflake
     public static final AfonProperty SNOWFLAKE_PRIVATE_KEY  = new AfonProperty("SNOWFLAKE_PRIVATE_KEY");
