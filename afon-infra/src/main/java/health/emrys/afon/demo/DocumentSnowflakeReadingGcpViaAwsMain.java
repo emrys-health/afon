@@ -3,6 +3,7 @@ package health.emrys.afon.demo;
 import java.io.IOException;
 import java.util.List;
 
+import static health.emrys.afon.demo.StepOperations.POLARIS_TABLE_NAME;
 import static java.lang.String.format;
 
 public class DocumentSnowflakeReadingGcpViaAwsMain extends AbstractDocumentMetadata {
@@ -34,11 +35,11 @@ public class DocumentSnowflakeReadingGcpViaAwsMain extends AbstractDocumentMetad
             
                 CREATE OR REPLACE ICEBERG TABLE %s
                     CATALOG = 'iceberg_gcp_id'
-                    CATALOG_TABLE_NAME = 'GcpAccessSpec260430301114'
+                    CATALOG_TABLE_NAME = '%s'
                     CATALOG_NAMESPACE = 'acceptancetests'
                     REPLACE_INVALID_CHARACTERS = TRUE;
                ```
-               """, SNOWFLAKE_TABLE_NAME);
+               """, SNOWFLAKE_TABLE_NAME, POLARIS_TABLE_NAME);
     }
 
     @Override
