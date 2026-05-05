@@ -22,6 +22,12 @@ public class PolarisClusterCredentials implements ClusterCredentials {
     public static ClusterCredentials createClusterCredentials(SupportedCloudsEnum cloud) {
         return new PolarisClusterCredentials(POLARIS_HOST_FOR.get(cloud));
     }
+
+    public static void main(String[] args) throws Exception {
+        PolarisClusterCredentials app = new PolarisClusterCredentials(args[0]);
+        System.out.println(app.getAccessToken());
+    }
+
     private final String accessToken;
 
     public PolarisClusterCredentials(String host) {

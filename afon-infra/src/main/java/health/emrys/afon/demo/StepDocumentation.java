@@ -91,6 +91,14 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
+    public void readFromSnowflake(String table, Properties properties) throws Exception {
+        out.println(format("""
+                           Read from table `%s` in Snowflake using JDBC URL `%s`
+                           """, table, AfonProperties.SNOWFLAKE_JDBC_URL.getValueFrom(properties)));
+        out.flush();
+    }
+
+    @Override
     public void executeMainOf(Class clazz, String[] args, Properties overrides) throws Exception {
         String fullArgs = mvnArgumentsToRun(clazz, args, overrides, "java");
         run("mvn",

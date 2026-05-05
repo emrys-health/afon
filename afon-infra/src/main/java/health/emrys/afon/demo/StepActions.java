@@ -10,6 +10,7 @@ import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.core.configuration.LocalPolarisRegisterMain;
 import health.emrys.afon.infra.EndpointPolarisConfiguration;
+import health.emrys.afon.snowflake.SmokeTest;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -189,6 +190,10 @@ public class StepActions {
     public void deleteTerraformStateFiles(SupportedCloudsEnum id) throws IOException {
         deleteTerraformIn(".", id);
         deleteTerraformIn("..", id);
+    }
+
+    public void readFromSnowflake(String table, Properties properties) throws Exception {
+        new SmokeTest().selectFrom(table, properties);
     }
     
     private void deleteTerraformIn(String directory,
