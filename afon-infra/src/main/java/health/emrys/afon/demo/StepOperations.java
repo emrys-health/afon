@@ -13,8 +13,7 @@ import org.slf4j.Logger;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_EXTERNAL;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.infra.checks.SparkCheck.EXTERNAL_NAMESPACE;
 import static java.lang.String.format;
 
@@ -197,15 +196,12 @@ public class StepOperations {
         return actions.waitFor(gcpPolarisDomainName);
     }
 
-    public Step waitFor(String domainName) {
-        return actions.waitFor(domainName);
-    }
-
     public Step checkLocalSparkTalksToAzureViaAws() {
         return new Step(
             "az_external_aws_check",
             format(
-                "run Spark locally such that it talks to %s which defers to %s", awsPolarisDomainName,
+                "run Spark locally such that it talks to %s which defers to %s",
+                awsPolarisDomainName,
                 AZURE_DOMAIN_NAME),
             () -> {
                 Properties properties = appProperties();
@@ -227,5 +223,22 @@ public class StepOperations {
 
     private void useAzureKubernetes() throws ManagedProcessException {
         actions.run("kubectl", null, "config", "use-context", clusterName);
+    }
+
+    public Step registerGcpTableInAws() {
+        return new Step(
+            "gcp_table_in_aws_polaris",
+            "Create a GCP table in the Polaris of AWS",
+            () -> {
+                actions.registerTable(
+                    GCP,
+                    "gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325" +
+                        "-b437-20900bbcf2a3.metadata.json",
+                    awsPolarisDomainName,
+                    "sf_table"
+                                     );
+            }
+
+        );
     }
 }
