@@ -50,10 +50,10 @@ public class AfonProperties {
     public static final AfonProperty AZURE_STORAGE_ACCOUNT    = new AfonProperty("AZURE_STORAGE_ACCOUNT");
     public static final AfonProperty DATABRICKS_TOKEN         = new AfonProperty("DATABRICKS_TOKEN");
 
-    // needed by Polaris:
-    public static final AfonProperty AZURE_TENANT_ID       = new AfonProperty("AZURE_TENANT_ID");
-    public static final AfonProperty AZURE_CLIENT_ID       = new AfonProperty("AZURE_CLIENT_ID");
-    public static final AfonProperty AZURE_CLIENT_SECRET   = new AfonProperty("AZURE_CLIENT_SECRET");
+    public static final AfonProperty AZURE_TENANT_ID            = new AfonProperty("AZURE_TENANT_ID");
+    public static final AfonProperty AZURE_CONNECTION_STRING    = new AfonProperty("AZURE_CONNECTION_STRING");
+    public static final AfonProperty AZURE_CLIENT_ID            = new AfonProperty("AZURE_CLIENT_ID");
+    public static final AfonProperty AZURE_CLIENT_SECRET        = new AfonProperty("AZURE_CLIENT_SECRET");
 
     public static final AfonProperty POLARIS_ID       = new AfonProperty("POLARIS_ID");
     public static final AfonProperty POLARIS_SECRET   = new AfonProperty("POLARIS_SECRET");
