@@ -158,7 +158,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("jupyter")
-            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-vnc")
+            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-vnc-firefox")
             .env(List.of(
                 // Disable Jupyter's built-in auth so oauth2-proxy is the sole gate.
                 // NOTEBOOK_ARGS is read by start-notebook.sh and forwarded to the server,

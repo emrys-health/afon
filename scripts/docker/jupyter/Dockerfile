@@ -26,6 +26,20 @@ RUN apt-get update \
         xterm \
  && rm -rf /var/lib/apt/lists/*
 
+# Firefox from Mozilla's official APT repo. Ubuntu's own `firefox` package on
+# 22.04+ is a snap stub that won't work inside this container, so we add the
+# Mozilla repo and pin it above the Ubuntu transitional package.
+RUN install -d -m 0755 /etc/apt/keyrings \
+ && wget -qO- https://packages.mozilla.org/apt/repo-signing-key.gpg \
+        > /etc/apt/keyrings/packages.mozilla.org.asc \
+ && echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" \
+        > /etc/apt/sources.list.d/mozilla.list \
+ && printf 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000\n' \
+        > /etc/apt/preferences.d/mozilla \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends firefox \
+ && rm -rf /var/lib/apt/lists/*
+
 # Hook script: jupyter docker-stacks sources every *.sh in this directory
 # from start-notebook.sh, so DISPLAY=:1 propagates into the notebook server.
 COPY start-vnc.sh /usr/local/bin/before-notebook.d/0-start-vnc.sh
