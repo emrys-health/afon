@@ -11,6 +11,7 @@ import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.core.configuration.LocalPolarisRegisterMain;
 import health.emrys.afon.infra.EndpointPolarisConfiguration;
 import health.emrys.afon.snowflake.SmokeTest;
+import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -22,6 +23,12 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
@@ -194,6 +201,20 @@ public class StepActions {
 
     public void readFromSnowflake(String table, Properties properties) throws Exception {
         new SmokeTest().selectFrom(table, properties);
+    }
+
+    public void runSnowflakeSql(String[] statements) throws NoSuchAlgorithmException, InvalidKeySpecException, SQLException {
+        SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory();
+        try (Connection conn = factory.getConnection();
+             Statement stmt = conn.createStatement()) {
+            for (String sql : statements) {
+                log.info("Running sql:\n{}", sql);
+                ResultSet rs = stmt.executeQuery(sql);
+                while (rs.next()) {
+                    log.info(rs.getString(1));
+                }
+            }
+        }
     }
     
     private void deleteTerraformIn(String directory,

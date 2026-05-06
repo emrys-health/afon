@@ -235,21 +235,42 @@ public class StepOperations {
             });
     }
 
-    private void useAwsKubernetes() throws ManagedProcessException {
-        String context = format("arn:aws:eks:%s:%s:cluster/%s", region, awsAccountId, clusterName);
-        actions.run("kubectl", null, "config", "use-context", context);
-    }
-
-    private void useAzureKubernetes() throws ManagedProcessException {
-        actions.run("kubectl", null, "config", "use-context", clusterName);
-    }
-
     public Step snowflakeReadsGcpViaPolaris() {
         return new Step(
             "snowflake_reads_gcp",
             "Call Snowflake that uses AWS Polaris to get the credentials to read from GCP storage",
             () -> {
-                actions.readFromSnowflake(SNOWFLAKE_TABLE_NAME, appProperties());
+                log.warn("Calling Snowflake. Note that some of these statements can take a long time");
+                actions.runSnowflakeSql(new String[]{
+                    "USE DATABASE SNOWFLAKE_LEARNING_DB",
+                    "DROP  ICEBERG TABLE my_gcp_table_id",
+                    "DROP CATALOG INTEGRATION iceberg_gcp_id",
+                    """
+                    CREATE OR REPLACE CATALOG INTEGRATION iceberg_gcp_id
+                      CATALOG_SOURCE = ICEBERG_REST
+                      TABLE_FORMAT = ICEBERG
+                      REST_CONFIG = (
+                          CATALOG_URI = 'https://emryspolaris.click/api/catalog/',
+                          CATALOG_NAME = 'gcp'
+                          ACCESS_DELEGATION_MODE = VENDED_CREDENTIALS
+                      )
+                      REST_AUTHENTICATION = (
+                          TYPE = OAUTH
+                          OAUTH_CLIENT_ID = 'root'
+                          OAUTH_CLIENT_SECRET = 's3cr3t'
+                          OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
+                      )
+                      ENABLED = TRUE;
+                    """,
+                    """                    
+                    CREATE OR REPLACE ICEBERG TABLE my_gcp_table_id
+                         CATALOG = 'iceberg_gcp_id'
+                         CATALOG_TABLE_NAME = 'sf_table'
+                         CATALOG_NAMESPACE = 'acceptancetests'
+                         REPLACE_INVALID_CHARACTERS = TRUE;
+                    """,
+                    "SELECT COUNT(*) FROM my_gcp_table_id"
+                });
             }
         );
     }

@@ -31,7 +31,7 @@ public class SnowflakeConnectionFactory {
         log.info("Attempting to connect to database at {} ...", url);
     }
 
-    Connection getConnection() throws SQLException {
+    public Connection getConnection() throws SQLException {
         Properties props = new Properties();
         props.put("user", "ETL_SERVICE_USER");
         props.put("db", "SNOWFLAKE_LEARNING_DB");
@@ -39,6 +39,7 @@ public class SnowflakeConnectionFactory {
         props.put("warehouse", "COMPUTE_WH");
         props.put("role", "ACCOUNTADMIN");
         props.put("privateKey", privateKey);
+//        props.put("statement_timeout_in_seconds", "120");
         return DriverManager.getConnection(url, props);
     }
 
