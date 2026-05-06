@@ -30,7 +30,7 @@ public class AzureReader {
 
     public static void main(String[] args) {
         AzureReader app = new AzureReader();
-        app.list();
+        app.list("my_project_folder*");
     }
 
     public AzureReader() {
@@ -39,10 +39,9 @@ public class AzureReader {
         connectionString = AfonProperties.AZURE_CONNECTION_STRING.getValueFrom(properties);
     }
 
-    public Set<String> list() {
-        Set<String> result   = new HashSet<>();
-        String      wildcard = "my_project_folder*";
-        Pattern     pattern  = wildcardToRegex(wildcard);
+    public Set<BlobItem> list(String wildcard) {
+        Set<BlobItem> result  = new HashSet<>();
+        Pattern       pattern = wildcardToRegex(wildcard);
 
         BlobContainerClient containerClient = new BlobContainerClientBuilder()
             .connectionString(connectionString)
@@ -50,11 +49,9 @@ public class AzureReader {
             .buildClient();
 
         for (BlobItem blobItem : containerClient.listBlobs()) {
-            String name = blobItem.getName();
-
-            if (pattern.matcher(name).matches()) {
-                log.info("{} : {}", name, blobItem.getTags());
-                result.add(name);
+            if (pattern.matcher(blobItem.getName()).matches()) {
+                log.info("{} : {}", blobItem.getName(), blobItem.getProperties().getLastModified());
+                result.add(blobItem);
             }
         }
         return result;
