@@ -263,7 +263,10 @@ public class StepOperations {
                       ENABLED = TRUE;
                     """,
                     format(
-                    """                    
+                    """              
+                    -- NOTE!!!!
+                    -- This query can take a minute or two to run
+                    -- Please wait... 
                     CREATE OR REPLACE ICEBERG TABLE my_gcp_table_id
                          CATALOG = 'iceberg_gcp_id'
                          CATALOG_TABLE_NAME = '%s'
