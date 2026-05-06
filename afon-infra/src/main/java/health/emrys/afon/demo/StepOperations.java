@@ -262,13 +262,14 @@ public class StepOperations {
                       )
                       ENABLED = TRUE;
                     """,
+                    format(
                     """                    
                     CREATE OR REPLACE ICEBERG TABLE my_gcp_table_id
                          CATALOG = 'iceberg_gcp_id'
-                         CATALOG_TABLE_NAME = 'sf_table'
-                         CATALOG_NAMESPACE = 'acceptancetests'
+                         CATALOG_TABLE_NAME = '%s'
+                         CATALOG_NAMESPACE = '%s'
                          REPLACE_INVALID_CHARACTERS = TRUE;
-                    """,
+                    """, SparkCheck.TABLE, EXTERNAL_NAMESPACE),
                     "SELECT COUNT(*) FROM my_gcp_table_id"
                 });
             }
