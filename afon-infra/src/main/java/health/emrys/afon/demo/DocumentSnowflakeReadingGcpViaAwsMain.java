@@ -9,7 +9,15 @@ public class DocumentSnowflakeReadingGcpViaAwsMain extends AbstractDocumentMetad
 
     @Override
     public String getSupplementaryIntro() {
-        return "";
+        return """
+               ### Summary of this deployment
+               
+               This deployment uses Spark running locally but talking to the AWS Spark Connector to create an
+               Iceberg table in GCP. This table is automatically registered in the AWS Polaris as part of 
+               the creation process.
+               
+               We then point Snowflake at this Polaris running in our real estate and run a SF query against it.
+               """;
     }
 
     @Override
