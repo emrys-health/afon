@@ -29,8 +29,7 @@ public class PolarisConfigurer {
     }
 
     public static String getDeleteURI(String warehouseName) {
-//        return format("/api/management/v1/catalogs/%s", warehouseName);
-        return format("/api/catalog/v1/catalogs/%s", warehouseName);
+        return format("/api/management/v1/catalogs/%s", warehouseName);
     }
     public static String getDeleteNamespaceURI(String warehouseName,
                                                String namespace) {
