@@ -28,13 +28,9 @@ public class SmokeTest {
     }
 
     public void selectFrom(String table, Properties properties) throws Exception {
-        String url = SNOWFLAKE_JDBC_URL.getValueFrom(properties);
+        SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory();
 
-        Properties afonProperties = new AfonPropertiesLoader().getProperties();
-        PrivateKey privateKey     = getSnowflakePrivateKey(afonProperties);
-
-        log.info("Attempting to connect to database at {} ...", url);
-        try (Connection conn = getConnection(privateKey, url);
+        try (Connection conn = factory.getConnection() ;
              Statement stmt = conn.createStatement()) {
             String sql = "SELECT * from " + table;
             log.info("Running sql {}", sql);
@@ -47,24 +43,5 @@ public class SmokeTest {
         log.info("Finished calling Snowflake");
     }
 
-    private Connection getConnection(PrivateKey privateKey, String url) throws SQLException {
-        Properties props = new Properties();
-        props.put("user", "ETL_SERVICE_USER");
-        props.put("db", "SNOWFLAKE_LEARNING_DB");
-        props.put("schema", "PUBLIC");
-        props.put("warehouse", "COMPUTE_WH");
-        props.put("role", "ACCOUNTADMIN");
-        props.put("privateKey", privateKey);
-        return DriverManager.getConnection(url, props);
-    }
 
-    private PrivateKey getSnowflakePrivateKey(Properties afonProperties) throws NoSuchAlgorithmException,
-                                                                                InvalidKeySpecException {
-        String              keyFileContent = SNOWFLAKE_PRIVATE_KEY.getValueFrom(afonProperties);
-        byte[]              decodedKey     = Base64.getDecoder().decode(keyFileContent);
-        PKCS8EncodedKeySpec keySpec        = new PKCS8EncodedKeySpec(decodedKey);
-        KeyFactory          kf             = KeyFactory.getInstance("RSA");
-        PrivateKey          privateKey     = kf.generatePrivate(keySpec);
-        return privateKey;
-    }
 }
