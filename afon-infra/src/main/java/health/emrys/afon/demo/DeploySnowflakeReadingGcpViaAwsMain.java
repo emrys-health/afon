@@ -8,7 +8,6 @@ public class DeploySnowflakeReadingGcpViaAwsMain implements StepsProvider {
     public static List<Step> steps(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(DeployFullStackAwsMain.steps(stepOperations));
-//        steps.add(stepOperations.registerGcpTableInAws());
         steps.add(stepOperations.checkAwsSparkConnectorReadingGcp());
         steps.add(stepOperations.snowflakeReadsGcpViaPolaris());
         return steps;

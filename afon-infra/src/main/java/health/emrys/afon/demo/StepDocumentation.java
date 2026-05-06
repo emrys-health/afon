@@ -53,6 +53,20 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
+    public void runSnowflakeSql(String[] statements) {
+        out.println("Run Snowflake SQL:");
+        for (String sql : statements) {
+            out.println(format(
+                """
+                ```
+                %s
+                ```
+                """, sql));
+            out.flush();
+        }
+    }
+
+    @Override
     public void run(String command, Path path, OutputStream stdOut, String... commands) throws ManagedProcessException {
         if (path != null) {
             out.println(format("In `%s` ", path));
