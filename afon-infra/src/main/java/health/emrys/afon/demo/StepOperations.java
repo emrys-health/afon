@@ -23,8 +23,8 @@ public class StepOperations {
 
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
 
-    private static final Properties NO_ENV_VARIABLES = new Properties();
-    public static final String POLARIS_TABLE_NAME = "sf_table";
+    private static final Properties NO_ENV_VARIABLES   = new Properties();
+    public static final  String     POLARIS_TABLE_NAME = "sf_table";
 
     private final StepActions actions;
 
@@ -200,17 +200,33 @@ public class StepOperations {
     }
 
     public Step checkLocalSparkTalksToAzureViaAws() {
-        return new Step(
-            "az_external_aws_check",
+        return awsSparkSmokeTestUsing(
+            AZURE_EXTERNAL,
             format(
                 "run Spark locally such that it talks to %s which defers to %s",
                 awsPolarisDomainName,
-                AZURE_DOMAIN_NAME),
+                AZURE_DOMAIN_NAME));
+    }
+
+    public Step checkAwsSparkConnectorReadingGcp() {
+        return awsSparkSmokeTestUsing(
+            GCP,
+            format(
+                "run Spark locally such that it talks to %s writes a table to %s",
+                awsPolarisDomainName,
+                GCP));
+    }
+
+    private Step awsSparkSmokeTestUsing(SupportedCloudsEnum warehouse,
+                                        String description) {
+        return new Step(
+            format("aws_spark_write_to_%s", warehouse.toString()),
+            description,
             () -> {
                 Properties properties = appProperties();
                 actions.executeMainOf(
                     SparkCheck.class,
-                    new String[]{AZURE_EXTERNAL.toString(),
+                    new String[]{warehouse.toString(),
                                  POLARIS_ID.getValueFrom(properties),
                                  POLARIS_SECRET.getValueFrom(properties),
                                  awsPolarisDomainName
