@@ -78,7 +78,7 @@ public class Documenter {
                                """, ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))));
             printTo(os, """
                 # Steps
-                You could run the individual steps by hand. They are:
+                If you really wanted to, you could run the individual steps by hand. They are:
                 """);
             writeSteps(os);
             printTo(os, documentMetadata.getFurtherNotes());

@@ -212,7 +212,7 @@ public class StepOperations {
         return awsSparkSmokeTestUsing(
             GCP,
             format(
-                "run Spark locally such that it talks to %s writes a table to %s",
+                "run Spark locally such that it talks to '%s', writes a table to %s",
                 awsPolarisDomainName,
                 GCP));
     }

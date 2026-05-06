@@ -58,7 +58,7 @@ public class StepDocumentation extends StepActions {
         for (String sql : statements) {
             out.println(format(
                 """
-                ```
+                ```sql
                 %s
                 ```
                 """, sql));
