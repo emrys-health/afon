@@ -58,6 +58,13 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
     static final    Logger        logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
     static final    String        NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p " +
         "'{\"metadata\":{\"finalizers\":[]}}' --type=merge";
+    /** Port the Jupyter pod's in-pod VNC server listens on. The Jupyter image must run an
+     *  X server (e.g. Xvfb) plus a VNC server (e.g. x11vnc) bound to this port for the
+     *  Guacamole sidecar to be able to stream its GUI. */
+    static final    int           JUPYTER_VNC_PORT           = 5901;
+    /** Password the Jupyter VNC server is configured with. Kept in-cluster only — the
+     *  Guacamole web UI itself is intended to live behind oauth2-proxy. */
+    static final    String        JUPYTER_VNC_PASSWORD       = "afon";
     protected final List<Service> loadBalancers;
     protected final SparkConfig   sparkOperatorConfig;
     private final   String        jupyterDomain;
@@ -151,7 +158,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("jupyter")
-            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1")
+            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-vnc")
             .env(List.of(
                 // Disable Jupyter's built-in auth so oauth2-proxy is the sole gate.
                 // NOTEBOOK_ARGS is read by start-notebook.sh and forwarded to the server,
@@ -234,7 +241,16 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
             .targetPort("7078") // Port the container is listening on
             .protocol("TCP")
             .build();
-        Service.Builder.create(this, "jupyter-internal")
+        // Exposed so the in-cluster Guacamole pod can reach the Jupyter pod's VNC server
+        // (Xvfb + x11vnc, or equivalent, must be running inside the Jupyter image).
+        ServiceSpecPort vncPort = ServiceSpecPort
+            .builder()
+            .name("vnc")
+            .port(JUPYTER_VNC_PORT)
+            .targetPort(String.valueOf(JUPYTER_VNC_PORT))
+            .protocol("TCP")
+            .build();
+        Service jupyterInternal = Service.Builder.create(this, "jupyter-internal")
                        .metadata(ServiceMetadata
                                      .builder()
                                      .name("jupyter-internal")
@@ -247,10 +263,18 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                                         .internalTrafficPolicy("Cluster")
                                         .clusterIp("None")
                                         .clusterIps(List.of())
-                                        .port(List.of(sparkPort))
+                                        .port(List.of(sparkPort, vncPort))
                                         .build())
                        .build();
 
+        List<ITerraformDependable> guacamoleDeps = new ArrayList<>(eksDependOn);
+        guacamoleDeps.add(jupyterInternal);
+        new GuacamoleConfig(
+            this,
+            guacamoleDeps,
+            "jupyter-internal",
+            JUPYTER_VNC_PORT,
+            JUPYTER_VNC_PASSWORD);
 
         networkPolicies(jupyterLabels, sparkConnectorName);
     }
