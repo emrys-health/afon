@@ -240,28 +240,37 @@ public class StepOperations {
             "snowflake_reads_gcp",
             "Call Snowflake that uses AWS Polaris to get the credentials to read from GCP storage",
             () -> {
+                Properties properties = appProperties();
                 log.warn("Calling Snowflake. Note that some of these statements can take a long time");
                 actions.runSnowflakeSql(new String[]{
                     "USE DATABASE SNOWFLAKE_LEARNING_DB",
+
                     "DROP  ICEBERG TABLE my_gcp_table_id",
+
                     "DROP CATALOG INTEGRATION iceberg_gcp_id",
+
+                    format(
                     """
                     CREATE OR REPLACE CATALOG INTEGRATION iceberg_gcp_id
                       CATALOG_SOURCE = ICEBERG_REST
                       TABLE_FORMAT = ICEBERG
                       REST_CONFIG = (
-                          CATALOG_URI = 'https://emryspolaris.click/api/catalog/',
+                          CATALOG_URI = 'https://%s/api/catalog/',
                           CATALOG_NAME = 'gcp'
                           ACCESS_DELEGATION_MODE = VENDED_CREDENTIALS
                       )
                       REST_AUTHENTICATION = (
                           TYPE = OAUTH
-                          OAUTH_CLIENT_ID = 'root'
-                          OAUTH_CLIENT_SECRET = 's3cr3t'
+                          OAUTH_CLIENT_ID = '%s'
+                          OAUTH_CLIENT_SECRET = '%s'
                           OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
                       )
                       ENABLED = TRUE;
                     """,
+                    awsPolarisDomainName,
+                    POLARIS_ID.getValueFrom(properties),
+                    POLARIS_SECRET.getValueFrom(properties)),
+
                     format(
                     """              
                     -- NOTE!!!!
@@ -272,7 +281,10 @@ public class StepOperations {
                          CATALOG_TABLE_NAME = '%s'
                          CATALOG_NAMESPACE = '%s'
                          REPLACE_INVALID_CHARACTERS = TRUE;
-                    """, SparkCheck.TABLE, EXTERNAL_NAMESPACE),
+                    """,
+                    SparkCheck.TABLE,
+                    EXTERNAL_NAMESPACE),
+
                     "SELECT COUNT(*) FROM my_gcp_table_id"
                 });
             }
