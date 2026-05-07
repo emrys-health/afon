@@ -30,7 +30,7 @@ public class SparkCheck {
             SparkSession spark          = null;
             String       warehouse      = null;
             String       namespace      = EXTERNAL_NAMESPACE;
-            if (args.length == 4) {
+            if (args.length >= 4) {
                 warehouse                       = args[0];
                 String            polarisId     = args[1];
                 String            polarisSecret = args[2];

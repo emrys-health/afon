@@ -29,6 +29,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
@@ -159,7 +160,11 @@ public class StepActions {
         Properties original = saveAndSetSystem(overrides);
         try {
             Method main = clazz.getDeclaredMethod("main", String[].class);
-            main.invoke(null, (Object)args);
+            String[] mainArgs = Arrays
+                .stream(args)
+                .filter(s -> s != null && !s.isEmpty())
+                .toArray(String[]::new);
+            main.invoke(null, (Object) mainArgs);
         } finally {
             restoreSystemProperties(overrides, original);
         }
