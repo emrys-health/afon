@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance
 
 import SparkHelper.sparkWarehouse
+import health.emrys.afon.acceptance
 import health.emrys.afon.config.AfonProperties.{AZURE_BUCKET, DATABRICKS_TOKEN}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, AzureUtils, JsonMaker}
@@ -30,7 +31,7 @@ class ExternalAzureDBxTableSpec extends SpecPretifier with GivenWhenThen {
     properties.setProperty(AZURE_BUCKET.getPropertyName, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
     val config            = new AzureCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
-    val catalogRoles      = new CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
+    val catalogRoles      = new acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
     val tableName         = "diamonds"
     val sparkNamespace    = "ph_glue_iceberg_db"
 

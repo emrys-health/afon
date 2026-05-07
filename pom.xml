@@ -32,8 +32,10 @@
         <hadoop.version>3.3.4</hadoop.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <scala.version>2.12.20</scala.version>
-        <scala.compat.version>2.12</scala.compat.version>
+        <scala.version>2.13.18</scala.version>
+        <scala.compat.version>2.13</scala.compat.version>
+        <spark.compat.version>4.0</spark.compat.version>
+        <spark.version>${spark.compat.version}.1</spark.version>
         <iceberg.version>1.10.0</iceberg.version>
         <documentation_utils.version>0.11</documentation_utils.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

@@ -28,7 +28,7 @@ class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
     val properties        = new AfonPropertiesLoader().getProperties
     val config            = new GoogleCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
-    val catalogRoles      = new CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
+    val catalogRoles      = new health.emrys.afon.acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
     properties.setProperty(GCP_BUCKET_NAME.getPropertyName, BUCKET) // bit of a hack - TODO clean me up
 
     "be registered with Polaris" in {
