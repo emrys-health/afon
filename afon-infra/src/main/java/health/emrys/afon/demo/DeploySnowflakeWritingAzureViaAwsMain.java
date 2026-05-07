@@ -10,7 +10,7 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
             stepOperations.registerMostRecentSnowflakeAzureTableInAws(),
-            stepOperations.awsSparkTestUsing(AZURE, ACCEPTANCE_TEST_NAMESPACE)
+            stepOperations.awsSparkReadTestUsing(AZURE, ACCEPTANCE_TEST_NAMESPACE)
             );
     }
 
