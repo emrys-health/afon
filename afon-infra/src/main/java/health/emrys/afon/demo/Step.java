@@ -10,9 +10,10 @@ interface ThrowableRunnable {
 
 public class Step {
 
-    private static final Logger log  = getLogger(Step.class);
+    private static final Logger log = getLogger(Step.class);
 
-    public static final Step NoOp = new Step("noop", "No operation", new ThrowableRunnable() {
+    public static final Step NoOp = new Step(
+        "noop", "No operation", new ThrowableRunnable() {
         @Override
         public void run() {
             log.debug("No operation");
@@ -35,5 +36,15 @@ public class Step {
             "name='" + name + '\'' +
             ", description='" + description + '\'' +
             '}';
+    }
+
+    public Step andThen(Step other) {
+        return new Step(
+            String.format("%s_then_%s", this.name, other.name),
+            description + " then " + other.description,
+            () -> {
+                this.function.run();
+                other.function.run();
+            });
     }
 }

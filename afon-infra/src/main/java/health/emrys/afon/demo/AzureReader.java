@@ -30,7 +30,7 @@ public class AzureReader {
 
     public static void main(String[] args) {
         AzureReader app = new AzureReader();
-        app.list("my_project_folder*");
+        app.list("my_project_folder*metadata.json");
     }
 
     public AzureReader() {

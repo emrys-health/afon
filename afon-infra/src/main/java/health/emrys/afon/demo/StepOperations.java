@@ -1,23 +1,23 @@
 package health.emrys.afon.demo;
 
-import ch.vorburger.exec.ManagedProcessException;
+import com.azure.storage.blob.models.BlobItem;
 import health.emrys.afon.cdk.AwsWholeStack;
 import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
 import health.emrys.afon.infra.checks.SparkCheck;
-import health.emrys.afon.snowflake.SmokeTest;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
-import java.util.Properties;
+import java.util.*;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.demo.DocumentSnowflakeReadingGcpViaAwsMain.SNOWFLAKE_TABLE_NAME;
 import static health.emrys.afon.infra.checks.SparkCheck.EXTERNAL_NAMESPACE;
+import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
+import static java.util.Comparator.comparing;
 
 public class StepOperations {
 
@@ -113,13 +113,19 @@ public class StepOperations {
 
     public @NonNull Step purgeForeignCatalogFrom(String domainName,
                                                  SupportedCloudsEnum catalog) {
-        String name = machineNameFrom(domainName);
+        return purgeEverythingFor(domainName, catalog, EXTERNAL_NAMESPACE, SparkCheck.TABLE);
+    }
+
+    public @NonNull Step purgeEverythingFor(String domainName,
+                                            SupportedCloudsEnum catalog,
+                                            String namespace,
+                                            String tableName) {
         return new Step(
-            name + "_foreign_clean",
-            format("remove all persisted references to %s in the Polaris at %s", EXTERNAL_NAMESPACE, domainName),
+            format("%s_purge_%s", machineNameFrom(domainName), catalog.toString()),
+            format("remove all persisted references to %s in the Polaris at %s", namespace, domainName),
             () -> actions.executeMainOf(
                 PurgeAndPopulatePolaris.class,
-                new String[]{domainName, catalog.name(), EXTERNAL_NAMESPACE, SparkCheck.TABLE},
+                new String[]{domainName, catalog.name(), namespace, tableName},
                 NO_ENV_VARIABLES));
     }
 
@@ -132,10 +138,10 @@ public class StepOperations {
     }
 
     public Step createAzureCatalogInAzure() {
-        return createAzureCatalogIn(azurePolarisDomainName);
+        return createAzureCatalogWithExternalBucketIn(azurePolarisDomainName);
     }
 
-    public @NonNull Step createAzureCatalogIn(String domainName) {
+    public @NonNull Step createAzureCatalogWithExternalBucketIn(String domainName) {
         return new Step(
             "foreign_catalog_in_" + machineNameFrom(domainName),
             format("Create a catalog in the Polaris at `%s`", domainName),
@@ -157,9 +163,16 @@ public class StepOperations {
         return createExternalAzureCatalogIn(azurePolarisDomainName);
     }
 
+    public @NonNull Step createAzureCatalogIn(String domainName) {
+        return new Step(
+            "azure_in_" + machineNameFrom(domainName),
+            format("configure a catalog called `%s` in the Polaris at `%s`", AZURE, domainName),
+            () -> actions.createSingleCatalogsFor(domainName, AZURE));
+    }
+
     public @NonNull Step createExternalAzureCatalogIn(String domainName) {
         return new Step(
-            "external_aws_in_" + machineNameFrom(domainName),
+            "external_azure_in_" + machineNameFrom(domainName),
             format("configure a catalog called `%s` in the Polaris at `%s`", AZURE_EXTERNAL, domainName),
             () -> actions.createSingleCatalogsFor(domainName, AZURE_EXTERNAL));
     }
@@ -199,38 +212,47 @@ public class StepOperations {
         return actions.waitFor(gcpPolarisDomainName);
     }
 
-    public Step checkLocalSparkTalksToAzureViaAws() {
+    public Step checkLocalSparkTalksToAzurePolarisViaAwsPolaris() {
         return awsSparkSmokeTestUsing(
             AZURE_EXTERNAL,
             format(
                 "run Spark locally such that it talks to %s which defers to %s",
                 awsPolarisDomainName,
-                AZURE_DOMAIN_NAME));
+                AZURE_DOMAIN_NAME),
+            EXTERNAL_NAMESPACE);
     }
 
     public Step checkAwsSparkConnectorReadingGcp() {
+        return awsSparkTestUsing(GCP, EXTERNAL_NAMESPACE);
+    }
+
+    public @NonNull Step awsSparkTestUsing(SupportedCloudsEnum warehouse, String namespace) {
         return awsSparkSmokeTestUsing(
-            GCP,
+            warehouse,
             format(
                 "run Spark locally such that it talks to '%s', writes a table to %s",
                 awsPolarisDomainName,
-                GCP));
+                warehouse),
+            namespace);
     }
 
     private Step awsSparkSmokeTestUsing(SupportedCloudsEnum warehouse,
-                                        String description) {
+                                        String description,
+                                        String namespace) {
         return new Step(
             format("aws_spark_write_to_%s", warehouse.toString()),
             description,
             () -> {
                 Properties properties = appProperties();
+                List<String> args = List.of(
+                    warehouse.toString(),
+                    POLARIS_ID.getValueFrom(properties),
+                    POLARIS_SECRET.getValueFrom(properties),
+                    awsPolarisDomainName,
+                    namespace);
                 actions.executeMainOf(
                     SparkCheck.class,
-                    new String[]{warehouse.toString(),
-                                 POLARIS_ID.getValueFrom(properties),
-                                 POLARIS_SECRET.getValueFrom(properties),
-                                 awsPolarisDomainName
-                    },
+                    args.toArray(new String[0]),
                     NO_ENV_VARIABLES);
             });
     }
@@ -250,40 +272,40 @@ public class StepOperations {
                     "DROP CATALOG INTEGRATION iceberg_gcp_id",
 
                     format(
-                    """
-                    CREATE OR REPLACE CATALOG INTEGRATION iceberg_gcp_id
-                      CATALOG_SOURCE = ICEBERG_REST
-                      TABLE_FORMAT = ICEBERG
-                      REST_CONFIG = (
-                          CATALOG_URI = 'https://%s/api/catalog/',
-                          CATALOG_NAME = 'gcp'
-                          ACCESS_DELEGATION_MODE = VENDED_CREDENTIALS
-                      )
-                      REST_AUTHENTICATION = (
-                          TYPE = OAUTH
-                          OAUTH_CLIENT_ID = '%s'
-                          OAUTH_CLIENT_SECRET = '%s'
-                          OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
-                      )
-                      ENABLED = TRUE;
-                    """,
-                    awsPolarisDomainName,
-                    POLARIS_ID.getValueFrom(properties),
-                    POLARIS_SECRET.getValueFrom(properties)),
+                        """
+                        CREATE OR REPLACE CATALOG INTEGRATION iceberg_gcp_id
+                          CATALOG_SOURCE = ICEBERG_REST
+                          TABLE_FORMAT = ICEBERG
+                          REST_CONFIG = (
+                              CATALOG_URI = 'https://%s/api/catalog/',
+                              CATALOG_NAME = 'gcp'
+                              ACCESS_DELEGATION_MODE = VENDED_CREDENTIALS
+                          )
+                          REST_AUTHENTICATION = (
+                              TYPE = OAUTH
+                              OAUTH_CLIENT_ID = '%s'
+                              OAUTH_CLIENT_SECRET = '%s'
+                              OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
+                          )
+                          ENABLED = TRUE;
+                        """,
+                        awsPolarisDomainName,
+                        POLARIS_ID.getValueFrom(properties),
+                        POLARIS_SECRET.getValueFrom(properties)),
 
                     format(
-                    """              
-                    -- NOTE!!!!
-                    -- This query can take a minute or two to run
-                    -- Please wait... 
-                    CREATE OR REPLACE ICEBERG TABLE my_gcp_table_id
-                         CATALOG = 'iceberg_gcp_id'
-                         CATALOG_TABLE_NAME = '%s'
-                         CATALOG_NAMESPACE = '%s'
-                         REPLACE_INVALID_CHARACTERS = TRUE;
-                    """,
-                    SparkCheck.TABLE,
-                    EXTERNAL_NAMESPACE),
+                        """              
+                        -- NOTE!!!!
+                        -- This query can take a minute or two to run
+                        -- Please wait... 
+                        CREATE OR REPLACE ICEBERG TABLE my_gcp_table_id
+                             CATALOG = 'iceberg_gcp_id'
+                             CATALOG_TABLE_NAME = '%s'
+                             CATALOG_NAMESPACE = '%s'
+                             REPLACE_INVALID_CHARACTERS = TRUE;
+                        """,
+                        SparkCheck.TABLE,
+                        EXTERNAL_NAMESPACE),
 
                     "SELECT COUNT(*) FROM my_gcp_table_id"
                 });
@@ -291,17 +313,43 @@ public class StepOperations {
         );
     }
 
-    public Step registerGcpTableInAws() {
+    public Step registerMostRecentSnowflakeAzureTableInAws() {
+        AzureReader    lister = new AzureReader();
+        String         glob   = format("%s/my_project_folder*metadata.json", ACCEPTANCE_TEST_NAMESPACE);
+        List<BlobItem> list   = new ArrayList<>(lister.list(glob));
+        BlobItem latest = list
+            .stream()
+            .sorted(
+                comparing((BlobItem o) -> o.getProperties().getCreationTime())
+                   )
+            .findFirst()
+            .get();
+        String bucket  = AZURE_BUCKET.getValueFrom(appProperties());
+        String account = AZURE_STORAGE_ACCOUNT.getValueFrom(appProperties());
+        String path    = latest.getName().toString();
+        String json = format(
+            "abfss://%s@%s.dfs.core.windows.net/%s",
+            bucket,
+            account,
+            path);
+        String tableName = SparkCheck.TABLE;
+        return purgeEverythingFor(awsPolarisDomainName, AZURE, ACCEPTANCE_TEST_NAMESPACE, tableName)
+            .andThen(createAzureCatalogIn(awsPolarisDomainName))
+            .andThen(registerTableInAws(json, AZURE, tableName));
+    }
+
+    public Step registerTableInAws(String jsonMetadataFQN,
+                                   SupportedCloudsEnum warehouse,
+                                   String tableName) {
         return new Step(
-            "gcp_table_in_aws_polaris",
-            "Create a GCP table in the Polaris of AWS",
+            format("%s_table_in_aws_polaris", warehouse.toString()),
+            format("Create a %s table in the Polaris of AWS", warehouse.name()),
             () -> {
                 actions.registerTable(
-                    GCP,
-                    "gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325" +
-                        "-b437-20900bbcf2a3.metadata.json",
+                    warehouse,
+                    jsonMetadataFQN,
                     awsPolarisDomainName,
-                    POLARIS_TABLE_NAME
+                    tableName
                                      );
             }
 
