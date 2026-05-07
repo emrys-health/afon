@@ -36,7 +36,7 @@
         <scala.compat.version>2.13</scala.compat.version>
         <spark.compat.version>4.0</spark.compat.version>
         <spark.version>${spark.compat.version}.1</spark.version>
-        <iceberg.version>1.10.0</iceberg.version>
+        <iceberg.version>1.10.1</iceberg.version>
         <documentation_utils.version>0.11</documentation_utils.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>

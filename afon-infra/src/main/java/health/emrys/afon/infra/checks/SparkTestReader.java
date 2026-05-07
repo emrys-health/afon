@@ -17,8 +17,6 @@ public class SparkTestReader extends SparkChecker {
 
     @Override
     protected void doCheck(SparkSession spark, String warehouse, String namespace) {
-        spark.conf().set("spark.sql.parquet.enableVectorizedReader", "false");
-        spark.conf().set("spark.sql.iceberg.vectorization.enabled", "false");
         String fqn = tableFQN(warehouse, namespace);
         logger.info("Reading from: {}", fqn);
         Dataset<Row> table = spark.table(fqn);
