@@ -6,7 +6,9 @@ import health.emrys.afon.cdk.AzureKubernetesPolaris;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
-import health.emrys.afon.infra.checks.SparkCheck;
+import health.emrys.afon.infra.checks.SparkChecker;
+import health.emrys.afon.infra.checks.SparkTestReader;
+import health.emrys.afon.infra.checks.SparkTestWriter;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -14,7 +16,7 @@ import java.util.*;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.infra.checks.SparkCheck.EXTERNAL_NAMESPACE;
+import static health.emrys.afon.infra.checks.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
@@ -113,7 +115,7 @@ public class StepOperations {
 
     public @NonNull Step purgeForeignCatalogFrom(String domainName,
                                                  SupportedCloudsEnum catalog) {
-        return purgeEverythingFor(domainName, catalog, EXTERNAL_NAMESPACE, SparkCheck.TABLE);
+        return purgeEverythingFor(domainName, catalog, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
     }
 
     public @NonNull Step purgeEverythingFor(String domainName,
@@ -213,7 +215,7 @@ public class StepOperations {
     }
 
     public Step checkLocalSparkTalksToAzurePolarisViaAwsPolaris() {
-        return awsSparkSmokeTestUsing(
+        return awsSparkWriteTestUsing(
             AZURE_EXTERNAL,
             format(
                 "run Spark locally such that it talks to %s which defers to %s",
@@ -227,18 +229,36 @@ public class StepOperations {
     }
 
     public @NonNull Step awsSparkTestUsing(SupportedCloudsEnum warehouse, String namespace) {
-        return awsSparkSmokeTestUsing(
+        return awsSparkWriteTestUsing(
             warehouse,
             format(
-                "run Spark locally such that it talks to '%s', writes a table to %s",
-                awsPolarisDomainName,
+                "run Spark locally such that it talks to the AWS Polaris, writes a table to %s",
                 warehouse),
             namespace);
     }
 
-    private Step awsSparkSmokeTestUsing(SupportedCloudsEnum warehouse,
+    private Step awsSparkWriteTestUsing(SupportedCloudsEnum warehouse,
                                         String description,
                                         String namespace) {
+        return awsSparkWriteTestUsing(warehouse, description, namespace, SparkTestWriter.class);
+    }
+
+    Step awsSparkReadTestUsing(SupportedCloudsEnum warehouse,
+                               String namespace) {
+        return awsSparkWriteTestUsing(warehouse,
+                                      format("read via Spark %s.%s.%s",
+                                             warehouse,
+                                             namespace,
+                                             SparkChecker.TABLE
+                                             ),
+                                      namespace,
+                                      SparkTestReader.class);
+    }
+
+    private @NonNull Step awsSparkWriteTestUsing(SupportedCloudsEnum warehouse,
+                                                 String description,
+                                                 String namespace,
+                                                 Class<? extends SparkChecker> clazz) {
         return new Step(
             format("aws_spark_write_to_%s", warehouse.toString()),
             description,
@@ -251,7 +271,7 @@ public class StepOperations {
                     awsPolarisDomainName,
                     namespace);
                 actions.executeMainOf(
-                    SparkCheck.class,
+                    clazz,
                     args.toArray(new String[0]),
                     NO_ENV_VARIABLES);
             });
@@ -304,7 +324,7 @@ public class StepOperations {
                              CATALOG_NAMESPACE = '%s'
                              REPLACE_INVALID_CHARACTERS = TRUE;
                         """,
-                        SparkCheck.TABLE,
+                        SparkChecker.TABLE,
                         EXTERNAL_NAMESPACE),
 
                     "SELECT COUNT(*) FROM my_gcp_table_id"
@@ -332,7 +352,7 @@ public class StepOperations {
             bucket,
             account,
             path);
-        String tableName = SparkCheck.TABLE;
+        String tableName = SparkChecker.TABLE;
         return purgeEverythingFor(awsPolarisDomainName, AZURE, ACCEPTANCE_TEST_NAMESPACE, tableName)
             .andThen(createAzureCatalogIn(awsPolarisDomainName))
             .andThen(registerTableInAws(json, AZURE, tableName));

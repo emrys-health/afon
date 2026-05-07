@@ -15,7 +15,7 @@ import java.io.IOException;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.infra.checks.SparkCheck.EXTERNAL_NAMESPACE;
+import static health.emrys.afon.infra.checks.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
