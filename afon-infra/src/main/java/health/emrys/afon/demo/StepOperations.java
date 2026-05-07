@@ -245,14 +245,16 @@ public class StepOperations {
 
     Step awsSparkReadTestUsing(SupportedCloudsEnum warehouse,
                                String namespace) {
-        return awsSparkWriteTestUsing(warehouse,
-                                      format("read via Spark %s.%s.%s",
-                                             warehouse,
-                                             namespace,
-                                             SparkChecker.TABLE
-                                             ),
-                                      namespace,
-                                      SparkTestReader.class);
+        return awsSparkWriteTestUsing(
+            warehouse,
+            format(
+                "read via Spark %s.%s.%s",
+                warehouse,
+                namespace,
+                SparkChecker.TABLE
+                  ),
+            namespace,
+            SparkTestReader.class);
     }
 
     private @NonNull Step awsSparkWriteTestUsing(SupportedCloudsEnum warehouse,
@@ -334,13 +336,31 @@ public class StepOperations {
     }
 
     public Step registerMostRecentSnowflakeAzureTableInAws() {
-        AzureReader    lister = new AzureReader();
-        String         glob   = format("%s/my_project_folder*metadata.json", ACCEPTANCE_TEST_NAMESPACE);
-        List<BlobItem> list   = new ArrayList<>(lister.list(glob));
+        String glob            = format("%s/my_project_folder*metadata.json", ACCEPTANCE_TEST_NAMESPACE);
+        String latestJson      = firstFile(glob, false);
+        String latestDirectory = latestJson.substring(0, latestJson.lastIndexOf("/"));
+        String start           = "dfs.core.windows.net/";
+        latestDirectory = latestDirectory.substring(latestDirectory.indexOf(start) + start.length());
+        String json      = firstFile(latestDirectory + "*metadata.json", true);
+        String tableName = SparkChecker.TABLE;
+        return purgeEverythingFor(awsPolarisDomainName, AZURE, ACCEPTANCE_TEST_NAMESPACE, tableName)
+            .andThen(createAzureCatalogIn(awsPolarisDomainName))
+            .andThen(registerTableInAws(json, AZURE, tableName));
+    }
+
+    private static @NonNull String firstFile(String glob,
+                                             boolean ascendingOrder) {
+        log.info("Querying Azure for {}", glob);
+        AzureReader          lister    = new AzureReader();
+        List<BlobItem>       list      = new ArrayList<>(lister.list(glob));
+        Comparator<BlobItem> comparing = comparing((BlobItem o) -> o.getProperties().getCreationTime());
+        if (ascendingOrder) {
+            comparing = comparing.reversed();
+        }
         BlobItem latest = list
             .stream()
             .sorted(
-                comparing((BlobItem o) -> o.getProperties().getCreationTime())
+                comparing
                    )
             .findFirst()
             .get();
@@ -352,10 +372,7 @@ public class StepOperations {
             bucket,
             account,
             path);
-        String tableName = SparkChecker.TABLE;
-        return purgeEverythingFor(awsPolarisDomainName, AZURE, ACCEPTANCE_TEST_NAMESPACE, tableName)
-            .andThen(createAzureCatalogIn(awsPolarisDomainName))
-            .andThen(registerTableInAws(json, AZURE, tableName));
+        return json;
     }
 
     public Step registerTableInAws(String jsonMetadataFQN,
