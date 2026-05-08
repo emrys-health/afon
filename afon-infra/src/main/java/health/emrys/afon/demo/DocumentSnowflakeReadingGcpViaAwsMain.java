@@ -5,8 +5,6 @@ import java.util.List;
 
 public class DocumentSnowflakeReadingGcpViaAwsMain extends AbstractDocumentMetadata {
 
-    public static final String SNOWFLAKE_TABLE_NAME = "my_gcp_table_id";
-
     @Override
     public String getSupplementaryIntro() {
         return """
@@ -22,7 +20,7 @@ public class DocumentSnowflakeReadingGcpViaAwsMain extends AbstractDocumentMetad
 
     @Override
     public String getFilename() {
-        return "snowflake.md";
+        return "snowflake_reads_gcp.md";
     }
 
     @Override
