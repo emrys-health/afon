@@ -69,10 +69,10 @@ public class StepActions {
     }
 
     private boolean isWaitingInterrupted(int timeout) {
-        int pause = 5000;
-        log.info("Waiting {}s. Maximum = {}s", pause / 1000, timeout / 1000);
+        int pauseMs = 15_000;
+        log.info("Waiting {}s. Maximum = {}s", pauseMs / 1000, timeout / 1000);
         try {
-            Thread.sleep(pause);
+            Thread.sleep(pauseMs);
         } catch (InterruptedException e) {
             return true;
         }
