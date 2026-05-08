@@ -429,27 +429,19 @@ public class StepOperations {
         if (descendingOrder) {
             comparing = comparing.reversed();
         }
-        Stream<BlobItem> sorted = list
+        BlobItem latest = list
             .stream()
-            .sorted(comparing);
-//        log.info("Sorted by create time {}",
-//                 String.join("\n",
-//                             sorted
-//                                 .map(x -> x.getProperties().getCreationTime().toString())
-//                                 .toArray(String[]::new)));
-        BlobItem latest = sorted
+            .sorted(comparing)
             .findFirst()
             .get();
         log.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
         String bucket  = AZURE_BUCKET.getValueFrom(appProperties());
         String account = AZURE_STORAGE_ACCOUNT.getValueFrom(appProperties());
-        String path    = latest.getName().toString();
-        String json = format(
+        return format(
             "abfss://%s@%s.dfs.core.windows.net/%s",
             bucket,
             account,
-            path);
-        return json;
+            latest.getName());
     }
 
     public Step registerTableInAws(String jsonMetadataFQN,
@@ -465,7 +457,6 @@ public class StepOperations {
                     awsPolarisDomainName,
                     tableName);
             }
-
         );
     }
 }
