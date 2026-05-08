@@ -110,6 +110,13 @@ kubectl logs spark-connector-0-driver
 
 # Domain names
 
+For our PoC, the approach to managing different domain names is different per cloud provider (see below).
+But in general, get the DNSs for the cloud to which you want to deploy and assign them to the name servers
+of the provider that sold the domain names.
+Once this is done, a cloud managed Kubernetes will talk to the cloud provider and have it point the domain name
+at a container it runs.
+This all happens as part of a `tofu apply`.
+
 ### AWS
 
 Pointing the domain names at an IP address in Kubernetes is easy in AWS as the whole thing is integrated.
@@ -202,12 +209,15 @@ It appears that there are lingering AWS infrastructure components.
 Run `health.emrys.afon.cdk.AwsNuke` to print out helpful command lines.
 In particular, the output of this script should blatt everything:
 
+```shell
+mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsNuke exec:java
+```
+
+This is a shell script. 
+The advantage of this is that you can use it if your accidentally delete your Terraform state.
+
 And if all else fails. go to the [AWS VPCs](https://eu-west-2.console.aws.amazon.com/vpcconsole/home?region=eu-west-2#vpcs:)
 and delete everything you created by hand.
-
-```shell
-mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsConstruct exec:java
-```
 
 ### Be GitOps aligned
 
