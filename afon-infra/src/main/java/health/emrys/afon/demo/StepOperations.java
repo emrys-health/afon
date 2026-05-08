@@ -12,7 +12,11 @@ import health.emrys.afon.infra.checks.SparkTestWriter;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collector;
+import java.util.stream.Stream;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
@@ -263,7 +267,7 @@ public class StepOperations {
                                                  String namespace,
                                                  Class<? extends SparkChecker> clazz) {
         return new Step(
-            format("aws_spark_write_to_%s", warehouse.toString()),
+            format("aws_spark_talks_to_%s", warehouse.toString()),
             description,
             () -> {
                 Properties properties = appProperties();
@@ -337,69 +341,76 @@ public class StepOperations {
     }
 
     public Step snowflakeWritesToAzure() {
-        Properties properties = appProperties();
-        String     bucket     = AZURE_BUCKET.getValueFrom(properties);
-        String     account    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
-        String     tenantId  = AZURE_TENANT_ID.getValueFrom(properties);
+        Properties        properties = appProperties();
+        String            bucket     = AZURE_BUCKET.getValueFrom(properties);
+        String            account    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
+        String            tenantId   = AZURE_TENANT_ID.getValueFrom(properties);
+        LocalDateTime     now        = LocalDateTime.now();
+        DateTimeFormatter formatter  = DateTimeFormatter.ofPattern("yy_MM_dd_mm_HH_ss");
+        String            formatted  = now.format(formatter);
         return new Step(
             "snowflake_writes_to_azure",
             "Call Snowflake so it writes sample data to Azure blob storage",
             () -> {
                 actions.runSnowflakeSql(new String[]{
-                    format("""
-                    CREATE OR REPLACE STORAGE INTEGRATION azure_int
-                      TYPE = EXTERNAL_STAGE
-                      STORAGE_PROVIDER = AZURE
-                      ENABLED = TRUE
-                      STORAGE_ALLOWED_LOCATIONS = ('azure://%s.blob.core.windows.net/%s')
-                      AZURE_TENANT_ID='%s';
-                    """, bucket, account, account, bucket, tenantId),
+                    format(
+                        """
+                        CREATE OR REPLACE STORAGE INTEGRATION azure_int
+                          TYPE = EXTERNAL_STAGE
+                          STORAGE_PROVIDER = AZURE
+                          ENABLED = TRUE
+                          STORAGE_ALLOWED_LOCATIONS = ('azure://%s.blob.core.windows.net/%s')
+                          AZURE_TENANT_ID='%s';
+                        """, bucket, account, account, bucket, tenantId),
 
                     """
                     DROP ICEBERG TABLE IF EXISTS my_azure_iceberg_table ;
                     """,
 
-                    format("""
-                    CREATE OR REPLACE EXTERNAL VOLUME my_external_volume
-                      STORAGE_LOCATIONS = (
-                        (
-                          NAME = 'azure_loc'
-                          STORAGE_PROVIDER = 'AZURE'
-                          STORAGE_BASE_URL = 'azure://%s.blob.core.windows.net/%s/%s/'
-                          AZURE_TENANT_ID='%s'
-                        )
-                      );
-                    """, account, bucket, ACCEPTANCE_TEST_NAMESPACE, tenantId),
+                    format(
+                        """
+                        CREATE OR REPLACE EXTERNAL VOLUME my_external_volume
+                          STORAGE_LOCATIONS = (
+                            (
+                              NAME = 'azure_loc'
+                              STORAGE_PROVIDER = 'AZURE'
+                              STORAGE_BASE_URL = 'azure://%s.blob.core.windows.net/%s/%s/'
+                              AZURE_TENANT_ID='%s'
+                            )
+                          );
+                        """, account, bucket, ACCEPTANCE_TEST_NAMESPACE, tenantId),
 
                     """
                     USE DATABASE SNOWFLAKE_LEARNING_DB;
                     """,
 
-                    format("""
-                    CREATE OR REPLACE ICEBERG TABLE my_azure_iceberg_table (
-                        value STRING
-                    )
-                      EXTERNAL_VOLUME = 'MY_EXTERNAL_VOLUME'
-                      CATALOG = 'SNOWFLAKE'
-                      BASE_LOCATION = '%s/';
-                    """, SNOWFLAKE_OUT_DIR),
+                    format(
+                        """
+                        CREATE OR REPLACE ICEBERG TABLE my_azure_iceberg_table (
+                            value STRING
+                        )
+                          EXTERNAL_VOLUME = 'MY_EXTERNAL_VOLUME'
+                          CATALOG = 'SNOWFLAKE'
+                          BASE_LOCATION = '%s/';
+                        """, SNOWFLAKE_OUT_DIR),
 
-                    """
+                    format("""
                     INSERT INTO my_azure_iceberg_table (value)
                     VALUES
-                        ('Alice'),
-                        ('Bob');
-                    """
+                        ('Alice_%s'),
+                        ('Bob_%s');
+                    """, formatted, formatted)
                 });
             }
         );
     }
 
     public Step registerMostRecentSnowflakeAzureTableInAws() {
-        String glob      = format("%s/%s*metadata.json",
-                                  ACCEPTANCE_TEST_NAMESPACE,
-                                  SNOWFLAKE_OUT_DIR);
-        String json      = firstFileInLatestDirectoryMatching(glob);
+        String glob = format(
+            "%s/%s*metadata.json",
+            ACCEPTANCE_TEST_NAMESPACE,
+            SNOWFLAKE_OUT_DIR);
+        String json = firstFile(glob, true); // firstFileInLatestDirectoryMatching(glob);
         return registerTableInAws(json, AZURE, SparkChecker.TABLE);
     }
 
@@ -409,31 +420,27 @@ public class StepOperations {
             .andThen(createAzureCatalogIn(awsPolarisDomainName));
     }
 
-    private static @NonNull String firstFileInLatestDirectoryMatching(String glob) {
-        String latestJson      = firstFile(glob, false);
-        String latestDirectory = latestJson.substring(0, latestJson.lastIndexOf("/"));
-        String start           = "dfs.core.windows.net/";
-        latestDirectory = latestDirectory.substring(latestDirectory.indexOf(start) + start.length());
-        String json = firstFile(latestDirectory + "*metadata.json", true);
-        return json;
-    }
-
     private static @NonNull String firstFile(String glob,
-                                             boolean ascendingOrder) {
+                                             boolean descendingOrder) {
         log.info("Querying Azure for {}", glob);
         AzureReader          lister    = new AzureReader();
         List<BlobItem>       list      = new ArrayList<>(lister.list(glob));
         Comparator<BlobItem> comparing = comparing((BlobItem o) -> o.getProperties().getCreationTime());
-        if (ascendingOrder) {
+        if (descendingOrder) {
             comparing = comparing.reversed();
         }
-        BlobItem latest = list
+        Stream<BlobItem> sorted = list
             .stream()
-            .sorted(
-                comparing
-                   )
+            .sorted(comparing);
+//        log.info("Sorted by create time {}",
+//                 String.join("\n",
+//                             sorted
+//                                 .map(x -> x.getProperties().getCreationTime().toString())
+//                                 .toArray(String[]::new)));
+        BlobItem latest = sorted
             .findFirst()
             .get();
+        log.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
         String bucket  = AZURE_BUCKET.getValueFrom(appProperties());
         String account = AZURE_STORAGE_ACCOUNT.getValueFrom(appProperties());
         String path    = latest.getName().toString();
@@ -456,8 +463,7 @@ public class StepOperations {
                     warehouse,
                     jsonMetadataFQN,
                     awsPolarisDomainName,
-                    tableName
-                                     );
+                    tableName);
             }
 
         );

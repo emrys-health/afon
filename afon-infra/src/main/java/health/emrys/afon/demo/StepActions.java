@@ -204,10 +204,6 @@ public class StepActions {
         deleteTerraformIn("..", id);
     }
 
-    public void readFromSnowflake(String table, Properties properties) throws Exception {
-        new SmokeTest().selectFrom(table, properties);
-    }
-
     public void runSnowflakeSql(String[] statements) throws NoSuchAlgorithmException, InvalidKeySpecException, SQLException {
         SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory();
         try (Connection conn = factory.getConnection();
@@ -219,6 +215,7 @@ public class StepActions {
                     log.info(rs.getString(1));
                 }
             }
+            conn.commit();
         }
     }
     
