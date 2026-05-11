@@ -218,7 +218,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         new JupyterMfaConfig(
             this,
             proxyDeps,
-            "http://jupyter-web:8888",
+            "http://guacamole-web:8080",
             jupyterDomain);
 
         // for emrysjupyter.click, this is Z03165251T5B540VMLNST
