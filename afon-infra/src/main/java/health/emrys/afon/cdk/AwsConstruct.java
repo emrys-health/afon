@@ -211,7 +211,7 @@ public class AwsConstruct extends AbstractConstruct {
             .name(clusterName)
             .roleArn(eksClusterRole.getArn())
             .vpcConfig(vpcConfig)
-            .version("1.31")
+            .version("1.35")
             .accessConfig(EksClusterAccessConfig.builder()
                                                 .authenticationMode("API_AND_CONFIG_MAP")
                                                 .bootstrapClusterCreatorAdminPermissions(true)
