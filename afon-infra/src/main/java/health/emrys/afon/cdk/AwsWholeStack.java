@@ -33,6 +33,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
+import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DNS_ZONE;
 import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DOMAIN;
 import static health.emrys.afon.infra.Defaults.*;
 import static java.lang.String.format;
@@ -69,7 +70,9 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         super(scope, id, properties);
         this.jupyterDomain = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
-        deployJupyter(dependables, SPARK_CONNECTOR_NAME, cloudProvider.loadBalancerRole);
+        deployJupyter(dependables,
+                      SPARK_CONNECTOR_NAME,
+                      AWS_JUPYTER_DNS_ZONE.getValueFrom(properties));
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
         HelmProviderKubernetes kubernetes = HelmProviderKubernetes
@@ -143,7 +146,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
     private void deployJupyter(List<ITerraformDependable> eksDependOn,
                                String sparkConnectorName,
-                               IamRole loadBalancerRole) {
+                               String jupyterDnsZoneId) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
         // Disable Jupyter's built-in token/password auth via env vars — oauth2-proxy handles authentication.
@@ -224,7 +227,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
         cloudProvider.configureDNS(
             "JupyterAliasRecord",
-            "Z03165251T5B540VMLNST", // aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click
+            jupyterDnsZoneId, // aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click
             jupyterDomain, cloudProvider.getLbRelease(), ingress);
 
         ServiceSpecPort sparkPort = ServiceSpecPort
