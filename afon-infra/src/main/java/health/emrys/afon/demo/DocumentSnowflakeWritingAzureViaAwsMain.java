@@ -6,7 +6,12 @@ import java.util.List;
 public class DocumentSnowflakeWritingAzureViaAwsMain extends AbstractDocumentMetadata {
     @Override
     public String getSupplementaryIntro() {
-        return "";
+        return """
+                ## What it does
+                This e2e test has Snowlfake write to Azure blob storage, registers its
+                the metadata with Polaris then runs Spark against Polaris to see the same data.
+                
+                """;
     }
 
     @Override
