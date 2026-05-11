@@ -58,6 +58,7 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
 import static health.emrys.afon.config.AfonProperties.AWS_ACCOUNT_ID;
+import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
 
 public class AwsConstruct extends AbstractConstruct {
@@ -495,7 +496,11 @@ public class AwsConstruct extends AbstractConstruct {
         // 2. Create the Alias A Record
         // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
         // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
-        configureDNS("IngressAliasRecord", "Z06847223IC61YVGEH6HR", this.polarisDomainName, lbRelease, ingress);
+        configureDNS("IngressAliasRecord",
+                     AWS_POLARIS_DNS_ZONE.getValueFrom(properties),
+                     this.polarisDomainName,
+                     lbRelease,
+                     ingress);
     }
 
     private static ReleaseSet createValue(String name, String value) {
