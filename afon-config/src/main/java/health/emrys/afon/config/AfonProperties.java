@@ -72,6 +72,8 @@ public class AfonProperties {
     public static final AfonProperty OIDC_ISSUER_URL   = new AfonProperty("OIDC_ISSUER_URL");
     public static final AfonProperty OIDC_EMAIL_DOMAIN = new AfonProperty("OIDC_EMAIL_DOMAIN");
 
+    public static final AfonProperty JUPYTER_VNC_PASSWORD = new AfonProperty("JUPYTER_VNC_PASSWORD");
+
     // Snowflake
     public static final AfonProperty SNOWFLAKE_JDBC_URL    = new AfonProperty("SNOWFLAKE_JDBC_URL");
     public static final AfonProperty SNOWFLAKE_PRIVATE_KEY = new AfonProperty("SNOWFLAKE_PRIVATE_KEY");

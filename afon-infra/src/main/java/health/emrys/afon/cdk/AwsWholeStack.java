@@ -19,6 +19,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
@@ -33,8 +34,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
-import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DNS_ZONE;
-import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DOMAIN;
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.*;
 import static java.lang.String.format;
 
@@ -58,17 +58,21 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
     static final    Logger        logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
     static final    String        NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p " +
-        "'{\"metadata\":{\"finalizers\":[]}}' --type=merge";
-    /** Port the Jupyter pod's in-pod VNC server listens on. The Jupyter image must run an
-     *  X server (e.g. Xvfb) plus a VNC server (e.g. x11vnc) bound to this port for the
-     *  Guacamole sidecar to be able to stream its GUI. */
+                                                               "'{\"metadata\":{\"finalizers\":[]}}' --type=merge";
+    /**
+     * Port the Jupyter pod's in-pod VNC server listens on. The Jupyter image must run an
+     * X server (e.g. Xvfb) plus a VNC server (e.g. x11vnc) bound to this port for the
+     * Guacamole sidecar to be able to stream its GUI.
+     */
     static final    int           JUPYTER_VNC_PORT           = 5901;
-    /** Password the Jupyter VNC server is configured with. Kept in-cluster only — the
-     *  Guacamole web UI itself is intended to live behind oauth2-proxy. */
-    static final    String        JUPYTER_VNC_PASSWORD       = "afon";
+    /**
+     * Password the Jupyter VNC server is configured with. Kept in-cluster only — the
+     * Guacamole web UI itself is intended to live behind oauth2-proxy.
+     */
     protected final List<Service> loadBalancers;
     protected final SparkConfig   sparkOperatorConfig;
     private final   String        jupyterDomain;
+    private final   String        jupyterPassword;
     private         String        DELETE_CRDS;
 
     public AwsWholeStack(final Construct scope,
@@ -76,10 +80,12 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                          final Properties properties) {
         super(scope, id, properties);
         this.jupyterDomain = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
+        jupyterPassword    = AfonProperties.JUPYTER_VNC_PASSWORD.getValueFrom(properties);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
-        deployJupyter(dependables,
-                      SPARK_CONNECTOR_NAME,
-                      AWS_JUPYTER_DNS_ZONE.getValueFrom(properties));
+        deployJupyter(
+            dependables,
+            SPARK_CONNECTOR_NAME,
+            AWS_JUPYTER_DNS_ZONE.getValueFrom(properties));
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
         HelmProviderKubernetes kubernetes = HelmProviderKubernetes
@@ -172,8 +178,8 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                     .builder()
                     .name("NOTEBOOK_ARGS")
                     .value("--NotebookApp.token= --NotebookApp.password= " +
-                               "--ServerApp.token= --ServerApp" +
-                               ".password_required=False")
+                           "--ServerApp.token= --ServerApp" +
+                           ".password_required=False")
                     .build()
                         ))
             .build();
@@ -253,22 +259,26 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
             .targetPort(String.valueOf(JUPYTER_VNC_PORT))
             .protocol("TCP")
             .build();
+        ServiceSpec networkSpec = ServiceSpec
+            .builder()
+            .selector(jupyterLabels) // Selects the Pods
+            // created by secretAppDeployment
+            .type("ClusterIP")
+            .internalTrafficPolicy("Cluster")
+            .clusterIp("None")
+            .clusterIps(List.of())
+            .port(List.of(sparkPort, vncPort))
+            .build();
         Service jupyterInternal = Service.Builder.create(this, "jupyter-internal")
-                       .metadata(ServiceMetadata
-                                     .builder()
-                                     .name("jupyter-internal")
-                                     .namespace("default")
-                                     .build())
-                       .dependsOn(eksDependOn).lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                       .spec(ServiceSpec.builder()
-                                        .selector(jupyterLabels) // Selects the Pods created by secretAppDeployment
-                                        .type("ClusterIP")
-                                        .internalTrafficPolicy("Cluster")
-                                        .clusterIp("None")
-                                        .clusterIps(List.of())
-                                        .port(List.of(sparkPort, vncPort))
-                                        .build())
-                       .build();
+                                                 .metadata(ServiceMetadata
+                                                               .builder()
+                                                               .name("jupyter-internal")
+                                                               .namespace("default")
+                                                               .build())
+                                                 .dependsOn(eksDependOn)
+                                                 .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                                                 .spec(networkSpec)
+                                                 .build();
 
         List<ITerraformDependable> guacamoleDeps = new ArrayList<>(eksDependOn);
         guacamoleDeps.add(jupyterInternal);
@@ -277,7 +287,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
             guacamoleDeps,
             "jupyter-internal",
             JUPYTER_VNC_PORT,
-            JUPYTER_VNC_PASSWORD);
+            jupyterPassword);
 
         networkPolicies(jupyterLabels, sparkConnectorName);
     }
@@ -444,6 +454,6 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         new AwsWholeStack(app, ID, new AfonPropertiesLoader().getProperties());
         app.synth();
         logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu " +
-                        "-apply");
+                    "-apply");
     }
 }
