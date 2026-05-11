@@ -8,10 +8,11 @@ import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
+import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
+import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
@@ -85,7 +86,8 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         deployJupyter(
             dependables,
             SPARK_CONNECTOR_NAME,
-            AWS_JUPYTER_DNS_ZONE.getValueFrom(properties));
+            AWS_JUPYTER_DNS_ZONE.getValueFrom(properties),
+            properties);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
         HelmProviderKubernetes kubernetes = HelmProviderKubernetes
@@ -159,15 +161,32 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
     private void deployJupyter(List<ITerraformDependable> eksDependOn,
                                String sparkConnectorName,
-                               String jupyterDnsZoneId) {
+                               String jupyterDnsZoneId,
+                               Properties properties) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
+
+        // Azure Blob credentials consumed by the in-image mount-azure.sh hook (rclone).
+        String key = "az_key";
+        String container = "az_container";
+        Secret azureStorageSecret = Secret.Builder
+            .create(this, "azureStorageSecret")
+            .metadata(SecretMetadata.builder()
+                                    .name("azure-storage-creds")
+                                    .namespace("default")
+                                    .build())
+            .data(Map.of(
+//                "account",   AZURE_STORAGE_ACCOUNT.getValueFrom(properties),
+                key, AZURE_CONNECTION_STRING.getValueFrom(properties),
+                container, AZURE_BUCKET.getValueFrom(properties)))
+            .build();
 
         // Disable Jupyter's built-in token/password auth via env vars — oauth2-proxy handles authentication.
         // Using env vars avoids overriding the container CMD (which would break the tini entrypoint).
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("jupyter")
-            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-noclip")
+            .securityContext(DeploymentSpecTemplateSpecContainerSecurityContext.builder().privileged(true).build())
+            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-rclone4")
             .env(List.of(
                 // Disable Jupyter's built-in auth so oauth2-proxy is the sole gate.
                 // NOTEBOOK_ARGS is read by start-notebook.sh and forwarded to the server,
@@ -180,12 +199,18 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                     .value("--NotebookApp.token= --NotebookApp.password= " +
                            "--ServerApp.token= --ServerApp" +
                            ".password_required=False")
-                    .build()
+                    .build(),
+//                envFromSecret("AZURE_STORAGE_ACCOUNT",   "azure-storage-creds", "account"),
+                envFromSecret("AZURE_CONNECTION_STRING", "azure-storage-creds", key),
+                envFromSecret("AZURE_BUCKET", "azure-storage-creds", container)
                         ))
             .build();
+
+        List<ITerraformDependable> jupyterDeps = new ArrayList<>(eksDependOn);
+        jupyterDeps.add(azureStorageSecret);
         DeploymentUtils.deploy(
             this,
-            eksDependOn,
+            jupyterDeps,
             jupyterLabels,
             List.of(jupyterContainer),
             List.of(),
@@ -421,6 +446,22 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         return NetworkPolicySpecEgressToNamespaceSelector
             .builder()
             .matchLabels(sparkOperatorLables)
+            .build();
+    }
+
+    private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
+        String envName, String secretName, String secretKey) {
+        return DeploymentSpecTemplateSpecContainerEnv
+            .builder()
+            .name(envName)
+            .valueFrom(DeploymentSpecTemplateSpecContainerEnvValueFrom
+                           .builder()
+                           .secretKeyRef(DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef
+                                             .builder()
+                                             .name(secretName)
+                                             .key(secretKey)
+                                             .build())
+                           .build())
             .build();
     }
 

@@ -37,15 +37,25 @@ RUN install -d -m 0755 /etc/apt/keyrings \
  && printf 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000\n' \
         > /etc/apt/preferences.d/mozilla \
  && apt-get update \
- && apt-get install -y --no-install-recommends firefox \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends firefox
 
 # Hook script: jupyter docker-stacks sources every *.sh in this directory
 # from start-notebook.sh, so DISPLAY=:1 propagates into the notebook server.
 COPY start-vnc.sh /usr/local/bin/before-notebook.d/0-start-vnc.sh
 RUN chmod +x /usr/local/bin/before-notebook.d/0-start-vnc.sh
 
+# rclone + FUSE: mounts an Azure Blob container at /mnt/azure at container
+# startup, with credentials supplied via env vars (see mount-azure.sh).
+RUN curl -fsSL https://rclone.org/install.sh | bash \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends fuse3 \
+ && modprobe fuse \
+ && rm -rf /var/lib/apt/lists/*
+# && mkdir -p /mnt/azure \
+COPY mount-azure.sh /usr/local/bin/before-notebook.d/1-mount-azure.sh
+RUN chmod +x /usr/local/bin/before-notebook.d/1-mount-azure.sh
+
 # 4. Install the matching PySpark package (for the Python client)
 USER $NB_UID
 #RUN conda remove pyspark && conda install -c conda-forge pyspark=4.0.0
-RUN pip install --no-cache-dir pyspark==4.0.1 grpcio>=1.48.1 grpcio-status
+RUN pip install --no-cache-dir pyspark==4.0.1 grpcio\>=1.48.1 grpcio-status

@@ -51,6 +51,7 @@ public class AfonProperties {
     public static final AfonProperty AZURE_BUCKET_FORBIDDEN = new AfonProperty("AZURE_BUCKET_FORBIDDEN");
     public static final AfonProperty AZURE_EXTERNAL_BUCKET  = new AfonProperty("AZURE_EXTERNAL_BUCKET");
     public static final AfonProperty AZURE_STORAGE_ACCOUNT  = new AfonProperty("AZURE_STORAGE_ACCOUNT");
+    public static final AfonProperty AZURE_STORAGE_KEY      = new AfonProperty("AZURE_STORAGE_KEY");
     public static final AfonProperty DATABRICKS_TOKEN       = new AfonProperty("DATABRICKS_TOKEN");
 
     public static final AfonProperty AZURE_TENANT_ID         = new AfonProperty("AZURE_TENANT_ID");
