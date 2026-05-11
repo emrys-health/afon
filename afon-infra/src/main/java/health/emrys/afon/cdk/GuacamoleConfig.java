@@ -55,6 +55,8 @@ class GuacamoleConfig {
                         <param name="hostname">%s</param>
                         <param name="port">%d</param>
                         <param name="password">%s</param>
+                        <param name="disable-copy">true</param>
+                        <param name="disable-paste">true</param>
                     </connection>
                 </authorize>
             </user-mapping>

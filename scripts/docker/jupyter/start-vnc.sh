@@ -35,6 +35,7 @@ x11vnc -storepasswd "${VNC_PASSWORD}" "${HOME}/.vnc/passwd" > /dev/null
 x11vnc -display "${VNC_DISPLAY}" \
        -rfbport "${VNC_PORT}" \
        -rfbauth "${HOME}/.vnc/passwd" \
+        -noclipboard -nosetclipboard \
        -forever -shared -bg -o /tmp/x11vnc.log
 
 export DISPLAY="${VNC_DISPLAY}"
