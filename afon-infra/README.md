@@ -117,6 +117,8 @@ Once this is done, a cloud managed Kubernetes will talk to the cloud provider an
 at a container it runs.
 This all happens as part of a `tofu apply`.
 
+You can find the domain name servers for your cloud provider in its web GUI if you just search for `DNS`.
+
 ### AWS
 
 Pointing the domain names at an IP address in Kubernetes is easy in AWS as the whole thing is integrated.
