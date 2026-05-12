@@ -62,7 +62,10 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                          final Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
-        JupyterConfig              jupyter     = new JupyterConfig(this, cloudProvider, properties);
+        JupyterConfig jupyter = new JupyterAwsConfig(
+            this,
+            cloudProvider,
+            properties);
         networkPolicies(jupyter.deployJupyter(dependables), SPARK_CONNECTOR_NAME);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 

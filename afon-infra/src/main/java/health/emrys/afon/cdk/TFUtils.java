@@ -4,6 +4,7 @@ import com.hashicorp.cdktf.TerraformResource;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import software.constructs.Construct;
 
@@ -15,6 +16,13 @@ import static health.emrys.afon.infra.Defaults.POLARIS_SERVICE_NAME;
 import static java.lang.String.format;
 
 public class TFUtils {
+
+    public static DeploymentSpecTemplateSpecContainerEnv envVar(String name, String value) {
+        return DeploymentSpecTemplateSpecContainerEnv.builder()
+                                                     .name(name)
+                                                     .value(value)
+                                                     .build();
+    }
 
     private final String    domainName;
     private final String    tlsSecretName;
