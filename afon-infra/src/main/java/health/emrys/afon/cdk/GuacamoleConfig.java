@@ -47,10 +47,12 @@ class GuacamoleConfig {
 
     private static final Map<String, String> LABELS = Map.of("app", "guacamole");
 
-    private static final String USER_MAPPING_XML_TEMPLATE = """
-            <user-mapping>
-                <authorize username="afon" password="afon">
-                    <connection name="jupyter-vnc">
+    /** One Guacamole login → one in-pod VNC port → one independent X session. */
+    public record Session(String username, String password, int vncPort) {}
+
+    private static final String AUTHORIZE_BLOCK_TEMPLATE = """
+                <authorize username="%s" password="%s">
+                    <connection name="jupyter-vnc-%s">
                         <protocol>vnc</protocol>
                         <param name="hostname">%s</param>
                         <param name="port">%d</param>
@@ -59,7 +61,6 @@ class GuacamoleConfig {
                         <param name="disable-paste">true</param>
                     </connection>
                 </authorize>
-            </user-mapping>
             """;
 
     private static final String GUACAMOLE_PROPERTIES = """
@@ -70,8 +71,8 @@ class GuacamoleConfig {
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
                     String jupyterVncHost,
-                    int jupyterVncPort,
-                    String jupyterVncPassword) {
+                    String jupyterVncPassword,
+                    List<Session> sessions) {
 
         ConfigMap configMap = ConfigMap.Builder
                 .create(scope, "guacamoleConfigMap")
@@ -80,11 +81,10 @@ class GuacamoleConfig {
                                            .namespace("default")
                                            .build())
                 .data(Map.of(
-                        "user-mapping.xml", String.format(
-                                USER_MAPPING_XML_TEMPLATE,
+                        "user-mapping.xml", buildUserMappingXml(
                                 jupyterVncHost,
-                                jupyterVncPort,
-                                jupyterVncPassword),
+                                jupyterVncPassword,
+                                sessions),
                         "guacamole.properties", GUACAMOLE_PROPERTIES))
                 .build();
 
@@ -156,6 +156,19 @@ class GuacamoleConfig {
                                                                      .build()))
                                         .build())
                        .build();
+    }
+
+    private static String buildUserMappingXml(String host, String vncPassword, List<Session> sessions) {
+        StringBuilder sb = new StringBuilder("<user-mapping>\n");
+        for (Session s : sessions) {
+            sb.append(String.format(
+                    AUTHORIZE_BLOCK_TEMPLATE,
+                    s.username(), s.password(),
+                    s.username(),
+                    host, s.vncPort(), vncPassword));
+        }
+        sb.append("</user-mapping>\n");
+        return sb.toString();
     }
 
     private static DeploymentSpecTemplateSpecContainerEnv envVar(String name, String value) {
