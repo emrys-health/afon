@@ -48,4 +48,4 @@ RUN chmod +x /usr/local/bin/before-notebook.d/0-start-vnc.sh
 # 4. Install the matching PySpark package (for the Python client)
 USER $NB_UID
 #RUN conda remove pyspark && conda install -c conda-forge pyspark=4.0.0
-RUN pip install --no-cache-dir pyspark==4.0.1 grpcio>=1.48.1 grpcio-status
+RUN pip install --no-cache-dir pyspark==4.0.1 grpcio\>=1.48.1 grpcio-status

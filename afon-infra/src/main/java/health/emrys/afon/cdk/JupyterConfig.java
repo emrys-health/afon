@@ -26,11 +26,18 @@ import static java.lang.String.format;
 
 public class JupyterConfig {
     /**
-     * Port the Jupyter pod's in-pod VNC server listens on. The Jupyter image must run an
-     * X server (e.g. Xvfb) plus a VNC server (e.g. x11vnc) bound to this port for the
-     * Guacamole sidecar to be able to stream its GUI.
+     * One in-pod X session per entry. Each session pairs a Guacamole login (used to
+     * authenticate against the Guacamole web UI) with the VNC port serving that
+     * user's Xvfb/x11vnc instance inside the Jupyter pod. start-vnc.sh in the image
+     * must launch one Xvfb + x11vnc on each of these ports (display :N for port
+     * 5900+N).
      */
-    private final int            JUPYTER_VNC_PORT = 5901;
+    private static final List<GuacamoleConfig.Session> SESSIONS = List.of(
+        new GuacamoleConfig.Session("alice", "alice", 5901),
+        new GuacamoleConfig.Session("bob",   "bob",   5902),
+        new GuacamoleConfig.Session("carol", "carol", 5903)
+    );
+
     private final TerraformStack stack;
     private final AwsConstruct   cloudProvider;
     private final String         jupyterDomain;
@@ -55,7 +62,7 @@ public class JupyterConfig {
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("jupyter")
-            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-noclip")
+            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-noclip-multi")
             .env(List.of(
                 // Disable Jupyter's built-in auth so oauth2-proxy is the sole gate.
                 // NOTEBOOK_ARGS is read by start-notebook.sh and forwarded to the server,
@@ -138,15 +145,19 @@ public class JupyterConfig {
             .targetPort("7078") // Port the container is listening on
             .protocol("TCP")
             .build();
-        // Exposed so the in-cluster Guacamole pod can reach the Jupyter pod's VNC server
-        // (Xvfb + x11vnc, or equivalent, must be running inside the Jupyter image).
-        ServiceSpecPort vncPort = ServiceSpecPort
-            .builder()
-            .name("vnc")
-            .port(JUPYTER_VNC_PORT)
-            .targetPort(String.valueOf(JUPYTER_VNC_PORT))
-            .protocol("TCP")
-            .build();
+        // One Service port per per-user VNC instance (Xvfb + x11vnc) running inside
+        // the Jupyter pod, so the Guacamole pod can reach each session by port.
+        List<ServiceSpecPort> servicePorts = new ArrayList<>();
+        servicePorts.add(sparkPort);
+        for (GuacamoleConfig.Session s : SESSIONS) {
+            servicePorts.add(ServiceSpecPort
+                .builder()
+                .name("vnc-" + s.username())
+                .port(s.vncPort())
+                .targetPort(String.valueOf(s.vncPort()))
+                .protocol("TCP")
+                .build());
+        }
         ServiceSpec networkSpec = ServiceSpec
             .builder()
             .selector(jupyterLabels) // Selects the Pods
@@ -155,7 +166,7 @@ public class JupyterConfig {
             .internalTrafficPolicy("Cluster")
             .clusterIp("None")
             .clusterIps(List.of())
-            .port(List.of(sparkPort, vncPort))
+            .port(servicePorts)
             .build();
         Service jupyterInternal = Service.Builder.create(stack, "jupyter-internal")
                                                  .metadata(ServiceMetadata
@@ -174,8 +185,8 @@ public class JupyterConfig {
             stack,
             guacamoleDeps,
             "jupyter-internal",
-            JUPYTER_VNC_PORT,
-            jupyterPassword);
+            jupyterPassword,
+            SESSIONS);
 
         return jupyterLabels;
     }
