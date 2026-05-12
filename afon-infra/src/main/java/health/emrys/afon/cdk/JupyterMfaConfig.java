@@ -75,7 +75,7 @@ class JupyterMfaConfig {
                 "--cookie-secure=true",                           // set true when TLS terminates at this proxy
                 "--skip-provider-button=false",
                 "--ping-path=/ping",
-                format("--redirect-url=https://%s/guacamole", jupyterDomain)
+                format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)
                          ))
             .env(List.of(
                 envFromSecret("OAUTH2_PROXY_CLIENT_ID", SECRET_NAME, "client-id"),
