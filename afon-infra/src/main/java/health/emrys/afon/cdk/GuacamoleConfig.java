@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static health.emrys.afon.cdk.TFUtils.envVar;
+
 /**
  * Deploys Apache Guacamole as a clientless remote desktop gateway so that the GUI of the
  * Jupyter pod (rendered into an in-pod X server such as Xvfb and exposed via VNC) can be
@@ -171,10 +173,4 @@ class GuacamoleConfig {
         return sb.toString();
     }
 
-    private static DeploymentSpecTemplateSpecContainerEnv envVar(String name, String value) {
-        return DeploymentSpecTemplateSpecContainerEnv.builder()
-                                                     .name(name)
-                                                     .value(value)
-                                                     .build();
-    }
 }

@@ -4,8 +4,6 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
-import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
@@ -19,12 +17,10 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
-import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DNS_ZONE;
-import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DOMAIN;
+import static health.emrys.afon.cdk.TFUtils.envVar;
 import static health.emrys.afon.infra.Defaults.JUPYTER_SERVICE_NAME;
-import static java.lang.String.format;
 
-public class JupyterConfig {
+abstract class JupyterConfig {
     /**
      * One in-pod X session per entry. Each session pairs a Guacamole login (used to
      * authenticate against the Guacamole web UI) with the VNC port serving that
@@ -32,26 +28,24 @@ public class JupyterConfig {
      * must launch one Xvfb + x11vnc on each of these ports (display :N for port
      * 5900+N).
      */
-    private static final List<GuacamoleConfig.Session> SESSIONS = List.of(
-        new GuacamoleConfig.Session("alice", "alice", 5901),
-        new GuacamoleConfig.Session("bob",   "bob",   5902),
-        new GuacamoleConfig.Session("carol", "carol", 5903)
-    );
+    private final List<GuacamoleConfig.Session> sessions;
+    private final TerraformStack                stack;
+    private final String                        jupyterPassword;
 
-    private final TerraformStack stack;
-    private final AwsConstruct   cloudProvider;
-    private final String         jupyterDomain;
-    private final String         jupyterPassword;
-    private final String         jupyterDnsZoneId;
 
     public JupyterConfig(TerraformStack stack,
-                         AwsConstruct cloudProvider,
                          Properties properties) {
         this.stack            = stack;
-        this.cloudProvider    = cloudProvider;
-        this.jupyterDomain    = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
         this.jupyterPassword  = AfonProperties.JUPYTER_VNC_PASSWORD.getValueFrom(properties);
-        this.jupyterDnsZoneId = AWS_JUPYTER_DNS_ZONE.getValueFrom(properties);
+        this.sessions         = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            sessions.add(
+                new GuacamoleConfig.Session(
+                    "user" + i,
+                    jupyterPassword,
+                    5901 + i)
+                        );
+        }
     }
 
     Map<String, String> deployJupyter(List<ITerraformDependable> eksDependOn) {
@@ -64,20 +58,20 @@ public class JupyterConfig {
             .name("jupyter")
             .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-noclip-multi")
             .env(List.of(
-                // Disable Jupyter's built-in auth so oauth2-proxy is the sole gate.
-                // NOTEBOOK_ARGS is read by start-notebook.sh and forwarded to the server,
-                // avoiding the need to override the tini entrypoint / CMD.
-                // Both NotebookApp (classic) and ServerApp (Jupyter >= 7) flags are included
-                // so this works regardless of which server the image uses.
-                DeploymentSpecTemplateSpecContainerEnv
-                    .builder()
-                    .name("NOTEBOOK_ARGS")
-                    .value("--NotebookApp.token= --NotebookApp.password= " +
-                           "--ServerApp.token= --ServerApp" +
-                           ".password_required=False")
-                    .build()
-                        ))
-            .build();
+                     // Disable Jupyter's built-in auth so oauth2-proxy is the sole gate.
+                     // NOTEBOOK_ARGS is read by start-notebook.sh and forwarded to the server,
+                     // avoiding the need to override the tini entrypoint / CMD.
+                     // Both NotebookApp (classic) and ServerApp (Jupyter >= 7) flags are included
+                     // so this works regardless of which server the image uses.
+                     envVar(
+                         "NOTEBOOK_ARGS",
+                         "--NotebookApp.token= --NotebookApp.password= " +
+                         "--ServerApp.token= --ServerApp.password_required=False"),
+                     envVar(
+                         "VNC_SESSIONS", // see scripts/docker/jupyter/start-vnc.sh
+                         "" + sessions.size())
+                        )
+                ).build();
         DeploymentUtils.deploy(
             stack,
             eksDependOn,
@@ -114,29 +108,9 @@ public class JupyterConfig {
             stack,
             proxyDeps,
             "http://guacamole-web:8080",
-            jupyterDomain);
+            getJupyterDomain());
 
-        // for emrysjupyter.click, this is Z03165251T5B540VMLNST
-        // run aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click to see
-
-        // ALB ingress: terminates HTTPS at the load balancer, routes to oauth2-proxy ClusterIP.
-        // Traffic flow: internet → ALB (443) → oauth2-proxy:4180 → jupyter-web:8888 → Jupyter pod
-        IngressV1 ingress = cloudProvider.createHttpsIngress(
-            "jupyter-https-ingress",
-            "jupyter-ingress",
-            format(
-                "arn:aws:acm:%s:%s:certificate/8f58f850-3756-40d4-b7b5-499124f150e3",
-                cloudProvider.getRegion(),
-                cloudProvider.getAccountId()),
-            jupyterDomain,
-            JupyterMfaConfig.PROXY_SVC_NAME,
-            JupyterMfaConfig.PROXY_PORT,
-            cloudProvider.getSubnetIds());
-
-        cloudProvider.configureDNS(
-            "JupyterAliasRecord",
-            jupyterDnsZoneId, // aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click
-            jupyterDomain, cloudProvider.getLbRelease(), ingress);
+        configureHttpsAndDNS();
 
         ServiceSpecPort sparkPort = ServiceSpecPort
             .builder()
@@ -149,14 +123,14 @@ public class JupyterConfig {
         // the Jupyter pod, so the Guacamole pod can reach each session by port.
         List<ServiceSpecPort> servicePorts = new ArrayList<>();
         servicePorts.add(sparkPort);
-        for (GuacamoleConfig.Session s : SESSIONS) {
+        for (GuacamoleConfig.Session s : sessions) {
             servicePorts.add(ServiceSpecPort
-                .builder()
-                .name("vnc-" + s.username())
-                .port(s.vncPort())
-                .targetPort(String.valueOf(s.vncPort()))
-                .protocol("TCP")
-                .build());
+                                 .builder()
+                                 .name("vnc-" + s.username())
+                                 .port(s.vncPort())
+                                 .targetPort(String.valueOf(s.vncPort()))
+                                 .protocol("TCP")
+                                 .build());
         }
         ServiceSpec networkSpec = ServiceSpec
             .builder()
@@ -186,9 +160,12 @@ public class JupyterConfig {
             guacamoleDeps,
             "jupyter-internal",
             jupyterPassword,
-            SESSIONS);
+            sessions);
 
         return jupyterLabels;
     }
 
+    protected abstract void configureHttpsAndDNS();
+
+    protected abstract String getJupyterDomain();
 }
