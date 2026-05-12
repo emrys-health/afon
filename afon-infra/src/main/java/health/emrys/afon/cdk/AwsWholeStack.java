@@ -333,6 +333,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
         List<NetworkPolicySpecEgress> egress = List.of(
             createWebEgressPolicy(),
+            createAzureBlobEgressPolicy(),
             createDnsEgressPolicy(),
             NetworkPolicySpecEgress.builder()
                                    .to(clusterPodSelectors)
@@ -346,6 +347,21 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                                    .to(sparkOperatorPods)
                                    .build());
         networkPolicyFor(labels, egress);
+    }
+
+    // Azure Blob Storage front-ends live in Microsoft's 20.0.0.0/8 block.
+    // Microsoft publishes finer-grained `AzureCloud.<region>` service tags, but
+    // the underlying CIDRs rotate weekly, so a static /8 is the pragmatic choice
+    // for letting rclone reach the storage account from the Jupyter pod.
+    private static @NonNull NetworkPolicySpecEgress createAzureBlobEgressPolicy() {
+        List<NetworkPolicySpecEgressTo>    azureIps   = ipBlocksFor("20.0.0.0/8");
+        List<NetworkPolicySpecEgressPorts> httpsPort  = List.of(
+            NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build());
+        return NetworkPolicySpecEgress
+            .builder()
+            .to(azureIps)
+            .ports(httpsPort)
+            .build();
     }
 
     private static @NonNull NetworkPolicySpecEgress createSparkConnectorEgressPolicy(

@@ -27,5 +27,16 @@
 #       --vfs-cache-mode writes \
 #       --log-file /tmp/rclone.log
 
+# This file is `source`d by start-notebook.sh, so anything that blocks here
+# blocks the Jupyter server from starting. Run rclone in the background in a
+# subshell + nohup so it survives this script returning, and never let a
+# non-zero exit escape (would trip `set -e` upstream).
 mkdir -p /tmp/azure
-rclone mount :azureblob:$AZURE_BUCKET /tmp/azure/ --azureblob-connection-string $AZURE_CONNECTION_STRING --vfs-cache-mode writes --daemon || echo "rclone failed"
+(
+    nohup rclone mount ":azureblob:${AZURE_BUCKET}" /tmp/azure/ \
+        --azureblob-connection-string "${AZURE_CONNECTION_STRING}" \
+        --vfs-cache-mode writes \
+        --allow-other \
+        > /tmp/rclone.log 2>&1 &
+    disown
+) || echo "rclone background launch failed"
