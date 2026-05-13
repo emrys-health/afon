@@ -1,6 +1,9 @@
 This file documents *what* the infrastructure is and *why* we chose it.
 See the [REAMDME](./README.md) file for *how* to create the infrastructure.
 
+**NOTE: that this document is partially deprecated as we now use Cilium as our CNI not Calico.**
+TODO: update me!
+
 # Pods
 
 A healthy Emrys K8s cluster **on AWS** should look something like this:
