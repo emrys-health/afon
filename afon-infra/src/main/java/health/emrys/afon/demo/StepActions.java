@@ -10,7 +10,6 @@ import health.emrys.afon.cdk.SparkClusterDeployment;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.core.configuration.LocalPolarisRegisterMain;
 import health.emrys.afon.infra.EndpointPolarisConfiguration;
-import health.emrys.afon.snowflake.SmokeTest;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
