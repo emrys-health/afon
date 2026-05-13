@@ -60,6 +60,16 @@ To deploy the environment (as of the demo to the advising team, 23/3/26) then ru
 
 This should create an AWS and Azure K8s cluster both running a Polaris, populate it and run against them a simple Spark test locally.
 
+# Viewing the SRE
+
+You can view Jupyter at [`https://emrysjupyter.click/guacamole`](https://emrysjupyter.click/guacamole) 
+(or whichever domain you have defined in the `afon.properties` file).
+
+Note that we use Apache Guacamole to stream pixels, and X11 VNC to render the images on the server side
+(see `start-vnc.sh`).
+
+That is, Guacamole runs in its own Kubernetes pod and streams the X11 data from the pod running Jupyter.
+
 # Diagnostics
 
 #### Polaris
