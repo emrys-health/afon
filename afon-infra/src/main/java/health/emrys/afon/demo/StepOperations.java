@@ -233,6 +233,10 @@ public class StepOperations {
         return awsSparkTestUsing(GCP, EXTERNAL_NAMESPACE);
     }
 
+    public Step checkAwsSparkConnectorReadingAzure() {
+        return awsSparkTestUsing(AZURE, EXTERNAL_NAMESPACE);
+    }
+
     public @NonNull Step awsSparkTestUsing(SupportedCloudsEnum warehouse, String namespace) {
         return awsSparkWriteTestUsing(
             warehouse,
@@ -285,9 +289,17 @@ public class StepOperations {
     }
 
     public Step snowflakeReadsGcpViaPolaris() {
+        return snowflakeReadViaPolaris(GCP);
+    }
+
+    public Step snowflakeReadsAzureViaPolaris() {
+        return snowflakeReadViaPolaris(AZURE);
+    }
+
+    private @NonNull Step snowflakeReadViaPolaris(SupportedCloudsEnum warehouse) {
         return new Step(
-            "snowflake_reads_gcp",
-            "Call Snowflake that uses AWS Polaris to get the credentials to read from GCP storage",
+            "snowflake_reads_" + warehouse.toString(),
+            format("Call Snowflake that uses AWS Polaris to get the credentials to read from %s storage", warehouse.name()),
             () -> {
                 Properties properties = appProperties();
                 log.warn("Calling Snowflake. Note that some of these statements can take a long time");
@@ -305,7 +317,7 @@ public class StepOperations {
                           TABLE_FORMAT = ICEBERG
                           REST_CONFIG = (
                               CATALOG_URI = 'https://%s/api/catalog/',
-                              CATALOG_NAME = 'gcp'
+                              CATALOG_NAME = '%s'
                               ACCESS_DELEGATION_MODE = VENDED_CREDENTIALS
                           )
                           REST_AUTHENTICATION = (
@@ -317,6 +329,7 @@ public class StepOperations {
                           ENABLED = TRUE;
                         """,
                         awsPolarisDomainName,
+                        warehouse.toString(),
                         POLARIS_ID.getValueFrom(properties),
                         POLARIS_SECRET.getValueFrom(properties)),
 
