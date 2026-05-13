@@ -14,9 +14,10 @@ import org.slf4j.Logger;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.stream.Collector;
-import java.util.stream.Stream;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
@@ -237,6 +238,10 @@ public class StepOperations {
         return awsSparkTestUsing(AZURE, EXTERNAL_NAMESPACE);
     }
 
+    public Step checkAwsSparkConnectorReadingAws() {
+        return awsSparkTestUsing(AWS, EXTERNAL_NAMESPACE);
+    }
+
     public @NonNull Step awsSparkTestUsing(SupportedCloudsEnum warehouse, String namespace) {
         return awsSparkWriteTestUsing(
             warehouse,
@@ -294,6 +299,10 @@ public class StepOperations {
 
     public Step snowflakeReadsAzureViaPolaris() {
         return snowflakeReadViaPolaris(AZURE);
+    }
+
+    public Step snowflakeReadsAwsViaPolaris() {
+        return snowflakeReadViaPolaris(AWS);
     }
 
     private @NonNull Step snowflakeReadViaPolaris(SupportedCloudsEnum warehouse) {
