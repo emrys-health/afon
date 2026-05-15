@@ -431,7 +431,52 @@ public class AwsConstruct extends AbstractConstruct {
 
                 // Also apply to the operator so it can manage the pods
                 createValue("operator.tolerations[0].operator", "Exists"),
-                createValue("operator.tolerations[0].effect", "NoSchedule")
+                createValue("operator.tolerations[0].effect", "NoSchedule"),
+
+                // 4. Prometheus metrics endpoints.
+                // - cilium-agent: /metrics on container port 9962
+                // - cilium-operator: /metrics on container port 9963
+                // - cilium-envoy:   /metrics on container port 9964
+                // The matching ServiceMonitor toggles (prometheus.serviceMonitor.enabled,
+                // operator.prometheus.serviceMonitor.enabled) are intentionally LEFT OFF:
+                // they need monitoring.coreos.com CRDs which kube-prometheus-stack
+                // installs in a later stack (PrometheusClusterDeploy). The ServiceMonitor
+                // for Cilium is therefore created on the Prometheus side once those CRDs
+                // exist.
+                createValue("prometheus.enabled", "true"),
+                createValue("operator.prometheus.enabled", "true"),
+
+                // 5. Standalone cilium-envoy DaemonSet (L7 proxy). Default in 1.15 runs
+                // envoy embedded in the cilium-agent container; enabling this splits it
+                // out so agent restarts don't drop L7 connections. envoy.prometheus is
+                // on by default in 1.15 — set explicitly for clarity.
+                createValue("envoy.enabled", "true"),
+                createValue("envoy.prometheus.enabled", "true"),
+                // envoy is scheduled on every node like the agent, so it needs the same
+                // permissive tolerations (otherwise it can't start on NotReady nodes).
+                createValue("envoy.tolerations[0].operator", "Exists"),
+                createValue("envoy.tolerations[0].effect", "NoSchedule"),
+
+                // 6. Hubble — network observability (flow visibility + metrics).
+                // - hubble.enabled: on-node flow collector inside cilium-agent
+                // - hubble.relay: aggregates flows from all nodes (gRPC :4245)
+                // - hubble.ui:    web UI for browsing flows; consumes relay
+                // hubble-metrics Service is created automatically when at least one
+                // metric category is enabled; it exposes /metrics on port 9965 from
+                // each cilium-agent pod (port name `hubble-metrics`). The matching
+                // ServiceMonitor is created on the Prometheus side, same reason as
+                // the agent/operator/envoy ones above (CRD ordering).
+                createValue("hubble.enabled", "true"),
+                createValue("hubble.relay.enabled", "true"),
+                createValue("hubble.ui.enabled", "true"),
+                createValue("hubble.metrics.enableOpenMetrics", "true"),
+                createValue("hubble.metrics.enabled[0]", "dns"),
+                createValue("hubble.metrics.enabled[1]", "drop"),
+                createValue("hubble.metrics.enabled[2]", "tcp"),
+                createValue("hubble.metrics.enabled[3]", "flow"),
+                createValue("hubble.metrics.enabled[4]", "port-distribution"),
+                createValue("hubble.metrics.enabled[5]", "icmp"),
+                createValue("hubble.metrics.enabled[6]", "httpV2")
                                   ))
             .build();
 

@@ -70,8 +70,101 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
 
             // Ensure the release depends on the namespace being created first
             .dependsOn(eksDependOn)
+
+            // ServiceMonitors for Cilium agent + operator. Applied via kubectl
+            // (not kubernetes_manifest) because the monitoring.coreos.com CRDs are
+            // installed by *this* helm release — kubernetes_manifest would call
+            // the API server at plan time and fail. atomic=true above guarantees
+            // the CRDs are ready by the time the provisioner fires.
+            // The `release: kube-prometheus-stack` label is what the chart's
+            // default serviceMonitorSelector matches against, so the operator
+            // picks these up automatically.
+            .provisioners(CdkUtils.uponCreateRun(CILIUM_SERVICE_MONITORS_YAML))
             .build();
     }
+
+    private static final String CILIUM_SERVICE_MONITORS_YAML = """
+        kubectl apply -f - <<'YAML'
+        apiVersion: monitoring.coreos.com/v1
+        kind: ServiceMonitor
+        metadata:
+          name: cilium-agent
+          namespace: kube-system
+          labels:
+            release: kube-prometheus-stack
+        spec:
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: cilium-agent
+          namespaceSelector:
+            matchNames:
+              - kube-system
+          endpoints:
+            - port: metrics
+              interval: 30s
+              honorLabels: true
+              path: /metrics
+        ---
+        apiVersion: monitoring.coreos.com/v1
+        kind: ServiceMonitor
+        metadata:
+          name: cilium-operator
+          namespace: kube-system
+          labels:
+            release: kube-prometheus-stack
+        spec:
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: cilium-operator
+          namespaceSelector:
+            matchNames:
+              - kube-system
+          endpoints:
+            - port: metrics
+              interval: 30s
+              honorLabels: true
+              path: /metrics
+        ---
+        apiVersion: monitoring.coreos.com/v1
+        kind: ServiceMonitor
+        metadata:
+          name: cilium-envoy
+          namespace: kube-system
+          labels:
+            release: kube-prometheus-stack
+        spec:
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: cilium-envoy
+          namespaceSelector:
+            matchNames:
+              - kube-system
+          endpoints:
+            - port: envoy-metrics
+              interval: 30s
+              honorLabels: true
+              path: /metrics
+        ---
+        apiVersion: monitoring.coreos.com/v1
+        kind: ServiceMonitor
+        metadata:
+          name: hubble
+          namespace: kube-system
+          labels:
+            release: kube-prometheus-stack
+        spec:
+          selector:
+            matchLabels:
+              k8s-app: hubble
+          namespaceSelector:
+            matchNames:
+              - kube-system
+          endpoints:
+            - port: hubble-metrics
+              interval: 30s
+              honorLabels: true
+              path: /metrics
+        YAML""";
 
     public static void main(String[] args) {
         logger.info("Creating JSON for Prometheus");
