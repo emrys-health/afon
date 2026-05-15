@@ -24,6 +24,7 @@ RUN apt-get update \
         x11vnc \
         fluxbox \
         xterm \
+        autocutsel \
  && rm -rf /var/lib/apt/lists/*
 
 # Firefox from Mozilla's official APT repo. Ubuntu's own `firefox` package on
