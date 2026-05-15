@@ -27,6 +27,11 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.*;
 
+/**
+ * This was initially run as a step after its superclass so it could be configured with domain names etc.
+ * But now we're more production like (static domain names; persisted Polaris metadata etc)
+ * this could be feasibly moved into its parent class.
+ */
 public class SparkClusterDeployment extends AwsWholeStack {
 
     static final Logger logger                 = org.slf4j.LoggerFactory.getLogger(SparkClusterDeployment.class);
