@@ -56,7 +56,7 @@ abstract class JupyterConfig {
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("jupyter")
-            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-noclip-multi")
+            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi")
             .env(List.of(
                      // Disable Jupyter's built-in auth so oauth2-proxy is the sole gate.
                      // NOTEBOOK_ARGS is read by start-notebook.sh and forwarded to the server,

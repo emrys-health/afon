@@ -43,6 +43,17 @@ for i in $(seq 1 "${VNC_SESSIONS}"); do
 
     DISPLAY="${display}" fluxbox > "/tmp/fluxbox-${i}.log" 2>&1 &
 
+    # In-session clipboard bridge: xterm uses PRIMARY by default, Firefox uses
+    # CLIPBOARD — without autocutsel keeping them in sync (via CUT_BUFFER0)
+    # copy-from-terminal / paste-into-browser silently does nothing. This sync
+    # is internal to the X session and does NOT bypass Guacamole's
+    # disable-copy/disable-paste, which still block any leak to the user's
+    # local browser clipboard.
+    DISPLAY="${display}" autocutsel -fork -selection CLIPBOARD \
+        > "/tmp/autocutsel-clip-${i}.log" 2>&1
+    DISPLAY="${display}" autocutsel -fork -selection PRIMARY \
+        > "/tmp/autocutsel-prim-${i}.log" 2>&1
+
     x11vnc -display "${display}" \
            -rfbport "${port}" \
            -rfbauth "${HOME}/.vnc/passwd" \
