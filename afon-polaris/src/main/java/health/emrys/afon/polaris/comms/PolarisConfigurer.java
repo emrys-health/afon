@@ -13,7 +13,7 @@ public class PolarisConfigurer {
     private final AfonPolarisClient client;
 
     public static String listTables(String warehouseName, String namespace) {
-        return format("/api/catalog/v1/%s/namespaces/%s/tables/", warehouseName, namespace);
+        return tableURI(warehouseName, namespace, "");
     }
 
     public static String getCatalogRolesURI(String warehouseName) {
@@ -25,19 +25,23 @@ public class PolarisConfigurer {
     }
 
     public static String getCatalogAdminGrantsURI(String warehouseName) {
-        return format("/api/management/v1/catalogs/%s/catalog-roles/catalog_admin/grants", warehouseName);
+        return format("%s/%s/catalog-roles/catalog_admin/grants",
+                      getCreateCatalogURI(),
+                      warehouseName);
     }
 
-    public static String getDeleteURI(String warehouseName) {
-        return format("/api/management/v1/catalogs/%s", warehouseName);
+    public static String catalogsURI(String warehouseName) {
+        return format("%s/%s",
+                      getCreateCatalogURI(),
+                      warehouseName);
     }
-    public static String getDeleteNamespaceURI(String warehouseName,
-                                               String namespace) {
+    public static String namespaceURI(String warehouseName,
+                                      String namespace) {
         return format("/api/catalog/v1/%s/namespaces/%s", warehouseName, namespace);
     }
-    public static String getDeleteTableURI(String warehouseName,
-                                           String namespace,
-                                           String tableName) {
+    public static String tableURI(String warehouseName,
+                                  String namespace,
+                                  String tableName) {
         return format("/api/catalog/v1/%s/namespaces/%s/tables/%s",
                       warehouseName, namespace, tableName);
     }
@@ -51,7 +55,7 @@ public class PolarisConfigurer {
      */
     public HttpResponse[] configurCatalogFor(CloudConfigForPolaris config, String accessToken) throws IOException, IncorrectConfigException {
         String warehouseName = config.warehouseName();
-        client.delete(getDeleteURI(warehouseName), accessToken); // this failing is expected if there is no catalog
+        client.delete(catalogsURI(warehouseName), accessToken); // this failing is expected if there is no catalog
         return new HttpResponse[]{
                 client.postJsonCall(getCreateCatalogURI(),
                                     config.catalogConfig(),
