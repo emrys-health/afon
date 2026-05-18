@@ -1,9 +1,12 @@
 package health.emrys.afon.acceptance
 
 import SparkHelper.{namespace, spark}
+import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
+import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.comms.PolarisConfigurer
 import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCatalogAdminGrantsURI, getCatalogRolesURI, getCreateCatalogURI, namespaceURI, tableURI}
+import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
@@ -38,6 +41,20 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       assert(response.getCode == 200)
     }
 
+    "associate properties with catalog" in {
+      Given(s"the catalog has a metadata property '$METADATA_KEY'")
+      assert(config.createCatalog().getProperties.containsKey(METADATA_KEY))
+      val uriGet = s"${PolarisConfigurer.getCreateCatalogURI}/${config.warehouseName()}"
+      When(s"we call GET at $uriGet and deserialize the response")
+      val response = client.getCall(uriGet, accessToken)
+      val entity = new String(response.getEntity.getContent.readAllBytes())
+      val OBJECT_MAPPER = new ObjectMapper()
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+      val fromPolaris = OBJECT_MAPPER.readValue(entity, classOf[Catalog]);
+      val metadata = fromPolaris.getProperties
+      assert(metadata.containsKey(METADATA_KEY))
+      Then(s"the metadata contains something like '${metadata.get(METADATA_KEY)}' for the key '$METADATA_KEY'")
+    }
 
     "be told about the catalog admin grants" in GrantCatalogAdmin()
 

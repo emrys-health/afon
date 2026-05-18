@@ -41,7 +41,7 @@ public class AcceptanceTestConfig {
         this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
         this.awsForbidden               = new AwsCloudConfigForPolaris(properties) {
             @Override
-            public String getBucketUrl() {
+            public String getBucketUri() {
                 return bucketToUrl(AWS_S3_BUCKET_NAME_FORBIDDEN.getValueFrom(properties));
             }
             @Override
@@ -55,7 +55,7 @@ public class AcceptanceTestConfig {
               return SupportedCloudsEnum.GCP_FORBIDDEN.toString();
             }
             @Override
-            public String getBucket() {
+            public String getBucketUri() {
               return toBucketUri(GCP_BUCKET_NAME_FORBIDDEN.getValueFrom(properties));
             }
         };
@@ -66,7 +66,7 @@ public class AcceptanceTestConfig {
                 return SupportedCloudsEnum.AZURE_FORBIDDEN.toString();
             }
             @Override
-            public String getBucketUrl() {
+            public String getBucketUri() {
                 return bucketUrl(AZURE_BUCKET_FORBIDDEN.getValueFrom(properties),
                                  AZURE_STORAGE_ACCOUNT.getValueFrom(properties));
             }

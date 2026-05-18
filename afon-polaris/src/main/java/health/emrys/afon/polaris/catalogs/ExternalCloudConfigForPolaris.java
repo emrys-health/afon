@@ -33,7 +33,7 @@ abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolari
         CatalogProperties bucketProperties = CatalogProperties
             .builder()
             .addProperty("warehouse", getRemoteCatalogName()) // corresponds to org.apache.iceberg.CatalogProperties.WAREHOUSE_LOCATION)
-            .setDefaultBaseLocation(getBucketUrl())
+            .setDefaultBaseLocation(getBucketUri())
             .build();
 
         ConnectionConfigInfo connectionInfo = new ConnectionConfigInfo(
@@ -62,7 +62,4 @@ abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolari
 
     protected abstract @NonNull String getEndpoint();
 
-    protected abstract @NonNull String getBucketUrl();
-
-    protected abstract @NonNull StorageConfigInfo getStorageConfigInfo();
 }

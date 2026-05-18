@@ -28,7 +28,7 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
 
   @Override
     public String catalogConfig() throws IncorrectConfigException {
-        Catalog catalog = createCatalog(getBucket(), getStorageConfigInfo());
+        Catalog catalog = createCatalog(getBucketUri(), getStorageConfigInfo());
         return toJson(new CreateCatalogRequest(catalog));
     }
 
@@ -37,7 +37,7 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
             .builder()
             .setGcsServiceAccount(serviceAccount)
             .setStorageType(GCS)
-            .setAllowedLocations(List.of(getBucket()))
+            .setAllowedLocations(List.of(getBucketUri()))
             .build();
     }
 
@@ -46,7 +46,7 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
         return SupportedCloudsEnum.GCP.toString();
     }
 
-    public String getBucket() {
+    protected String getBucketUri() {
       return bucket;
     }
 

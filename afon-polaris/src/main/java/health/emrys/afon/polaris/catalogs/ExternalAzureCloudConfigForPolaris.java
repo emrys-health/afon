@@ -50,7 +50,7 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
     }
 
     @Override
-    protected @NonNull String getBucketUrl() {
+    protected @NonNull String getBucketUri() {
         return bucketUrl;
     }
 

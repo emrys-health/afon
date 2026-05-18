@@ -3,12 +3,12 @@ package health.emrys.afon.polaris.catalogs;
 import org.apache.polaris.core.admin.model.AwsStorageConfigInfo;
 import org.apache.polaris.core.admin.model.Catalog;
 import org.apache.polaris.core.admin.model.CreateCatalogRequest;
+import org.apache.polaris.core.admin.model.StorageConfigInfo;
 
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
-import static health.emrys.afon.polaris.catalogs.AwsUtils.getStorageConfigInfo;
 
 public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
@@ -24,15 +24,15 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
     }
 
     public AwsCloudConfigForPolaris(Properties properties) {
-        this(AWS_S3_ROLE_ARN.getValueFrom(properties),
-             bucketToUrl(AWS_S3_BUCKET_NAME.getValueFrom(properties)),
-             AWS_REGION.getValueFrom(properties));
+        this(
+            AWS_S3_ROLE_ARN.getValueFrom(properties),
+            bucketToUrl(AWS_S3_BUCKET_NAME.getValueFrom(properties)),
+            AWS_REGION.getValueFrom(properties));
     }
 
     @Override
     public String catalogConfig() throws IncorrectConfigException {
-        AwsStorageConfigInfo storageConfigInfo = getStorageConfigInfo(roleArn, getBucketUrl(), region);
-        Catalog              catalog           = createCatalog(getBucketUrl(), storageConfigInfo);
+        Catalog catalog = createCatalog();
         return toJson(new CreateCatalogRequest(catalog));
     }
 
@@ -41,11 +41,16 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
         return SupportedCloudsEnum.AWS.toString();
     }
 
+    @Override
+    protected StorageConfigInfo getStorageConfigInfo() {
+        return AwsUtils.getStorageConfigInfo(roleArn, getBucketUri(), region);
+    }
+
     public String getRoleArn() {
         return roleArn;
     }
 
-    public String getBucketUrl() {
+    protected String getBucketUri() {
         return bucket;
     }
 
@@ -56,10 +61,10 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
     @Override
     public String toString() {
         return "AwsCloudConfigForPolaris{" +
-                "warehouseName='" + warehouseName() + '\'' +
-                ", roleArn='" + roleArn + '\'' +
-                ", bucket='" + getBucketUrl() + '\'' +
-                ", region='" + region + '\'' +
-                '}';
+               "warehouseName='" + warehouseName() + '\'' +
+               ", roleArn='" + roleArn + '\'' +
+               ", bucket='" + getBucketUri() + '\'' +
+               ", region='" + region + '\'' +
+               '}';
     }
 }

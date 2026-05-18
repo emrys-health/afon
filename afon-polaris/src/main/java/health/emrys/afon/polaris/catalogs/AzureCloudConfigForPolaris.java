@@ -19,28 +19,29 @@ public class AzureCloudConfigForPolaris extends CloudConfigForPolaris {
 
     public AzureCloudConfigForPolaris(Properties properties) {
         super(new JsonMaker());
-        String bucketName       = AZURE_BUCKET.getValueFrom(properties);
+        String bucketName = AZURE_BUCKET.getValueFrom(properties);
         this.bucketUrl          = bucketUrl(bucketName, AZURE_STORAGE_ACCOUNT.getValueFrom(properties));
         this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);
         this.multiTenantAppName = AZURE_CLIENT_ID.getValueFrom(properties);
         this.clientId           = AZURE_CLIENT_ID.getValueFrom(properties);
     }
 
-    public String getBucketUrl() {
-      return bucketUrl;
+    protected String getBucketUri() {
+        return bucketUrl;
     }
 
     @Override
     public String catalogConfig() throws IncorrectConfigException {
-        Catalog catalog = createCatalog(getBucketUrl(), getStorageConfigInfo());
+        Catalog catalog = createCatalog(getBucketUri(), getStorageConfigInfo());
         return toJson(new CreateCatalogRequest(catalog));
     }
 
     public StorageConfigInfo getStorageConfigInfo() {
-        return AzureUtils.getStorageConfigInfo(tenant,
-                                               multiTenantAppName,
-                                               getBucketUrl(),
-                                               clientId);
+        return AzureUtils.getStorageConfigInfo(
+            tenant,
+            multiTenantAppName,
+            getBucketUri(),
+            clientId);
     }
 
     @Override
