@@ -54,9 +54,9 @@ public class PurgeAndPopulatePolaris {
                  table, warehouse, namespace, domainName);
         var    client      = new AfonPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
         String accessToken = client.getAccessToken();
-        client.delete(getDeleteTableURI(warehouse.toString(), namespace, table), accessToken);
-        client.delete(getDeleteNamespaceURI(warehouse.toString(), namespace), accessToken);
-        client.delete(getDeleteURI(warehouse.toString()), accessToken);
+        client.delete(tableURI(warehouse.toString(), namespace, table), accessToken);
+        client.delete(namespaceURI(warehouse.toString(), namespace), accessToken);
+        client.delete(catalogsURI(warehouse.toString()), accessToken);
     }
 
     public void purgeAcceptanceTests(String domainName) {

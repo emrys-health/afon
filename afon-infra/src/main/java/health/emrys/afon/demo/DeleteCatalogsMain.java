@@ -20,13 +20,13 @@ public class DeleteCatalogsMain {
         if (args.length == 0) {
             app.deleteAll();
         } else if  (args.length == 1) {
-            String uri = getDeleteURI(args[0]);
+            String uri = catalogsURI(args[0]);
             app.delete(uri);
         } else if  (args.length == 2) {
-            String uri = getDeleteNamespaceURI(args[0], args[1]);
+            String uri = namespaceURI(args[0], args[1]);
             app.delete(uri);
         } else if  (args.length == 3) {
-            String uri = getDeleteTableURI(args[0], args[1], args[2]);
+            String uri = tableURI(args[0], args[1], args[2]);
             app.delete(uri);
         }
     }
@@ -40,7 +40,7 @@ public class DeleteCatalogsMain {
     private void deleteAll() {
         for (SupportedCloudsEnum warehouse: SupportedCloudsEnum.values()) {
             String warehouseName = warehouse.toString();
-            String uri = getDeleteURI(warehouseName);
+            String uri = catalogsURI(warehouseName);
             delete(uri);
         }
     }
