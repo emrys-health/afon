@@ -3,7 +3,7 @@ package health.emrys.afon.acceptance
 import SparkHelper.{namespace, spark}
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.comms.PolarisConfigurer
-import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCatalogAdminGrantsURI, getCatalogRolesURI, getCreateCatalogURI}
+import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCatalogAdminGrantsURI, getCatalogRolesURI, getCreateCatalogURI, namespaceURI, tableURI}
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
@@ -56,8 +56,8 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val sql = s"CREATE NAMESPACE IF NOT EXISTS $FULL_NAMESPACE"
       When(s"we create a namespace with SQL '$sql'")
       spark.sql(sql)
-      val uri = PolarisConfigurer.namespaceURI(config.warehouseName(), namespace)
-      Then(s"Polaris acknowledges the namespace exists when call '$uri''")
+      val uri = namespaceURI(config.warehouseName(), namespace)
+      Then(s"Polaris acknowledges the namespace exists when call '$uri")
       val response = client.getCall(uri, accessToken)
       assert(response.getCode == 200)
     }
@@ -71,7 +71,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     }
     "be registered with Polaris" in {
       Given(s"we have registered the table in catalog '${config.warehouseName()}', namespace '$namespace'")
-      val uriGet = PolarisConfigurer.tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
+      val uriGet = tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
       When(s"we call Polaris at $uriGet")
       val response = client.getCall(uriGet, accessToken)
       Then("Polaris acknowledges the table has been created")
