@@ -37,6 +37,26 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
      *
      * @param eksDependOn
      */
+    /**
+     * Declarative description of a Service we want Prometheus to scrape.
+     * Rendered into the chart's {@code prometheus.additionalServiceMonitors}
+     * Helm values, so kube-prometheus-stack installs the ServiceMonitor as part
+     * of its own release (CRDs and resources in the right order, drift
+     * detection, automatic deletion on destroy — none of which the previous
+     * kubectl-apply provisioner gave us).
+     */
+    private record MonitoredService(String name,
+                                    String selectorKey,
+                                    String selectorValue,
+                                    String portName) {}
+
+    private static final List<MonitoredService> CILIUM_MONITORS = List.of(
+        new MonitoredService("cilium-agent",    "app.kubernetes.io/name", "cilium-agent",    "metrics"),
+        new MonitoredService("cilium-operator", "app.kubernetes.io/name", "cilium-operator", "metrics"),
+        new MonitoredService("cilium-envoy",    "app.kubernetes.io/name", "cilium-envoy",    "envoy-metrics"),
+        new MonitoredService("hubble",          "k8s-app",                "hubble",          "hubble-metrics")
+    );
+
     private void deployPrometheus(List<@NotNull ITerraformDependable> eksDependOn) {
         // Configuration Overrides for the Helm Chart
         // We use the ReleaseSet.builder() for the `set` block in Terraform
@@ -64,107 +84,47 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
             // Reference the namespace created above
             .namespace("default")
             .set(chartOverrides)
+            // ServiceMonitors for the Cilium components are passed as values so
+            // the chart renders them itself: same release as the CRDs, in the
+            // right order, fully tracked by Terraform.
+            .values(List.of(additionalServiceMonitorsValues(CILIUM_MONITORS)))
             .timeout(600)
             .atomic(true)
             .forceUpdate(true)
 
             // Ensure the release depends on the namespace being created first
             .dependsOn(eksDependOn)
-
-            // ServiceMonitors for Cilium agent + operator. Applied via kubectl
-            // (not kubernetes_manifest) because the monitoring.coreos.com CRDs are
-            // installed by *this* helm release — kubernetes_manifest would call
-            // the API server at plan time and fail. atomic=true above guarantees
-            // the CRDs are ready by the time the provisioner fires.
-            // The `release: kube-prometheus-stack` label is what the chart's
-            // default serviceMonitorSelector matches against, so the operator
-            // picks these up automatically.
-            .provisioners(CdkUtils.uponCreateRun(CILIUM_SERVICE_MONITORS_YAML))
             .build();
     }
 
-    private static final String CILIUM_SERVICE_MONITORS_YAML = """
-        kubectl apply -f - <<'YAML'
-        apiVersion: monitoring.coreos.com/v1
-        kind: ServiceMonitor
-        metadata:
-          name: cilium-agent
-          namespace: kube-system
-          labels:
-            release: kube-prometheus-stack
-        spec:
-          selector:
-            matchLabels:
-              app.kubernetes.io/name: cilium-agent
-          namespaceSelector:
-            matchNames:
-              - kube-system
-          endpoints:
-            - port: metrics
-              interval: 30s
-              honorLabels: true
-              path: /metrics
-        ---
-        apiVersion: monitoring.coreos.com/v1
-        kind: ServiceMonitor
-        metadata:
-          name: cilium-operator
-          namespace: kube-system
-          labels:
-            release: kube-prometheus-stack
-        spec:
-          selector:
-            matchLabels:
-              app.kubernetes.io/name: cilium-operator
-          namespaceSelector:
-            matchNames:
-              - kube-system
-          endpoints:
-            - port: metrics
-              interval: 30s
-              honorLabels: true
-              path: /metrics
-        ---
-        apiVersion: monitoring.coreos.com/v1
-        kind: ServiceMonitor
-        metadata:
-          name: cilium-envoy
-          namespace: kube-system
-          labels:
-            release: kube-prometheus-stack
-        spec:
-          selector:
-            matchLabels:
-              app.kubernetes.io/name: cilium-envoy
-          namespaceSelector:
-            matchNames:
-              - kube-system
-          endpoints:
-            - port: envoy-metrics
-              interval: 30s
-              honorLabels: true
-              path: /metrics
-        ---
-        apiVersion: monitoring.coreos.com/v1
-        kind: ServiceMonitor
-        metadata:
-          name: hubble
-          namespace: kube-system
-          labels:
-            release: kube-prometheus-stack
-        spec:
-          selector:
-            matchLabels:
-              k8s-app: hubble
-          namespaceSelector:
-            matchNames:
-              - kube-system
-          endpoints:
-            - port: hubble-metrics
-              interval: 30s
-              honorLabels: true
-              path: /metrics
-        YAML""";
+    /**
+     * Builds the {@code prometheus.additionalServiceMonitors} YAML fragment.
+     * The chart adds {@code apiVersion}/{@code kind}/{@code metadata.name} and
+     * its own {@code release: kube-prometheus-stack} label automatically, so
+     * each entry only needs the spec-level fields.
+     */
+    static String additionalServiceMonitorsValues(List<MonitoredService> monitors) {
+        StringBuilder sb = new StringBuilder("prometheus:\n  additionalServiceMonitors:\n");
+        for (MonitoredService m : monitors) {
+            sb.append(String.format(
+                """
+                    - name: %s%n
+                      selector:%n
+                        matchLabels:%n
+                          %s: %s%n
+                      namespaceSelector:%n
+                        matchNames:%n
+                          - kube-system%n
+                      endpoints:%n
+                        - port: %s%n
+                          interval: 30s%n
+                          honorLabels: true%n
+                          path: /metrics%n
+                """,
+                m.name(), m.selectorKey(), m.selectorValue(), m.portName()));
+        }
+        return sb.toString();
+    }
 
     public static void main(String[] args) {
         logger.info("Creating JSON for Prometheus");
