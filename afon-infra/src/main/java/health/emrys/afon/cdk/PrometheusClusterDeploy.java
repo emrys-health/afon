@@ -24,19 +24,11 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
         super(scope, id, properties);
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
         dependablesAndLoadBalancers.addAll(loadBalancers);
+        dependablesAndLoadBalancers.addAll(cloudProvider.getDependables());
         deployPrometheus(dependablesAndLoadBalancers);
     }
 
 
-    /**
-     * Create an SSH tunnel with:
-     * kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090
-     * and run:
-     * curl -g 'http://localhost:9090/api/v1/query?query=sum(rate(container_network_receive_bytes_total[5m]))' | jq
-     * to see how much data has been ingressed
-     *
-     * @param eksDependOn
-     */
     /**
      * Declarative description of a Service we want Prometheus to scrape.
      * Rendered into the chart's {@code prometheus.additionalServiceMonitors}
@@ -44,6 +36,11 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
      * of its own release (CRDs and resources in the right order, drift
      * detection, automatic deletion on destroy — none of which the previous
      * kubectl-apply provisioner gave us).
+     * Create an SSH tunnel with:
+     * kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090
+     * and run:
+     * curl -g 'http://localhost:9090/api/v1/query?query=sum(rate(container_network_receive_bytes_total[5m]))' | jq
+     * to see how much data has been ingressed
      */
     private record MonitoredService(String name,
                                     String selectorKey,
