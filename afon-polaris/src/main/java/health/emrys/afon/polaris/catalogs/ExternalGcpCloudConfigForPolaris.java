@@ -40,7 +40,7 @@ public class ExternalGcpCloudConfigForPolaris extends ExternalCloudConfigForPola
     }
 
     @Override
-    protected @NonNull String getBucketUrl() {
+    protected @NonNull String getBucketUri() {
         return bucket;
     }
 
