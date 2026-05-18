@@ -97,6 +97,14 @@ public class SparkClusterDeployment extends AwsWholeStack {
                         "sparkConf", sparkConfig(SPARK_SERVICE_ACCOUNT_NAME, id),
                         "driverSpec", Map.of(
                                 "podTemplateSpec", Map.of(
+                                        // app.kubernetes.io/name is the canonical label Hubble UI
+                                        // reads to title flows; without it the driver/executor
+                                        // pods show as "Unknown App".
+                                        "metadata", Map.of(
+                                                "labels", Map.of(
+                                                        "app.kubernetes.io/name", SPARK_CONNECTOR_NAME + "-driver"
+                                                                )
+                                                          ),
                                         "spec", Map.of(
                                                 "resources", Map.of(
                                                         "limits", Map.of("ephemeralStorage", "16Gi"),
@@ -105,7 +113,16 @@ public class SparkClusterDeployment extends AwsWholeStack {
                                                 "restartPolicy", "Always"
                                                       )
                                                          )
-                                            )
+                                            ),
+                        "executorSpec", Map.of(
+                                "podTemplateSpec", Map.of(
+                                        "metadata", Map.of(
+                                                "labels", Map.of(
+                                                        "app.kubernetes.io/name", SPARK_CONNECTOR_NAME + "-executor"
+                                                                )
+                                                          )
+                                                         )
+                                              )
                               )
                                                                );
 
