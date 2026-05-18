@@ -468,6 +468,11 @@ public class AwsConstruct extends AbstractConstruct {
                 // the agent/operator/envoy ones above (CRD ordering).
                 createValue("hubble.enabled", "true"),
                 createValue("hubble.relay.enabled", "true"),
+                // hubble-relay's own /metrics endpoint (port 9966, name `metrics`)
+                // exposed via the hubble-relay-metrics Service in kube-system.
+                // ServiceMonitor for it is created on the Prometheus side, same
+                // CRD-ordering reason as the agent/operator/envoy/hubble monitors.
+                createValue("hubble.relay.prometheus.enabled", "true"),
                 createValue("hubble.ui.enabled", "true"),
                 createValue("hubble.metrics.enableOpenMetrics", "true"),
                 createValue("hubble.metrics.enabled[0]", "dns"),
