@@ -467,7 +467,21 @@ public class AwsConstruct extends AbstractConstruct {
                 // ServiceMonitor is created on the Prometheus side, same reason as
                 // the agent/operator/envoy ones above (CRD ordering).
                 createValue("hubble.enabled", "true"),
+                // Default cert issuer (auto.method=helm) bakes certs into the
+                // helm release and has been observed to leave cilium-agent's
+                // hubble TLS listener silent on EKS + kubeProxyReplacement,
+                // so hubble-relay's dial to hubble-peer:443 hangs and the
+                // startup probe trips. The cronJob issuer regenerates the
+                // CA + serving certs from inside the cluster and keeps them
+                // rotated, which clears the handshake stall.
+                createValue("hubble.tls.auto.method", "cronJob"),
                 createValue("hubble.relay.enabled", "true"),
+                // Cold-start dials of hubble-peer can take longer than the
+                // 5s default while BPF socket-LB warms up after a fresh
+                // Cilium rollout — give the peer client enough headroom to
+                // finish the handshake before the 5-min startup-probe budget
+                // is consumed.
+                createValue("hubble.relay.dialTimeout", "30s"),
                 // hubble-relay's own /metrics endpoint (port 9966, name `metrics`)
                 // exposed via the hubble-relay-metrics Service in kube-system.
                 // ServiceMonitor for it is created on the Prometheus side, same
