@@ -54,7 +54,8 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
         new MonitoredService("cilium-agent",    "app.kubernetes.io/name", "cilium-agent",    "metrics"),
         new MonitoredService("cilium-operator", "app.kubernetes.io/name", "cilium-operator", "metrics"),
         new MonitoredService("cilium-envoy",    "app.kubernetes.io/name", "cilium-envoy",    "envoy-metrics"),
-        new MonitoredService("hubble",          "k8s-app",                "hubble",          "hubble-metrics")
+        new MonitoredService("hubble",          "k8s-app",                "hubble",          "hubble-metrics"),
+        new MonitoredService("hubble-relay",    "k8s-app",                "hubble-relay",    "metrics")
     );
 
     private void deployPrometheus(List<@NotNull ITerraformDependable> eksDependOn) {
