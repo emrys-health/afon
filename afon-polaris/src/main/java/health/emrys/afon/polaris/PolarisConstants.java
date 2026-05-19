@@ -30,7 +30,7 @@ public class PolarisConstants {
                             -cp . 
                             -jar /deployments/quarkus-run.jar""", DEBUG_PORT).replaceAll("\\s+", " ").trim();
 
-    public static final String POLARIS_IMAGE_NAME = "ph1ll1phenry/polaris_3451";
+    public static final String POLARIS_IMAGE_NAME = "apache/polaris:1.4.1";
 
     public static final Set<AfonProperty> POLARIS_PROPERTIES
         = Set.of(
