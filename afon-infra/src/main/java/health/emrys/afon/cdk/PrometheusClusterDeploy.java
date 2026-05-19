@@ -4,6 +4,7 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
@@ -26,7 +27,7 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
         dependablesAndLoadBalancers.addAll(loadBalancers);
         dependablesAndLoadBalancers.addAll(cloudProvider.getDependables());
         deployPrometheus(dependablesAndLoadBalancers);
-        Release loki = deployLoki(dependablesAndLoadBalancers);
+        Release loki = deployLoki(dependablesAndLoadBalancers, properties);
         deployPromtail(dependablesAndLoadBalancers, loki);
     }
 
@@ -136,15 +137,18 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
 
     /**
      * Installs the current {@code grafana/loki} chart (single-binary mode,
-     * ships Loki 3.x). Persistence is disabled — this is a dev cluster, lost
-     * logs on pod restart are an acceptable trade for one less PVC to manage.
+     * ships Loki 3.x) configured to push chunks and the index to S3. The
+     * bucket, region, and IAM credentials are read from the
+     * {@link Properties} passed to the {@link PrometheusClusterDeploy}
+     * constructor (keys {@code AWS_S3_BUCKET_NAME}, {@code AWS_REGION},
+     * {@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY}).
      *
      * <p>The companion log shipper is installed by
      * {@link #deployPromtail(List, Release)}; logs are queried in the same
      * Grafana that kube-prometheus-stack already deploys, wired up by
      * {@link #grafanaLokiDatasourceValues()}.
      */
-    private Release deployLoki(List<@NotNull ITerraformDependable> eksDependOn) {
+    private Release deployLoki(List<@NotNull ITerraformDependable> eksDependOn, Properties properties) {
         return Release.Builder
             .create(this, "lokiRelease")
             .name("loki")
@@ -152,7 +156,7 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
             .repository(GRAFANA_HELM_REPO)
             .version("6.16.0")
             .namespace("default")
-            .values(List.of(lokiValues()))
+            .values(List.of(lokiValues(properties)))
             .timeout(600)
             .atomic(true)
             .forceUpdate(true)
@@ -191,34 +195,51 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
      * the read/write/backend replica counts are zeroed because deploymentMode
      * SingleBinary is mutually exclusive with the scalable/microservices modes.
      */
-    static String lokiValues() {
-        return """
+    static String lokiValues(Properties properties) {
+        String bucket    = AfonProperties.AWS_S3_BUCKET_NAME.getValueFrom(properties);
+        String region    = AfonProperties.AWS_REGION.getValueFrom(properties);
+        String accessKey = AfonProperties.AWS_ACCESS_KEY_ID.getValueFrom(properties);
+        String secretKey = AfonProperties.AWS_SECRET_ACCESS_KEY.getValueFrom(properties);
+        return String.format("""
             deploymentMode: SingleBinary
             loki:
               auth_enabled: false
               commonConfig:
                 replication_factor: 1
+              # All long-term data (chunks, index, ruler rules) is shipped to
+              # S3. Credentials come from afon.properties / env.properties via
+              # AfonProperties — the rendered values land in the local Tofu
+              # state and cdktf.out (both gitignored), not in git history.
               storage:
-                type: filesystem
+                type: s3
+                bucketNames:
+                  chunks: %1$s
+                  ruler: %1$s
+                  admin: %1$s
+                s3:
+                  region: %2$s
+                  endpoint: ""
+                  accessKeyId: %3$s
+                  secretAccessKey: %4$s
+                  s3ForcePathStyle: false
+                  insecure: false
               schemaConfig:
                 configs:
                   - from: 2024-04-01
                     store: tsdb
-                    object_store: filesystem
+                    object_store: s3
                     schema: v13
                     index:
                       prefix: loki_index_
                       period: 24h
             singleBinary:
               replicas: 1
+              # Persistence stays off — durable state is in S3. The emptyDir
+              # below covers Loki's local working paths (WAL, in-memory index
+              # cache, compactor scratch), which the chart's default
+              # readOnlyRootFilesystem=true would otherwise block.
               persistence:
                 enabled: false
-              # Loki runs as UID 10001 (chart default) and the chart only mounts
-              # a volume at /var/loki when persistence is enabled. With
-              # persistence off, the loki user has no writable directory for
-              # the ruler-storage module's mkdir — even with the rootfs
-              # writable, /var is root-owned. Mount a per-pod emptyDir there;
-              # the chart's podSecurityContext.fsGroup makes it writable.
               extraVolumes:
                 - name: loki-data
                   emptyDir: {}
@@ -241,7 +262,7 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
               enabled: false
             gateway:
               enabled: false
-            """;
+            """, bucket, region, accessKey, secretKey);
     }
 
     /**
