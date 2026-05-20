@@ -38,3 +38,18 @@ kubectl -n kube-system port-forward svc/hubble-relay 4245:80
 ```
 
 and run `hubble observe`.
+
+### Loki
+
+Tunnel into the K8s to allow your local Grafana to show logs by running:
+
+```shell
+kubectl port-forward svc/loki 3100:3100
+```
+
+Then (if you have not already), add a `loki` Data Source that points at `http://localhost:3100`.
+You should now be able to logs in `Drilldown -> Logs` in the Grafana GUI.
+You may need to refresh your browser.
+
+As currently configured (20/05/26), Loki persists its logs to the bucket defined 
+by `AWS_S3_BUCKET_NAME` in `afon.properties`.
