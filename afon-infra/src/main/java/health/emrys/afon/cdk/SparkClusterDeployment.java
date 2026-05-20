@@ -168,6 +168,13 @@ public class SparkClusterDeployment extends AwsWholeStack {
         String                          subnetIds      = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
         lbDependencies.add(cloudProvider.loadBalancerRole);
+        // Creating this LoadBalancer Service fires the AWS LB Controller's
+        // mutating webhook (mservice.elbv2.k8s.aws). Depend on the controller's
+        // Helm release — which is installed atomically, so Terraform waits for
+        // its pods to be Ready — otherwise the webhook Service can still have
+        // zero endpoints and the apply fails with "no endpoints available for
+        // service aws-load-balancer-webhook-service".
+        lbDependencies.add(cloudProvider.getLbRelease());
         return Service.Builder.create(this, SPARK_SERVICE_NAME)
                               .metadata(ServiceMetadata.builder()
                                                        .name(SPARK_SERVICE_NAME)
