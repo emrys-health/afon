@@ -14,7 +14,7 @@ This installs Prometheus, Hubble etc.
 Tunnel into the Kubernetes cluster with:
 
 ```shell
-docker run -d --name grafana -p 3000:3000 --network=host grafana/grafana
+docker run -d --name grafana --network=host grafana/grafana
 kubectl port-forward  svc/kube-prometheus-stack-prometheus 9090:9090
 ```
 
@@ -68,3 +68,16 @@ And in Azure, something like:
 ```shell
 az storage blob list   --account-name afonstorageaccount   --container-name afonstorage  --prefix acceptancetests/   --query "[].properties.contentLength"   --output tsv | awk '{sum+=$1} END {printf "%.2f kb\n", sum/1024}'
 ```
+
+# Local Grafana
+
+You can run your Dockerized Grafana persisting the config each time with:
+```shell
+docker run -d --name grafana --network=host -v $YOUR_LOCAL_CONFIG_DIRECTORY/grafana:/var/lib/grafana grafana/grafana
+```
+To grab all the metadata files first time around, run:
+```shell
+docker cp YOUR_CONTAINER_ID:/var/lib/grafana $YOUR_LOCAL_CONFIG_DIRECTORY
+```
+**Note** you may need to execute `sudo chown -R 472:472 YOUR_LOCAL_CONFIG_DIRECTORY` to give Grafana permissions.
+User/group 472 is the Grafana user.

@@ -487,7 +487,11 @@ public class AwsConstruct extends AbstractConstruct {
                 // ServiceMonitor for it is created on the Prometheus side, same
                 // CRD-ordering reason as the agent/operator/envoy/hubble monitors.
                 createValue("hubble.relay.prometheus.enabled", "true"),
-                createValue("hubble.ui.enabled", "true"),
+                // hubble-ui is intentionally NOT enabled here. It ships as a
+                // separate standalone release (see below) so Terraform can
+                // order it after the datapath is Ready and its hardcoded,
+                // no-grace frontend liveness probe doesn't trip on cold start.
+                createValue("hubble.ui.enabled", "false"),
                 createValue("hubble.metrics.enableOpenMetrics", "true"),
                 createValue("hubble.metrics.enabled[0]", "dns"),
                 createValue("hubble.metrics.enabled[1]", "drop"),
@@ -501,25 +505,44 @@ public class AwsConstruct extends AbstractConstruct {
 
         eksDependOn = List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2, cilium);
 
-        // hubble-ui's frontend (nginx) container carries hardcoded liveness/
-        // readiness probes on :8081 with no initialDelaySeconds and no
-        // startupProbe (the 1.15 chart exposes no knob to relax them). When the
-        // pod is first created it shares this release with the Cilium agent
-        // that is still programming the node datapath, so for the first ~30s
-        // the kubelet can't reach :8081, the liveness probe fails 3x, and the
-        // container is killed into CrashLoopBackoff with no app-level error.
-        // Once the datapath (and relay) are up a fresh pod starts cleanly, so
-        // we wait for those to be Ready and then bounce hubble-ui exactly once.
-        // The waits are best-effort (|| true) so a slow relay never fails the
-        // apply; the restart is what actually clears the crash loop.
-        Resource.Builder
-            .create(this, "hubbleUiStabilise")
+        // Gate: block until the Cilium datapath is actually Ready (the main
+        // release above is not atomic, so its completion does not imply the
+        // agent DaemonSet has rolled out). The relay wait is best-effort — the
+        // UI frontend probe only needs pod networking, not relay — but waiting
+        // for it means the backend has something to talk to on first start.
+        Resource ciliumReady = Resource.Builder
+            .create(this, "ciliumDatapathReady")
             .dependsOn(List.of(cilium))
             .provisioners(uponCreateRun(
-                "kubectl -n kube-system rollout status daemonset/cilium --timeout=300s || true",
-                "kubectl -n kube-system rollout status deployment/hubble-relay --timeout=300s || true",
-                "kubectl -n kube-system rollout restart deployment/hubble-ui",
-                "kubectl -n kube-system rollout status deployment/hubble-ui --timeout=180s || true"
+                "kubectl -n kube-system rollout status daemonset/cilium --timeout=300s",
+                "kubectl -n kube-system rollout status deployment/hubble-relay --timeout=300s || true"
+            ))
+            .build();
+
+        // hubble-ui as its own release, gated on ciliumReady. The frontend's
+        // hardcoded liveness probe on :8081 has no startup grace, so when it
+        // was bundled in the Cilium release it got killed into CrashLoopBackoff
+        // while the agent was still programming the node. Starting it only
+        // after the datapath is Ready means :8081 is reachable immediately and
+        // the probe passes first time — no restart needed. agent/operator are
+        // off so this release renders hubble-ui only; hubble TLS is off because
+        // relay's server TLS is disabled (UI talks to hubble-relay:80 in
+        // plaintext), so no client-cert volume is required.
+        Release.Builder
+            .create(this, "hubble-ui")
+            .name("hubble-ui")
+            .repository("https://helm.cilium.io/")
+            .chart("cilium")
+            .version("1.15.0")
+            .namespace("kube-system")
+            .dependsOn(List.of(ciliumReady))
+            .set(java.util.List.of(
+                createValue("agent", "false"),
+                createValue("operator.enabled", "false"),
+                createValue("hubble.enabled", "true"),
+                createValue("hubble.tls.enabled", "false"),
+                createValue("hubble.ui.enabled", "true"),
+                createValue("hubble.ui.standalone.enabled", "true")
             ))
             .build();
 
