@@ -501,6 +501,28 @@ public class AwsConstruct extends AbstractConstruct {
 
         eksDependOn = List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2, cilium);
 
+        // hubble-ui's frontend (nginx) container carries hardcoded liveness/
+        // readiness probes on :8081 with no initialDelaySeconds and no
+        // startupProbe (the 1.15 chart exposes no knob to relax them). When the
+        // pod is first created it shares this release with the Cilium agent
+        // that is still programming the node datapath, so for the first ~30s
+        // the kubelet can't reach :8081, the liveness probe fails 3x, and the
+        // container is killed into CrashLoopBackoff with no app-level error.
+        // Once the datapath (and relay) are up a fresh pod starts cleanly, so
+        // we wait for those to be Ready and then bounce hubble-ui exactly once.
+        // The waits are best-effort (|| true) so a slow relay never fails the
+        // apply; the restart is what actually clears the crash loop.
+        Resource.Builder
+            .create(this, "hubbleUiStabilise")
+            .dependsOn(List.of(cilium))
+            .provisioners(uponCreateRun(
+                "kubectl -n kube-system rollout status daemonset/cilium --timeout=300s || true",
+                "kubectl -n kube-system rollout status deployment/hubble-relay --timeout=300s || true",
+                "kubectl -n kube-system rollout restart deployment/hubble-ui",
+                "kubectl -n kube-system rollout status deployment/hubble-ui --timeout=180s || true"
+            ))
+            .build();
+
         String trustPolicy = format(
             """
             ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
