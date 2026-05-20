@@ -26,9 +26,9 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
         dependablesAndLoadBalancers.addAll(loadBalancers);
         dependablesAndLoadBalancers.addAll(cloudProvider.getDependables());
-        deployPrometheus(dependablesAndLoadBalancers);
+        deployPrometheus(dependablesAndLoadBalancers, properties);
         Release loki = deployLoki(dependablesAndLoadBalancers, properties);
-        deployPromtail(dependablesAndLoadBalancers, loki);
+        deployPromtail(dependablesAndLoadBalancers, loki, properties);
     }
 
 
@@ -58,7 +58,7 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
         new MonitoredService("hubble-relay",    "k8s-app",                "hubble-relay",    "metrics")
     );
 
-    private void deployPrometheus(List<@NotNull ITerraformDependable> eksDependOn) {
+    private void deployPrometheus(List<@NotNull ITerraformDependable> eksDependOn, Properties properties) {
         // Configuration Overrides for the Helm Chart
         // We use the ReleaseSet.builder() for the `set` block in Terraform
         final List<ReleaseSet> chartOverrides = List.of(
@@ -93,7 +93,7 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
             // in the same Grafana instance kube-prometheus-stack already ships.
             .values(List.of(
                 additionalServiceMonitorsValues(CILIUM_MONITORS),
-                grafanaLokiDatasourceValues()
+                grafanaLokiDatasourceValues(properties)
                           ))
             .timeout(600)
             .atomic(true)
@@ -171,7 +171,7 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
      * lines to the {@code default} namespace, so Loki only stores what the
      * user asked for.
      */
-    private void deployPromtail(List<@NotNull ITerraformDependable> eksDependOn, Release loki) {
+    private void deployPromtail(List<@NotNull ITerraformDependable> eksDependOn, Release loki, Properties properties) {
         List<ITerraformDependable> deps = new ArrayList<>(eksDependOn);
         deps.add(loki);
         Release.Builder
@@ -181,7 +181,7 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
             .repository(GRAFANA_HELM_REPO)
             .version("6.16.5")
             .namespace("default")
-            .values(List.of(promtailValues()))
+            .values(List.of(promtailValues(properties)))
             .timeout(600)
             .atomic(true)
             .forceUpdate(true)
@@ -203,7 +203,12 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
         return String.format("""
             deploymentMode: SingleBinary
             loki:
-              auth_enabled: false
+              # Multi-tenancy on: every object key is prefixed with the tenant
+              # ID. Promtail and Grafana send CLUSTER_NAME as the tenant (see
+              # promtailValues / grafanaLokiDatasourceValues), so the S3 layout
+              # becomes <bucket>/<CLUSTER_NAME>/... instead of the auth-off
+              # default of <bucket>/fake/...
+              auth_enabled: true
               commonConfig:
                 replication_factor: 1
               # All long-term data (chunks, index, ruler rules) is shipped to
@@ -276,17 +281,21 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
      * {@code kubernetes-pods} scrape job; {@code action: keep} drops every
      * pod whose namespace isn't {@code default}.
      */
-    static String promtailValues() {
-        return """
+    static String promtailValues(Properties properties) {
+        String clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+        return String.format("""
             config:
               clients:
+                # tenant_id sets the X-Scope-OrgID header on every push, which
+                # is the tenant Loki uses as the top-level S3 directory.
                 - url: http://loki.default.svc.cluster.local:3100/loki/api/v1/push
+                  tenant_id: %s
               snippets:
                 extraRelabelConfigs:
                   - source_labels: [__meta_kubernetes_namespace]
                     action: keep
                     regex: default
-            """;
+            """, clusterName);
     }
 
     /**
@@ -294,8 +303,9 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
      * kube-prometheus-stack release. {@code access: proxy} routes queries
      * through the Grafana pod, so we don't need to expose Loki externally.
      */
-    static String grafanaLokiDatasourceValues() {
-        return """
+    static String grafanaLokiDatasourceValues(Properties properties) {
+        String clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+        return String.format("""
             grafana:
               additionalDataSources:
                 - name: Loki
@@ -304,7 +314,14 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
                   url: http://loki.default.svc.cluster.local:3100
                   isDefault: false
                   editable: false
-            """;
+                  # Loki has auth_enabled: true, so reads must carry the tenant
+                  # header too — otherwise Grafana queries a different tenant
+                  # than Promtail writes to and returns no logs.
+                  jsonData:
+                    httpHeaderName1: X-Scope-OrgID
+                  secureJsonData:
+                    httpHeaderValue1: %s
+            """, clusterName);
     }
 
     public static void main(String[] args) {

@@ -50,6 +50,11 @@ kubectl port-forward svc/loki 3100:3100
 ```
 
 Then (if you have not already), add a `loki` Data Source that points at `http://localhost:3100`.
+Note that you'll need to add an `HTTP headers` value with a header name of `X-Scope-OrgID`
+and a value that's whatever `CLUSTER_NAME` is in `afon.properties`.
+
+![image](pics/grafana_multitenancy.png)
+
 You should now be able to logs in `Drilldown -> Logs` in the Grafana GUI.
 You may need to refresh your browser.
 
