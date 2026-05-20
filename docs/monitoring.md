@@ -53,3 +53,18 @@ You may need to refresh your browser.
 
 As currently configured (20/05/26), Loki persists its logs to the bucket defined 
 by `AWS_S3_BUCKET_NAME` in `afon.properties`.
+
+### Blob storage size
+
+In AWS, run something like:
+```shell
+aws s3 ls s3://emrys-afon-bucket/acceptancetests/ --recursive --summarize | grep "Total Size
+```
+In GCP, something like:
+```shell
+gcloud storage du -s gs://emrys_afon_core/acceptancetests/**
+```
+And in Azure, something like:
+```shell
+az storage blob list   --account-name afonstorageaccount   --container-name afonstorage  --prefix acceptancetests/   --query "[].properties.contentLength"   --output tsv | awk '{sum+=$1} END {printf "%.2f kb\n", sum/1024}'
+```
