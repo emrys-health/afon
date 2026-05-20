@@ -232,6 +232,11 @@ public class PrometheusClusterDeploy extends SparkClusterDeployment {
                     index:
                       prefix: loki_index_
                       period: 24h
+              # Enables the /loki/api/v1/index/volume endpoint that backs
+              # Grafana's log-volume histogram. Without it Grafana reports
+              # "Log volume has not been configured."
+              limits_config:
+                volume_enabled: true
             singleBinary:
               replicas: 1
               # Persistence stays off — durable state is in S3. The emptyDir
