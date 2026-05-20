@@ -31,6 +31,8 @@ kubectl port-forward svc/hubble-ui -n kube-system 12000:80
 
 then point your browser at `http://localhost:12000` and you should see the network flows between pods.
 
+![image](pics/hubble-ui.png)
+
 To give something akin to `netstat` in Linux, create yet another tunnel with:
 
 ```shell
@@ -81,3 +83,5 @@ docker cp YOUR_CONTAINER_ID:/var/lib/grafana $YOUR_LOCAL_CONFIG_DIRECTORY
 ```
 **Note** you may need to execute `sudo chown -R 472:472 YOUR_LOCAL_CONFIG_DIRECTORY` to give Grafana permissions.
 User/group 472 is the Grafana user.
+
+![image](pics/grafana.png)
