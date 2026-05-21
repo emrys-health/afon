@@ -1,6 +1,6 @@
 # Monitoring
 
-To install the monitoring components on AWS, run:
+To install the monitoring components on AWS, run in `afon-infra`:
 
 ```shell
 mvn compile -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy exec:java
@@ -11,14 +11,15 @@ This installs Prometheus, Hubble etc.
 
 ### Prometheus
 
-Tunnel into the Kubernetes cluster with:
+Have Grafan tunnel into the Kubernetes cluster with:
 
 ```shell
 docker run -d --name grafana --network=host grafana/grafana
+
 kubectl port-forward  svc/kube-prometheus-stack-prometheus 9090:9090
 ```
 
-then point your browser at `http://localhost:3000` and log into Grafana with admin/admin.
+then point your browser at `http://localhost:3000` and log into Grafana with `admin`/`admin`.
 Add a Data Source that's `http://localhost:9090` and you should see nearly 2000 metrics.
 
 ### Hubble
