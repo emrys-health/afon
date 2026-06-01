@@ -11,7 +11,7 @@ This installs Prometheus, Hubble etc.
 
 ### Prometheus
 
-Have Grafan tunnel into the Kubernetes cluster with:
+Have Grafana tunnel into the Kubernetes cluster with:
 
 ```shell
 docker run -d --name grafana --network=host grafana/grafana
@@ -24,7 +24,7 @@ Add a Data Source that's `http://localhost:9090` and you should see nearly 2000 
 
 ### Hubble
 
-Install Hubble then tunnel into Kubernetes with:
+Tunnel into Kubernetes with:
 
 ```shell
 kubectl port-forward svc/hubble-ui -n kube-system 12000:80
@@ -40,7 +40,18 @@ To give something akin to `netstat` in Linux, create yet another tunnel with:
 kubectl -n kube-system port-forward svc/hubble-relay 4245:80
 ```
 
-and run `hubble observe`.
+Install the [Hubble CLI](https://docs.cilium.io/en/stable/observability/hubble/setup/)
+and run `hubble observe`. This will print out somthing like:
+```shell
+$ hubble observe
+Jun  1 09:05:34.677: 10.0.1.196:40327 (host) -> 18.169.47.27:443 (world) to-network FORWARDED (TCP Flags: ACK, PSH)
+Jun  1 09:05:35.097: 10.0.1.196:46270 (host) -> 18.169.47.27:443 (world) to-network FORWARDED (TCP Flags: ACK)
+Jun  1 09:05:36.323: 10.0.2.139 (remote-node) -> 10.0.1.24 (health) to-endpoint FORWARDED (ICMPv4 EchoRequest)
+Jun  1 09:05:36.323: 10.0.2.139 (remote-node) <- 10.0.1.24 (health) to-network FORWARDED (ICMPv4 EchoReply)
+Jun  1 09:05:36.323: 10.0.2.139:55266 (remote-node) -> 10.0.1.24:4240 (health) to-endpoint FORWARDED (TCP Flags: ACK, PSH)
+Jun  1 09:05:36.324: 10.0.2.139:55266 (remote-node) <- 10.0.1.24:4240 (health) to-network FORWARDED (TCP Flags: ACK, PSH)
+...
+```
 
 ### Loki
 
