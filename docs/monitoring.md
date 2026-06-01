@@ -9,6 +9,16 @@ mvn compile -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy exec:
 and `tofu apply` the file it generates in `cdktf.out/stacks/aws`.
 This installs Prometheus, Hubble etc.
 
+### Tools
+
+We currently (1/6/26) have:
+
+1. **Prometheus** running in the cloud to capture metrics
+1. **Loki** running in the cloud to view logs. Note that Loki writes logs to S3 (see below)
+1. **Grafana** running locally to view metrics and logs
+1. **Hubble** running in the cloud to view network traffic (and optionally, **Hubble CLI** running locally to query Hubble) 
+
+
 ### Prometheus
 
 Have Grafana tunnel into the Kubernetes cluster with:
