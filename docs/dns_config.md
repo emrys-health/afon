@@ -53,6 +53,18 @@ nameServers:
 ```
 Again, make a note.
 
+### AWS
+
+For AWS, you do need to let the infra code know about your domain.
+Get the Zone ID for your domain by running something like:
+```shell
+aws route53 list-hosted-zones-by-name --dns-name emrysjupyter2.click
+```
+And then update the `AWS_XXX_DNS_ZONE` values in `afon.properties` accordingly.
+
+Note the `AWS_ZONE_ID` is for the ELB and the `AWS_XXX_DNS_ZONE` are for the DNS. 
+Although they are lexically similar (thank AWS for that) they are unrelated concepts.
+
 ### Domain name registration
 
 Go to the DNS section of your name registry.
