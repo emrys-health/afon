@@ -8,7 +8,8 @@ public class DeployFullStackAwsMain implements StepsProvider {
             stepOperations.cleanLocalAws(),
             stepOperations.deployAwsSpark(),
             stepOperations.waitForAwsPolaris(),
-            stepOperations.initializeAllCatalogsInAws()
+            stepOperations.initializeAllCatalogsInAws(),
+            stepOperations.checkAwsSparkConnectorReadingAws()
                       );
     }
     public static void main(String[] args) {
