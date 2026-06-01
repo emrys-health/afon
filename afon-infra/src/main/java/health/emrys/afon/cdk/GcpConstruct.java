@@ -56,9 +56,11 @@ public class GcpConstruct extends AbstractConstruct {
     private final ContainerCluster   gkeCluster;
     private       KubernetesProvider k8sProvider;
     private       HelmProvider       helmProvider;
+    private final String             projectID;
 
     GcpConstruct(final Construct scope, final String id, String projectID, Properties properties) {
         super(scope, id);
+        this.projectID = projectID;
         String clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
         String vpcName     = "gke-private-vpc-" + clusterName;
         String subnetName  = "gke-private-subnet-" + clusterName;
@@ -175,6 +177,10 @@ public class GcpConstruct extends AbstractConstruct {
     @Override
     public List<ITerraformDependable> getDependables() {
         return List.of(gkeCluster);
+    }
+
+    public String getProjectId() {
+        return projectID;
     }
 
     @Override

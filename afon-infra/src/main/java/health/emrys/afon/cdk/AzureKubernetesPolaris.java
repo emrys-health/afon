@@ -56,7 +56,8 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
         };
         var util = new TFUtils(
             this, azurePolarisDomainName, TLS_SECRET_NAME,
-            POLARIS_PORT, POLARIS_INTERNAL);
+            POLARIS_PORT, POLARIS_INTERNAL,
+            new AzureKeyVaultCertStore(AfonProperties.AZURE_KEY_VAULT_NAME.getValueFrom(properties)));
         HelmProvider               helm        = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
         Map<String, String> annotations = Map.of(

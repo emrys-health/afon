@@ -53,6 +53,7 @@ public class AfonProperties {
     public static final AfonProperty AZURE_STORAGE_ACCOUNT  = new AfonProperty("AZURE_STORAGE_ACCOUNT");
     public static final AfonProperty DATABRICKS_TOKEN       = new AfonProperty("DATABRICKS_TOKEN");
 
+    public static final AfonProperty AZURE_KEY_VAULT_NAME    = new AfonProperty("AZURE_KEY_VAULT_NAME");
     public static final AfonProperty AZURE_TENANT_ID         = new AfonProperty("AZURE_TENANT_ID");
     public static final AfonProperty AZURE_CONNECTION_STRING = new AfonProperty("AZURE_CONNECTION_STRING");
     public static final AfonProperty AZURE_CLIENT_ID         = new AfonProperty("AZURE_CLIENT_ID");

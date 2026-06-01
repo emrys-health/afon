@@ -53,7 +53,8 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
         };
         var util = new TFUtils(
             this, gcpDomainName, TLS_SECRET_NAME, POLARIS_PORT
-            , POLARIS_INTERNAL);
+            , POLARIS_INTERNAL,
+            new GcpSecretManagerCertStore(cloudProvider.getProjectId()));
         HelmProvider               helm            = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables     = cloudProvider.getDependables();
         Release                    nginxRelease    = util.installNginxIngress(this, helm, dependables, null);
