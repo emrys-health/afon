@@ -65,6 +65,12 @@ And then update the `AWS_XXX_DNS_ZONE` values in `afon.properties` accordingly.
 Note the `AWS_ZONE_ID` is for the ELB and the `AWS_XXX_DNS_ZONE` are for the DNS. 
 Although they are lexically similar (thank AWS for that) they are unrelated concepts.
 
+This should be sufficient for DNS but if you want to use HTTPS, you'll need to assign a certificate.
+If this is all in AWS, go to [AWS Certificate Manager](https://eu-west-2.console.aws.amazon.com/acm/certificates/list?region=eu-west-2)
+and `Request` a certificate for your domain. 
+You then need to press the `Create Record in Route 53` button to prove you own it.
+Note that it might take a few minutes to propagate.
+
 ### Domain name registration
 
 Go to the DNS section of your name registry.
