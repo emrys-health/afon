@@ -78,16 +78,18 @@ public class AwsConstruct extends AbstractConstruct {
     private final String                     zone_id;
     private final String                     clusterName;
     private final AwsNuke                    awsNuke;
+    private final String                     polarisCertArn;
     final         Vpc                        vpc;
     final         IamRole                    loadBalancerRole;
-    final         Resource                   newKubeConfig;
-    private       Release                    lbRelease;
+    final         Resource newKubeConfig;
+    private       Release  lbRelease;
 
     AwsConstruct(final Construct scope, final String id, Properties properties) {
         super(scope, id);
         awsNuke        = new AwsNuke(properties);
         componentNames = new AwsComponentNames(properties);
         clusterName    = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+        polarisCertArn = AfonProperties.AWS_POLARIS_CERT_ARN.getValueFrom(properties);
 
         this.polarisDomainName = AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
         this.accountId         = AWS_ACCOUNT_ID.getValueFrom(properties);
@@ -567,10 +569,7 @@ public class AwsConstruct extends AbstractConstruct {
         IngressV1 ingress = createHttpsIngress(
             "polaris-https-ingress",
             "polaris-ingress",
-            format(
-                "arn:aws:acm:%s:%s:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4",
-                region,
-                accountId),
+            polarisCertArn,
             this.polarisDomainName,
             POLARIS_INTERNAL,
             8181,
