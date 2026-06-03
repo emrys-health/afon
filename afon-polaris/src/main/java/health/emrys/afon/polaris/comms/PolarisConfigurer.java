@@ -16,8 +16,10 @@ public class PolarisConfigurer {
         return tableURI(warehouseName, namespace, "");
     }
 
-    public static String getCatalogRolesURI(String warehouseName) {
-        return format("/api/management/v1/principal-roles/service_admin/catalog-roles/%s", warehouseName);
+    public static String getCatalogRolesURI(String roleName, String warehouseName) {
+        return format("/api/management/v1/principal-roles/%s/catalog-roles/%s",
+                      roleName,
+                      warehouseName);
     }
 
     public static String getCreateCatalogURI() {
@@ -28,6 +30,22 @@ public class PolarisConfigurer {
         return format("%s/%s/catalog-roles/catalog_admin/grants",
                       getCreateCatalogURI(),
                       warehouseName);
+    }
+
+    public static String principalRolesURI() {
+        return "/api/management/v1/principal-roles";
+    }
+
+    public static String principalsURI() {
+        return "/api/management/v1/principals";
+    }
+
+    public static String catalogRolesURI(String warehouseName) {
+        return format("/api/management/v1/catalogs/%s/catalog-roles", warehouseName);
+    }
+
+    public static String catalogRolesGrantURI(String warehouseName, String catalogRole) {
+        return format("/api/management/v1/catalogs/%s/catalog-roles/%s/grants", warehouseName, catalogRole);
     }
 
     public static String catalogsURI(String warehouseName) {

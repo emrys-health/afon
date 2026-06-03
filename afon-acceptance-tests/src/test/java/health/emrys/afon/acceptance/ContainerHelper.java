@@ -7,6 +7,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
 
@@ -51,7 +52,16 @@ public class ContainerHelper {
             POLARIS_PROPERTIES.forEach((x) -> {
               myContainer.withEnv(x.getPropertyName(), x.getValueFrom(properties));
             });
-            myContainer.setPortBindings(List.of("8181:8181", "8182:8182"));
+            Map.of(
+                "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
+                "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
+                "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL", "DEBUG",
+                "QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL", "DEBUG"
+                  )
+               .entrySet()
+               .forEach(x -> myContainer.withEnv(x.getKey(), x.getValue()));
+
+            myContainer.setPortBindings(List.of("8181:8181", "8182:8182", DEBUG_PORT + ":" + DEBUG_PORT));
             logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading the image.");
             myContainer.start();
             myContainer.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
