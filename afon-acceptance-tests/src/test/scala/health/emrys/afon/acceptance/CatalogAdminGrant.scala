@@ -1,7 +1,9 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
-import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCatalogAdminGrantsURI, getCatalogRolesURI}
+import health.emrys.afon.polaris.comms.PolarisConfigurer.{catalogRolesGrantURI, catalogRolesURI, getCatalogAdminGrantsURI, getCatalogRolesURI, principalRolesURI, principalsURI}
+import org.apache.hc.core5.http.ClassicHttpResponse
+import org.apache.polaris.core.admin.model.CatalogPrivilege
 import org.scalatest.GivenWhenThen
 
 abstract class PolarisFixture extends Function0[Any] {
@@ -13,6 +15,13 @@ abstract class PolarisFixture extends Function0[Any] {
 
 }
 
+/**
+ * Without this, you'll see something like:
+ * org.apache.iceberg.exceptions.ForbiddenException: Forbidden: Principal 'root'
+ * with activated PrincipalRoles '[service_admin]' and activated grants via
+ * '[service_admin, catalog_admin]' is not authorized for op
+ * CREATE_TABLE_STAGED_WITH_WRITE_DELEGATION
+ */
 class CatalogAdminGrant(test: GivenWhenThen,
                         config: CloudConfigForPolaris,
                         warehouseNameOpt: Option[String] = None) extends PolarisFixture {
@@ -35,14 +44,40 @@ class CatalogRoles(test: GivenWhenThen,
                    warehouseNameOpt: Option[String] = None) extends PolarisFixture {
   import test._
 
+  val catalogRoleName = "mycatalogrole"
+
   def apply = {
     Given(s"a Polaris endpoint at ${client.getEndpoint}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
-    val uri  = getCatalogRolesURI(warehouseName)
-    val json = config.catalogRoles
+    assert(createPrincipal().getCode == REST_CODE_RESOURCE_CREATED)
+    assert(createPrincipalRoles().getCode == REST_CODE_RESOURCE_CREATED)
+    assert(createCatalogRole(warehouseName).getCode == REST_CODE_RESOURCE_CREATED)
+    assert(createCatalogRoleGrant(warehouseName).getCode == REST_CODE_RESOURCE_CREATED)
+    Then(s"Polaris indicates the HTTP requests lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
+  }
+
+  private def createCatalogRoleGrant(warehouseName: String) = {
+    val uri = catalogRolesGrantURI(warehouseName, catalogRoleName)
+    val json = config.catalogRoleGrant(CatalogPrivilege.TABLE_READ_DATA)
     When(s"we call '$uri' with payload:\n$json")
-    val response = client.putJsonCall(uri, json, accessToken)
-    Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
-    assert(response.getCode == REST_CODE_RESOURCE_CREATED)
+    client.putJsonCall(uri, json, accessToken)
+  }
+  private def createCatalogRole(warehouseName: String) = {
+    val uri = catalogRolesURI(warehouseName)
+    val json = config.catalogRoleCreation(catalogRoleName)
+    When(s"we call '$uri' with payload:\n$json")
+    client.postJsonCall(uri, json, accessToken)
+  }
+  private def createPrincipalRoles() = {
+    val uri = principalRolesURI
+    val json = config.principalRoleCreation
+    When(s"we call '$uri' with payload:\n$json")
+    client.postJsonCall(uri, json, accessToken)
+  }
+  private def createPrincipal() = {
+    val uri = principalsURI
+    val json = config.principalCreation
+    When(s"we call '$uri' with payload:\n$json")
+    client.postJsonCall(uri, json, accessToken)
   }
 }

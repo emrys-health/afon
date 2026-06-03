@@ -23,6 +23,36 @@ public abstract class CloudConfigForPolaris {
                      );
     }
 
+    public String principalCreation() throws IncorrectConfigException {
+        return toJson(
+            Principal.builder().setClientId("client_id").setName("client_name").build()
+                     );
+    }
+
+    public String principalRoleCreation() throws IncorrectConfigException {
+        return toJson(
+            PrincipalRole.builder().setName("principle_role").build()
+                     );
+    }
+
+    public String catalogRoleCreation(String catalogRoleName) throws IncorrectConfigException {
+        return toJson(
+            CatalogRole.builder().setName(catalogRoleName).build()
+                     );
+    }
+
+    public String catalogRoleGrant(CatalogPrivilege privelege) throws IncorrectConfigException {
+        return toJson(
+            AddGrantRequest.builder().setGrant(
+                CatalogGrant.builder()
+                            .setPrivilege(privelege)
+                            .setType(GrantResource.TypeEnum.CATALOG)
+                            .build()
+                                              )
+                .build()
+              );
+    }
+
     public String catalogRoles() throws IncorrectConfigException {
         return toJson(
             new CatalogRole(PolarisEntityConstants.getNameOfCatalogAdminRole())
