@@ -25,7 +25,7 @@ public class DeployExternalCatalogsMain implements StepsProvider {
             stepOperations.waitForAzurePolaris(),
             stepOperations.purgeForeignCatalogFromAzure(),
             stepOperations.createAzureCatalogInAzure(),
-            stepOperations.createExternalAzureCatalogInAzure(),
+//            stepOperations.createExternalAzureCatalogInAzure(), // not sure this is necessary and it fails because of the line above
             stepOperations.checkLocalSparkTalksToAzurePolarisViaAwsPolaris()
                 ));
         return stackSteps;
