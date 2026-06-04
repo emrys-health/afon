@@ -22,6 +22,11 @@ public class PolarisConfigurer {
                       warehouseName);
     }
 
+    public static String getPrincipleToRolesURI(String principle) {
+        return format("/api/management/v1/principals/%s/principal-roles",
+                      principle);
+    }
+
     public static String getCreateCatalogURI() {
         return "/api/management/v1/catalogs";
     }
