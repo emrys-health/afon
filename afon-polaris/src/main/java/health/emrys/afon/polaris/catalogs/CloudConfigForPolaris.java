@@ -29,9 +29,9 @@ public abstract class CloudConfigForPolaris {
                      );
     }
 
-    public String principalRoleCreation() throws IncorrectConfigException {
+    public String principalRoleCreation(String principleRole) throws IncorrectConfigException {
         return toJson(
-            PrincipalRole.builder().setName("principle_role").build()
+            PrincipalRole.builder().setName(principleRole).build()
                      );
     }
 
