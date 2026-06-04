@@ -42,8 +42,24 @@ kube-system   hubble-relay-587fd6785-g2f8q                               1/1    
 kube-system   hubble-ui-f799d8b94-574lj                                  2/2     Running   0             20h
 ```
 
+In general, a pod with `operator` in its name is an "SRE in a pod".
+They automate deployment and self heal the cluster.
+
 ### Logging & Monitoring
 
 Currently (4/6/26) we favour an external Grafana and tunneling into the K8s cluster.
 But Grafana (`kube-prometheus-stack-grafana-6d75dbdd5c-l4nvp`) is deployed as part of the Prometheus Helm chart.
+So is the Alert Manager (`alertmanager-kube-prometheus-stack-alertmanager-0`).
+It too is currently unused.
+
+The Hubble UI (`hubble-ui-f799d8b94-574lj`) shows connections that are in Cilium's (finite) memory.
+Therefore, this GUI represents connection in a limited window in time not all connections ever made by the pods.
+The window of time depends on traffic volumes, available memory etc.
+
+Hubble relay (`hubble-relay-587fd6785-g2f8q`) collects the data from all the nodes and serves it.
+
+Cilium (`cilium-`UUID) only deals with L3/L4 traffic (IP/TCP etc). 
+Cilium Envoy (`cilium-envoy-*`) deals with higher level traffic (including HTTP).
+It allows network policies to be set at this level.
+
 
