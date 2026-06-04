@@ -1,8 +1,7 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
-import health.emrys.afon.polaris.comms.PolarisConfigurer.{catalogRolesGrantURI, catalogRolesURI, getCatalogAdminGrantsURI, getCatalogRolesURI, principalRolesURI, principalsURI}
-import org.apache.hc.core5.http.ClassicHttpResponse
+import health.emrys.afon.polaris.comms.PolarisConfigurer._
 import org.apache.polaris.core.admin.model.CatalogPrivilege
 import org.apache.polaris.core.admin.model.CatalogPrivilege.{TABLE_READ_DATA, TABLE_WRITE_DATA}
 import org.scalatest.GivenWhenThen
@@ -68,7 +67,7 @@ class CatalogRoles(test: GivenWhenThen,
     val uri = getCatalogRolesURI(principalRoleName, warehouseName)
     val json = config.catalogRoleCreation(catalogRoleName)
     When(s"we call '$uri' with payload:\n$json")
-    client.postJsonCall(uri, json, accessToken)
+    client.putJsonCall(uri, json, accessToken)
   }
 
   private def createCatalogRoleGrant(warehouseName: String,
