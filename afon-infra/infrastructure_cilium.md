@@ -58,6 +58,8 @@ The window of time depends on traffic volumes, available memory etc.
 
 Hubble relay (`hubble-relay-587fd6785-g2f8q`) collects the data from all the nodes and serves it.
 
+### Networking
+
 Cilium (`cilium-`UUID) only deals with L3/L4 traffic (IP/TCP etc). 
 Cilium Envoy (`cilium-envoy-*`) deals with higher level traffic (including HTTP).
 It allows network policies to be set at this level.
