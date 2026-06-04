@@ -23,9 +23,9 @@ public abstract class CloudConfigForPolaris {
                      );
     }
 
-    public String principalCreation() throws IncorrectConfigException {
+    public String principalCreation(String principleName) throws IncorrectConfigException {
         return toJson(
-            Principal.builder().setClientId("client_id").setName("client_name").build()
+            Principal.builder().setClientId(principleName).setName(principleName).build()
                      );
     }
 

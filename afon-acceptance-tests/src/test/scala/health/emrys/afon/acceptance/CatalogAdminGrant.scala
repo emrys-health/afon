@@ -46,6 +46,7 @@ class CatalogRoles(test: GivenWhenThen,
 
   val catalogRoleName = "mycatalogrole"
   val principalRoleName = "myprinciplerole"
+  val principleName = "myprincipleName"
 
   def apply = {
     Given(s"a Polaris endpoint at ${client.getEndpoint}")
@@ -59,8 +60,16 @@ class CatalogRoles(test: GivenWhenThen,
     assert(createCatalogRoleGrant(warehouseName, TABLE_WRITE_DATA).getCode == REST_CODE_RESOURCE_CREATED)
 
     assert(associateRoles(warehouseName).getCode == REST_CODE_RESOURCE_CREATED)
+    assert(associatePrincipleRoles().getCode == REST_CODE_RESOURCE_CREATED)
 
     Then(s"Polaris indicates the HTTP requests lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
+  }
+
+  private def associatePrincipleRoles() = {
+    val uri = getPrincipleToRolesURI(principleName)
+    val json = config.principalRoleCreation(principalRoleName)
+    When(s"we call '$uri' with payload:\n$json")
+    client.putJsonCall(uri, json, accessToken)
   }
 
   private def associateRoles(warehouseName: String) = {
@@ -91,7 +100,7 @@ class CatalogRoles(test: GivenWhenThen,
   }
   private def createPrincipal() = {
     val uri = principalsURI
-    val json = config.principalCreation
+    val json = config.principalCreation(principleName)
     When(s"we call '$uri' with payload:\n$json")
     client.postJsonCall(uri, json, accessToken)
   }
