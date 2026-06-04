@@ -32,6 +32,10 @@ public class PolarisConfigurer {
                       warehouseName);
     }
 
+    public static String principalRolesURI(String roleName) {
+        return format("%s/%s/principal-roles", principalsURI(), roleName);
+    }
+
     public static String principalRolesURI() {
         return "/api/management/v1/principal-roles";
     }

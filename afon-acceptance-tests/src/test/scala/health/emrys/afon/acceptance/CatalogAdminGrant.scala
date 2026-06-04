@@ -4,6 +4,7 @@ import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.comms.PolarisConfigurer.{catalogRolesGrantURI, catalogRolesURI, getCatalogAdminGrantsURI, getCatalogRolesURI, principalRolesURI, principalsURI}
 import org.apache.hc.core5.http.ClassicHttpResponse
 import org.apache.polaris.core.admin.model.CatalogPrivilege
+import org.apache.polaris.core.admin.model.CatalogPrivilege.{TABLE_READ_DATA, TABLE_WRITE_DATA}
 import org.scalatest.GivenWhenThen
 
 abstract class PolarisFixture extends Function0[Any] {
@@ -45,20 +46,35 @@ class CatalogRoles(test: GivenWhenThen,
   import test._
 
   val catalogRoleName = "mycatalogrole"
+  val principalRoleName = "myprinciplerole"
 
   def apply = {
     Given(s"a Polaris endpoint at ${client.getEndpoint}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
     assert(createPrincipal().getCode == REST_CODE_RESOURCE_CREATED)
+
     assert(createPrincipalRoles().getCode == REST_CODE_RESOURCE_CREATED)
+
     assert(createCatalogRole(warehouseName).getCode == REST_CODE_RESOURCE_CREATED)
-    assert(createCatalogRoleGrant(warehouseName).getCode == REST_CODE_RESOURCE_CREATED)
+    assert(createCatalogRoleGrant(warehouseName, TABLE_READ_DATA).getCode == REST_CODE_RESOURCE_CREATED)
+    assert(createCatalogRoleGrant(warehouseName, TABLE_WRITE_DATA).getCode == REST_CODE_RESOURCE_CREATED)
+
+    assert(associateRoles(warehouseName).getCode == REST_CODE_RESOURCE_CREATED)
+
     Then(s"Polaris indicates the HTTP requests lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
   }
 
-  private def createCatalogRoleGrant(warehouseName: String) = {
+  private def associateRoles(warehouseName: String) = {
+    val uri = getCatalogRolesURI(principalRoleName, warehouseName)
+    val json = config.catalogRoleCreation(catalogRoleName)
+    When(s"we call '$uri' with payload:\n$json")
+    client.postJsonCall(uri, json, accessToken)
+  }
+
+  private def createCatalogRoleGrant(warehouseName: String,
+                                     perm: CatalogPrivilege) = {
     val uri = catalogRolesGrantURI(warehouseName, catalogRoleName)
-    val json = config.catalogRoleGrant(CatalogPrivilege.TABLE_READ_DATA)
+    val json = config.catalogRoleGrant(perm)
     When(s"we call '$uri' with payload:\n$json")
     client.putJsonCall(uri, json, accessToken)
   }
@@ -70,7 +86,7 @@ class CatalogRoles(test: GivenWhenThen,
   }
   private def createPrincipalRoles() = {
     val uri = principalRolesURI
-    val json = config.principalRoleCreation
+    val json = config.principalRoleCreation(principalRoleName)
     When(s"we call '$uri' with payload:\n$json")
     client.postJsonCall(uri, json, accessToken)
   }
