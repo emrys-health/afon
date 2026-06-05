@@ -1,11 +1,11 @@
 package health.emrys.afon.acceptance
 
-import SparkHelper.{namespace, spark}
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
+import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.comms.PolarisConfigurer
-import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCatalogAdminGrantsURI, getCatalogRolesURI, getCreateCatalogURI, namespaceURI, tableURI}
+import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
@@ -14,7 +14,7 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 
   val NUM_ROWS = 100
-  val REST_CODE_RESOURCE_CREATED = 201
+
   val FULL_NAMESPACE = s"${cloudProvider}.$namespace"
 
   def config: CloudConfigForPolaris
@@ -123,4 +123,5 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
 object AbstractAccessSpec {
   val tables = scala.collection.mutable.Set[String]()
+  val REST_CODE_RESOURCE_CREATED = 201
 }
