@@ -53,6 +53,7 @@ class CatalogRoles(test: GivenWhenThen,
 
   def apply = {
     Given(s"a Polaris endpoint at ${client.getEndpoint}")
+    And(s"a principal that's already been created:\n${PolarisHelper.principle.getPrincipal}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
 
     assert(createCatalogRole(warehouseName).getCode == REST_CODE_RESOURCE_CREATED)
