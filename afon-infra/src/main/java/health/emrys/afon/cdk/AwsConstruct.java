@@ -548,6 +548,48 @@ public class AwsConstruct extends AbstractConstruct {
             ))
             .build();
 
+        // metrics-server — serves the Kubernetes Metrics API (metrics.k8s.io)
+        // that backs `kubectl top nodes` and `kubectl top pods`. EKS does not
+        // install it by default, so without this release those commands fail
+        // with "error: Metrics API not available". Gated on ciliumReady because
+        // metrics-server scrapes every kubelet over the pod network, which only
+        // works once the Cilium datapath has rolled out.
+        Release metricsServer = Release.Builder
+            .create(this, "metrics-server")
+            .name("metrics-server")
+            .repository("https://kubernetes-sigs.github.io/metrics-server/")
+            .chart("metrics-server")
+            .version("3.12.2")
+            .namespace("kube-system")
+            .dependsOn(List.of(ciliumReady))
+            .timeout(300)
+            .atomic(true)
+            .set(List.of(
+                // EKS kubelets serve their summary API with self-signed certs
+                // that are not part of the cluster CA, so metrics-server cannot
+                // verify them and the scrape fails with an x509 error. Skipping
+                // verification of the kubelet serving cert is the standard EKS
+                // workaround. (The chart's default args already prefer the node
+                // InternalIP, which is what we want here.)
+                createValue("args[0]", "--kubelet-insecure-tls")
+            ))
+            .build();
+
+        // Confirm the Metrics API is actually serving before the stack reports
+        // done. metrics-server needs a scrape cycle (~15-60s) after rollout
+        // before `kubectl top nodes` returns data rather than
+        // "metrics not available yet", so retry briefly. Uses the local
+        // kubeconfig written by newKubeConfig, same as the ciliumReady gate.
+        Resource.Builder
+            .create(this, "metricsServerReady")
+            .dependsOn(List.of(metricsServer))
+            .provisioners(uponCreateRun(
+                "kubectl -n kube-system rollout status deployment/metrics-server --timeout=300s",
+                "for i in $(seq 1 30); do kubectl top nodes && break || " +
+                    "{ echo 'waiting for node metrics...'; sleep 10; }; done"
+            ))
+            .build();
+
         String trustPolicy = format(
             """
             ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
