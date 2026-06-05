@@ -3,6 +3,7 @@ package health.emrys.afon.polaris.comms;
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.catalogs.JsonMaker;
+import health.emrys.afon.polaris.catalogs.PolarisDTOs;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.PrincipalRole;
@@ -103,16 +104,16 @@ public class PolarisConfigurer {
                 accessToken),
             client.putJsonCall(
                 getCatalogAdminGrantsURI(warehouseName),
-                config.catalogAdminGrants(),
+                config.getDtoMaker().catalogAdminGrants(),
                 accessToken),
             };
     }
 
-    public PrincipalWithCredentials configureUser(CloudConfigForPolaris config,
-                                                  String accessToken,
+    public PrincipalWithCredentials configureUser(String accessToken,
                                                   String principalName) throws IncorrectConfigException, IOException {
         String              uri      = principalsURI();
-        String              json     = config.principalCreation(principalName);
+        PolarisDTOs         dtos     = new PolarisDTOs(new JsonMaker());
+        String              json     = dtos.principalCreation(principalName);
         ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
         try (InputStream is = response.getEntity().getContent()) {
             JsonMaker jsonMaker = new JsonMaker();

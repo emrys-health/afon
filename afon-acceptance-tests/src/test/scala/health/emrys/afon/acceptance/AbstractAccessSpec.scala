@@ -14,7 +14,7 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 
   val NUM_ROWS = 100
-  val REST_CODE_RESOURCE_CREATED = 201
+
   val FULL_NAMESPACE = s"${cloudProvider}.$namespace"
 
   def config: CloudConfigForPolaris
@@ -123,4 +123,5 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
 object AbstractAccessSpec {
   val tables = scala.collection.mutable.Set[String]()
+  val REST_CODE_RESOURCE_CREATED = 201
 }
