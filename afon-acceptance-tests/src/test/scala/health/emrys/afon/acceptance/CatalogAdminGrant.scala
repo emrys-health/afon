@@ -56,11 +56,11 @@ class CatalogRoles(test: GivenWhenThen,
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
 
     assert(createCatalogRole(warehouseName).getCode == REST_CODE_RESOURCE_CREATED)
-    assert(createCatalogRoleGrant(warehouseName, TABLE_READ_DATA).getCode == REST_CODE_RESOURCE_CREATED)
-    assert(createCatalogRoleGrant(warehouseName, TABLE_WRITE_DATA).getCode == REST_CODE_RESOURCE_CREATED)
-    assert(createCatalogRoleGrant(warehouseName, NAMESPACE_CREATE).getCode == REST_CODE_RESOURCE_CREATED)
-    assert(createCatalogRoleGrant(warehouseName, TABLE_CREATE).getCode == REST_CODE_RESOURCE_CREATED)
-    assert(createCatalogRoleGrant(warehouseName, NAMESPACE_FULL_METADATA).getCode == REST_CODE_RESOURCE_CREATED)
+
+    val privileges = Set(TABLE_READ_DATA, TABLE_WRITE_DATA, NAMESPACE_CREATE, TABLE_CREATE, NAMESPACE_FULL_METADATA)
+    privileges.foreach(privilege =>
+      assert(createCatalogRoleGrant(warehouseName, privilege).getCode == REST_CODE_RESOURCE_CREATED)
+    )
 
     assert(associateRoles(warehouseName).getCode == REST_CODE_RESOURCE_CREATED)
 
@@ -68,7 +68,7 @@ class CatalogRoles(test: GivenWhenThen,
   }
 
   private def associateRoles(warehouseName: String) = {
-    val uri = getCatalogRolesURI(principalRoleName, warehouseName)
+    val uri = associateRolesURI(principalRoleName, warehouseName)
     val json = dtos.catalogRoleCreation(catalogRoleName)
     When(s"we call '$uri' with payload:\n$json")
     client.putJsonCall(uri, json, accessToken)

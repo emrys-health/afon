@@ -26,7 +26,7 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
     val catalogRoles      = new CatalogRoles(this, config, Some(config.warehouseName)) {
       override def apply() = {
         val principal = PolarisHelper.principle
-        Given(s"a principal with ID ${principal.getPrincipal} exists")
+        Given(s"a principal: ${principal.getPrincipal}")
         super.apply()
       }
     }
