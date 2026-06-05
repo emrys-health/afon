@@ -2,9 +2,14 @@ package health.emrys.afon.polaris.comms;
 
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.polaris.catalogs.JsonMaker;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
+import org.apache.polaris.core.admin.model.PrincipalRole;
+import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 import static java.lang.String.format;
 
@@ -17,14 +22,16 @@ public class PolarisConfigurer {
     }
 
     public static String getCatalogRolesURI(String roleName, String warehouseName) {
-        return format("/api/management/v1/principal-roles/%s/catalog-roles/%s",
-                      roleName,
-                      warehouseName);
+        return format(
+            "/api/management/v1/principal-roles/%s/catalog-roles/%s",
+            roleName,
+            warehouseName);
     }
 
     public static String getPrincipleToRolesURI(String principle) {
-        return format("/api/management/v1/principals/%s/principal-roles",
-                      principle);
+        return format(
+            "/api/management/v1/principals/%s/principal-roles",
+            principle);
     }
 
     public static String getCreateCatalogURI() {
@@ -32,9 +39,10 @@ public class PolarisConfigurer {
     }
 
     public static String getCatalogAdminGrantsURI(String warehouseName) {
-        return format("%s/%s/catalog-roles/catalog_admin/grants",
-                      getCreateCatalogURI(),
-                      warehouseName);
+        return format(
+            "%s/%s/catalog-roles/catalog_admin/grants",
+            getCreateCatalogURI(),
+            warehouseName);
     }
 
     public static String principalRolesURI(String roleName) {
@@ -58,19 +66,23 @@ public class PolarisConfigurer {
     }
 
     public static String catalogsURI(String warehouseName) {
-        return format("%s/%s",
-                      getCreateCatalogURI(),
-                      warehouseName);
+        return format(
+            "%s/%s",
+            getCreateCatalogURI(),
+            warehouseName);
     }
+
     public static String namespaceURI(String warehouseName,
                                       String namespace) {
         return format("/api/catalog/v1/%s/namespaces/%s", warehouseName, namespace);
     }
+
     public static String tableURI(String warehouseName,
                                   String namespace,
                                   String tableName) {
-        return format("/api/catalog/v1/%s/namespaces/%s/tables/%s",
-                      warehouseName, namespace, tableName);
+        return format(
+            "/api/catalog/v1/%s/namespaces/%s/tables/%s",
+            warehouseName, namespace, tableName);
     }
 
     public PolarisConfigurer(AfonPolarisClient client) {
@@ -80,16 +92,31 @@ public class PolarisConfigurer {
     /**
      * Everything you need to initialize Polaris in one method.
      */
-    public HttpResponse[] configurCatalogFor(CloudConfigForPolaris config, String accessToken) throws IOException, IncorrectConfigException {
+    public HttpResponse[] configurCatalogFor(CloudConfigForPolaris config,
+                                             String accessToken) throws IOException, IncorrectConfigException {
         String warehouseName = config.warehouseName();
         client.delete(catalogsURI(warehouseName), accessToken); // this failing is expected if there is no catalog
         return new HttpResponse[]{
-                client.postJsonCall(getCreateCatalogURI(),
-                                    config.catalogConfig(),
-                                    accessToken),
-                client.putJsonCall(getCatalogAdminGrantsURI(warehouseName),
-                                   config.catalogAdminGrants(),
-                                   accessToken),
-        };
+            client.postJsonCall(
+                getCreateCatalogURI(),
+                config.catalogConfig(),
+                accessToken),
+            client.putJsonCall(
+                getCatalogAdminGrantsURI(warehouseName),
+                config.catalogAdminGrants(),
+                accessToken),
+            };
+    }
+
+    public PrincipalWithCredentials configureUser(CloudConfigForPolaris config,
+                                                  String accessToken,
+                                                  String principalName) throws IncorrectConfigException, IOException {
+        String              uri      = principalsURI();
+        String              json     = config.principalCreation(principalName);
+        ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
+        try (InputStream is = response.getEntity().getContent()) {
+            JsonMaker jsonMaker = new JsonMaker();
+            return jsonMaker.fromJson(is, PrincipalWithCredentials.class);
+        }
     }
 }

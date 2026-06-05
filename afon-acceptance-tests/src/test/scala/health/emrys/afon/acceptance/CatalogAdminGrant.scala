@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
+import health.emrys.afon.polaris.comms.PolarisConfigurer
 import health.emrys.afon.polaris.comms.PolarisConfigurer._
 import org.apache.polaris.core.admin.model.CatalogPrivilege
 import org.apache.polaris.core.admin.model.CatalogPrivilege.{TABLE_READ_DATA, TABLE_WRITE_DATA}
@@ -51,7 +52,8 @@ class CatalogRoles(test: GivenWhenThen,
   def apply = {
     Given(s"a Polaris endpoint at ${client.getEndpoint}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
-    assert(createPrincipal().getCode == REST_CODE_RESOURCE_CREATED)
+//    assert(createPrincipal().getCode == REST_CODE_RESOURCE_CREATED)
+    createPrincipalDelegating()
 
     assert(createPrincipalRoles().getCode == REST_CODE_RESOURCE_CREATED)
 
@@ -98,10 +100,10 @@ class CatalogRoles(test: GivenWhenThen,
     When(s"we call '$uri' with payload:\n$json")
     client.postJsonCall(uri, json, accessToken)
   }
-  private def createPrincipal() = {
-    val uri = principalsURI
-    val json = config.principalCreation(principleName)
-    When(s"we call '$uri' with payload:\n$json")
-    client.postJsonCall(uri, json, accessToken)
+  private def createPrincipalDelegating() = {
+    val configurer = new PolarisConfigurer(client)
+    val principle = configurer.configureUser(config, accessToken, principleName)
+    println("principle = " + principle)
+    principle
   }
 }
