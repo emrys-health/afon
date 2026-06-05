@@ -1,8 +1,8 @@
 package health.emrys.afon.polaris.catalogs;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.polaris.core.admin.model.*;
-import org.apache.polaris.core.entity.PolarisEntityConstants;
+import org.apache.polaris.core.admin.model.Catalog;
+import org.apache.polaris.core.admin.model.CatalogProperties;
+import org.apache.polaris.core.admin.model.StorageConfigInfo;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,50 +13,11 @@ public abstract class CloudConfigForPolaris {
 
     private final JsonMaker jsonMaker;
 
+    private final PolarisDTOs dtoMaker;
+
     protected CloudConfigForPolaris(JsonMaker jsonMaker) {
         this.jsonMaker = jsonMaker;
-    }
-
-    public String catalogAdminGrants() throws IncorrectConfigException {
-        return toJson(
-            new CatalogGrant(CatalogPrivilege.TABLE_WRITE_DATA, GrantResource.TypeEnum.CATALOG)
-                     );
-    }
-
-    public String principalCreation(String principleName) throws IncorrectConfigException {
-        return toJson(
-            Principal.builder().setClientId(principleName).setName(principleName).build()
-                     );
-    }
-
-    public String principalRoleCreation(String principleRole) throws IncorrectConfigException {
-        return toJson(
-            PrincipalRole.builder().setName(principleRole).build()
-                     );
-    }
-
-    public String catalogRoleCreation(String catalogRoleName) throws IncorrectConfigException {
-        return toJson(
-            CatalogRole.builder().setName(catalogRoleName).build()
-                     );
-    }
-
-    public String catalogRoleGrant(CatalogPrivilege privelege) throws IncorrectConfigException {
-        return toJson(
-            AddGrantRequest.builder().setGrant(
-                CatalogGrant.builder()
-                            .setPrivilege(privelege)
-                            .setType(GrantResource.TypeEnum.CATALOG)
-                            .build()
-                                              )
-                .build()
-              );
-    }
-
-    public String catalogRoles() throws IncorrectConfigException {
-        return toJson(
-            new CatalogRole(PolarisEntityConstants.getNameOfCatalogAdminRole())
-                     );
+        this.dtoMaker = new PolarisDTOs(jsonMaker);
     }
 
     public abstract String catalogConfig() throws IncorrectConfigException;
@@ -64,11 +25,7 @@ public abstract class CloudConfigForPolaris {
     public abstract String warehouseName();
 
     protected String toJson(Object object) throws IncorrectConfigException {
-        try {
-            return jsonMaker.toJson(object);
-        } catch (JsonProcessingException e) {
-            throw new IncorrectConfigException(this.toString(), e);
-        }
+        return dtoMaker.toJson(object);
     }
 
     protected Catalog createCatalog(String bucket,
@@ -97,4 +54,7 @@ public abstract class CloudConfigForPolaris {
         return properties;
     }
 
+    public PolarisDTOs getDtoMaker() {
+        return dtoMaker;
+    }
 }
