@@ -60,9 +60,12 @@ public class AfonProperties {
     public static final AfonProperty AZURE_CLIENT_ID         = new AfonProperty("AZURE_CLIENT_ID");
     public static final AfonProperty AZURE_CLIENT_SECRET     = new AfonProperty("AZURE_CLIENT_SECRET");
 
-    public static final AfonProperty POLARIS_ID       = new AfonProperty("POLARIS_ID");
-    public static final AfonProperty POLARIS_SECRET   = new AfonProperty("POLARIS_SECRET");
-    public static final AfonProperty POLARIS_ENDPOINT = new AfonProperty("POLARIS_ENDPOINT");
+    // Polaris
+    public static final AfonProperty USER_POLARIS_ID     = new AfonProperty("USER_POLARIS_ID");
+    public static final AfonProperty USER_POLARIS_SECRET = new AfonProperty("USER_POLARIS_SECRET");
+    public static final AfonProperty POLARIS_ID          = new AfonProperty("POLARIS_ID");
+    public static final AfonProperty POLARIS_SECRET      = new AfonProperty("POLARIS_SECRET");
+    public static final AfonProperty POLARIS_ENDPOINT    = new AfonProperty("POLARIS_ENDPOINT");
 
     public static final AfonProperty OAUTH2_CLIENT_ID     = new AfonProperty("OAUTH2_CLIENT_ID");
     public static final AfonProperty OAUTH2_CLIENT_SECRET = new AfonProperty("OAUTH2_CLIENT_SECRET");

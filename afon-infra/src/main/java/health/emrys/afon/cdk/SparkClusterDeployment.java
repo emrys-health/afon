@@ -263,8 +263,8 @@ public class SparkClusterDeployment extends AwsWholeStack {
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
         Properties properties = new AfonPropertiesLoader().getProperties();
         SparkWarehouseConfig sparkWarehouseConfig = new SparkWarehouseConfig(
-            POLARIS_ID.getValueFrom(properties),
-            POLARIS_SECRET.getValueFrom(properties),
+            USER_POLARIS_ID.getValueFrom(properties),
+            USER_POLARIS_SECRET.getValueFrom(properties),
             AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties)
         );
         for (SupportedCloudsEnum cloudProvider : SupportedCloudsEnum.values()) {
