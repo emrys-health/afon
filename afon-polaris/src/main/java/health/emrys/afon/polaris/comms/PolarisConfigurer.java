@@ -6,7 +6,6 @@ import health.emrys.afon.polaris.catalogs.JsonMaker;
 import health.emrys.afon.polaris.catalogs.PolarisDTOs;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
-import org.apache.polaris.core.admin.model.PrincipalRole;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
 
 import java.io.IOException;
@@ -22,7 +21,7 @@ public class PolarisConfigurer {
         return tableURI(warehouseName, namespace, "");
     }
 
-    public static String getCatalogRolesURI(String roleName, String warehouseName) {
+    public static String associateRolesURI(String roleName, String warehouseName) {
         return format(
             "/api/management/v1/principal-roles/%s/catalog-roles/%s",
             roleName,
