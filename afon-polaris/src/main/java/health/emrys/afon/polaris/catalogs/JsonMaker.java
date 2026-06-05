@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import health.emrys.afon.config.AfonPropertiesLoader;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 public class JsonMaker {
     /**
      * For testing the config JSON only.
@@ -25,8 +28,17 @@ public class JsonMaker {
     }
 
     public String toJson(Object object) throws JsonProcessingException {
-        ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+        ObjectMapper mapper = getObjectMapper();
         String json = mapper.writeValueAsString(object);
         return json;
+    }
+
+    private static ObjectMapper getObjectMapper() {
+        return new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    }
+
+    public <T> T fromJson(InputStream is, Class<T> clazz) throws IOException {
+        ObjectMapper mapper = getObjectMapper();
+        return mapper.readValue(is, clazz);
     }
 }
