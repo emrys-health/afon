@@ -23,7 +23,13 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
     val externalBucket    = AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)
     val config            = new GlueCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(config.warehouseName()))
-    val catalogRoles      = new CatalogRoles(this, config, Some(config.warehouseName))
+    val catalogRoles      = new CatalogRoles(this, config, Some(config.warehouseName)) {
+      override def apply() = {
+        val principal = PolarisHelper.principle
+        Given(s"a principal with ID ${principal.getPrincipal} exists")
+        super.apply()
+      }
+    }
     val tableName         = "DatumAccTest2"
     val sparkNamespace    = "ph_glue_iceberg_db"
     val awsRegion         = AWS_REGION.getValueFrom(properties)
