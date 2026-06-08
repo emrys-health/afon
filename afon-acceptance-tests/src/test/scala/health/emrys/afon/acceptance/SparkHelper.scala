@@ -8,7 +8,7 @@ import org.apache.spark.sql.SparkSession
 object SparkHelper {
   val namespace = PolarisConstants.ACCEPTANCE_TEST_NAMESPACE
 
-  val principal = PolarisHelper.principle
+  val principal = PolarisHelper.principal
 
   val sparkWarehouse = new SparkWarehouseConfig(
     principal.getCredentials.getClientId,

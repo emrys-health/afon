@@ -14,8 +14,8 @@ public class JsonMakerTest {
     private JsonMaker jsonMaker = new JsonMaker();
 
     @Test
-    public void testPrincipleDeserialization() throws IOException {
-        String name = "myprincipleName";
+    public void testPrincipalDeserialization() throws IOException {
+        String name = "myprincipalName";
         var json = String.format(""" 
                    {"principal":{"name":"%s","clientId":"2bd68e998ec145a1","properties":{},"createTimestamp":1780656452136,"lastUpdateTimestamp":1780656452136,"entityVersion":1},"credentials":{"clientId":"2bd68e998ec145a1","clientSecret":"***REMOVED***"}}
                    """, name);
