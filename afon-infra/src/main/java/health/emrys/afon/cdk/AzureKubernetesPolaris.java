@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.TFUtils.POLARIS_PROVISIONERS;
+import static health.emrys.afon.infra.Defaults.JUPYTER_SERVICE_NAME;
 import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 
 public class AzureKubernetesPolaris extends AzureKubernetesStack {
@@ -35,6 +36,8 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
     private static final int     POLARIS_PORT     = 8181;
     private final        String  resourceGroup;
     protected final      Release nginxRelease;
+    protected final      Release certManager;
+    private final        Service internalService;
 
     public AzureKubernetesPolaris(Construct scope, String id,
                                   Properties properties) {
@@ -65,9 +68,9 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
             POLARIS_PORT, POLARIS_INTERNAL, POLARIS_INGRESS_NAME);
         HelmProvider               helm        = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
-        nginxRelease = configureNginx(helm, dependables);
-        Release certManager     = util.installCertManager(this, helm, dependables);
-        Service internalService = polarisConfig.deployPolaris(cloudProvider.getDependables());
+        nginxRelease    = configureNginx(helm, dependables);
+        certManager     = util.installCertManager(this, helm, dependables);
+        internalService = polarisConfig.deployPolaris(cloudProvider.getDependables());
         IngressV1 ingress = util.createIngress(
             List.of(
                 nginxRelease, certManager, internalService),

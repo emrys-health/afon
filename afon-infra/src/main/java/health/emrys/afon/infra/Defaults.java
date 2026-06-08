@@ -2,9 +2,10 @@ package health.emrys.afon.infra;
 
 public interface Defaults {
 
-    String GCP_REGION   = "europe-west2";
+    String GCP_REGION = "europe-west2";
 
     String JUPYTER_SERVICE_NAME = "jupyter-web";
+    String JUPYTER_INGRESS      = "jupyter-ingress";
 
     String POLARIS_POD_NAME     = "polaris";
     String POLARIS_INGRESS_NAME = "polaris-ingress";
