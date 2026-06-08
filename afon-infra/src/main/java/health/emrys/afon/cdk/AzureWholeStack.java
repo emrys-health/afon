@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -12,7 +13,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_PORT;
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_SVC_NAME;
-import static health.emrys.afon.config.AfonProperties.AZURE_JUPYTER_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.JUPYTER_INGRESS;
 
 public class AzureWholeStack extends AzureKubernetesPolaris {
@@ -48,9 +49,19 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
             }
 
             @Override
-            protected String getJupyterDomain() {
-                return jupyterDomainName;
+            protected JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps) {
+                return new JupyterMfaConfig(
+                    AzureWholeStack.this,
+                    proxyDeps,
+                    "http://guacamole-web:8080",
+                    jupyterDomainName,
+                    AZURE_OAUTH2_CLIENT_ID.getValueFrom(properties),
+                    AZURE_OAUTH2_CLIENT_SECRET.getValueFrom(properties),
+                    AZURE_OAUTH2_COOKIE_SECRET.getValueFrom(properties)
+                    );
             }
+
+
         };
         jupyter.deployJupyter(cloudProvider.getDependables());
     }

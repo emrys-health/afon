@@ -28,16 +28,17 @@ abstract class JupyterConfig {
      * must launch one Xvfb + x11vnc on each of these ports (display :N for port
      * 5900+N).
      */
-    private final List<GuacamoleConfig.Session> sessions;
-    private final TerraformStack                stack;
-    private final String                        jupyterPassword;
+    private final   List<GuacamoleConfig.Session> sessions;
+    private final   TerraformStack                stack;
+    private final   String                        jupyterPassword;
+    protected final Properties                    properties;
 
 
     public JupyterConfig(TerraformStack stack,
                          Properties properties) {
-        this.stack            = stack;
-        this.jupyterPassword  = AfonProperties.JUPYTER_VNC_PASSWORD.getValueFrom(properties);
-        this.sessions         = new ArrayList<>();
+        this.stack           = stack;
+        this.jupyterPassword = AfonProperties.JUPYTER_VNC_PASSWORD.getValueFrom(properties);
+        this.sessions        = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             sessions.add(
                 new GuacamoleConfig.Session(
@@ -46,6 +47,7 @@ abstract class JupyterConfig {
                     5901 + i)
                         );
         }
+        this.properties = properties;
     }
 
     Map<String, String> deployJupyter(List<ITerraformDependable> eksDependOn) {
@@ -104,11 +106,7 @@ abstract class JupyterConfig {
         // Deploy oauth2-proxy pointing at the Jupyter web ClusterIP service.
         List<ITerraformDependable> proxyDeps = new ArrayList<>(eksDependOn);
         proxyDeps.add(jupyterWeb);
-        new JupyterMfaConfig(
-            stack,
-            proxyDeps,
-            "http://guacamole-web:8080",
-            getJupyterDomain());
+        getMFAConfig(proxyDeps);
 
         configureHttpsAndDNS();
 
@@ -167,5 +165,5 @@ abstract class JupyterConfig {
 
     protected abstract void configureHttpsAndDNS();
 
-    protected abstract String getJupyterDomain();
+    protected abstract JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps);
 }
