@@ -18,7 +18,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.infra.Defaults.POLARIS_SERVICE_NAME;
+import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_IMAGE_NAME;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_PROPERTIES;
 import static java.lang.String.format;
@@ -172,10 +172,10 @@ public class PolarisConfig extends Construct {
         Deployment polarisDeployment,
         Map<String, String> polarisLabels) {
         return Service.Builder
-            .create(this, POLARIS_SERVICE_NAME)
+            .create(this, POLARIS_INGRESS_NAME)
             .metadata(ServiceMetadata
                           .builder()
-                          .name(POLARIS_SERVICE_NAME)
+                          .name(POLARIS_INGRESS_NAME)
                           .build())
             .dependsOn(List.of(polarisDeployment))
             .provisioners(uponDestroyRun(NO_POLARIS_FINALIZERS))

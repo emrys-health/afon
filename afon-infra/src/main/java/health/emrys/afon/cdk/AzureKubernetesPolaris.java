@@ -19,7 +19,11 @@ import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
+
+import static health.emrys.afon.cdk.TFUtils.POLARIS_PROVISIONERS;
+import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 
 public class AzureKubernetesPolaris extends AzureKubernetesStack {
 
@@ -56,19 +60,19 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
         };
         var util = new TFUtils(
             this, azurePolarisDomainName, TLS_SECRET_NAME,
-            POLARIS_PORT, POLARIS_INTERNAL);
+            POLARIS_PORT, POLARIS_INTERNAL, POLARIS_INGRESS_NAME);
         HelmProvider               helm        = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
         Map<String, String> annotations = Map.of(
             "controller.service.annotations.service\\.beta\\" +
                 ".kubernetes\\.io/azure-load-balancer-health-probe" +
                 "-request-path", "/healthz");
-        Release nginxRelease    = util.installNginxIngress(this, helm, dependables, annotations);
+        Release nginxRelease    = TFUtils.installNginxIngress(this, helm, dependables, annotations);
         Release certManager     = util.installCertManager(this, helm, dependables);
         Service internalService = polarisConfig.deployPolaris(cloudProvider.getDependables());
         IngressV1 ingress = util.createIngress(List.of(
-            nginxRelease, certManager,
-            internalService));
+                                                    nginxRelease, certManager, internalService),
+                                               Optional.of(POLARIS_PROVISIONERS));
         configureDns(ingress);
     }
 
