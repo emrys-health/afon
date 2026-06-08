@@ -4,6 +4,8 @@ import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.SQLConf$;
 import org.apache.spark.sql.internal.StaticSQLConf$;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,8 +20,9 @@ import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 public class SparkWarehouseConfig {
 
     public static final String[] SUPPORTED_CLOUD_NAMES = Arrays.stream(SupportedCloudsEnum.values()).map(x -> x.toString()).toArray(String[]::new);
+  private static final Logger log = LoggerFactory.getLogger(SparkWarehouseConfig.class);
 
-    private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
+  private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
     private final String DEFAULT_CATALOG          = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
     private final String WAREHOUSE_PATH           = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
 
@@ -62,6 +65,7 @@ public class SparkWarehouseConfig {
                 .setSparkHome(tmpDir)
                 .set(WAREHOUSE_PATH, tmpDir);
         for (String cloudProvider : cloudProviders) {
+            log.info("Configuring Spark context for cloud {}", cloudProvider);
             configureWith(sparkConfigs(cloudProvider), sparkConf);
         }
 
