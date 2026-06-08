@@ -18,15 +18,15 @@ public class PolarisDTOs {
                      );
     }
 
-    public String principalCreation(String principleName) throws IncorrectConfigException {
+    public String principalCreation(String principalName) throws IncorrectConfigException {
         return toJson(
-            Principal.builder().setClientId(principleName).setName(principleName).build()
+            Principal.builder().setClientId(principalName).setName(principalName).build()
                      );
     }
 
-    public String principalRoleCreation(String principleRole) throws IncorrectConfigException {
+    public String principalRoleCreation(String principalRole) throws IncorrectConfigException {
         return toJson(
-            PrincipalRole.builder().setName(principleRole).build()
+            PrincipalRole.builder().setName(principalRole).build()
                      );
     }
 

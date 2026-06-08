@@ -50,9 +50,9 @@ public class PermissionsConfigurer {
         String json = dtos.principalRoleCreation(principalRoleName);
         return client.postJsonCall(uri, json, accessToken);
     }
-    public HttpResponse associatePrincipleRoles(String principleName,
+    public HttpResponse associatePrincipalRoles(String principalName,
                                                 String principalRoleName) throws IncorrectConfigException, IOException {
-        String uri = getPrincipleToRolesURI(principleName);
+        String uri = getPrincipalToRolesURI(principalName);
         String json = dtos.principalRoleCreation(principalRoleName);
         return client.putJsonCall(uri, json, accessToken);
     }

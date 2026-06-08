@@ -54,7 +54,7 @@ class CatalogRoles(test: GivenWhenThen,
 
   def apply = {
     Given(s"a Polaris endpoint at ${client.getEndpoint}")
-    And(s"a principal that's already been created:\n${PolarisHelper.principle.getPrincipal}")
+    And(s"a principal that's already been created:\n${PolarisHelper.principal.getPrincipal}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
 
     When(s"we create a catalog role name called '$catalogRoleName'")
@@ -70,7 +70,7 @@ class CatalogRoles(test: GivenWhenThen,
         .getCode == REST_CODE_RESOURCE_CREATED)
     )
 
-    When(s"we associate priciple role '$principalRoleName' with catalog role name '$catalogRoleName'")
+    When(s"we associate principal role '$principalRoleName' with catalog role name '$catalogRoleName'")
     assert(permissions
       .associateRoles(warehouseName, principalRoleName, catalogRoleName)
       .getCode == REST_CODE_RESOURCE_CREATED)

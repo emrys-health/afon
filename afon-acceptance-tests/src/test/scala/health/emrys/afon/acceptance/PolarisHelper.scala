@@ -2,16 +2,16 @@ package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.AbstractAccessSpec.REST_CODE_RESOURCE_CREATED
 import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
-import health.emrys.afon.acceptance.PolarisHelper.{principalRoleName, principleName}
+import health.emrys.afon.acceptance.PolarisHelper.{principalRoleName, principalName}
 import health.emrys.afon.polaris.catalogs.{JsonMaker, PolarisDTOs}
 import health.emrys.afon.polaris.comms.{PermissionsConfigurer, PolarisConfigurer}
-import health.emrys.afon.polaris.comms.PolarisConfigurer.{getPrincipleToRolesURI, principalRolesURI}
+import health.emrys.afon.polaris.comms.PolarisConfigurer.{getPrincipalToRolesURI, principalRolesURI}
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials
 
 object PolarisHelper {
-  val principleName     = "myprincipleName"
-  val principalRoleName = "myprinciplerole"
-  val principle         = (new PolarisHelper).createPrinciple()
+  val principalName     = "myprincipalName"
+  val principalRoleName = "myprincipalrole"
+  val principal         = (new PolarisHelper).createPrincipal()
 }
 
 class PolarisHelper {
@@ -20,17 +20,17 @@ class PolarisHelper {
   val client      = instance.getPolarisClient()
   val permissions = new PermissionsConfigurer(client)
 
-  def createPrinciple(): PrincipalWithCredentials = {
+  def createPrincipal(): PrincipalWithCredentials = {
     val configurer = new PolarisConfigurer(client)
-    val principle  = configurer.configureUser(accessToken, principleName)
+    val principal  = configurer.configureUser(accessToken, principalName)
 
     assert(permissions
       .createPrincipalRoles(principalRoleName)
       .getCode == REST_CODE_RESOURCE_CREATED)
     assert(permissions
-      .associatePrincipleRoles(principleName, principalRoleName)
+      .associatePrincipalRoles(principalName, principalRoleName)
       .getCode == REST_CODE_RESOURCE_CREATED)
 
-    principle
+    principal
   }
 }
