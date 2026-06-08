@@ -8,6 +8,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DNS_ZONE;
 import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DOMAIN;
+import static health.emrys.afon.infra.Defaults.JUPYTER_INGRESS;
 
 public class JupyterAwsConfig extends JupyterConfig {
     private final AwsConstruct cloudProvider;
@@ -33,7 +34,7 @@ public class JupyterAwsConfig extends JupyterConfig {
         // Traffic flow: internet → ALB (443) → oauth2-proxy:4180 → jupyter-web:8888 → Jupyter pod
         IngressV1 ingress = cloudProvider.createHttpsIngress(
             "jupyter-https-ingress",
-            "jupyter-ingress",
+            JUPYTER_INGRESS,
             jupyterCertArn,
             jupyterDomain,
             JupyterMfaConfig.PROXY_SVC_NAME,
