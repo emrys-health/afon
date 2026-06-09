@@ -5,6 +5,7 @@ import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import software.constructs.Construct;
@@ -32,7 +33,14 @@ public class AwsPlainKubernetes extends TerraformStack {
             .builder()
             .host(cloudProvider.getClusterEndpoint())
             .clusterCaCertificate(Fn.base64decode(cloudProvider.getBase64CertData()))
-            .token(cloudProvider.getToken())
+            // Exec auth so the token is minted per-call rather than a static 15-min
+            // data.aws_eks_cluster_auth token that expires mid-destroy.
+            .exec(HelmProviderKubernetesExec
+                      .builder()
+                      .apiVersion("client.authentication.k8s.io/v1beta1")
+                      .command("aws")
+                      .args(cloudProvider.eksGetTokenArgs())
+                      .build())
             .build();
         HelmProvider helm = HelmProvider.Builder
             .create(this, "helm")

@@ -6,6 +6,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -70,11 +71,19 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         network.networkPolicies(jupyter.deployJupyter(dependables), SPARK_CONNECTOR_NAME);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
+        // Exec auth (aws eks get-token) instead of a static data.aws_eks_cluster_auth
+        // token: the static token lives 15 min, shorter than a full destroy, so it
+        // expires mid-teardown and the helm uninstalls hang on 401 until timeout.
         HelmProviderKubernetes kubernetes = HelmProviderKubernetes
             .builder()
             .host(cloudProvider.getClusterEndpoint())
             .clusterCaCertificate(Fn.base64decode(cloudProvider.getBase64CertData()))
-            .token(cloudProvider.getToken())
+            .exec(HelmProviderKubernetesExec
+                      .builder()
+                      .apiVersion("client.authentication.k8s.io/v1beta1")
+                      .command("aws")
+                      .args(cloudProvider.eksGetTokenArgs())
+                      .build())
             .build();
         HelmProvider helm = HelmProvider.Builder
             .create(this, "helm")

@@ -40,6 +40,7 @@ import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
@@ -83,6 +84,10 @@ public class AwsConstruct extends AbstractConstruct {
     final         IamRole                    loadBalancerRole;
     final         Resource newKubeConfig;
     private       Release  lbRelease;
+    private       KubernetesProvider kubernetesProvider;
+
+    /** Auth API version expected by the kubernetes/helm provider exec plugin contract. */
+    private static final String K8S_EXEC_API_VERSION = "client.authentication.k8s.io/v1beta1";
 
     AwsConstruct(final Construct scope, final String id, Properties properties) {
         super(scope, id);
@@ -874,6 +879,12 @@ public class AwsConstruct extends AbstractConstruct {
             .provider(kubernetesProvider)
             .metadata(ingressMetadata)
             .spec(alb)
+            // Depend on the LBC release so destroy order is ingress -> controller.
+            // Without this edge Terraform may uninstall the LBC first, leaving the
+            // ALB finalizer on the ingress with nothing to remove it — the
+            // kubernetes_ingress_v1 delete then blocks on the Terminating object
+            // until the provider operation times out.
+            .dependsOn(List.of(lbRelease))
             .lifecycle(TerraformResourceLifecycle
                            .builder()
                            .preventDestroy(false)
@@ -935,5 +946,44 @@ public class AwsConstruct extends AbstractConstruct {
 
     public String getRegion() {
         return region;
+    }
+
+    public String getClusterName() {
+        return clusterName;
+    }
+
+    /**
+     * Arguments to {@code aws eks get-token} for this cluster. Used by the kubernetes
+     * and helm provider {@code exec} blocks so a fresh bearer token is minted on every
+     * API call rather than captured once at plan time. A static token from
+     * {@code data.aws_eks_cluster_auth} expires after 15 minutes, which is shorter than
+     * a full EKS teardown — once it lapses, every remaining k8s/helm destroy gets a 401
+     * and the provider retries until {@code tofu destroy} times out.
+     */
+    List<String> eksGetTokenArgs() {
+        return List.of("eks", "get-token", "--cluster-name", clusterName, "--region", region, "--output", "json");
+    }
+
+    /**
+     * Exec-based auth for the kubernetes provider, replacing the previous static
+     * {@code data.aws_eks_cluster_auth} token (see {@link #eksGetTokenArgs()}). Mirrors
+     * the GCP path's use of {@code gke-gcloud-auth-plugin}.
+     */
+    @Override
+    public synchronized KubernetesProvider configureK8s() {
+        if (kubernetesProvider == null) {
+            kubernetesProvider = KubernetesProvider.Builder
+                .create(this, "kubernetes")
+                .host(getClusterEndpoint())
+                .clusterCaCertificate(Fn.base64decode(getBase64CertData()))
+                .exec(List.of(KubernetesProviderExec
+                                  .builder()
+                                  .apiVersion(K8S_EXEC_API_VERSION)
+                                  .command("aws")
+                                  .args(eksGetTokenArgs())
+                                  .build()))
+                .build();
+        }
+        return kubernetesProvider;
     }
 }
