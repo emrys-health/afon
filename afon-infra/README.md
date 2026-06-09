@@ -1,5 +1,7 @@
 # Assumptions
 
+### Cloud permissions
+
 We assume that if you running Afon, you have an AWS, Azure and/or GCP cloud.
 We also assume that the roles and permissions to create a K8s cluster have been set up.
 These include running:
@@ -8,10 +10,15 @@ These include running:
 ../scripts/azure/create.sh  # for Azure
 ../scripts/gcp/create.sh    # for Google
 ```
+
+### External Database
+
 We also assume that you have a Database to store the Polaris metadata.
 Credentials to access that live in [env.properties](../env.properties)
 
-Finally, if you want to use Jupyter, you need to get past the Oauth2 security that we delegate to Google.
+### OAuth Provider
+
+Finally, if you want to use Jupyter/Guacamole, you need to get past the Oauth2 security that we delegate to Google.
 So, you'll need a Google account login.
 
 If you want to set up OAuth via Google, then register your domain [here](https://console.cloud.google.com/auth/clients?project=afon-core).
@@ -23,6 +30,9 @@ Doing so will generate the client ID and secret you then put in `env.properties`
 Note 1: Run everything in the `afon-infra` directory.
 
 Note 2: If you really foul things up, you'll leave the environment in an unstable state.
+Consult the `*Nuke.java` files to destroy your environment totally. 
+They will output shell scripts that you can run. 
+You may need to run them multiple times for the VPC to disappear from your cloud.
 
 Note 3: only AWS has the full stack. 
 Azure and GCP just host Polaris at the moment.
