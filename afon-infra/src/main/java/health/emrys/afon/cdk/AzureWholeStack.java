@@ -4,12 +4,17 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
+import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
+import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+
+import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_PORT;
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_SVC_NAME;
@@ -29,7 +34,23 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
         // proves the cilium-agent is serving requests, avoiding the
         // "Cilium API client timeout exceeded" pod-sandbox failure.
         List<Release> dependencies = List.of(nginxRelease);
-        new SparkConfig(this, "sparkop", dependencies);
+        SparkConfig sparkOperatorConfig = new SparkConfig(this, "sparkop", dependencies);
+
+        // The SparkApplication driver runs under this service account
+        // (spark.kubernetes.authenticate.driver.serviceAccountName).
+        ServiceAccount.Builder
+            .create(this, "sparkApplicationSa")
+            .metadata(ServiceAccountMetadata.builder()
+                                            .name(SPARK_SERVICE_ACCOUNT_NAME)
+                                            .namespace("default")
+                                            .build())
+            .build();
+
+        // Installing the operator alone leaves it idle — it only launches a master/workers
+        // and a driver/executors in response to the SparkCluster/SparkApplication CRs.
+        List<ITerraformDependable> sparkDependsOn = new ArrayList<>(cloudProvider.getDependables());
+        sparkDependsOn.add(sparkOperatorConfig.operatorReady);
+        SparkWorkloads.deploy(this, ID, sparkDependsOn);
 
         String jupyterDomainName = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
         var util = new TFUtils(
