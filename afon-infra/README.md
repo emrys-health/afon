@@ -14,6 +14,10 @@ Credentials to access that live in [env.properties](../env.properties)
 Finally, if you want to use Jupyter, you need to get past the Oauth2 security that we delegate to Google.
 So, you'll need a Google account login.
 
+If you want to set up OAuth via Google, then register your domain [here](https://console.cloud.google.com/auth/clients?project=afon-core).
+Doing so will generate the client ID and secret you then put in `env.properties`.
+(The cookie secret you generate yourself using something like `openssl rand -hex 16`).
+
 # Deployment
 
 Note 1: Run everything in the `afon-infra` directory.
