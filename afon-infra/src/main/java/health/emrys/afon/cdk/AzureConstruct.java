@@ -281,7 +281,7 @@ public class AzureConstruct extends AbstractConstruct {
         KubernetesClusterDefaultNodePool nodePool = KubernetesClusterDefaultNodePool
             .builder()
             .name("systempool")
-            .nodeCount(1)
+            .nodeCount(3)
             .vmSize("Standard_A8_v2")
             .vnetSubnetId(nodeSubnet.getId())
             .build();

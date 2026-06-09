@@ -28,8 +28,8 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
         // operator on nginxRelease (which has already scheduled pods successfully)
         // proves the cilium-agent is serving requests, avoiding the
         // "Cilium API client timeout exceeded" pod-sandbox failure.
-//        List<Release> dependencies = List.of(nginxRelease);
-//        new SparkConfig(this, "sparkop", dependencies);
+        List<Release> dependencies = List.of(nginxRelease);
+        new SparkConfig(this, "sparkop", dependencies);
 
         String jupyterDomainName = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
         var util = new TFUtils(
