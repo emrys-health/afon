@@ -282,7 +282,7 @@ public class AzureConstruct extends AbstractConstruct {
             .builder()
             .name("systempool")
             .nodeCount(3)
-            .vmSize("Standard_A8_v2")
+            .vmSize("Standard_D2s_v3")
             .vnetSubnetId(nodeSubnet.getId())
             .build();
 
