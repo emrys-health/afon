@@ -8,7 +8,7 @@ public class DeploySnowflakeReadingAwsViaAwsMain implements StepsProvider {
     public static List<Step> steps(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(DeployFullStackAwsMain.steps(stepOperations));
-        steps.add(stepOperations.checkAwsSparkConnectorReadingAws());
+        steps.add(stepOperations.checkAwsSparkConnectorTalkingToAws());
         steps.add(stepOperations.snowflakeReadsAwsViaPolaris());
         return steps;
     }

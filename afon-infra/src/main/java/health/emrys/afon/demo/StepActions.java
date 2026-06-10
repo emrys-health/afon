@@ -3,10 +3,7 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
-import health.emrys.afon.cdk.AwsWholeStack;
-import health.emrys.afon.cdk.AzureKubernetesPolaris;
-import health.emrys.afon.cdk.GcpKubernetesPolaris;
-import health.emrys.afon.cdk.SparkClusterDeployment;
+import health.emrys.afon.cdk.*;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.core.configuration.LocalPolarisRegisterMain;
 import health.emrys.afon.infra.EndpointPolarisConfiguration;
@@ -108,6 +105,11 @@ public class StepActions {
     public void startGcpPolaris() throws Exception {
         executeMainOf(GcpKubernetesPolaris.class, new String[]{});
         startCloud(cdktfPath(GcpKubernetesPolaris.ID));
+    }
+
+    public void startFullStackAzure() throws Exception {
+        executeMainOf(AzureWholeStack.class, new String[]{});
+        startCloud(cdktfPath(AzureKubernetesPolaris.ID));
     }
 
     public void startAzurePolaris() throws Exception {

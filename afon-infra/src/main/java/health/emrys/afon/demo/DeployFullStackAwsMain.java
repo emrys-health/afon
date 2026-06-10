@@ -9,7 +9,7 @@ public class DeployFullStackAwsMain implements StepsProvider {
             stepOperations.deployAwsSpark(),
             stepOperations.waitForAwsPolaris(),
             stepOperations.initializeAllCatalogsInAws(),
-            stepOperations.checkAwsSparkConnectorReadingAws()
+            stepOperations.checkAwsSparkConnectorTalkingToAws()
                       );
     }
     public static void main(String[] args) {

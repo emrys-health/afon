@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformResource;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -10,12 +11,16 @@ import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.infra.Defaults.POLARIS_SERVICE_NAME;
+import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 import static java.lang.String.format;
 
 public class TFUtils {
+
+    public static final List<LocalExecProvisioner> POLARIS_PROVISIONERS
+        = uponDestroyRun(PolarisConfig.NO_POLARIS_FINALIZERS);
 
     public static DeploymentSpecTemplateSpecContainerEnv envVar(String name, String value) {
         return DeploymentSpecTemplateSpecContainerEnv.builder()
@@ -24,32 +29,62 @@ public class TFUtils {
                                                      .build();
     }
 
+    public static Release installNginxIngress(Construct construct,
+                                              HelmProvider helmProvider,
+                                              final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
+                                              Map<String, String> annotations) {
+        var builder = Release.Builder
+            .create(construct, "nginx-ingress")
+            .provider(helmProvider)
+            .dependsOn(dependsOn)
+            .name("nginx-ingress")
+            .chart("ingress-nginx")
+            .repository("https://kubernetes.github.io/ingress-nginx")
+            .namespace("ingress-nginx")
+            .createNamespace(true)
+            .timeout(600)
+            .atomic(true);
+        if (annotations != null && !annotations.isEmpty()) {
+            var releaseSetBuilder = ReleaseSet.builder();
+            annotations.forEach((name, value) -> {
+                releaseSetBuilder.name(name);
+                releaseSetBuilder.value(value);
+            });
+            builder.set(List.of(releaseSetBuilder.build()));
+        }
+        return builder.build();
+    }
+
     private final String    domainName;
     private final String    tlsSecretName;
-    private final int       polarisPort;
-    private final String    polarisInternal;
+    private final int       port;
+    private final String    internalService;
     private final Construct construct;
+    private final String    ingressName;
 
     public TFUtils(Construct construct,
                    String domainName,
                    String tlsSecretName,
-                   int polarisPort,
-                   String polarisInternal) {
+                   int port,
+                   String internalService,
+                   String ingressName) {
         this.domainName      = domainName;
         this.tlsSecretName   = tlsSecretName;
-        this.polarisPort     = polarisPort;
-        this.polarisInternal = polarisInternal;
+        this.port            = port;
+        this.internalService = internalService;
         this.construct       = construct;
+        this.ingressName     = ingressName;
     }
 
-    public IngressV1 createIngress(List<TerraformResource> dependencies) {
+    public IngressV1 createIngress(List<TerraformResource> dependencies,
+                                   Optional<List<LocalExecProvisioner>> ingressProvisioners) {
         IngressV1SpecRuleHttpPathBackendServicePort port = IngressV1SpecRuleHttpPathBackendServicePort
             .builder()
-            .number(polarisPort)
+            .number(this.port)
             .build();
         IngressV1SpecRuleHttpPathBackendService backend = IngressV1SpecRuleHttpPathBackendService
             .builder()
-            .name(polarisInternal)
+            .name(internalService)
             .port(port)
             .build();
         IngressV1SpecRuleHttpPath httpPath = IngressV1SpecRuleHttpPath
@@ -81,46 +116,21 @@ public class TFUtils {
                         ))
             .rule(List.of(ingressV1SpecRule))
             .build();
-        return IngressV1.Builder
-            .create(construct, POLARIS_SERVICE_NAME)
+        IngressV1.Builder ingressBuilder = IngressV1.Builder
+            .create(construct, ingressName)
             .metadata(IngressV1Metadata
                           .builder()
-                          .name(POLARIS_SERVICE_NAME)
+                          .name(ingressName)
                           .annotations(Map.of(
                               "cert-manager.io/cluster-issuer", "letsencrypt-prod"
                                              ))
                           .build())
             .dependsOn(dependencies)
-            .provisioners(uponDestroyRun(PolarisConfig.NO_POLARIS_FINALIZERS))
             .spec(nginxSpec)
-            .waitForLoadBalancer(true)
+            .waitForLoadBalancer(true);
+        ingressProvisioners.stream().forEach(x -> ingressBuilder.provisioners(x));
+        return ingressBuilder
             .build();
-    }
-
-    public Release installNginxIngress(Construct construct,
-                                       HelmProvider helmProvider,
-                                       final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
-                                       Map<String, String> annotations) {
-        var builder = Release.Builder
-            .create(construct, "nginx-ingress")
-            .provider(helmProvider)
-            .dependsOn(dependsOn)
-            .name("nginx-ingress")
-            .chart("ingress-nginx")
-            .repository("https://kubernetes.github.io/ingress-nginx")
-            .namespace("ingress-nginx")
-            .createNamespace(true)
-            .timeout(600)
-            .atomic(true);
-        if (annotations != null && !annotations.isEmpty()) {
-            var releaseSetBuilder = ReleaseSet.builder();
-            annotations.forEach((name, value) -> {
-                releaseSetBuilder.name(name);
-                releaseSetBuilder.value(value);
-            });
-            builder.set(List.of(releaseSetBuilder.build()));
-        }
-        return builder.build();
     }
 
     /**
