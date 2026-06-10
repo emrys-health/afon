@@ -108,6 +108,13 @@ public class StepOperations {
             });
     }
 
+    public Step deployWholeStackAzure() {
+        return new Step(
+            "az_sre",
+            "deploy SRE in Azure",
+            () -> actions.startFullStackAzure());
+    }
+
     public Step deployAzurePolaris() {
         return new Step(
             "az_polaris",
@@ -242,7 +249,16 @@ public class StepOperations {
         return awsSparkTestUsing(AWS, EXTERNAL_NAMESPACE);
     }
 
-    public @NonNull Step awsSparkTestUsing(SupportedCloudsEnum warehouse, String namespace) {
+    public Step checkSparkConnectorTalkingToAzure() {
+        return sparkTestUsing(AZURE,
+                              format("local Spark call that uses %s", azurePolarisDomainName),
+                              EXTERNAL_NAMESPACE,
+                              SparkTestWriter.class,
+                              azurePolarisDomainName);
+    }
+
+    public @NonNull Step awsSparkTestUsing(SupportedCloudsEnum warehouse,
+                                           String namespace) {
         return awsSparkWriteTestUsing(
             warehouse,
             format(
@@ -262,10 +278,11 @@ public class StepOperations {
         return sparkTestUsing(
             warehouse,
             format(
-                "read via Spark table `%s.%s.%s`",
+                "read via Spark table `%s.%s.%s` by calling `%s`",
                 warehouse,
                 namespace,
-                SparkChecker.TABLE
+                SparkChecker.TABLE,
+                awsPolarisDomainName
                   ),
             namespace,
             SparkTestReader.class,
