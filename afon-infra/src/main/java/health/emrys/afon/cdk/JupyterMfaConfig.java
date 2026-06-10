@@ -44,7 +44,10 @@ class JupyterMfaConfig {
     JupyterMfaConfig(Construct scope,
                      List<ITerraformDependable> dependsOn,
                      String jupyterUpstreamUrl,
-                     String jupyterDomain) {
+                     String jupyterDomain,
+                     String clientId,
+                     String clientSecret,
+                     String cookieSecret) {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
 
@@ -56,9 +59,9 @@ class JupyterMfaConfig {
                           .namespace("default")
                           .build())
             .data(Map.of(
-                "client-id", OAUTH2_CLIENT_ID.getValueFrom(properties),
-                "client-secret", OAUTH2_CLIENT_SECRET.getValueFrom(properties),
-                "cookie-secret", OAUTH2_COOKIE_SECRET.getValueFrom(properties)
+                "client-id", clientId,
+                "client-secret", clientSecret,
+                "cookie-secret", cookieSecret
                         ))
             .build();
 

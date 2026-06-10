@@ -45,15 +45,16 @@ public class AfonProperties {
     public static final AfonProperty GCP_DOMAIN_NAME                = new AfonProperty("GCP_DOMAIN_NAME");
 
     // AZURE
-    public static final AfonProperty AZURE_SUBSCRIPTION     = new AfonProperty("AZURE_SUBSCRIPTION");
-    public static final AfonProperty AZURE_REGION           = new AfonProperty("AZURE_REGION");
-    public static final AfonProperty AZURE_RESOURCE_GROUP   = new AfonProperty("AZURE_RESOURCE_GROUP");
-    public static final AfonProperty AZURE_DOMAIN_NAME      = new AfonProperty("AZURE_DOMAIN_NAME");
-    public static final AfonProperty AZURE_BUCKET           = new AfonProperty("AZURE_BUCKET");
-    public static final AfonProperty AZURE_BUCKET_FORBIDDEN = new AfonProperty("AZURE_BUCKET_FORBIDDEN");
-    public static final AfonProperty AZURE_EXTERNAL_BUCKET  = new AfonProperty("AZURE_EXTERNAL_BUCKET");
-    public static final AfonProperty AZURE_STORAGE_ACCOUNT  = new AfonProperty("AZURE_STORAGE_ACCOUNT");
-    public static final AfonProperty DATABRICKS_TOKEN       = new AfonProperty("DATABRICKS_TOKEN");
+    public static final AfonProperty AZURE_SUBSCRIPTION        = new AfonProperty("AZURE_SUBSCRIPTION");
+    public static final AfonProperty AZURE_REGION              = new AfonProperty("AZURE_REGION");
+    public static final AfonProperty AZURE_RESOURCE_GROUP      = new AfonProperty("AZURE_RESOURCE_GROUP");
+    public static final AfonProperty AZURE_DOMAIN_NAME         = new AfonProperty("AZURE_DOMAIN_NAME");
+    public static final AfonProperty AZURE_JUPYTER_DOMAIN_NAME = new AfonProperty("AZURE_JUPYTER_DOMAIN_NAME");
+    public static final AfonProperty AZURE_BUCKET              = new AfonProperty("AZURE_BUCKET");
+    public static final AfonProperty AZURE_BUCKET_FORBIDDEN    = new AfonProperty("AZURE_BUCKET_FORBIDDEN");
+    public static final AfonProperty AZURE_EXTERNAL_BUCKET     = new AfonProperty("AZURE_EXTERNAL_BUCKET");
+    public static final AfonProperty AZURE_STORAGE_ACCOUNT     = new AfonProperty("AZURE_STORAGE_ACCOUNT");
+    public static final AfonProperty DATABRICKS_TOKEN          = new AfonProperty("DATABRICKS_TOKEN");
 
     public static final AfonProperty AZURE_TENANT_ID         = new AfonProperty("AZURE_TENANT_ID");
     public static final AfonProperty AZURE_CONNECTION_STRING = new AfonProperty("AZURE_CONNECTION_STRING");
@@ -70,6 +71,10 @@ public class AfonProperties {
     public static final AfonProperty OAUTH2_CLIENT_ID     = new AfonProperty("OAUTH2_CLIENT_ID");
     public static final AfonProperty OAUTH2_CLIENT_SECRET = new AfonProperty("OAUTH2_CLIENT_SECRET");
     public static final AfonProperty OAUTH2_COOKIE_SECRET = new AfonProperty("OAUTH2_COOKIE_SECRET");
+
+    public static final AfonProperty AZURE_OAUTH2_CLIENT_ID     = new AfonProperty("AZURE_OAUTH2_CLIENT_ID");
+    public static final AfonProperty AZURE_OAUTH2_CLIENT_SECRET = new AfonProperty("AZURE_OAUTH2_CLIENT_SECRET");
+    public static final AfonProperty AZURE_OAUTH2_COOKIE_SECRET = new AfonProperty("AZURE_OAUTH2_COOKIE_SECRET");
 
     public static final AfonProperty POLARIS_DB_PASSWORD = new AfonProperty("POLARIS_DB_PASSWORD");
     public static final AfonProperty POLARIS_DB_HOST     = new AfonProperty("POLARIS_DB_HOST");

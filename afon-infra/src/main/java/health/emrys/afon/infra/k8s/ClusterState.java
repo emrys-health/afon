@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 
 import static health.emrys.afon.infra.Defaults.POLARIS_POD_NAME;
-import static health.emrys.afon.infra.Defaults.POLARIS_SERVICE_NAME;
+import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 
 public class ClusterState implements AutoCloseable {
 
@@ -32,7 +32,7 @@ public class ClusterState implements AutoCloseable {
         } else {
             accessToken = tokenFromSysProp;
         }
-        polarisHost = k8sClient.getIngressExpectingOnlyOneFor(POLARIS_SERVICE_NAME);
+        polarisHost = k8sClient.getIngressExpectingOnlyOneFor(POLARIS_INGRESS_NAME);
         logger.info("Polaris is available to the outside world at: {}", polarisHost);
     }
 

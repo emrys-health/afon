@@ -1,19 +1,22 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import health.emrys.afon.config.AfonProperties;
 
+import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DNS_ZONE;
-import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DOMAIN;
+import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.infra.Defaults.JUPYTER_INGRESS;
 
 public class JupyterAwsConfig extends JupyterConfig {
-    private final AwsConstruct cloudProvider;
-    private final String       jupyterDomain;
-    private final String       jupyterDnsZoneId;
-    private final String jupyterCertArn;
+    private final AwsConstruct   cloudProvider;
+    private final String         jupyterDomain;
+    private final String         jupyterDnsZoneId;
+    private final String         jupyterCertArn;
+    private final TerraformStack stack;
 
     public JupyterAwsConfig(TerraformStack stack,
                             AwsConstruct cloudProvider,
@@ -23,6 +26,7 @@ public class JupyterAwsConfig extends JupyterConfig {
         this.jupyterDomain    = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
         this.jupyterDnsZoneId = AWS_JUPYTER_DNS_ZONE.getValueFrom(properties);
         this.jupyterCertArn   = AfonProperties.AWS_JUPYTER_CERT_ARN.getValueFrom(properties);
+        this.stack            = stack;
     }
 
     protected void configureHttpsAndDNS() {
@@ -33,7 +37,7 @@ public class JupyterAwsConfig extends JupyterConfig {
         // Traffic flow: internet → ALB (443) → oauth2-proxy:4180 → jupyter-web:8888 → Jupyter pod
         IngressV1 ingress = cloudProvider.createHttpsIngress(
             "jupyter-https-ingress",
-            "jupyter-ingress",
+            JUPYTER_INGRESS,
             jupyterCertArn,
             jupyterDomain,
             JupyterMfaConfig.PROXY_SVC_NAME,
@@ -47,7 +51,16 @@ public class JupyterAwsConfig extends JupyterConfig {
     }
 
     @Override
-    protected String getJupyterDomain() {
-        return jupyterDomain;
+    protected JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps) {
+        return new JupyterMfaConfig(
+            this.stack,
+            proxyDeps,
+            "http://guacamole-web:8080",
+            jupyterDomain,
+            OAUTH2_CLIENT_ID.getValueFrom(properties),
+            OAUTH2_CLIENT_SECRET.getValueFrom(properties),
+            OAUTH2_COOKIE_SECRET.getValueFrom(properties));
     }
+
+
 }
