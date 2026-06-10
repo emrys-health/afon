@@ -238,7 +238,7 @@ public class StepOperations {
         return awsSparkTestUsing(AZURE, EXTERNAL_NAMESPACE);
     }
 
-    public Step checkAwsSparkConnectorReadingAws() {
+    public Step checkAwsSparkConnectorTalkingToAws() {
         return awsSparkTestUsing(AWS, EXTERNAL_NAMESPACE);
     }
 
@@ -254,12 +254,12 @@ public class StepOperations {
     private Step awsSparkWriteTestUsing(SupportedCloudsEnum warehouse,
                                         String description,
                                         String namespace) {
-        return awsSparkWriteTestUsing(warehouse, description, namespace, SparkTestWriter.class);
+        return sparkTestUsing(warehouse, description, namespace, SparkTestWriter.class, awsPolarisDomainName);
     }
 
     Step awsSparkReadTestUsing(SupportedCloudsEnum warehouse,
                                String namespace) {
-        return awsSparkWriteTestUsing(
+        return sparkTestUsing(
             warehouse,
             format(
                 "read via Spark table `%s.%s.%s`",
@@ -268,15 +268,19 @@ public class StepOperations {
                 SparkChecker.TABLE
                   ),
             namespace,
-            SparkTestReader.class);
+            SparkTestReader.class,
+            awsPolarisDomainName);
     }
 
-    private @NonNull Step awsSparkWriteTestUsing(SupportedCloudsEnum warehouse,
-                                                 String description,
-                                                 String namespace,
-                                                 Class<? extends SparkChecker> clazz) {
+    private @NonNull Step sparkTestUsing(SupportedCloudsEnum warehouse,
+                                         String description,
+                                         String namespace,
+                                         Class<? extends SparkChecker> clazz,
+                                         String domainName) {
         return new Step(
-            format("aws_spark_talks_to_%s", warehouse.toString()),
+            format("%s_spark_talks_to_%s",
+                   machineNameFrom(domainName),
+                   warehouse.toString()),
             description,
             () -> {
                 Properties properties = appProperties();
@@ -284,7 +288,7 @@ public class StepOperations {
                     warehouse.toString(),
                     POLARIS_ID.getValueFrom(properties),
                     POLARIS_SECRET.getValueFrom(properties),
-                    awsPolarisDomainName,
+                    domainName,
                     namespace);
                 actions.executeMainOf(
                     clazz,
