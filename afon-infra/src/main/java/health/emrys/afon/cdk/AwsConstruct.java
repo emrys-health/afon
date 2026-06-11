@@ -624,22 +624,38 @@ public class AwsConstruct extends AbstractConstruct {
                                               );
 
 
-        // Destroy-time cleanup: must run before lbRelease is uninstalled so the LBC
-        // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
-        // The explicit helm uninstall --no-hooks pre-empts Terraform's own Helm destroy,
-        // which fails when webhooks/finalizers interfere. Helm treats "release not found" as success.
+        // Destroy-time cleanup, ordered so Terraform's subsequent ingress/Helm deletes
+        // can't block:
+        //   1. Delete the LBC admission webhooks FIRST. Once the controller is gone its
+        //      webhook Service has no endpoints, so any later ingress patch/delete that
+        //      still hits the webhook fails with "no endpoints available" — remove the
+        //      webhooks before anything else touches the ingresses.
+        //   2. helm-uninstall the controller and WAIT for its pods to disappear. This must
+        //      happen BEFORE stripping finalizers: a live LBC re-adds its
+        //      group.ingress.k8s.aws finalizer on every reconcile, so stripping while it
+        //      runs is instantly undone (this is why polaris-ingress hung even though it
+        //      was being patched).
+        //   3. Only then strip finalizers off EVERY ingress and TargetGroupBinding in all
+        //      namespaces (not just polaris-ingress — jupyter-ingress was never covered,
+        //      which is why it hung indefinitely). With the controller gone the strip
+        //      sticks, so Terraform's delete of the ingress objects returns immediately.
+        // The orphaned ALB/ENIs/SGs left behind are reaped later by awsNuke.cleanELBs()
+        // on the subnet destroy and destroySGsAndVPC() on the VPC.
         List<LocalExecProvisioner> onLbcDestroy = uponDestroyRun(
             "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer" +
                 " | xargs -r kubectl delete --ignore-not-found=true",
             "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer |" +
                 " xargs -r kubectl delete --ignore-not-found=true",
+            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
+                "|| true",
+            "kubectl -n kube-system wait --for=delete pod " +
+                "-l app.kubernetes.io/name=aws-load-balancer-controller --timeout=120s 2>/dev/null || true",
             "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
                 "while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p " +
                 "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
-            "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}'" +
-                " --type=merge 2>/dev/null || true",
-            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
-                "|| true",
+            "kubectl get ingress -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
+                "while read NS NAME; do kubectl patch ingress \"$NAME\" -n \"$NS\" -p " +
+                "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
             "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true");
         Resource.Builder
             .create(this, "lbc-destroy-cleanup")
