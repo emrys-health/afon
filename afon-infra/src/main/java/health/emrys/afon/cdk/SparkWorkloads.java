@@ -203,7 +203,8 @@ public class SparkWorkloads {
         SparkWarehouseConfig sparkWarehouseConfig = new SparkWarehouseConfig(
             USER_POLARIS_ID.getValueFrom(properties),
             USER_POLARIS_SECRET.getValueFrom(properties),
-            polarisDomainName
+            polarisDomainName,
+            "https"
         );
         for (SupportedCloudsEnum cloudProvider : SupportedCloudsEnum.values()) {
             Map<String, String> configs = sparkWarehouseConfig.sparkConfigs(cloudProvider);
