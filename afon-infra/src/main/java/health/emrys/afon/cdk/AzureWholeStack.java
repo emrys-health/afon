@@ -50,7 +50,10 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
         // and a driver/executors in response to the SparkCluster/SparkApplication CRs.
         List<ITerraformDependable> sparkDependsOn = new ArrayList<>(cloudProvider.getDependables());
         sparkDependsOn.add(sparkOperatorConfig.operatorReady);
-        SparkWorkloads.deploy(this, ID, sparkDependsOn);
+
+        // deploy the Spark workers and driver pointing at Azure Polaris
+        SparkWorkloads sparkDeployer = new SparkWorkloads(AZURE_DOMAIN_NAME.getValueFrom(properties));
+        sparkDeployer.deploy(this, ID, sparkDependsOn);
 
         String jupyterDomainName = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
         var util = new TFUtils(
