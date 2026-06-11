@@ -16,6 +16,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.infra.Defaults.*;
 
 /**
@@ -35,7 +36,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
 
-        SparkWorkloads.deploy(this, id, eksDependOn);
+        new SparkWorkloads(AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties)).deploy(this, id, eksDependOn);
 
         Service sparkLB = sparkExternalService(eksDependOn);
 
