@@ -9,6 +9,7 @@ import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplat
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,6 +19,14 @@ import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 import static java.lang.String.format;
 
 public class TFUtils {
+
+    /**
+     * Where issued TLS certs are cached between {@code tofu destroy}/{@code apply} cycles so
+     * that redeploys reuse an existing Let's Encrypt certificate instead of requesting a new
+     * one. Re-requesting on every redeploy quickly hits LE's production limit of 5 certs per
+     * week per exact set of identifiers.
+     */
+    private static final String TLS_BACKUP_DIR = "$HOME/.afon/tls";
 
     public static final List<LocalExecProvisioner> POLARIS_PROVISIONERS
         = uponDestroyRun(PolarisConfig.NO_POLARIS_FINALIZERS);
@@ -162,6 +171,13 @@ public class TFUtils {
                       class: nginx
             YAML""", domainName);
 
+        // Restore a cached cert (if any) before the ClusterIssuer/ingress trigger issuance,
+        // and back the issued cert up on teardown — see TLS_BACKUP_DIR.
+        List<LocalExecProvisioner> provisioners = new ArrayList<>();
+        provisioners.addAll(CdkUtils.uponCreateRun(restoreTlsSecretCommand()));
+        provisioners.addAll(CdkUtils.uponCreateRun(clusterIssuerYaml));
+        provisioners.addAll(uponDestroyRun(backupTlsSecretCommand()));
+
         return Release.Builder
             .create(construct, "cert-manager")
             .provider(helmProvider)
@@ -174,7 +190,47 @@ public class TFUtils {
             .timeout(300)
             .atomic(true)
             .set(List.of(ReleaseSet.builder().name("crds.enabled").value("true").build()))
-            .provisioners(CdkUtils.uponCreateRun(clusterIssuerYaml))
+            .provisioners(provisioners)
             .build();
+    }
+
+    private String tlsBackupFile() {
+        return format("%s/%s-%s.yaml", TLS_BACKUP_DIR, domainName, tlsSecretName);
+    }
+
+    /**
+     * Restores the cached TLS secret into the {@code default} namespace if a backup exists, so
+     * cert-manager sees a valid certificate already present and skips the ACME request. Always
+     * exits 0 — a missing or unusable backup must not fail {@code apply}; cert-manager simply
+     * issues a fresh certificate in that case.
+     */
+    private String restoreTlsSecretCommand() {
+        return format(
+            "BK=\"%1$s\"; " +
+            "if [ -f \"$BK\" ]; then " +
+            "echo \"Restoring TLS secret %2$s from $BK to avoid re-requesting a certificate\"; " +
+            "kubectl apply -n default -f \"$BK\" || echo \"TLS restore failed; cert-manager will issue a new certificate\"; " +
+            "else echo \"No TLS backup at $BK; cert-manager will issue a new certificate\"; fi",
+            tlsBackupFile(), tlsSecretName);
+    }
+
+    /**
+     * On teardown, caches the live TLS secret to {@link #TLS_BACKUP_DIR} — but only if it holds a
+     * genuine Let's Encrypt certificate with at least 30 days left (longer than cert-manager's
+     * default renewBefore), so the restored cert won't immediately trigger a renewal. The nginx
+     * "Fake Certificate" and near-expiry certs are skipped so a good backup is never clobbered.
+     */
+    private String backupTlsSecretCommand() {
+        return format(
+            "mkdir -p \"%1$s\"; BK=\"%2$s\"; C=$(mktemp); K=$(mktemp); " +
+            "kubectl get secret %3$s -n default -o jsonpath='{.data.tls\\.crt}' 2>/dev/null | base64 -d > \"$C\"; " +
+            "kubectl get secret %3$s -n default -o jsonpath='{.data.tls\\.key}' 2>/dev/null | base64 -d > \"$K\"; " +
+            "if [ -s \"$C\" ] && openssl x509 -in \"$C\" -noout -issuer 2>/dev/null | grep -qi \"let's encrypt\" " +
+            "&& openssl x509 -in \"$C\" -noout -checkend 2592000 >/dev/null 2>&1; then " +
+            "kubectl create secret tls %3$s -n default --cert=\"$C\" --key=\"$K\" --dry-run=client -o yaml > \"$BK\"; " +
+            "echo \"Backed up Let's Encrypt cert for %4$s to $BK\"; " +
+            "else echo \"No renewable Let's Encrypt cert in %3$s; keeping any existing backup\"; fi; " +
+            "rm -f \"$C\" \"$K\"",
+            TLS_BACKUP_DIR, tlsBackupFile(), tlsSecretName, domainName);
     }
 }
