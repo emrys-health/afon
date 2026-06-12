@@ -9,7 +9,7 @@ ARG GCLOUD_VERSION=565.0.0
 ARG EKSCTL_VERSION=v0.215.0
 
 ARG JAVA_VERSION=17
-ARG MAVEN_VERSION=3.9.15
+ARG MAVEN_VERSION=3.9.16
 
 ENV JAVA_HOME=/opt/java
 ENV MAVEN_HOME=/opt/maven
@@ -74,6 +74,8 @@ RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
     > /etc/apt/sources.list.d/azure-cli.list \
  && apt-get update \
  && apt-get install -y azure-cli=${AZ_CLI_VERSION}-1~jammy
+
+RUN az aks install-cli
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
