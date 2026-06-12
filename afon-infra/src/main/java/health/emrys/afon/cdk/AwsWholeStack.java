@@ -55,6 +55,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
      */
     protected final List<Service> loadBalancers;
     protected final SparkConfig   sparkOperatorConfig;
+    protected final HelmProvider  helmProvider;
     private         String        DELETE_CRDS;
 
     public AwsWholeStack(final Construct scope,
@@ -76,7 +77,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
             .clusterCaCertificate(Fn.base64decode(cloudProvider.getBase64CertData()))
             .token(cloudProvider.getToken())
             .build();
-        HelmProvider helm = HelmProvider.Builder
+        helmProvider = HelmProvider.Builder
             .create(this, "helm")
             .kubernetes(kubernetes)
             .build();
