@@ -1,18 +1,17 @@
 package health.emrys.afon.acceptance;
 
-import com.github.dockerjava.api.model.VolumesFrom;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
-import org.testcontainers.utility.MountableFile;
 
 import java.io.File;
 import java.util.*;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
+import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -46,7 +45,7 @@ public class ContainerHelper {
             String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
             polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
                 .withCommand("sh", "-c", POLARIS_CMD)
-                .withEnv(ENVIRONMENT_VARIABLE, String.format("POLARIS,%s,%s", polarisId, polarisSecret))
+                .withEnv(ENVIRONMENT_VARIABLE, format("POLARIS,%s,%s", polarisId, polarisSecret))
                 // GCP
                 .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
                 .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
@@ -70,21 +69,49 @@ public class ContainerHelper {
         }
     }
 
-    public synchronized void startTrino() {
+    public synchronized void startTrino(Properties properties) {
         if (trino == null) {
             try {
                 trino = new GenericContainer<>("trinodb/trino:latest");
-                FileFinder fileFinder = new FileFinder();
-                File       configDir  = fileFinder.fullPathOf("scripts/trino/catalog/");
-                File       config     = fileFinder.fullPathOf("scripts/trino/config.properties");
-                trino.withFileSystemBind(configDir.getAbsolutePath(), "/etc/trino/catalog");
+                FileFinder fileFinder  = new FileFinder();
+                File       configDir   = fileFinder.fullPathOf("scripts/trino/catalog/");
+                File       config      = fileFinder.fullPathOf("scripts/trino/config.properties");
+                String     catalogPath = "/etc/trino/catalog";
+                trino.withFileSystemBind(configDir.getAbsolutePath(), catalogPath);
                 trino.withFileSystemBind(config.getAbsolutePath(), "/etc/trino/config.properties");
+                trino.setNetworkMode("host");
                 trino.start();
+                SupportedCloudsEnum catalog = SupportedCloudsEnum.AWS_TRINO;
+                trino.copyFileToContainer(
+                    Transferable.of(trinoLocalConfig(properties, catalog).getBytes()),
+                    format("%s/%s.properties", catalogPath, catalog));
             } catch (Exception e) {
                 throw new RuntimeException("Cannot start Trino container", e);
             }
 
         }
+    }
+
+    private String trinoLocalConfig(Properties properties,
+                                    SupportedCloudsEnum catalog) {
+        String polarisId     = POLARIS_ID.getValueFrom(properties);
+        String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
+        return format(
+            """
+            connector.name=iceberg
+            iceberg.catalog.type=rest
+            iceberg.rest-catalog.uri=http://%s/api/catalog/
+            iceberg.rest-catalog.warehouse=%s
+            iceberg.rest-catalog.vended-credentials-enabled=true
+            
+            iceberg.rest-catalog.security=OAUTH2
+            iceberg.rest-catalog.oauth2.credential=%s:%s
+            iceberg.rest-catalog.oauth2.scope=PRINCIPAL_ROLE:ALL
+            """,
+            POLARIS_ENDPOINT.getValueFrom(properties),
+            catalog,
+            polarisId,
+            polarisSecret);
     }
 
 }
