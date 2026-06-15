@@ -76,7 +76,7 @@ public class AcceptanceTestConfig {
     private static void startContainers(Properties properties) {
         ContainerHelper containerHelper = ContainerHelper.instance;
         containerHelper.startPolaris(properties);
-        containerHelper.startTrino(properties);
+        containerHelper.startTrino();
     }
 
     public AfonPolarisClient getPolarisClient() {

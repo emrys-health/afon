@@ -1,15 +1,15 @@
 package health.emrys.afon.acceptance;
 
+import com.github.dockerjava.api.model.VolumesFrom;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
+import org.testcontainers.utility.MountableFile;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Scanner;
+import java.io.File;
+import java.util.*;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
@@ -45,34 +45,45 @@ public class ContainerHelper {
             String polarisId     = POLARIS_ID.getValueFrom(properties);
             String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
             polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
-                    .withCommand("sh", "-c", POLARIS_CMD)
-                    .withEnv(ENVIRONMENT_VARIABLE, String.format("POLARIS,%s,%s", polarisId, polarisSecret))
-                    // GCP
-                    .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
-                    .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
+                .withCommand("sh", "-c", POLARIS_CMD)
+                .withEnv(ENVIRONMENT_VARIABLE, String.format("POLARIS,%s,%s", polarisId, polarisSecret))
+                // GCP
+                .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
+                .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
             POLARIS_PROPERTIES.forEach((x) -> {
-              polaris.withEnv(x.getPropertyName(), x.getValueFrom(properties));
+                polaris.withEnv(x.getPropertyName(), x.getValueFrom(properties));
             });
             Map.of(
-                "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
-                "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
-                "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL", "DEBUG",
-                "QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL", "DEBUG"
+                   "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
+                   "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
+                   "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL", "DEBUG",
+                   "QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL", "DEBUG"
                   )
                .entrySet()
                .forEach(x -> polaris.withEnv(x.getKey(), x.getValue()));
 
             polaris.setPortBindings(List.of("8181:8181", "8182:8182", DEBUG_PORT + ":" + DEBUG_PORT));
-            logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading the image.");
+            logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading " +
+                        "the image.");
             polaris.start();
             polaris.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
         }
     }
 
-    public synchronized void startTrino(Properties properties) {
+    public synchronized void startTrino() {
         if (trino == null) {
-            trino = new GenericContainer<>("trinodb/trino:latest");
-            trino.start();
+            try {
+                trino = new GenericContainer<>("trinodb/trino:latest");
+                FileFinder fileFinder = new FileFinder();
+                File       configDir  = fileFinder.fullPathOf("scripts/trino/catalog/");
+                File       config     = fileFinder.fullPathOf("scripts/trino/config.properties");
+                trino.withFileSystemBind(configDir.getAbsolutePath(), "/etc/trino/catalog");
+                trino.withFileSystemBind(config.getAbsolutePath(), "/etc/trino/config.properties");
+                trino.start();
+            } catch (Exception e) {
+                throw new RuntimeException("Cannot start Trino container", e);
+            }
+
         }
     }
 
