@@ -32,6 +32,11 @@
         </dependency>
         <dependency>
             <groupId>${parent.groupId}</groupId>
+            <artifactId>afon-trino</artifactId>
+            <version>${parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${parent.groupId}</groupId>
             <artifactId>afon-polaris</artifactId>
             <version>${parent.version}</version>
         </dependency>
