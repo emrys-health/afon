@@ -19,6 +19,7 @@ public class AfonProperties {
     // AWS
     public static final AfonProperty AWS_S3_BUCKET_NAME           = new AfonProperty("AWS_S3_BUCKET_NAME");
     public static final AfonProperty AWS_S3_EXTERNAL_BUCKET_NAME  = new AfonProperty("AWS_S3_EXTERNAL_BUCKET_NAME");
+    public static final AfonProperty AWS_S3_BUCKET_NAME_TRINO     = new AfonProperty("AWS_S3_BUCKET_NAME_TRINO");
     public static final AfonProperty AWS_S3_ROLE_ARN              = new AfonProperty("AWS_S3_ROLE_ARN");
     public static final AfonProperty GLUE_S3_ROLE_ARN             = new AfonProperty("GLUE_S3_ROLE_ARN");
     public static final AfonProperty GLUE_CATALOG_NAME            = new AfonProperty("GLUE_CATALOG_NAME");
@@ -91,6 +92,7 @@ public class AfonProperties {
     public enum SupportedCloudsEnum {
         AWS("aws"),
         AWS_FORBIDDEN("aws_forbidden"),
+        AWS_TRINO("aws_trino"),
         AZURE_EXTERNAL("azure_external"),
         AZURE_FORBIDDEN("azure_forbidden"),
         AZURE("azure"),

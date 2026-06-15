@@ -53,6 +53,7 @@
         <module>afon-spark</module>
         <module>afon-spark-connect</module>
         <module>afon-snowflake</module>
+        <module>afon-trino</module>
     </modules>
 
     <dependencies>
