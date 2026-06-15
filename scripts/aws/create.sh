@@ -44,6 +44,18 @@ aws iam create-policy --policy-name AfonBucketWhiteList  --policy-document "{
       \"Effect\": \"Allow\",
       \"Action\": \"s3:*\",
       \"Resource\": \"arn:aws:s3:::$AWS_S3_EXTERNAL_BUCKET_NAME/*\"
+    },
+    {
+      \"Sid\": \"AllowBucketEmrysAfonBucketTrinoList\",
+      \"Effect\": \"Allow\",
+      \"Action\": \"s3:ListBucket\",
+      \"Resource\": \"arn:aws:s3:::$AWS_S3_BUCKET_NAME_TRINO\"
+    },
+    {
+      \"Sid\": \"AllowBucketEmrysAfonBucketTrinoObjects\",
+      \"Effect\": \"Allow\",
+      \"Action\": \"s3:*\",
+      \"Resource\": \"arn:aws:s3:::$AWS_S3_BUCKET_NAME_TRINO/*\"
     }
   ]
 }" && \

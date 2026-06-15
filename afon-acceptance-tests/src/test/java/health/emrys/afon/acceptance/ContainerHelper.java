@@ -107,11 +107,15 @@ public class ContainerHelper {
             iceberg.rest-catalog.security=OAUTH2
             iceberg.rest-catalog.oauth2.credential=%s:%s
             iceberg.rest-catalog.oauth2.scope=PRINCIPAL_ROLE:ALL
+            
+            fs.s3.enabled=true
+            s3.region=%s
             """,
             POLARIS_ENDPOINT.getValueFrom(properties),
             catalog,
             polarisId,
-            polarisSecret);
+            polarisSecret,
+            AWS_REGION.getValueFrom(properties));
     }
 
 }
