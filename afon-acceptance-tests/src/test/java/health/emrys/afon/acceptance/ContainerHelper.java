@@ -27,30 +27,31 @@ public class ContainerHelper {
      * For testing.
      */
     public static void main(String[] args) {
-        instance.start(new AfonPropertiesLoader().getProperties());
+        instance.startPolaris(new AfonPropertiesLoader().getProperties());
         System.out.println("Press enter to continue...");
         Scanner s = new Scanner(System.in);
         s.nextLine();
     }
 
-    private GenericContainer<?> myContainer;
+    private GenericContainer<?> polaris;
+    private GenericContainer<?> trino;
 
     private ContainerHelper() {
     }
 
-    public synchronized void start(Properties properties) {
-        if (myContainer == null) {
+    public synchronized void startPolaris(Properties properties) {
+        if (polaris == null) {
             String googleCreds   = GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties);
             String polarisId     = POLARIS_ID.getValueFrom(properties);
             String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
-            myContainer = new GenericContainer<>(POLARIS_IMAGE_NAME)
+            polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
                     .withCommand("sh", "-c", POLARIS_CMD)
                     .withEnv(ENVIRONMENT_VARIABLE, String.format("POLARIS,%s,%s", polarisId, polarisSecret))
                     // GCP
                     .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
                     .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
             POLARIS_PROPERTIES.forEach((x) -> {
-              myContainer.withEnv(x.getPropertyName(), x.getValueFrom(properties));
+              polaris.withEnv(x.getPropertyName(), x.getValueFrom(properties));
             });
             Map.of(
                 "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
@@ -59,12 +60,19 @@ public class ContainerHelper {
                 "QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL", "DEBUG"
                   )
                .entrySet()
-               .forEach(x -> myContainer.withEnv(x.getKey(), x.getValue()));
+               .forEach(x -> polaris.withEnv(x.getKey(), x.getValue()));
 
-            myContainer.setPortBindings(List.of("8181:8181", "8182:8182", DEBUG_PORT + ":" + DEBUG_PORT));
+            polaris.setPortBindings(List.of("8181:8181", "8182:8182", DEBUG_PORT + ":" + DEBUG_PORT));
             logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading the image.");
-            myContainer.start();
-            myContainer.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
+            polaris.start();
+            polaris.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
+        }
+    }
+
+    public synchronized void startTrino(Properties properties) {
+        if (trino == null) {
+            trino = new GenericContainer<>("trinodb/trino:latest");
+            trino.start();
         }
     }
 

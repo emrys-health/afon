@@ -36,7 +36,7 @@ public class AcceptanceTestConfig {
         this.clientId     = POLARIS_ID.getValueFrom(properties);
         this.clientSecret = POLARIS_SECRET.getValueFrom(properties);
         this.properties   = properties;
-        ContainerHelper.instance.start(properties);
+        startContainers(properties);
         this.polarisClient              = new AfonPolarisClient(properties);
         this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
         this.awsForbidden               = new AwsCloudConfigForPolaris(properties) {
@@ -71,6 +71,12 @@ public class AcceptanceTestConfig {
                                  AZURE_STORAGE_ACCOUNT.getValueFrom(properties));
             }
         };
+    }
+
+    private static void startContainers(Properties properties) {
+        ContainerHelper containerHelper = ContainerHelper.instance;
+        containerHelper.startPolaris(properties);
+        containerHelper.startTrino(properties);
     }
 
     public AfonPolarisClient getPolarisClient() {
