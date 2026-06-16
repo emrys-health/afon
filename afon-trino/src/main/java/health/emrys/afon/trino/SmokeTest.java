@@ -27,16 +27,13 @@ public class SmokeTest {
         this.url = url;
     }
 
-    public String readTable(String tableName) throws SQLException {
+    public String readTable(String sqlQuery) throws SQLException {
         // 2. Set up connection properties (User is required by Trino)
         Properties properties = new Properties();
         properties.setProperty("user", "analytics_user");
         // If your cluster requires SSL or Password authentication:
         // properties.setProperty("password", "your_password");
         // properties.setProperty("SSL", "true");
-
-        // 3. Define the SQL query
-        String sqlQuery = String.format("SELECT COUNT(*) FROM %s", tableName);
 
         System.out.println("Connecting to Trino...");
 
