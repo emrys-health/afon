@@ -1,4 +1,4 @@
-package health.emrys.afon.cdk;
+package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
@@ -44,6 +44,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
+import health.emrys.afon.cdk.AbstractConstruct;
 import health.emrys.afon.config.AfonProperties;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
@@ -51,8 +52,8 @@ import software.constructs.Construct;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.cdk.AwsKubernetesPolaris.POLARIS_INTERNAL;
-import static health.emrys.afon.cdk.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
+import static health.emrys.afon.cdk.aws.AwsKubernetesPolaris.POLARIS_INTERNAL;
+import static health.emrys.afon.cdk.aws.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;

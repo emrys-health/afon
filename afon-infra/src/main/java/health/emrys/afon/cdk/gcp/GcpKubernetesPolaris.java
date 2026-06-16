@@ -1,4 +1,4 @@
-package health.emrys.afon.cdk;
+package health.emrys.afon.cdk.gcp;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
@@ -13,6 +13,8 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import health.emrys.afon.cdk.PolarisConfig;
+import health.emrys.afon.cdk.TFUtils;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import software.constructs.Construct;
 

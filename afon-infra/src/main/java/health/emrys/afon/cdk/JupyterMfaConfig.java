@@ -33,15 +33,15 @@ import static java.lang.String.format;
  * <p>oauth2-proxy delegates authentication to an OIDC provider (default: Google). MFA is enforced
  * by the provider itself — any account with 2-Step Verification enabled will require it.
  */
-class JupyterMfaConfig {
+public class JupyterMfaConfig {
 
-    static final int    PROXY_PORT     = 4180;
-    static final String PROXY_SVC_NAME = "oauth2-proxy";
+    public static final int    PROXY_PORT     = 4180;
+    public static final String PROXY_SVC_NAME = "oauth2-proxy";
 
     private static final Map<String, String> PROXY_LABELS = Map.of("app", "oauth2-proxy");
     private static final String              SECRET_NAME  = "oauth2-proxy-secret";
 
-    JupyterMfaConfig(Construct scope,
+    public JupyterMfaConfig(Construct scope,
                      List<ITerraformDependable> dependsOn,
                      String jupyterUpstreamUrl,
                      String jupyterDomain,

@@ -1,7 +1,8 @@
-package health.emrys.afon.cdk;
+package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
+import health.emrys.afon.cdk.EmrysCloud;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;

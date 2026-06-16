@@ -1,4 +1,4 @@
-package health.emrys.afon.cdk;
+package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
@@ -12,6 +12,8 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import health.emrys.afon.cdk.PolarisConfig;
+import health.emrys.afon.cdk.TFUtils;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jspecify.annotations.NonNull;
@@ -24,7 +26,6 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.TFUtils.POLARIS_PROVISIONERS;
-import static health.emrys.afon.infra.Defaults.JUPYTER_SERVICE_NAME;
 import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 
 public class AzureKubernetesPolaris extends AzureKubernetesStack {

@@ -4,7 +4,7 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
-abstract class AbstractConstruct extends Construct implements CloudProvider {
+public abstract class AbstractConstruct extends Construct implements CloudProvider {
 
     private final @NotNull String             id;
     private                KubernetesProvider kubernetesProvider;

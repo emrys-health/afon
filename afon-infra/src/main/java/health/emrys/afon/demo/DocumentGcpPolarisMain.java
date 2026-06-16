@@ -1,6 +1,6 @@
 package health.emrys.afon.demo;
 
-import health.emrys.afon.cdk.GcpConstruct;
+import health.emrys.afon.cdk.gcp.GcpConstruct;
 import org.slf4j.Logger;
 
 import java.io.IOException;

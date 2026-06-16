@@ -1,4 +1,4 @@
-package health.emrys.afon.cdk;
+package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.Fn;
@@ -7,15 +7,16 @@ import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
-import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
+import health.emrys.afon.cdk.JupyterConfig;
+import health.emrys.afon.cdk.NetworkConfiguration;
+import health.emrys.afon.cdk.SparkConfig;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
@@ -46,7 +47,7 @@ import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 public class AwsWholeStack extends AwsKubernetesPolaris {
 
     static final Logger logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
-    static final String NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p " +
+    public static final String NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p " +
                                                      "'{\"metadata\":{\"finalizers\":[]}}' --type=merge";
 
     /**

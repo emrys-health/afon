@@ -1,8 +1,8 @@
 package health.emrys.afon.demo;
 
 import com.azure.storage.blob.models.BlobItem;
-import health.emrys.afon.cdk.AwsWholeStack;
-import health.emrys.afon.cdk.AzureKubernetesPolaris;
+import health.emrys.afon.cdk.aws.AwsWholeStack;
+import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
