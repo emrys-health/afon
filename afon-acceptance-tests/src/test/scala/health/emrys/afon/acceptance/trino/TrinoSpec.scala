@@ -38,7 +38,10 @@ class TrinoSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
       spark.sql(s"CREATE NAMESPACE IF NOT EXISTS ${cloudProvider}.$ACCEPTANCE_TEST_NAMESPACE")
       spark.createDataFrame(syntheticData(nRows)).writeTo(tableName).create()
 
-      And(s"a Trino instance with local.properties of:\n${trinoLocalConfig(properties, cloudProvider)}")
+      And(
+        s"""a Trino instance with $cloudProvider.properties of:
+           |
+           |${trinoLocalConfig(properties, cloudProvider)}""".stripMargin)
 
       val url = s"jdbc:trino://localhost:8080/"
       When(s"we connect to $url")
