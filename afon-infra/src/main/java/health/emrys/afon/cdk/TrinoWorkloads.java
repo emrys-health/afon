@@ -152,35 +152,9 @@ public class TrinoWorkloads {
         if (name.startsWith("azure")) {
             return "fs.azure.enabled=true\n";
         }
-//        if (name.startsWith("gcp")) {
-//            // TODO use gcs.json-key-file-path not gcs.json-key for security reasons
-//            return format("fs.gcs.enabled=true\ngcs.json-key=%s\n", asPropertiesValue(gcpJson));
-//        }
-        return "";
-    }
-
-    /**
-     * TODO this is unencryped!  Mount a drive! Do not run this in prod!
-     *
-     * Embeds a JSON document as a single {@code .properties} value. Trino parses catalog files with
-     * Java-properties semantics, where backslash is the escape character and a raw newline ends the
-     * value — both of which a service-account JSON contains (structural newlines, and the {@code \n}
-     * sequences inside {@code private_key}). So compact the JSON onto one line (raw newlines are
-     * never significant between JSON tokens) and double every backslash, so the parser hands Trino
-     * back the byte-for-byte original JSON.
-     */
-    private static String asPropertiesValue(String json) {
-        try {
-            // Service-account keys frequently carry raw newlines inside private_key (so they are
-            // not strict JSON); tolerate control chars on read, then writeValueAsString re-emits
-            // them correctly escaped as \n and compacts to one line.
-            ObjectMapper mapper = JsonMapper.builder()
-                                            .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
-                                            .build();
-            String compact = mapper.writeValueAsString(mapper.readTree(json));
-            return compact.replace("\\", "\\\\");
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new RuntimeException("GOOGLE_APPLICATION_CREDENTIALS is not valid JSON", e);
+        if (name.startsWith("gcp")) {
+            return "fs.gcs.enabled=true\ngcs.auth-type=APPLICATION_DEFAULT\n";
         }
+        return "";
     }
 }
