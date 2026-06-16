@@ -1,4 +1,4 @@
-package health.emrys.afon.cdk;
+package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
@@ -6,6 +6,7 @@ import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
+import health.emrys.afon.cdk.*;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import software.constructs.Construct;
 
@@ -33,8 +34,8 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
         // operator on nginxRelease (which has already scheduled pods successfully)
         // proves the cilium-agent is serving requests, avoiding the
         // "Cilium API client timeout exceeded" pod-sandbox failure.
-        List<Release> dependencies = List.of(nginxRelease);
-        SparkConfig sparkOperatorConfig = new SparkConfig(this, "sparkop", dependencies);
+        List<Release> dependencies        = List.of(nginxRelease);
+        SparkConfig   sparkOperatorConfig = new SparkConfig(this, "sparkop", dependencies);
 
         // The SparkApplication driver runs under this service account
         // (spark.kubernetes.authenticate.driver.serviceAccountName).

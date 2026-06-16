@@ -1,8 +1,10 @@
-package health.emrys.afon.cdk;
+package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
+import health.emrys.afon.cdk.JupyterConfig;
+import health.emrys.afon.cdk.JupyterMfaConfig;
 import health.emrys.afon.config.AfonProperties;
 
 import java.util.List;

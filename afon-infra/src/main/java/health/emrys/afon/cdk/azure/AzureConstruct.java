@@ -1,4 +1,4 @@
-package health.emrys.afon.cdk;
+package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
@@ -28,6 +28,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
+import health.emrys.afon.cdk.AbstractConstruct;
 import health.emrys.afon.config.AfonProperties;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;

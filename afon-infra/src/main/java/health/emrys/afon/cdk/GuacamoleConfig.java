@@ -40,7 +40,7 @@ import static health.emrys.afon.cdk.TFUtils.envVar;
  * internet (Ingress + ACM cert + DNS) is left as a follow-up so it can be put behind the
  * existing oauth2-proxy MFA gate.
  */
-class GuacamoleConfig {
+public class GuacamoleConfig {
 
     static final int    WEB_PORT        = 8080;
     static final int    GUACD_PORT      = 4822;

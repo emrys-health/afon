@@ -18,7 +18,7 @@ public class NetworkConfiguration {
         this.tfStack = tfStack;
     }
 
-    void networkPolicies(Map<String, String> labels, String sparkConnectorName) {
+    public void networkPolicies(Map<String, String> labels, String sparkConnectorName) {
         List<NetworkPolicySpecEgressTo> clusterPodSelectors = specEgressFor(
             egressPodSelectorFor(Map.of()));
         List<NetworkPolicySpecEgressTo> clusterIps = ipBlocksFor("10.96.0.0/12");

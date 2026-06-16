@@ -16,8 +16,8 @@ abstract public class SparkChecker {
 
     public static void parseAndExecute(String[] args, SparkChecker app) {
         try {
-            SparkSession    spark     = null;
-            String          warehouse = null;
+            SparkSession spark     = null;
+            String       warehouse = null;
             String       namespace = EXTERNAL_NAMESPACE;
             if (args.length >= 4) {
                 warehouse = args[0];

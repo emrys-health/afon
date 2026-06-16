@@ -1,4 +1,4 @@
-package health.emrys.afon.cdk;
+package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
@@ -6,6 +6,8 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import health.emrys.afon.cdk.SparkWorkloads;
+import health.emrys.afon.cdk.TrinoWorkloads;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
@@ -110,7 +112,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
         }
     }
 
-    static void logAndThrow(RuntimeException e) {
+    public static void logAndThrow(RuntimeException e) {
         logger.error(e.toString());
         throw new RuntimeException(e);
     }

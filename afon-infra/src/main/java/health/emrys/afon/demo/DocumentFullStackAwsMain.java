@@ -1,6 +1,6 @@
 package health.emrys.afon.demo;
 
-import health.emrys.afon.cdk.AwsNuke;
+import health.emrys.afon.cdk.aws.AwsNuke;
 import org.slf4j.Logger;
 
 import java.io.IOException;
