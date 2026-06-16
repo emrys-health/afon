@@ -74,10 +74,10 @@ public class ContainerHelper {
             try {
                 trino = new GenericContainer<>("trinodb/trino:latest");
                 FileFinder fileFinder  = new FileFinder();
-                File       configDir   = fileFinder.fullPathOf("scripts/trino/catalog/");
+//                File       configDir   = fileFinder.fullPathOf("scripts/trino/catalog/");
                 File       config      = fileFinder.fullPathOf("scripts/trino/config.properties");
                 String     catalogPath = "/etc/trino/catalog";
-                trino.withFileSystemBind(configDir.getAbsolutePath(), catalogPath);
+//                trino.withFileSystemBind(configDir.getAbsolutePath(), catalogPath);
                 trino.withFileSystemBind(config.getAbsolutePath(), "/etc/trino/config.properties");
                 trino.setNetworkMode("host");
                 trino.start();
