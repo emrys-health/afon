@@ -11,6 +11,7 @@ import java.io.File;
 import java.util.*;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
@@ -80,10 +81,11 @@ public class ContainerHelper {
                 trino.withFileSystemBind(config.getAbsolutePath(), "/etc/trino/config.properties");
                 trino.setNetworkMode("host");
                 trino.start();
-                SupportedCloudsEnum catalog = SupportedCloudsEnum.AWS_TRINO;
-                trino.copyFileToContainer(
-                    Transferable.of(trinoLocalConfig(properties, catalog).getBytes()),
-                    format("%s/%s.properties", catalogPath, catalog));
+                for (SupportedCloudsEnum catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
+                    trino.copyFileToContainer(
+                        Transferable.of(trinoLocalConfig(properties, catalog).getBytes()),
+                        format("%s/%s.properties", catalogPath, catalog));
+                }
             } catch (Exception e) {
                 throw new RuntimeException("Cannot start Trino container", e);
             }
