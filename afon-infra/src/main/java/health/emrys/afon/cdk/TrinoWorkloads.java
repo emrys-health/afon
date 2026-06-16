@@ -153,6 +153,7 @@ public class TrinoWorkloads {
             return "fs.azure.enabled=true\n";
         }
         if (name.startsWith("gcp")) {
+            // see https://github.com/trinodb/trino/issues/26772
             return "fs.gcs.enabled=true\ngcs.auth-type=APPLICATION_DEFAULT\n";
         }
         return "";
