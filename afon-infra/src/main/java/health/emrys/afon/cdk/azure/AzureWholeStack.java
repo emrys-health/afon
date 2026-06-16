@@ -60,7 +60,7 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
         var util = new TFUtils(
             this, jupyterDomainName, TLS_SECRET_NAME,
             PROXY_PORT, PROXY_SVC_NAME, JUPYTER_INGRESS);
-        JupyterConfig jupyter = new JupyterConfig(this, properties) {
+        JupyterHubConfig jupyter = new JupyterHubConfig(this, properties) {
 
             @Override
             protected void configureHttpsAndDNS() {
@@ -78,7 +78,7 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
                 return new JupyterMfaConfig(
                     AzureWholeStack.this,
                     proxyDeps,
-                    "http://guacamole-web:8080",
+                    JupyterHubConfig.PUBLIC_UPSTREAM_URL,
                     jupyterDomainName,
                     AZURE_OAUTH2_CLIENT_ID.getValueFrom(properties),
                     AZURE_OAUTH2_CLIENT_SECRET.getValueFrom(properties),
@@ -88,7 +88,7 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
 
 
         };
-        jupyter.deployJupyter(cloudProvider.getDependables());
+        jupyter.deployJupyterHub(cloudProvider.getDependables());
     }
 
     public static void main(String[] args) {
