@@ -36,11 +36,12 @@ public class SparkClusterDeployment extends AwsWholeStack {
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
 
-        new SparkWorkloads(AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties)).deploy(this, id, eksDependOn);
+        String awsPolarisDomainName = AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
+        new SparkWorkloads(awsPolarisDomainName).deploy(this, id, eksDependOn);
 
         // Trino only needs the cluster reachable (not the Spark operator), so it depends on the
         // EKS dependables rather than eksDependOn.
-        new TrinoWorkloads(properties)
+        new TrinoWorkloads(properties, awsPolarisDomainName)
             .deploy(this, helmProvider, id, cloudProvider.getDependables());
 
         Service sparkLB = sparkExternalService(eksDependOn);

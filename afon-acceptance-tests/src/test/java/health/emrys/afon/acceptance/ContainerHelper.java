@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -74,10 +75,8 @@ public class ContainerHelper {
             try {
                 trino = new GenericContainer<>("trinodb/trino:latest");
                 FileFinder fileFinder  = new FileFinder();
-                File       configDir   = fileFinder.fullPathOf("scripts/trino/catalog/");
                 File       config      = fileFinder.fullPathOf("scripts/trino/config.properties");
                 String     catalogPath = "/etc/trino/catalog";
-                trino.withFileSystemBind(configDir.getAbsolutePath(), catalogPath);
                 trino.withFileSystemBind(config.getAbsolutePath(), "/etc/trino/config.properties");
                 trino.setNetworkMode("host");
                 trino.start();
@@ -88,34 +87,16 @@ public class ContainerHelper {
             } catch (Exception e) {
                 throw new RuntimeException("Cannot start Trino container", e);
             }
-
         }
     }
 
     public static String trinoLocalConfig(Properties properties,
                                           SupportedCloudsEnum catalog) {
-        String polarisId     = POLARIS_ID.getValueFrom(properties);
-        String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
-        return format(
-            """
-            connector.name=iceberg
-            iceberg.catalog.type=rest
-            iceberg.rest-catalog.uri=http://%s/api/catalog/
-            iceberg.rest-catalog.warehouse=%s
-            iceberg.rest-catalog.vended-credentials-enabled=true
-            
-            iceberg.rest-catalog.security=OAUTH2
-            iceberg.rest-catalog.oauth2.credential=%s:%s
-            iceberg.rest-catalog.oauth2.scope=PRINCIPAL_ROLE:ALL
-            
-            fs.s3.enabled=true
-            s3.region=%s
-            """,
+        TrinoServerConfiguration trinoConfig = new TrinoServerConfiguration(
             POLARIS_ENDPOINT.getValueFrom(properties),
-            catalog,
-            polarisId,
-            polarisSecret,
-            AWS_REGION.getValueFrom(properties));
+            properties
+        );
+        return  trinoConfig.catalogProperties(catalog);
     }
 
 }
