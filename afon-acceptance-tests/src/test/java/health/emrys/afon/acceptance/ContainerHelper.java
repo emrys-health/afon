@@ -92,8 +92,8 @@ public class ContainerHelper {
         }
     }
 
-    private String trinoLocalConfig(Properties properties,
-                                    SupportedCloudsEnum catalog) {
+    public static String trinoLocalConfig(Properties properties,
+                                          SupportedCloudsEnum catalog) {
         String polarisId     = POLARIS_ID.getValueFrom(properties);
         String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
         return format(
