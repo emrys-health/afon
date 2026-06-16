@@ -152,10 +152,10 @@ public class TrinoWorkloads {
         if (name.startsWith("azure")) {
             return "fs.azure.enabled=true\n";
         }
-        if (name.startsWith("gcp")) {
-            // TODO use gcs.json-key-file-path not gcs.json-key for security reasons
-            return format("fs.gcs.enabled=true\ngcs.json-key=%s\n", asPropertiesValue(gcpJson));
-        }
+//        if (name.startsWith("gcp")) {
+//            // TODO use gcs.json-key-file-path not gcs.json-key for security reasons
+//            return format("fs.gcs.enabled=true\ngcs.json-key=%s\n", asPropertiesValue(gcpJson));
+//        }
         return "";
     }
 

@@ -7,14 +7,17 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 
+/**
+ * To run against Kubernetes, run this first:
+ * <pre>kubectl port-forward svc/trino 8080:8080</pre>
+ */
 public class SmokeTest {
 
     public static void main(String[] args) {
-        // 1. Define your Trino connection URL
-        // Format: jdbc:trino://<host>:<port>/<catalog>/<schema>
-        String url = "jdbc:trino://localhost:8080/local/aws_trino";
+        String url = "jdbc:trino://localhost:8080/";
         try {
-            new SmokeTest(url).readTable("doesnotexist");
+            String result = new SmokeTest(url).readTable("SELECT COUNT(*) FROM aws.namespaceph.test_table");
+            System.out.println(result);
         } catch (SQLException e) {
             e.printStackTrace();
         }
