@@ -11,7 +11,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.cdk.JupyterConfig;
+import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.NetworkConfiguration;
 import health.emrys.afon.cdk.SparkConfig;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
@@ -64,12 +64,12 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                          final Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
-        JupyterConfig jupyter = new JupyterAwsConfig(
+        JupyterHubConfig jupyter = new JupyterHubAwsConfig(
             this,
             cloudProvider,
             properties);
         NetworkConfiguration network = new NetworkConfiguration(this);
-        network.networkPolicies(jupyter.deployJupyter(dependables), SPARK_CONNECTOR_NAME);
+        network.networkPolicies(jupyter.deployJupyterHub(dependables), SPARK_CONNECTOR_NAME);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
         HelmProviderKubernetes kubernetes = HelmProviderKubernetes
