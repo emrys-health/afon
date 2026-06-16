@@ -78,7 +78,7 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
                 return new JupyterMfaConfig(
                     AzureWholeStack.this,
                     proxyDeps,
-                    JupyterHubConfig.PUBLIC_UPSTREAM_URL,
+                    JupyterHubConfig.MFA_UPSTREAMS,
                     jupyterDomainName,
                     AZURE_OAUTH2_CLIENT_ID.getValueFrom(properties),
                     AZURE_OAUTH2_CLIENT_SECRET.getValueFrom(properties),

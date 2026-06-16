@@ -75,6 +75,20 @@ public class GuacamoleConfig {
                     String jupyterVncHost,
                     String jupyterVncPassword,
                     List<Session> sessions) {
+        // All sessions live on the same (single) Jupyter pod, just on different VNC ports.
+        this(scope, dependsOn, session -> jupyterVncHost, jupyterVncPassword, sessions);
+    }
+
+    /**
+     * Variant where each session can target a <em>different</em> VNC host — used by the JupyterHub
+     * deployment, where every user has their own pod (and thus its own per-user VNC Service) rather
+     * than sharing one pod across ports.
+     */
+    GuacamoleConfig(Construct scope,
+                    List<ITerraformDependable> dependsOn,
+                    java.util.function.Function<Session, String> hostResolver,
+                    String jupyterVncPassword,
+                    List<Session> sessions) {
 
         ConfigMap configMap = ConfigMap.Builder
                 .create(scope, "guacamoleConfigMap")
@@ -84,7 +98,7 @@ public class GuacamoleConfig {
                                            .build())
                 .data(Map.of(
                         "user-mapping.xml", buildUserMappingXml(
-                                jupyterVncHost,
+                                hostResolver,
                                 jupyterVncPassword,
                                 sessions),
                         "guacamole.properties", GUACAMOLE_PROPERTIES))
@@ -160,14 +174,16 @@ public class GuacamoleConfig {
                        .build();
     }
 
-    private static String buildUserMappingXml(String host, String vncPassword, List<Session> sessions) {
+    private static String buildUserMappingXml(java.util.function.Function<Session, String> hostResolver,
+                                              String vncPassword,
+                                              List<Session> sessions) {
         StringBuilder sb = new StringBuilder("<user-mapping>\n");
         for (Session s : sessions) {
             sb.append(String.format(
                     AUTHORIZE_BLOCK_TEMPLATE,
                     s.username(), s.password(),
                     s.username(),
-                    host, s.vncPort(), vncPassword));
+                    hostResolver.apply(s), s.vncPort(), vncPassword));
         }
         sb.append("</user-mapping>\n");
         return sb.toString();

@@ -85,28 +85,53 @@ public abstract class JupyterHubConfig {
     private static final int PROXY_PUBLIC    = 8000;
     private static final int PROXY_API       = 8001;
     private static final int SINGLEUSER_PORT = 8888;
+    /** Port the in-pod VNC server listens on (display :1) — Guacamole connects here per user. */
+    private static final int VNC_PORT        = 5901;
 
     private static final String HUB_SVC          = "hub";
     private static final String PROXY_PUBLIC_SVC = "proxy-public";
-
-    /** In-cluster URL oauth2-proxy should forward authenticated traffic to (JupyterHub's public proxy). */
-    public static final String PUBLIC_UPSTREAM_URL = "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC;
     private static final String PROXY_API_SVC    = "proxy-api";
     private static final String CONFIG_MAP_NAME  = "hub-config";
     private static final String CONFIG_FILE      = "jupyterhub_config.py";
     private static final String CONFIG_MOUNT     = "/etc/jupyterhub";
     private static final String SECRET_NAME      = "jupyterhub-secrets";
 
+    /** JupyterHub is served under this sub-path so Guacamole can own the domain root. */
+    private static final String HUB_BASE_URL = "/jupyter/";
+    /** KubeSpawner stamps this label (value = username) on each user pod; the per-user VNC Service selects it. */
+    private static final String GUAC_USER_LABEL = "guacamole-user";
+
+    /**
+     * Upstreams the oauth2-proxy MFA gate fronts, on a single domain. Guacamole owns the root and
+     * is how every user reaches their pod's desktop; JupyterHub sits under {@value #HUB_BASE_URL}
+     * purely so users can log in and have their pod spawned. oauth2-proxy routes by longest path
+     * prefix, so {@code /jupyter/*} hits the hub and everything else hits Guacamole.
+     */
+    public static final List<String> MFA_UPSTREAMS = List.of(
+        "http://" + GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT,
+        "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL);
+
     private static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
     private static final Map<String, String> PROXY_LABELS = Map.of("app", "jupyterhub-proxy");
 
-    private final   TerraformStack stack;
-    protected final Properties     properties;
+    private final   TerraformStack                stack;
+    private final   String                        jupyterPassword;
+    private final   List<GuacamoleConfig.Session> sessions;
+    protected final Properties                    properties;
 
     public JupyterHubConfig(TerraformStack stack,
                             Properties properties) {
-        this.stack      = stack;
-        this.properties = properties;
+        this.stack           = stack;
+        this.properties      = properties;
+        this.jupyterPassword = AfonProperties.JUPYTER_VNC_PASSWORD.getValueFrom(properties);
+        // A fixed roster of users: each is a JupyterHub login (which spawns that user's pod) and
+        // the matching Guacamole login (which streams that pod's desktop). Guacamole's static
+        // user-mapping.xml needs the set known up front. One VNC port per pod, since each user now
+        // has their own pod rather than sharing ports on one.
+        this.sessions = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            sessions.add(new GuacamoleConfig.Session("user" + i, jupyterPassword, VNC_PORT));
+        }
     }
 
     public Map<String, String> deployJupyterHub(List<ITerraformDependable> eksDependOn) {
@@ -197,12 +222,37 @@ public abstract class JupyterHubConfig {
         proxyDeps.add(hubSecret);
         deployProxy(proxyDeps);
 
-        // Public entrypoint the oauth2-proxy MFA gate forwards to (in place of a single Jupyter pod).
+        // Public entrypoint for the JupyterHub side of the MFA gate (login + spawn).
         Service proxyPublic = clusterIpService(
             "jupyterhubProxyPublic", PROXY_PUBLIC_SVC, PROXY_LABELS, "http", PROXY_PUBLIC, eksDependOn);
 
-        // Put oauth2-proxy in front of the public proxy so MFA is enforced before anything reaches
-        // JupyterHub, exactly as JupyterConfig does for the single Jupyter pod.
+        // Per user, a stable VNC Service that selects whichever pod KubeSpawner spawns for that user
+        // (matched on the guacamole-user label). This is the fixed endpoint Guacamole dials, even
+        // though the backing pod only exists once the user has logged into JupyterHub.
+        List<ITerraformDependable> guacamoleDeps = new ArrayList<>(eksDependOn);
+        for (GuacamoleConfig.Session session : sessions) {
+            guacamoleDeps.add(clusterIpService(
+                "jupyterhubVnc-" + session.username(),
+                vncServiceName(session.username()),
+                Map.of(GUAC_USER_LABEL, session.username()),
+                "vnc",
+                VNC_PORT,
+                eksDependOn));
+        }
+
+        // Guacamole streams each user's pod desktop. One login per user, each pointing at that
+        // user's VNC Service (a different host per session, unlike the single-pod deployment where
+        // all sessions shared one host on different ports).
+        new GuacamoleConfig(
+            stack,
+            guacamoleDeps,
+            session -> vncServiceName(session.username()),
+            jupyterPassword,
+            sessions);
+
+        // A single oauth2-proxy MFA gate fronts both Guacamole (root) and JupyterHub
+        // (under /jupyter/), so users authenticate once, spawn their pod via the hub, then reach its
+        // desktop through Guacamole — all behind the same OIDC/MFA login.
         List<ITerraformDependable> mfaDeps = new ArrayList<>(eksDependOn);
         mfaDeps.add(proxyPublic);
         getMFAConfig(mfaDeps);
@@ -210,6 +260,10 @@ public abstract class JupyterHubConfig {
         configureHttpsAndDNS();
 
         return PROXY_LABELS;
+    }
+
+    private static String vncServiceName(String username) {
+        return "guac-vnc-" + username;
     }
 
     private void deployHub(List<ITerraformDependable> dependsOn) {
@@ -338,11 +392,18 @@ public abstract class JupyterHubConfig {
      * deployment uses, tells the hub how to reach the externally-run proxy, and — since oauth2-proxy
      * is the real authentication gate — lets any username straight through.
      */
-    private static String jupyterhubConfigPy() {
+    private String jupyterhubConfigPy() {
+        String allowedUsers = sessions.stream()
+                                      .map(s -> "'" + s.username() + "'")
+                                      .reduce((a, b) -> a + ", " + b)
+                                      .orElse("");
         return """
             import os
 
             c = get_config()  # noqa
+
+            # --- Served under a sub-path so Guacamole can own the domain root. ---
+            c.JupyterHub.base_url = '%7$s'
 
             # --- Proxy runs in its own pod (configurable-http-proxy), not inside the hub. ---
             c.ConfigurableHTTPProxy.should_start = False
@@ -363,14 +424,20 @@ public abstract class JupyterHubConfig {
             c.KubeSpawner.http_timeout = 120
             # One in-pod VNC session per single-user server (see start-vnc.sh in the image).
             c.KubeSpawner.environment = {'VNC_SESSIONS': '1'}
+            # Stamp the username on the pod so the per-user VNC Service (which Guacamole dials) can
+            # select it. KubeSpawner expands {username} when rendering extra_labels.
+            c.KubeSpawner.extra_labels = {'%8$s': '{username}'}
 
-            # --- oauth2-proxy in front already enforces auth/MFA, so pass usernames through. ---
+            # --- oauth2-proxy in front already enforces auth/MFA; pass these known usernames
+            #     through (they line up 1:1 with the Guacamole logins). ---
             c.JupyterHub.authenticator_class = 'jupyterhub.auth.DummyAuthenticator'
-            c.Authenticator.allow_all = True
+            c.Authenticator.allow_all = False
+            c.Authenticator.allowed_users = {%9$s}
             """.formatted(
             PROXY_API_SVC, PROXY_API,
             HUB_SVC, HUB_PORT,
-            SINGLEUSER_IMAGE, SINGLEUSER_PORT);
+            SINGLEUSER_IMAGE, SINGLEUSER_PORT,
+            HUB_BASE_URL, GUAC_USER_LABEL, allowedUsers);
     }
 
     private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(

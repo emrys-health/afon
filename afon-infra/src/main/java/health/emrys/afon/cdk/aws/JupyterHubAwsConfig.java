@@ -60,7 +60,7 @@ public class JupyterHubAwsConfig extends JupyterHubConfig {
         return new JupyterMfaConfig(
             this.stack,
             proxyDeps,
-            JupyterHubConfig.PUBLIC_UPSTREAM_URL,
+            JupyterHubConfig.MFA_UPSTREAMS,
             jupyterDomain,
             OAUTH2_CLIENT_ID.getValueFrom(properties),
             OAUTH2_CLIENT_SECRET.getValueFrom(properties),
