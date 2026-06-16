@@ -126,6 +126,12 @@
             <artifactId>afon-snowflake</artifactId>
             <version>${parent.version}</version>
         </dependency>
+        <dependency>
+            <groupId>health.emrys</groupId>
+            <artifactId>afon-trino</artifactId>
+            <version>0.1</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <profiles>
