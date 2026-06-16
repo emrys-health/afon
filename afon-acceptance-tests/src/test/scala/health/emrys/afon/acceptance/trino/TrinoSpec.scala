@@ -40,7 +40,7 @@ class TrinoSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 
       And(s"a Trino instance with local.properties of:\n${trinoLocalConfig(properties, cloudProvider)}")
 
-      val url = s"jdbc:trino://localhost:8080/local/${AWS_TRINO}"
+      val url = s"jdbc:trino://localhost:8080/"
       When(s"we connect to $url")
       val smokeTest = new SmokeTest(url)
       val sql = s"SELECT COUNT(*) FROM $tableName"
