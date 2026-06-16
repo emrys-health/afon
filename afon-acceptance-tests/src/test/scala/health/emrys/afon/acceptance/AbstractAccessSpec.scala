@@ -1,11 +1,15 @@
 package health.emrys.afon.acceptance
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
+import health.emrys.afon.acceptance.ContainerHelper.trinoLocalConfig
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
+import health.emrys.afon.config.AfonPropertiesLoader
+import health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.comms.PolarisConfigurer
 import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
+import health.emrys.afon.trino.SmokeTest
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
@@ -117,6 +121,30 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
         assert(xs.size == NUM_ROWS)
         And(s"the results look like:\n${xs.take(3).mkString("\n")}\n...")
       }
+    }
+  }
+
+  "Trino" should {
+    val properties          = new AfonPropertiesLoader().getProperties
+    "vend credentials" in {
+      Given(s"a catalog called ${config.warehouseName()} in Polaris")
+
+      val tableName = tableNameFQN.toLowerCase()
+      And(s"a table called $tableName with $NUM_ROWS rows in cloud storage")
+
+      And(
+        s"""a Trino instance with $cloudProvider.properties of:
+           |
+           |${trinoLocalConfig(properties, cloudProvider)}""".stripMargin)
+
+      val url = s"jdbc:trino://localhost:8080/"
+      When(s"we connect to $url")
+      val smokeTest = new SmokeTest(url)
+      val sql = s"SELECT COUNT(*) FROM $tableName"
+      And(s"execute SQL: ${formatSQL(sql)}")
+      val result = smokeTest.readTable(sql)
+      Then(s"the result is $result")
+      assert(Integer.parseInt(result) == NUM_ROWS)
     }
   }
 }
