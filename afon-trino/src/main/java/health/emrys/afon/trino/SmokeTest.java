@@ -10,13 +10,39 @@ import java.util.Properties;
 /**
  * To run against Kubernetes, run this first:
  * <pre>kubectl port-forward svc/trino 8080:8080</pre>
+ * Populate the cloud Polaris with something like:
+ * <pre>
+mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="GCP acceptancetests smoketesttable260601231212 gs://emrys_afon_core/acceptancetests/smoketesttable260601231212/metadata/00000-0cf4c26f-668b-474c-9542-618d3fba2e19.metadata.json  emryspolaris.click" exec:java
+</pre>
+ * or <pre>
+ mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="AZURE acceptancetests smoketesttable260601231212 abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable260601231212/metadata/00001-ba11f3b6-6920-4007-9368-ab913506716f.metadata.json  emryspolaris.click" exec:java
+</pre>
+ *
  */
 public class SmokeTest {
 
+    /**
+     * @param args
+     * For the table that is not the default one, pass an argument like:
+     * gcp.acceptancetests.smoketesttable260601231212
+     * or
+     * azure.acceptancetests.smoketesttable260601231212
+     * after running the mvn commands above
+     */
     public static void main(String[] args) {
         String url = "jdbc:trino://localhost:8080/";
         try {
-            String result = new SmokeTest(url).readTable("SELECT COUNT(*) FROM aws.namespaceph.test_table");
+            // for other clouds try:
+            // gcp.acceptancetests.smoketesttable260601231212
+            // or
+            // azure.acceptancetests.smoketesttable260601231212
+            String sql = "SELECT COUNT(*) FROM ";
+            if (args.length > 0) {
+                sql = sql + args[0];
+            } else {
+                sql = sql + "aws.namespaceph.test_table";
+            }
+            String result = new SmokeTest(url).readTable(sql);
             System.out.println(result);
         } catch (SQLException e) {
             e.printStackTrace();
@@ -33,7 +59,7 @@ public class SmokeTest {
     public String readTable(String sqlQuery) throws SQLException {
         // 2. Set up connection properties (User is required by Trino)
         Properties properties = new Properties();
-        properties.setProperty("user", "analytics_user");
+        properties.setProperty("user", "arbitrary");
         // If your cluster requires SSL or Password authentication:
         // properties.setProperty("password", "your_password");
         // properties.setProperty("SSL", "true");
