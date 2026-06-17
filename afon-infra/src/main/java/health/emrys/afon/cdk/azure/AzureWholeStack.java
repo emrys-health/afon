@@ -86,7 +86,20 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
                     );
             }
 
+            @Override
+            protected String jupyterDomain() {
+                return jupyterDomainName;
+            }
 
+            @Override
+            protected String oauthClientId() {
+                return AZURE_OAUTH2_CLIENT_ID.getValueFrom(properties);
+            }
+
+            @Override
+            protected String oauthClientSecret() {
+                return AZURE_OAUTH2_CLIENT_SECRET.getValueFrom(properties);
+            }
         };
         jupyter.deployJupyterHub(cloudProvider.getDependables());
     }

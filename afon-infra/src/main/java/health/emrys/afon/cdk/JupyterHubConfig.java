@@ -186,9 +186,12 @@ public abstract class JupyterHubConfig {
             .dependsOn(List.of(hubRole, hubServiceAccount))
             .build();
 
-        // The hub and the proxy authenticate to each other with a shared token, and the hub signs
-        // its cookies with a fixed secret so restarts don't log everyone out. Derive both
-        // deterministically from an existing secret so no new configuration is required.
+        // Secrets the hub needs:
+        //  - proxy.token / hub.cookieSecret: shared with the proxy and used to sign cookies;
+        //    derived deterministically from an existing secret so restarts don't log everyone out.
+        //  - hub.cryptKey: encrypts auth_state (the captured OIDC tokens) at rest in the hub DB.
+        //  - oauth.clientId / oauth.clientSecret: the OIDC client credentials (same provider as
+        //    oauth2-proxy) JupyterHub uses to log users in and obtain their tokens.
         String cookieSecret = AfonProperties.OAUTH2_COOKIE_SECRET.getValueFrom(properties);
         Secret hubSecret = Secret.Builder
             .create(stack, "jupyterhubSecret")
@@ -198,7 +201,10 @@ public abstract class JupyterHubConfig {
                                     .build())
             .data(Map.of(
                 "proxy.token", sha256Hex("proxy-token:" + cookieSecret),
-                "hub.cookieSecret", sha256Hex("cookie-secret:" + cookieSecret)))
+                "hub.cookieSecret", sha256Hex("cookie-secret:" + cookieSecret),
+                "hub.cryptKey", sha256Hex("crypt-key:" + cookieSecret),
+                "oauth.clientId", oauthClientId(),
+                "oauth.clientSecret", oauthClientSecret()))
             .dependsOn(eksDependOn)
             .build();
 
@@ -275,7 +281,10 @@ public abstract class JupyterHubConfig {
             .args(List.of("--config", CONFIG_MOUNT + "/" + CONFIG_FILE))
             .env(List.of(
                 envFromSecret("CONFIGPROXY_AUTH_TOKEN", SECRET_NAME, "proxy.token"),
-                envFromSecret("JPY_COOKIE_SECRET", SECRET_NAME, "hub.cookieSecret")))
+                envFromSecret("JPY_COOKIE_SECRET", SECRET_NAME, "hub.cookieSecret"),
+                envFromSecret("JUPYTERHUB_CRYPT_KEY", SECRET_NAME, "hub.cryptKey"),
+                envFromSecret("OAUTH_CLIENT_ID", SECRET_NAME, "oauth.clientId"),
+                envFromSecret("OAUTH_CLIENT_SECRET", SECRET_NAME, "oauth.clientSecret")))
             .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                  .containerPort(HUB_PORT)
                                                                  .protocol("TCP")
@@ -393,12 +402,10 @@ public abstract class JupyterHubConfig {
      * is the real authentication gate — lets any username straight through.
      */
     private String jupyterhubConfigPy() {
-        String allowedUsers = sessions.stream()
-                                      .map(s -> "'" + s.username() + "'")
-                                      .reduce((a, b) -> a + ", " + b)
-                                      .orElse("");
+        String issuer = AfonProperties.OIDC_ISSUER_URL.getValueFrom(properties);
         return """
-            import os
+            import os, json
+            from urllib.request import urlopen
 
             c = get_config()  # noqa
 
@@ -430,16 +437,40 @@ public abstract class JupyterHubConfig {
             # select it. KubeSpawner expands {username} when rendering extra_labels.
             c.KubeSpawner.extra_labels = {'%8$s': '{username}'}
 
-            # --- oauth2-proxy in front already enforces auth/MFA; pass these known usernames
-            #     through (they line up 1:1 with the Guacamole logins). ---
-            c.JupyterHub.authenticator_class = 'jupyterhub.auth.DummyAuthenticator'
-            c.Authenticator.allow_all = False
-            c.Authenticator.allowed_users = {%9$s}
+            # --- OIDC login against the same provider oauth2-proxy uses. JupyterHub is the OAuth
+            #     client itself (not DummyAuthenticator) so it can capture each user's token via
+            #     auth_state and hand it to their pod. Endpoints come from the issuer's discovery
+            #     document, keeping this provider-agnostic. ---
+            _issuer = '%9$s'.rstrip('/')
+            _oidc = json.load(urlopen(_issuer + '/.well-known/openid-configuration'))
+            c.JupyterHub.authenticator_class = 'generic-oauth'
+            c.GenericOAuthenticator.client_id = os.environ['OAUTH_CLIENT_ID']
+            c.GenericOAuthenticator.client_secret = ***REMOVED***'OAUTH_CLIENT_SECRET']
+            c.GenericOAuthenticator.oauth_callback_url = 'https://%10$s%7$shub/oauth_callback'
+            c.GenericOAuthenticator.authorize_url = _oidc['authorization_endpoint']
+            c.GenericOAuthenticator.token_url = _oidc['token_endpoint']
+            c.GenericOAuthenticator.userdata_url = _oidc['userinfo_endpoint']
+            c.GenericOAuthenticator.scope = ['openid', 'email', 'profile']
+            c.GenericOAuthenticator.username_claim = 'email'
+            c.GenericOAuthenticator.allow_all = True
+            # Encrypt and retain the OAuth token response so it can be injected into the pod.
+            c.GenericOAuthenticator.enable_auth_state = True
+
+            # Inject the user's OIDC token into their pod, where the Spark Connector and Polaris
+            # read OIDC_TOKEN to act as that user.
+            async def _inject_token(spawner, auth_state):
+                if not auth_state:
+                    return
+                spawner.environment['OIDC_TOKEN'] = auth_state.get('access_token', '')
+                if auth_state.get('id_token'):
+                    spawner.environment['OIDC_ID_TOKEN'] = auth_state['id_token']
+            c.Spawner.auth_state_hook = _inject_token
             """.formatted(
             PROXY_API_SVC, PROXY_API,
             HUB_SVC, HUB_PORT,
             SINGLEUSER_IMAGE, SINGLEUSER_PORT,
-            HUB_BASE_URL, GUAC_USER_LABEL, allowedUsers);
+            HUB_BASE_URL, GUAC_USER_LABEL,
+            issuer, jupyterDomain());
     }
 
     private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
@@ -476,4 +507,13 @@ public abstract class JupyterHubConfig {
     protected abstract void configureHttpsAndDNS();
 
     protected abstract JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps);
+
+    /** Public domain JupyterHub is served on; used to build the OIDC callback URL. */
+    protected abstract String jupyterDomain();
+
+    /** OIDC client id for JupyterHub's OAuthenticator (same provider as oauth2-proxy). */
+    protected abstract String oauthClientId();
+
+    /** OIDC client secret for JupyterHub's OAuthenticator. */
+    protected abstract String oauthClientSecret();
 }
