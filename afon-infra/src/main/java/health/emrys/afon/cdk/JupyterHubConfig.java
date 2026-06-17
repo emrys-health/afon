@@ -85,7 +85,13 @@ public abstract class JupyterHubConfig {
     private static final int HUB_PORT        = 8081;
     private static final int PROXY_PUBLIC    = 8000;
     private static final int PROXY_API       = 8001;
-    private static final int SINGLEUSER_PORT = 8888;
+    /**
+     * Port the hub-facing {@code jupyterhub-singleuser} server binds to. It is NOT 8888: that is
+     * reserved for the plain, token-less Jupyter the image runs on 127.0.0.1:8888 for the user to
+     * work in via the VNC desktop ({@code http://localhost:8888}). The hub server exists only so
+     * the hub considers the pod healthy; users never reach it (its public path is blocked).
+     */
+    private static final int SINGLEUSER_PORT = 8090;
     /** Port the in-pod VNC server listens on (display :1) — Guacamole connects here per user. */
     private static final int VNC_PORT        = 5901;
 
@@ -119,13 +125,16 @@ public abstract class JupyterHubConfig {
 
     /**
      * Upstreams the oauth2-proxy MFA gate fronts, on a single domain. Guacamole owns the root and
-     * is how every user reaches their pod's desktop; JupyterHub sits under {@value #HUB_BASE_URL}
-     * purely so users can log in and have their pod spawned. oauth2-proxy routes by longest path
-     * prefix, so {@code /jupyter/*} hits the hub and everything else hits Guacamole.
+     * is how every user reaches their pod's desktop. JupyterHub is exposed only under
+     * {@code /jupyter/hub/} — enough for login, spawn and the OAuth callback — and deliberately
+     * NOT {@code /jupyter/user/*}. That means the spawned notebook is unreachable over public HTTP,
+     * so the only way to touch it is the clipboard-disabled Guacamole desktop (the copy-paste
+     * control). oauth2-proxy routes by longest path prefix, so {@code /jupyter/hub/*} hits the hub
+     * and everything else (including {@code /jupyter/user/*}) falls through to Guacamole.
      */
     public static final List<String> MFA_UPSTREAMS = List.of(
         "http://" + GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT,
-        "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL);
+        "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL + "hub/");
 
     private static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
     private static final Map<String, String> PROXY_LABELS = Map.of("app", "jupyterhub-proxy");
@@ -263,9 +272,12 @@ public abstract class JupyterHubConfig {
                 eksDependOn));
         }
 
-        // Guacamole streams each user's pod desktop. The login is the email; the connection points
-        // at that user's own VNC Service (a different host per user, unlike the single-pod
-        // deployment where all sessions shared one host on different ports).
+        // Guacamole streams each user's pod desktop. File-based login: the user logs into Guacamole
+        // with their email + the VNC password, which authenticates them against user-mapping.xml AND
+        // serves them their own connection (a header-auth SSO session can't use these file-provider
+        // connections — "Session not associated with authentication provider default" — so true SSO
+        // would require a database-backed Guacamole instead). Each user's connection targets their
+        // own VNC Service (a different host per user).
         new GuacamoleConfig(
             stack,
             guacamoleDeps,
@@ -438,6 +450,9 @@ public abstract class JupyterHubConfig {
             c.JupyterHub.hub_connect_ip = '%3$s'
             c.JupyterHub.hub_port = %4$d
             c.JupyterHub.cleanup_servers = False
+            # Don't bounce the user to /jupyter/user/<name>/ after spawn: that path is blocked at the
+            # gate (notebook access is desktop-only). They land on the hub home, then open Guacamole.
+            c.JupyterHub.redirect_to_server = False
 
             # --- One pod per user, spawned on demand by KubeSpawner. ---
             c.JupyterHub.spawner_class = 'kubespawner.KubeSpawner'

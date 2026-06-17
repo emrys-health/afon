@@ -41,10 +41,14 @@ RUN install -d -m 0755 /etc/apt/keyrings \
  && apt-get install -y --no-install-recommends firefox \
  && rm -rf /var/lib/apt/lists/*
 
-# Hook script: jupyter docker-stacks sources every *.sh in this directory
-# from start-notebook.sh, so DISPLAY=:1 propagates into the notebook server.
+# Hook scripts: jupyter docker-stacks sources every *.sh in this directory from
+# start-notebook.sh (before exec'ing the main command), so DISPLAY=:1 propagates and any
+# backgrounded servers start. 0-start-vnc brings up the X/VNC desktop; 1-start-local-lab
+# backgrounds the loopback-only Jupyter the user works in via that desktop (localhost:8888).
 COPY start-vnc.sh /usr/local/bin/before-notebook.d/0-start-vnc.sh
-RUN chmod +x /usr/local/bin/before-notebook.d/0-start-vnc.sh
+COPY start-local-lab.sh /usr/local/bin/before-notebook.d/1-start-local-lab.sh
+RUN chmod +x /usr/local/bin/before-notebook.d/0-start-vnc.sh \
+             /usr/local/bin/before-notebook.d/1-start-local-lab.sh
 
 # 4. Install the matching PySpark package (for the Python client)
 USER $NB_UID
