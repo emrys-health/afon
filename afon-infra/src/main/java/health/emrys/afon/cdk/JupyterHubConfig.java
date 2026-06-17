@@ -40,6 +40,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -98,8 +99,23 @@ public abstract class JupyterHubConfig {
 
     /** JupyterHub is served under this sub-path so Guacamole can own the domain root. */
     private static final String HUB_BASE_URL = "/jupyter/";
-    /** KubeSpawner stamps this label (value = username) on each user pod; the per-user VNC Service selects it. */
+    /** KubeSpawner stamps this label (value = the user's slug) on each pod; the per-user VNC Service selects it. */
     private static final String GUAC_USER_LABEL = "guacamole-user";
+
+    /**
+     * A Guacamole user. {@code email} is the OIDC identity (the JupyterHub username and the
+     * Guacamole login); {@code slug} is a DNS/label-safe form used for the per-user VNC Service
+     * name and the pod label, since an email address is valid as neither.
+     */
+    private record GuacUser(String email, String slug) {}
+
+    /**
+     * Fixed roster. Guacamole's file-based auth and the per-user VNC Services must enumerate users
+     * up front, so adding a user means editing this list and redeploying.
+     */
+    private static final List<GuacUser> GUAC_USERS = List.of(
+        new GuacUser("phil.henry@emrys.health", "phil-henry"),
+        new GuacUser("will@emrys.health", "will"));
 
     /**
      * Upstreams the oauth2-proxy MFA gate fronts, on a single domain. Guacamole owns the root and
@@ -124,13 +140,11 @@ public abstract class JupyterHubConfig {
         this.stack           = stack;
         this.properties      = properties;
         this.jupyterPassword = AfonProperties.JUPYTER_VNC_PASSWORD.getValueFrom(properties);
-        // A fixed roster of users: each is a JupyterHub login (which spawns that user's pod) and
-        // the matching Guacamole login (which streams that pod's desktop). Guacamole's static
-        // user-mapping.xml needs the set known up front. One VNC port per pod, since each user now
-        // has their own pod rather than sharing ports on one.
+        // One Guacamole login per user, keyed by email; each streams that user's own pod desktop on
+        // the single VNC port (each user now has their own pod rather than sharing ports on one).
         this.sessions = new ArrayList<>();
-        for (int i = 0; i < 3; i++) {
-            sessions.add(new GuacamoleConfig.Session("user" + i, jupyterPassword, VNC_PORT));
+        for (GuacUser user : GUAC_USERS) {
+            sessions.add(new GuacamoleConfig.Session(user.email(), jupyterPassword, VNC_PORT));
         }
     }
 
@@ -233,26 +247,29 @@ public abstract class JupyterHubConfig {
             "jupyterhubProxyPublic", PROXY_PUBLIC_SVC, PROXY_LABELS, "http", PROXY_PUBLIC, eksDependOn);
 
         // Per user, a stable VNC Service that selects whichever pod KubeSpawner spawns for that user
-        // (matched on the guacamole-user label). This is the fixed endpoint Guacamole dials, even
-        // though the backing pod only exists once the user has logged into JupyterHub.
+        // (matched on the guacamole-user=<slug> label set by the hub's spawn hook). This is the
+        // fixed endpoint Guacamole dials, even though the backing pod only exists once the user has
+        // logged into JupyterHub and spawned it.
+        Map<String, String> emailToVncHost = new LinkedHashMap<>();
         List<ITerraformDependable> guacamoleDeps = new ArrayList<>(eksDependOn);
-        for (GuacamoleConfig.Session session : sessions) {
+        for (GuacUser user : GUAC_USERS) {
+            emailToVncHost.put(user.email(), vncServiceName(user.slug()));
             guacamoleDeps.add(clusterIpService(
-                "jupyterhubVnc-" + session.username(),
-                vncServiceName(session.username()),
-                Map.of(GUAC_USER_LABEL, session.username()),
+                "jupyterhubVnc-" + user.slug(),
+                vncServiceName(user.slug()),
+                Map.of(GUAC_USER_LABEL, user.slug()),
                 "vnc",
                 VNC_PORT,
                 eksDependOn));
         }
 
-        // Guacamole streams each user's pod desktop. One login per user, each pointing at that
-        // user's VNC Service (a different host per session, unlike the single-pod deployment where
-        // all sessions shared one host on different ports).
+        // Guacamole streams each user's pod desktop. The login is the email; the connection points
+        // at that user's own VNC Service (a different host per user, unlike the single-pod
+        // deployment where all sessions shared one host on different ports).
         new GuacamoleConfig(
             stack,
             guacamoleDeps,
-            session -> vncServiceName(session.username()),
+            session -> emailToVncHost.get(session.username()),
             jupyterPassword,
             sessions);
 
@@ -268,8 +285,8 @@ public abstract class JupyterHubConfig {
         return PROXY_LABELS;
     }
 
-    private static String vncServiceName(String username) {
-        return "guac-vnc-" + username;
+    private static String vncServiceName(String slug) {
+        return "guac-vnc-" + slug;
     }
 
     private void deployHub(List<ITerraformDependable> dependsOn) {
@@ -433,9 +450,6 @@ public abstract class JupyterHubConfig {
             c.KubeSpawner.http_timeout = 120
             # One in-pod VNC session per single-user server (see start-vnc.sh in the image).
             c.KubeSpawner.environment = {'VNC_SESSIONS': '1'}
-            # Stamp the username on the pod so the per-user VNC Service (which Guacamole dials) can
-            # select it. KubeSpawner expands {username} when rendering extra_labels.
-            c.KubeSpawner.extra_labels = {'%8$s': '{username}'}
 
             # --- OIDC login against the same provider oauth2-proxy uses. JupyterHub is the OAuth
             #     client itself (not DummyAuthenticator) so it can capture each user's token via
@@ -452,25 +466,47 @@ public abstract class JupyterHubConfig {
             c.GenericOAuthenticator.userdata_url = _oidc['userinfo_endpoint']
             c.GenericOAuthenticator.scope = ['openid', 'email', 'profile']
             c.GenericOAuthenticator.username_claim = 'email'
-            c.GenericOAuthenticator.allow_all = True
-            # Encrypt and retain the OAuth token response so it can be injected into the pod.
             c.GenericOAuthenticator.enable_auth_state = True
+            # Only the known roster may log in (these line up 1:1 with the Guacamole logins).
+            c.GenericOAuthenticator.allow_all = False
+            c.GenericOAuthenticator.allowed_users = {%11$s}
 
-            # Inject the user's OIDC token into their pod, where the Spark Connector and Polaris
-            # read OIDC_TOKEN to act as that user.
-            async def _inject_token(spawner, auth_state):
-                if not auth_state:
-                    return
-                spawner.environment['OIDC_TOKEN'] = auth_state.get('access_token', '')
-                if auth_state.get('id_token'):
-                    spawner.environment['OIDC_ID_TOKEN'] = auth_state['id_token']
-            c.Spawner.auth_state_hook = _inject_token
+            # email -> DNS/label-safe slug, matching the per-user VNC Service names.
+            _GUAC_SLUGS = {%12$s}
+
+            async def _on_spawn(spawner, auth_state):
+                # Label the pod with the user's slug so their guac-vnc-<slug> Service selects it.
+                slug = _GUAC_SLUGS.get(spawner.user.name)
+                if slug:
+                    spawner.extra_labels = dict(spawner.extra_labels or {})
+                    spawner.extra_labels['%8$s'] = slug
+                # Inject the user's OIDC token, read by the Spark Connector and Polaris.
+                if auth_state:
+                    spawner.environment['OIDC_TOKEN'] = auth_state.get('access_token', '')
+                    if auth_state.get('id_token'):
+                        spawner.environment['OIDC_ID_TOKEN'] = auth_state['id_token']
+            c.Spawner.auth_state_hook = _on_spawn
             """.formatted(
             PROXY_API_SVC, PROXY_API,
             HUB_SVC, HUB_PORT,
             SINGLEUSER_IMAGE, SINGLEUSER_PORT,
             HUB_BASE_URL, GUAC_USER_LABEL,
-            issuer, jupyterDomain());
+            issuer, jupyterDomain(),
+            pythonSetOf(GUAC_USERS.stream().map(GuacUser::email).toList()),
+            pythonSlugMap());
+    }
+
+    /** Renders a Python set literal body (no braces): {@code 'a', 'b'}. */
+    private static String pythonSetOf(List<String> values) {
+        return values.stream().map(v -> "'" + v + "'").reduce((a, b) -> a + ", " + b).orElse("");
+    }
+
+    /** Renders the email->slug dict literal body (no braces): {@code 'a@x': 'a', 'b@x': 'b'}. */
+    private static String pythonSlugMap() {
+        return GUAC_USERS.stream()
+                         .map(u -> "'" + u.email() + "': '" + u.slug() + "'")
+                         .reduce((a, b) -> a + ", " + b)
+                         .orElse("");
     }
 
     private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
