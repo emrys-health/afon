@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-public class PrometheusClusterDeploy extends SparkClusterDeployment {
+public class PrometheusClusterDeploy extends TrinoClusterDeployment {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PrometheusClusterDeploy.class);
 
