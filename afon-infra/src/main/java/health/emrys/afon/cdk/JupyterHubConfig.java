@@ -419,6 +419,8 @@ public abstract class JupyterHubConfig {
             c.JupyterHub.spawner_class = 'kubespawner.KubeSpawner'
             c.KubeSpawner.namespace = os.environ.get('POD_NAMESPACE', 'default')
             c.KubeSpawner.image = '%5$s'
+            # Re-pull on every spawn so a rebuilt image under the same tag is picked up.
+            c.KubeSpawner.image_pull_policy = 'Always'
             c.KubeSpawner.port = %6$d
             c.KubeSpawner.start_timeout = 300
             c.KubeSpawner.http_timeout = 120
