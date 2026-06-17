@@ -66,4 +66,19 @@ public class JupyterHubAwsConfig extends JupyterHubConfig {
             OAUTH2_CLIENT_SECRET.getValueFrom(properties),
             OAUTH2_COOKIE_SECRET.getValueFrom(properties));
     }
+
+    @Override
+    protected String jupyterDomain() {
+        return jupyterDomain;
+    }
+
+    @Override
+    protected String oauthClientId() {
+        return OAUTH2_CLIENT_ID.getValueFrom(properties);
+    }
+
+    @Override
+    protected String oauthClientSecret() {
+        return OAUTH2_CLIENT_SECRET.getValueFrom(properties);
+    }
 }
