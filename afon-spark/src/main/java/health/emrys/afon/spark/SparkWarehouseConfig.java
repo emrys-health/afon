@@ -88,8 +88,6 @@ public class SparkWarehouseConfig {
         Map conf = new HashMap<String, String>();
         conf.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
         conf.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
-        conf.put(format("spark.sql.catalog.%s.client_id", sparkCatalog), clientId);
-        conf.put(format("spark.sql.catalog.%s.client_secret", sparkCatalog), clientSecret);
         conf.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
         conf.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
         conf.put(format("spark.sql.catalog.%s.rest.auth.oauth2.scope", sparkCatalog), OAUTH_SCOPE);
