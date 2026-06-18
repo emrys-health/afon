@@ -90,7 +90,6 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
         conf.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
         conf.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
-        conf.put(format("spark.sql.catalog.%s.rest.auth.oauth2.scope", sparkCatalog), OAUTH_SCOPE);
         conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), OAUTH_SCOPE);
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
         conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol, host));
