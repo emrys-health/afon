@@ -34,6 +34,7 @@ import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
  */
 public class SparkWorkloads {
 
+    public static final String SPARK_IMAGE = "apache/spark:4.0.1";
     private final String polarisDomainName;
 
     public SparkWorkloads(String polarisDomainName) {
@@ -72,7 +73,7 @@ public class SparkWorkloads {
                                             )
                                             ),
                 "sparkConf", Map.of(
-                    "spark.kubernetes.container.image", "apache/spark:4.0.1",
+                    "spark.kubernetes.container.image", SPARK_IMAGE,
                     "spark.master.ui.title", "Prod Spark Cluster",
                     "spark.master.rest.enabled", "true",
                     "spark.master.rest.host", "0.0.0.0",
@@ -161,7 +162,7 @@ public class SparkWorkloads {
     private Map<String, String> sparkConfig(String serviceAccountName,
                                             SupportedCloudsEnum id) {
         var first = Map.of(
-            "spark.kubernetes.container.image", "apache/spark:4.0.1",
+            "spark.kubernetes.container.image", SPARK_IMAGE,
             "spark.master.ui.title", "Prod Spark Cluster",
             "spark.master.rest.enabled", "true",
             "spark.master.rest.host", "0.0.0.0",
