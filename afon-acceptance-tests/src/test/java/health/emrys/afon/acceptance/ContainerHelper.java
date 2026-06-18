@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
@@ -9,10 +10,13 @@ import org.testcontainers.images.builder.Transferable;
 
 import java.io.File;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
+import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -21,23 +25,47 @@ public class ContainerHelper {
 
     private static final Logger logger = getLogger(ContainerHelper.class);
 
-    public static final ContainerHelper instance    = new ContainerHelper();
-    public static final String          GOOGLE_FILE = "/tmp/application_default_credentials.json";
+    public static final ContainerHelper instance = new ContainerHelper();
+
+    private static final String GOOGLE_FILE = "/tmp/application_default_credentials.json";
 
     /**
      * For testing.
      */
     public static void main(String[] args) {
-        instance.startPolaris(new AfonPropertiesLoader().getProperties());
+        Properties properties = new AfonPropertiesLoader().getProperties();
+//        instance.startPolaris(properties);
+        instance.startSparkConnect(properties);
         System.out.println("Press enter to continue...");
         Scanner s = new Scanner(System.in);
         s.nextLine();
+        logger.info("That's all folks!");
     }
 
     private GenericContainer<?> polaris;
     private GenericContainer<?> trino;
+    private GenericContainer<?> sparkConnect;
 
     private ContainerHelper() {
+    }
+
+    public synchronized void startSparkConnect(Properties properties) {
+        if (sparkConnect == null) {
+            sparkConnect = new GenericContainer<>("ph1ll1phenry/spark_jars:4.0.1");
+//            sparkConnect.withCommand("/opt/spark/bin/spark-submit", "--class", "org.apache.spark.sql.connect.service.SparkConnectServer", "--name", "Spark Connect Server");
+            SparkWarehouseConfig config = new SparkWarehouseConfig(properties);
+            Stream<String> envs = Arrays.stream(values()).flatMap(
+                cloudProvider ->
+                    config.sparkConfigs(cloudProvider).entrySet().stream().map(
+                        entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
+                                                                         );
+            String envString = envs.collect(Collectors.joining(" ")) + " -Dspark.master=local[4]";
+            logger.info("Spark connect env: {}", envString);
+            sparkConnect.withEnv("SPARK_SUBMIT_OPTS", envString);
+//            sparkConnect.setNetworkMode("host");
+            sparkConnect.setPortBindings(List.of("15002:15002"));
+            sparkConnect.start();
+        }
     }
 
     public synchronized void startPolaris(Properties properties) {
@@ -98,7 +126,7 @@ public class ContainerHelper {
             POLARIS_ENDPOINT.getValueFrom(properties),
             properties
         );
-        return  trinoConfig.catalogProperties(catalog);
+        return trinoConfig.catalogProperties(catalog);
     }
 
 }
