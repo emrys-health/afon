@@ -34,7 +34,7 @@ public class ContainerHelper {
      */
     public static void main(String[] args) {
         Properties properties = new AfonPropertiesLoader().getProperties();
-//        instance.startPolaris(properties);
+        instance.startPolaris(properties);
         instance.startSparkConnect(properties);
         System.out.println("Press enter to continue...");
         Scanner s = new Scanner(System.in);
@@ -52,7 +52,6 @@ public class ContainerHelper {
     public synchronized void startSparkConnect(Properties properties) {
         if (sparkConnect == null) {
             sparkConnect = new GenericContainer<>("ph1ll1phenry/spark_jars:4.0.1");
-//            sparkConnect.withCommand("/opt/spark/bin/spark-submit", "--class", "org.apache.spark.sql.connect.service.SparkConnectServer", "--name", "Spark Connect Server");
             SparkWarehouseConfig config = new SparkWarehouseConfig(properties);
             Stream<String> envs = Arrays.stream(values()).flatMap(
                 cloudProvider ->
@@ -62,8 +61,8 @@ public class ContainerHelper {
             String envString = envs.collect(Collectors.joining(" ")) + " -Dspark.master=local[4]";
             logger.info("Spark connect env: {}", envString);
             sparkConnect.withEnv("SPARK_SUBMIT_OPTS", envString);
-//            sparkConnect.setNetworkMode("host");
-            sparkConnect.setPortBindings(List.of("15002:15002"));
+//            sparkConnect.setPortBindings(List.of("15002:15002"));
+            sparkConnect.setNetworkMode("host");
             sparkConnect.start();
         }
     }
