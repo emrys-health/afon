@@ -24,6 +24,7 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 
 /**
  * Cloud-agnostic application of the Spark operator's custom resources: a {@code SparkCluster}
@@ -34,7 +35,6 @@ import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
  */
 public class SparkWorkloads {
 
-    public static final String SPARK_IMAGE = "apache/spark:4.0.1";
     private final String polarisDomainName;
 
     public SparkWorkloads(String polarisDomainName) {
