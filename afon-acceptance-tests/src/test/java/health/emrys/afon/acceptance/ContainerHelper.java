@@ -58,8 +58,17 @@ public class ContainerHelper {
                     config.sparkConfigs(cloudProvider).entrySet().stream().map(
                         entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
                                                                          );
-            String envString = envs.collect(Collectors.joining(" ")) + " -Dspark.master=local[4]";
+            String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger.netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
+            String envString = envs.collect(Collectors.joining(" "))
+                 + " -Dspark.master=local[4]"
+                 + " -Dspark.connect.grpc.interceptor.classes=org.apache.spark.sql.connect.service.LoggingInterceptor"
+                 + " " + logging;
+            sparkConnect.withEnv("spark.driver.extraJavaOptions", logging);
+            sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC", "DEBUG");
+            sparkConnect.withEnv("LOG4J_LOGGER_ORG_APACHE_SPARK_SQL_CONNECT", "DEBUG");
+            sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC_NETTY", "TRACE");
             logger.info("Spark connect env: {}", envString);
+
             sparkConnect.withEnv("SPARK_SUBMIT_OPTS", envString);
 //            sparkConnect.setPortBindings(List.of("15002:15002"));
             sparkConnect.setNetworkMode("host");

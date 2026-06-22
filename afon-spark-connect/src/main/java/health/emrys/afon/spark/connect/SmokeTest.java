@@ -10,12 +10,18 @@ import org.apache.spark.sql.SparkSession;
  */
 public class SmokeTest {
 
+    /**
+     * Note that the `;token=...` string just must match with PreSharedKeyAuthenticationInterceptor
+     * (example, sc://localhost:15002/;token=deadbeef)
+     * See SPARK-51156 "Provide a basic authentication token when running Spark Connect server locally"
+     *
+     */
     public static void main(String[] args) {
         SparkSession spark = SparkSession
                 .builder()
                 .classic()
                 .appName("test2")
-                .remote("sc://localhost:15002")
+                .remote("sc://localhost:15002/;token=deadbeef")
                 .getOrCreate();
         spark.read().table("aws.acceptancetests.AwsAccessSpec251117511401").show();
     }
