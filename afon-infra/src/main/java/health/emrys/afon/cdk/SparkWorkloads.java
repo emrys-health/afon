@@ -6,22 +6,16 @@ import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
-import io.kubernetes.client.openapi.ApiException;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.USER_POLARIS_ID;
+import static health.emrys.afon.config.AfonProperties.USER_POLARIS_SECRET;
 import static health.emrys.afon.infra.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
