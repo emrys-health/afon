@@ -51,7 +51,7 @@ public class ContainerHelper {
 
     public synchronized void startSparkConnect(Properties properties) {
         if (sparkConnect == null) {
-            sparkConnect = new GenericContainer<>("ph1ll1phenry/spark_jars:4.0.1");
+            sparkConnect = new GenericContainer<>(SPARK_IMAGE);
             SparkWarehouseConfig config = new SparkWarehouseConfig(properties);
             Stream<String> envs = Arrays.stream(values()).flatMap(
                 cloudProvider ->
