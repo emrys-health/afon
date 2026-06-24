@@ -1,6 +1,9 @@
 package health.emrys.afon.demo;
 
+import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.cdk.aws.AwsNuke;
+import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -32,14 +35,30 @@ public class DocumentFullStackAwsMain extends AbstractDocumentMetadata {
     }
 
     public String getFurtherNotes() {
-        var nuke = new AwsNuke();
-        return String.format("""
+        var    nuke              = new AwsNuke();
+        String polarisDomainName =
+            AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(new AfonPropertiesLoader().getProperties());
+        return String.format(
+            """
+            # Problems starting Spark Connect
+            
+            There appears to be a race condition so that Spark Connect is killed as soon as it starts
+            (see [this ticket](https://github.com/emrys-health/afon-core/issues/65). 
+            If this happens, run:
+            
+            ```
+            kubectl delete sparkapp spark-connector
+            %s
+            ```
+            
             # Problems destroying the stack?
             
             Run this *twice*:
             ```shell
             %s
             ```
-            """, nuke.cleanUpHint());
+            """,
+            SparkWorkloads.startConnectCommand(polarisDomainName),
+            nuke.cleanUpHint());
     }
 }
