@@ -51,8 +51,16 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
     }
 
     /**
-     * Obtains an access token from KeyCloak (password grant for the provisioned Polaris user) rather
-     * than from Polaris' internal - and, under external authentication, unimplemented - token endpoint.
+     * Get the token with:
+     * <pre>
+curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token -H "Content-Type: application/x-www-form-urlencoded" -d grant_type=client_credentials -d client_id=root -d client_secret=s3cr3t
+     * </pre>
+     *
+     * Validate with:
+     *
+     * <pre>
+curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token/introspect -H "Content-Type: application/x-www-form-urlencoded" -d token=$POLARIS_TOKEN  -d client_id=root -d client_secret=s3cr3t | jq
+     * </pre>
      */
     @Override
     public String callAccessToken() throws IOException {
