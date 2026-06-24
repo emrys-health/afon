@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
@@ -9,10 +10,13 @@ import org.testcontainers.images.builder.Transferable;
 
 import java.io.File;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
+import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -21,23 +25,55 @@ public class ContainerHelper {
 
     private static final Logger logger = getLogger(ContainerHelper.class);
 
-    public static final ContainerHelper instance    = new ContainerHelper();
-    public static final String          GOOGLE_FILE = "/tmp/application_default_credentials.json";
+    public static final ContainerHelper instance = new ContainerHelper();
+
+    private static final String GOOGLE_FILE = "/tmp/application_default_credentials.json";
 
     /**
      * For testing.
      */
     public static void main(String[] args) {
-        instance.startPolaris(new AfonPropertiesLoader().getProperties());
+        Properties properties = new AfonPropertiesLoader().getProperties();
+        instance.startPolaris(properties);
+        instance.startSparkConnect(properties);
         System.out.println("Press enter to continue...");
         Scanner s = new Scanner(System.in);
         s.nextLine();
+        logger.info("That's all folks!");
     }
 
     private GenericContainer<?> polaris;
     private GenericContainer<?> trino;
+    private GenericContainer<?> sparkConnect;
 
     private ContainerHelper() {
+    }
+
+    public synchronized void startSparkConnect(Properties properties) {
+        if (sparkConnect == null) {
+            sparkConnect = new GenericContainer<>(SPARK_IMAGE);
+            SparkWarehouseConfig config = new SparkWarehouseConfig(properties);
+            Stream<String> envs = Arrays.stream(values()).flatMap(
+                cloudProvider ->
+                    config.sparkConfigs(cloudProvider).entrySet().stream().map(
+                        entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
+                                                                         );
+            String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger.netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
+            String envString = envs.collect(Collectors.joining(" "))
+                 + " -Dspark.master=local[4]"
+                 + " -Dspark.connect.grpc.interceptor.classes=org.apache.spark.sql.connect.service.LoggingInterceptor"
+                 + " " + logging;
+            sparkConnect.withEnv("spark.driver.extraJavaOptions", logging);
+            sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC", "DEBUG");
+            sparkConnect.withEnv("LOG4J_LOGGER_ORG_APACHE_SPARK_SQL_CONNECT", "DEBUG");
+            sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC_NETTY", "TRACE");
+            logger.info("Spark connect env: {}", envString);
+
+            sparkConnect.withEnv("SPARK_SUBMIT_OPTS", envString);
+//            sparkConnect.setPortBindings(List.of("15002:15002"));
+            sparkConnect.setNetworkMode("host");
+            sparkConnect.start();
+        }
     }
 
     public synchronized void startPolaris(Properties properties) {
@@ -98,7 +134,7 @@ public class ContainerHelper {
             POLARIS_ENDPOINT.getValueFrom(properties),
             properties
         );
-        return  trinoConfig.catalogProperties(catalog);
+        return trinoConfig.catalogProperties(catalog);
     }
 
 }

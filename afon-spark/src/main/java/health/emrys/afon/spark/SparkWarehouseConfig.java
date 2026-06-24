@@ -1,5 +1,6 @@
 package health.emrys.afon.spark;
 
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.SQLConf$;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
 import static java.lang.String.format;
@@ -19,10 +21,13 @@ import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 
 public class SparkWarehouseConfig {
 
-    public static final String[] SUPPORTED_CLOUD_NAMES = Arrays.stream(SupportedCloudsEnum.values()).map(x -> x.toString()).toArray(String[]::new);
-  private static final Logger log = LoggerFactory.getLogger(SparkWarehouseConfig.class);
+    public static final String SPARK_IMAGE = "ph1ll1phenry/spark_jars:4.0.1";
 
-  private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
+    public static final  String[] SUPPORTED_CLOUD_NAMES =
+        Arrays.stream(SupportedCloudsEnum.values()).map(x -> x.toString()).toArray(String[]::new);
+    private static final Logger   log                   = LoggerFactory.getLogger(SparkWarehouseConfig.class);
+
+    private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
     private final String DEFAULT_CATALOG          = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
     private final String WAREHOUSE_PATH           = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
 
@@ -32,10 +37,10 @@ public class SparkWarehouseConfig {
     private final String polarisProtocol;
 
     public SparkWarehouseConfig(
-            String clientId,
-            String clientSecret,
-            String host,
-            String polarisProtocol) {
+        String clientId,
+        String clientSecret,
+        String host,
+        String polarisProtocol) {
         this.clientId        = clientId;
         this.clientSecret    = ***REMOVED***
         this.host            = host;
@@ -43,10 +48,17 @@ public class SparkWarehouseConfig {
     }
 
     public SparkWarehouseConfig(
-            String clientId,
-            String clientSecret,
-            String host) {
+        String clientId,
+        String clientSecret,
+        String host) {
         this(clientId, clientSecret, host, "http");
+    }
+
+    public SparkWarehouseConfig(Properties properties) {
+        this(AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
+             AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
+             AfonProperties.POLARIS_ENDPOINT.getValueFrom(properties)
+             );
     }
 
     public SparkConf sparkConf() throws IOException {
@@ -60,10 +72,10 @@ public class SparkWarehouseConfig {
     public SparkConf sparkConf(int cores, String... cloudProviders) throws IOException {
         String tmpDir = Files.createTempDirectory("SparkForTesting").toString();
         SparkConf sparkConf = new SparkConf()
-                .setMaster(format("local[%d]", cores))
-                .setAppName("Tests")
-                .setSparkHome(tmpDir)
-                .set(WAREHOUSE_PATH, tmpDir);
+            .setMaster(format("local[%d]", cores))
+            .setAppName("Tests")
+            .setSparkHome(tmpDir)
+            .set(WAREHOUSE_PATH, tmpDir);
         for (String cloudProvider : cloudProviders) {
             log.info("Configuring Spark context for cloud {}", cloudProvider);
             configureWith(sparkConfigs(cloudProvider), sparkConf);
@@ -92,8 +104,10 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
         conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), OAUTH_SCOPE);
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
-        conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol, host));
-        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), sparkCatalog); // this is the Polaris catalog name
+        conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol,
+                                                                          host));
+        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), sparkCatalog); // this is the Polaris
+        // catalog name
         return Map.copyOf(conf);
     }
 
