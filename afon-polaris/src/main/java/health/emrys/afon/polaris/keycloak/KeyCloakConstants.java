@@ -32,10 +32,6 @@ public class KeyCloakConstants {
      * token that Polaris will accept.
      */
     public static final String KEYCLOAK_REALM         = "polaris";
-    public static final String KEYCLOAK_CLIENT_ID     = "polaris";
-    public static final String KEYCLOAK_CLIENT_SECRET = "polaris-secret";
-    public static final String KEYCLOAK_USER          = "polaris-user";
-    public static final String KEYCLOAK_USER_PASSWORD = "polaris-password";
 
     /**
      * Base URL of KeyCloak as seen from the host (the {@link KeyCloakAdmin} runs on the host JVM).
@@ -47,8 +43,8 @@ public class KeyCloakConstants {
     /**
      * Issuer / discovery URL as seen from inside the docker network (i.e. by Polaris).
      */
-    public static String internalRealmUrl() {
-        return format("http://%s:%d/realms/%s", KEYCLOAK_ALIAS, KEYCLOAK_PORT, KEYCLOAK_REALM);
+    public static String internalRealmUrl(String host) {
+        return format("http://%s:%d/realms/%s", host, KEYCLOAK_PORT, KEYCLOAK_REALM);
     }
 
     /**
@@ -58,7 +54,9 @@ public class KeyCloakConstants {
      * <p>The keys are the canonical (dotted) Polaris/Quarkus property names; SmallRye Config reads
      * them from the environment, which is how the official Polaris docker images are configured.
      */
-    public static Map<String, String> polarisOidcEnv() {
+    public static Map<String, String> polarisOidcEnv(String keyCloakURL,
+                                                     String user,
+                                                     String userPassword) {
         Map<String, String> env = new LinkedHashMap<>();
         // Use KeyCloak instead of Polaris' internal token store.
         env.put("polaris.authentication.type", "external");
@@ -69,9 +67,9 @@ public class KeyCloakConstants {
         env.put("polaris.oidc.principal-roles-mapper.type", "default");
         // Point Quarkus OIDC at the KeyCloak realm. OIDC is disabled by default, so enable the tenant.
         env.put("quarkus.oidc.tenant-enabled", "true");
-        env.put("quarkus.oidc.auth-server-url", internalRealmUrl());
-        env.put("quarkus.oidc.client-id", KEYCLOAK_CLIENT_ID);
-        env.put("quarkus.oidc.credentials.secret", KEYCLOAK_CLIENT_SECRET);
+        env.put("quarkus.oidc.auth-server-url", keyCloakURL);
+        env.put("quarkus.oidc.client-id", user);
+        env.put("quarkus.oidc.credentials.secret", userPassword);
         env.put("quarkus.oidc.application-type", "service");
         return env;
     }

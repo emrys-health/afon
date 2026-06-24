@@ -62,6 +62,9 @@ public class AfonProperties {
     public static final AfonProperty AZURE_CLIENT_ID         = new AfonProperty("AZURE_CLIENT_ID");
     public static final AfonProperty AZURE_CLIENT_SECRET     = new AfonProperty("AZURE_CLIENT_SECRET");
 
+    // Key Cloak
+    public static final AfonProperty KEY_CLOAK_HOSTNAME     = new AfonProperty("KEY_CLOAK_HOSTNAME");
+
     // Polaris
     public static final AfonProperty USER_POLARIS_ID     = new AfonProperty("USER_POLARIS_ID");
     public static final AfonProperty USER_POLARIS_SECRET = new AfonProperty("USER_POLARIS_SECRET");

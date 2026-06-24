@@ -49,9 +49,6 @@ public class ContainerHelper {
         logger.info("That's all folks!");
     }
 
-    /**
-     * Shared docker network so that Polaris can reach KeyCloak by its {@link KeyCloakConstants#KEYCLOAK_ALIAS}.
-     */
     private final Network network = Network.newNetwork();
 
     private GenericContainer<?> polaris;
@@ -87,7 +84,8 @@ public class ContainerHelper {
                         "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
-            new KeyCloakAdmin().registerPolarisUser();
+            new KeyCloakAdmin().registerPolarisUser(USER_POLARIS_ID.getValueFrom(properties),
+                                                    USER_POLARIS_SECRET.getValueFrom(properties));
         }
     }
 
@@ -137,7 +135,9 @@ public class ContainerHelper {
                 polaris.withEnv(x.getPropertyName(), x.getValueFrom(properties));
             });
             // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
-            polarisOidcEnv().forEach(polaris::withEnv);
+            polarisOidcEnv(internalRealmUrl(KEYCLOAK_ALIAS),
+                           USER_POLARIS_ID.getValueFrom(properties),
+                           USER_POLARIS_SECRET.getValueFrom(properties)).forEach(polaris::withEnv);
             Map.of(
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
