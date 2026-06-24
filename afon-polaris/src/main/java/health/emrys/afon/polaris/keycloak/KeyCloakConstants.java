@@ -21,6 +21,14 @@ public class KeyCloakConstants {
     public static final String KEYCLOAK_ALIAS = "keycloak";
 
     /**
+     * Single, pinned base URL used as the token issuer everywhere - token minting, introspection and
+     * Polaris' JWKS validation - so the {@code iss} claim is always identical and never depends on the
+     * request host. KeyCloak is pinned to this via {@code KC_HOSTNAME}. It is the docker network alias,
+     * so host-side callers (e.g. {@link KeyCloakAdmin}) need {@code 127.0.0.1 keycloak} in /etc/hosts.
+     */
+    public static final String KEYCLOAK_BASE_URL = format("http://%s:%d", KEYCLOAK_ALIAS, KEYCLOAK_PORT);
+
+    /**
      * Bootstrap admin of the KeyCloak instance (master realm).
      */
     public static final String KEYCLOAK_ADMIN          = "admin";
@@ -34,10 +42,11 @@ public class KeyCloakConstants {
     public static final String KEYCLOAK_REALM         = "polaris";
 
     /**
-     * Base URL of KeyCloak as seen from the host (the {@link KeyCloakAdmin} runs on the host JVM).
+     * Base URL the host-side {@link KeyCloakAdmin} uses. Deliberately the same pinned host as the
+     * issuer so everything lines up (requires {@code 127.0.0.1 keycloak} in /etc/hosts).
      */
     public static String hostBaseUrl() {
-        return format("http://localhost:%d", KEYCLOAK_PORT);
+        return KEYCLOAK_BASE_URL;
     }
 
     /**

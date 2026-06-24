@@ -71,9 +71,15 @@ public class ContainerHelper {
                 .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", KEYCLOAK_ADMIN)
                 .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", KEYCLOAK_ADMIN_PASSWORD)
                 .withEnv("KC_HTTP_ENABLED", "true")
-                // Don't pin the hostname: KeyCloak is reached both as 'keycloak' (by Polaris on the
-                // docker network) and as 'localhost' (by the host-side KeyCloakAdmin below).
+                // PH: note Claude Code says I need to add  127.0.0.1 keycloak to /etc/hosts to make this work
+
+                // Pin a single issuer so the token's 'iss' is always KEYCLOAK_BASE_URL, regardless of
+                // which host (keycloak vs localhost) minted it. Without this, KC_HOSTNAME_STRICT=false
+                // stamps 'iss' from the request host, so a token fetched via one host fails validation
+                // (introspection / Polaris JWKS) via another.
+                .withEnv("KC_HOSTNAME", KEYCLOAK_BASE_URL)
                 .withEnv("KC_HOSTNAME_STRICT", "false")
+                .withEnv("KC_HOSTNAME_BACKCHANNEL_DYNAMIC", "false")
                 .waitingFor(Wait.forHttp("/realms/master")
                                 .forPort(KEYCLOAK_PORT)
                                 .forStatusCode(200)
