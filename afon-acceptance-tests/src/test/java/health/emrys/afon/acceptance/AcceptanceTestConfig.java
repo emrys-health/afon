@@ -5,6 +5,7 @@ import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
+import health.emrys.afon.polaris.comms.KeyCloakPolarisClient;
 
 import java.util.Properties;
 
@@ -38,7 +39,7 @@ public class AcceptanceTestConfig {
         this.clientSecret = ***REMOVED***
         this.properties   = properties;
         startContainers(properties);
-        this.polarisClient              = new AfonPolarisClient(properties);
+        this.polarisClient              = new KeyCloakPolarisClient(properties);
         this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
         this.awsTrino                   = new AwsCloudConfigForPolaris(properties) {
             @Override
@@ -91,6 +92,7 @@ public class AcceptanceTestConfig {
 
     private static void startContainers(Properties properties) {
         ContainerHelper containerHelper = ContainerHelper.instance;
+        containerHelper.startKeyCloak(properties);
         containerHelper.startPolaris(properties);
         containerHelper.startTrino(properties);
     }

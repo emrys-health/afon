@@ -1,6 +1,8 @@
 package health.emrys.afon.polaris.keycloak;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -15,6 +17,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import static health.emrys.afon.polaris.keycloak.KeyCloakConstants.*;
 import static java.lang.String.format;
@@ -52,14 +55,14 @@ public class KeyCloakAdmin {
      * Ensures the Polaris realm, client and user all exist. Idempotent: anything that already exists
      * is left untouched.
      */
-    public void registerPolarisUser() {
+    public void registerPolarisUser(String user, String userPassword) {
         try {
             String adminToken = adminToken();
             createRealm(adminToken, KEYCLOAK_REALM);
-            createConfidentialClient(adminToken, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID, KEYCLOAK_CLIENT_SECRET);
-            createUser(adminToken, KEYCLOAK_REALM, KEYCLOAK_USER, KEYCLOAK_USER_PASSWORD);
-            logger.info("KeyCloak realm '{}' provisioned with client '{}' and user '{}'",
-                        KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID, KEYCLOAK_USER);
+            createConfidentialClient(adminToken, KEYCLOAK_REALM, user, userPassword);
+            createUser(adminToken, KEYCLOAK_REALM, user, userPassword);
+            logger.info("KeyCloak realm '{}' provisioned with client/user '{}'",
+                        KEYCLOAK_REALM, user);
         } catch (IOException e) {
             throw new RuntimeException("Failed to provision KeyCloak for Polaris", e);
         }
@@ -191,6 +194,8 @@ public class KeyCloakAdmin {
      * already-running KeyCloak.
      */
     public static void main(String[] args) {
-        new KeyCloakAdmin().registerPolarisUser();
+        Properties properties = new AfonPropertiesLoader().getProperties();
+        new KeyCloakAdmin().registerPolarisUser(AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
+                                                AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties));
     }
 }
