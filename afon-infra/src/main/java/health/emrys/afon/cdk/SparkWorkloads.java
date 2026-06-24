@@ -24,6 +24,7 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 
 /**
  * Cloud-agnostic application of the Spark operator's custom resources: a {@code SparkCluster}
@@ -72,7 +73,7 @@ public class SparkWorkloads {
                                             )
                                             ),
                 "sparkConf", Map.of(
-                    "spark.kubernetes.container.image", "apache/spark:4.0.1",
+                    "spark.kubernetes.container.image", SPARK_IMAGE,
                     "spark.master.ui.title", "Prod Spark Cluster",
                     "spark.master.rest.enabled", "true",
                     "spark.master.rest.host", "0.0.0.0",
@@ -167,7 +168,7 @@ public class SparkWorkloads {
      */
     private static Map<String, String> sparkConfig(String polarisDomainName) {
         var first = Map.of(
-            "spark.kubernetes.container.image", "apache/spark:4.0.1",
+            "spark.kubernetes.container.image", SPARK_IMAGE,
             "spark.master.ui.title", "Prod Spark Cluster",
             "spark.master.rest.enabled", "true",
             "spark.master.rest.host", "0.0.0.0",

@@ -12,6 +12,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
@@ -65,21 +66,24 @@ public class JupyterMfaConfig {
                         ))
             .build();
 
+        List<String> argsForOAuthProxy = List.of(
+            "--provider=oidc",
+            "--oidc-issuer-url=" + OIDC_ISSUER_URL.getValueFrom(properties),
+            "--upstream=" + jupyterUpstreamUrl,
+            "--http-address=0.0.0.0:" + PROXY_PORT,
+            "--cookie-secure=true",                           // set true when TLS terminates at this proxy
+            "--skip-provider-button=false",
+            "--ping-path=/ping",
+            format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)
+                                   );
+        List<String> args = new ArrayList<>();
+        args.addAll(emailArgs(properties));
+        args.addAll(argsForOAuthProxy);
         DeploymentSpecTemplateSpecContainer proxyContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("oauth2-proxy")
             .image("quay.io/oauth2-proxy/oauth2-proxy:v7.6.0")
-            .args(List.of(
-                "--provider=oidc",
-                "--oidc-issuer-url=" + OIDC_ISSUER_URL.getValueFrom(properties),
-                "--email-domain=" + OIDC_EMAIL_DOMAIN.getValueFrom(properties),
-                "--upstream=" + jupyterUpstreamUrl,
-                "--http-address=0.0.0.0:" + PROXY_PORT,
-                "--cookie-secure=true",                           // set true when TLS terminates at this proxy
-                "--skip-provider-button=false",
-                "--ping-path=/ping",
-                format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)
-                         ))
+            .args(args)
             .env(List.of(
                 envFromSecret("OAUTH2_PROXY_CLIENT_ID", SECRET_NAME, "client-id"),
                 envFromSecret("OAUTH2_PROXY_CLIENT_SECRET", SECRET_NAME, "client-secret"),
@@ -111,6 +115,10 @@ public class JupyterMfaConfig {
                                                           .build()))
                                         .build())
                        .build();
+    }
+
+    protected @NonNull List<String> emailArgs(Properties properties) {
+        return List.of("--email-domain=" + OIDC_EMAIL_DOMAIN.getValueFrom(properties));
     }
 
     private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
