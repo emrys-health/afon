@@ -6,16 +6,22 @@ import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
+import io.kubernetes.client.openapi.ApiException;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
-import java.util.*;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.config.AfonProperties.USER_POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.USER_POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
@@ -76,6 +82,31 @@ public class SparkWorkloads {
                           )
                                                                );
 
+        String                     sparkClusterJson       = toJson(sparkClusterManifest);
+        List<LocalExecProvisioner> allClusterProvisioners = new ArrayList<>();
+        allClusterProvisioners.addAll(uponCreateRun("echo '" + sparkClusterJson + "' | kubectl apply -f -"));
+        allClusterProvisioners.addAll(uponDestroyRun(
+            "kubectl delete statefulset emrys-master --force --grace-period=0",
+            "kubectl delete statefulset emrys-worker --force --grace-period=0",
+            "kubectl patch sparkclusters emrys  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
+                                                    ));
+        Resource.Builder.create(scope, "sparkClusterManifest")
+                        .provisioners(allClusterProvisioners)
+                        .dependsOn(dependsOn)
+                        .build();
+
+        List<LocalExecProvisioner> allConnectProvisioners = new ArrayList<>();
+        allConnectProvisioners.addAll(uponCreateRun(startConnectCommand(polarisDomainName)));
+        allConnectProvisioners.addAll(uponDestroyRun(
+            "kubectl patch sparkapplication spark-connector  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
+                                                    ));
+        Resource.Builder.create(scope, "sparkConnectManifest")
+                        .provisioners(allConnectProvisioners)
+                        .dependsOn(dependsOn)
+                        .build();
+    }
+
+    public static String startConnectCommand(String polarisDomainName) {
         final Map<String, Object> sparkConnectManifest = Map.of(
             "apiVersion", "spark.apache.org/v1",
             "kind", "SparkApplication",
@@ -88,7 +119,7 @@ public class SparkWorkloads {
                     "sparkVersion", "4.0.1"
                                          ),
                 "mainClass", "org.apache.spark.sql.connect.service.SparkConnectServer",
-                "sparkConf", sparkConfig(SPARK_SERVICE_ACCOUNT_NAME, id),
+                "sparkConf", sparkConfig(polarisDomainName),
                 "driverSpec", Map.of(
                     "podTemplateSpec", Map.of(
                         // app.kubernetes.io/name is the canonical label Hubble UI
@@ -116,32 +147,14 @@ public class SparkWorkloads {
                           )
                                                                );
 
+        String sparkConnectJson = toJson(sparkConnectManifest);
+        return "echo '" + sparkConnectJson + "' | kubectl apply -f -";
+    }
+
+    private static String toJson(Map<String, Object> map) {
         ObjectMapper mapper = new ObjectMapper();
         try {
-            String sparkClusterJson = mapper.writeValueAsString(sparkClusterManifest);
-            String sparkConnectJson = mapper.writeValueAsString(sparkConnectManifest);
-
-            List<LocalExecProvisioner> allClusterProvisioners = new ArrayList<>();
-            allClusterProvisioners.addAll(uponCreateRun("echo '" + sparkClusterJson + "' | kubectl apply -f -"));
-            allClusterProvisioners.addAll(uponDestroyRun(
-                "kubectl delete statefulset emrys-master --force --grace-period=0",
-                "kubectl delete statefulset emrys-worker --force --grace-period=0",
-                "kubectl patch sparkclusters emrys  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
-                                                        ));
-            Resource.Builder.create(scope, "sparkClusterManifest")
-                            .provisioners(allClusterProvisioners)
-                            .dependsOn(dependsOn)
-                            .build();
-
-            List<LocalExecProvisioner> allConnectProvisioners = new ArrayList<>();
-            allConnectProvisioners.addAll(uponCreateRun("echo '" + sparkConnectJson + "' | kubectl apply -f -"));
-            allConnectProvisioners.addAll(uponDestroyRun(
-                "kubectl patch sparkapplication spark-connector  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
-                                                        ));
-            Resource.Builder.create(scope, "sparkConnectManifest")
-                            .provisioners(allConnectProvisioners)
-                            .dependsOn(dependsOn)
-                            .build();
+            return mapper.writeValueAsString(map);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize manifest to JSON", e);
         }
@@ -153,8 +166,7 @@ public class SparkWorkloads {
      * kubectl logs -f spark-connector-0-driver  | egrep -i 'SparkSqlParser|iceberg'
      * </code>
      */
-    private Map<String, String> sparkConfig(String serviceAccountName,
-                                            SupportedCloudsEnum id) {
+    private static Map<String, String> sparkConfig(String polarisDomainName) {
         var first = Map.of(
             "spark.kubernetes.container.image", SPARK_IMAGE,
             "spark.master.ui.title", "Prod Spark Cluster",
@@ -165,7 +177,7 @@ public class SparkWorkloads {
             "spark.submit.deployMode", "cluster",
             "spark.executor.cores", "1",
             "spark.cores.max", "3",
-            "spark.kubernetes.authenticate.driver.serviceAccountName", serviceAccountName
+            "spark.kubernetes.authenticate.driver.serviceAccountName", SPARK_SERVICE_ACCOUNT_NAME
                           );
         var second = Map.of(
             "spark.driver.allowMultipleContexts", "true",
@@ -182,7 +194,7 @@ public class SparkWorkloads {
             "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
                            );
         try {
-            Map<String, String> toReturn = sparkCloudProperties(id);
+            Map<String, String> toReturn = sparkCloudProperties(polarisDomainName);
             toReturn.putAll(first);
             toReturn.putAll(second);
             return toReturn;
@@ -191,7 +203,7 @@ public class SparkWorkloads {
         }
     }
 
-    private @NotNull Map<String, String> sparkCloudProperties(SupportedCloudsEnum id) {
+    private static @NotNull Map<String, String> sparkCloudProperties(String polarisDomainName) {
         var toReturn = new HashMap<String, String>();
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
         Properties properties = new AfonPropertiesLoader().getProperties();
