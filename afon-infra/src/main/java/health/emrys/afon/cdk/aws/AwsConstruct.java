@@ -375,8 +375,9 @@ public class AwsConstruct extends AbstractConstruct {
             .nodeGroupName("default-ng")
             .subnetIds(subnetIds)
             .nodeRoleArn(nodeGroupRole.getArn())
-            .instanceTypes(List.of("t3.medium"))
+            .instanceTypes(List.of("r6i.large"))
             .scalingConfig(scalingConfig)
+            .diskSize(50)
             .dependsOn(List.of(
                 newKubeConfig, cluster, eksAuthData,
                 publicSubnet1, publicSubnet2))

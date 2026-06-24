@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
@@ -138,7 +139,11 @@ public class SparkContextConfigurationPrinter {
                                         REPLACE_INVALID_CHARACTERS = TRUE
                                       """));
         System.out.println("\u001B[0m");
-
+        for (SupportedCloudsEnum cloud : SupportedCloudsEnum.values()) {
+            Map<String, String> configs = polarisConfig.sparkConfigs(cloud);
+            System.out.println("# " + cloud);
+            configs.forEach((key, value) -> System.out.println(format(".config('%s', '%s')", key, value)));
+        }
     }
 
     private String snowflakeSql(SupportedCloudsEnum cloud, String catalog_table) {
