@@ -1,14 +1,17 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.polaris.keycloak.KeyCloakAdmin;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 
 import java.io.File;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -16,6 +19,7 @@ import java.util.stream.Stream;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
+import static health.emrys.afon.polaris.keycloak.KeyCloakConstants.*;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
@@ -34,6 +38,9 @@ public class ContainerHelper {
      */
     public static void main(String[] args) {
         Properties properties = new AfonPropertiesLoader().getProperties();
+        // KeyCloak must be up (and the Polaris realm provisioned) before Polaris starts, as Polaris
+        // resolves its OIDC configuration from KeyCloak.
+        instance.startKeyCloak(properties);
         instance.startPolaris(properties);
         instance.startSparkConnect(properties);
         System.out.println("Press enter to continue...");
@@ -42,11 +49,46 @@ public class ContainerHelper {
         logger.info("That's all folks!");
     }
 
+    /**
+     * Shared docker network so that Polaris can reach KeyCloak by its {@link KeyCloakConstants#KEYCLOAK_ALIAS}.
+     */
+    private final Network network = Network.newNetwork();
+
     private GenericContainer<?> polaris;
     private GenericContainer<?> trino;
     private GenericContainer<?> sparkConnect;
+    private GenericContainer<?> keyCloak;
 
     private ContainerHelper() {
+    }
+
+    public synchronized void startKeyCloak(Properties properties) {
+        if (keyCloak == null) {
+            keyCloak = new GenericContainer<>(KEYCLOAK_IMAGE)
+                .withNetwork(network)
+                .withNetworkAliases(KEYCLOAK_ALIAS)
+                // Declare the port so the HTTP wait strategy can resolve it (the fixed binding below
+                // pins the host port to the same number).
+                .withExposedPorts(KEYCLOAK_PORT)
+                .withCommand("start-dev")
+                .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", KEYCLOAK_ADMIN)
+                .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", KEYCLOAK_ADMIN_PASSWORD)
+                .withEnv("KC_HTTP_ENABLED", "true")
+                // Don't pin the hostname: KeyCloak is reached both as 'keycloak' (by Polaris on the
+                // docker network) and as 'localhost' (by the host-side KeyCloakAdmin below).
+                .withEnv("KC_HOSTNAME_STRICT", "false")
+                .waitingFor(Wait.forHttp("/realms/master")
+                                .forPort(KEYCLOAK_PORT)
+                                .forStatusCode(200)
+                                .withStartupTimeout(Duration.ofMinutes(3)));
+            // Fixed binding so the host-side KeyCloakAdmin can reach it at localhost:8080.
+            keyCloak.setPortBindings(List.of(KEYCLOAK_PORT + ":" + KEYCLOAK_PORT));
+            logger.info("Starting KeyCloak docker container. This usually takes about 20s, longer if " +
+                        "it's downloading the image.");
+            keyCloak.start();
+            // Provision the realm, client and user/password that Polaris will trust.
+            new KeyCloakAdmin().registerPolarisUser();
+        }
     }
 
     public synchronized void startSparkConnect(Properties properties) {
@@ -70,7 +112,6 @@ public class ContainerHelper {
             logger.info("Spark connect env: {}", envString);
 
             sparkConnect.withEnv("SPARK_SUBMIT_OPTS", envString);
-//            sparkConnect.setPortBindings(List.of("15002:15002"));
             sparkConnect.setNetworkMode("host");
             sparkConnect.start();
         }
@@ -82,6 +123,11 @@ public class ContainerHelper {
             String polarisId     = POLARIS_ID.getValueFrom(properties);
             String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
             polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
+                // Same network as KeyCloak so Polaris can reach it via the KEYCLOAK_ALIAS host name.
+                .withNetwork(network)
+                // Declare the ports so the HTTP wait strategy can resolve them (the fixed bindings
+                // below pin the host ports to the same numbers).
+                .withExposedPorts(8181, 8182, DEBUG_PORT)
                 .withCommand("sh", "-c", POLARIS_CMD)
                 .withEnv(ENVIRONMENT_VARIABLE, format("POLARIS,%s,%s", polarisId, polarisSecret))
                 // GCP
@@ -90,6 +136,8 @@ public class ContainerHelper {
             POLARIS_PROPERTIES.forEach((x) -> {
                 polaris.withEnv(x.getPropertyName(), x.getValueFrom(properties));
             });
+            // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
+            polarisOidcEnv().forEach(polaris::withEnv);
             Map.of(
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
