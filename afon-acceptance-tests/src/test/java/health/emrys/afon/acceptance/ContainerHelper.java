@@ -23,7 +23,7 @@ import java.util.stream.Stream;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
-import static health.emrys.afon.polaris.keycloak.KeyCloakConstants.*;
+import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.*;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
@@ -84,7 +84,7 @@ public class ContainerHelper {
                 .withEnv("KC_LOG_LEVEL", "DEBUG")
                 // Issuer is left dynamic (stamped from the request host) so host-side callers can use
                 // 'localhost' with no /etc/hosts entry. Polaris tolerates the resulting issuer-host
-                // difference via quarkus.oidc.token.issuer=any (see KeyCloakConstants#polarisOidcEnv);
+                // difference via quarkus.oidc.token.issuer=any (see KeyCloakHelper#polarisOidcEnv);
                 // the token signature is still validated. For production, pin KC_HOSTNAME instead.
                 .withEnv("KC_HOSTNAME_STRICT", "false")
                 .waitingFor(Wait.forHttp("/realms/master")

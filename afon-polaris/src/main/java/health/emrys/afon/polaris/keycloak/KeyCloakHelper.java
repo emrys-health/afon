@@ -9,7 +9,7 @@ import static java.lang.String.format;
  * Configuration shared between the KeyCloak container, the {@link KeyCloakAdmin} that provisions
  * users in it and the Polaris container that uses KeyCloak as its OIDC identity provider.
  */
-public class KeyCloakConstants {
+public class KeyCloakHelper {
 
     public static final String KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak:26.6.3";
 
