@@ -1,6 +1,7 @@
 package health.emrys.afon.trino;
 
 import health.emrys.afon.config.AfonProperties;
+import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.Properties;
 
@@ -32,10 +33,12 @@ public class KeyCloakTrinoServerConfiguration extends TrinoServerConfiguration {
     }
 
     @Override
-    public String catalogProperties(AfonProperties.SupportedCloudsEnum cloud) {
-        return super.catalogProperties(cloud).replace(
-            "iceberg.rest-catalog.oauth2.scope=" + OAUTH_SCOPE,
-            format("iceberg.rest-catalog.oauth2.scope=%s%niceberg.rest-catalog.oauth2.server-uri=%s",
-                   KEYCLOAK_SCOPE, oauth2ServerUri));
+    protected @NonNull String getOauthScope() {
+        return KEYCLOAK_SCOPE;
+    }
+
+    @Override
+    protected String additionalProperties() {
+        return "iceberg.rest-catalog.oauth2.server-uri=" + oauth2ServerUri;
     }
 }
