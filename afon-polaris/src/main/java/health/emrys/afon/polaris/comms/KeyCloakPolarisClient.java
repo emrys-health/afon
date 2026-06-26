@@ -46,8 +46,7 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
         super(properties);
         // Use the same KeyCloak host that Polaris discovered, so the token's issuer matches and
         // Polaris accepts the bearer token.
-        this.keyCloakTokenUri = internalRealmUrl(KEY_CLOAK_HOSTNAME.getValueFrom(properties))
-                                + "/protocol/openid-connect/token";
+        this.keyCloakTokenUri = tokenEndpoint(KEY_CLOAK_HOSTNAME.getValueFrom(properties));
     }
 
     /**

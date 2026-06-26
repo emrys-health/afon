@@ -21,14 +21,6 @@ public class KeyCloakConstants {
     public static final String KEYCLOAK_ALIAS = "keycloak";
 
     /**
-     * Single, pinned base URL used as the token issuer everywhere - token minting, introspection and
-     * Polaris' JWKS validation - so the {@code iss} claim is always identical and never depends on the
-     * request host. KeyCloak is pinned to this via {@code KC_HOSTNAME}. It is the docker network alias,
-     * so host-side callers (e.g. {@link KeyCloakAdmin}) need {@code 127.0.0.1 keycloak} in /etc/hosts.
-     */
-    public static final String KEYCLOAK_BASE_URL = format("http://%s:%d", KEYCLOAK_ALIAS, KEYCLOAK_PORT);
-
-    /**
      * Bootstrap admin of the KeyCloak instance (master realm).
      */
     public static final String KEYCLOAK_ADMIN          = "admin";
@@ -42,11 +34,11 @@ public class KeyCloakConstants {
     public static final String KEYCLOAK_REALM         = "polaris";
 
     /**
-     * Base URL the host-side {@link KeyCloakAdmin} uses. Deliberately the same pinned host as the
-     * issuer so everything lines up (requires {@code 127.0.0.1 keycloak} in /etc/hosts).
+     * Base URL of KeyCloak as seen from the host (the {@link KeyCloakAdmin} runs on the host JVM and
+     * reaches the container via the fixed localhost port binding).
      */
     public static String hostBaseUrl() {
-        return KEYCLOAK_BASE_URL;
+        return format("http://localhost:%d", KEYCLOAK_PORT);
     }
 
     /**
@@ -54,6 +46,15 @@ public class KeyCloakConstants {
      */
     public static String internalRealmUrl(String host) {
         return format("http://%s:%d/realms/%s", host, KEYCLOAK_PORT, KEYCLOAK_REALM);
+    }
+
+    /**
+     * The OIDC token endpoint for the Polaris realm on the given host. This is where OAuth2 clients
+     * (the acceptance-test Polaris client, and the Spark/Iceberg REST catalog) obtain their tokens in
+     * external-auth mode - Polaris itself returns HTTP 501 from {@code /api/catalog/v1/oauth/tokens}.
+     */
+    public static String tokenEndpoint(String host) {
+        return internalRealmUrl(host) + "/protocol/openid-connect/token";
     }
 
     /**
@@ -70,9 +71,13 @@ public class KeyCloakConstants {
         // Use KeyCloak instead of Polaris' internal token store.
         env.put("polaris.authentication.type", "external");
         env.put("polaris.authentication.authenticator.type", "default");
-        // Map the token's username claim to a Polaris principal and its roles.
+        // Map the token's client identity to a Polaris principal and its roles. We use the 'azp'
+        // (authorized party) claim rather than 'preferred_username': for a client_credentials grant
+        // KeyCloak sets preferred_username to "service-account-<clientId>" (e.g. "service-account-root"),
+        // which does not match the bootstrapped Polaris principal. 'azp' is the bare client id ("root"),
+        // which is the principal Polaris was bootstrapped with (see polaris.bootstrap.credentials).
         env.put("polaris.oidc.principal-mapper.type", "default");
-        env.put("polaris.oidc.principal-mapper.name-claim-path", "preferred_username");
+        env.put("polaris.oidc.principal-mapper.name-claim-path", "azp");
         env.put("polaris.oidc.principal-roles-mapper.type", "default");
         // Point Quarkus OIDC at the KeyCloak realm. OIDC is disabled by default, so enable the tenant.
         env.put("quarkus.oidc.tenant-enabled", "true");
@@ -80,6 +85,11 @@ public class KeyCloakConstants {
         env.put("quarkus.oidc.client-id", user);
         env.put("quarkus.oidc.credentials.secret", userPassword);
         env.put("quarkus.oidc.application-type", "service");
+        // TESTING RELAXATION: accept any issuer. KeyCloak (KC_HOSTNAME_STRICT=false) stamps 'iss' from
+        // the request host, so a token minted via 'localhost' differs from Polaris' 'keycloak' issuer.
+        // The token signature is still verified against the realm JWKS - only the issuer-host check is
+        // skipped. Do NOT use this in production; there, pin a single issuer via KC_HOSTNAME instead.
+        env.put("quarkus.oidc.token.issuer", "any");
         return env;
     }
 }
