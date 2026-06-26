@@ -32,4 +32,4 @@ USER 185
 EXPOSE 15002
 
 # Set the default command to launch the Spark Connect server directly
-ENTRYPOINT ["/opt/spark/sbin/start-connect-server.sh", "--wait"]
+#ENTRYPOINT ["/opt/spark/sbin/start-connect-server.sh", "--wait"]
