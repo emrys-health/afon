@@ -72,8 +72,8 @@ public class ContainerHelper {
                 // pins the host port to the same number).
                 .withExposedPorts(KEYCLOAK_PORT)
                 .withCommand("start-dev")
-                .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", KEYCLOAK_ADMIN)
-                .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", KEYCLOAK_ADMIN_PASSWORD)
+                .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", KEYCLOAK_ADMIN.getValueFrom(properties))
+                .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", KEYCLOAK_ADMIN_PASSWORD.getValueFrom(properties))
                 .withEnv("KC_HTTP_ENABLED", "true")
                 // Run KeyCloak at DEBUG level to aid diagnosing OIDC/token issues.
                 .withEnv("KC_LOG_LEVEL", "DEBUG")
@@ -92,8 +92,10 @@ public class ContainerHelper {
                         "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
-            new KeyCloakAdmin().registerPolarisUser(USER_POLARIS_ID.getValueFrom(properties),
-                                                    USER_POLARIS_SECRET.getValueFrom(properties));
+            new KeyCloakAdmin(properties)
+                .registerPolarisUser(
+                    USER_POLARIS_ID.getValueFrom(properties),
+                    USER_POLARIS_SECRET.getValueFrom(properties));
         }
     }
 
@@ -105,12 +107,14 @@ public class ContainerHelper {
                 cloudProvider ->
                     config.sparkConfigs(cloudProvider).entrySet().stream().map(
                         entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
-                                                                         );
-            String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger.netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
+                                                                 );
+            String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger" +
+                             ".netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
             String envString = envs.collect(Collectors.joining(" "))
-                 + " -Dspark.master=local[4]"
-                 + " -Dspark.connect.grpc.interceptor.classes=org.apache.spark.sql.connect.service.LoggingInterceptor"
-                 + " " + logging;
+                               + " -Dspark.master=local[4]"
+                               + " -Dspark.connect.grpc.interceptor.classes=org.apache.spark.sql.connect.service" +
+                               ".LoggingInterceptor"
+                               + " " + logging;
             sparkConnect.withEnv("spark.driver.extraJavaOptions", logging);
             sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC", "DEBUG");
             sparkConnect.withEnv("LOG4J_LOGGER_ORG_APACHE_SPARK_SQL_CONNECT", "DEBUG");
@@ -143,9 +147,10 @@ public class ContainerHelper {
                 polaris.withEnv(x.getPropertyName(), x.getValueFrom(properties));
             });
             // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
-            polarisOidcEnv(internalRealmUrl(KEYCLOAK_ALIAS),
-                           USER_POLARIS_ID.getValueFrom(properties),
-                           USER_POLARIS_SECRET.getValueFrom(properties)).forEach(polaris::withEnv);
+            polarisOidcEnv(
+                internalRealmUrl(KEYCLOAK_ALIAS),
+                USER_POLARIS_ID.getValueFrom(properties),
+                USER_POLARIS_SECRET.getValueFrom(properties)).forEach(polaris::withEnv);
             Map.of(
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
@@ -167,7 +172,7 @@ public class ContainerHelper {
         if (trino == null) {
             try {
                 trino = new GenericContainer<>("trinodb/trino:latest");
-                String     catalogPath = "/etc/trino/catalog";
+                String catalogPath = "/etc/trino/catalog";
                 trino.withFileSystemBind(trinoConfigPropertiesFile().getAbsolutePath(), "/etc/trino/config.properties");
                 trino.setNetworkMode("host");
                 trino.start();
@@ -191,8 +196,8 @@ public class ContainerHelper {
     }
 
     private static File trinoConfigPropertiesFile() throws IOException {
-        FileFinder fileFinder  = new FileFinder();
-        File       config      = fileFinder.fullPathOf("scripts/trino/config.properties");
+        FileFinder fileFinder = new FileFinder();
+        File       config     = fileFinder.fullPathOf("scripts/trino/config.properties");
         return config;
     }
 
