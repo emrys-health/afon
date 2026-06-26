@@ -38,6 +38,11 @@ public class ContainerHelper {
     private static final String GOOGLE_FILE = "/tmp/application_default_credentials.json";
 
     /**
+     * Network alias used by Polaris (running on the same docker network) to reach KeyCloak.
+     */
+    private static final String KEYCLOAK_ALIAS = "keycloak";
+
+    /**
      * For testing.
      */
     public static void main(String[] args) {

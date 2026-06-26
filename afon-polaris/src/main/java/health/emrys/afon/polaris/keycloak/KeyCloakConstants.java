@@ -16,11 +16,6 @@ public class KeyCloakConstants {
     public static final int KEYCLOAK_PORT = 8080;
 
     /**
-     * Network alias used by Polaris (running on the same docker network) to reach KeyCloak.
-     */
-    public static final String KEYCLOAK_ALIAS = "keycloak";
-
-    /**
      * The realm, client and user that Polaris trusts. The user/password is the credential that a
      * Polaris client (Spark, Trino, the acceptance tests, ...) presents to KeyCloak to obtain a
      * token that Polaris will accept.
