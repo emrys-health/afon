@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakConstants.*;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -26,8 +27,6 @@ import static org.slf4j.LoggerFactory.getLogger;
 /**
  * Provisions, via the KeyCloak admin REST API, the realm, client and user/password that Polaris
  * trusts. After this has run, a client can obtain a token from KeyCloak using
- * {@link KeyCloakConstants#KEYCLOAK_USER}/{@link KeyCloakConstants#KEYCLOAK_USER_PASSWORD} (or the
- * {@link KeyCloakConstants#KEYCLOAK_CLIENT_ID} client credentials) and present it to Polaris.
  *
  * <p>Uses no extra dependencies beyond the Apache HttpClient5 + Jackson already on the classpath.
  */
@@ -41,14 +40,10 @@ public class KeyCloakAdmin {
     private final String adminUser;
     private final String adminPassword;
 
-    public KeyCloakAdmin() {
-        this(hostBaseUrl(), KEYCLOAK_ADMIN, KEYCLOAK_ADMIN_PASSWORD);
-    }
-
-    public KeyCloakAdmin(String baseUrl, String adminUser, String adminPassword) {
-        this.baseUrl       = baseUrl;
-        this.adminUser     = adminUser;
-        this.adminPassword = adminPassword;
+    public KeyCloakAdmin(Properties properties) {
+        this.baseUrl       = format("http://%s:%d", KEY_CLOAK_HOSTNAME.getValueFrom(properties), KEYCLOAK_PORT);
+        this.adminUser     = KEYCLOAK_ADMIN.getValueFrom(properties);
+        this.adminPassword = KEYCLOAK_ADMIN_PASSWORD.getValueFrom(properties);
     }
 
     /**
@@ -61,8 +56,9 @@ public class KeyCloakAdmin {
             createRealm(adminToken, KEYCLOAK_REALM);
             createConfidentialClient(adminToken, KEYCLOAK_REALM, user, userPassword);
             createUser(adminToken, KEYCLOAK_REALM, user, userPassword);
-            logger.info("KeyCloak realm '{}' provisioned with client/user '{}'",
-                        KEYCLOAK_REALM, user);
+            logger.info(
+                "KeyCloak realm '{}' provisioned with client/user '{}'",
+                KEYCLOAK_REALM, user);
         } catch (IOException e) {
             throw new RuntimeException("Failed to provision KeyCloak for Polaris", e);
         }
@@ -79,20 +75,21 @@ public class KeyCloakAdmin {
             "client_id", "admin-cli",
             "username", adminUser,
             "password", adminPassword
-        ));
+                                 ));
         HttpPost post = new HttpPost(uri);
         post.setHeader("Content-Type", "application/x-www-form-urlencoded");
         post.setEntity(new StringEntity(body));
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             logger.info("Calling {}", uri);
-            return client.execute(post, response -> {
-                logger.info("Calling {} resulted in HTTP code {}", uri, response.getCode());
-                if (response.getCode() != HttpStatus.SC_OK) {
-                    throw new IOException("Could not obtain KeyCloak admin token: HTTP " + response.getCode());
-                }
-                Map<?, ?> json = MAPPER.readValue(response.getEntity().getContent(), Map.class);
-                return (String) json.get("access_token");
-            });
+            return client.execute(
+                post, response -> {
+                    logger.info("Calling {} resulted in HTTP code {}", uri, response.getCode());
+                    if (response.getCode() != HttpStatus.SC_OK) {
+                        throw new IOException("Could not obtain KeyCloak admin token: HTTP " + response.getCode());
+                    }
+                    Map<?, ?> json = MAPPER.readValue(response.getEntity().getContent(), Map.class);
+                    return (String) json.get("access_token");
+                });
         }
     }
 
@@ -100,7 +97,7 @@ public class KeyCloakAdmin {
         String json = MAPPER.writeValueAsString(Map.of(
             "realm", realm,
             "enabled", true
-        ));
+                                                      ));
         postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm);
     }
 
@@ -121,7 +118,7 @@ public class KeyCloakAdmin {
             "serviceAccountsEnabled", true,
             "directAccessGrantsEnabled", true,
             "standardFlowEnabled", false
-        ));
+                                                      ));
         postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "client " + clientId);
     }
 
@@ -137,8 +134,8 @@ public class KeyCloakAdmin {
                 "type", "password",
                 "value", password,
                 "temporary", false
-            ))
-        ));
+                                         ))
+                                                      ));
         postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + username);
     }
 
@@ -149,18 +146,19 @@ public class KeyCloakAdmin {
         post.setHeader("Content-Type", "application/json");
         post.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            client.execute(post, response -> {
-                int code = response.getCode();
-                logger.info("Calling {} resulted in HTTP code {}", uri, code);
-                if (code == HttpStatus.SC_CREATED) {
-                    logger.info("Created KeyCloak {}", what);
-                } else if (code == HttpStatus.SC_CONFLICT) {
-                    logger.info("KeyCloak {} already exists - leaving it untouched", what);
-                } else {
-                    throw new IOException(format("Could not create KeyCloak %s: HTTP %d", what, code));
-                }
-                return null;
-            });
+            client.execute(
+                post, response -> {
+                    int code = response.getCode();
+                    logger.info("Calling {} resulted in HTTP code {}", uri, code);
+                    if (code == HttpStatus.SC_CREATED) {
+                        logger.info("Created KeyCloak {}", what);
+                    } else if (code == HttpStatus.SC_CONFLICT) {
+                        logger.info("KeyCloak {} already exists - leaving it untouched", what);
+                    } else {
+                        throw new IOException(format("Could not create KeyCloak %s: HTTP %d", what, code));
+                    }
+                    return null;
+                });
         }
     }
 
@@ -195,7 +193,9 @@ public class KeyCloakAdmin {
      */
     public static void main(String[] args) {
         Properties properties = new AfonPropertiesLoader().getProperties();
-        new KeyCloakAdmin().registerPolarisUser(AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
-                                                AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties));
+        new KeyCloakAdmin(properties)
+            .registerPolarisUser(
+                AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
+                AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties));
     }
 }

@@ -21,25 +21,11 @@ public class KeyCloakConstants {
     public static final String KEYCLOAK_ALIAS = "keycloak";
 
     /**
-     * Bootstrap admin of the KeyCloak instance (master realm).
-     */
-    public static final String KEYCLOAK_ADMIN          = "admin";
-    public static final String KEYCLOAK_ADMIN_PASSWORD = "admin";
-
-    /**
      * The realm, client and user that Polaris trusts. The user/password is the credential that a
      * Polaris client (Spark, Trino, the acceptance tests, ...) presents to KeyCloak to obtain a
      * token that Polaris will accept.
      */
     public static final String KEYCLOAK_REALM         = "polaris";
-
-    /**
-     * Base URL of KeyCloak as seen from the host (the {@link KeyCloakAdmin} runs on the host JVM and
-     * reaches the container via the fixed localhost port binding).
-     */
-    public static String hostBaseUrl() {
-        return format("http://localhost:%d", KEYCLOAK_PORT);
-    }
 
     /**
      * Issuer / discovery URL as seen from inside the docker network (i.e. by Polaris).
