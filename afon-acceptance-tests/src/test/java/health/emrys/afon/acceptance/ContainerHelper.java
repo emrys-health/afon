@@ -71,15 +71,13 @@ public class ContainerHelper {
                 .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", KEYCLOAK_ADMIN)
                 .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", KEYCLOAK_ADMIN_PASSWORD)
                 .withEnv("KC_HTTP_ENABLED", "true")
-                // PH: note Claude Code says I need to add  127.0.0.1 keycloak to /etc/hosts to make this work
-
-                // Pin a single issuer so the token's 'iss' is always KEYCLOAK_BASE_URL, regardless of
-                // which host (keycloak vs localhost) minted it. Without this, KC_HOSTNAME_STRICT=false
-                // stamps 'iss' from the request host, so a token fetched via one host fails validation
-                // (introspection / Polaris JWKS) via another.
-                .withEnv("KC_HOSTNAME", KEYCLOAK_BASE_URL)
+                // Run KeyCloak at DEBUG level to aid diagnosing OIDC/token issues.
+                .withEnv("KC_LOG_LEVEL", "DEBUG")
+                // Issuer is left dynamic (stamped from the request host) so host-side callers can use
+                // 'localhost' with no /etc/hosts entry. Polaris tolerates the resulting issuer-host
+                // difference via quarkus.oidc.token.issuer=any (see KeyCloakConstants#polarisOidcEnv);
+                // the token signature is still validated. For production, pin KC_HOSTNAME instead.
                 .withEnv("KC_HOSTNAME_STRICT", "false")
-                .withEnv("KC_HOSTNAME_BACKCHANNEL_DYNAMIC", "false")
                 .waitingFor(Wait.forHttp("/realms/master")
                                 .forPort(KEYCLOAK_PORT)
                                 .forStatusCode(200)
@@ -186,7 +184,9 @@ public class ContainerHelper {
                                           SupportedCloudsEnum catalog) {
         TrinoServerConfiguration trinoConfig = new TrinoServerConfiguration(
             POLARIS_ENDPOINT.getValueFrom(properties),
-            properties
+            properties,
+            // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
+            tokenEndpoint(KEY_CLOAK_HOSTNAME.getValueFrom(properties))
         );
         return trinoConfig.catalogProperties(catalog);
     }

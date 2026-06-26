@@ -137,7 +137,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
            |
            |${trinoLocalConfig(properties, cloudProvider)}""".stripMargin)
 
-      val url = s"jdbc:trino://localhost:8080/"
+      val url = s"jdbc:trino://localhost:8090/"
       When(s"we connect to $url")
       val smokeTest = new SmokeTest(url)
       val sql = s"SELECT COUNT(*) FROM $tableName"

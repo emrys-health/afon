@@ -14,13 +14,26 @@ public class TrinoServerConfiguration {
     private final String awsRegion;
     private final String polarisClientId;
     private final String polarisSecret;
+    /**
+     * When non-null, Trino's Iceberg REST catalog obtains its OAuth2 token from this external endpoint
+     * (e.g. KeyCloak) instead of from Polaris, whose token endpoint returns HTTP 501 in external-auth
+     * mode. The credential then identifies a client KeyCloak knows about.
+     */
+    private final String oauth2ServerUri;
 
     public TrinoServerConfiguration(String polarisDomainName,
                                     Properties properties) {
+        this(polarisDomainName, properties, null);
+    }
+
+    public TrinoServerConfiguration(String polarisDomainName,
+                                    Properties properties,
+                                    String oauth2ServerUri) {
         this.polarisDomainName = polarisDomainName;
         this.awsRegion         = AWS_REGION.getValueFrom(properties);
         this.polarisClientId   = USER_POLARIS_ID.getValueFrom(properties);
         this.polarisSecret     = USER_POLARIS_SECRET.getValueFrom(properties);
+        this.oauth2ServerUri   = oauth2ServerUri;
     }
 
     public String catalogProperties(AfonProperties.SupportedCloudsEnum cloud) {
@@ -28,6 +41,12 @@ public class TrinoServerConfiguration {
         if (polarisDomainName.toLowerCase().contains("localhost")) {
             protocol = "http";
         }
+        // KeyCloak rejects Polaris' "PRINCIPAL_ROLE:ALL" scope as invalid_scope; request "openid" when
+        // tokens come from KeyCloak. The server-uri line points Trino at KeyCloak rather than Polaris.
+        String scope          = oauth2ServerUri == null ? OAUTH_SCOPE : "openid";
+        String oauthServerUri = oauth2ServerUri == null
+            ? ""
+            : format("iceberg.rest-catalog.oauth2.server-uri=%s%n", oauth2ServerUri);
         return format(
             """
             connector.name=iceberg
@@ -38,13 +57,14 @@ public class TrinoServerConfiguration {
             iceberg.rest-catalog.security=OAUTH2
             iceberg.rest-catalog.oauth2.credential=%s:%s
             iceberg.rest-catalog.oauth2.scope=%s
-            %s""",
+            %s%s""",
             protocol,
             polarisDomainName,
             cloud,
             polarisClientId,
             polarisSecret,
-            OAUTH_SCOPE,
+            scope,
+            oauthServerUri,
             fileSystemProperties(cloud));
     }
 
