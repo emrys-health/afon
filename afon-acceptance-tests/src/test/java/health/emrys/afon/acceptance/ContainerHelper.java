@@ -3,6 +3,7 @@ package health.emrys.afon.acceptance;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.keycloak.KeyCloakAdmin;
 import health.emrys.afon.spark.SparkWarehouseConfig;
+import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
@@ -11,6 +12,9 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -163,10 +167,8 @@ public class ContainerHelper {
         if (trino == null) {
             try {
                 trino = new GenericContainer<>("trinodb/trino:latest");
-                FileFinder fileFinder  = new FileFinder();
-                File       config      = fileFinder.fullPathOf("scripts/trino/config.properties");
                 String     catalogPath = "/etc/trino/catalog";
-                trino.withFileSystemBind(config.getAbsolutePath(), "/etc/trino/config.properties");
+                trino.withFileSystemBind(trinoConfigPropertiesFile().getAbsolutePath(), "/etc/trino/config.properties");
                 trino.setNetworkMode("host");
                 trino.start();
                 for (SupportedCloudsEnum catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
@@ -180,9 +182,23 @@ public class ContainerHelper {
         }
     }
 
+    public static Properties trinoConfigProperties() throws IOException {
+        Properties props = new Properties();
+        try (Reader reader = Files.newBufferedReader(trinoConfigPropertiesFile().toPath())) {
+            props.load(reader);
+        }
+        return props;
+    }
+
+    private static File trinoConfigPropertiesFile() throws IOException {
+        FileFinder fileFinder  = new FileFinder();
+        File       config      = fileFinder.fullPathOf("scripts/trino/config.properties");
+        return config;
+    }
+
     public static String trinoLocalConfig(Properties properties,
                                           SupportedCloudsEnum catalog) {
-        TrinoServerConfiguration trinoConfig = new TrinoServerConfiguration(
+        TrinoServerConfiguration trinoConfig = new KeyCloakTrinoServerConfiguration(
             POLARIS_ENDPOINT.getValueFrom(properties),
             properties,
             // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.

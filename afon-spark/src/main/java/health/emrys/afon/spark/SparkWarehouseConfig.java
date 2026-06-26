@@ -35,32 +35,16 @@ public class SparkWarehouseConfig {
     private final String clientSecret;
     private final String host;
     private final String polarisProtocol;
-    /**
-     * When non-null, the Iceberg REST catalog obtains its OAuth2 token from this external endpoint
-     * (e.g. KeyCloak) instead of from Polaris. Required when Polaris runs in external-auth mode,
-     * where its own {@code /api/catalog/v1/oauth/tokens} endpoint returns HTTP 501.
-     */
-    private final String oauth2ServerUri;
-
-    public SparkWarehouseConfig(
-        String clientId,
-        String clientSecret,
-        String host,
-        String polarisProtocol,
-        String oauth2ServerUri) {
-        this.clientId        = clientId;
-        this.clientSecret    = clientSecret;
-        this.host            = host;
-        this.polarisProtocol = polarisProtocol;
-        this.oauth2ServerUri = oauth2ServerUri;
-    }
 
     public SparkWarehouseConfig(
         String clientId,
         String clientSecret,
         String host,
         String polarisProtocol) {
-        this(clientId, clientSecret, host, polarisProtocol, null);
+        this.clientId        = clientId;
+        this.clientSecret    = clientSecret;
+        this.host            = host;
+        this.polarisProtocol = polarisProtocol;
     }
 
     public SparkWarehouseConfig(
@@ -118,14 +102,7 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
         conf.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
         conf.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
-        if (oauth2ServerUri != null) {
-            // External-auth (e.g. KeyCloak): fetch the token from the identity provider, not Polaris.
-            conf.put(format("spark.sql.catalog.%s.oauth2-server-uri", sparkCatalog), oauth2ServerUri);
-            // KeyCloak rejects "PRINCIPAL_ROLE:ALL" (and Iceberg's default "catalog") as invalid_scope.
-            conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), "openid");
-        } else {
-            conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), OAUTH_SCOPE);
-        }
+        conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), OAUTH_SCOPE);
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
         conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol,
                                                                           host));

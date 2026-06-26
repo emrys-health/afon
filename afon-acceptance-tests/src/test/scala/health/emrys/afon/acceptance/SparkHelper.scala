@@ -5,7 +5,7 @@ import health.emrys.afon.config.AfonProperties.KEY_CLOAK_HOSTNAME
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.PolarisConstants
 import health.emrys.afon.polaris.keycloak.KeyCloakConstants
-import health.emrys.afon.spark.SparkWarehouseConfig
+import health.emrys.afon.spark.KeyCloakSparkWarehouseConfig
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 
@@ -22,7 +22,7 @@ object SparkHelper {
   private val keyCloakTokenUri =
     KeyCloakConstants.tokenEndpoint(KEY_CLOAK_HOSTNAME.getValueFrom(new AfonPropertiesLoader().getProperties))
 
-  val sparkWarehouse = new SparkWarehouseConfig(
+  val sparkWarehouse = new KeyCloakSparkWarehouseConfig(
     instance.getClientId,
     instance.getClientSecret,
     "localhost:8181",
