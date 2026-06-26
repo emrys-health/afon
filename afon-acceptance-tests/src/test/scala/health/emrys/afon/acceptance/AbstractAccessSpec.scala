@@ -1,10 +1,9 @@
 package health.emrys.afon.acceptance
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
-import health.emrys.afon.acceptance.ContainerHelper.trinoLocalConfig
+import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.config.AfonPropertiesLoader
-import health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.comms.PolarisConfigurer
@@ -137,7 +136,8 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
            |
            |${trinoLocalConfig(properties, cloudProvider)}""".stripMargin)
 
-      val url = s"jdbc:trino://localhost:8080/"
+      val trinoHttp = trinoConfigProperties().get("discovery.uri").toString
+      val url = s"jdbc:trino://${trinoHttp.substring(trinoHttp.indexOf("//") + 2)}/"
       When(s"we connect to $url")
       val smokeTest = new SmokeTest(url)
       val sql = s"SELECT COUNT(*) FROM $tableName"

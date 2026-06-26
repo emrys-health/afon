@@ -1,6 +1,7 @@
 package health.emrys.afon.trino;
 
 import health.emrys.afon.config.AfonProperties;
+import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.Properties;
 
@@ -38,14 +39,25 @@ public class TrinoServerConfiguration {
             iceberg.rest-catalog.security=OAUTH2
             iceberg.rest-catalog.oauth2.credential=%s:%s
             iceberg.rest-catalog.oauth2.scope=%s
+            %s
             %s""",
             protocol,
             polarisDomainName,
             cloud,
             polarisClientId,
             polarisSecret,
-            OAUTH_SCOPE,
-            fileSystemProperties(cloud));
+            getOauthScope(),
+            fileSystemProperties(cloud),
+            additionalProperties()
+            );
+    }
+
+    protected String additionalProperties() {
+        return "";
+    }
+
+    protected @NonNull String getOauthScope() {
+        return OAUTH_SCOPE;
     }
 
     /**
