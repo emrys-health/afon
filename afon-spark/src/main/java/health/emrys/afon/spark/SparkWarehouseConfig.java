@@ -21,7 +21,7 @@ import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 
 public class SparkWarehouseConfig {
 
-    public static final String SPARK_IMAGE = "ph1ll1phenry/spark_jars:4.0.1";
+    public static final String SPARK_IMAGE = "apache/spark:4.0.1";
 
     public static final  String[] SUPPORTED_CLOUD_NAMES =
         Arrays.stream(SupportedCloudsEnum.values()).map(x -> x.toString()).toArray(String[]::new);
