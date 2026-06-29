@@ -5,8 +5,6 @@ import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
@@ -16,31 +14,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.TFUtils.clusterIpService;
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_IMAGE_NAME;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_PROPERTIES;
 import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
 
-    private static final String          SECRET_NAME           = "my-app-secret";
-    private static final String          POLARIS_ENV_FILE      = "polaris_env.sh";
-    private static final String          GCP_CRED_FILE         = "service-account.json";
-    private static final String          SECRETS_DIR           = "/etc/app-secrets";
-    public static final  String          NO_POLARIS_FINALIZERS = finalizeIngress("polaris-ingress");
-    public static final  String          NO_JUPYTER_FINALIZERS = finalizeIngress("jupyter-ingress");
-    public static final  ServiceSpecPort POLARIS_PORTS         = ServiceSpecPort.builder()
-                                                                                .name("web")
-                                                                                .port(8181)
-                                                                                .targetPort("8181")
-                                                                                .protocol("TCP")
-                                                                                .build();
-
-    private static String finalizeIngress(String service) {
-        return format("kubectl patch ingress %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
-    }
+    private static final String          SECRET_NAME      = "my-app-secret";
+    private static final String          POLARIS_ENV_FILE = "polaris_env.sh";
+    private static final String          GCP_CRED_FILE    = "service-account.json";
+    private static final String          SECRETS_DIR      = "/etc/app-secrets";
+    public static final  ServiceSpecPort POLARIS_PORTS    = ServiceSpecPort.builder()
+                                                                           .name("web")
+                                                                           .port(8181)
+                                                                           .targetPort("8181")
+                                                                           .protocol("TCP")
+                                                                           .build();
+    public static final  String          POLARIS_INTERNAL = "polaris-internal";
 
     public Map<String, String> polarisLabels;
 
@@ -69,8 +61,9 @@ public class PolarisConfig extends Construct {
         return properties;
     }
 
-    static String getProviderCredentials(Properties properties,
-                                         String deploymentId) {
+    static String getProviderCredentials(
+        Properties properties,
+        String deploymentId) {
         List<String> exports = POLARIS_PROPERTIES
             .stream()
             .map(x -> format("export %s=%s", x.getPropertyName(), x.getValueFrom(properties)))
@@ -104,8 +97,9 @@ public class PolarisConfig extends Construct {
             export JAVA_OPTS_APPEND=-D"polaris.features.\\"ENABLE_CATALOG_FEDERATION\\"=true" 
             """,
             String.join("\n", exports),
-            GOOGLE_APPLICATION_CREDENTIALS.getPropertyName(), SECRETS_DIR + "/" + GCP_CRED_FILE
-                                );
+            GOOGLE_APPLICATION_CREDENTIALS.getPropertyName(),
+            SECRETS_DIR + "/" + GCP_CRED_FILE
+        );
     }
 
     public Service deployPolaris(List<ITerraformDependable> eksDependOn) {
@@ -168,26 +162,13 @@ public class PolarisConfig extends Construct {
         return configurePolarisService(polarisDeployment, polarisLabels);
     }
 
-    protected @NotNull Service configurePolarisService(
-        Deployment polarisDeployment,
-        Map<String, String> polarisLabels) {
-        return Service.Builder
-            .create(this, POLARIS_INGRESS_NAME)
-            .metadata(ServiceMetadata
-                          .builder()
-                          .name(POLARIS_INGRESS_NAME)
-                          .build())
-            .dependsOn(List.of(polarisDeployment))
-            .provisioners(uponDestroyRun(NO_POLARIS_FINALIZERS))
-            .spec(ServiceSpec
-                      .builder()
-                      .selector(polarisLabels)
-                      .type("LoadBalancer")
-                      .port(List.of(
-                          POLARIS_PORTS
-                                   ))
-                      .build())
-            .build();
+    protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
+        return clusterIpService(
+            List.of(polarisDeployment),
+            polarisLabels,
+            POLARIS_INTERNAL,
+            List.of(PolarisConfig.POLARIS_PORTS),
+            this);
     }
 
     public static final void main(String[] unused) {
