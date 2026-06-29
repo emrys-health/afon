@@ -7,6 +7,8 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFrom;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -87,6 +89,22 @@ public class TFUtils {
             builder.set(List.of(releaseSetBuilder.build()));
         }
         return builder.build();
+    }
+
+    static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
+        String envName, String secretName, String secretKey) {
+        return DeploymentSpecTemplateSpecContainerEnv
+            .builder()
+            .name(envName)
+            .valueFrom(DeploymentSpecTemplateSpecContainerEnvValueFrom
+                           .builder()
+                           .secretKeyRef(DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef
+                                             .builder()
+                                             .name(secretName)
+                                             .key(secretKey)
+                                             .build())
+                           .build())
+            .build();
     }
 
     private final String    domainName;

@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static health.emrys.afon.cdk.TFUtils.envFromSecret;
 import static health.emrys.afon.config.AfonProperties.*;
 import static java.lang.String.format;
 
@@ -121,19 +122,4 @@ public class JupyterMfaConfig {
         return List.of("--email-domain=" + OIDC_EMAIL_DOMAIN.getValueFrom(properties));
     }
 
-    private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
-        String envName, String secretName, String secretKey) {
-        return DeploymentSpecTemplateSpecContainerEnv
-            .builder()
-            .name(envName)
-            .valueFrom(DeploymentSpecTemplateSpecContainerEnvValueFrom
-                           .builder()
-                           .secretKeyRef(DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef
-                                             .builder()
-                                             .name(secretName)
-                                             .key(secretKey)
-                                             .build())
-                           .build())
-            .build();
-    }
 }
