@@ -11,8 +11,6 @@ import static java.lang.String.format;
  */
 public class KeyCloakHelper {
 
-    public static final String KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak:26.6.3";
-
     public static final int KEYCLOAK_PORT = 8080;
 
     /**
