@@ -19,8 +19,14 @@ import static java.lang.String.format;
 
 public class TFUtils {
 
+    public static final String                     NO_POLARIS_FINALIZERS
+        = finalizeIngress(POLARIS_INGRESS_NAME);
     public static final List<LocalExecProvisioner> POLARIS_PROVISIONERS
-        = uponDestroyRun(PolarisConfig.NO_POLARIS_FINALIZERS);
+        = uponDestroyRun(NO_POLARIS_FINALIZERS);
+
+    static String finalizeIngress(String service) {
+        return format("kubectl patch ingress %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
+    }
 
     public static DeploymentSpecTemplateSpecContainerEnv envVar(String name, String value) {
         return DeploymentSpecTemplateSpecContainerEnv.builder()
@@ -29,10 +35,11 @@ public class TFUtils {
                                                      .build();
     }
 
-    public static Release installNginxIngress(Construct construct,
-                                              HelmProvider helmProvider,
-                                              final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
-                                              Map<String, String> annotations) {
+    public static Release installNginxIngress(
+        Construct construct,
+        HelmProvider helmProvider,
+        final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
+        Map<String, String> annotations) {
         var builder = Release.Builder
             .create(construct, "nginx-ingress")
             .provider(helmProvider)
@@ -62,12 +69,13 @@ public class TFUtils {
     private final Construct construct;
     private final String    ingressName;
 
-    public TFUtils(Construct construct,
-                   String domainName,
-                   String tlsSecretName,
-                   int port,
-                   String internalService,
-                   String ingressName) {
+    public TFUtils(
+        Construct construct,
+        String domainName,
+        String tlsSecretName,
+        int port,
+        String internalService,
+        String ingressName) {
         this.domainName      = domainName;
         this.tlsSecretName   = tlsSecretName;
         this.port            = port;
@@ -76,8 +84,9 @@ public class TFUtils {
         this.ingressName     = ingressName;
     }
 
-    public IngressV1 createIngress(List<TerraformResource> dependencies,
-                                   Optional<List<LocalExecProvisioner>> ingressProvisioners) {
+    public IngressV1 createIngress(
+        List<TerraformResource> dependencies,
+        Optional<List<LocalExecProvisioner>> ingressProvisioners) {
         IngressV1SpecRuleHttpPathBackendServicePort port = IngressV1SpecRuleHttpPathBackendServicePort
             .builder()
             .number(this.port)
@@ -113,7 +122,7 @@ public class TFUtils {
                     .hosts(List.of(domainName))
                     .secretName(tlsSecretName)
                     .build()
-                        ))
+            ))
             .rule(List.of(ingressV1SpecRule))
             .build();
         IngressV1.Builder ingressBuilder = IngressV1.Builder
@@ -123,7 +132,7 @@ public class TFUtils {
                           .name(ingressName)
                           .annotations(Map.of(
                               "cert-manager.io/cluster-issuer", "letsencrypt-prod"
-                                             ))
+                          ))
                           .build())
             .dependsOn(dependencies)
             .spec(nginxSpec)
@@ -140,9 +149,10 @@ public class TFUtils {
      * (before cert-manager's CRDs are registered) and fail with
      * "Failed to construct REST client".
      */
-    public Release installCertManager(Construct construct,
-                                      HelmProvider helmProvider,
-                                      final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn) {
+    public Release installCertManager(
+        Construct construct,
+        HelmProvider helmProvider,
+        final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn) {
         String clusterIssuerYaml = format(
             """
             kubectl apply -f - <<'YAML'
