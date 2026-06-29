@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -127,12 +128,30 @@ public class StepActions {
 
     public void startSparkClusterInAws() throws Exception {
         executeMainOf(SparkClusterDeployment.class, new String[]{});
-        startCloud(cdktfPath(SparkClusterDeployment.ID));
+        startAWS();
     }
 
     public void startAwsPolaris() throws Exception {
         executeMainOf(AwsWholeStack.class, new String[]{});
-        startCloud(cdktfPath(AwsWholeStack.ID));
+        startAWS();
+    }
+
+    private void startAWS() throws ManagedProcessException {
+        // The kubernetes/helm providers are configured from the EKS cluster's endpoint and
+        // auth token. With the v3 (plugin-framework) providers, those must be known at plan
+        // time, otherwise apply fails with "Provider produced inconsistent final plan" (the
+        // provider can't be configured until the cluster exists). So we bootstrap ONLY the
+        // cluster in a targeted first phase; the second, full apply then plans the k8s/helm
+        // resources against a cluster that already exists.
+        //
+        // We deliberately do NOT target the node group here: it has no CNI of its own and
+        // only becomes Ready once Cilium (a Helm release) is installed. Cilium and the node
+        // group are created as siblings in the full apply, so the node group must stay in
+        // phase two. Stacks without an EKS cluster (Azure/GCP) yield no targets and skip
+        // straight to the full apply.
+        Path         jsonDirectory    = cdktfPath(AWS);
+        List<String> bootstrapTargets = eksBootstrapTargets(jsonDirectory);
+        startCloud(jsonDirectory, bootstrapTargets);
     }
 
     // AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click
@@ -180,20 +199,11 @@ public class StepActions {
     }
 
     public void startCloud(Path jsonDirectory) throws ManagedProcessException {
+        startCloud(jsonDirectory, List.of());
+    }
+
+    public void startCloud(Path jsonDirectory, List<String> bootstrapTargets) throws ManagedProcessException {
         run("tofu", jsonDirectory, "init");
-        // The kubernetes/helm providers are configured from the EKS cluster's endpoint and
-        // auth token. With the v3 (plugin-framework) providers, those must be known at plan
-        // time, otherwise apply fails with "Provider produced inconsistent final plan" (the
-        // provider can't be configured until the cluster exists). So we bootstrap ONLY the
-        // cluster in a targeted first phase; the second, full apply then plans the k8s/helm
-        // resources against a cluster that already exists.
-        //
-        // We deliberately do NOT target the node group here: it has no CNI of its own and
-        // only becomes Ready once Cilium (a Helm release) is installed. Cilium and the node
-        // group are created as siblings in the full apply, so the node group must stay in
-        // phase two. Stacks without an EKS cluster (Azure/GCP) yield no targets and skip
-        // straight to the full apply.
-        List<String> bootstrapTargets = eksBootstrapTargets(jsonDirectory);
         if (!bootstrapTargets.isEmpty()) {
             List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve"));
             phaseOne.addAll(bootstrapTargets);
