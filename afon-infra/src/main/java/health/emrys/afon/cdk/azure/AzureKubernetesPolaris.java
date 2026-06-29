@@ -45,25 +45,7 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
         super(scope, id, properties);
         resourceGroup = AfonProperties.AZURE_RESOURCE_GROUP.getValueFrom(properties);
 
-        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
-            @Override
-            protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
-                return Service.Builder
-                    .create(AzureKubernetesPolaris.this, POLARIS_INTERNAL)
-                    .metadata(ServiceMetadata
-                                  .builder()
-                                  .name(POLARIS_INTERNAL)
-                                  .build())
-                    .dependsOn(List.of(polarisDeployment))
-                    .spec(ServiceSpec
-                              .builder()
-                              .selector(polarisLabels)
-                              .type("ClusterIP")
-                              .port(List.of(PolarisConfig.POLARIS_PORTS))
-                              .build())
-                    .build();
-            }
-        };
+        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
         var util = new TFUtils(
             this, azurePolarisDomainName, TLS_SECRET_NAME,
             POLARIS_PORT, POLARIS_INTERNAL, POLARIS_INGRESS_NAME);
