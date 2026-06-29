@@ -3,6 +3,8 @@ package health.emrys.afon.demo;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.aws.AwsWholeStack;
 import health.emrys.afon.cdk.aws.SparkClusterDeployment;
 import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
@@ -29,7 +31,9 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
@@ -177,8 +181,47 @@ public class StepActions {
 
     public void startCloud(Path jsonDirectory) throws ManagedProcessException {
         run("tofu", jsonDirectory, "init");
+        // The kubernetes/helm providers are configured from the EKS cluster's endpoint and
+        // auth token. With the v3 (plugin-framework) providers, those must be known at plan
+        // time, otherwise apply fails with "Provider produced inconsistent final plan" (the
+        // provider can't be configured until the cluster exists). So we bootstrap the cluster
+        // (and its node group) in a targeted first phase; the second, full apply then plans
+        // the k8s/helm resources against a cluster that already exists. Stacks without an EKS
+        // cluster (Azure/GCP) yield no targets and skip straight to the full apply.
+        List<String> bootstrapTargets = eksBootstrapTargets(jsonDirectory);
+        if (!bootstrapTargets.isEmpty()) {
+            List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve"));
+            phaseOne.addAll(bootstrapTargets);
+            log.info("Bootstrapping EKS before the full apply: {}", phaseOne);
+            run("tofu", jsonDirectory, phaseOne.toArray(new String[0]));
+        }
         OutputStream suppressedStdOut = OutputStream.nullOutputStream();
         run("tofu", jsonDirectory, suppressedStdOut, "apply", "--auto-approve");
+    }
+
+    /**
+     * Reads {@code cdk.tf.json} in the given stack directory and returns {@code -target=...}
+     * arguments for any EKS cluster and node group it declares, so they can be created in a
+     * first apply phase before the kubernetes/helm providers are configured. Returns an empty
+     * list (and logs nothing fatal) when the file is absent or declares no such resources.
+     */
+    private List<String> eksBootstrapTargets(Path jsonDirectory) {
+        List<String> targets = new ArrayList<>();
+        Path json = jsonDirectory.resolve("cdk.tf.json");
+        if (!json.toFile().exists()) {
+            return targets;
+        }
+        try {
+            JsonNode resources = new ObjectMapper().readTree(json.toFile()).path("resource");
+            for (String type : List.of("aws_eks_cluster", "aws_eks_node_group")) {
+                resources.path(type).fieldNames()
+                         .forEachRemaining(name -> targets.add("-target=" + type + "." + name));
+            }
+        } catch (IOException e) {
+            log.warn("Could not read {} to compute EKS bootstrap targets; "
+                     + "proceeding with a single apply", json, e);
+        }
+        return targets;
     }
 
     public void run(String command, Path path, String... commands) throws ManagedProcessException {
