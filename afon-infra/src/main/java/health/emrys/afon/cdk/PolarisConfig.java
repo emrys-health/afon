@@ -163,7 +163,7 @@ public class PolarisConfig extends Construct {
     }
 
     protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
-        return clusterIpService(polarisDeployment,
+        return clusterIpService(List.of(polarisDeployment),
                                 polarisLabels,
                                 POLARIS_INTERNAL,
                                 List.of(PolarisConfig.POLARIS_PORTS),

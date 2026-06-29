@@ -1,11 +1,11 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformResource;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -41,17 +41,21 @@ public class TFUtils {
                                                      .build();
     }
 
-    public static @NonNull Service clusterIpService(Deployment polarisDeployment, Map<String, String> polarisLabels, String serviceName, List<ServiceSpecPort> ports, Construct scope) {
+    public static @NonNull Service clusterIpService(java.util.List<? extends ITerraformDependable> dependsOn,
+                                                    Map<String, String> labels,
+                                                    String serviceName,
+                                                    List<ServiceSpecPort> ports,
+                                                    Construct scope) {
         return Service.Builder
             .create(scope, serviceName)
             .metadata(ServiceMetadata
                           .builder()
                           .name(serviceName)
                           .build())
-            .dependsOn(List.of(polarisDeployment))
+            .dependsOn(dependsOn)
             .spec(ServiceSpec
                       .builder()
-                      .selector(polarisLabels)
+                      .selector(labels)
                       .type("ClusterIP")
                       .port(ports)
                       .build())
