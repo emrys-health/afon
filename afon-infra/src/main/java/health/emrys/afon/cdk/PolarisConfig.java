@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.TFUtils.clusterIpService;
-import static health.emrys.afon.cdk.aws.AwsKubernetesPolaris.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_IMAGE_NAME;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_PROPERTIES;
@@ -23,16 +22,17 @@ import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
 
-    private static final String          SECRET_NAME           = "my-app-secret";
-    private static final String          POLARIS_ENV_FILE      = "polaris_env.sh";
-    private static final String          GCP_CRED_FILE         = "service-account.json";
-    private static final String          SECRETS_DIR           = "/etc/app-secrets";
-    public static final  ServiceSpecPort POLARIS_PORTS         = ServiceSpecPort.builder()
-                                                                                .name("web")
-                                                                                .port(8181)
-                                                                                .targetPort("8181")
-                                                                                .protocol("TCP")
-                                                                                .build();
+    private static final String          SECRET_NAME      = "my-app-secret";
+    private static final String          POLARIS_ENV_FILE = "polaris_env.sh";
+    private static final String          GCP_CRED_FILE    = "service-account.json";
+    private static final String          SECRETS_DIR      = "/etc/app-secrets";
+    public static final  ServiceSpecPort POLARIS_PORTS    = ServiceSpecPort.builder()
+                                                                           .name("web")
+                                                                           .port(8181)
+                                                                           .targetPort("8181")
+                                                                           .protocol("TCP")
+                                                                           .build();
+    public static final  String          POLARIS_INTERNAL = "polaris-internal";
 
     public Map<String, String> polarisLabels;
 
@@ -163,11 +163,12 @@ public class PolarisConfig extends Construct {
     }
 
     protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
-        return clusterIpService(List.of(polarisDeployment),
-                                polarisLabels,
-                                POLARIS_INTERNAL,
-                                List.of(PolarisConfig.POLARIS_PORTS),
-                                this);
+        return clusterIpService(
+            List.of(polarisDeployment),
+            polarisLabels,
+            POLARIS_INTERNAL,
+            List.of(PolarisConfig.POLARIS_PORTS),
+            this);
     }
 
     public static final void main(String[] unused) {
