@@ -118,39 +118,42 @@ public class StepActions {
 
     public void startFullStackAzure() throws Exception {
         executeMainOf(AzureWholeStack.class, new String[]{});
-        startCloud(cdktfPath(AzureKubernetesPolaris.ID));
+        startManagedKubernetesStack(AzureKubernetesPolaris.ID);
     }
 
     public void startAzurePolaris() throws Exception {
         executeMainOf(AzureKubernetesPolaris.class, new String[]{});
-        startCloud(cdktfPath(AzureKubernetesPolaris.ID));
+        startManagedKubernetesStack(AzureKubernetesPolaris.ID);
     }
 
     public void startSparkClusterInAws() throws Exception {
         executeMainOf(SparkClusterDeployment.class, new String[]{});
-        startAWS();
+        startManagedKubernetesStack(AWS);
     }
 
     public void startAwsPolaris() throws Exception {
         executeMainOf(AwsWholeStack.class, new String[]{});
-        startAWS();
+        startManagedKubernetesStack(AWS);
     }
 
-    private void startAWS() throws ManagedProcessException {
-        // The kubernetes/helm providers are configured from the EKS cluster's endpoint and
-        // auth token. With the v3 (plugin-framework) providers, those must be known at plan
-        // time, otherwise apply fails with "Provider produced inconsistent final plan" (the
-        // provider can't be configured until the cluster exists). So we bootstrap ONLY the
-        // cluster in a targeted first phase; the second, full apply then plans the k8s/helm
-        // resources against a cluster that already exists.
+    private void startManagedKubernetesStack(SupportedCloudsEnum id) throws ManagedProcessException {
+        // The kubernetes/helm providers are configured from the managed cluster's endpoint and
+        // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
+        // (plugin-framework) providers, those must be known at plan time, otherwise apply fails
+        // with "Provider produced inconsistent final plan" (the provider can't be configured
+        // until the cluster exists). So we bootstrap ONLY the cluster in a targeted first phase;
+        // the second, full apply then plans the k8s/helm resources against a cluster that
+        // already exists.
         //
-        // We deliberately do NOT target the node group here: it has no CNI of its own and
-        // only becomes Ready once Cilium (a Helm release) is installed. Cilium and the node
-        // group are created as siblings in the full apply, so the node group must stay in
-        // phase two. Stacks without an EKS cluster (Azure/GCP) yield no targets and skip
-        // straight to the full apply.
-        Path         jsonDirectory    = cdktfPath(AWS);
-        List<String> bootstrapTargets = eksBootstrapTargets(jsonDirectory);
+        // We deliberately target only the control plane, not the worker nodes. On AWS the node
+        // group has no CNI of its own and only becomes Ready once Cilium (a Helm release) is
+        // installed, so it must stay in phase two alongside Cilium; the EKS cluster resource
+        // does not include the node group. On Azure the default node pool is declared inline on
+        // the cluster resource (and uses AKS-managed Cilium), so targeting the cluster brings up
+        // the nodes too. Stacks without a managed cluster (e.g. GCP, which uses an exec auth
+        // plugin) yield no targets and skip straight to the full apply.
+        Path         jsonDirectory    = cdktfPath(id);
+        List<String> bootstrapTargets = clusterBootstrapTargets(jsonDirectory);
         startCloud(jsonDirectory, bootstrapTargets);
     }
 
@@ -215,13 +218,22 @@ public class StepActions {
     }
 
     /**
-     * Reads {@code cdk.tf.json} in the given stack directory and returns {@code -target=...}
-     * arguments for any EKS cluster it declares, so the cluster can be created in a first
-     * apply phase. This makes the cluster endpoint/auth token known at plan time for the
-     * second, full apply, which is what the v3 kubernetes/helm providers require. Returns an
-     * empty list (and logs nothing fatal) when the file is absent or declares no EKS cluster.
+     * Terraform resource types for the managed Kubernetes control planes whose endpoint and
+     * credentials the kubernetes/helm providers depend on at plan time. We bootstrap these in a
+     * targeted first apply phase. GCP is absent on purpose: it authenticates via an exec plugin,
+     * so its provider does not need the cluster to exist at plan time.
      */
-    private List<String> eksBootstrapTargets(Path jsonDirectory) {
+    private static final List<String> MANAGED_CLUSTER_RESOURCE_TYPES =
+        List.of("aws_eks_cluster", "azurerm_kubernetes_cluster");
+
+    /**
+     * Reads {@code cdk.tf.json} in the given stack directory and returns {@code -target=...}
+     * arguments for any managed Kubernetes cluster it declares, so the cluster can be created in
+     * a first apply phase. This makes the cluster endpoint/credentials known at plan time for the
+     * second, full apply, which is what the v3 kubernetes/helm providers require. Returns an
+     * empty list (and logs nothing fatal) when the file is absent or declares no such cluster.
+     */
+    private List<String> clusterBootstrapTargets(Path jsonDirectory) {
         List<String> targets = new ArrayList<>();
         Path json = jsonDirectory.resolve("cdk.tf.json");
         if (!json.toFile().exists()) {
@@ -229,11 +241,12 @@ public class StepActions {
         }
         try {
             JsonNode resources = new ObjectMapper().readTree(json.toFile()).path("resource");
-            String type = "aws_eks_cluster";
-            resources.path(type).fieldNames()
-                     .forEachRemaining(name -> targets.add("-target=" + type + "." + name));
+            for (String type : MANAGED_CLUSTER_RESOURCE_TYPES) {
+                resources.path(type).fieldNames()
+                         .forEachRemaining(name -> targets.add("-target=" + type + "." + name));
+            }
         } catch (IOException e) {
-            log.warn("Could not read {} to compute EKS bootstrap targets; "
+            log.warn("Could not read {} to compute cluster bootstrap targets; "
                      + "proceeding with a single apply", json, e);
         }
         return targets;
