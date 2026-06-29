@@ -8,6 +8,8 @@ import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
+import com.hashicorp.cdktf.providers.aws.data_aws_lb.DataAwsLb;
+import com.hashicorp.cdktf.providers.aws.data_aws_lb.DataAwsLbConfig;
 import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntry;
 import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntryConfig;
 import com.hashicorp.cdktf.providers.aws.eks_access_policy_association.EksAccessPolicyAssociation;
@@ -76,7 +78,6 @@ public class AwsConstruct extends AbstractConstruct {
     private final String                     polarisDomainName;
     private final String                     accountId;
     private final String                     region;
-    private final String                     zone_id;
     private final String                     clusterName;
     private final AwsNuke                    awsNuke;
     private final String                     polarisCertArn;
@@ -95,7 +96,6 @@ public class AwsConstruct extends AbstractConstruct {
         this.polarisDomainName = AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
         this.accountId         = AWS_ACCOUNT_ID.getValueFrom(properties);
         this.region            = AfonProperties.AWS_REGION.getValueFrom(properties);
-        this.zone_id           = AfonProperties.AWS_ZONE_ID.getValueFrom(properties);
         clusterPolicyArn       = format("arn:aws:iam::%s:policy/AWSLoadBalancerControllerIAMPolicyCurl", accountId);
         // --- AWS Provider Configuration (Required for EKS Addon) ---
         // 1. Configure the AWS Provider
@@ -652,7 +652,8 @@ public class AwsConstruct extends AbstractConstruct {
                      AWS_POLARIS_DNS_ZONE.getValueFrom(properties),
                      this.polarisDomainName,
                      lbRelease,
-                     ingress);
+                     ingress,
+                     "polaris-ingress");
     }
 
     private static ReleaseSet createValue(String name, String value) {
@@ -663,18 +664,42 @@ public class AwsConstruct extends AbstractConstruct {
     }
 
     /**
-     * Creates a Route 53 Alias A record pointing {@code domainName} at the ALB provisioned by
-     * the given Ingress. The ELB hosted zone ID {@code "ZHURV8PSTC4K8"} is fixed for eu-west-2.
+     * Creates a Route 53 Alias A record pointing {@code domainName} at the ALB the AWS Load
+     * Balancer Controller provisions for the given Ingress. The ALB is located via an
+     * {@code aws_lb} data source filtered on the controller's tags (rather than reading the
+     * Ingress' status, which the kubernetes provider returns as null unreliably), and the
+     * ALB's own DNS name and hosted zone are used for the alias.
      *
-     * @param constructId unique CDKTF construct ID for this record
-     * @param r53ZoneId   the Route 53 hosted zone ID that owns {@code domainName}
-     * @param domainName  the domain to point at the ALB (e.g. {@code "emrysjupyter.click"})
-     * @param release     Helm release the record should depend on
-     * @param ingress     IngressV1 whose ALB hostname is used as the alias target
+     * @param constructId   unique CDKTF construct ID for this record
+     * @param r53ZoneId     the Route 53 hosted zone ID that owns {@code domainName}
+     * @param domainName    the domain to point at the ALB (e.g. {@code "emrysjupyter.click"})
+     * @param release       Helm release the record should depend on
+     * @param ingress       IngressV1 the data-source lookup depends on (so it resolves at apply time)
+     * @param ingressK8sName the Ingress' Kubernetes metadata.name, used to match the ALB's
+     *                       {@code ingress.k8s.aws/stack=default/<name>} tag
      */
     public void configureDNS(String constructId, String r53ZoneId, String domainName,
-                             Release release, IngressV1 ingress) {
-        String hostname = ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getHostname();
+                             Release release, IngressV1 ingress, String ingressK8sName) {
+        // We deliberately do NOT read the ALB hostname from the Ingress' status. The
+        // hashicorp/kubernetes provider routinely returns a null status[0] for an
+        // ALB-backed Ingress even when wait_for_load_balancer is set and the ALB is
+        // actually up (see kubernetes-sigs/aws-load-balancer-controller#2768 and
+        // hashicorp/terraform-provider-kubernetes#2679), which made the Route53 alias
+        // below fail with "Attempt to index null value".
+        //
+        // The AWS Load Balancer Controller does provision the ALB; only the status
+        // read-back is unreliable. So we query AWS directly for the ALB the controller
+        // created, identified by the tags it stamps on it. depends_on(ingress) defers
+        // this data read to apply time, after the Ingress (and thus the ALB) exists.
+        DataAwsLb alb = new DataAwsLb(
+            this, constructId + "Alb", DataAwsLbConfig
+            .builder()
+            .tags(Map.of(
+                "elbv2.k8s.aws/cluster", clusterName,
+                "ingress.k8s.aws/stack", "default/" + ingressK8sName,
+                "ingress.k8s.aws/resource", "LoadBalancer"))
+            .dependsOn(List.of(ingress))
+            .build());
         new Route53Record(
             this, constructId, Route53RecordConfig
             .builder()
@@ -685,8 +710,8 @@ public class AwsConstruct extends AbstractConstruct {
             .dependsOn(List.of(release))
             .alias(Route53RecordAlias
                        .builder()
-                       .name(hostname)
-                       .zoneId(zone_id)
+                       .name(alb.getDnsName())
+                       .zoneId(alb.getZoneId())
                        .evaluateTargetHealth(true)
                        .build())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
@@ -874,6 +899,12 @@ public class AwsConstruct extends AbstractConstruct {
         return IngressV1.Builder
             .create(this, constructId)
             .provider(kubernetesProvider)
+            // The ALB (and thus the ingress' status.loadBalancer.hostname that the Route53
+            // alias record reads) is only provisioned once the AWS Load Balancer Controller
+            // is running. Without this dependency the ingress can be created before the
+            // controller's Helm release, so waitForLoadBalancer never sees a hostname and
+            // status stays null, breaking the Route53 alias record.
+            .dependsOn(List.of(lbRelease))
             .metadata(ingressMetadata)
             .spec(alb)
             .lifecycle(TerraformResourceLifecycle

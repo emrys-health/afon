@@ -184,10 +184,11 @@ public class SparkWorkloads {
             "spark.sql.iceberg.planning.preserve-data-grouping", "true",
             "spark.sql.sources.v2.bucketing.enabled", "true",
             "spark.sql.sources.bucketing.enabled", "true",
-            "spark.jars.packages", "com.google.guava:guava:33.4.0-jre,org.apache.hadoop:hadoop-aws:3.4.2,com.google" +
-                                   ".cloud:google-cloud-storage:2.57.0,software.amazon.awssdk:bundle:2.34.6,org" +
-                                   ".apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.0,org.apache" +
-                                   ".hadoop:hadoop-azure:3.3.4,com.azure:azure-storage-file-datalake:12.22.0",
+// These are not necessary if you use ph1ll1phenry/spark_jars:4.0.1
+//            "spark.jars.packages", "com.google.guava:guava:33.4.0-jre,org.apache.hadoop:hadoop-aws:3.4.2,com.google" +
+//                                   ".cloud:google-cloud-storage:2.57.0,software.amazon.awssdk:bundle:2.34.6,org" +
+//                                   ".apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.0,org.apache" +
+//                                   ".hadoop:hadoop-azure:3.3.4,com.azure:azure-storage-file-datalake:12.22.0",
             "spark.driver.userClassPathFirst", "true",
             "spark.executor.userClassPathFirst", "true",
             "spark.log.level", "DEBUG",
