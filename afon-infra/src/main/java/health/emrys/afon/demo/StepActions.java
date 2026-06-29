@@ -184,10 +184,15 @@ public class StepActions {
         // The kubernetes/helm providers are configured from the EKS cluster's endpoint and
         // auth token. With the v3 (plugin-framework) providers, those must be known at plan
         // time, otherwise apply fails with "Provider produced inconsistent final plan" (the
-        // provider can't be configured until the cluster exists). So we bootstrap the cluster
-        // (and its node group) in a targeted first phase; the second, full apply then plans
-        // the k8s/helm resources against a cluster that already exists. Stacks without an EKS
-        // cluster (Azure/GCP) yield no targets and skip straight to the full apply.
+        // provider can't be configured until the cluster exists). So we bootstrap ONLY the
+        // cluster in a targeted first phase; the second, full apply then plans the k8s/helm
+        // resources against a cluster that already exists.
+        //
+        // We deliberately do NOT target the node group here: it has no CNI of its own and
+        // only becomes Ready once Cilium (a Helm release) is installed. Cilium and the node
+        // group are created as siblings in the full apply, so the node group must stay in
+        // phase two. Stacks without an EKS cluster (Azure/GCP) yield no targets and skip
+        // straight to the full apply.
         List<String> bootstrapTargets = eksBootstrapTargets(jsonDirectory);
         if (!bootstrapTargets.isEmpty()) {
             List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve"));
@@ -201,9 +206,10 @@ public class StepActions {
 
     /**
      * Reads {@code cdk.tf.json} in the given stack directory and returns {@code -target=...}
-     * arguments for any EKS cluster and node group it declares, so they can be created in a
-     * first apply phase before the kubernetes/helm providers are configured. Returns an empty
-     * list (and logs nothing fatal) when the file is absent or declares no such resources.
+     * arguments for any EKS cluster it declares, so the cluster can be created in a first
+     * apply phase. This makes the cluster endpoint/auth token known at plan time for the
+     * second, full apply, which is what the v3 kubernetes/helm providers require. Returns an
+     * empty list (and logs nothing fatal) when the file is absent or declares no EKS cluster.
      */
     private List<String> eksBootstrapTargets(Path jsonDirectory) {
         List<String> targets = new ArrayList<>();
@@ -213,10 +219,9 @@ public class StepActions {
         }
         try {
             JsonNode resources = new ObjectMapper().readTree(json.toFile()).path("resource");
-            for (String type : List.of("aws_eks_cluster", "aws_eks_node_group")) {
-                resources.path(type).fieldNames()
-                         .forEachRemaining(name -> targets.add("-target=" + type + "." + name));
-            }
+            String type = "aws_eks_cluster";
+            resources.path(type).fieldNames()
+                     .forEachRemaining(name -> targets.add("-target=" + type + "." + name));
         } catch (IOException e) {
             log.warn("Could not read {} to compute EKS bootstrap targets; "
                      + "proceeding with a single apply", json, e);
