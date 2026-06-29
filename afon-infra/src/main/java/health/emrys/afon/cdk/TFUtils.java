@@ -5,8 +5,14 @@ import com.hashicorp.cdktf.TerraformResource;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
+import com.hashicorp.cdktf.providers.kubernetes.service.Service;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -33,6 +39,23 @@ public class TFUtils {
                                                      .name(name)
                                                      .value(value)
                                                      .build();
+    }
+
+    public static @NonNull Service clusterIpService(Deployment polarisDeployment, Map<String, String> polarisLabels, String serviceName, List<ServiceSpecPort> ports, Construct scope) {
+        return Service.Builder
+            .create(scope, serviceName)
+            .metadata(ServiceMetadata
+                          .builder()
+                          .name(serviceName)
+                          .build())
+            .dependsOn(List.of(polarisDeployment))
+            .spec(ServiceSpec
+                      .builder()
+                      .selector(polarisLabels)
+                      .type("ClusterIP")
+                      .port(ports)
+                      .build())
+            .build();
     }
 
     public static Release installNginxIngress(

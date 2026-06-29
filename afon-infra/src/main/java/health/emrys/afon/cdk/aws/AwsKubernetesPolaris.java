@@ -30,7 +30,6 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
 
     protected final PolarisConfig polarisConfig;
     protected final AwsConstruct  cloudProvider;
-    protected final Service       polarisLB;
 
     public AwsKubernetesPolaris(@NotNull Construct scope,
                                 SupportedCloudsEnum id,
@@ -44,7 +43,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
                 return null; // no longer using an external service
             }
         };
-        polarisLB     = polarisConfig.deployPolaris(cloudProvider.getDependables());
+        polarisConfig.deployPolaris(cloudProvider.getDependables());
         Service.Builder
             .create(this, POLARIS_INTERNAL)
             .metadata(ServiceMetadata

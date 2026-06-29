@@ -14,12 +14,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static health.emrys.afon.cdk.TFUtils.clusterIpService;
+import static health.emrys.afon.cdk.aws.AwsKubernetesPolaris.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_IMAGE_NAME;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_PROPERTIES;
 import static java.lang.String.format;
 
-public abstract class PolarisConfig extends Construct {
+public class PolarisConfig extends Construct {
 
     private static final String          SECRET_NAME           = "my-app-secret";
     private static final String          POLARIS_ENV_FILE      = "polaris_env.sh";
@@ -160,9 +162,13 @@ public abstract class PolarisConfig extends Construct {
         return configurePolarisService(polarisDeployment, polarisLabels);
     }
 
-    protected abstract @NotNull Service configurePolarisService(
-        Deployment deployment,
-        Map<String, String> polarisLabels);
+    protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
+        return clusterIpService(polarisDeployment,
+                                polarisLabels,
+                                POLARIS_INTERNAL,
+                                List.of(PolarisConfig.POLARIS_PORTS),
+                                this);
+    }
 
     public static final void main(String[] unused) {
         System.out.println(PolarisConfig.getProviderCredentials(appProperties(), "test"));
