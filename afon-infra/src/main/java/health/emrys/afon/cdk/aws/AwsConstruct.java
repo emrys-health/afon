@@ -54,7 +54,7 @@ import software.constructs.Construct;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.cdk.aws.AwsKubernetesPolaris.POLARIS_INTERNAL;
+import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.cdk.aws.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
