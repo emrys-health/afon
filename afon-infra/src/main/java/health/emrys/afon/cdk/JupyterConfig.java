@@ -16,11 +16,12 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
+import static health.emrys.afon.cdk.TFUtils.finalizeIngress;
 import static health.emrys.afon.cdk.TFUtils.envVar;
 import static health.emrys.afon.infra.Defaults.JUPYTER_SERVICE_NAME;
 
 public abstract class JupyterConfig {
+    public static final  String          NO_JUPYTER_FINALIZERS = finalizeIngress("jupyter-ingress");
     /**
      * One in-pod X session per entry. Each session pairs a Guacamole login (used to
      * authenticate against the Guacamole web UI) with the VNC port serving that
