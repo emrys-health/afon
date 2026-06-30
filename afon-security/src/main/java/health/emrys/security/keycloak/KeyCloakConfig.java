@@ -4,14 +4,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.KEYCLOAK_ADMIN;
-import static health.emrys.afon.config.AfonProperties.KEYCLOAK_ADMIN_PASSWORD;
+import static health.emrys.afon.config.AfonProperties.KC_BOOTSTRAP_ADMIN_USERNAME;
+import static health.emrys.afon.config.AfonProperties.KC_BOOTSTRAP_ADMIN_PASSWORD;
 
 public class KeyCloakConfig {
 
     public static final String KEYCLOAK_IMAGE              = "quay.io/keycloak/keycloak:26.6.3";
-    public static final String KC_BOOTSTRAP_ADMIN_USERNAME = "KC_BOOTSTRAP_ADMIN_USERNAME";
-    public static final String KC_BOOTSTRAP_ADMIN_PASSWORD = "KC_BOOTSTRAP_ADMIN_PASSWORD";
 
     private final Properties properties;
 
@@ -21,8 +19,8 @@ public class KeyCloakConfig {
 
     public Map<String, String> configUsing() {
         Map<String, String> config = new HashMap<>();
-        config.put(KC_BOOTSTRAP_ADMIN_USERNAME, KEYCLOAK_ADMIN.getValueFrom(properties));
-        config.put(KC_BOOTSTRAP_ADMIN_PASSWORD, KEYCLOAK_ADMIN_PASSWORD.getValueFrom(properties));
+        config.put(KC_BOOTSTRAP_ADMIN_USERNAME.getPropertyName(), KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties));
+        config.put(KC_BOOTSTRAP_ADMIN_PASSWORD.getPropertyName(), KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
         config.put("KC_HTTP_ENABLED", "true");
         // Run KeyCloak at DEBUG level to aid diagnosing OIDC/token issues.
         config.put("KC_LOG_LEVEL", "DEBUG");

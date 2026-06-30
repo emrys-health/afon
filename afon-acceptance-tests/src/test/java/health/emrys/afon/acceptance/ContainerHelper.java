@@ -208,7 +208,7 @@ public class ContainerHelper {
             POLARIS_ENDPOINT.getValueFrom(properties),
             properties,
             // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
-            tokenEndpoint(KEY_CLOAK_HOSTNAME.getValueFrom(properties))
+            tokenEndpoint(KEYCLOAK_HOSTNAME.getValueFrom(properties))
         );
         return  trinoConfig.catalogProperties(catalog);
     }
