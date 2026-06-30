@@ -61,6 +61,11 @@
             <version>${parent.version}</version>
         </dependency>
         <dependency>
+            <groupId>${project.parent.groupId}</groupId>
+            <artifactId>afon-security</artifactId>
+            <version>${parent.version}</version>
+        </dependency>
+        <dependency>
             <groupId>io.kubernetes</groupId>
             <artifactId>client-java</artifactId>
             <version>24.0.0</version>
