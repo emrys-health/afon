@@ -11,24 +11,26 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.TFUtils.envFromSecret;
-import static health.emrys.afon.config.AfonProperties.KEYCLOAK_ADMIN;
-import static health.emrys.afon.config.AfonProperties.KEYCLOAK_ADMIN_PASSWORD;
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.security.keycloak.KeyCloakConfig.*;
 
 public class KeyCloakDeploymentConfig extends Construct {
 
-    public static final String        ADMIN_USER     = "admin-user";
-    public static final String        ADMIN_PASSWORD = "admin-password";
-    public static final String        APP_NAME       = "keycloak";
-    private final       String        SECRET_NAME    = "kcsecrets";
+    public static final String ADMIN_USER     = "admin-user";
+    public static final String ADMIN_PASSWORD = "admin-password";
+    public static final String APP_NAME       = "keycloak";
+    private final       String SECRET_NAME    = "kcsecrets";
 
     public KeyCloakDeploymentConfig(
         @NotNull Construct scope,
         @NotNull Properties properties,
         @NotNull CloudProvider cloudProvider) {
         super(scope, APP_NAME + "_scope");
-        String adminUser     = KEYCLOAK_ADMIN.getValueFrom(properties);
-        String adminPassword = KEYCLOAK_ADMIN_PASSWORD.getValueFrom(properties);
+        String adminUser     = KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties);
+        String adminPassword = KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties);
+        String dbUrl         = KC_DB_URL.getValueFrom(properties);
+        String dbUser        = KC_DB_USERNAME.getValueFrom(properties);
+        String dbPassword    = KC_DB_PASSWORD.getValueFrom(properties);
 
         Secret.Builder
             .create(scope, SECRET_NAME)
@@ -39,7 +41,10 @@ public class KeyCloakDeploymentConfig extends Construct {
                           .build())
             .data(Map.of(
                 ADMIN_USER, adminUser,
-                ADMIN_PASSWORD, adminPassword
+                ADMIN_PASSWORD, adminPassword,
+                KC_DB_URL.getPropertyName(), dbUrl,
+                KC_DB_USERNAME.getPropertyName(), dbUser,
+                KC_DB_PASSWORD.getPropertyName(), dbPassword
             ))
             .build();
 
@@ -50,8 +55,8 @@ public class KeyCloakDeploymentConfig extends Construct {
             .image(KEYCLOAK_IMAGE)
             .args(args)
             .env(List.of(
-                envFromSecret(KC_BOOTSTRAP_ADMIN_USERNAME, SECRET_NAME, ADMIN_USER),
-                envFromSecret(KC_BOOTSTRAP_ADMIN_PASSWORD, SECRET_NAME, ADMIN_PASSWORD)
+                envFromSecret(KC_BOOTSTRAP_ADMIN_USERNAME.getPropertyName(), SECRET_NAME, ADMIN_USER),
+                envFromSecret(KC_BOOTSTRAP_ADMIN_PASSWORD.getPropertyName(), SECRET_NAME, ADMIN_PASSWORD)
             ))
             .build();
         DeploymentUtils.deploy(
