@@ -8,6 +8,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.EmrysCloud;
+import health.emrys.afon.cdk.KeyCloakDeploymentConfig;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -61,6 +62,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
                       .port(List.of(polarisConfig.POLARIS_PORTS))
                       .build())
             .build();
+        new KeyCloakDeploymentConfig(this, properties, cloudProvider);
     }
 
     public static void main(String[] args) {
