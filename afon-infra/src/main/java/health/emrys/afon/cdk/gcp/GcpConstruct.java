@@ -3,6 +3,7 @@ package health.emrys.afon.cdk.gcp;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.google.compute_network.ComputeNetwork;
 import com.hashicorp.cdktf.providers.google.compute_network.ComputeNetworkConfig;
 import com.hashicorp.cdktf.providers.google.compute_router.ComputeRouter;
@@ -102,6 +103,16 @@ public class GcpConstruct extends AbstractConstruct {
                     .ipCidrRange("10.30.0.0/20")
                     .build()
                                      ))
+            // Once the VPC-native GKE cluster attaches to these secondary ranges, GKE manages
+            // them and a later plan sees a diff on secondary_ip_range. With the two-phase apply
+            // (cluster bootstrapped first, full apply second) that diff becomes an in-place
+            // subnet update, which GCP rejects while node instances occupy the subnet
+            // ("subnetwork ... is already being used by ... instances/..."). The ranges are
+            // static here, so ignore post-creation changes to them.
+            .lifecycle(TerraformResourceLifecycle
+                           .builder()
+                           .ignoreChanges(List.of("secondary_ip_range"))
+                           .build())
             .build();
         ComputeSubnetwork subnet = new ComputeSubnetwork(this, "subnet", subnetworkConfig);
 
