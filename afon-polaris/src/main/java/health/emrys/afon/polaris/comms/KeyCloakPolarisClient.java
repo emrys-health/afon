@@ -44,6 +44,14 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
         this.keyCloakTokenUri = tokenEndpoint(KEYCLOAK_HOSTNAME.getValueFrom(properties));
     }
 
+    public KeyCloakPolarisClient(Properties properties, String kcHostname) {
+        // The Polaris endpoint (used for the bearer-authenticated catalog/management calls).
+        super(properties);
+        // Use the same KeyCloak host that Polaris discovered, so the token's issuer matches and
+        // Polaris accepts the bearer token.
+        this.keyCloakTokenUri = tokenEndpoint(kcHostname);
+    }
+
     /**
      * Get the token with:
      * <pre>
