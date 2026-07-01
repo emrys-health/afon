@@ -5,6 +5,7 @@ import health.emrys.afon.polaris.keycloak.KeyCloakAdmin;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
 import health.emrys.afon.trino.TrinoServerConfiguration;
+import health.emrys.security.keycloak.KeyCloakConfig;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -25,6 +26,7 @@ import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.*;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
+import static health.emrys.security.keycloak.KeyCloakConfig.*;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -41,6 +43,7 @@ public class ContainerHelper {
      * Network alias used by Polaris (running on the same docker network) to reach KeyCloak.
      */
     private static final String KEYCLOAK_ALIAS = "keycloak";
+    public static final String KEYCLOAK_HOSTNAME = "localhost";
 
     /**
      * For testing.
@@ -77,27 +80,21 @@ public class ContainerHelper {
                 // pins the host port to the same number).
                 .withExposedPorts(KEYCLOAK_PORT)
                 .withCommand("start-dev")
-                .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", KEYCLOAK_ADMIN.getValueFrom(properties))
-                .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", KEYCLOAK_ADMIN_PASSWORD.getValueFrom(properties))
-                .withEnv("KC_HTTP_ENABLED", "true")
-                // Run KeyCloak at DEBUG level to aid diagnosing OIDC/token issues.
-                .withEnv("KC_LOG_LEVEL", "DEBUG")
-                // Issuer is left dynamic (stamped from the request host) so host-side callers can use
-                // 'localhost' with no /etc/hosts entry. Polaris tolerates the resulting issuer-host
-                // difference via quarkus.oidc.token.issuer=any (see KeyCloakHelper#polarisOidcEnv);
-                // the token signature is still validated. For production, pin KC_HOSTNAME instead.
-                .withEnv("KC_HOSTNAME_STRICT", "false")
                 .waitingFor(Wait.forHttp("/realms/master")
                                 .forPort(KEYCLOAK_PORT)
                                 .forStatusCode(200)
                                 .withStartupTimeout(Duration.ofMinutes(3)));
+            KeyCloakConfig kcConfig = new KeyCloakConfig(properties);
+            kcConfig.configUsing().entrySet().forEach(entry ->
+                keyCloak.withEnv(entry.getKey(), entry.getValue())
+            );
             // Fixed binding so the host-side KeyCloakAdmin can reach it at localhost:8080.
             keyCloak.setPortBindings(List.of(KEYCLOAK_PORT + ":" + KEYCLOAK_PORT));
             logger.info("Starting KeyCloak docker container. This usually takes about 20s, longer if " +
                         "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
-            new KeyCloakAdmin(properties)
+            new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME)
                 .registerPolarisUser(
                     USER_POLARIS_ID.getValueFrom(properties),
                     USER_POLARIS_SECRET.getValueFrom(properties));
@@ -212,7 +209,7 @@ public class ContainerHelper {
             POLARIS_ENDPOINT.getValueFrom(properties),
             properties,
             // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
-            tokenEndpoint(KEY_CLOAK_HOSTNAME.getValueFrom(properties))
+            tokenEndpoint(KEYCLOAK_HOSTNAME)
         );
         return  trinoConfig.catalogProperties(catalog);
     }
