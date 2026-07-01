@@ -13,9 +13,11 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.cdk.TFUtils;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -24,6 +26,7 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.TFUtils.POLARIS_PROVISIONERS;
+import static health.emrys.afon.cdk.TFUtils.clusterIpService;
 import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 
 public class GcpKubernetesPolaris extends GcpKubernetesStack {
@@ -36,25 +39,7 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
 
     public GcpKubernetesPolaris(Construct scope, String id, Properties properties) {
         super(scope, id, properties);
-        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
-            @Override
-            protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
-                return Service.Builder
-                    .create(GcpKubernetesPolaris.this, POLARIS_INTERNAL)
-                    .metadata(ServiceMetadata
-                                  .builder()
-                                  .name(POLARIS_INTERNAL)
-                                  .build())
-                    .dependsOn(List.of(polarisDeployment))
-                    .spec(ServiceSpec
-                              .builder()
-                              .selector(polarisLabels)
-                              .type("ClusterIP")
-                              .port(List.of(PolarisConfig.POLARIS_PORTS))
-                              .build())
-                    .build();
-            }
-        };
+        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
         var util = new TFUtils(
             this, gcpDomainName, TLS_SECRET_NAME, POLARIS_PORT
             , POLARIS_INTERNAL, POLARIS_INGRESS_NAME);

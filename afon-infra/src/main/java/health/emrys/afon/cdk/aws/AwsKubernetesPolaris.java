@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
 
 public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
@@ -26,11 +27,9 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsKubernetesPolaris.class);
 
     public static final SupportedCloudsEnum ID               = AWS;
-    public static final String              POLARIS_INTERNAL = "polaris-internal";
 
     protected final PolarisConfig polarisConfig;
     protected final AwsConstruct  cloudProvider;
-    protected final Service       polarisLB;
 
     public AwsKubernetesPolaris(@NotNull Construct scope,
                                 SupportedCloudsEnum id,
@@ -44,7 +43,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
                 return null; // no longer using an external service
             }
         };
-        polarisLB     = polarisConfig.deployPolaris(cloudProvider.getDependables());
+        polarisConfig.deployPolaris(cloudProvider.getDependables());
         Service.Builder
             .create(this, POLARIS_INTERNAL)
             .metadata(ServiceMetadata
