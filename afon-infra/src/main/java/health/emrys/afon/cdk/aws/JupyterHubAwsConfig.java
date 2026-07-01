@@ -52,7 +52,9 @@ public class JupyterHubAwsConfig extends JupyterHubConfig {
         cloudProvider.configureDNS(
             "JupyterHubAliasRecord",
             jupyterDnsZoneId,
-            jupyterDomain, cloudProvider.getLbRelease(), ingress);
+            jupyterDomain, cloudProvider.getLbRelease(),
+            ingress,
+            JUPYTER_INGRESS);
     }
 
     @Override
