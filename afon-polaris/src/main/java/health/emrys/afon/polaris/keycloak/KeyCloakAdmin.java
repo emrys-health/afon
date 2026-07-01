@@ -40,7 +40,7 @@ public class KeyCloakAdmin {
     private final String adminPassword;
 
     public KeyCloakAdmin(Properties properties) {
-        this(properties, KEYCLOAK_HOSTNAME.getValueFrom(properties));
+        this(properties, KC_HOSTNAME.getValueFrom(properties));
     }
 
     public KeyCloakAdmin(Properties properties, String kcHostname) {

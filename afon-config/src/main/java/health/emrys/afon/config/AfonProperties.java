@@ -62,7 +62,7 @@ public class AfonProperties {
     public static final AfonProperty AZURE_CLIENT_SECRET     = new AfonProperty("AZURE_CLIENT_SECRET");
 
     // Key Cloak
-    public static final AfonProperty KEYCLOAK_HOSTNAME           = new AfonProperty("KEYCLOAK_HOSTNAME");
+    public static final AfonProperty KC_HOSTNAME                 = new AfonProperty("KC_HOSTNAME");
     public static final AfonProperty KC_BOOTSTRAP_ADMIN_USERNAME = new AfonProperty("KC_BOOTSTRAP_ADMIN_USERNAME");
     public static final AfonProperty KC_BOOTSTRAP_ADMIN_PASSWORD = new AfonProperty("KC_BOOTSTRAP_ADMIN_PASSWORD");
     public static final AfonProperty KC_DB_URL                   = new AfonProperty("KC_DB_URL");
