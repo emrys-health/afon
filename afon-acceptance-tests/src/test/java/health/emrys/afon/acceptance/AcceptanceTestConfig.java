@@ -39,7 +39,7 @@ public class AcceptanceTestConfig {
         this.clientSecret = POLARIS_SECRET.getValueFrom(properties);
         this.properties   = properties;
         startContainers(properties);
-        this.polarisClient              = new KeyCloakPolarisClient(properties);
+        this.polarisClient              = new KeyCloakPolarisClient(properties, ContainerHelper.KEYCLOAK_HOSTNAME);
         this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
         this.awsTrino                   = new AwsCloudConfigForPolaris(properties) {
             @Override

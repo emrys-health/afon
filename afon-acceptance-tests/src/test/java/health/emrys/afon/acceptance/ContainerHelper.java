@@ -43,6 +43,7 @@ public class ContainerHelper {
      * Network alias used by Polaris (running on the same docker network) to reach KeyCloak.
      */
     private static final String KEYCLOAK_ALIAS = "keycloak";
+    public static final String KEYCLOAK_HOSTNAME = "localhost";
 
     /**
      * For testing.
@@ -93,7 +94,7 @@ public class ContainerHelper {
                         "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
-            new KeyCloakAdmin(properties)
+            new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME)
                 .registerPolarisUser(
                     USER_POLARIS_ID.getValueFrom(properties),
                     USER_POLARIS_SECRET.getValueFrom(properties));
@@ -208,7 +209,7 @@ public class ContainerHelper {
             POLARIS_ENDPOINT.getValueFrom(properties),
             properties,
             // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
-            tokenEndpoint(KEYCLOAK_HOSTNAME.getValueFrom(properties))
+            tokenEndpoint(KEYCLOAK_HOSTNAME)
         );
         return  trinoConfig.catalogProperties(catalog);
     }

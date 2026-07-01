@@ -40,7 +40,11 @@ public class KeyCloakAdmin {
     private final String adminPassword;
 
     public KeyCloakAdmin(Properties properties) {
-        this.baseUrl       = format("http://%s:%d", KEYCLOAK_HOSTNAME.getValueFrom(properties), KEYCLOAK_PORT);
+        this(properties, KEYCLOAK_HOSTNAME.getValueFrom(properties));
+    }
+
+    public KeyCloakAdmin(Properties properties, String kcHostname) {
+        this.baseUrl       = format("http://%s:%d", kcHostname, KEYCLOAK_PORT);
         this.adminUser     = KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties);
         this.adminPassword = KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties);
     }
