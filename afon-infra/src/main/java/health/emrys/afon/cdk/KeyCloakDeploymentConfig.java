@@ -71,7 +71,10 @@ public class KeyCloakDeploymentConfig extends Construct {
         envs.add(envVar("KC_HOSTNAME_STRICT", "true"));
         envs.add(envVar("KC_HOSTNAME_STRICT_BACKCHANNE", "false"));
         envs.add(envVar("KC_HTTP_ENABLED", "true"));
-        kcProperties.stream().forEach(x -> envFromSecret(x.getPropertyName(), SECRET_NAME, x.getPropertyName()));
+        envs.add(envVar(KC_HOSTNAME.getPropertyName(), KC_HOSTNAME.getValueFrom(properties)));
+        kcProperties.stream().forEach(x -> envs.add(
+            envFromSecret(x.getPropertyName(), SECRET_NAME, x.getPropertyName()))
+        );
 
         List<String> args = List.of("start");
         DeploymentSpecTemplateSpecContainer keyCloak = DeploymentSpecTemplateSpecContainer
