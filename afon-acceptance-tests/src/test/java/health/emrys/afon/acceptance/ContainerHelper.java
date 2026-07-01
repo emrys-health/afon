@@ -26,7 +26,7 @@ import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.*;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
-import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_IMAGE;
+import static health.emrys.security.keycloak.KeyCloakConfig.*;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;

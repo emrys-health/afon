@@ -4,12 +4,36 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.KC_BOOTSTRAP_ADMIN_USERNAME;
 import static health.emrys.afon.config.AfonProperties.KC_BOOTSTRAP_ADMIN_PASSWORD;
+import static health.emrys.afon.config.AfonProperties.KC_BOOTSTRAP_ADMIN_USERNAME;
 
 public class KeyCloakConfig {
 
-    public static final String KEYCLOAK_IMAGE              = "quay.io/keycloak/keycloak:26.6.3";
+    public static final int    KEYCLOAK_PORT  = 8080;
+    public static final String KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak:26.6.3";
+
+    /**
+     * The realm, client and user that Polaris trusts. The user/password is the credential that a
+     * Polaris client (Spark, Trino, the acceptance tests, ...) presents to KeyCloak to obtain a
+     * token that Polaris will accept.
+     */
+    public static final String KEYCLOAK_REALM         = "polaris";
+
+    /**
+     * Issuer / discovery URL as seen from inside the docker network (i.e. by Polaris).
+     */
+    public static String internalRealmUrl(String host) {
+        return String.format("http://%s:%d/realms/%s", host, KEYCLOAK_PORT, KEYCLOAK_REALM);
+    }
+
+    /**
+     * The OIDC token endpoint for the Polaris realm on the given host. This is where OAuth2 clients
+     * (the acceptance-test Polaris client, and the Spark/Iceberg REST catalog) obtain their tokens in
+     * external-auth mode - Polaris itself returns HTTP 501 from {@code /api/catalog/v1/oauth/tokens}.
+     */
+    public static String tokenEndpoint(String host) {
+        return internalRealmUrl(host) + "/protocol/openid-connect/token";
+    }
 
     private final Properties properties;
 

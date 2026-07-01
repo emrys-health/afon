@@ -1,19 +1,21 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonProperty;
+import health.emrys.security.keycloak.KeyCloakConfig;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.cdk.TFUtils.envFromSecret;
-import static health.emrys.afon.cdk.TFUtils.envVar;
+import static health.emrys.afon.cdk.TFUtils.*;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.security.keycloak.KeyCloakConfig.*;
 
@@ -35,6 +37,13 @@ import static health.emrys.security.keycloak.KeyCloakConfig.*;
 public class KeyCloakDeploymentConfig extends Construct {
 
     public static final String APP_NAME       = "keycloak";
+    public static final String KC_SVC         = "keycloak_service";
+    public static final ServiceSpecPort KC_PORT = ServiceSpecPort.builder()
+                                                                 .name("web")
+                                                                 .port(KEYCLOAK_PORT)
+                                                                 .targetPort("" + KEYCLOAK_PORT)
+                                                                 .protocol("TCP")
+                                                                 .build();
     private final       String SECRET_NAME    = "kcsecrets";
 
     public KeyCloakDeploymentConfig(
@@ -86,12 +95,16 @@ public class KeyCloakDeploymentConfig extends Construct {
             .build();
         List<ITerraformDependable> dependants = new ArrayList(cloudProvider.getDependables());
         dependants.add(kcSecrets);
-        DeploymentUtils.deploy(
+        Map<String, String> labels = Map.of("app", APP_NAME);
+        Deployment app = DeploymentUtils.deploy(
             this,
             dependants,
-            Map.of("app", APP_NAME),
+            labels,
             List.of(keyCloak),
             List.of(),
             APP_NAME);
+
+        dependants.add(app);
+        clusterIpService(dependants, labels, KC_SVC, List.of(KC_PORT), this);
     }
 }
