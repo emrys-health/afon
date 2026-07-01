@@ -37,7 +37,7 @@ import static health.emrys.security.keycloak.KeyCloakConfig.*;
 public class KeyCloakDeploymentConfig extends Construct {
 
     public static final String APP_NAME       = "keycloak";
-    public static final String KC_SVC         = "keycloak_service";
+    public static final String KC_SVC         = "keycloak-service";
     public static final ServiceSpecPort KC_PORT = ServiceSpecPort.builder()
                                                                  .name("web")
                                                                  .port(KEYCLOAK_PORT)
