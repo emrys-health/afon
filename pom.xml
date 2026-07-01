@@ -54,6 +54,7 @@
         <module>afon-spark-connect</module>
         <module>afon-snowflake</module>
         <module>afon-trino</module>
+        <module>afon-security</module>
     </modules>
 
     <dependencies>

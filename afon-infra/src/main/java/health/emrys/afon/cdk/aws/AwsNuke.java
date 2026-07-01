@@ -8,10 +8,10 @@ import org.jspecify.annotations.NonNull;
 import java.util.List;
 import java.util.Properties;
 
+import static health.emrys.afon.cdk.TFUtils.NO_POLARIS_FINALIZERS;
 import static health.emrys.afon.cdk.aws.AwsConstruct.NO_JUPYTER_LB;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
-import static health.emrys.afon.cdk.PolarisConfig.NO_POLARIS_FINALIZERS;
+import static health.emrys.afon.cdk.JupyterConfig.NO_JUPYTER_FINALIZERS;
 import static health.emrys.afon.cdk.aws.SparkClusterDeployment.NO_SPARK_LB_FINALIZERS;
 import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
 import static java.lang.String.format;

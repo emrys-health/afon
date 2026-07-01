@@ -49,7 +49,7 @@ public class JupyterAwsConfig extends JupyterConfig {
         cloudProvider.configureDNS(
             "JupyterAliasRecord",
             jupyterDnsZoneId, // aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click
-            jupyterDomain, cloudProvider.getLbRelease(), ingress);
+            jupyterDomain, cloudProvider.getLbRelease(), ingress, JUPYTER_INGRESS);
     }
 
     @Override

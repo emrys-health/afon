@@ -1,0 +1,47 @@
+package health.emrys.afon.cdk.aws;
+
+import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
+import health.emrys.afon.cdk.KeyCloakDeploymentConfig;
+import health.emrys.afon.config.AfonProperties;
+import org.jetbrains.annotations.NotNull;
+import software.constructs.Construct;
+
+import java.util.Properties;
+
+import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
+
+public class AwsKeyCloakDeploymentConfig extends KeyCloakDeploymentConfig<AwsConstruct> {
+    private final String dnsZone;
+    private final String certArn;
+    private final String hostname;
+
+    public AwsKeyCloakDeploymentConfig(
+        @NotNull Construct scope,
+        @NotNull Properties properties,
+        @NotNull AwsConstruct cloudProvider) {
+        super(scope, properties, cloudProvider);
+        dnsZone  = AfonProperties.AWS_KEYCLOAK_DNS_ZONE.getValueFrom(properties);
+        certArn  = AfonProperties.AWS_KEYCLOAK_CERT_ARN.getValueFrom(properties);
+        hostname = AfonProperties.KC_HOSTNAME.getValueFrom(properties);
+    }
+
+    @Override
+    protected void configureHttpsAndDNS() {
+        IngressV1 ingress = cloudProvider.createHttpsIngress(
+            "keycloak-https-ingress",
+            KEYCLOAK_INGRESS,
+            certArn,
+            hostname,
+            KC_SVC,
+            KEYCLOAK_PORT,
+            cloudProvider.getSubnetIds());
+
+        cloudProvider.configureDNS(
+            "KeyCloakAliasRecord",
+            dnsZone, // aws route53 list-hosted-zones-by-name --dns-name emrysjupyter.click
+            hostname,
+            cloudProvider.getLbRelease(),
+            ingress,
+            KEYCLOAK_INGRESS);
+    }
+}
