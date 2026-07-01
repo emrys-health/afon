@@ -68,6 +68,7 @@ public class AfonProperties {
     public static final AfonProperty KC_DB_URL                   = new AfonProperty("KC_DB_URL");
     public static final AfonProperty KC_DB_USERNAME              = new AfonProperty("KC_DB_USERNAME");
     public static final AfonProperty KC_DB_PASSWORD              = new AfonProperty("KC_DB_PASSWORD");
+    public static final AfonProperty KC_DB                       = new AfonProperty("KC_DB");
 
     // Polaris
     public static final AfonProperty USER_POLARIS_ID     = new AfonProperty("USER_POLARIS_ID");

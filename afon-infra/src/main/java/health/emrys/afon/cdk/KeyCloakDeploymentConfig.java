@@ -2,17 +2,18 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
+import health.emrys.afon.config.AfonProperty;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.TFUtils.envFromSecret;
+import static health.emrys.afon.cdk.TFUtils.envVar;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.security.keycloak.KeyCloakConfig.*;
 
@@ -33,8 +34,6 @@ import static health.emrys.security.keycloak.KeyCloakConfig.*;
  */
 public class KeyCloakDeploymentConfig extends Construct {
 
-    public static final String ADMIN_USER     = "admin-user";
-    public static final String ADMIN_PASSWORD = "admin-password";
     public static final String APP_NAME       = "keycloak";
     private final       String SECRET_NAME    = "kcsecrets";
 
@@ -43,11 +42,18 @@ public class KeyCloakDeploymentConfig extends Construct {
         @NotNull Properties properties,
         @NotNull CloudProvider cloudProvider) {
         super(scope, APP_NAME + "_scope");
-        String adminUser     = KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties);
-        String adminPassword = KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties);
-        String dbUrl         = KC_DB_URL.getValueFrom(properties);
-        String dbUser        = KC_DB_USERNAME.getValueFrom(properties);
-        String dbPassword    = KC_DB_PASSWORD.getValueFrom(properties);
+
+        Set<AfonProperty> kcProperties = Set.of(
+            KC_BOOTSTRAP_ADMIN_USERNAME,
+            KC_BOOTSTRAP_ADMIN_PASSWORD,
+            KC_DB_URL,
+            KC_DB_USERNAME,
+            KC_DB_PASSWORD);
+
+        Map<String, String> secretsMap = kcProperties.stream().collect(Collectors.toMap(
+            AfonProperty::getPropertyName,
+            x -> x.getValueFrom(properties)
+        ));
 
         Secret kcSecrets = Secret.Builder
             .create(scope, SECRET_NAME)
@@ -56,14 +62,16 @@ public class KeyCloakDeploymentConfig extends Construct {
                           .name(SECRET_NAME)
                           .namespace("default")
                           .build())
-            .data(Map.of(
-                ADMIN_USER, adminUser,
-                ADMIN_PASSWORD, adminPassword,
-                KC_DB_URL.getPropertyName(), dbUrl,
-                KC_DB_USERNAME.getPropertyName(), dbUser,
-                KC_DB_PASSWORD.getPropertyName(), dbPassword
-            ))
+            .data(secretsMap)
             .build();
+
+        List<DeploymentSpecTemplateSpecContainerEnv> envs = new ArrayList<>();
+        envs.add(envVar(KC_DB.getPropertyName(), KC_DB.getValueFrom(properties)));
+        envs.add(envVar("KC_PROXY", "edge"));
+        envs.add(envVar("KC_HOSTNAME_STRICT", "true"));
+        envs.add(envVar("KC_HOSTNAME_STRICT_BACKCHANNE", "false"));
+        envs.add(envVar("KC_HTTP_ENABLED", "true"));
+        kcProperties.stream().forEach(x -> envFromSecret(x.getPropertyName(), SECRET_NAME, x.getPropertyName()));
 
         List<String> args = List.of("start");
         DeploymentSpecTemplateSpecContainer keyCloak = DeploymentSpecTemplateSpecContainer
@@ -71,13 +79,7 @@ public class KeyCloakDeploymentConfig extends Construct {
             .name(APP_NAME)
             .image(KEYCLOAK_IMAGE)
             .args(args)
-            .env(List.of(
-                envFromSecret(KC_BOOTSTRAP_ADMIN_USERNAME.getPropertyName(), SECRET_NAME, ADMIN_USER),
-                envFromSecret(KC_BOOTSTRAP_ADMIN_PASSWORD.getPropertyName(), SECRET_NAME, ADMIN_PASSWORD),
-                envFromSecret(KC_DB_URL.getPropertyName(), SECRET_NAME, KC_DB_URL.getPropertyName()),
-                envFromSecret(KC_DB_USERNAME.getPropertyName(), SECRET_NAME, KC_DB_USERNAME.getPropertyName()),
-                envFromSecret(KC_DB_PASSWORD.getPropertyName(), SECRET_NAME, KC_DB_PASSWORD.getPropertyName())
-            ))
+            .env(envs)
             .build();
         List<ITerraformDependable> dependants = new ArrayList(cloudProvider.getDependables());
         dependants.add(kcSecrets);
