@@ -34,7 +34,7 @@ import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
  * -e KC_HTTP_ENABLED=true \
  * quay.io/keycloak/keycloak:26.6.3 start
  */
-public abstract class KeyCloakDeploymentConfig extends Construct {
+public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends Construct {
 
     public static final String          APP_NAME         = "keycloak";
     public static final String          KC_SVC           = "keycloak-service";
@@ -46,12 +46,14 @@ public abstract class KeyCloakDeploymentConfig extends Construct {
                                                                           .build();
     private final       String          SECRET_NAME      = "kcsecrets";
     protected final     String          KEYCLOAK_INGRESS = "keycloak-ingress";
+    protected final     T               cloudProvider;
 
     public KeyCloakDeploymentConfig(
         @NotNull Construct scope,
         @NotNull Properties properties,
-        @NotNull CloudProvider cloudProvider) {
+        @NotNull T cloudProvider) {
         super(scope, APP_NAME + "_scope");
+        this.cloudProvider = cloudProvider;
 
         Set<AfonProperty> kcProperties = Set.of(
             KC_BOOTSTRAP_ADMIN_USERNAME,
@@ -107,7 +109,6 @@ public abstract class KeyCloakDeploymentConfig extends Construct {
 
         dependants.add(app);
         clusterIpService(dependants, labels, KC_SVC, List.of(KC_PORT), this);
-        configureHttpsAndDNS();
     }
 
     protected abstract void configureHttpsAndDNS();

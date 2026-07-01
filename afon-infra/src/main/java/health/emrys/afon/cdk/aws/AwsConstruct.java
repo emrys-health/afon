@@ -49,6 +49,8 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.AbstractConstruct;
 import health.emrys.afon.config.AfonProperties;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.constructs.Construct;
 
 import java.util.*;
@@ -65,6 +67,8 @@ import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
 
 public class AwsConstruct extends AbstractConstruct {
+
+    private static final Logger log = LoggerFactory.getLogger(AwsConstruct.class);
 
     private final String                     clusterPolicyArn;
     final static  String                     NO_JUPYTER_LB = """
@@ -837,6 +841,8 @@ public class AwsConstruct extends AbstractConstruct {
         final List<String> subnetIds) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
+        String subnetIdsCSV = subnetIds.stream().collect(Collectors.joining(","));
+        log.info("subnetIDs = {}, certArn = {}, hostname = {}", subnetIdsCSV, certArn, hostName);
         Map<String, String> albAnnotations = Map.of(
             // 1. Tell the LBC to create an Application Load Balancer (ALB)
             "kubernetes.io/ingress.class", "alb",
@@ -857,7 +863,7 @@ public class AwsConstruct extends AbstractConstruct {
             "alb.ingress.kubernetes.io/scheme", "internet-facing",
             "external-dns.alpha.kubernetes.io/hostname", hostName,
 
-            "alb.ingress.kubernetes.io/subnets", subnetIds.stream().collect(Collectors.joining(","))
+            "alb.ingress.kubernetes.io/subnets", subnetIdsCSV
                                                    );
 
         var sslServicePort = IngressV1SpecRuleHttpPathBackendService
