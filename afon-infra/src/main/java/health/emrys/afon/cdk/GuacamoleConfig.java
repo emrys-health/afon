@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static health.emrys.afon.cdk.TFUtils.clusterIpService;
 import static health.emrys.afon.cdk.TFUtils.envVar;
 
 /**
@@ -141,23 +142,13 @@ public class GuacamoleConfig {
                 List.of(guacamoleHomeVolume),
                 "guacamole");
 
-        Service.Builder.create(scope, SVC_NAME)
-                       .metadata(ServiceMetadata.builder()
-                                                .name(SVC_NAME)
-                                                .namespace("default")
-                                                .build())
-                       .dependsOn(deps)
-                       .spec(ServiceSpec.builder()
-                                        .selector(LABELS)
-                                        .type("ClusterIP")
-                                        .port(List.of(ServiceSpecPort.builder()
-                                                                     .name("http")
-                                                                     .port(WEB_PORT)
-                                                                     .targetPort(String.valueOf(WEB_PORT))
-                                                                     .protocol("TCP")
-                                                                     .build()))
-                                        .build())
-                       .build();
+        List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
+                                                             .name("http")
+                                                             .port(WEB_PORT)
+                                                             .targetPort(String.valueOf(WEB_PORT))
+                                                             .protocol("TCP")
+                                                             .build());
+        clusterIpService(deps, LABELS, SVC_NAME, ports, scope);
     }
 
     private static String buildUserMappingXml(String host, String vncPassword, List<Session> sessions) {
