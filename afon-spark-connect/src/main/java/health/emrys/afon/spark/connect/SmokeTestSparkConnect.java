@@ -1,6 +1,8 @@
 package health.emrys.afon.spark.connect;
 
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Need to add these JVM args to run:
@@ -9,6 +11,8 @@ import org.apache.spark.sql.SparkSession;
  * <pre>kubectl port-forward pod/spark-connector-0-driver 15002:15002</pre>
  */
 public class SmokeTestSparkConnect {
+
+    private static final Logger log = LoggerFactory.getLogger(SmokeTestSparkConnect.class);
 
     /**
      * Note that the `;token=...` string just must match with PreSharedKeyAuthenticationInterceptor
@@ -27,7 +31,9 @@ mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRe
                 .appName("test2")
                 .remote("sc://localhost:15002/;token=deadbeef")
                 .getOrCreate();
-        spark.read().table("aws.acceptancetests.AwsAccessSpec251117511401").show();
+        String tableName = "aws.acceptancetests.AwsAccessSpec251117511401"; // aws_trino.acceptancetests.AwsAccessSpec
+        log.info("Reading table {}", tableName);
+        spark.read().table(tableName).show();
     }
 
 }

@@ -428,6 +428,12 @@ public class AwsConstruct extends AbstractConstruct {
                 createValue("enableIPv4Masquerade", "true"),
                 createValue("ipv4NativeRoutingCIDR", vpc.getCidrBlock()),
 
+                // FQDN-based network policy (L7 DNS): toEndpoints/toFQDNs rules need
+                // the DNS proxy, which is gated by the cilium-config key
+                // `enable-fqdn-policy`. The chart writes arbitrary ConfigMap keys via
+                // the `extraConfig` map, so set it there.
+                createStringValue("extraConfig.enable-fqdn-policy", "true"),
+
                 // 3. Solving the "Pending" Issue (Tolerations)
                 // This allows Cilium to run even if the node is "NotReady"
                 createValue("tolerations[0].operator", "Exists"),
@@ -660,6 +666,20 @@ public class AwsConstruct extends AbstractConstruct {
         return ReleaseSet.builder()
                          .name(name)
                          .value(value)
+                         .build();
+    }
+
+    /**
+     * Like {@link #createValue} but forces Helm to treat the value as a string
+     * (equivalent to {@code --set-string}). Needed for values that land verbatim in
+     * a ConfigMap's {@code data}, whose entries must be strings: an unquoted {@code true}
+     * renders as a YAML bool and Kubernetes then rejects the ConfigMap.
+     */
+    private static ReleaseSet createStringValue(String name, String value) {
+        return ReleaseSet.builder()
+                         .name(name)
+                         .value(value)
+                         .type("string")
                          .build();
     }
 
