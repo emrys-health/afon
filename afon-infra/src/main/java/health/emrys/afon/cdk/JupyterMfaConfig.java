@@ -12,6 +12,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static health.emrys.afon.cdk.TFUtils.envFromSecret;
 import static health.emrys.afon.config.AfonProperties.*;
 import static java.lang.String.format;
 

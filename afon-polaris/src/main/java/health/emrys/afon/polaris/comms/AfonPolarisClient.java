@@ -36,8 +36,8 @@ public class AfonPolarisClient {
     static final String CONTENT_TYPE = "Content-Type";
 
     private final String endpoint;
-    private final String clientId;
-    private final String clientSecret;
+    protected final String clientId;
+    protected final String clientSecret;
 
     public static @NonNull String getTokenUri(String endpoint) {
         return format("%s/api/catalog/v1/oauth/tokens", endpoint);
@@ -173,7 +173,7 @@ public class AfonPolarisClient {
         request.setHeader("Authorization", "Bearer " + accessToken);
     }
 
-    private static String parseAccessToken(ClassicHttpResponse response) throws IOException {
+    protected static String parseAccessToken(ClassicHttpResponse response) throws IOException {
         ObjectMapper        mapper                  = JsonMapper
             .builder().enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION).build();
         Map<String, Object> tokenResponse           = mapper.readValue(response.getEntity().getContent(), Map.class);
@@ -181,7 +181,7 @@ public class AfonPolarisClient {
         return accessTokenFromResponse;
     }
 
-    private ClassicHttpResponse makeCall(String payload,
+    protected ClassicHttpResponse makeCall(String payload,
                                          BasicClassicHttpRequest post) throws IOException {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             post.setEntity(new StringEntity(payload));
