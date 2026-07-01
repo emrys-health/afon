@@ -32,8 +32,4 @@ public class JupyterKeyCloakConfig extends JupyterMfaConfig {
         // TODO
     }
 
-    @Override
-    protected @NonNull List<String> emailArgs(Properties properties) {
-        return List.of();
-    }
 }
