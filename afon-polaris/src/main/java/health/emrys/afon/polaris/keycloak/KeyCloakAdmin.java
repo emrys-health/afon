@@ -19,7 +19,8 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.*;
+import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
+import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -40,9 +41,13 @@ public class KeyCloakAdmin {
     private final String adminPassword;
 
     public KeyCloakAdmin(Properties properties) {
-        this.baseUrl       = format("http://%s:%d", KEY_CLOAK_HOSTNAME.getValueFrom(properties), KEYCLOAK_PORT);
-        this.adminUser     = KEYCLOAK_ADMIN.getValueFrom(properties);
-        this.adminPassword = KEYCLOAK_ADMIN_PASSWORD.getValueFrom(properties);
+        this(properties, KC_HOSTNAME.getValueFrom(properties));
+    }
+
+    public KeyCloakAdmin(Properties properties, String kcHostname) {
+        this.baseUrl       = format("http://%s:%d", kcHostname, KEYCLOAK_PORT);
+        this.adminUser     = KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties);
+        this.adminPassword = KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties);
     }
 
     /**
