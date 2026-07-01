@@ -34,6 +34,8 @@ public class AfonProperties {
     public static final AfonProperty AWS_JUPYTER_CERT_ARN         = new AfonProperty("AWS_JUPYTER_CERT_ARN");
     public static final AfonProperty AWS_POLARIS_DNS_ZONE         = new AfonProperty("AWS_POLARIS_DNS_ZONE");
     public static final AfonProperty AWS_JUPYTER_DNS_ZONE         = new AfonProperty("AWS_JUPYTER_DNS_ZONE");
+    public static final AfonProperty AWS_KEYCLOAK_DNS_ZONE        = new AfonProperty("AWS_KEYCLOAK_DNS_ZONE");
+    public static final AfonProperty AWS_KEYCLOAK_CERT_ARN        = new AfonProperty("AWS_KEYCLOAK_CERT_ARN");
 
     // GCP
     public static final AfonProperty GCP_BUCKET_NAME                = new AfonProperty("GCP_BUCKET_NAME");

@@ -8,7 +8,6 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonProperty;
-import health.emrys.security.keycloak.KeyCloakConfig;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
 
@@ -17,34 +16,36 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.TFUtils.*;
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.security.keycloak.KeyCloakConfig.*;
+import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_IMAGE;
+import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
 
 /**
  * These environment variable, although inappropriate for Docker, get the app to start:
  * docker run  -it -p 127.0.0.1:8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
-      -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
-      -e KC_DB_URL=jdbc:postgresql://polaris-db.crsocia0o0bd.eu-west-2.rds.amazonaws.com:5432/keycloak \
-      -e KC_DB_USERNAME=postgres \
-      -e KC_DB_PASSWORD=3mry5af0n \
-      -e KC_DB=postgres \
-      -e KC_PROXY=edge \
-      -e KC_HOSTNAME=localhost \
-      -e KC_HOSTNAME_STRICT=true \
-      -e KC_HOSTNAME_STRICT_BACKCHANNEL=false \
-      -e KC_HTTP_ENABLED=true \
-      quay.io/keycloak/keycloak:26.6.3 start
+ * -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+ * -e KC_DB_URL=jdbc:postgresql://polaris-db.crsocia0o0bd.eu-west-2.rds.amazonaws.com:5432/keycloak \
+ * -e KC_DB_USERNAME=postgres \
+ * -e KC_DB_PASSWORD=3mry5af0n \
+ * -e KC_DB=postgres \
+ * -e KC_PROXY=edge \
+ * -e KC_HOSTNAME=localhost \
+ * -e KC_HOSTNAME_STRICT=true \
+ * -e KC_HOSTNAME_STRICT_BACKCHANNEL=false \
+ * -e KC_HTTP_ENABLED=true \
+ * quay.io/keycloak/keycloak:26.6.3 start
  */
-public class KeyCloakDeploymentConfig extends Construct {
+public abstract class KeyCloakDeploymentConfig extends Construct {
 
-    public static final String APP_NAME       = "keycloak";
-    public static final String KC_SVC         = "keycloak-service";
-    public static final ServiceSpecPort KC_PORT = ServiceSpecPort.builder()
-                                                                 .name("web")
-                                                                 .port(KEYCLOAK_PORT)
-                                                                 .targetPort("" + KEYCLOAK_PORT)
-                                                                 .protocol("TCP")
-                                                                 .build();
-    private final       String SECRET_NAME    = "kcsecrets";
+    public static final String          APP_NAME         = "keycloak";
+    public static final String          KC_SVC           = "keycloak-service";
+    public static final ServiceSpecPort KC_PORT          = ServiceSpecPort.builder()
+                                                                          .name("web")
+                                                                          .port(KEYCLOAK_PORT)
+                                                                          .targetPort("" + KEYCLOAK_PORT)
+                                                                          .protocol("TCP")
+                                                                          .build();
+    private final       String          SECRET_NAME      = "kcsecrets";
+    protected final     String          KEYCLOAK_INGRESS = "keycloak-ingress";
 
     public KeyCloakDeploymentConfig(
         @NotNull Construct scope,
@@ -106,5 +107,8 @@ public class KeyCloakDeploymentConfig extends Construct {
 
         dependants.add(app);
         clusterIpService(dependants, labels, KC_SVC, List.of(KC_PORT), this);
+        configureHttpsAndDNS();
     }
+
+    protected abstract void configureHttpsAndDNS();
 }
