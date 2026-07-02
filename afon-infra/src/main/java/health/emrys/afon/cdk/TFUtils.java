@@ -48,6 +48,30 @@ public class TFUtils {
                                                     String serviceName,
                                                     List<ServiceSpecPort> ports,
                                                     Construct scope) {
+        return typedService("ClusterIP", dependsOn, labels, serviceName, ports, scope);
+    }
+
+    /**
+     * A NodePort service is required when the backing workload is exposed via the AWS Load
+     * Balancer Controller with the default {@code target-type: instance}: the ALB forwards to a
+     * node port on each EC2 node, so a ClusterIP service (which has no node port) makes the LBC
+     * fail with "TargetGroup port is empty" and the ALB then serves "Backend service does not
+     * exist".
+     */
+    public static @NonNull Service nodePortService(java.util.List<? extends ITerraformDependable> dependsOn,
+                                                   Map<String, String> labels,
+                                                   String serviceName,
+                                                   List<ServiceSpecPort> ports,
+                                                   Construct scope) {
+        return typedService("NodePort", dependsOn, labels, serviceName, ports, scope);
+    }
+
+    private static @NonNull Service typedService(String type,
+                                                 java.util.List<? extends ITerraformDependable> dependsOn,
+                                                 Map<String, String> labels,
+                                                 String serviceName,
+                                                 List<ServiceSpecPort> ports,
+                                                 Construct scope) {
         return Service.Builder
             .create(scope, serviceName)
             .metadata(ServiceMetadata
@@ -58,7 +82,7 @@ public class TFUtils {
             .spec(ServiceSpec
                       .builder()
                       .selector(labels)
-                      .type("ClusterIP")
+                      .type(type)
                       .port(ports)
                       .build())
             .build();
