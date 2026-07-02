@@ -4,6 +4,7 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
+import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
 
 import java.util.Map;
 import java.util.Properties;
@@ -28,10 +29,12 @@ public class PolarisClusterCredentials implements ClusterCredentials {
         System.out.println(app.getAccessToken());
     }
 
+    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+
     private final String accessToken;
 
     public PolarisClusterCredentials(String host) {
-        accessToken = new AfonPolarisClient(host, properties).getAccessToken();
+        accessToken = clientFactory.getPolarisClient(host, properties).getAccessToken();
     }
 
     @Override

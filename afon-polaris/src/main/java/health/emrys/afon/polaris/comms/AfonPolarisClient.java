@@ -43,17 +43,17 @@ public class AfonPolarisClient {
         return format("%s/api/catalog/v1/oauth/tokens", endpoint);
     }
 
-    public AfonPolarisClient(Properties properties) {
+    AfonPolarisClient(Properties properties) {
         this(properties, "http");
     }
 
-    public AfonPolarisClient(String httpsHost, Properties properties) {
+    AfonPolarisClient(String httpsHost, Properties properties) {
         this(format("https://%s", httpsHost),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
     }
 
-    public AfonPolarisClient(Properties properties, String protocol) {
+    AfonPolarisClient(Properties properties, String protocol) {
         this(format("%s://%s", protocol, POLARIS_ENDPOINT.getValueFrom(properties)),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
