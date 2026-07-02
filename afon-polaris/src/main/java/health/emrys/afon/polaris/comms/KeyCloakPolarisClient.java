@@ -2,6 +2,7 @@ package health.emrys.afon.polaris.comms;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.ConfigUtils;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.ConfigUtils.protocolFor;
 import static health.emrys.security.keycloak.KeyCloakConfig.tokenEndpoint;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -51,13 +53,6 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
         // Use the same KeyCloak host that Polaris discovered, so the token's issuer matches and
         // Polaris accepts the bearer token.
         this.keyCloakTokenUri = tokenEndpoint(kcHostname, protocolFor(kcHostname));
-    }
-
-    private String protocolFor(String kcHostname) {
-        if (kcHostname.toLowerCase().contains("localhost")) {
-            return "http";
-        }
-        return "https";
     }
 
     /**
