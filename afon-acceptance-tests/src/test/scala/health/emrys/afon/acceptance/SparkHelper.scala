@@ -18,7 +18,7 @@ object SparkHelper {
   // credentials (root/s3cr3t); Polaris maps the token's 'azp' claim back to the 'root' principal. The
   // Polaris-minted 'principal' credentials are unknown to KeyCloak, so they cannot be used here.
   private val keyCloakTokenUri =
-    tokenEndpoint(ContainerHelper.KEYCLOAK_HOSTNAME)
+    tokenEndpoint(ContainerHelper.KEYCLOAK_HOSTNAME, ContainerHelper.KEYCLOACK_PROTOCOL)
 
   val sparkWarehouse = new KeyCloakSparkWarehouseConfig(
     instance.getClientId,
