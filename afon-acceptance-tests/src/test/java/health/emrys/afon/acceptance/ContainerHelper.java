@@ -42,8 +42,9 @@ public class ContainerHelper {
     /**
      * Network alias used by Polaris (running on the same docker network) to reach KeyCloak.
      */
-    private static final String KEYCLOAK_ALIAS = "keycloak";
-    public static final String KEYCLOAK_HOSTNAME = "localhost";
+    private static final String KEYCLOAK_ALIAS     = "keycloak";
+    public static final  String KEYCLOAK_HOSTNAME  = "localhost";
+    public static final  String KEYCLOACK_PROTOCOL = "http";
 
     /**
      * For testing.
@@ -86,7 +87,7 @@ public class ContainerHelper {
                                 .withStartupTimeout(Duration.ofMinutes(3)));
             KeyCloakConfig kcConfig = new KeyCloakConfig(properties);
             kcConfig.configUsing().entrySet().forEach(entry ->
-                keyCloak.withEnv(entry.getKey(), entry.getValue())
+                                                          keyCloak.withEnv(entry.getKey(), entry.getValue())
             );
             // Fixed binding so the host-side KeyCloakAdmin can reach it at localhost:8080.
             keyCloak.setPortBindings(List.of(KEYCLOAK_PORT + ":" + KEYCLOAK_PORT));
@@ -109,7 +110,7 @@ public class ContainerHelper {
                 cloudProvider ->
                     config.sparkConfigs(cloudProvider).entrySet().stream().map(
                         entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
-                                                                 );
+            );
             String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger" +
                              ".netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
             String envString = envs.collect(Collectors.joining(" "))
@@ -150,7 +151,7 @@ public class ContainerHelper {
             });
             // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
             polarisOidcEnv(
-                internalRealmUrl(KEYCLOAK_ALIAS),
+                internalRealmUrl(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL),
                 USER_POLARIS_ID.getValueFrom(properties),
                 USER_POLARIS_SECRET.getValueFrom(properties)).forEach(polaris::withEnv);
             Map.of(
@@ -158,7 +159,7 @@ public class ContainerHelper {
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL", "DEBUG",
                    "QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL", "DEBUG"
-                  )
+               )
                .entrySet()
                .forEach(x -> polaris.withEnv(x.getKey(), x.getValue()));
 
@@ -203,15 +204,16 @@ public class ContainerHelper {
         return config;
     }
 
-    public static String trinoLocalConfig(Properties properties,
-                                          SupportedCloudsEnum catalog) {
+    public static String trinoLocalConfig(
+        Properties properties,
+        SupportedCloudsEnum catalog) {
         TrinoServerConfiguration trinoConfig = new KeyCloakTrinoServerConfiguration(
             POLARIS_ENDPOINT.getValueFrom(properties),
             properties,
             // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
-            tokenEndpoint(KEYCLOAK_HOSTNAME)
+            tokenEndpoint(KEYCLOAK_HOSTNAME, KEYCLOACK_PROTOCOL)
         );
-        return  trinoConfig.catalogProperties(catalog);
+        return trinoConfig.catalogProperties(catalog);
     }
 
 }

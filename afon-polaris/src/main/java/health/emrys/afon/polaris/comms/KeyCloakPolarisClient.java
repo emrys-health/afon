@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.*;
 import static health.emrys.security.keycloak.KeyCloakConfig.tokenEndpoint;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -42,7 +41,8 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
         super(properties);
         // Use the same KeyCloak host that Polaris discovered, so the token's issuer matches and
         // Polaris accepts the bearer token.
-        this.keyCloakTokenUri = tokenEndpoint(KC_HOSTNAME.getValueFrom(properties));
+        String kcHostname = KC_HOSTNAME.getValueFrom(properties);
+        this.keyCloakTokenUri = tokenEndpoint(kcHostname, protocolFor(kcHostname));
     }
 
     public KeyCloakPolarisClient(Properties properties, String kcHostname) {
@@ -50,7 +50,14 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
         super(properties);
         // Use the same KeyCloak host that Polaris discovered, so the token's issuer matches and
         // Polaris accepts the bearer token.
-        this.keyCloakTokenUri = tokenEndpoint(kcHostname);
+        this.keyCloakTokenUri = tokenEndpoint(kcHostname, protocolFor(kcHostname));
+    }
+
+    private String protocolFor(String kcHostname) {
+        if (kcHostname.toLowerCase().contains("localhost")) {
+            return "http";
+        }
+        return "https";
     }
 
     /**

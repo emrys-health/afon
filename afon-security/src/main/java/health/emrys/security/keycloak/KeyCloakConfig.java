@@ -22,8 +22,12 @@ public class KeyCloakConfig {
     /**
      * Issuer / discovery URL as seen from inside the docker network (i.e. by Polaris).
      */
-    public static String internalRealmUrl(String host) {
-        return String.format("http://%s:%d/realms/%s", host, KEYCLOAK_PORT, KEYCLOAK_REALM);
+    public static String internalRealmUrl(String host, String protocol) {
+        return String.format("%s://%s:%d/realms/%s",
+                             protocol,
+                             host,
+                             KEYCLOAK_PORT,
+                             KEYCLOAK_REALM);
     }
 
     /**
@@ -31,8 +35,8 @@ public class KeyCloakConfig {
      * (the acceptance-test Polaris client, and the Spark/Iceberg REST catalog) obtain their tokens in
      * external-auth mode - Polaris itself returns HTTP 501 from {@code /api/catalog/v1/oauth/tokens}.
      */
-    public static String tokenEndpoint(String host) {
-        return internalRealmUrl(host) + "/protocol/openid-connect/token";
+    public static String tokenEndpoint(String host, String http) {
+        return internalRealmUrl(host, http) + "/protocol/openid-connect/token";
     }
 
     private final Properties properties;
