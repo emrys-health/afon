@@ -3,6 +3,8 @@ package health.emrys.afon.polaris.keycloak;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.ConfigUtils;
+import health.emrys.security.keycloak.KeyCloakConfig;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -19,6 +21,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.ConfigUtils.protocolFor;
 import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
 import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 import static java.lang.String.format;
@@ -45,9 +48,10 @@ public class KeyCloakAdmin {
     }
 
     public KeyCloakAdmin(Properties properties, String kcHostname) {
-        this.baseUrl       = format("http://%s:%d", kcHostname, KEYCLOAK_PORT);
+        this.baseUrl       = KeyCloakConfig.urlFor(kcHostname, protocolFor(kcHostname));
         this.adminUser     = KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties);
         this.adminPassword = KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties);
+        logger.info("KeyCloak Admin URL: {}", this.baseUrl);
     }
 
     /**
