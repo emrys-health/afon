@@ -11,7 +11,7 @@ public class AfonPolarisClientFactory {
     private AfonPolarisClientFactory() {}
 
     public AfonPolarisClient getPolarisClient(Properties properties) {
-        return new AfonPolarisClient(properties, "http");
+        return new AfonPolarisClient(properties);
     }
 
     public AfonPolarisClient getPolarisClient(String httpsHost, Properties properties) {
