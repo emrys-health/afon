@@ -6,6 +6,7 @@ import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
+import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
@@ -23,6 +24,8 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class PurgeAndPopulatePolaris {
 
     private static final Logger log = getLogger(PurgeAndPopulatePolaris.class);
+
+    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
 
     public static void main(String[] args) throws Exception {
         String host = args[0];
@@ -52,7 +55,7 @@ public class PurgeAndPopulatePolaris {
                       String table) throws IOException {
         log.info("Attempting to delete table {} in warehouse {} from namespace {} in {}",
                  table, warehouse, namespace, domainName);
-        var    client      = new AfonPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
+        var    client      = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
         String accessToken = client.getAccessToken();
         client.delete(tableURI(warehouse.toString(), namespace, table), accessToken);
         client.delete(namespaceURI(warehouse.toString(), namespace), accessToken);
@@ -66,7 +69,7 @@ public class PurgeAndPopulatePolaris {
     private void purgeRecursivelyForAllCatalogs(String domainName, String namespace) {
         log.info("Deleting namespace {} from {} for all warehouses if they're present",
                  namespace, domainName);
-        var client = new AfonPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
+        var client = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
 
         for (SupportedCloudsEnum warehouse : List.of(AZURE, AWS, GCP)) {
             try {
