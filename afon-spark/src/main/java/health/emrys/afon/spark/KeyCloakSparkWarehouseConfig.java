@@ -1,8 +1,14 @@
 package health.emrys.afon.spark;
 
+import health.emrys.afon.config.ConfigUtils;
+import health.emrys.security.keycloak.KeyCloakConfig;
+
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.ConfigUtils.protocolFor;
 import static java.lang.String.format;
 
 /**
@@ -22,13 +28,22 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
 
     private final String oauth2ServerUri;
 
+    public KeyCloakSparkWarehouseConfig(Properties properties) {
+        super(POLARIS_ID.getValueFrom(properties),
+              POLARIS_SECRET.getValueFrom(properties),
+              POLARIS_ENDPOINT.getValueFrom(properties),
+              protocolFor(POLARIS_ENDPOINT.getValueFrom(properties))
+              );
+        String kcHost = KC_HOSTNAME.getValueFrom(properties);
+        this.oauth2ServerUri = KeyCloakConfig.tokenEndpoint(kcHost, protocolFor(kcHost));
+    }
     public KeyCloakSparkWarehouseConfig(
         String clientId,
         String clientSecret,
-        String host,
+        String polarisHost,
         String polarisProtocol,
         String oauth2ServerUri) {
-        super(clientId, clientSecret, host, polarisProtocol);
+        super(clientId, clientSecret, polarisHost, polarisProtocol);
         this.oauth2ServerUri = oauth2ServerUri;
     }
 
