@@ -26,25 +26,20 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
 
     private static final String KEYCLOAK_SCOPE = "openid";
 
+    private static String kcUriFor(Properties properties) {
+        String kcHost = KC_HOSTNAME.getValueFrom(properties);
+        return KeyCloakConfig.tokenEndpoint(kcHost, protocolFor(kcHost));
+    }
+
     private final String oauth2ServerUri;
 
-    public KeyCloakSparkWarehouseConfig(Properties properties) {
+    KeyCloakSparkWarehouseConfig(Properties properties) {
         super(POLARIS_ID.getValueFrom(properties),
               POLARIS_SECRET.getValueFrom(properties),
               POLARIS_ENDPOINT.getValueFrom(properties),
               protocolFor(POLARIS_ENDPOINT.getValueFrom(properties))
               );
-        String kcHost = KC_HOSTNAME.getValueFrom(properties);
-        this.oauth2ServerUri = KeyCloakConfig.tokenEndpoint(kcHost, protocolFor(kcHost));
-    }
-    public KeyCloakSparkWarehouseConfig(
-        String clientId,
-        String clientSecret,
-        String polarisHost,
-        String polarisProtocol,
-        String oauth2ServerUri) {
-        super(clientId, clientSecret, polarisHost, polarisProtocol);
-        this.oauth2ServerUri = oauth2ServerUri;
+        this.oauth2ServerUri = kcUriFor(properties);
     }
 
     @Override

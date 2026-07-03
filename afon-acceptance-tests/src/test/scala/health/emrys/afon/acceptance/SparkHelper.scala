@@ -2,7 +2,7 @@ package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
 import health.emrys.afon.polaris.PolarisConstants
-import health.emrys.afon.spark.KeyCloakSparkWarehouseConfig
+import health.emrys.afon.spark.{KeyCloakSparkWarehouseConfig, SparkWarehouseConfigFactory}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 
@@ -16,7 +16,7 @@ object SparkHelper {
   // (whose /api/catalog/v1/oauth/tokens returns HTTP 501). We authenticate with the KeyCloak client
   // credentials (root/s3cr3t); Polaris maps the token's 'azp' claim back to the 'root' principal. The
   // Polaris-minted 'principal' credentials are unknown to KeyCloak, so they cannot be used here.
-  val sparkWarehouse = new KeyCloakSparkWarehouseConfig(instance.getProperties)
+  val sparkWarehouse = SparkWarehouseConfigFactory.getFactory.getConfig(instance.getProperties)
   val sc: SparkContext = SparkContext.getOrCreate(sparkWarehouse.sparkConf())
   val spark: SparkSession = SparkSession
     .builder()
