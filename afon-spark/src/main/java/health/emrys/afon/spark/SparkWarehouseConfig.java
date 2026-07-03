@@ -36,7 +36,7 @@ public class SparkWarehouseConfig {
     private final String host;
     private final String polarisProtocol;
 
-    public SparkWarehouseConfig(
+    SparkWarehouseConfig(
         String clientId,
         String clientSecret,
         String host,
@@ -47,14 +47,14 @@ public class SparkWarehouseConfig {
         this.polarisProtocol = polarisProtocol;
     }
 
-    public SparkWarehouseConfig(
+    SparkWarehouseConfig(
         String clientId,
         String clientSecret,
         String host) {
         this(clientId, clientSecret, host, "http");
     }
 
-    public SparkWarehouseConfig(Properties properties) {
+    SparkWarehouseConfig(Properties properties) {
         this(AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
              AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
              AfonProperties.POLARIS_ENDPOINT.getValueFrom(properties)
@@ -97,6 +97,10 @@ public class SparkWarehouseConfig {
     }
 
     public Map<String, String> sparkConfigs(String sparkCatalog) {
+        return sparkConfigs(sparkCatalog, sparkCatalog);
+    }
+
+    public Map<String, String> sparkConfigs(String sparkCatalog, String polarisCatalog) {
         Map conf = new HashMap<String, String>();
         conf.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
         conf.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
@@ -106,7 +110,7 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
         conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol,
                                                                           host));
-        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), sparkCatalog); // this is the Polaris
+        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), polarisCatalog); // this is the Polaris
         // catalog name
         return Map.copyOf(conf);
     }

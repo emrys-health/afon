@@ -5,6 +5,7 @@ import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
+import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
 import health.emrys.afon.polaris.comms.KeyCloakPolarisClient;
 
 import java.util.Properties;
@@ -22,6 +23,8 @@ public class AcceptanceTestConfig {
         instance = new AcceptanceTestConfig(loader.getProperties());
     }
 
+    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+
     private final AfonPolarisClient           polarisClient;
     private final AwsCloudConfigForPolaris    awsCloudConfigForPolaris;
     private final AwsCloudConfigForPolaris    awsForbidden;
@@ -35,11 +38,12 @@ public class AcceptanceTestConfig {
     private final AwsCloudConfigForPolaris    awsTrino;
 
     private AcceptanceTestConfig(Properties properties) {
+        properties.put(KC_HOSTNAME.getPropertyName(), ContainerHelper.KEYCLOAK_HOSTNAME);
         this.clientId     = POLARIS_ID.getValueFrom(properties);
         this.clientSecret = ***REMOVED***
         this.properties   = properties;
         startContainers(properties);
-        this.polarisClient              = new KeyCloakPolarisClient(properties, ContainerHelper.KEYCLOAK_HOSTNAME);
+        this.polarisClient              = clientFactory.getPolarisClient(properties);
         this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
         this.awsTrino                   = new AwsCloudConfigForPolaris(properties) {
             @Override
@@ -140,5 +144,11 @@ public class AcceptanceTestConfig {
 
     public AwsCloudConfigForPolaris getAwsTrino() {
         return awsTrino;
+    }
+
+    public Properties getProperties() {
+        Properties props = new Properties();
+        props.putAll(properties);
+        return props;
     }
 }

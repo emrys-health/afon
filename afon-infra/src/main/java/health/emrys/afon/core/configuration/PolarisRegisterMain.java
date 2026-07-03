@@ -2,6 +2,7 @@ package health.emrys.afon.core.configuration;
 
 import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
+import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
 import org.slf4j.Logger;
 
 import static java.lang.String.format;
@@ -11,14 +12,16 @@ public class PolarisRegisterMain {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisRegisterMain.class);
 
     public static void main(String[] args) {
+        final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
         try (ClusterState state = new ClusterState()) {
             RegisterTableConfig conf        = new RegisterTableConfig(args);
             String              endpoint    = format("https://%s", state.getPolarisHost());
             String              accessToken = state.getCredentials();
             String[]            creds       = accessToken.split(":");
-            AfonPolarisClient   client      = new AfonPolarisClient(endpoint,
-                                                             creds[0],
-                                                             creds[1]);
+            AfonPolarisClient client = clientFactory.getPolarisClient(
+                endpoint,
+                creds[0],
+                creds[1]);
 
             conf.createNamespace(client);
             conf.createTable(client);

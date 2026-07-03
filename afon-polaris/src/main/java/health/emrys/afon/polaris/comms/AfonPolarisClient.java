@@ -43,17 +43,17 @@ public class AfonPolarisClient {
         return format("%s/api/catalog/v1/oauth/tokens", endpoint);
     }
 
-    public AfonPolarisClient(Properties properties) {
+    AfonPolarisClient(Properties properties) {
         this(properties, "http");
     }
 
-    public AfonPolarisClient(String httpsHost, Properties properties) {
+    AfonPolarisClient(String httpsHost, Properties properties) {
         this(format("https://%s", httpsHost),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
     }
 
-    public AfonPolarisClient(Properties properties, String protocol) {
+    AfonPolarisClient(Properties properties, String protocol) {
         this(format("%s://%s", protocol, POLARIS_ENDPOINT.getValueFrom(properties)),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
@@ -108,7 +108,7 @@ public class AfonPolarisClient {
     }
 
     public ClassicHttpResponse delete(String uri, String accessToken) throws IOException {
-        logger.info("Deleting with uri {}", uri);
+        logger.info("Deleting with uri {} at {}", uri, endpoint);
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpDelete          delete  = new HttpDelete(endpoint + uri);
             addAccessTokenToHeaders(delete, accessToken);
@@ -149,10 +149,12 @@ public class AfonPolarisClient {
         return makeCallWithToken(json, new HttpPost(url), accessToken);
     }
 
-    public ClassicHttpResponse getCall(String uri,
+    public ClassicHttpResponse getCall(String url,
                                        String accessToken) throws IOException {
+        String  uri     = endpoint + url;
+        logger.info("Calling {}", url);
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet request = new HttpGet(endpoint + uri);
+            HttpGet request = new HttpGet(uri);
             addAccessTokenToHeaders(request, accessToken);
             ClassicHttpResponse response = client.execute(request);
             logger.info(format("%s:%d", request, response.getCode()));

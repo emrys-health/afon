@@ -5,6 +5,7 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
+import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
 import io.kubernetes.client.openapi.ApiException;
 
 import java.io.IOException;
@@ -21,6 +22,8 @@ import static health.emrys.afon.config.AfonPropertiesLoader.add;
 @Deprecated
 public class EmrysCloud implements ClusterCredentials {
 
+    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+
     private final String            accessToken;
     private final AfonPolarisClient client;
     private final String            polarisId;
@@ -36,7 +39,7 @@ public class EmrysCloud implements ClusterCredentials {
         props.setProperty(POLARIS_ENDPOINT.getPropertyName(), clusterState.getPolarisHost());
         polarisId     = props.getProperty(AfonProperties.POLARIS_ID.getPropertyName());
         polarisSecret = props.getProperty(AfonProperties.POLARIS_SECRET.getPropertyName());
-        client        = new AfonPolarisClient(props, "https");
+        client        = clientFactory.getPolarisClient(props, "https");
         accessToken   = client.getAccessToken();
     }
 

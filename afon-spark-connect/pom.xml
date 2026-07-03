@@ -57,6 +57,12 @@
             <artifactId>spark-connect_${scala.compat.version}</artifactId>
             <version>${spark.version}</version>
         </dependency>
+        <dependency>
+            <groupId>health.emrys</groupId>
+            <artifactId>afon-spark</artifactId>
+            <version>0.1</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
 

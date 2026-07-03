@@ -108,7 +108,9 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
             APP_NAME);
 
         dependants.add(app);
-        clusterIpService(dependants, labels, KC_SVC, List.of(KC_PORT), this);
+        // NodePort (not ClusterIP): the AWS Load Balancer Controller uses instance targets by
+        // default and requires a node port to build the ingress TargetGroup.
+        nodePortService(dependants, labels, KC_SVC, List.of(KC_PORT), this);
     }
 
     protected abstract void configureHttpsAndDNS();
