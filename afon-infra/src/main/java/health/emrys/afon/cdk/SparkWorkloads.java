@@ -8,6 +8,7 @@ import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
+import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import io.kubernetes.client.openapi.ApiException;
 import org.jetbrains.annotations.NotNull;
 import software.constructs.Construct;
@@ -51,36 +52,37 @@ public class SparkWorkloads {
      * @param dependsOn must include the operator-ready signal (so the CRDs exist) and the
      *                  cluster's own dependables.
      */
-    public void deploy(@NotNull Construct scope,
-                       @NotNull SupportedCloudsEnum id,
-                       @NotNull List<? extends ITerraformDependable> dependsOn) {
+    public void deploy(
+        @NotNull Construct scope,
+        @NotNull SupportedCloudsEnum id,
+        @NotNull List<? extends ITerraformDependable> dependsOn) {
         final Map<String, Object> sparkClusterManifest = Map.of(
             "apiVersion", "spark.apache.org/v1alpha1",
             "kind", "SparkCluster",
             "metadata", Map.of(
                 "name", "emrys",
                 "namespace", "default"
-                              ),
+            ),
             "spec", Map.of(
                 "runtimeVersions", Map.of(
                     "sparkVersion", "4.0.1"
-                                         ),
+                ),
                 "clusterTolerations", Map.of(
                     "instanceConfig", Map.of(
                         "initWorkers", 2, // Integer type
                         "minWorkers", 2, // Integer type
                         "maxWorkers", 2  // Integer type
-                                            )
-                                            ),
+                    )
+                ),
                 "sparkConf", Map.of(
                     "spark.kubernetes.container.image", SPARK_IMAGE,
                     "spark.master.ui.title", "Prod Spark Cluster",
                     "spark.master.rest.enabled", "true",
                     "spark.master.rest.host", "0.0.0.0",
                     "spark.ui.reverseProxy", "true"
-                                   )
-                          )
-                                                               );
+                )
+            )
+        );
 
         String                     sparkClusterJson       = toJson(sparkClusterManifest);
         List<LocalExecProvisioner> allClusterProvisioners = new ArrayList<>();
@@ -89,7 +91,7 @@ public class SparkWorkloads {
             "kubectl delete statefulset emrys-master --force --grace-period=0",
             "kubectl delete statefulset emrys-worker --force --grace-period=0",
             "kubectl patch sparkclusters emrys  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
-                                                    ));
+        ));
         Resource.Builder.create(scope, "sparkClusterManifest")
                         .provisioners(allClusterProvisioners)
                         .dependsOn(dependsOn)
@@ -99,7 +101,7 @@ public class SparkWorkloads {
         allConnectProvisioners.addAll(uponCreateRun(startConnectCommand(polarisDomainName)));
         allConnectProvisioners.addAll(uponDestroyRun(
             "kubectl patch sparkapplication spark-connector  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
-                                                    ));
+        ));
         Resource.Builder.create(scope, "sparkConnectManifest")
                         .provisioners(allConnectProvisioners)
                         .dependsOn(dependsOn)
@@ -113,11 +115,11 @@ public class SparkWorkloads {
             "metadata", Map.of(
                 "name", SPARK_CONNECTOR_NAME,
                 "namespace", "default"
-                              ),
+            ),
             "spec", Map.of(
                 "runtimeVersions", Map.of(
                     "sparkVersion", "4.0.1"
-                                         ),
+                ),
                 "mainClass", "org.apache.spark.sql.connect.service.SparkConnectServer",
                 "sparkConf", sparkConfig(polarisDomainName),
                 "driverSpec", Map.of(
@@ -128,24 +130,24 @@ public class SparkWorkloads {
                         "metadata", Map.of(
                             "labels", Map.of(
                                 "app.kubernetes.io/name", SPARK_CONNECTOR_NAME + "-driver"
-                                            )
-                                          ),
+                            )
+                        ),
                         "spec", Map.of(
                             "restartPolicy", "Always"
-                                      )
-                                             )
-                                    ),
+                        )
+                    )
+                ),
                 "executorSpec", Map.of(
                     "podTemplateSpec", Map.of(
                         "metadata", Map.of(
                             "labels", Map.of(
                                 "app.kubernetes.io/name", SPARK_CONNECTOR_NAME + "-executor"
-                                            )
-                                          )
-                                             )
-                                      )
-                          )
-                                                               );
+                            )
+                        )
+                    )
+                )
+            )
+        );
 
         String sparkConnectJson = toJson(sparkConnectManifest);
         return "echo '" + sparkConnectJson + "' | kubectl apply -f -";
@@ -178,7 +180,7 @@ public class SparkWorkloads {
             "spark.executor.cores", "1",
             "spark.cores.max", "3",
             "spark.kubernetes.authenticate.driver.serviceAccountName", SPARK_SERVICE_ACCOUNT_NAME
-                          );
+        );
         var second = Map.of(
             "spark.driver.allowMultipleContexts", "true",
             "spark.sql.iceberg.planning.preserve-data-grouping", "true",
@@ -193,7 +195,7 @@ public class SparkWorkloads {
             "spark.executor.userClassPathFirst", "true",
             "spark.log.level", "DEBUG",
             "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
-                           );
+        );
         try {
             Map<String, String> toReturn = sparkCloudProperties(polarisDomainName);
             toReturn.putAll(first);
@@ -205,10 +207,11 @@ public class SparkWorkloads {
     }
 
     private static @NotNull Map<String, String> sparkCloudProperties(String polarisDomainName) {
-        var toReturn = new HashMap<String, String>();
+        var                         toReturn     = new HashMap<String, String>();
+        SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
         Properties properties = new AfonPropertiesLoader().getProperties();
-        SparkWarehouseConfig sparkWarehouseConfig = new SparkWarehouseConfig(
+        SparkWarehouseConfig sparkWarehouseConfig = sparkFactory.getConfig(
             USER_POLARIS_ID.getValueFrom(properties),
             USER_POLARIS_SECRET.getValueFrom(properties),
             polarisDomainName,
