@@ -3,6 +3,7 @@ package health.emrys.afon.acceptance;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.keycloak.KeyCloakAdmin;
 import health.emrys.afon.spark.SparkWarehouseConfig;
+import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import health.emrys.security.keycloak.KeyCloakConfig;
@@ -63,6 +64,7 @@ public class ContainerHelper {
     }
 
     private final Network network = Network.newNetwork();
+    private final SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
 
     private GenericContainer<?> polaris;
     private GenericContainer<?> trino;
@@ -105,7 +107,7 @@ public class ContainerHelper {
     public synchronized void startSparkConnect(Properties properties) {
         if (sparkConnect == null) {
             sparkConnect = new GenericContainer<>(SPARK_IMAGE);
-            SparkWarehouseConfig config = new SparkWarehouseConfig(properties);
+            SparkWarehouseConfig config = sparkFactory.getConfig(properties);
             Stream<String> envs = Arrays.stream(values()).flatMap(
                 cloudProvider ->
                     config.sparkConfigs(cloudProvider).entrySet().stream().map(

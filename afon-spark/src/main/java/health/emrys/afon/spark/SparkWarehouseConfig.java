@@ -36,7 +36,7 @@ public class SparkWarehouseConfig {
     private final String host;
     private final String polarisProtocol;
 
-    public SparkWarehouseConfig(
+    SparkWarehouseConfig(
         String clientId,
         String clientSecret,
         String host,
@@ -47,14 +47,14 @@ public class SparkWarehouseConfig {
         this.polarisProtocol = polarisProtocol;
     }
 
-    public SparkWarehouseConfig(
+    SparkWarehouseConfig(
         String clientId,
         String clientSecret,
         String host) {
         this(clientId, clientSecret, host, "http");
     }
 
-    public SparkWarehouseConfig(Properties properties) {
+    SparkWarehouseConfig(Properties properties) {
         this(AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
              AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
              AfonProperties.POLARIS_ENDPOINT.getValueFrom(properties)
