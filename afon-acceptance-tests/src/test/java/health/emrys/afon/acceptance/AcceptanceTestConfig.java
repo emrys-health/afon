@@ -145,4 +145,10 @@ public class AcceptanceTestConfig {
     public AwsCloudConfigForPolaris getAwsTrino() {
         return awsTrino;
     }
+
+    public Properties getProperties() {
+        Properties props = new Properties();
+        props.putAll(properties);
+        return props;
+    }
 }
