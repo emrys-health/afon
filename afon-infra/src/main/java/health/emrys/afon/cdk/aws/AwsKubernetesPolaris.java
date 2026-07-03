@@ -63,7 +63,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
                       .build())
             .build();
         AwsKeyCloakDeploymentConfig keyCloakConfig = new AwsKeyCloakDeploymentConfig(this, properties, cloudProvider);
-//        keyCloakConfig.configureHttpsAndDNS();
+        keyCloakConfig.configureHttpsAndDNS();
     }
 
     public static void main(String[] args) {

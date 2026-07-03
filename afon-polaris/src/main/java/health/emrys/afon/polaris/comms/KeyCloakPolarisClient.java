@@ -2,8 +2,10 @@ package health.emrys.afon.polaris.comms;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.ConfigUtils;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -14,7 +16,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.*;
+import static health.emrys.afon.config.ConfigUtils.protocolFor;
 import static health.emrys.security.keycloak.KeyCloakConfig.tokenEndpoint;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -27,7 +29,6 @@ import static org.slf4j.LoggerFactory.getLogger;
  */
 public class KeyCloakPolarisClient extends AfonPolarisClient {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Logger       log    = getLogger(KeyCloakPolarisClient.class);
 
     public static void main(String[] args) {
@@ -35,22 +36,30 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
         log.info("access token: {}", app.getAccessToken());
     }
 
-    private final String keyCloakTokenUri;
-
-    public KeyCloakPolarisClient(Properties properties) {
-        // The Polaris endpoint (used for the bearer-authenticated catalog/management calls).
-        super(properties);
-        // Use the same KeyCloak host that Polaris discovered, so the token's issuer matches and
-        // Polaris accepts the bearer token.
-        this.keyCloakTokenUri = tokenEndpoint(KC_HOSTNAME.getValueFrom(properties));
+    private static @NonNull String tokenEndpointFor(Properties properties) {
+        String kcHostname = KC_HOSTNAME.getValueFrom(properties);
+        return tokenEndpoint(kcHostname, protocolFor(kcHostname));
     }
 
-    public KeyCloakPolarisClient(Properties properties, String kcHostname) {
-        // The Polaris endpoint (used for the bearer-authenticated catalog/management calls).
-        super(properties);
-        // Use the same KeyCloak host that Polaris discovered, so the token's issuer matches and
-        // Polaris accepts the bearer token.
-        this.keyCloakTokenUri = tokenEndpoint(kcHostname);
+    private static @NonNull String tokenEndpointFor(String kcHostname) {
+        return tokenEndpoint(kcHostname, protocolFor(kcHostname));
+    }
+
+    private final String keyCloakTokenUri;
+
+    KeyCloakPolarisClient(Properties properties) {
+        super(properties, "http");
+        this.keyCloakTokenUri = tokenEndpointFor(properties);
+    }
+
+    KeyCloakPolarisClient(String httpsHost, Properties properties) {
+        super(httpsHost, properties);
+        this.keyCloakTokenUri = tokenEndpointFor(properties);
+    }
+
+    KeyCloakPolarisClient(Properties properties, String protocol) {
+        super(properties, protocol);
+        this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
     /**

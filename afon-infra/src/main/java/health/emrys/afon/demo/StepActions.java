@@ -113,7 +113,7 @@ public class StepActions {
 
     public void startGcpPolaris() throws Exception {
         executeMainOf(GcpKubernetesPolaris.class, new String[]{});
-        startCloud(cdktfPath(GcpKubernetesPolaris.ID));
+        startManagedKubernetesStack(GcpKubernetesPolaris.ID);
     }
 
     public void startFullStackAzure() throws Exception {
@@ -150,8 +150,10 @@ public class StepActions {
         // installed, so it must stay in phase two alongside Cilium; the EKS cluster resource
         // does not include the node group. On Azure the default node pool is declared inline on
         // the cluster resource (and uses AKS-managed Cilium), so targeting the cluster brings up
-        // the nodes too. Stacks without a managed cluster (e.g. GCP, which uses an exec auth
-        // plugin) yield no targets and skip straight to the full apply.
+        // the nodes too. On GCP the default node pool is likewise part of the
+        // google_container_cluster resource and uses GKE's built-in CNI, so the targeted apply
+        // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
+        // Stacks without a managed cluster yield no targets and skip straight to the full apply.
         Path         jsonDirectory    = cdktfPath(id);
         List<String> bootstrapTargets = clusterBootstrapTargets(jsonDirectory);
         startCloud(jsonDirectory, bootstrapTargets);
@@ -220,11 +222,13 @@ public class StepActions {
     /**
      * Terraform resource types for the managed Kubernetes control planes whose endpoint and
      * credentials the kubernetes/helm providers depend on at plan time. We bootstrap these in a
-     * targeted first apply phase. GCP is absent on purpose: it authenticates via an exec plugin,
-     * so its provider does not need the cluster to exist at plan time.
+     * targeted first apply phase. GCP is included even though it authenticates via an exec plugin:
+     * that plugin only supplies the auth token on demand, but the provider's {@code host} and
+     * {@code cluster_ca_certificate} are still read from the {@code google_container_cluster}
+     * resource, so the cluster must exist at plan time to avoid an inconsistent final plan.
      */
     private static final List<String> MANAGED_CLUSTER_RESOURCE_TYPES =
-        List.of("aws_eks_cluster", "azurerm_kubernetes_cluster");
+        List.of("aws_eks_cluster", "azurerm_kubernetes_cluster", "google_container_cluster");
 
     /**
      * Reads {@code cdk.tf.json} in the given stack directory and returns {@code -target=...}
