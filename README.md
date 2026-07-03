@@ -239,6 +239,57 @@ Test specs include:
 
 ## How-to Guides — for specific problems
 
+### Deploy from a single YAML config (new)
+
+Deployments can now be described in one declarative file (`afon-deployment.yaml`)
+instead of picking a per-topology `Deploy*Main` class. The design and roadmap
+live in [docs/config_driven_architecture.md](docs/config_driven_architecture.md);
+the work landed in three stages:
+
+| Stage | What it delivered |
+|---|---|
+| **1. Schema + parser** | A JSON Schema (`afon-config/src/main/resources/afon-deployment.schema.json`) and matching Java records (`health.emrys.afon.config.deployment`) that parse and validate the YAML — clouds, catalogs, query engines, workbench. Secrets are never in the YAML: fields like `jdbcUrlRef` *name* a property in `afon.properties`/`env.properties`. `LegacyConfigExporter` generates a starter YAML from your current properties. Example config: `docs/examples/emrys-demo.yaml`. |
+| **2. Plugin extraction** | The cloud stacks, engines and workbench became plugins behind `health.emrys.afon.platform`: `AwsCloudPlugin`/`AzureCloudPlugin`/`GcpCloudPlugin` (via `PluginRegistry`), `SparkEngineDeployer`/`TrinoEngineDeployer`, `JupyterWorkbenchDeployer`. The legacy `Deploy*Main` classes still work and now delegate to the same code — `PluginParityTest` asserts both paths synthesise byte-identical Terraform, so `tofu apply` never recreates live resources. |
+| **3. Planner + entry point** | `DeploymentPlanner` turns the YAML into the familiar ordered step list (per cloud: clean → deploy → wait for DNS → configure catalogs, then Snowflake catalog integrations last). `DeployFromConfigMain` runs it; `DocumentFromConfigMain` prints it as markdown. `SnowflakeEngineDeployer` emits the same `CREATE CATALOG INTEGRATION` SQL as the `DeploySnowflakeReading*Main` demos. `DeploymentPlannerTest` asserts the config-driven AWS deployment is identical to the legacy `DeployFullStackAwsMain` stack. |
+
+**1. Generate a config from your current properties** (or start from
+`docs/examples/emrys-demo.yaml`):
+
+```shell
+cd afon-config
+mvn compile -Dexec.mainClass=health.emrys.afon.config.deployment.LegacyConfigExporter \
+  -Dexec.args="../my-deployment.yaml" exec:java
+```
+
+**2. Preview the plan** — parses, validates, and prints the steps without
+deploying anything:
+
+```shell
+cd afon-infra
+mvn compile -Dexec.mainClass=health.emrys.afon.platform.DocumentFromConfigMain \
+  -Dexec.args="../docs/examples/emrys-demo.yaml" exec:java
+```
+
+**3. Deploy:**
+
+```shell
+mvn compile -Pdemo -Dexec.mainClass=health.emrys.afon.platform.DeployFromConfigMain \
+  -Dexec.args="../docs/examples/emrys-demo.yaml" exec:exec
+```
+
+**4. Resume a failed run from a named step** (same mechanism as the legacy
+mains — pass the step name after the config path):
+
+```shell
+mvn compile -Pdemo -Dexec.mainClass=health.emrys.afon.platform.DeployFromConfigMain \
+  -Dexec.args="../docs/examples/emrys-demo.yaml deploy_azure" exec:exec
+```
+
+Current constraints: cloud `id`s must still be `aws`/`azure`/`gcp` (state and
+tooling key off `SupportedCloudsEnum` until Phase 4), and VS Code/RStudio
+workbenches plus the config-builder UI are still to come. The legacy
+`Deploy*Main` commands below all keep working unchanged.
+
 ### Deploy the full AWS stack
 
 The full AWS stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).

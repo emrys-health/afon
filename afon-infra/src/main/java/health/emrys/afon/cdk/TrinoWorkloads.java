@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -73,7 +74,11 @@ public class TrinoWorkloads {
         try {
             // JSON is valid YAML, so the existing ObjectMapper produces a values document Helm
             // accepts — avoiding a YAML dependency while keeping the multi-line catalog strings.
-            String valuesYaml = new ObjectMapper().writeValueAsString(values);
+            // Keys are sorted because Map.of iteration order is randomised per JVM, which would
+            // otherwise reorder the values document on every synth and dirty the Terraform plan.
+            String valuesYaml = new ObjectMapper()
+                .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+                .writeValueAsString(values);
 
             Release.Builder.create(scope, "trino")
                            .provider(helmProvider)

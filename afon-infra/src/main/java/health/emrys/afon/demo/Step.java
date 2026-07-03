@@ -4,10 +4,6 @@ import org.slf4j.Logger;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-interface ThrowableRunnable {
-    void run() throws Exception;
-}
-
 public class Step {
 
     private static final Logger log = getLogger(Step.class);
@@ -24,10 +20,18 @@ public class Step {
     final String            description;
     final ThrowableRunnable function;
 
-    Step(String name, String description, ThrowableRunnable function) {
+    public Step(String name, String description, ThrowableRunnable function) {
         this.name        = name;
         this.description = description;
         this.function    = function;
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public String description() {
+        return description;
     }
 
     @Override

@@ -12,7 +12,7 @@ public class TrinoClusterDeployment extends SparkClusterDeployment {
         super(scope, id, properties);
         // Trino only needs the cluster reachable (not the Spark operator), so it depends on the
         // EKS dependables rather than eksDependOn.
-        new TrinoWorkloads(properties, awsPolarisDomainName)
+        new TrinoWorkloads(properties, polarisDomainName())
             .deploy(this, helmProvider, id, cloudProvider.getDependables());
     }
 }

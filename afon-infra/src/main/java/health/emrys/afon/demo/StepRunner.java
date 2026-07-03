@@ -19,7 +19,7 @@ public class StepRunner {
         }
     }
 
-    void runFrom(List<Step> steps, String firstStepToRun) {
+    public void runFrom(List<Step> steps, String firstStepToRun) {
         log.info("Running everything from {} (inclusive) onwards out of {}", humanReadable(steps), firstStepToRun);
         int    index = steps.stream().map(s -> s.name).toList().lastIndexOf(firstStepToRun);
         if (index == -1) {
@@ -29,7 +29,7 @@ public class StepRunner {
         }
     }
 
-    void runSteps(List<Step> steps) {
+    public void runSteps(List<Step> steps) {
         log.info("StepOperations:\n{}", humanReadable(steps));
         try {
             for (Step step : steps) {

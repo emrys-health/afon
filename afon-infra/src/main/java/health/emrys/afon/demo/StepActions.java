@@ -142,7 +142,7 @@ public class StepActions {
         startManagedKubernetesStack(AWS);
     }
 
-    private void startManagedKubernetesStack(SupportedCloudsEnum id) throws ManagedProcessException {
+    public void startManagedKubernetesStack(SupportedCloudsEnum id) throws ManagedProcessException {
         // The kubernetes/helm providers are configured from the managed cluster's endpoint and
         // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
         // (plugin-framework) providers, those must be known at plan time, otherwise apply fails

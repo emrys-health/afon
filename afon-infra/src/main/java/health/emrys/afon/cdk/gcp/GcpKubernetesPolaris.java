@@ -2,6 +2,7 @@ package health.emrys.afon.cdk.gcp;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZone;
 import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZoneConfig;
 import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSet;
@@ -13,10 +14,13 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import health.emrys.afon.cdk.JupyterConfig;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.cdk.TFUtils;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.platform.ProvisionedCloud;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -29,7 +33,7 @@ import static health.emrys.afon.cdk.TFUtils.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cdk.TFUtils.clusterIpService;
 import static health.emrys.afon.infra.Defaults.POLARIS_INGRESS_NAME;
 
-public class GcpKubernetesPolaris extends GcpKubernetesStack {
+public class GcpKubernetesPolaris extends GcpKubernetesStack implements ProvisionedCloud {
 
     private static final String DNS_ZONE_NAME    = "polaris-zone";
     private static final String POLARIS_INTERNAL = "polaris-internal";
@@ -86,5 +90,55 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
         Properties properties = new AfonPropertiesLoader().getProperties();
         new GcpKubernetesPolaris(app, ID.toString(), properties);
         app.synth();
+    }
+
+    // -------------------------------------------------------------------------
+    // ProvisionedCloud implementation
+    // -------------------------------------------------------------------------
+
+    @Override
+    public String cloudId() {
+        return ID.toString();
+    }
+
+    @Override
+    public TerraformStack stack() {
+        return this;
+    }
+
+    @Override
+    public List<ITerraformDependable> dependables() {
+        return cloudProvider.getDependables();
+    }
+
+    @Override
+    public List<ITerraformDependable> workloadReadiness() {
+        return cloudProvider.getDependables();
+    }
+
+    @Override
+    public KubernetesProvider k8sProvider() {
+        return cloudProvider.configureK8s();
+    }
+
+    @Override
+    public HelmProvider helmProvider() {
+        return cloudProvider.configureHelm();
+    }
+
+    @Override
+    public String polarisDomainName() {
+        return gcpDomainName;
+    }
+
+    @Override
+    public JupyterConfig newJupyterConfig() {
+        throw new UnsupportedOperationException(
+            "No workbench has been deployed to GCP yet; see docs/config_driven_architecture.md");
+    }
+
+    @Override
+    public boolean lockDownJupyterEgress() {
+        return true;
     }
 }

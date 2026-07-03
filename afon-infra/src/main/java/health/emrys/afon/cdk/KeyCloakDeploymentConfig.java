@@ -55,7 +55,9 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
         super(scope, APP_NAME + "_scope");
         this.cloudProvider = cloudProvider;
 
-        Set<AfonProperty> kcProperties = Set.of(
+        // List, not Set: Set.of() iteration order is randomised per JVM, which made
+        // every synth reorder the env vars and produce a spurious Terraform diff.
+        List<AfonProperty> kcProperties = List.of(
             KC_BOOTSTRAP_ADMIN_USERNAME,
             KC_BOOTSTRAP_ADMIN_PASSWORD,
             KC_DB_URL,

@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
@@ -154,7 +155,9 @@ public class SparkWorkloads {
     }
 
     private static String toJson(Map<String, Object> map) {
-        ObjectMapper mapper = new ObjectMapper();
+        // Sorted for deterministic synth output (Map.of iteration order is randomised per JVM).
+        ObjectMapper mapper = new ObjectMapper()
+            .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
         try {
             return mapper.writeValueAsString(map);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
