@@ -21,6 +21,8 @@ public class PolarisConfigureMain {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisConfigureMain.class);
 
+    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+
     public static void main(String[] args) {
         try {
             PolarisConfigureMain app = new PolarisConfigureMain();
@@ -94,7 +96,7 @@ public class PolarisConfigureMain {
         if (POLARIS_ENDPOINT.getValueFrom(properties).toLowerCase().contains("localhost")) {
             protocol = "http";
         }
-        var    client      = new AfonPolarisClient(properties, protocol);
+        var    client      = clientFactory.getPolarisClient(properties, protocol);
         var    configurer  = new PolarisConfigurer(client);
         String accessToken = client.getAccessToken();
         logger.info("Access token {}", accessToken);
