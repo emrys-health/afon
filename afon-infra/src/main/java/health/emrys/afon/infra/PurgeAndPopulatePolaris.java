@@ -73,18 +73,18 @@ public class PurgeAndPopulatePolaris {
 
         for (SupportedCloudsEnum warehouse : List.of(AZURE, AWS, GCP)) {
             try {
-                purgeAllTablesIn(domainName, warehouse, client, namespace);
+                purgeAllTablesIn(warehouse, client, namespace);
             } catch (IOException | ParseException e) {
-                log.warn("Failed to delete {} namespace in catalog {} in {}. Ignoring and continuing.",
-                         namespace, warehouse, domainName);
+                log.warn("Failed to delete {} namespace in catalog {} in {}. Error is {}. Ignoring and continuing.",
+                         namespace, warehouse, domainName, e.getMessage());
             }
         }
     }
 
-    private void purgeAllTablesIn(String domainName,
-                                  SupportedCloudsEnum warehouse,
+    private void purgeAllTablesIn(SupportedCloudsEnum warehouse,
                                   AfonPolarisClient client,
                                   String namespace) throws IOException, ParseException {
+        log.info("Attempting to delete tables from {}.{}", warehouse, namespace);
         ObjectMapper        mapper      = new ObjectMapper();
         String              accessToken = client.getAccessToken();
         ClassicHttpResponse response    = client.getCall(listTables(warehouse.toString(), namespace), accessToken);
@@ -92,6 +92,7 @@ public class PurgeAndPopulatePolaris {
         JsonNode            identifiers = root.get("identifiers");
 
         if (identifiers != null && identifiers.isArray()) {
+            log.info("Deleting tables from {}.{}", warehouse, namespace);
             for (JsonNode node : identifiers) {
                 String table = node.get("name").toString();
                 clean(warehouse, namespace, table.replace("\"", ""));

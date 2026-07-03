@@ -22,11 +22,11 @@ public class AfonPolarisClientFactory {
         Properties props = new Properties();
         props.putAll(properties);
         props.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisHost);
-        return new KeyCloakPolarisClient(properties);
+        return new KeyCloakPolarisClient(polarisHost, properties);
     }
 
     public AfonPolarisClient getPolarisClient(Properties properties, String protocol) {
-        return new KeyCloakPolarisClient(protocol, properties);
+        return new KeyCloakPolarisClient(properties, protocol);
     }
 
     public AfonPolarisClient getPolarisClient(String endpoint, String clientId, String clientSecret) {
