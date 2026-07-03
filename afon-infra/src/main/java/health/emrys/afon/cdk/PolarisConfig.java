@@ -7,12 +7,16 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
+import health.emrys.security.keycloak.KeyCloakConfig;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.TFUtils.clusterIpService;
 import static health.emrys.afon.config.AfonProperties.*;
@@ -70,6 +74,8 @@ public class PolarisConfig extends Construct {
             .sorted()
             .toList();
 
+        String kcConfig = kcExports(properties);
+
         String pgConfig = format(
             """
             export POLARIS_PERSISTENCE_TYPE="relational-jdbc"
@@ -85,6 +91,8 @@ public class PolarisConfig extends Construct {
         return pgConfig + format(
             """
             %s
+            
+            %s
             export %s='%s'
             
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL=DEBUG
@@ -96,10 +104,27 @@ public class PolarisConfig extends Construct {
             export POLARIS_FEATURES_SUPPORTED_CATALOG_CONNECTION_TYPES="ICEBERG_REST,HIVE"
             export JAVA_OPTS_APPEND=-D"polaris.features.\\"ENABLE_CATALOG_FEDERATION\\"=true" 
             """,
+            kcConfig,
             String.join("\n", exports),
             GOOGLE_APPLICATION_CREDENTIALS.getPropertyName(),
             SECRETS_DIR + "/" + GCP_CRED_FILE
         );
+    }
+
+    private static @NonNull String kcExports(Properties properties) {
+        String kcHost = KC_HOSTNAME.getValueFrom(properties);
+        Map<String, String> kcProperties = KeyCloakHelper.polarisOidcEnv(
+            KeyCloakConfig.internalRealmUrl(kcHost, "https"),
+            KC_DB_USERNAME.getValueFrom(properties),
+            KC_DB_PASSWORD.getValueFrom(properties));
+        return toExports(kcProperties);
+    }
+
+    static @NonNull String toExports(Map<String, String> properties) {
+        return properties
+            .entrySet().stream().map(x ->
+                                         format("export %s=%s", AppUtils.toEnvironmentVariable(x.getKey()), x.getValue())
+            ).collect(Collectors.joining("\n"));
     }
 
     public Service deployPolaris(List<ITerraformDependable> eksDependOn) {

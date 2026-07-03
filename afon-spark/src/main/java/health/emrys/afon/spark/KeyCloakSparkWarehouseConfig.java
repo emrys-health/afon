@@ -1,8 +1,15 @@
 package health.emrys.afon.spark;
 
+import health.emrys.afon.config.ConfigUtils;
+import health.emrys.security.keycloak.KeyCloakConfig;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.ConfigUtils.protocolFor;
 import static java.lang.String.format;
 
 /**
@@ -20,21 +27,34 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
 
     private static final String KEYCLOAK_SCOPE = "openid";
 
+    private static String kcUriFor(Properties properties) {
+        String kcHost = KC_HOSTNAME.getValueFrom(properties);
+        return KeyCloakConfig.tokenEndpoint(kcHost, protocolFor(kcHost));
+    }
+
     private final String oauth2ServerUri;
 
-    public KeyCloakSparkWarehouseConfig(
-        String clientId,
-        String clientSecret,
-        String host,
-        String polarisProtocol,
-        String oauth2ServerUri) {
-        super(clientId, clientSecret, host, polarisProtocol);
-        this.oauth2ServerUri = oauth2ServerUri;
+    KeyCloakSparkWarehouseConfig(Properties properties) {
+        super(POLARIS_ID.getValueFrom(properties),
+              POLARIS_SECRET.getValueFrom(properties),
+              POLARIS_ENDPOINT.getValueFrom(properties),
+              protocolFor(POLARIS_ENDPOINT.getValueFrom(properties))
+              );
+        this.oauth2ServerUri = kcUriFor(properties);
+    }
+
+    @Override
+    public Map<String, String> sparkConfigs(String sparkCatalog, String polarisCatalog) {
+        return addOauthServer(sparkCatalog, super.sparkConfigs(sparkCatalog, polarisCatalog));
     }
 
     @Override
     public Map<String, String> sparkConfigs(String sparkCatalog) {
-        Map<String, String> conf = new HashMap<>(super.sparkConfigs(sparkCatalog));
+        return addOauthServer(sparkCatalog, super.sparkConfigs(sparkCatalog));
+    }
+
+    private @NotNull Map<String, String> addOauthServer(String sparkCatalog, Map<String, String> actual) {
+        Map<String, String> conf    = new HashMap<>(actual);
         conf.put(format("spark.sql.catalog.%s.oauth2-server-uri", sparkCatalog), oauth2ServerUri);
         conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), KEYCLOAK_SCOPE);
         return Map.copyOf(conf);

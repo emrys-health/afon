@@ -5,6 +5,7 @@ import health.emrys.afon.infra.ClusterCredentials;
 import health.emrys.afon.infra.PolarisClusterCredentials;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
+import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import io.kubernetes.client.openapi.ApiException;
 import org.apache.spark.SparkContext;
 import org.apache.spark.sql.SparkSession;
@@ -36,7 +37,8 @@ public class SparkSessionFactory {
         ).createSparkSession();
     }
 
-    private final String polarisId;
+    private final SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
+    private final String                      polarisId;
     private final String polarisSecret;
     private final String polarisHost;
     private final String protocol;
@@ -53,7 +55,7 @@ public class SparkSessionFactory {
     }
 
     public SparkSession createSparkSession() throws IOException {
-        SparkWarehouseConfig sparkWarehouse = new SparkWarehouseConfig(
+        SparkWarehouseConfig sparkWarehouse = sparkFactory.getConfig(
             polarisId,
             polarisSecret,
             polarisHost,
