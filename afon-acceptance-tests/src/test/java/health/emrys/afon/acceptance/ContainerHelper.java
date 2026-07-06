@@ -101,6 +101,10 @@ public class ContainerHelper {
                 .registerPolarisUser(
                     USER_POLARIS_ID.getValueFrom(properties),
                     USER_POLARIS_SECRET.getValueFrom(properties));
+            new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME)
+                .registerPolarisUser(
+                    POLARIS_ID.getValueFrom(properties),
+                    POLARIS_SECRET.getValueFrom(properties));
         }
     }
 

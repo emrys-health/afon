@@ -124,17 +124,18 @@ public abstract class JupyterHubConfig {
         new GuacUser("will@emrys.health", "will"));
 
     /**
-     * Upstreams the oauth2-proxy MFA gate fronts, on a single domain. Guacamole owns the root and
-     * is how every user reaches their pod's desktop. JupyterHub is exposed only under
-     * {@code /jupyter/hub/} — enough for login, spawn and the OAuth callback — and deliberately
-     * NOT {@code /jupyter/user/*}. That means the spawned notebook is unreachable over public HTTP,
-     * so the only way to touch it is the clipboard-disabled Guacamole desktop (the copy-paste
-     * control). oauth2-proxy routes by longest path prefix, so {@code /jupyter/hub/*} hits the hub
-     * and everything else (including {@code /jupyter/user/*}) falls through to Guacamole.
+     * Upstreams the oauth2-proxy MFA gate fronts, on a single domain. Guacamole owns the root; the
+     * JupyterHub hub ({@code /jupyter/hub/*}, for login/spawn/OAuth callback) and the spawned
+     * single-user notebooks ({@code /jupyter/user/*}) are both exposed under {@code /jupyter/}. All
+     * three sit behind the same OIDC/MFA gate. oauth2-proxy routes by longest path prefix, so
+     * {@code /jupyter/hub/*} and {@code /jupyter/user/*} hit proxy-public and everything else falls
+     * through to Guacamole. Exposing {@code /jupyter/user/*} means the post-spawn redirect to the
+     * notebook resolves instead of 404ing against Guacamole.
      */
     public static final List<String> MFA_UPSTREAMS = List.of(
         "http://" + GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT,
-        "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL + "hub/");
+        "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL + "hub/",
+        "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL + "user/");
 
     private static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
     private static final Map<String, String> PROXY_LABELS = Map.of("app", "jupyterhub-proxy");
@@ -450,9 +451,9 @@ public abstract class JupyterHubConfig {
             c.JupyterHub.hub_connect_ip = '%3$s'
             c.JupyterHub.hub_port = %4$d
             c.JupyterHub.cleanup_servers = False
-            # Don't bounce the user to /jupyter/user/<name>/ after spawn: that path is blocked at the
-            # gate (notebook access is desktop-only). They land on the hub home, then open Guacamole.
-            c.JupyterHub.redirect_to_server = False
+            # /jupyter/user/* is now exposed through oauth2-proxy, so let the hub redirect to the
+            # spawned notebook after spawn (previously suppressed because that path 404'd at the gate).
+            c.JupyterHub.redirect_to_server = True
 
             # --- One pod per user, spawned on demand by KubeSpawner. ---
             c.JupyterHub.spawner_class = 'kubespawner.KubeSpawner'
