@@ -1,0 +1,4 @@
+name: projects/fjords-450014/policies/iam.disableServiceAccountKeyCreation
+spec:
+  rules:
+    - enforce: false

@@ -1,0 +1,39 @@
+# Smallest useful deployment: one cloud, Polaris + Spark, VS Code workbench.
+apiVersion: afon/v1
+deployment:
+  name: minimal-aws
+
+clouds:
+  - id: aws-primary
+    provider: aws
+    region: eu-west-2
+    storage:
+      bucket: my-org-afon-primary
+      roleArn: arn:aws:iam::123456789012:role/S3ReadWriteRole
+    polaris:
+      domain: polaris.example.com
+      certArn: arn:aws:acm:eu-west-2:123456789012:certificate/00000000-0000-0000-0000-000000000000
+      dnsZone: Z0000000000000000000
+
+catalogs:
+  - name: main
+    cloud: aws-primary
+    type: internal
+
+queryEngines:
+  - type: spark
+    target: aws-primary
+    workers: 2
+
+workbench:
+  type: vscode
+  target: aws-primary
+  domain: workbench.example.com
+  auth:
+    provider: google-oidc
+    emailDomain: example.com
+    clientIdRef: OAUTH2_CLIENT_ID
+    clientSecretRef: OAUTH2_CLIENT_SECRET
+    cookieSecretRef: OAUTH2_COOKIE_SECRET
+
+secretsFile: env.properties

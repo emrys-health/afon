@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://emrys.health/schemas/afon-deployment.schema.json",
+  "title": "Afon deployment configuration",
+  "description": "Declarative description of an Afon deployment: which clouds host data, which Polaris catalogs exist, which query engines are deployed and which workbench (if any) users get. Secrets are never inlined; keys ending in 'Ref' name properties resolved via the existing properties mechanism.",
+  "type": "object",
+  "required": ["apiVersion", "deployment", "clouds"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "afon/v1"
+    },
+    "deployment": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "clusterName": { "type": "string", "minLength": 1 }
+      }
+    },
+    "clouds": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/cloud" }
+    },
+    "catalogs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/catalog" }
+    },
+    "queryEngines": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/queryEngine" }
+    },
+    "workbench": { "$ref": "#/$defs/workbench" },
+    "secretsFile": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "cloudId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Free-form unique identifier for a cloud instance; becomes the CDKTF stack ID."
+    },
+    "catalogName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Polaris catalog name."
+    },
+    "secretRef": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$",
+      "description": "Name of a property in the secrets/properties files; the value is never inlined here."
+    },
+    "cloud": {
+      "type": "object",
+      "required": ["id", "provider", "region", "storage", "polaris"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/cloudId" },
+        "provider": {
+          "enum": ["aws", "azure", "gcp"],
+          "description": "Cloud provider plugin name. Extending this enum is the only schema change needed for a new provider."
+        },
+        "region": { "type": "string", "minLength": 1 },
+        "storage": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string" },
+          "description": "Provider-specific storage settings, e.g. bucket/roleArn (aws), storageAccount/container (azure), bucket/serviceAccount (gcp)."
+        },
+        "polaris": {
+          "type": "object",
+          "required": ["domain"],
+          "additionalProperties": { "type": "string" },
+          "properties": {
+            "domain": { "type": "string", "minLength": 1 }
+          },
+          "description": "Polaris exposure settings; provider-specific keys such as certArn/dnsZone (aws) or resourceGroup (azure) are allowed."
+        }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "required": ["name", "cloud", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/catalogName" },
+        "cloud": { "$ref": "#/$defs/cloudId" },
+        "type": { "enum": ["internal", "federated"] },
+        "via": {
+          "$ref": "#/$defs/cloudId",
+          "description": "For federated catalogs: the cloud whose Polaris proxies requests to this catalog's cloud."
+        },
+        "bucketOverride": {
+          "type": "string",
+          "description": "Use this bucket/container instead of the cloud's default storage location."
+        },
+        "testFixture": {
+          "type": "boolean",
+          "description": "Marks catalogs that exist only for acceptance tests (e.g. forbidden-bucket checks)."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "federated" } },
+            "required": ["type"]
+          },
+          "then": { "required": ["via"] },
+          "else": { "not": { "required": ["via"] } }
+        }
+      ]
+    },
+    "queryEngine": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["spark", "trino", "snowflake"] },
+        "target": {
+          "$ref": "#/$defs/cloudId",
+          "description": "The cloud whose Kubernetes cluster hosts this engine. Not applicable to snowflake (SaaS)."
+        },
+        "workers": { "type": "integer", "minimum": 1 },
+        "jdbcUrlRef": { "$ref": "#/$defs/secretRef" },
+        "readsCatalogs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/catalogName" },
+          "description": "Catalogs a snowflake catalog-integration is created for."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "snowflake" } },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["jdbcUrlRef"],
+            "not": {
+              "anyOf": [
+                { "required": ["target"] },
+                { "required": ["workers"] }
+              ]
+            }
+          },
+          "else": {
+            "required": ["target"],
+            "not": {
+              "anyOf": [
+                { "required": ["jdbcUrlRef"] },
+                { "required": ["readsCatalogs"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "workbench": {
+      "type": "object",
+      "required": ["type", "target", "domain"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["jupyter", "vscode", "rstudio"] },
+        "target": { "$ref": "#/$defs/cloudId" },
+        "domain": { "type": "string", "minLength": 1 },
+        "auth": {
+          "type": "object",
+          "required": ["provider"],
+          "additionalProperties": false,
+          "properties": {
+            "provider": { "type": "string", "minLength": 1 },
+            "emailDomain": { "type": "string", "minLength": 1 },
+            "clientIdRef": { "$ref": "#/$defs/secretRef" },
+            "clientSecretRef": { "$ref": "#/$defs/secretRef" },
+            "cookieSecretRef": { "$ref": "#/$defs/secretRef" }
+          }
+        }
+      }
+    }
+  }
+}

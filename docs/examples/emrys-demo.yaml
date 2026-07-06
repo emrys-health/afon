@@ -1,0 +1,98 @@
+# Equivalent of the current Emrys demo environment (afon.properties),
+# expressed declaratively. See docs/config_driven_architecture.md.
+apiVersion: afon/v1
+deployment:
+  name: emrys-demo
+  clusterName: spark-cluster-wb2
+
+clouds:
+  - id: aws
+    provider: aws
+    region: eu-west-2
+    storage:
+      bucket: emrys-afon-bucket
+      roleArn: arn:aws:iam::123456789012:role/S3ReadWriteRole
+    polaris:
+      domain: emryspolaris.click
+      certArn: arn:aws:acm:eu-west-2:123456789012:certificate/7eaf973f-36d1-4f09-8481-751b3f85efa4
+      dnsZone: Z06847223IC61YVGEH6HR
+  - id: azure
+    provider: azure
+    region: uksouth
+    storage:
+      storageAccount: afonstorageaccount
+      container: afonstorage
+    polaris:
+      domain: emryspolarisazure.click
+      resourceGroup: afon_resource_group
+      subscription: ffae1297-4c57-47e0-9a89-5583b97835cf
+  - id: gcp
+    provider: gcp
+    region: europe-west2
+    storage:
+      bucket: emrys_afon_core
+      serviceAccount: my-vendable-sa@fjords-450014.iam.gserviceaccount.com
+    polaris:
+      domain: emryspolarisgcp.click
+
+catalogs:
+  - name: aws
+    cloud: aws
+    type: internal
+  - name: azure
+    cloud: azure
+    type: internal
+  - name: gcp
+    cloud: gcp
+    type: internal
+  - name: azure_external
+    cloud: azure
+    type: federated
+    via: aws
+  - name: gcp_external
+    cloud: gcp
+    type: federated
+    via: aws
+  - name: aws_forbidden
+    cloud: aws
+    type: internal
+    bucketOverride: emrys-afon-bucket-forbidden
+    testFixture: true
+  - name: azure_forbidden
+    cloud: azure
+    type: internal
+    bucketOverride: afonstorage-forbidden
+    testFixture: true
+  - name: gcp_forbidden
+    cloud: gcp
+    type: internal
+    bucketOverride: emrys_afon_core_forbidden
+    testFixture: true
+  - name: aws_trino
+    cloud: aws
+    type: internal
+    bucketOverride: emrys-afon-bucket-trino
+
+queryEngines:
+  - type: spark
+    target: aws
+    workers: 2
+  - type: trino
+    target: aws
+    workers: 2
+  - type: snowflake
+    jdbcUrlRef: SNOWFLAKE_JDBC_URL
+    readsCatalogs: [aws, gcp, azure_external]
+
+workbench:
+  type: jupyter
+  target: aws
+  domain: emrysjupyter.click
+  auth:
+    provider: google-oidc
+    emailDomain: "*"
+    clientIdRef: OAUTH2_CLIENT_ID
+    clientSecretRef: OAUTH2_CLIENT_SECRET
+    cookieSecretRef: OAUTH2_COOKIE_SECRET
+
+secretsFile: env.properties
