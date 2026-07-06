@@ -88,6 +88,9 @@ public class JupyterMfaConfig {
             "--email-domain=" + OIDC_EMAIL_DOMAIN.getValueFrom(properties),
             "--http-address=0.0.0.0:" + PROXY_PORT,
             "--cookie-secure=true",                           // set true when TLS terminates at this proxy
+            // Accept id_tokens whose email is unverified: this Keycloak has no SMTP verification flow,
+            // so users are provisioned with emailVerified=true, but manually-created users may not be.
+            "--insecure-oidc-allow-unverified-email=true",
             "--skip-provider-button=false",
             "--ping-path=/ping",
             format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)));
