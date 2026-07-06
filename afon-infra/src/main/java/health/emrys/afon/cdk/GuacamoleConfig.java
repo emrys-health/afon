@@ -186,6 +186,10 @@ public class GuacamoleConfig {
                 .env(List.of(
                         envVar("GUACD_HOSTNAME", "localhost"),
                         envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
+                        // Deploy the webapp at the root context ("/") instead of the default
+                        // "/guacamole/". Guacamole owns the domain root behind oauth2-proxy (which maps
+                        // "/" here); without this, "/" returns 404 and only "/guacamole/" works.
+                        envVar("WEBAPP_CONTEXT", "ROOT"),
                         envVar("GUACAMOLE_HOME", "/etc/guacamole")))
                 .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                      .containerPort(WEB_PORT)
