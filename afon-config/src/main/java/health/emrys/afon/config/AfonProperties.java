@@ -65,6 +65,12 @@ public class AfonProperties {
 
     // Key Cloak
     public static final AfonProperty KC_HOSTNAME                 = new AfonProperty("KC_HOSTNAME");
+    /**
+     * Public scheme KeyCloak advertises in its frontend/issuer URLs (http or https). Optional;
+     * defaults to https. In production KeyCloak sits behind a TLS-terminating load balancer, so the
+     * pod speaks http but must stamp https issuers (which oauth2-proxy requires). Tests set http.
+     */
+    public static final AfonProperty KC_PROTOCOL                 = new AfonProperty("KC_PROTOCOL");
     public static final AfonProperty KC_BOOTSTRAP_ADMIN_USERNAME = new AfonProperty("KC_BOOTSTRAP_ADMIN_USERNAME");
     public static final AfonProperty KC_BOOTSTRAP_ADMIN_PASSWORD = new AfonProperty("KC_BOOTSTRAP_ADMIN_PASSWORD");
     public static final AfonProperty KC_DB_URL                   = new AfonProperty("KC_DB_URL");
@@ -75,6 +81,11 @@ public class AfonProperties {
     // Polaris
     public static final AfonProperty USER_POLARIS_ID     = new AfonProperty("USER_POLARIS_ID");
     public static final AfonProperty USER_POLARIS_SECRET = new AfonProperty("USER_POLARIS_SECRET");
+    /**
+     * Optional (verified) email for the provisioned Polaris user. Required only if this user logs in
+     * through oauth2-proxy, which rejects unverified emails. Defaults to unset.
+     */
+    public static final AfonProperty USER_POLARIS_EMAIL  = new AfonProperty("USER_POLARIS_EMAIL");
     public static final AfonProperty POLARIS_ID          = new AfonProperty("POLARIS_ID");
     public static final AfonProperty POLARIS_SECRET      = new AfonProperty("POLARIS_SECRET");
     public static final AfonProperty POLARIS_ENDPOINT    = new AfonProperty("POLARIS_ENDPOINT");

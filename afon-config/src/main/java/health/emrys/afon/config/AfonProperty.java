@@ -32,6 +32,15 @@ public class AfonProperty {
         return value;
     }
 
+    /**
+     * As {@link #getValueFrom(Properties)} but falls back to {@code defaultValue} when the property is
+     * absent, instead of throwing. Use for optional properties that have a sensible default (e.g. the
+     * KeyCloak scheme, which defaults to https for real deployments but is overridden to http in tests).
+     */
+    public String getValueFrom(Properties properties, String defaultValue) {
+        return properties.getProperty(propertyName, defaultValue);
+    }
+
     public String getPropertyName() {
         return propertyName;
     }
