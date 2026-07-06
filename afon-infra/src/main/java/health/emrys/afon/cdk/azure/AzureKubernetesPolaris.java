@@ -194,6 +194,21 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack implements Prov
         };
     }
 
+    /**
+     * nginx ingress with a cert-manager TLS certificate plus a DNS A record —
+     * the same wiring the Jupyter path uses in {@link #newJupyterConfig()}.
+     */
+    @Override
+    public void exposeWorkbench(String ingressName, String domain, String serviceName, int servicePort) {
+        var util = new TFUtils(
+            this, domain, ingressName + "-tls",
+            servicePort, serviceName, ingressName);
+        IngressV1 ingress = util.createIngress(
+            List.of(nginxRelease, certManager),
+            Optional.empty());
+        configureDns(ingress, domain);
+    }
+
     @Override
     public boolean lockDownJupyterEgress() {
         // Preserves current behaviour: the restrictive egress NetworkPolicy is

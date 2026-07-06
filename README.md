@@ -125,6 +125,12 @@ mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain e
 
 This deploys Polaris to AWS and Azure, populates catalogs, and runs a Spark smoke test. It takes approximately 45 minutes.
 
+> **Preferred:** describe the deployment in a single `afon-deployment.yaml` and
+> deploy with `DeployFromConfigMain` instead — see
+> [Deploy from a single YAML config](#deploy-from-a-single-yaml-config-new). The
+> per-topology `Deploy*Main` classes are legacy and scheduled for removal
+> ([Phase 4 TODO](#todo--phase-4-legacy-removal-breaking-changes)).
+
 ### 7. Access Polaris
 
 Once deployed, log in via your domain name:
@@ -244,13 +250,14 @@ Test specs include:
 Deployments can now be described in one declarative file (`afon-deployment.yaml`)
 instead of picking a per-topology `Deploy*Main` class. The design and roadmap
 live in [docs/config_driven_architecture.md](docs/config_driven_architecture.md);
-the work landed in three stages:
+the work landed in four stages:
 
 | Stage | What it delivered |
 |---|---|
 | **1. Schema + parser** | A JSON Schema (`afon-config/src/main/resources/afon-deployment.schema.json`) and matching Java records (`health.emrys.afon.config.deployment`) that parse and validate the YAML — clouds, catalogs, query engines, workbench. Secrets are never in the YAML: fields like `jdbcUrlRef` *name* a property in `afon.properties`/`env.properties`. `LegacyConfigExporter` generates a starter YAML from your current properties. Example config: `docs/examples/emrys-demo.yaml`. |
 | **2. Plugin extraction** | The cloud stacks, engines and workbench became plugins behind `health.emrys.afon.platform`: `AwsCloudPlugin`/`AzureCloudPlugin`/`GcpCloudPlugin` (via `PluginRegistry`), `SparkEngineDeployer`/`TrinoEngineDeployer`, `JupyterWorkbenchDeployer`. The legacy `Deploy*Main` classes still work and now delegate to the same code — `PluginParityTest` asserts both paths synthesise byte-identical Terraform, so `tofu apply` never recreates live resources. |
 | **3. Planner + entry point** | `DeploymentPlanner` turns the YAML into the familiar ordered step list (per cloud: clean → deploy → wait for DNS → configure catalogs, then Snowflake catalog integrations last). `DeployFromConfigMain` runs it; `DocumentFromConfigMain` prints it as markdown. `SnowflakeEngineDeployer` emits the same `CREATE CATALOG INTEGRATION` SQL as the `DeploySnowflakeReading*Main` demos. `DeploymentPlannerTest` asserts the config-driven AWS deployment is identical to the legacy `DeployFullStackAwsMain` stack. |
+| **3b. Workbenches + UI** | Every workbench (`jupyter`, `vscode`, `rstudio`) deploys behind the same oauth2-proxy gate via a shared `AuthProxyConfig`; `VsCodeWorkbench` and `RStudioWorkbench` join `JupyterWorkbenchDeployer` (synth-tested by `WebWorkbenchSynthTest`). `afon-ui/` is a static config generator (React + Tailwind + `ajv`, no backend, no credentials) that validates against the same JSON Schema as the Java planner and downloads `afon-deployment.yaml`; a Playwright test gates it. Acceptance: `WorkbenchAuthGateSpec` (any workbench refuses unauthenticated access) and `ConfigDrivenAccessSpec` (runs the per-cloud access specs for exactly the clouds the YAML declares). |
 
 **1. Generate a config from your current properties** (or start from
 `docs/examples/emrys-demo.yaml`):
@@ -285,10 +292,74 @@ mvn compile -Pdemo -Dexec.mainClass=health.emrys.afon.platform.DeployFromConfigM
   -Dexec.args="../docs/examples/emrys-demo.yaml deploy_azure" exec:exec
 ```
 
+**5. Build a config in the browser** — `afon-ui` is a static single-page app
+(no backend, no cloud credentials) that walks through clouds → catalogs →
+engines → workbench, validates live against the shared JSON Schema, and
+downloads the YAML for review:
+
+```shell
+cd afon-ui
+npm install && npm run dev   # http://localhost:5173
+```
+
 Current constraints: cloud `id`s must still be `aws`/`azure`/`gcp` (state and
-tooling key off `SupportedCloudsEnum` until Phase 4), and VS Code/RStudio
-workbenches plus the config-builder UI are still to come. The legacy
-`Deploy*Main` commands below all keep working unchanged.
+tooling key off `SupportedCloudsEnum` until Phase 4). The legacy
+`Deploy*Main` commands below all keep working unchanged until then.
+
+### TODO — Phase 4: legacy removal (breaking changes)
+
+Phases 1–3 of [docs/config_driven_architecture.md](docs/config_driven_architecture.md)
+are delivered; the YAML workflow above is the preferred path. Phase 4 removes
+the legacy path. It has **not** been executed yet because it deliberately
+breaks entry points and the synth-parity safety net. What needs to be done,
+and what breaks:
+
+**Clean-up tasks**
+
+1. **Delete the per-topology mains** — the 9 `Deploy*Main` classes in
+   `health.emrys.afon.demo` (`DeployFullStackAwsMain`,
+   `DeployFullStackAzureMain`, `DeployAzurePolarisMain`, `DeployGcpPolarisMain`,
+   `DeployExternalCatalogsMain`, the four `DeploySnowflake*Main`s), their
+   `Document*Main` companions, and `StepsProvider`. Keep `StepRunner`,
+   `StepOperations` and `StepActions` — `DeployFromConfigMain` runs on them.
+2. **Retire the parity gates** — `PluginParityTest` and the legacy-vs-config
+   assertions in `DeploymentPlannerTest` compare against code deleted in (1).
+   Replace them with config-driven synth snapshot tests so accidental infra
+   recreation is still caught.
+3. **Derive Trino's catalog list from `catalogs:`** — today it iterates
+   `SupportedCloudsEnum` (deferred from Phase 3 because changing it alters the
+   synthesised Helm values, which the parity gate forbids). Unblocked once (2)
+   lands.
+4. **Collapse `SupportedCloudsEnum`** — the biggest chunk: ~52 files across 7
+   modules reference it. Providers (`aws`/`azure`/`gcp`) should come from
+   `clouds[].provider`; the topology values (`AWS_TRINO`, `*_FORBIDDEN`,
+   `*_EXTERNAL`) are really catalog names and should come from `catalogs:`
+   (test fixtures marked with `testFixture: true`).
+5. **Purge legacy references** — `.vscode/launch.json`,
+   `docs/full_stack_aws.md`, `docs/aws_azure_external_catalogs.md`,
+   `scripts/trino/README.md`, `docs/DOCUMENTATION.md`, and the remaining
+   `Deploy*Main` how-to sections in this README.
+
+**Breaking changes**
+
+- Every `mvn … -Dexec.mainClass=health.emrys.afon.demo.Deploy*Main …` command
+  stops working. The only deploy entry point becomes `DeployFromConfigMain`
+  plus an `afon-deployment.yaml`; documentation generation moves from
+  `Document*Main` to `DocumentFromConfigMain`.
+- Code importing `SupportedCloudsEnum` breaks — including the
+  `afon-acceptance-tests` fixtures (`AcceptanceTestConfig`'s `AWS_TRINO` /
+  `*_FORBIDDEN` catalogs) and the Spark/Trino config-key derivation in
+  `afon-spark` / `afon-trino`. These must be re-keyed on config-declared
+  catalog names; `ConfigDrivenAccessSpec` becomes the way the access suites
+  are selected.
+- The synthesised Terraform for Trino changes when (3) lands: the first
+  `tofu apply` afterwards **will modify the live Trino Helm release**, and
+  there is no parity gate any more — review the plan against each live
+  environment before applying.
+- Cloud `id`s in the YAML stop being constrained to `aws`/`azure`/`gcp`
+  (multiple clouds per provider become possible), which changes CDKTF stack
+  IDs for anything not already using the defaults — keep `id`s stable for
+  existing deployments or OpenTofu will recreate stacks.
 
 ### Deploy the full AWS stack
 

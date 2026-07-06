@@ -9,6 +9,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
+import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -35,6 +36,8 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
+import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_CERT_ARN;
+import static health.emrys.afon.config.AfonProperties.AWS_JUPYTER_DNS_ZONE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
 import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_NAME;
 
@@ -166,6 +169,30 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud, 
     @Override
     public JupyterConfig newJupyterConfig() {
         return new JupyterAwsConfig(this, cloudProvider, properties);
+    }
+
+    /**
+     * ALB ingress terminating HTTPS at the load balancer plus a Route53 alias
+     * record — the same wiring {@code JupyterAwsConfig#configureHttpsAndDNS}
+     * uses. The certificate and hosted zone still come from the workbench
+     * properties ({@code AWS_JUPYTER_CERT_ARN} / {@code AWS_JUPYTER_DNS_ZONE});
+     * a deployment has at most one workbench, so they are shared.
+     */
+    @Override
+    public void exposeWorkbench(String ingressName, String domain, String serviceName, int servicePort) {
+        IngressV1 ingress = cloudProvider.createHttpsIngress(
+            ingressName + "-https-ingress",
+            ingressName,
+            AWS_JUPYTER_CERT_ARN.getValueFrom(properties),
+            domain,
+            serviceName,
+            servicePort,
+            cloudProvider.getSubnetIds());
+
+        cloudProvider.configureDNS(
+            ingressName + "AliasRecord",
+            AWS_JUPYTER_DNS_ZONE.getValueFrom(properties),
+            domain, cloudProvider.getLbRelease(), ingress, ingressName);
     }
 
     @Override
