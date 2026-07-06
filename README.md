@@ -1,10 +1,10 @@
 # Afon Documentation
 
-Afon is the core infrastructure project that deploys [Apache Polaris](https://polaris.apache.org/) across AWS, Azure, and GCP to enable secure cross-cloud querying of Iceberg tables via Spark and Snowflake.
+Afon is the core infrastructure project that deploys [Apache Polaris](https://polaris.apache.org/) across AWS, Azure, and GCP to enable secure cross-cloud querying of Iceberg tables within an ephemeral research envirobment
 
 ---
 
-## Quickstart — How I set it up
+## Quickstart — How to set it up
 
 ### Prerequisites
 
