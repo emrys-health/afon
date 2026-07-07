@@ -93,7 +93,7 @@ public class KeyCloakAdmin {
             "client_id", "admin-cli",
             "username", adminUser,
             "password", adminPassword
-                                 ));
+        ));
         HttpPost post = new HttpPost(uri);
         post.setHeader("Content-Type", "application/x-www-form-urlencoded");
         post.setEntity(new StringEntity(body));
@@ -115,7 +115,7 @@ public class KeyCloakAdmin {
         String json = MAPPER.writeValueAsString(Map.of(
             "realm", realm,
             "enabled", true
-                                                      ));
+        ));
         postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm);
     }
 
@@ -123,10 +123,11 @@ public class KeyCloakAdmin {
      * Creates a confidential client with direct access grants enabled so that the user's
      * username/password can be exchanged for a token.
      */
-    public void createConfidentialClient(String adminToken,
-                                         String realm,
-                                         String clientId,
-                                         String clientSecret) throws IOException {
+    public void createConfidentialClient(
+        String adminToken,
+        String realm,
+        String clientId,
+        String clientSecret) throws IOException {
         String json = MAPPER.writeValueAsString(Map.of(
             "clientId", clientId,
             "secret", clientSecret,
@@ -136,7 +137,7 @@ public class KeyCloakAdmin {
             "serviceAccountsEnabled", true,
             "directAccessGrantsEnabled", true,
             "standardFlowEnabled", false
-                                                      ));
+        ));
         postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "client " + clientId);
     }
 
@@ -168,11 +169,12 @@ public class KeyCloakAdmin {
      * Creates a confidential client for the OAuth2 authorization-code (browser) flow: standard flow
      * on, direct grants and service accounts off, with the given redirect URIs whitelisted.
      */
-    public void createBrowserClient(String adminToken,
-                                    String realm,
-                                    String clientId,
-                                    String clientSecret,
-                                    List<String> redirectUris) throws IOException {
+    public void createBrowserClient(
+        String adminToken,
+        String realm,
+        String clientId,
+        String clientSecret,
+        List<String> redirectUris) throws IOException {
         String json = MAPPER.writeValueAsString(Map.ofEntries(
             Map.entry("clientId", clientId),
             Map.entry("secret", clientSecret),
@@ -185,15 +187,16 @@ public class KeyCloakAdmin {
             Map.entry("redirectUris", redirectUris),
             // "+" tells KeyCloak to derive allowed CORS web origins from the redirect URIs.
             Map.entry("webOrigins", List.of("+"))
-                                                             ));
+        ));
         postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "browser client " + clientId);
     }
 
-    public void createUser(String adminToken,
-                           String realm,
-                           String username,
-                           String password,
-                           String email) throws IOException {
+    public void createUser(
+        String adminToken,
+        String realm,
+        String username,
+        String password,
+        String email) throws IOException {
         Map<String, Object> user = new HashMap<>();
         user.put("username", username);
         user.put("enabled", true);
@@ -203,11 +206,12 @@ public class KeyCloakAdmin {
         if (email != null && !email.isBlank()) {
             user.put("email", email);
         }
-        user.put("credentials", List.of(Map.of(
-            "type", "password",
-            "value", password,
-            "temporary", false
-                                              )));
+        user.put(
+            "credentials", List.of(Map.of(
+                "type", "password",
+                "value", password,
+                "temporary", false
+            )));
         String json = MAPPER.writeValueAsString(user);
         postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + username);
     }
@@ -260,9 +264,13 @@ public class KeyCloakAdmin {
         return sb.toString();
     }
 
-    /** oauth2-proxy's callback path (see JupyterMfaConfig's --redirect-url). */
+    /**
+     * oauth2-proxy's callback path (see JupyterMfaConfig's --redirect-url).
+     */
     public static final String OAUTH2_PROXY_CALLBACK = "/oauth2/callback";
-    /** JupyterHub's OAuthenticator callback path (HUB_BASE_URL + "hub/oauth_callback"). */
+    /**
+     * JupyterHub's OAuthenticator callback path (HUB_BASE_URL + "hub/oauth_callback").
+     */
     public static final String JUPYTERHUB_CALLBACK   = "/jupyter/hub/oauth_callback";
 
     /**
@@ -270,21 +278,33 @@ public class KeyCloakAdmin {
      * already-running KeyCloak.
      */
     public static void main(String[] args) {
-        Properties   properties = new AfonPropertiesLoader().getProperties();
+        Properties    properties = new AfonPropertiesLoader().getProperties();
         KeyCloakAdmin admin      = new KeyCloakAdmin(properties);
-        admin.registerPolarisUser(
-            AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
-            AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
-            AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, ""));
+        if (args.length == 3) {
+            String userID   = args[0];
+            String password = args[1];
+            String email    = args[2];
+            logger.info("user ID = {}, password = {}, email = {}", userID, password, email);
+            admin.registerPolarisUser(
+                userID,
+                password,
+                email
+            );
+        } else {
+            admin.registerPolarisUser(
+                AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
+                AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
+                AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, ""));
 
-        // Provision the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
-        // "sign in" on the OAuth splash yields KeyCloak's "Client not found".
-        String jupyterDomain = AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties);
-        admin.registerBrowserClient(
-            AfonProperties.OAUTH2_CLIENT_ID.getValueFrom(properties),
-            AfonProperties.OAUTH2_CLIENT_SECRET.getValueFrom(properties),
-            List.of(
-                "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
-                "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
+            // Provision the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
+            // "sign in" on the OAuth splash yields KeyCloak's "Client not found".
+            String jupyterDomain = AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties);
+            admin.registerBrowserClient(
+                AfonProperties.OAUTH2_CLIENT_ID.getValueFrom(properties),
+                AfonProperties.OAUTH2_CLIENT_SECRET.getValueFrom(properties),
+                List.of(
+                    "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
+                    "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
+        }
     }
 }
