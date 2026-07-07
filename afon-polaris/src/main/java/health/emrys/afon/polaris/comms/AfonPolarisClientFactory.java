@@ -37,4 +37,13 @@ public class AfonPolarisClientFactory {
         return new KeyCloakPolarisClient(props);
     }
 
+    public AfonPolarisClient getPolarisClient(String endpoint, String clientId, String clientSecret, String kcHost) {
+        Properties props = new AfonPropertiesLoader().getProperties();
+        props.setProperty(POLARIS_ENDPOINT.getPropertyName(), endpoint);
+        props.setProperty(POLARIS_ID.getPropertyName(), clientId);
+        props.setProperty(POLARIS_SECRET.getPropertyName(), clientSecret);
+        props.setProperty(KC_HOSTNAME.getPropertyName(), kcHost);
+        return new KeyCloakPolarisClient(props);
+    }
+
 }

@@ -21,8 +21,8 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
  */
 class ExternalAzureDBxTableSpec extends SpecPretifier with GivenWhenThen {
 
-  val client      = AcceptanceTestConfig.instance.getPolarisClient
-  val accessToken = AcceptanceTestConfig.instance.getAccessToken()
+  val client      = AcceptanceTestConfig.instance.getPolarisAdminClient
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
 
   val FEDERATED_CATALOG_NAME = "phdbx"
 

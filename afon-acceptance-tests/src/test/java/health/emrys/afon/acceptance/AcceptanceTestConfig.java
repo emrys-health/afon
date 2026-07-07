@@ -6,7 +6,6 @@ import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
-import health.emrys.afon.polaris.comms.KeyCloakPolarisClient;
 
 import java.util.Properties;
 
@@ -25,24 +24,30 @@ public class AcceptanceTestConfig {
 
     private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
 
-    private final AfonPolarisClient           polarisClient;
+    private final AfonPolarisClient           polarisAdminClient;
     private final AwsCloudConfigForPolaris    awsCloudConfigForPolaris;
     private final AwsCloudConfigForPolaris    awsForbidden;
     private final AzureCloudConfigForPolaris  azureCloudConfigForPolaris;
     private final AzureCloudConfigForPolaris  azureForbidden;
     private final GoogleCloudConfigForPolaris gcpCloudConfigForPolaris;
     private final GoogleCloudConfigForPolaris gcpForbidden;
-    private final String                      clientId;
-    private final String                      clientSecret;
+    private final String                      adminClientId;
+    private final String                      adminClientSecret;
     private final Properties                  properties;
     private final AwsCloudConfigForPolaris    awsTrino;
+    private final AfonPolarisClient           polarisClient;
 
     private AcceptanceTestConfig(Properties properties) {
         properties.put(KC_HOSTNAME.getPropertyName(), ContainerHelper.KEYCLOAK_HOSTNAME);
-        this.clientId     = POLARIS_ID.getValueFrom(properties);
-        this.clientSecret = ***REMOVED***
-        this.properties   = properties;
+        this.adminClientId     = POLARIS_ID.getValueFrom(properties);
+        this.adminClientSecret = ***REMOVED***
+        this.properties        = properties;
         startContainers(properties);
+        this.polarisAdminClient         = clientFactory.getPolarisClient(
+            POLARIS_ENDPOINT.getValueFrom(properties),
+            adminClientId,
+            adminClientSecret,
+            ContainerHelper.KEYCLOAK_HOSTNAME);
         this.polarisClient              = clientFactory.getPolarisClient(properties);
         this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
         this.awsTrino                   = new AwsCloudConfigForPolaris(properties) {
@@ -109,12 +114,20 @@ public class AcceptanceTestConfig {
         return polarisClient.getAccessToken();
     }
 
-    public String getClientId() {
-        return clientId;
+    public AfonPolarisClient getPolarisAdminClient() {
+        return polarisAdminClient;
     }
 
-    public String getClientSecret() {
-        return clientSecret;
+    public String getAdminAccessToken() {
+        return polarisAdminClient.getAccessToken();
+    }
+
+    public String getAdminClientId() {
+        return adminClientId;
+    }
+
+    public String getAdminClientSecret() {
+        return adminClientSecret;
     }
 
     public AwsCloudConfigForPolaris getAwsCloudConfigForPolaris() {
