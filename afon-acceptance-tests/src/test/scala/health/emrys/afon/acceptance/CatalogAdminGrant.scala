@@ -12,8 +12,8 @@ abstract class PolarisFixture extends Function0[Any] {
 
   val REST_CODE_RESOURCE_CREATED = 201
 
-  val client = AcceptanceTestConfig.instance.getPolarisClient
-  val accessToken = AcceptanceTestConfig.instance.getAccessToken()
+  val client = AcceptanceTestConfig.instance.getPolarisAdminClient
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
   val dtos = new PolarisDTOs(new JsonMaker())
 
 }
