@@ -28,10 +28,10 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).create()
   }
 
-  val client = AcceptanceTestConfig.instance.getPolarisClient
-  val accessToken = AcceptanceTestConfig.instance.getAccessToken()
 
   "Polaris" should {
+    val client      = AcceptanceTestConfig.instance.getPolarisAdminClient
+    val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
     "be told about the catalog" in {
       val uri = getCreateCatalogURI
       Given(s"a Polaris endpoint at ${client.getEndpoint}")
@@ -65,6 +65,8 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   }
 
   s"A table" should {
+    val client      = AcceptanceTestConfig.instance.getPolarisClient
+    val accessToken = AcceptanceTestConfig.instance.getAccessToken()
     "have a namespace" in {
       import scala.jdk.CollectionConverters._
       val conf = SparkHelper.sparkWarehouse.sparkConfigs(cloudProvider).asScala.map {

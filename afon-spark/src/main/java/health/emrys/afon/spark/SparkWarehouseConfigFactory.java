@@ -15,9 +15,15 @@ public class SparkWarehouseConfigFactory {
 
     private static @NotNull Properties propertiesWith(String clientId, String clientSecret, String host) {
         Properties properties = new AfonPropertiesLoader().getProperties();
+        properties.put(POLARIS_ENDPOINT.getPropertyName(), host);
+        return propertiesWith(clientId, clientSecret, properties);
+    }
+
+    private static @NotNull Properties propertiesWith(String clientId, String clientSecret, Properties defaults) {
+        Properties properties = new Properties();
+        properties.putAll(defaults);
         properties.put(POLARIS_ID.getPropertyName(), clientId);
         properties.put(POLARIS_SECRET.getPropertyName(), clientSecret);
-        properties.put(POLARIS_ENDPOINT.getPropertyName(), host);
         return properties;
     }
 
@@ -34,7 +40,15 @@ public class SparkWarehouseConfigFactory {
         String clientSecret,
         String host) {
         Properties properties = propertiesWith(clientId, clientSecret, host);
-        return new KeyCloakSparkWarehouseConfig(properties);
+        return getConfig(properties);
+    }
+
+    public SparkWarehouseConfig getConfig(
+        String clientId,
+        String clientSecret,
+        Properties defaults) {
+        Properties properties = propertiesWith(clientId, clientSecret, defaults);
+        return getConfig(properties);
     }
 
     public SparkWarehouseConfig getConfig(Properties properties) {
