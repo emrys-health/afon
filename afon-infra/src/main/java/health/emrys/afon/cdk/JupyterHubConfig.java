@@ -273,18 +273,25 @@ public abstract class JupyterHubConfig {
                 eksDependOn));
         }
 
-        // Guacamole streams each user's pod desktop. File-based login: the user logs into Guacamole
-        // with their email + the VNC password, which authenticates them against user-mapping.xml AND
-        // serves them their own connection (a header-auth SSO session can't use these file-provider
-        // connections — "Session not associated with authentication provider default" — so true SSO
-        // would require a database-backed Guacamole instead). Each user's connection targets their
-        // own VNC Service (a different host per user).
+        // Guacamole streams each user's pod desktop. Transparent SSO: no Guacamole login page — the
+        // guacamole-auth-header extension trusts the X-Forwarded-Email header oauth2-proxy sets, and
+        // guacamole-auth-jdbc (backed by the shared RDS Postgres) serves each user their own
+        // connection. A one-shot Job creates the DB/schema and provisions one VNC connection per user,
+        // each targeting that user's own VNC Service (a different host per user).
+        GuacamoleConfig.DbConfig guacamoleDb = new GuacamoleConfig.DbConfig(
+            AfonProperties.POLARIS_DB_HOST.getValueFrom(properties),
+            5432,
+            "guacamole",
+            AfonProperties.KC_DB_USERNAME.getValueFrom(properties),
+            AfonProperties.KC_DB_PASSWORD.getValueFrom(properties));
         new GuacamoleConfig(
             stack,
             guacamoleDeps,
             session -> emailToVncHost.get(session.username()),
             jupyterPassword,
-            sessions);
+            sessions,
+            guacamoleDb,
+            "X-Forwarded-Email");
 
         // A single oauth2-proxy MFA gate fronts both Guacamole (root) and JupyterHub
         // (under /jupyter/), so users authenticate once, spawn their pod via the hub, then reach its

@@ -91,6 +91,9 @@ public class JupyterMfaConfig {
             // Accept id_tokens whose email is unverified: this Keycloak has no SMTP verification flow,
             // so users are provisioned with emailVerified=true, but manually-created users may not be.
             "--insecure-oidc-allow-unverified-email=true",
+            // Forward the authenticated identity to upstreams as X-Forwarded-Email. Guacamole's
+            // header-auth extension reads this to log the user in with no second login page.
+            "--pass-user-headers=true",
             "--skip-provider-button=false",
             "--ping-path=/ping",
             format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)));
