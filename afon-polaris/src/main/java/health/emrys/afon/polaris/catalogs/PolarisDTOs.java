@@ -4,6 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.polaris.core.admin.model.*;
 import org.apache.polaris.core.entity.PolarisEntityConstants;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 public class PolarisDTOs {
 
     private final JsonMaker jsonMaker;
@@ -60,6 +63,10 @@ public class PolarisDTOs {
         } catch (JsonProcessingException e) {
             throw new IncorrectConfigException(this.toString(), e);
         }
+    }
+
+    public <T> T fromJson(InputStream is, Class<T> clazz) throws IOException {
+        return jsonMaker.fromJson(is, clazz);
     }
 
 }

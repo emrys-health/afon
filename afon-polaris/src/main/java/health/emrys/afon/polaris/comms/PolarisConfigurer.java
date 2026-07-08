@@ -7,6 +7,8 @@ import health.emrys.afon.polaris.catalogs.PolarisDTOs;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,6 +16,8 @@ import java.io.InputStream;
 import static java.lang.String.format;
 
 public class PolarisConfigurer {
+
+    private static final Logger log = LoggerFactory.getLogger(PolarisConfigurer.class);
 
     private final AfonPolarisClient client;
 
@@ -113,10 +117,17 @@ public class PolarisConfigurer {
         String              uri      = principalsURI();
         PolarisDTOs         dtos     = new PolarisDTOs(new JsonMaker());
         String              json     = dtos.principalCreation(principalName);
+        deletePrincipalIfPresent(accessToken, principalName);
         ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
         try (InputStream is = response.getEntity().getContent()) {
-            JsonMaker jsonMaker = new JsonMaker();
-            return jsonMaker.fromJson(is, PrincipalWithCredentials.class);
+            return dtos.fromJson(is, PrincipalWithCredentials.class);
+        }
+    }
+
+    private void deletePrincipalIfPresent(String accessToken, String principalName) throws IOException {
+        String              uri      = principalsURI() + "/" + principalName;
+        try (ClassicHttpResponse delete   = client.delete(uri, accessToken);) {
+            log.info("Deleting {} resulted in HTTP code {}", principalName, delete.getCode());
         }
     }
 }

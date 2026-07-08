@@ -2,6 +2,7 @@ package health.emrys.afon.polaris.comms;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,10 +40,12 @@ public class ConfigureUserMain {
     ConfigureUserMain(Properties properties) {
         AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(properties);
         accessToken = client.getAccessToken();
+        logger.debug("Using access token {}", accessToken);
         configurer  = new PolarisConfigurer(client);
     }
 
     private void configureUser(String principalName) throws IncorrectConfigException, IOException {
-        configurer.configureUser(accessToken, principalName);
+        PrincipalWithCredentials principal = configurer.configureUser(accessToken, principalName);
+        logger.info("Created Polaris User {}", principal);
     }
 }
