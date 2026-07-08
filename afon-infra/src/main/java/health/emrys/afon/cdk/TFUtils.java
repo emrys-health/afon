@@ -32,7 +32,7 @@ public class TFUtils {
     public static final List<LocalExecProvisioner> POLARIS_PROVISIONERS
         = uponDestroyRun(NO_POLARIS_FINALIZERS);
 
-    static String finalizeIngress(String service) {
+    public static String finalizeIngress(String service) {
         return format("kubectl patch ingress %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
     }
 

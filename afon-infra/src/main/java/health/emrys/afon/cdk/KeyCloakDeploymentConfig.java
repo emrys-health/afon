@@ -35,17 +35,17 @@ import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
  * quay.io/keycloak/keycloak:26.6.3 start
  */
 public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends Construct {
-
-    public static final String          APP_NAME         = "keycloak";
-    public static final String          KC_SVC           = "keycloak-service";
-    public static final ServiceSpecPort KC_PORT          = ServiceSpecPort.builder()
-                                                                          .name("web")
-                                                                          .port(KEYCLOAK_PORT)
-                                                                          .targetPort("" + KEYCLOAK_PORT)
-                                                                          .protocol("TCP")
-                                                                          .build();
-    private final       String          SECRET_NAME      = "kcsecrets";
-    protected final     String          KEYCLOAK_INGRESS = "keycloak-ingress";
+    public static final String          KEYCLOAK_HTTPS_INGRESS = "keycloak-https-ingress";
+    public static final String          APP_NAME               = "keycloak";
+    public static final String          KC_SVC                 = "keycloak-service";
+    public static final ServiceSpecPort KC_PORT                = ServiceSpecPort.builder()
+                                                                                .name("web")
+                                                                                .port(KEYCLOAK_PORT)
+                                                                                .targetPort("" + KEYCLOAK_PORT)
+                                                                                .protocol("TCP")
+                                                                                .build();
+    private final       String          SECRET_NAME            = "kcsecrets";
+    protected final     String          KEYCLOAK_INGRESS       = "keycloak-ingress";
     protected final     T               cloudProvider;
 
     public KeyCloakDeploymentConfig(
@@ -85,8 +85,8 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
         // over plain http.
         String protocol = KC_PROTOCOL.getValueFrom(properties, "https");
         String hostname = "https".equalsIgnoreCase(protocol)
-            ? protocol + "://" + KC_HOSTNAME.getValueFrom(properties)
-            : KC_HOSTNAME.getValueFrom(properties);
+                          ? protocol + "://" + KC_HOSTNAME.getValueFrom(properties)
+                          : KC_HOSTNAME.getValueFrom(properties);
 
         List<DeploymentSpecTemplateSpecContainerEnv> envs = new ArrayList<>();
         envs.add(envVar(KC_DB.getPropertyName(), KC_DB.getValueFrom(properties)));
