@@ -35,17 +35,17 @@ import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
  * quay.io/keycloak/keycloak:26.6.3 start
  */
 public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends Construct {
-
-    public static final String          APP_NAME         = "keycloak";
-    public static final String          KC_SVC           = "keycloak-service";
-    public static final ServiceSpecPort KC_PORT          = ServiceSpecPort.builder()
-                                                                          .name("web")
-                                                                          .port(KEYCLOAK_PORT)
-                                                                          .targetPort("" + KEYCLOAK_PORT)
-                                                                          .protocol("TCP")
-                                                                          .build();
-    private final       String          SECRET_NAME      = "kcsecrets";
-    protected final     String          KEYCLOAK_INGRESS = "keycloak-ingress";
+    public static final String          KEYCLOAK_HTTPS_INGRESS = "keycloak-https-ingress";
+    public static final String          APP_NAME               = "keycloak";
+    public static final String          KC_SVC                 = "keycloak-service";
+    public static final ServiceSpecPort KC_PORT                = ServiceSpecPort.builder()
+                                                                                .name("web")
+                                                                                .port(KEYCLOAK_PORT)
+                                                                                .targetPort("" + KEYCLOAK_PORT)
+                                                                                .protocol("TCP")
+                                                                                .build();
+    private final       String          SECRET_NAME            = "kcsecrets";
+    protected final     String          KEYCLOAK_INGRESS       = "keycloak-ingress";
     protected final     T               cloudProvider;
 
     public KeyCloakDeploymentConfig(
@@ -77,13 +77,27 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
             .data(secretsMap)
             .build();
 
+        // KeyCloak 26 takes the scheme of its frontend/issuer URLs from KC_HOSTNAME when that is a full
+        // URL. In production KeyCloak sits behind a TLS-terminating load balancer, so the pod itself only
+        // speaks http (KC_HTTP_ENABLED=true) but must still advertise https issuers - otherwise
+        // oauth2-proxy, which requires https, rejects the OIDC discovery document. We therefore pin the
+        // public scheme here. Configurable (defaulting to https) so the acceptance tests can run KeyCloak
+        // over plain http.
+        String protocol = KC_PROTOCOL.getValueFrom(properties, "https");
+        String hostname = "https".equalsIgnoreCase(protocol)
+                          ? protocol + "://" + KC_HOSTNAME.getValueFrom(properties)
+                          : KC_HOSTNAME.getValueFrom(properties);
+
         List<DeploymentSpecTemplateSpecContainerEnv> envs = new ArrayList<>();
         envs.add(envVar(KC_DB.getPropertyName(), KC_DB.getValueFrom(properties)));
-        envs.add(envVar("KC_PROXY", "edge"));
+        // KC 26 proxy v2: trust the AWS load balancer's X-Forwarded-* headers. This replaces the
+        // deprecated KC_PROXY=edge (which KC 26 warns about). Without it Keycloak treats the
+        // TLS-terminated request as plain http and omits the Secure flag from its AUTH_SESSION_ID /
+        // KC_RESTART cookies. KC_HOSTNAME_STRICT_BACKCHANNEL was a hostname v1 option and is dropped.
+        envs.add(envVar("KC_PROXY_HEADERS", "xforwarded"));
         envs.add(envVar("KC_HOSTNAME_STRICT", "true"));
-        envs.add(envVar("KC_HOSTNAME_STRICT_BACKCHANNE", "false"));
         envs.add(envVar("KC_HTTP_ENABLED", "true"));
-        envs.add(envVar(KC_HOSTNAME.getPropertyName(), KC_HOSTNAME.getValueFrom(properties)));
+        envs.add(envVar(KC_HOSTNAME.getPropertyName(), hostname));
         kcProperties.stream().forEach(x -> envs.add(
             envFromSecret(x.getPropertyName(), SECRET_NAME, x.getPropertyName()))
         );

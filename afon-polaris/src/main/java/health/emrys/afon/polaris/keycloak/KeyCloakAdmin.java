@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -59,14 +60,23 @@ public class KeyCloakAdmin {
      * is left untouched.
      */
     public void registerPolarisUser(String user, String userPassword) {
+        registerPolarisUser(user, userPassword, null);
+    }
+
+    /**
+     * As {@link #registerPolarisUser(String, String)} but also sets the user's (verified) email.
+     * A verified email is required for logins that go through oauth2-proxy, which rejects id_tokens
+     * whose email is unverified. Pass {@code null}/blank to leave the email unset.
+     */
+    public void registerPolarisUser(String user, String userPassword, String email) {
         try {
             String adminToken = adminToken();
             createRealm(adminToken, KEYCLOAK_REALM);
             createConfidentialClient(adminToken, KEYCLOAK_REALM, user, userPassword);
-            createUser(adminToken, KEYCLOAK_REALM, user, userPassword);
+            createUser(adminToken, KEYCLOAK_REALM, user, userPassword, email);
             logger.info(
-                "KeyCloak realm '{}' provisioned with client/user '{}'",
-                KEYCLOAK_REALM, user);
+                "KeyCloak realm '{}' provisioned with client/user '{}' (email '{}')",
+                KEYCLOAK_REALM, user, email);
         } catch (IOException e) {
             throw new RuntimeException("Failed to provision KeyCloak for Polaris", e);
         }
@@ -83,7 +93,7 @@ public class KeyCloakAdmin {
             "client_id", "admin-cli",
             "username", adminUser,
             "password", adminPassword
-                                 ));
+        ));
         HttpPost post = new HttpPost(uri);
         post.setHeader("Content-Type", "application/x-www-form-urlencoded");
         post.setEntity(new StringEntity(body));
@@ -105,7 +115,7 @@ public class KeyCloakAdmin {
         String json = MAPPER.writeValueAsString(Map.of(
             "realm", realm,
             "enabled", true
-                                                      ));
+        ));
         postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm);
     }
 
@@ -113,10 +123,11 @@ public class KeyCloakAdmin {
      * Creates a confidential client with direct access grants enabled so that the user's
      * username/password can be exchanged for a token.
      */
-    public void createConfidentialClient(String adminToken,
-                                         String realm,
-                                         String clientId,
-                                         String clientSecret) throws IOException {
+    public void createConfidentialClient(
+        String adminToken,
+        String realm,
+        String clientId,
+        String clientSecret) throws IOException {
         String json = MAPPER.writeValueAsString(Map.of(
             "clientId", clientId,
             "secret", clientSecret,
@@ -126,24 +137,82 @@ public class KeyCloakAdmin {
             "serviceAccountsEnabled", true,
             "directAccessGrantsEnabled", true,
             "standardFlowEnabled", false
-                                                      ));
+        ));
         postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "client " + clientId);
     }
 
-    public void createUser(String adminToken,
-                           String realm,
-                           String username,
-                           String password) throws IOException {
-        String json = MAPPER.writeValueAsString(Map.of(
-            "username", username,
-            "enabled", true,
-            "emailVerified", true,
+    /**
+     * Ensures the realm exists and (idempotently) creates the confidential, browser-flow client that
+     * oauth2-proxy and JupyterHub use to log users in. Unlike {@link #createConfidentialClient} (a
+     * direct-grant client for Polaris), this client has the authorization-code flow enabled and
+     * registered redirect URIs, so the browser redirect from oauth2-proxy resolves - otherwise
+     * KeyCloak returns "Client not found".
+     *
+     * @param redirectUris the exact callback URLs, e.g.
+     *                     {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
+     *                     {@code https://jupyter.example/jupyter/hub/oauth_callback} (JupyterHub).
+     */
+    public void registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris) {
+        try {
+            String adminToken = adminToken();
+            createRealm(adminToken, KEYCLOAK_REALM);
+            createBrowserClient(adminToken, KEYCLOAK_REALM, clientId, clientSecret, redirectUris);
+            logger.info(
+                "KeyCloak realm '{}' provisioned with browser client '{}' (redirects {})",
+                KEYCLOAK_REALM, clientId, redirectUris);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to provision KeyCloak browser client", e);
+        }
+    }
+
+    /**
+     * Creates a confidential client for the OAuth2 authorization-code (browser) flow: standard flow
+     * on, direct grants and service accounts off, with the given redirect URIs whitelisted.
+     */
+    public void createBrowserClient(
+        String adminToken,
+        String realm,
+        String clientId,
+        String clientSecret,
+        List<String> redirectUris) throws IOException {
+        String json = MAPPER.writeValueAsString(Map.ofEntries(
+            Map.entry("clientId", clientId),
+            Map.entry("secret", clientSecret),
+            Map.entry("enabled", true),
+            Map.entry("protocol", "openid-connect"),
+            Map.entry("publicClient", false),
+            Map.entry("standardFlowEnabled", true),
+            Map.entry("directAccessGrantsEnabled", false),
+            Map.entry("serviceAccountsEnabled", false),
+            Map.entry("redirectUris", redirectUris),
+            // "+" tells KeyCloak to derive allowed CORS web origins from the redirect URIs.
+            Map.entry("webOrigins", List.of("+"))
+        ));
+        postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "browser client " + clientId);
+    }
+
+    public void createUser(
+        String adminToken,
+        String realm,
+        String username,
+        String password,
+        String email) throws IOException {
+        Map<String, Object> user = new HashMap<>();
+        user.put("username", username);
+        user.put("enabled", true);
+        // emailVerified is always true because oauth2-proxy rejects logins whose id_token email is
+        // unverified; there is no SMTP verification flow behind this Keycloak.
+        user.put("emailVerified", true);
+        if (email != null && !email.isBlank()) {
+            user.put("email", email);
+        }
+        user.put(
             "credentials", List.of(Map.of(
                 "type", "password",
                 "value", password,
                 "temporary", false
-                                         ))
-                                                      ));
+            )));
+        String json = MAPPER.writeValueAsString(user);
         postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + username);
     }
 
@@ -196,14 +265,46 @@ public class KeyCloakAdmin {
     }
 
     /**
-     * Allows the user/password to be provisioned independently of the containers, e.g. against an
+     * oauth2-proxy's callback path (see JupyterMfaConfig's --redirect-url).
+     */
+    public static final String OAUTH2_PROXY_CALLBACK = "/oauth2/callback";
+    /**
+     * JupyterHub's OAuthenticator callback path (HUB_BASE_URL + "hub/oauth_callback").
+     */
+    public static final String JUPYTERHUB_CALLBACK   = "/jupyter/hub/oauth_callback";
+
+    /**
+     * Allows the realm/client/user to be provisioned independently of the containers, e.g. against an
      * already-running KeyCloak.
      */
     public static void main(String[] args) {
-        Properties properties = new AfonPropertiesLoader().getProperties();
-        new KeyCloakAdmin(properties)
-            .registerPolarisUser(
+        Properties    properties = new AfonPropertiesLoader().getProperties();
+        KeyCloakAdmin admin      = new KeyCloakAdmin(properties);
+        if (args.length == 3) {
+            String userID   = args[0];
+            String password = args[1];
+            String email    = args[2];
+            logger.info("user ID = {}, password = {}, email = {}", userID, password, email);
+            admin.registerPolarisUser(
+                userID,
+                password,
+                email
+            );
+        } else {
+            admin.registerPolarisUser(
                 AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
-                AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties));
+                AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
+                AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, ""));
+
+            // Provision the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
+            // "sign in" on the OAuth splash yields KeyCloak's "Client not found".
+            String jupyterDomain = AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties);
+            admin.registerBrowserClient(
+                AfonProperties.OAUTH2_CLIENT_ID.getValueFrom(properties),
+                AfonProperties.OAUTH2_CLIENT_SECRET.getValueFrom(properties),
+                List.of(
+                    "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
+                    "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
+        }
     }
 }
