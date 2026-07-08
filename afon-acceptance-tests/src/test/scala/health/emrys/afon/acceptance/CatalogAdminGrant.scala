@@ -4,8 +4,7 @@ import health.emrys.afon.acceptance.PolarisHelper.principalRoleName
 import health.emrys.afon.polaris.catalogs.{CloudConfigForPolaris, JsonMaker, PolarisDTOs}
 import health.emrys.afon.polaris.comms.PermissionsConfigurer
 import health.emrys.afon.polaris.comms.PolarisConfigurer._
-import org.apache.polaris.core.admin.model.CatalogPrivilege
-import org.apache.polaris.core.admin.model.CatalogPrivilege.{NAMESPACE_CREATE, NAMESPACE_FULL_METADATA, TABLE_CREATE, TABLE_READ_DATA, TABLE_WRITE_DATA, VIEW_FULL_METADATA}
+import org.apache.polaris.core.admin.model.CatalogPrivilege._
 import org.scalatest.GivenWhenThen
 
 abstract class PolarisFixture extends Function0[Any] {

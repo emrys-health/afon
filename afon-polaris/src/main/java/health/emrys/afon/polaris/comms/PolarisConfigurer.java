@@ -76,14 +76,16 @@ public class PolarisConfigurer {
             warehouseName);
     }
 
-    public static String namespaceURI(String warehouseName,
-                                      String namespace) {
+    public static String namespaceURI(
+        String warehouseName,
+        String namespace) {
         return format("/api/catalog/v1/%s/namespaces/%s", warehouseName, namespace);
     }
 
-    public static String tableURI(String warehouseName,
-                                  String namespace,
-                                  String tableName) {
+    public static String tableURI(
+        String warehouseName,
+        String namespace,
+        String tableName) {
         return format(
             "/api/catalog/v1/%s/namespaces/%s/tables/%s",
             warehouseName, namespace, tableName);
@@ -96,8 +98,9 @@ public class PolarisConfigurer {
     /**
      * Everything you need to initialize Polaris in one method.
      */
-    public HttpResponse[] configurCatalogFor(CloudConfigForPolaris config,
-                                             String accessToken) throws IOException, IncorrectConfigException {
+    public HttpResponse[] configurCatalogFor(
+        CloudConfigForPolaris config,
+        String accessToken) throws IOException, IncorrectConfigException {
         String warehouseName = config.warehouseName();
         client.delete(catalogsURI(warehouseName), accessToken); // this failing is expected if there is no catalog
         return new HttpResponse[]{
@@ -112,21 +115,22 @@ public class PolarisConfigurer {
             };
     }
 
-    public PrincipalWithCredentials configureUser(String accessToken,
-                                                  String principalName) throws IncorrectConfigException, IOException {
-        String              uri      = principalsURI();
-        PolarisDTOs         dtos     = new PolarisDTOs(new JsonMaker());
-        String              json     = dtos.principalCreation(principalName);
+    public PrincipalWithCredentials configureUser(
+        String accessToken,
+        String principalName) throws IncorrectConfigException, IOException {
+        String      uri  = principalsURI();
+        PolarisDTOs dtos = new PolarisDTOs(new JsonMaker());
+        String      json = dtos.principalCreation(principalName);
         deletePrincipalIfPresent(accessToken, principalName);
-        ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
-        try (InputStream is = response.getEntity().getContent()) {
+        try (ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
+             InputStream is = response.getEntity().getContent()) {
             return dtos.fromJson(is, PrincipalWithCredentials.class);
         }
     }
 
     private void deletePrincipalIfPresent(String accessToken, String principalName) throws IOException {
-        String              uri      = principalsURI() + "/" + principalName;
-        try (ClassicHttpResponse delete   = client.delete(uri, accessToken);) {
+        String uri = principalsURI() + "/" + principalName;
+        try (ClassicHttpResponse delete = client.delete(uri, accessToken)) {
             log.info("Deleting {} resulted in HTTP code {}", principalName, delete.getCode());
         }
     }
