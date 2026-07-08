@@ -28,7 +28,7 @@ public class AwsKeyCloakDeploymentConfig extends KeyCloakDeploymentConfig<AwsCon
     @Override
     protected void configureHttpsAndDNS() {
         IngressV1 ingress = cloudProvider.createHttpsIngress(
-            "keycloak-https-ingress",
+            KEYCLOAK_HTTPS_INGRESS,
             KEYCLOAK_INGRESS,
             certArn,
             hostname,
