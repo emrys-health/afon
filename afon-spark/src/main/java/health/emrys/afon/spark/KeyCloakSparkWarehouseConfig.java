@@ -35,8 +35,8 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
     private final String oauth2ServerUri;
 
     KeyCloakSparkWarehouseConfig(Properties properties) {
-        super(POLARIS_ID.getValueFrom(properties),
-              POLARIS_SECRET.getValueFrom(properties),
+        super(USER_POLARIS_ID.getValueFrom(properties),
+              USER_POLARIS_SECRET.getValueFrom(properties),
               POLARIS_ENDPOINT.getValueFrom(properties),
               protocolFor(POLARIS_ENDPOINT.getValueFrom(properties))
               );
