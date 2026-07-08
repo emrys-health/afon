@@ -56,7 +56,9 @@ import software.constructs.Construct;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.cdk.KeyCloakDeploymentConfig.KEYCLOAK_HTTPS_INGRESS;
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
+import static health.emrys.afon.cdk.TFUtils.finalizeIngress;
 import static health.emrys.afon.cdk.aws.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
@@ -787,7 +789,8 @@ public class AwsConstruct extends AbstractConstruct {
                 NO_INSTALLATION_FINALIZERS,
                 NO_JUPYTER_LB,
                 NO_POLARIS_FINALIZERS,
-                NO_JUPYTER_FINALIZERS))
+                NO_JUPYTER_FINALIZERS,
+                finalizeIngress(KEYCLOAK_HTTPS_INGRESS)))
             .build();
         return serviceAccountName;
     }

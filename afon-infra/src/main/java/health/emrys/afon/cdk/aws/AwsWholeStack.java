@@ -11,7 +11,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.cdk.JupyterConfig;
+import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.NetworkConfiguration;
 import health.emrys.afon.cdk.SparkConfig;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -64,12 +65,21 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
                          final Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
-        JupyterConfig jupyter = new JupyterAwsConfig(
+        JupyterHubConfig jupyter = new JupyterHubAwsConfig(
             this,
             cloudProvider,
             properties);
         NetworkConfiguration network = new NetworkConfiguration(this);
-        network.networkPolicies(jupyter.deployJupyter(dependables), SPARK_CONNECTOR_NAME);
+        // Every Service the hub deploy creates (guacamole-web, the per-user VNC services,
+        // jupyterhub-proxy-public) fires the AWS LB Controller's mutating webhook
+        // (mservice.elbv2.k8s.aws), which intercepts all Service creations — not just
+        // type: LoadBalancer. Depend on the controller's Helm release — installed atomically,
+        // so Terraform waits for its pods to be Ready — otherwise the webhook Service can still
+        // have zero endpoints and the apply fails with "no endpoints available for service
+        // aws-load-balancer-webhook-service". Same reasoning as SparkClusterDeployment's LB Service.
+        List<ITerraformDependable> jupyterDependables = new ArrayList<>(dependables);
+        jupyterDependables.add(cloudProvider.getLbRelease());
+        network.networkPolicies(jupyter.deployJupyterHub(jupyterDependables), SPARK_CONNECTOR_NAME);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
         HelmProviderKubernetes kubernetes = HelmProviderKubernetes

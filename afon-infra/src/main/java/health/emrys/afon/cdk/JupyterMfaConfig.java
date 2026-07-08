@@ -50,6 +50,21 @@ public class JupyterMfaConfig {
                      String clientId,
                      String clientSecret,
                      String cookieSecret) {
+        this(scope, dependsOn, List.of(jupyterUpstreamUrl), jupyterDomain, clientId, clientSecret, cookieSecret);
+    }
+
+    /**
+     * Variant accepting several upstreams. oauth2-proxy mounts each upstream at the path component
+     * of its URL (longest-prefix match), so a single MFA gate can front several apps on one domain
+     * — e.g. JupyterHub at {@code /} and Guacamole at {@code /guacamole/}.
+     */
+    public JupyterMfaConfig(Construct scope,
+                     List<ITerraformDependable> dependsOn,
+                     List<String> upstreamUrls,
+                     String jupyterDomain,
+                     String clientId,
+                     String clientSecret,
+                     String cookieSecret) {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
 
@@ -67,24 +82,29 @@ public class JupyterMfaConfig {
                         ))
             .build();
 
-        List<String> argsForOAuthProxy = List.of(
+        List<String> proxyArgs = new ArrayList<>(List.of(
             "--provider=oidc",
             "--oidc-issuer-url=" + OIDC_ISSUER_URL.getValueFrom(properties),
-            "--upstream=" + jupyterUpstreamUrl,
+            "--email-domain=" + OIDC_EMAIL_DOMAIN.getValueFrom(properties),
             "--http-address=0.0.0.0:" + PROXY_PORT,
             "--cookie-secure=true",                           // set true when TLS terminates at this proxy
+            // Accept id_tokens whose email is unverified: this Keycloak has no SMTP verification flow,
+            // so users are provisioned with emailVerified=true, but manually-created users may not be.
+            "--insecure-oidc-allow-unverified-email=true",
+            // Forward the authenticated identity to upstreams as X-Forwarded-Email. Guacamole's
+            // header-auth extension reads this to log the user in with no second login page.
+            "--pass-user-headers=true",
             "--skip-provider-button=false",
             "--ping-path=/ping",
-            format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)
-                                   );
-        List<String> args = new ArrayList<>();
-        args.addAll(emailArgs(properties));
-        args.addAll(argsForOAuthProxy);
+            format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)));
+        // One --upstream per app; oauth2-proxy routes by the path component of each URL.
+        upstreamUrls.forEach(url -> proxyArgs.add("--upstream=" + url));
+
         DeploymentSpecTemplateSpecContainer proxyContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("oauth2-proxy")
             .image("quay.io/oauth2-proxy/oauth2-proxy:v7.6.0")
-            .args(args)
+            .args(proxyArgs)
             .env(List.of(
                 envFromSecret("OAUTH2_PROXY_CLIENT_ID", SECRET_NAME, "client-id"),
                 envFromSecret("OAUTH2_PROXY_CLIENT_SECRET", SECRET_NAME, "client-secret"),
@@ -118,8 +138,19 @@ public class JupyterMfaConfig {
                        .build();
     }
 
-    protected @NonNull List<String> emailArgs(Properties properties) {
-        return List.of("--email-domain=" + OIDC_EMAIL_DOMAIN.getValueFrom(properties));
+    private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
+        String envName, String secretName, String secretKey) {
+        return DeploymentSpecTemplateSpecContainerEnv
+            .builder()
+            .name(envName)
+            .valueFrom(DeploymentSpecTemplateSpecContainerEnvValueFrom
+                           .builder()
+                           .secretKeyRef(DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef
+                                             .builder()
+                                             .name(secretName)
+                                             .key(secretKey)
+                                             .build())
+                           .build())
+            .build();
     }
-
 }

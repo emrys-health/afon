@@ -7,19 +7,21 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.cdk.SparkWorkloads;
-import health.emrys.afon.cdk.TrinoWorkloads;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DOMAIN_NAME;
-import static health.emrys.afon.infra.Defaults.*;
+import static health.emrys.afon.infra.Defaults.SPARK_SERVICE_NAME;
 
 /**
  * This was initially run as a step after its superclass so it could be configured with domain names etc.
@@ -30,6 +32,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
 
     static final Logger logger                 = org.slf4j.LoggerFactory.getLogger(SparkClusterDeployment.class);
     static final String NO_SPARK_LB_FINALIZERS = "kubectl patch service spark-master-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
+    protected final String awsPolarisDomainName;
 
     public SparkClusterDeployment(@NotNull Construct scope,
                                   @NotNull SupportedCloudsEnum id,
@@ -37,17 +40,9 @@ public class SparkClusterDeployment extends AwsWholeStack {
         super(scope, id, properties);
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
-
-        String awsPolarisDomainName = AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
+        awsPolarisDomainName = AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
         new SparkWorkloads(awsPolarisDomainName).deploy(this, id, eksDependOn);
-
-        // Trino only needs the cluster reachable (not the Spark operator), so it depends on the
-        // EKS dependables rather than eksDependOn.
-        new TrinoWorkloads(properties, awsPolarisDomainName)
-            .deploy(this, helmProvider, id, cloudProvider.getDependables());
-
         Service sparkLB = sparkExternalService(eksDependOn);
-
         unregisterCRDs(List.of(sparkLB));
     }
 
