@@ -29,6 +29,7 @@ public class PermissionsConfigurer {
         String warehouseName,
         String principalRoleName,
         String catalogRoleName) throws IOException, IncorrectConfigException {
+        logger.info("Associating {} with catalog role {} in catalog {}", principalRoleName, catalogRoleName, warehouseName);
         String uri  = associateRolesURI(principalRoleName, warehouseName);
         String json = dtos.catalogRoleCreation(catalogRoleName);
         return client.putJsonCall(uri, json, accessToken);
@@ -47,9 +48,6 @@ public class PermissionsConfigurer {
         String warehouseName,
         String catalogRoleName) throws IOException, IncorrectConfigException {
         String uri = catalogRolesURI(warehouseName);
-
-//        deleteRoleIfExists(catalogRoleName, warehouseName);
-
         String json = dtos.catalogRoleCreation(catalogRoleName);
         return client.postJsonCall(uri, json, accessToken);
     }
@@ -62,6 +60,7 @@ public class PermissionsConfigurer {
     }
 
     public HttpResponse createPrincipalRoles(String principalRoleName) throws IOException, IncorrectConfigException {
+        logger.info("Creating principal role {}", principalRoleName);
         String uri  = principalRolesURI();
         String json = dtos.principalRoleCreation(principalRoleName);
         return client.postJsonCall(uri, json, accessToken);
@@ -70,6 +69,7 @@ public class PermissionsConfigurer {
     public HttpResponse associatePrincipalRoles(
         String principalName,
         String principalRoleName) throws IncorrectConfigException, IOException {
+        logger.info("Associated user {} with role {}", principalName, principalRoleName);
         String uri  = getPrincipalToRolesURI(principalName);
         String json = dtos.principalRoleCreation(principalRoleName);
         return client.putJsonCall(uri, json, accessToken);
