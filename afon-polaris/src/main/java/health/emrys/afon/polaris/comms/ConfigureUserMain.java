@@ -36,11 +36,11 @@ public class ConfigureUserMain {
         ConfigureUserMain app           = new ConfigureUserMain(properties);
         String            catalogName   = args[1];
         String            principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
-        String            roleName      = "emrysrole";
+        String            roleName      = "emrysrole4";
         try {
             logger.info("Configuring Polaris User {} for catalog {} and role {}", principalName, catalogName, roleName);
             app.configurePrivilegesFor(catalogName, roleName);
-            app.configureUser(principalName, roleName);
+            app.configureUser(principalName, roleName, catalogName);
         } catch (Exception x) {
             logger.error("Error while configuring user " + principalName, x);
         }
@@ -56,10 +56,18 @@ public class ConfigureUserMain {
         permissions = new PermissionsConfigurer(client);
     }
 
-    private HttpResponse configureUser(String principalName, String roleName) throws IncorrectConfigException, IOException {
+    private HttpResponse configureUser(String principalName,
+                                       String roleName,
+                                       String catalogName) throws IncorrectConfigException, IOException, InterruptedException {
         PrincipalWithCredentials principal = configurer.configureUser(accessToken, principalName);
         logger.info("Created Polaris User {}", principal);
-        HttpResponse response = permissions.associatePrincipalRoles(principalName, roleName);
+
+
+        String principalRoleName = roleName + "Principal";
+        logger.info("HTTP code = {}", permissions.createPrincipalRoles(principalRoleName).getCode());
+        logger.info("HTTP code = {}", permissions.associateRoles(catalogName, principalRoleName, roleName));
+
+        HttpResponse response = permissions.associatePrincipalRoles(principalName, principalRoleName);
         if (isFailure(response)) {
             logger.error("Could not create user {} with role {}. HTTP code = {}", principalName, roleName, response.getCode());
         }
@@ -73,19 +81,27 @@ public class ConfigureUserMain {
     private List<HttpResponse> configurePrivilegesFor(
         String catalogName,
         String roleName) throws IOException, IncorrectConfigException {
+        permissions.deleteRoleIfExists(roleName, catalogName);
         List<HttpResponse> results  = new ArrayList<>();
         HttpResponse       response = permissions.createCatalogRole(catalogName, roleName);
         if (isFailure(response)) {
             logger.error("Could not create role {} frr catalog {}", roleName, catalogName);
             results.add(response);
         } else {
-            for (CatalogPrivilege privilege : catalogPrivileges) {
-                HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
-                if (isFailure(result)) {
-                    logger.error("Could not grant role {} the privilege {} on  catalog {}", roleName, privilege, catalogName);
-                }
-                results.add(result);
+            logger.info("Created role {}", roleName);
+            results.addAll(addPermissions(catalogName, roleName));
+        }
+        return results;
+    }
+
+    private List<HttpResponse> addPermissions(String catalogName, String roleName) throws IncorrectConfigException, IOException {
+        List<HttpResponse> results  = new ArrayList<>();
+        for (CatalogPrivilege privilege : catalogPrivileges) {
+            HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
+            if (isFailure(result)) {
+                logger.error("Could not grant role {} the privilege {} on  catalog {}", roleName, privilege, catalogName);
             }
+            results.add(result);
         }
         return results;
     }
