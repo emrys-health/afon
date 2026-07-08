@@ -1,12 +1,12 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.keycloak.KeyCloakAdmin;
+import health.emrys.afon.security.keycloak.KeyCloakAdmin;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
 import health.emrys.afon.trino.TrinoServerConfiguration;
-import health.emrys.security.keycloak.KeyCloakConfig;
+import health.emrys.afon.security.keycloak.KeyCloakConfig;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -27,7 +27,7 @@ import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.*;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
-import static health.emrys.security.keycloak.KeyCloakConfig.*;
+import static health.emrys.afon.security.keycloak.KeyCloakConfig.*;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;

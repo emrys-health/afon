@@ -1,4 +1,4 @@
-package health.emrys.security.keycloak;
+package health.emrys.afon.security.keycloak;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.slf4j.Logger;

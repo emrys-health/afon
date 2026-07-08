@@ -16,8 +16,8 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.TFUtils.*;
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_IMAGE;
-import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
+import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_IMAGE;
+import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
 
 /**
  * These environment variable, although inappropriate for Docker, get the app to start:

@@ -6,7 +6,7 @@ import java.util.Map;
 import static java.lang.String.format;
 
 /**
- * Configuration shared between the KeyCloak container, the {@link KeyCloakAdmin} that provisions
+ * Configuration shared between the KeyCloak container, the {@link health.emrys.afon.security.keycloak.KeyCloakAdmin} that provisions
  * users in it and the Polaris container that uses KeyCloak as its OIDC identity provider.
  */
 public class KeyCloakHelper {

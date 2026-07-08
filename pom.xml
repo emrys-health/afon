@@ -41,6 +41,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <polaris.version>1.4.0-SNAPSHOT</polaris.version>
+        <httpclient5-fluent.version>5.5</httpclient5-fluent.version>
     </properties>
 
     <modules>

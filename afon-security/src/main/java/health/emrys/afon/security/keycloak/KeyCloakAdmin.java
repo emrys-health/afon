@@ -1,10 +1,8 @@
-package health.emrys.afon.polaris.keycloak;
+package health.emrys.afon.security.keycloak;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.config.ConfigUtils;
-import health.emrys.security.keycloak.KeyCloakConfig;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -23,8 +21,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.ConfigUtils.protocolFor;
-import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
-import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
+import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
