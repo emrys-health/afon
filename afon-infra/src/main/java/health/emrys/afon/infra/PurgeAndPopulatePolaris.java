@@ -8,17 +8,17 @@ import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
 import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.infra.checks.SparkChecker.EXTERNAL_NAMESPACE;
-import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -56,15 +56,17 @@ public class PurgeAndPopulatePolaris {
         config.initializePolaris();
     }
 
-    private void cleanAllTables(
+    private List<HttpResponse> cleanAllTables(
         SupportedCloudsEnum warehouse,
         String namespace) throws IOException, ParseException {
         log.info("Attempting to delete tables from {}.{}", warehouse, namespace);
         String url = listTables(warehouse.toString(), namespace);
+        List<HttpResponse> responses = new ArrayList<>();
         for (JsonNode node : getAll(url, "identifiers")) {
             String table = node.get("name").toString();
-            cleanTable(warehouse, namespace, table.replace("\"", ""));
+            responses.add(cleanTable(warehouse, namespace, table.replace("\"", "")));
         }
+        return responses;
     }
 
     private Iterable<JsonNode> getAll(
@@ -80,23 +82,38 @@ public class PurgeAndPopulatePolaris {
         return identifiers;
     }
 
-    public void cleanTable(
+    public HttpResponse cleanTable(
         SupportedCloudsEnum warehouse,
         String namespace,
         String table) throws IOException {
         log.info(
             "Attempting to delete table {} in warehouse {} from namespace {} in {}",
             table, warehouse, namespace, domainName);
-        String accessToken = client.getAccessToken();
-        client.delete(tableURI(warehouse.toString(), namespace, table), accessToken);
+        String       accessToken = client.getAccessToken();
+        HttpResponse response    = client.delete(tableURI(warehouse.toString(), namespace, table), accessToken);
+        if (isFailure(response)) {
+            log.warn("Could not delete table {} in {}",  table, warehouse);
+        }
+        return response;
+    }
+
+    private static boolean isFailure(HttpResponse response) {
+        return response.getCode() / 100 != 2;
     }
 
     private void purgeRecursivelyForAllCatalogs(String domainName) {
         for (SupportedCloudsEnum warehouse : List.of(AZURE, AWS, GCP)) {
             try {
-                for (JsonNode node : getAll(namespaceURI(warehouse.toString()), "namespaces")) {
-                    String namespace = node.get("name").toString();
-                    client.delete(namespaceURI(warehouse.toString(), namespace), accessToken);
+                for (JsonNode namespaces : getAll(namespaceURI(warehouse.toString()), "namespaces")) {
+                    if (namespaces.isArray()) {
+                        for (JsonNode namespace : namespaces) {
+                            String namespaceName = namespace.textValue();
+                            cleanAllTables(warehouse, namespaceName);
+                            if (isFailure(client.delete(namespaceURI(warehouse.toString(), namespaceName), accessToken))) {
+                                throw new IllegalStateException(String.format("Could not delete namespace %s from %s", namespaceName, warehouse));
+                            }
+                        }
+                    }
                 }
                 client.delete(catalogsURI(warehouse.toString()), accessToken);
                 purgeRolesOf(warehouse);
