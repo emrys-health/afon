@@ -11,9 +11,6 @@ import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplat
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpec;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFrom;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerPort;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
@@ -28,8 +25,6 @@ import com.hashicorp.cdktf.providers.kubernetes.role_binding.RoleBindingSubject;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
@@ -47,7 +42,8 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.DeploymentUtils.withAppKubernetesIoName;
-import static health.emrys.afon.cdk.TFUtils.envVar;
+import static health.emrys.afon.cdk.TFUtils.clusterIpService;
+import static health.emrys.afon.cdk.TFUtils.envFromSecret;
 
 /**
  * Deploys <a href="https://z2jh.jupyter.org/">JupyterHub</a> instead of the single shared
@@ -250,8 +246,13 @@ public abstract class JupyterHubConfig {
         deployProxy(proxyDeps);
 
         // Public entrypoint for the JupyterHub side of the MFA gate (login + spawn).
-        Service proxyPublic = clusterIpService(
-            "jupyterhubProxyPublic", PROXY_PUBLIC_SVC, PROXY_LABELS, "http", PROXY_PUBLIC, eksDependOn);
+        List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
+                                                             .name("http")
+                                                             .port(PROXY_PUBLIC)
+                                                             .targetPort(String.valueOf(PROXY_PUBLIC))
+                                                             .protocol("TCP")
+                                                             .build());
+        Service proxyPublic = clusterIpService(eksDependOn, PROXY_LABELS, PROXY_PUBLIC_SVC, ports, stack);
 
         // Per user, a stable VNC Service that selects whichever pod KubeSpawner spawns for that user
         // (matched on the guacamole-user=<slug> label set by the hub's spawn hook). This is the
@@ -261,13 +262,14 @@ public abstract class JupyterHubConfig {
         List<ITerraformDependable> guacamoleDeps  = new ArrayList<>(eksDependOn);
         for (GuacUser user : onboarding.getUsers()) {
             emailToVncHost.put(user.email(), vncServiceName(user.slug()));
-            guacamoleDeps.add(clusterIpService(
-                "jupyterhubVnc-" + user.slug(),
-                vncServiceName(user.slug()),
-                Map.of(GUAC_USER_LABEL, user.slug()),
-                "vnc",
-                VNC_PORT,
-                eksDependOn));
+            List<ServiceSpecPort> userPorts = List.of(ServiceSpecPort.builder()
+                                                        .name("vnc")
+                                                        .port(VNC_PORT)
+                                                        .targetPort(String.valueOf(VNC_PORT))
+                                                        .protocol("TCP")
+                                                        .build());
+            Map<String, String> guacUserConfig = Map.of(GUAC_USER_LABEL, user.slug());
+            guacamoleDeps.add(clusterIpService(eksDependOn, guacUserConfig, vncServiceName(user.slug()), userPorts, stack));
         }
 
         // Guacamole streams each user's pod desktop. Transparent SSO: no Guacamole login page — the
@@ -369,7 +371,13 @@ public abstract class JupyterHubConfig {
                                 .build())
             .build();
 
-        clusterIpService("jupyterhubHub", HUB_SVC, HUB_LABELS, "hub", HUB_PORT, dependsOn);
+        List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
+                                                             .name("hub")
+                                                             .port(HUB_PORT)
+                                                             .targetPort(String.valueOf(HUB_PORT))
+                                                             .protocol("TCP")
+                                                             .build());
+        clusterIpService(dependsOn, HUB_LABELS, HUB_SVC, ports, stack);
     }
 
     private void deployProxy(List<ITerraformDependable> dependsOn) {
@@ -401,34 +409,13 @@ public abstract class JupyterHubConfig {
 
         DeploymentUtils.deploy(stack, dependsOn, PROXY_LABELS, List.of(proxyContainer), List.of(), "jupyterhub-proxy");
 
-        clusterIpService("jupyterhubProxyApi", PROXY_API_SVC, PROXY_LABELS, "api", PROXY_API, dependsOn);
-    }
-
-    private Service clusterIpService(
-        String id,
-        String name,
-        Map<String, String> selector,
-        String portName,
-        int port,
-        List<ITerraformDependable> dependsOn) {
-        return Service.Builder
-            .create(stack, id)
-            .metadata(ServiceMetadata.builder()
-                                     .name(name)
-                                     .namespace("default")
-                                     .build())
-            .dependsOn(dependsOn)
-            .spec(ServiceSpec.builder()
-                             .selector(selector)
-                             .type("ClusterIP")
-                             .port(List.of(ServiceSpecPort.builder()
-                                                          .name(portName)
-                                                          .port(port)
-                                                          .targetPort(String.valueOf(port))
-                                                          .protocol("TCP")
-                                                          .build()))
-                             .build())
-            .build();
+        List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
+                                                             .name("api")
+                                                             .port(PROXY_API)
+                                                             .targetPort(String.valueOf(PROXY_API))
+                                                             .protocol("TCP")
+                                                             .build());
+        clusterIpService(dependsOn, PROXY_LABELS, PROXY_API_SVC, ports, stack);
     }
 
     /**
@@ -532,22 +519,6 @@ public abstract class JupyterHubConfig {
                          .map(u -> "'" + u.email() + "': '" + u.slug() + "'")
                          .reduce((a, b) -> a + ", " + b)
                          .orElse("");
-    }
-
-    private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
-        String envName, String secretName, String secretKey) {
-        return DeploymentSpecTemplateSpecContainerEnv
-            .builder()
-            .name(envName)
-            .valueFrom(DeploymentSpecTemplateSpecContainerEnvValueFrom
-                           .builder()
-                           .secretKeyRef(DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef
-                                             .builder()
-                                             .name(secretName)
-                                             .key(secretKey)
-                                             .build())
-                           .build())
-            .build();
     }
 
     private static String sha256Hex(String input) {
