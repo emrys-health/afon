@@ -77,9 +77,14 @@ public class PolarisConfigurer {
     }
 
     public static String namespaceURI(
+        String warehouseName) {
+        return format("/api/catalog/v1/%s/namespaces/", warehouseName);
+    }
+
+    public static String namespaceURI(
         String warehouseName,
         String namespace) {
-        return format("/api/catalog/v1/%s/namespaces/%s", warehouseName, namespace);
+        return format("%s/%s", namespaceURI(warehouseName), namespace);
     }
 
     public static String tableURI(
