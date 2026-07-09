@@ -122,6 +122,10 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
             APP_NAME);
 
         dependants.add(app);
+        // The Service must not be created until the load balancer controller's mutating webhook is
+        // serving (on AWS its failurePolicy=Fail rejects the Service otherwise); getServiceDependables
+        // is empty on clouds without such a webhook.
+        dependants.addAll(cloudProvider.getServiceDependables());
         // NodePort (not ClusterIP): the AWS Load Balancer Controller uses instance targets by
         // default and requires a node port to build the ingress TargetGroup.
         nodePortService(dependants, labels, KC_SVC, List.of(KC_PORT), this);

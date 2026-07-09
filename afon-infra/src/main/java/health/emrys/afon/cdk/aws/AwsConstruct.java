@@ -949,6 +949,15 @@ public class AwsConstruct extends AbstractConstruct {
         return lbRelease;
     }
 
+    @Override
+    public List<ITerraformDependable> getServiceDependables() {
+        // The Keycloak Service is NodePort/LB-annotated, so its creation triggers the
+        // aws-load-balancer-controller's mservice mutating webhook (failurePolicy=Fail). Wait on
+        // the controller's Helm release (atomic, so Helm blocks until pods are Ready) to avoid the
+        // "no endpoints available for service aws-load-balancer-webhook-service" race.
+        return lbRelease == null ? List.of() : List.of(lbRelease);
+    }
+
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
         Resource.Builder
             .create(this, "cleanupELBs")
