@@ -54,13 +54,6 @@ public class SparkWarehouseConfig {
         this(clientId, clientSecret, host, "http");
     }
 
-    SparkWarehouseConfig(Properties properties) {
-        this(AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
-             AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
-             AfonProperties.POLARIS_ENDPOINT.getValueFrom(properties)
-             );
-    }
-
     public SparkConf sparkConf() throws IOException {
         return sparkConf(4);
     }
