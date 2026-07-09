@@ -29,7 +29,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.TerraformStack;
-import health.emrys.afon.cdk.Onboarding.GuacUser;
+import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;
 import health.emrys.afon.config.AfonProperties;
 
 import java.nio.charset.StandardCharsets;
@@ -146,7 +146,7 @@ public abstract class JupyterHubConfig {
         // One Guacamole login per user, keyed by email; each streams that user's own pod desktop on
         // the single VNC port (each user now has their own pod rather than sharing ports on one).
         this.sessions = new ArrayList<>();
-        for (GuacUser user : onboarding.getUsers()) {
+        for (EmrysUser user : onboarding.getUsers()) {
             sessions.add(new GuacamoleConfig.Session(user.email(), jupyterPassword, VNC_PORT));
         }
     }
@@ -260,7 +260,7 @@ public abstract class JupyterHubConfig {
         // logged into JupyterHub and spawned it.
         Map<String, String>        emailToVncHost = new LinkedHashMap<>();
         List<ITerraformDependable> guacamoleDeps  = new ArrayList<>(eksDependOn);
-        for (GuacUser user : onboarding.getUsers()) {
+        for (EmrysUser user : onboarding.getUsers()) {
             emailToVncHost.put(user.email(), vncServiceName(user.slug()));
             List<ServiceSpecPort> userPorts = List.of(ServiceSpecPort.builder()
                                                         .name("vnc")
@@ -500,7 +500,7 @@ public abstract class JupyterHubConfig {
             SINGLEUSER_IMAGE, SINGLEUSER_PORT,
             HUB_BASE_URL, GUAC_USER_LABEL,
             issuer, jupyterDomain(),
-            pythonSetOf(onboarding.getUsers().stream().map(GuacUser::email).toList()),
+            pythonSetOf(onboarding.getUsers().stream().map(EmrysUser::email).toList()),
             pythonSlugMap());
     }
 

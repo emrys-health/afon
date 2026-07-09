@@ -1,26 +1,22 @@
 package health.emrys.afon.cdk;
 
+import health.emrys.afon.security.keycloak.OnboardingConfig;
+
 import java.util.List;
 
-public class Onboarding {
-    /**
-     * A Guacamole user. {@code email} is the OIDC identity (the JupyterHub username and the
-     * Guacamole login); {@code slug} is a DNS/label-safe form used for the per-user VNC Service
-     * name and the pod label, since an email address is valid as neither.
-     */
-    public record GuacUser(String email, String slug) {}
+public class Onboarding implements OnboardingConfig {
 
     /**
      * Fixed roster. Guacamole's file-based auth and the per-user VNC Services must enumerate users
      * up front, so adding a user means editing this list and redeploying.
      * TODO - read from a CSV file
      */
-    private final List<GuacUser> users = List.of(
-        new GuacUser("phil.henry@emrys.health", "phil-henry"),
-        new GuacUser("will@emrys.health", "will"));
+    private final List<EmrysUser> users = List.of(
+        new EmrysUser("phil.henry@emrys.health", "phil-henry"),
+        new EmrysUser("will@emrys.health", "will"));
 
 
-    public List<GuacUser> getUsers() {
+    public List<EmrysUser> getUsers() {
         return users;
     }
 
