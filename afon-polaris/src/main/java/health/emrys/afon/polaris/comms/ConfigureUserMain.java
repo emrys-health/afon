@@ -65,8 +65,12 @@ public class ConfigureUserMain {
         logger.info("Created Polaris User {}", principal);
 
         // TODO - delete first?
-        logger.info("HTTP code = {}", permissions.createPrincipalRoles(principalRoleName).getCode());
-        logger.info("HTTP code = {}", permissions.associateRoles(catalogName, principalRoleName, roleName));
+        if (isFailure(permissions.createPrincipalRoles(principalRoleName))) {
+            logger.warn("Failed to create principal role {}", principalRoleName);
+        }
+        if (isFailure(permissions.associateRoles(catalogName, principalRoleName, roleName))) {
+            logger.warn("Failed to associate role {} with principale role {} in catalog {}", roleName, principalRoleName, catalogName);
+        }
 
         HttpResponse response = permissions.associatePrincipalRoles(principalName, principalRoleName);
         if (isFailure(response)) {
