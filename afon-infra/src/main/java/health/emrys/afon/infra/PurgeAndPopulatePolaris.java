@@ -13,6 +13,7 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
@@ -25,78 +26,94 @@ public class PurgeAndPopulatePolaris {
 
     private static final Logger log = getLogger(PurgeAndPopulatePolaris.class);
 
-    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
-
     public static void main(String[] args) throws Exception {
-        String host = args[0];
-        PurgeAndPopulatePolaris app = new PurgeAndPopulatePolaris(host);
+        String                  host = args[0];
+        PurgeAndPopulatePolaris app  = new PurgeAndPopulatePolaris(host);
         if (args.length == 1) {
-            app.createAllCatalogsFor();
+            app.createAllCatalogs();
         } else if (args.length == 4) {
-            app.clean(SupportedCloudsEnum.valueOf(args[1]), args[2], args[3]);
+            app.cleanTable(SupportedCloudsEnum.valueOf(args[1]), args[2], args[3]);
         }
     }
 
+    private final AfonPolarisClient client;
+    private final String            accessToken;
+
     public PurgeAndPopulatePolaris(String domainName) {
-        this.domainName = domainName;
+        AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+        this.domainName  = domainName;
+        this.client      = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
+        this.accessToken = client.getAccessToken();
+        log.info("POLARIS_TOKEN={}", accessToken);
     }
 
-    private final String domainName;
+    private final String       domainName;
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    public void createAllCatalogsFor() throws IncorrectConfigException, IOException {
-        purgeAcceptanceTests(domainName);
-        purgeRecursivelyForAllCatalogs(domainName, EXTERNAL_NAMESPACE);
+    public void createAllCatalogs() throws IncorrectConfigException, IOException {
+        purgeRecursivelyForAllCatalogs(domainName);
         EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(domainName);
         config.initializePolaris();
     }
 
-    public void clean(SupportedCloudsEnum warehouse,
-                      String namespace,
-                      String table) throws IOException {
-        log.info("Attempting to delete table {} in warehouse {} from namespace {} in {}",
-                 table, warehouse, namespace, domainName);
-        var    client      = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
+    private void cleanAllTables(
+        SupportedCloudsEnum warehouse,
+        String namespace) throws IOException, ParseException {
+        log.info("Attempting to delete tables from {}.{}", warehouse, namespace);
+        String url = listTables(warehouse.toString(), namespace);
+        for (JsonNode node : getAll(url, "identifiers")) {
+            String table = node.get("name").toString();
+            cleanTable(warehouse, namespace, table.replace("\"", ""));
+        }
+    }
+
+    private Iterable<JsonNode> getAll(
+        String url,
+        String rootNodeName) throws IOException, ParseException {
+        ClassicHttpResponse response    = client.getCall(url, accessToken);
+        JsonNode            root        = mapper.readTree(EntityUtils.toString(response.getEntity()));
+        JsonNode            identifiers = root.get(rootNodeName);
+        if (identifiers == null || !identifiers.isArray()) {
+            log.warn("Calling {} did not yield JSON with a root node of {}", url, rootNodeName);
+            return Collections.emptyList();
+        }
+        return identifiers;
+    }
+
+    public void cleanTable(
+        SupportedCloudsEnum warehouse,
+        String namespace,
+        String table) throws IOException {
+        log.info(
+            "Attempting to delete table {} in warehouse {} from namespace {} in {}",
+            table, warehouse, namespace, domainName);
         String accessToken = client.getAccessToken();
         client.delete(tableURI(warehouse.toString(), namespace, table), accessToken);
-        client.delete(namespaceURI(warehouse.toString(), namespace), accessToken);
-        client.delete(catalogsURI(warehouse.toString()), accessToken);
     }
 
-    public void purgeAcceptanceTests(String domainName) {
-        purgeRecursivelyForAllCatalogs(domainName, ACCEPTANCE_TEST_NAMESPACE);
-    }
-
-    private void purgeRecursivelyForAllCatalogs(String domainName, String namespace) {
-        log.info("Deleting namespace {} from {} for all warehouses if they're present",
-                 namespace, domainName);
-        var client = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
-
+    private void purgeRecursivelyForAllCatalogs(String domainName) {
         for (SupportedCloudsEnum warehouse : List.of(AZURE, AWS, GCP)) {
             try {
-                purgeAllTablesIn(warehouse, client, namespace);
+                for (JsonNode node : getAll(namespaceURI(warehouse.toString()), "namespaces")) {
+                    String namespace = node.get("name").toString();
+                    client.delete(namespaceURI(warehouse.toString(), namespace), accessToken);
+                }
+                client.delete(catalogsURI(warehouse.toString()), accessToken);
+                purgeRolesOf(warehouse);
             } catch (IOException | ParseException e) {
-                log.warn("Failed to delete {} namespace in catalog {} in {}. Error is {}. Ignoring and continuing.",
-                         namespace, warehouse, domainName, e.getMessage());
+                log.warn(
+                    "Failed to delete catalog {} in {}. Error is {}. Ignoring and continuing.",
+                    warehouse, domainName, e.getMessage());
             }
         }
     }
 
-    private void purgeAllTablesIn(SupportedCloudsEnum warehouse,
-                                  AfonPolarisClient client,
-                                  String namespace) throws IOException, ParseException {
-        log.info("Attempting to delete tables from {}.{}", warehouse, namespace);
-        ObjectMapper        mapper      = new ObjectMapper();
-        String              accessToken = client.getAccessToken();
-        ClassicHttpResponse response    = client.getCall(listTables(warehouse.toString(), namespace), accessToken);
-        JsonNode            root        = mapper.readTree(EntityUtils.toString(response.getEntity()));
-        JsonNode            identifiers = root.get("identifiers");
-
-        if (identifiers != null && identifiers.isArray()) {
-            log.info("Deleting tables from {}.{}", warehouse, namespace);
-            for (JsonNode node : identifiers) {
-                String table = node.get("name").toString();
-                clean(warehouse, namespace, table.replace("\"", ""));
-            }
+    private void purgeRolesOf(SupportedCloudsEnum warehouse) throws IOException, ParseException {
+        String uri = catalogRolesURI(warehouse.toString());
+        for (JsonNode node : getAll(uri, "roles")) {
+            String role = node.get("name").toString().replace("\"", "");
+            log.info("Deleting role {} from catalog {}", role, warehouse);
+            client.delete(String.format("%s/%s", uri, role), accessToken);
         }
     }
 
