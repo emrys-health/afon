@@ -16,8 +16,8 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.TFUtils.*;
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_IMAGE;
-import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
+import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_IMAGE;
+import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
 
 /**
  * These environment variable, although inappropriate for Docker, get the app to start:
@@ -35,6 +35,7 @@ import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
  * quay.io/keycloak/keycloak:26.6.3 start
  */
 public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends Construct {
+    public static final String          KEYCLOAK_INGRESS       = "keycloak-ingress";
     public static final String          KEYCLOAK_HTTPS_INGRESS = "keycloak-https-ingress";
     public static final String          APP_NAME               = "keycloak";
     public static final String          KC_SVC                 = "keycloak-service";
@@ -45,7 +46,6 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
                                                                                 .protocol("TCP")
                                                                                 .build();
     private final       String          SECRET_NAME            = "kcsecrets";
-    protected final     String          KEYCLOAK_INGRESS       = "keycloak-ingress";
     protected final     T               cloudProvider;
 
     public KeyCloakDeploymentConfig(
@@ -122,6 +122,10 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
             APP_NAME);
 
         dependants.add(app);
+        // The Service must not be created until the load balancer controller's mutating webhook is
+        // serving (on AWS its failurePolicy=Fail rejects the Service otherwise); getServiceDependables
+        // is empty on clouds without such a webhook.
+        dependants.addAll(cloudProvider.getServiceDependables());
         // NodePort (not ClusterIP): the AWS Load Balancer Controller uses instance targets by
         // default and requires a node port to build the ingress TargetGroup.
         nodePortService(dependants, labels, KC_SVC, List.of(KC_PORT), this);

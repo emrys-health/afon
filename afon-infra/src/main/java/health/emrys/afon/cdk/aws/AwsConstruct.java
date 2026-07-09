@@ -57,6 +57,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.KeyCloakDeploymentConfig.KEYCLOAK_HTTPS_INGRESS;
+import static health.emrys.afon.cdk.KeyCloakDeploymentConfig.KEYCLOAK_INGRESS;
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.cdk.TFUtils.finalizeIngress;
 import static health.emrys.afon.cdk.aws.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
@@ -790,7 +791,7 @@ public class AwsConstruct extends AbstractConstruct {
                 NO_JUPYTER_LB,
                 NO_POLARIS_FINALIZERS,
                 NO_JUPYTER_FINALIZERS,
-                finalizeIngress(KEYCLOAK_HTTPS_INGRESS)))
+                finalizeIngress(KEYCLOAK_INGRESS)))
             .build();
         return serviceAccountName;
     }
@@ -946,6 +947,15 @@ public class AwsConstruct extends AbstractConstruct {
 
     public Release getLbRelease() {
         return lbRelease;
+    }
+
+    @Override
+    public List<ITerraformDependable> getServiceDependables() {
+        // The Keycloak Service is NodePort/LB-annotated, so its creation triggers the
+        // aws-load-balancer-controller's mservice mutating webhook (failurePolicy=Fail). Wait on
+        // the controller's Helm release (atomic, so Helm blocks until pods are Ready) to avoid the
+        // "no endpoints available for service aws-load-balancer-webhook-service" race.
+        return lbRelease == null ? List.of() : List.of(lbRelease);
     }
 
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {

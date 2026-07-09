@@ -25,6 +25,11 @@
             <artifactId>afon-config</artifactId>
             <version>${parent.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5-fluent</artifactId>
+            <version>${httpclient5-fluent.version}</version>
+        </dependency>
     </dependencies>
 
 </project>

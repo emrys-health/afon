@@ -56,16 +56,21 @@ public class ConfigureUserMain {
         permissions = new PermissionsConfigurer(client);
     }
 
-    private HttpResponse configureUser(String principalName,
-                                       String roleName,
-                                       String catalogName) throws IncorrectConfigException, IOException, InterruptedException {
-        PrincipalWithCredentials principal = configurer.configureUser(accessToken, principalName);
+    private HttpResponse configureUser(
+            String principalName,
+            String roleName,
+            String catalogName) throws IncorrectConfigException, IOException {
+        PrincipalWithCredentials principal         = configurer.configureUser(accessToken, principalName);
+        String                   principalRoleName = roleName + "Principal";
         logger.info("Created Polaris User {}", principal);
 
-
-        String principalRoleName = roleName + "Principal";
-        logger.info("HTTP code = {}", permissions.createPrincipalRoles(principalRoleName).getCode());
-        logger.info("HTTP code = {}", permissions.associateRoles(catalogName, principalRoleName, roleName));
+        // TODO - delete first?
+        if (isFailure(permissions.createPrincipalRoles(principalRoleName))) {
+            logger.warn("Failed to create principal role {}", principalRoleName);
+        }
+        if (isFailure(permissions.associateRoles(catalogName, principalRoleName, roleName))) {
+            logger.warn("Failed to associate role {} with principale role {} in catalog {}", roleName, principalRoleName, catalogName);
+        }
 
         HttpResponse response = permissions.associatePrincipalRoles(principalName, principalRoleName);
         if (isFailure(response)) {
@@ -95,7 +100,7 @@ public class ConfigureUserMain {
     }
 
     private List<HttpResponse> addPermissions(String catalogName, String roleName) throws IncorrectConfigException, IOException {
-        List<HttpResponse> results  = new ArrayList<>();
+        List<HttpResponse> results = new ArrayList<>();
         for (CatalogPrivilege privilege : catalogPrivileges) {
             HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
             if (isFailure(result)) {

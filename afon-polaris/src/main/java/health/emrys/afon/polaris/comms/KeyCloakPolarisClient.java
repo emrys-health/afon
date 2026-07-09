@@ -1,8 +1,6 @@
 package health.emrys.afon.polaris.comms;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.config.ConfigUtils;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.jspecify.annotations.NonNull;
@@ -17,7 +15,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.ConfigUtils.protocolFor;
-import static health.emrys.security.keycloak.KeyCloakConfig.tokenEndpoint;
+import static health.emrys.afon.security.keycloak.KeyCloakConfig.tokenEndpoint;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 

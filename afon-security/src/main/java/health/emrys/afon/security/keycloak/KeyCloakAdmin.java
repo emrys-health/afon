@@ -1,14 +1,13 @@
-package health.emrys.afon.polaris.keycloak;
+package health.emrys.afon.security.keycloak;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.config.ConfigUtils;
-import health.emrys.security.keycloak.KeyCloakConfig;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.slf4j.Logger;
@@ -23,8 +22,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.ConfigUtils.protocolFor;
-import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
-import static health.emrys.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
+import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -33,6 +31,8 @@ import static org.slf4j.LoggerFactory.getLogger;
  * trusts. After this has run, a client can obtain a token from KeyCloak using
  *
  * <p>Uses no extra dependencies beyond the Apache HttpClient5 + Jackson already on the classpath.
+ * <p>
+ * Note in KeyCloak parlance, client is an app and user is a human
  */
 public class KeyCloakAdmin {
 
@@ -116,7 +116,9 @@ public class KeyCloakAdmin {
             "realm", realm,
             "enabled", true
         ));
-        postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm);
+        if (isFailure(postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm))) {
+            logger.warn("Could not create KeyCloak realm '{}'", realm);
+        }
     }
 
     /**
@@ -127,7 +129,8 @@ public class KeyCloakAdmin {
         String adminToken,
         String realm,
         String clientId,
-        String clientSecret) throws IOException {
+        String clientSecret
+    ) throws IOException {
         String json = MAPPER.writeValueAsString(Map.of(
             "clientId", clientId,
             "secret", clientSecret,
@@ -138,7 +141,14 @@ public class KeyCloakAdmin {
             "directAccessGrantsEnabled", true,
             "standardFlowEnabled", false
         ));
-        postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "client " + clientId);
+        if (isFailure(postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "client " + clientId))) {
+            logger.warn("Could not create confidential client {}", clientId);
+        }
+
+    }
+
+    private boolean isFailure(HttpResponse response) {
+        return response == null || response.getCode() / 100 != 2;
     }
 
     /**
@@ -169,12 +179,12 @@ public class KeyCloakAdmin {
      * Creates a confidential client for the OAuth2 authorization-code (browser) flow: standard flow
      * on, direct grants and service accounts off, with the given redirect URIs whitelisted.
      */
-    public void createBrowserClient(
-        String adminToken,
-        String realm,
-        String clientId,
-        String clientSecret,
-        List<String> redirectUris) throws IOException {
+    public void createBrowserClient(String adminToken,
+                                    String realm,
+                                    String clientId,
+                                    String clientSecret,
+                                    List<String> redirectUris
+    ) throws IOException {
         String json = MAPPER.writeValueAsString(Map.ofEntries(
             Map.entry("clientId", clientId),
             Map.entry("secret", clientSecret),
@@ -188,15 +198,17 @@ public class KeyCloakAdmin {
             // "+" tells KeyCloak to derive allowed CORS web origins from the redirect URIs.
             Map.entry("webOrigins", List.of("+"))
         ));
-        postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "browser client " + clientId);
+        if (isFailure(postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "browser client " + clientId))) {
+            logger.warn("Could not create browser client {}", clientId);
+        }
     }
 
-    public void createUser(
-        String adminToken,
-        String realm,
-        String username,
-        String password,
-        String email) throws IOException {
+    public void createUser(String adminToken,
+                           String realm,
+                           String username,
+                           String password,
+                           String email
+    ) throws IOException {
         Map<String, Object> user = new HashMap<>();
         user.put("username", username);
         user.put("enabled", true);
@@ -213,17 +225,49 @@ public class KeyCloakAdmin {
                 "temporary", false
             )));
         String json = MAPPER.writeValueAsString(user);
-        postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + username);
+        int    code = postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + username).getCode();
+        // A 409 on POST /users is ambiguous: it means the username already exists (genuinely
+        // idempotent - fine) OR that some other unique field collides, typically a duplicate email
+        // when the realm has duplicateEmailsAllowed=false. In the latter case the user is NOT created,
+        // so silently treating the 409 as success (as postJson does) leaves logins failing with
+        // user_not_found. Confirm the user really exists; if not, fail loudly with the likely cause.
+        if (code == HttpStatus.SC_CONFLICT && !userExists(adminToken, realm, username)) {
+            throw new IOException(format(
+                "Could not create KeyCloak user '%s' in realm '%s': HTTP 409 but no user with that "
+                + "username exists. The email '%s' is most likely already held by another user "
+                + "(realm duplicateEmailsAllowed=false).", username, realm, email));
+        }
     }
 
-    private void postJson(String adminToken, String uri, String json, String what) throws IOException {
+    /**
+     * @return true if a user with exactly this username exists in the realm.
+     */
+    private boolean userExists(String adminToken, String realm, String username) throws IOException {
+        String uri = format(
+            "%s/admin/realms/%s/users?exact=true&username=%s",
+            baseUrl, realm, URLEncoder.encode(username, StandardCharsets.UTF_8));
+        HttpGet get = new HttpGet(uri);
+        get.setHeader("Authorization", "Bearer " + adminToken);
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            return client.execute(
+                get, response -> {
+                    if (response.getCode() != HttpStatus.SC_OK) {
+                        return false;
+                    }
+                    List<?> users = MAPPER.readValue(response.getEntity().getContent(), List.class);
+                    return !users.isEmpty();
+                });
+        }
+    }
+
+    private HttpResponse postJson(String adminToken, String uri, String json, String what) throws IOException {
         logger.info("Calling {} with: \n{}", uri, json);
         HttpPost post = new HttpPost(uri);
         post.setHeader("Authorization", "Bearer " + adminToken);
         post.setHeader("Content-Type", "application/json");
         post.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            client.execute(
+            return client.execute(
                 post, response -> {
                     int code = response.getCode();
                     logger.info("Calling {} resulted in HTTP code {}", uri, code);
@@ -234,7 +278,7 @@ public class KeyCloakAdmin {
                     } else {
                         throw new IOException(format("Could not create KeyCloak %s: HTTP %d", what, code));
                     }
-                    return null;
+                    return response;
                 });
         }
     }

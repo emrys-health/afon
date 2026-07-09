@@ -1,23 +1,10 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMap;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpec;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecSelector;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplate;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpec;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFrom;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerPort;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeConfigMap;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.role.Role;
 import com.hashicorp.cdktf.providers.kubernetes.role.RoleMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.role.RoleRule;
@@ -28,25 +15,23 @@ import com.hashicorp.cdktf.providers.kubernetes.role_binding.RoleBindingSubject;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
-import com.hashicorp.cdktf.TerraformStack;
 import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.security.keycloak.OnboardingConfig;
+import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;
+import org.slf4j.Logger;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import static health.emrys.afon.cdk.DeploymentUtils.withAppKubernetesIoName;
-import static health.emrys.afon.cdk.TFUtils.envVar;
+import static health.emrys.afon.cdk.TFUtils.clusterIpService;
+import static health.emrys.afon.cdk.TFUtils.envFromSecret;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Deploys <a href="https://z2jh.jupyter.org/">JupyterHub</a> instead of the single shared
@@ -76,9 +61,13 @@ import static health.emrys.afon.cdk.TFUtils.envVar;
  */
 public abstract class JupyterHubConfig {
 
-    private static final String HUB_IMAGE     = "jupyterhub/k8s-hub:3.3.8";
-    private static final String PROXY_IMAGE   = "jupyterhub/configurable-http-proxy:4.6.1";
-    /** Same multi-VNC notebook image the single-pod {@link JupyterConfig} uses. */
+    private static final Logger logger    = getLogger(JupyterHubConfig.class);
+
+    private static final String HUB_IMAGE = "jupyterhub/k8s-hub:3.3.8";
+    private static final String PROXY_IMAGE      = "jupyterhub/configurable-http-proxy:4.6.1";
+    /**
+     * Same multi-VNC notebook image the single-pod {@link JupyterConfig} uses.
+     */
     private static final String SINGLEUSER_IMAGE =
         "ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi";
 
@@ -92,7 +81,9 @@ public abstract class JupyterHubConfig {
      * the hub considers the pod healthy; users never reach it (its public path is blocked).
      */
     private static final int SINGLEUSER_PORT = 8090;
-    /** Port the in-pod VNC server listens on (display :1) — Guacamole connects here per user. */
+    /**
+     * Port the in-pod VNC server listens on (display :1) — Guacamole connects here per user.
+     */
     private static final int VNC_PORT        = 5901;
 
     private static final String HUB_SVC          = "hub";
@@ -103,25 +94,15 @@ public abstract class JupyterHubConfig {
     private static final String CONFIG_MOUNT     = "/etc/jupyterhub";
     private static final String SECRET_NAME      = "jupyterhub-secrets";
 
-    /** JupyterHub is served under this sub-path so Guacamole can own the domain root. */
-    private static final String HUB_BASE_URL = "/jupyter/";
-    /** KubeSpawner stamps this label (value = the user's slug) on each pod; the per-user VNC Service selects it. */
+    /**
+     * JupyterHub is served under this sub-path so Guacamole can own the domain root.
+     */
+    private static final String HUB_BASE_URL    = "/jupyter/";
+    /**
+     * KubeSpawner stamps this label (value = the user's slug) on each pod; the per-user VNC Service selects it.
+     */
     private static final String GUAC_USER_LABEL = "guacamole-user";
 
-    /**
-     * A Guacamole user. {@code email} is the OIDC identity (the JupyterHub username and the
-     * Guacamole login); {@code slug} is a DNS/label-safe form used for the per-user VNC Service
-     * name and the pod label, since an email address is valid as neither.
-     */
-    private record GuacUser(String email, String slug) {}
-
-    /**
-     * Fixed roster. Guacamole's file-based auth and the per-user VNC Services must enumerate users
-     * up front, so adding a user means editing this list and redeploying.
-     */
-    private static final List<GuacUser> GUAC_USERS = List.of(
-        new GuacUser("phil.henry@emrys.health", "phil-henry"),
-        new GuacUser("will@emrys.health", "will"));
 
     /**
      * Upstreams the oauth2-proxy MFA gate fronts, on a single domain. Guacamole owns the root; the
@@ -143,17 +124,19 @@ public abstract class JupyterHubConfig {
     private final   TerraformStack                stack;
     private final   String                        jupyterPassword;
     private final   List<GuacamoleConfig.Session> sessions;
+    private final   OnboardingConfig              onboarding = new Onboarding();
     protected final Properties                    properties;
 
-    public JupyterHubConfig(TerraformStack stack,
-                            Properties properties) {
+    public JupyterHubConfig(
+        TerraformStack stack,
+        Properties properties) {
         this.stack           = stack;
         this.properties      = properties;
         this.jupyterPassword = AfonProperties.JUPYTER_VNC_PASSWORD.getValueFrom(properties);
         // One Guacamole login per user, keyed by email; each streams that user's own pod desktop on
         // the single VNC port (each user now has their own pod rather than sharing ports on one).
         this.sessions = new ArrayList<>();
-        for (GuacUser user : GUAC_USERS) {
+        for (EmrysUser user : onboarding.getUsers()) {
             sessions.add(new GuacamoleConfig.Session(user.email(), jupyterPassword, VNC_PORT));
         }
     }
@@ -253,24 +236,30 @@ public abstract class JupyterHubConfig {
         deployProxy(proxyDeps);
 
         // Public entrypoint for the JupyterHub side of the MFA gate (login + spawn).
-        Service proxyPublic = clusterIpService(
-            "jupyterhubProxyPublic", PROXY_PUBLIC_SVC, PROXY_LABELS, "http", PROXY_PUBLIC, eksDependOn);
+        List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
+                                                             .name("http")
+                                                             .port(PROXY_PUBLIC)
+                                                             .targetPort(String.valueOf(PROXY_PUBLIC))
+                                                             .protocol("TCP")
+                                                             .build());
+        Service proxyPublic = clusterIpService(eksDependOn, PROXY_LABELS, PROXY_PUBLIC_SVC, ports, stack);
 
         // Per user, a stable VNC Service that selects whichever pod KubeSpawner spawns for that user
         // (matched on the guacamole-user=<slug> label set by the hub's spawn hook). This is the
         // fixed endpoint Guacamole dials, even though the backing pod only exists once the user has
         // logged into JupyterHub and spawned it.
-        Map<String, String> emailToVncHost = new LinkedHashMap<>();
-        List<ITerraformDependable> guacamoleDeps = new ArrayList<>(eksDependOn);
-        for (GuacUser user : GUAC_USERS) {
+        Map<String, String>        emailToVncHost = new LinkedHashMap<>();
+        List<ITerraformDependable> guacamoleDeps  = new ArrayList<>(eksDependOn);
+        for (EmrysUser user : onboarding.getUsers()) {
             emailToVncHost.put(user.email(), vncServiceName(user.slug()));
-            guacamoleDeps.add(clusterIpService(
-                "jupyterhubVnc-" + user.slug(),
-                vncServiceName(user.slug()),
-                Map.of(GUAC_USER_LABEL, user.slug()),
-                "vnc",
-                VNC_PORT,
-                eksDependOn));
+            List<ServiceSpecPort> userPorts = List.of(ServiceSpecPort.builder()
+                                                        .name("vnc")
+                                                        .port(VNC_PORT)
+                                                        .targetPort(String.valueOf(VNC_PORT))
+                                                        .protocol("TCP")
+                                                        .build());
+            Map<String, String> guacUserConfig = Map.of(GUAC_USER_LABEL, user.slug());
+            guacamoleDeps.add(clusterIpService(eksDependOn, guacUserConfig, vncServiceName(user.slug()), userPorts, stack));
         }
 
         // Guacamole streams each user's pod desktop. Transparent SSO: no Guacamole login page — the
@@ -372,7 +361,13 @@ public abstract class JupyterHubConfig {
                                 .build())
             .build();
 
-        clusterIpService("jupyterhubHub", HUB_SVC, HUB_LABELS, "hub", HUB_PORT, dependsOn);
+        List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
+                                                             .name("hub")
+                                                             .port(HUB_PORT)
+                                                             .targetPort(String.valueOf(HUB_PORT))
+                                                             .protocol("TCP")
+                                                             .build());
+        clusterIpService(dependsOn, HUB_LABELS, HUB_SVC, ports, stack);
     }
 
     private void deployProxy(List<ITerraformDependable> dependsOn) {
@@ -404,33 +399,13 @@ public abstract class JupyterHubConfig {
 
         DeploymentUtils.deploy(stack, dependsOn, PROXY_LABELS, List.of(proxyContainer), List.of(), "jupyterhub-proxy");
 
-        clusterIpService("jupyterhubProxyApi", PROXY_API_SVC, PROXY_LABELS, "api", PROXY_API, dependsOn);
-    }
-
-    private Service clusterIpService(String id,
-                                     String name,
-                                     Map<String, String> selector,
-                                     String portName,
-                                     int port,
-                                     List<ITerraformDependable> dependsOn) {
-        return Service.Builder
-            .create(stack, id)
-            .metadata(ServiceMetadata.builder()
-                                     .name(name)
-                                     .namespace("default")
-                                     .build())
-            .dependsOn(dependsOn)
-            .spec(ServiceSpec.builder()
-                             .selector(selector)
-                             .type("ClusterIP")
-                             .port(List.of(ServiceSpecPort.builder()
-                                                          .name(portName)
-                                                          .port(port)
-                                                          .targetPort(String.valueOf(port))
-                                                          .protocol("TCP")
-                                                          .build()))
-                             .build())
-            .build();
+        List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
+                                                             .name("api")
+                                                             .port(PROXY_API)
+                                                             .targetPort(String.valueOf(PROXY_API))
+                                                             .protocol("TCP")
+                                                             .build());
+        clusterIpService(dependsOn, PROXY_LABELS, PROXY_API_SVC, ports, stack);
     }
 
     /**
@@ -440,112 +415,101 @@ public abstract class JupyterHubConfig {
      */
     private String jupyterhubConfigPy() {
         String issuer = AfonProperties.OIDC_ISSUER_URL.getValueFrom(properties);
+        logger.info("login at: https://{}/jupyter/hub/home", jupyterDomain());
         return """
-            import os, json
-            from urllib.request import urlopen
-
-            c = get_config()  # noqa
-
-            # --- Served under a sub-path so Guacamole can own the domain root. ---
-            c.JupyterHub.base_url = '%7$s'
-
-            # --- Proxy runs in its own pod (configurable-http-proxy), not inside the hub. ---
-            c.ConfigurableHTTPProxy.should_start = False
-            c.ConfigurableHTTPProxy.api_url = 'http://%1$s:%2$d'
-
-            # --- How spawned notebook pods reach the hub. ---
-            c.JupyterHub.hub_ip = '0.0.0.0'
-            c.JupyterHub.hub_connect_ip = '%3$s'
-            c.JupyterHub.hub_port = %4$d
-            c.JupyterHub.cleanup_servers = False
-            # /jupyter/user/* is now exposed through oauth2-proxy, so let the hub redirect to the
-            # spawned notebook after spawn (previously suppressed because that path 404'd at the gate).
-            c.JupyterHub.redirect_to_server = True
-
-            # --- One pod per user, spawned on demand by KubeSpawner. ---
-            c.JupyterHub.spawner_class = 'kubespawner.KubeSpawner'
-            c.KubeSpawner.namespace = os.environ.get('POD_NAMESPACE', 'default')
-            c.KubeSpawner.image = '%5$s'
-            # Re-pull on every spawn so a rebuilt image under the same tag is picked up.
-            c.KubeSpawner.image_pull_policy = 'Always'
-            c.KubeSpawner.port = %6$d
-            c.KubeSpawner.start_timeout = 300
-            c.KubeSpawner.http_timeout = 120
-            # One in-pod VNC session per single-user server (see start-vnc.sh in the image).
-            c.KubeSpawner.environment = {'VNC_SESSIONS': '1'}
-
-            # --- OIDC login against the same provider oauth2-proxy uses. JupyterHub is the OAuth
-            #     client itself (not DummyAuthenticator) so it can capture each user's token via
-            #     auth_state and hand it to their pod. Endpoints come from the issuer's discovery
-            #     document, keeping this provider-agnostic. ---
-            _issuer = '%9$s'.rstrip('/')
-            _oidc = json.load(urlopen(_issuer + '/.well-known/openid-configuration'))
-            c.JupyterHub.authenticator_class = 'generic-oauth'
-            c.GenericOAuthenticator.client_id = os.environ['OAUTH_CLIENT_ID']
-            c.GenericOAuthenticator.client_secret = ***REMOVED***'OAUTH_CLIENT_SECRET']
-            c.GenericOAuthenticator.oauth_callback_url = 'https://%10$s%7$shub/oauth_callback'
-            c.GenericOAuthenticator.authorize_url = _oidc['authorization_endpoint']
-            c.GenericOAuthenticator.token_url = _oidc['token_endpoint']
-            c.GenericOAuthenticator.userdata_url = _oidc['userinfo_endpoint']
-            c.GenericOAuthenticator.scope = ['openid', 'email', 'profile']
-            c.GenericOAuthenticator.username_claim = 'email'
-            c.GenericOAuthenticator.enable_auth_state = True
-            # Only the known roster may log in (these line up 1:1 with the Guacamole logins).
-            c.GenericOAuthenticator.allow_all = False
-            c.GenericOAuthenticator.allowed_users = {%11$s}
-
-            # email -> DNS/label-safe slug, matching the per-user VNC Service names.
-            _GUAC_SLUGS = {%12$s}
-
-            async def _on_spawn(spawner, auth_state):
-                # Label the pod with the user's slug so their guac-vnc-<slug> Service selects it.
-                slug = _GUAC_SLUGS.get(spawner.user.name)
-                if slug:
-                    spawner.extra_labels = dict(spawner.extra_labels or {})
-                    spawner.extra_labels['%8$s'] = slug
-                # Inject the user's OIDC token, read by the Spark Connector and Polaris.
-                if auth_state:
-                    spawner.environment['OIDC_TOKEN'] = auth_state.get('access_token', '')
-                    if auth_state.get('id_token'):
-                        spawner.environment['OIDC_ID_TOKEN'] = auth_state['id_token']
-            c.Spawner.auth_state_hook = _on_spawn
-            """.formatted(
+               import os, json
+               from urllib.request import urlopen
+               
+               c = get_config()  # noqa
+               
+               # --- Served under a sub-path so Guacamole can own the domain root. ---
+               c.JupyterHub.base_url = '%7$s'
+               
+               # --- Proxy runs in its own pod (configurable-http-proxy), not inside the hub. ---
+               c.ConfigurableHTTPProxy.should_start = False
+               c.ConfigurableHTTPProxy.api_url = 'http://%1$s:%2$d'
+               
+               # --- How spawned notebook pods reach the hub. ---
+               c.JupyterHub.hub_ip = '0.0.0.0'
+               c.JupyterHub.hub_connect_ip = '%3$s'
+               c.JupyterHub.hub_port = %4$d
+               c.JupyterHub.cleanup_servers = False
+               # /jupyter/user/* is now exposed through oauth2-proxy, so let the hub redirect to the
+               # spawned notebook after spawn (previously suppressed because that path 404'd at the gate).
+               c.JupyterHub.redirect_to_server = True
+               
+               # --- One pod per user, spawned on demand by KubeSpawner. ---
+               c.JupyterHub.spawner_class = 'kubespawner.KubeSpawner'
+               c.KubeSpawner.namespace = os.environ.get('POD_NAMESPACE', 'default')
+               c.KubeSpawner.image = '%5$s'
+               # Re-pull on every spawn so a rebuilt image under the same tag is picked up.
+               c.KubeSpawner.image_pull_policy = 'Always'
+               c.KubeSpawner.port = %6$d
+               c.KubeSpawner.start_timeout = 300
+               c.KubeSpawner.http_timeout = 120
+               # One in-pod VNC session per single-user server (see start-vnc.sh in the image).
+               c.KubeSpawner.environment = {'VNC_SESSIONS': '1'}
+               
+               # --- OIDC login against the same provider oauth2-proxy uses. JupyterHub is the OAuth
+               #     client itself (not DummyAuthenticator) so it can capture each user's token via
+               #     auth_state and hand it to their pod. Endpoints come from the issuer's discovery
+               #     document, keeping this provider-agnostic. ---
+               _issuer = '%9$s'.rstrip('/')
+               _oidc = json.load(urlopen(_issuer + '/.well-known/openid-configuration'))
+               c.JupyterHub.authenticator_class = 'generic-oauth'
+               c.GenericOAuthenticator.client_id = os.environ['OAUTH_CLIENT_ID']
+               c.GenericOAuthenticator.client_secret = ***REMOVED***'OAUTH_CLIENT_SECRET']
+               c.GenericOAuthenticator.oauth_callback_url = 'https://%10$s%7$shub/oauth_callback'
+               c.GenericOAuthenticator.authorize_url = _oidc['authorization_endpoint']
+               c.GenericOAuthenticator.token_url = _oidc['token_endpoint']
+               c.GenericOAuthenticator.userdata_url = _oidc['userinfo_endpoint']
+               c.GenericOAuthenticator.scope = ['openid', 'email', 'profile']
+               c.GenericOAuthenticator.username_claim = 'email'
+               c.GenericOAuthenticator.enable_auth_state = True
+               # Only the known roster may log in (these line up 1:1 with the Guacamole logins).
+               c.GenericOAuthenticator.allow_all = False
+               c.GenericOAuthenticator.allowed_users = {%11$s}
+               
+               # email -> DNS/label-safe slug, matching the per-user VNC Service names.
+               _GUAC_SLUGS = {%12$s}
+               
+               async def _on_spawn(spawner, auth_state):
+                   # Label the pod with the user's slug so their guac-vnc-<slug> Service selects it.
+                   slug = _GUAC_SLUGS.get(spawner.user.name)
+                   if slug:
+                       spawner.extra_labels = dict(spawner.extra_labels or {})
+                       spawner.extra_labels['%8$s'] = slug
+                   # Inject the user's OIDC token, read by the Spark Connector and Polaris.
+                   if auth_state:
+                       spawner.environment['OIDC_TOKEN'] = auth_state.get('access_token', '')
+                       if auth_state.get('id_token'):
+                           spawner.environment['OIDC_ID_TOKEN'] = auth_state['id_token']
+               c.Spawner.auth_state_hook = _on_spawn
+               """.formatted(
             PROXY_API_SVC, PROXY_API,
             HUB_SVC, HUB_PORT,
             SINGLEUSER_IMAGE, SINGLEUSER_PORT,
             HUB_BASE_URL, GUAC_USER_LABEL,
             issuer, jupyterDomain(),
-            pythonSetOf(GUAC_USERS.stream().map(GuacUser::email).toList()),
+            pythonSetOf(onboarding.getUsers().stream().map(EmrysUser::email).toList()),
             pythonSlugMap());
     }
 
-    /** Renders a Python set literal body (no braces): {@code 'a', 'b'}. */
+    /**
+     * Renders a Python set literal body (no braces): {@code 'a', 'b'}.
+     */
     private static String pythonSetOf(List<String> values) {
         return values.stream().map(v -> "'" + v + "'").reduce((a, b) -> a + ", " + b).orElse("");
     }
 
-    /** Renders the email->slug dict literal body (no braces): {@code 'a@x': 'a', 'b@x': 'b'}. */
-    private static String pythonSlugMap() {
-        return GUAC_USERS.stream()
+    /**
+     * Renders the email->slug dict literal body (no braces): {@code 'a@x': 'a', 'b@x': 'b'}.
+     */
+    private String pythonSlugMap() {
+        return onboarding.getUsers().stream()
                          .map(u -> "'" + u.email() + "': '" + u.slug() + "'")
                          .reduce((a, b) -> a + ", " + b)
                          .orElse("");
-    }
-
-    private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
-        String envName, String secretName, String secretKey) {
-        return DeploymentSpecTemplateSpecContainerEnv
-            .builder()
-            .name(envName)
-            .valueFrom(DeploymentSpecTemplateSpecContainerEnvValueFrom
-                           .builder()
-                           .secretKeyRef(DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef
-                                             .builder()
-                                             .name(secretName)
-                                             .key(secretKey)
-                                             .build())
-                           .build())
-            .build();
     }
 
     private static String sha256Hex(String input) {
@@ -567,12 +531,18 @@ public abstract class JupyterHubConfig {
 
     protected abstract JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps);
 
-    /** Public domain JupyterHub is served on; used to build the OIDC callback URL. */
+    /**
+     * Public domain JupyterHub is served on; used to build the OIDC callback URL.
+     */
     protected abstract String jupyterDomain();
 
-    /** OIDC client id for JupyterHub's OAuthenticator (same provider as oauth2-proxy). */
+    /**
+     * OIDC client id for JupyterHub's OAuthenticator (same provider as oauth2-proxy).
+     */
     protected abstract String oauthClientId();
 
-    /** OIDC client secret for JupyterHub's OAuthenticator. */
+    /**
+     * OIDC client secret for JupyterHub's OAuthenticator.
+     */
     protected abstract String oauthClientSecret();
 }
