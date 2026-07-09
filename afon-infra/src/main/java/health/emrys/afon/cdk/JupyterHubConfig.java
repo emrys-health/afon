@@ -1,20 +1,10 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMap;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpec;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecSelector;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplate;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpec;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerPort;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeConfigMap;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.role.Role;
 import com.hashicorp.cdktf.providers.kubernetes.role.RoleMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.role.RoleRule;
@@ -28,22 +18,20 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
-import com.hashicorp.cdktf.TerraformStack;
-import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;
 import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.security.keycloak.OnboardingConfig;
+import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;
+import org.slf4j.Logger;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import static health.emrys.afon.cdk.DeploymentUtils.withAppKubernetesIoName;
 import static health.emrys.afon.cdk.TFUtils.clusterIpService;
 import static health.emrys.afon.cdk.TFUtils.envFromSecret;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Deploys <a href="https://z2jh.jupyter.org/">JupyterHub</a> instead of the single shared
@@ -73,7 +61,9 @@ import static health.emrys.afon.cdk.TFUtils.envFromSecret;
  */
 public abstract class JupyterHubConfig {
 
-    private static final String HUB_IMAGE        = "jupyterhub/k8s-hub:3.3.8";
+    private static final Logger logger    = getLogger(JupyterHubConfig.class);
+
+    private static final String HUB_IMAGE = "jupyterhub/k8s-hub:3.3.8";
     private static final String PROXY_IMAGE      = "jupyterhub/configurable-http-proxy:4.6.1";
     /**
      * Same multi-VNC notebook image the single-pod {@link JupyterConfig} uses.
@@ -134,7 +124,7 @@ public abstract class JupyterHubConfig {
     private final   TerraformStack                stack;
     private final   String                        jupyterPassword;
     private final   List<GuacamoleConfig.Session> sessions;
-    private final   Onboarding                    onboarding = new Onboarding();
+    private final   OnboardingConfig              onboarding = new Onboarding();
     protected final Properties                    properties;
 
     public JupyterHubConfig(
@@ -425,6 +415,7 @@ public abstract class JupyterHubConfig {
      */
     private String jupyterhubConfigPy() {
         String issuer = AfonProperties.OIDC_ISSUER_URL.getValueFrom(properties);
+        logger.info("login at: https://{}/jupyter/hub/home", jupyterDomain());
         return """
                import os, json
                from urllib.request import urlopen
