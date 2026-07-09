@@ -210,17 +210,48 @@ public class KeyCloakAdmin {
                 "temporary", false
             )));
         String json = MAPPER.writeValueAsString(user);
-        postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + username);
+        int code = postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + username);
+        // A 409 on POST /users is ambiguous: it means the username already exists (genuinely
+        // idempotent - fine) OR that some other unique field collides, typically a duplicate email
+        // when the realm has duplicateEmailsAllowed=false. In the latter case the user is NOT created,
+        // so silently treating the 409 as success (as postJson does) leaves logins failing with
+        // user_not_found. Confirm the user really exists; if not, fail loudly with the likely cause.
+        if (code == HttpStatus.SC_CONFLICT && !userExists(adminToken, realm, username)) {
+            throw new IOException(format(
+                "Could not create KeyCloak user '%s' in realm '%s': HTTP 409 but no user with that "
+                + "username exists. The email '%s' is most likely already held by another user "
+                + "(realm duplicateEmailsAllowed=false).", username, realm, email));
+        }
     }
 
-    private void postJson(String adminToken, String uri, String json, String what) throws IOException {
+    /**
+     * @return true if a user with exactly this username exists in the realm.
+     */
+    private boolean userExists(String adminToken, String realm, String username) throws IOException {
+        String uri = format(
+            "%s/admin/realms/%s/users?exact=true&username=%s",
+            baseUrl, realm, URLEncoder.encode(username, StandardCharsets.UTF_8));
+        HttpGet get = new HttpGet(uri);
+        get.setHeader("Authorization", "Bearer " + adminToken);
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            return client.execute(get, response -> {
+                if (response.getCode() != HttpStatus.SC_OK) {
+                    return false;
+                }
+                List<?> users = MAPPER.readValue(response.getEntity().getContent(), List.class);
+                return !users.isEmpty();
+            });
+        }
+    }
+
+    private int postJson(String adminToken, String uri, String json, String what) throws IOException {
         logger.info("Calling {} with: \n{}", uri, json);
         HttpPost post = new HttpPost(uri);
         post.setHeader("Authorization", "Bearer " + adminToken);
         post.setHeader("Content-Type", "application/json");
         post.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            client.execute(
+            return client.execute(
                 post, response -> {
                     int code = response.getCode();
                     logger.info("Calling {} resulted in HTTP code {}", uri, code);
@@ -231,7 +262,7 @@ public class KeyCloakAdmin {
                     } else {
                         throw new IOException(format("Could not create KeyCloak %s: HTTP %d", what, code));
                     }
-                    return null;
+                    return code;
                 });
         }
     }
