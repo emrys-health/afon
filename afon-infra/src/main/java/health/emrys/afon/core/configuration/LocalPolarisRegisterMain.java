@@ -3,8 +3,6 @@ package health.emrys.afon.core.configuration;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
-import health.emrys.afon.polaris.comms.KeyCloakPolarisClient;
-import health.emrys.security.keycloak.KeyCloakConfig;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -12,7 +10,6 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.KC_HOSTNAME;
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.security.keycloak.KeyCloakConfig.tokenEndpoint;
 
 /**
  * Run with something like:

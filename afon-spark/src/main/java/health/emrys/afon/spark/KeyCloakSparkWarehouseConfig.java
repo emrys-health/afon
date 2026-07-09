@@ -1,7 +1,6 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.config.ConfigUtils;
-import health.emrys.security.keycloak.KeyCloakConfig;
+import health.emrys.afon.security.keycloak.KeyCloakConfig;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;

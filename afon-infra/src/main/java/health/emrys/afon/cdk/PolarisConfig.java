@@ -8,7 +8,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
-import health.emrys.security.keycloak.KeyCloakConfig;
+import health.emrys.afon.security.keycloak.KeyCloakConfig;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;

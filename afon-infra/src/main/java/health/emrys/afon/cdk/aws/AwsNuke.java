@@ -52,26 +52,61 @@ public class AwsNuke {
             } done""", vpcId, region);
     }
 
+    /**
+     * Destroy-time cleanup (a {@code local-exec} on the public subnet) that removes the
+     * aws-load-balancer-controller's orphaned AWS resources <em>before</em> Terraform deletes the
+     * subnets. The controller is uninstalled on destroy before it can delete its own ELBs, so those
+     * ELBs (and their RequesterManaged ENIs, security groups and target groups) are left behind and
+     * their ENIs pin the subnets — {@code DeleteSubnet} then fails with {@code DependencyViolation}
+     * and retries for ~20 min. This deletes the ELBs and, critically, <em>waits</em> for the delete
+     * to complete so the ENIs are released before the subnet delete proceeds. It is deliberately
+     * loud (echoes the resolved VPC and a stderr warning if it cannot be resolved) so a future
+     * failure is visible in the tofu output rather than silently no-ops into a 20 min hang.
+     */
     @NotNull String cleanELBs() {
         return format(
             """
-            %s
-            for LB in $(aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text) ; do
-              echo "Deleting LB $LB"
-              aws elbv2 delete-load-balancer --load-balancer-arn $LB
-            done
-            for ENI in $(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC" --query "NetworkInterfaces[?RequesterManaged==\\`false\\`].NetworkInterfaceId" --output text) ; do
-              ATTACHMENT=$(aws ec2 describe-network-interfaces --network-interface-ids $ENI --query "NetworkInterfaces[0].Attachment.AttachmentId" --output text 2>/dev/null)
-              if [ -n "$ATTACHMENT" ] && [ "$ATTACHMENT" != "None" ] && [ "$ATTACHMENT" != "null" ]; then
-                echo "Force-detaching $ENI (attachment $ATTACHMENT)"
-                aws ec2 detach-network-interface --attachment-id $ATTACHMENT --force 2>/dev/null || true
-                aws ec2 wait network-interface-available --network-interface-ids $ENI 2>/dev/null || true
-              fi
-              echo "Deleting ENI $ENI"
-              aws ec2 delete-network-interface --network-interface-id $ENI 2>/dev/null || true
+            VPCS=$(%s)
+            if [ -z "$VPCS" ]; then
+              echo "cleanELBs: could NOT resolve any VPC with Name tag '%s' - skipping ELB cleanup; a subnet DependencyViolation hang is likely" >&2
+              exit 0
+            fi
+            # A failed prior destroy can leave several VPCs sharing the same Name tag. describe-vpcs then
+            # returns multiple ids; iterate (rather than 'export VPC=$(...)', which yields a multi-value
+            # string that matches no single VpcId and silently no-ops the whole cleanup).
+            for VPC in $VPCS ; do
+              echo "cleanELBs: removing load-balancer-controller resources in $VPC"
+              LBS=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text)
+              for LB in $LBS ; do
+                echo "Deleting load balancer $LB"
+                aws elbv2 delete-load-balancer --load-balancer-arn "$LB" || true
+              done
+              # Block until every LB is really gone. delete-load-balancer is async and its (RequesterManaged)
+              # ENIs linger for ~30-60s after it returns; without this wait Terraform races ahead to
+              # DeleteSubnet and hits DependencyViolation. The waiter polls for up to ~10 min per LB (they
+              # delete concurrently, so later waits return quickly).
+              for LB in $LBS ; do
+                echo "Waiting for $LB to finish deleting"
+                aws elbv2 wait load-balancers-deleted --load-balancer-arns "$LB" 2>/dev/null || true
+              done
+              # Target groups and the k8s-* security groups the controller created are not in Terraform
+              # state; delete the orphans so the later security-group / VPC destroy is not blocked either.
+              for TG in $(aws elbv2 describe-target-groups --query "TargetGroups[?VpcId=='$VPC'].TargetGroupArn" --output text) ; do
+                echo "Deleting target group $TG"
+                aws elbv2 delete-target-group --target-group-arn "$TG" || true
+              done
+              for SG in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC" --query "SecurityGroups[?starts_with(GroupName, 'k8s-')].GroupId" --output text) ; do
+                echo "Deleting LB-controller security group $SG"
+                aws ec2 delete-security-group --group-id "$SG" || true
+              done
+              # Belt-and-braces: drop any now-detached ENIs the LB deletion left behind (available = unattached).
+              for ENI in $(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC" "Name=status,Values=available" --query "NetworkInterfaces[].NetworkInterfaceId" --output text) ; do
+                echo "Deleting leftover ENI $ENI"
+                aws ec2 delete-network-interface --network-interface-id "$ENI" 2>/dev/null || true
+              done
             done
             """,
-            getVPCCommand());
+            getVPCsCommand(), componentNames.getVpcId());
     }
 
     @NotNull String getVPCCommand() {
