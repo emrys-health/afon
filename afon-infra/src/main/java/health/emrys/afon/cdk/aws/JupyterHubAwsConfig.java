@@ -2,11 +2,13 @@ package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformStack;
+import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.JupyterMfaConfig;
 import health.emrys.afon.config.AfonProperties;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
@@ -24,16 +26,19 @@ public class JupyterHubAwsConfig extends JupyterHubConfig {
     private final String         jupyterDnsZoneId;
     private final String         jupyterCertArn;
     private final TerraformStack stack;
+    private final Route53Record  keycloakAliasRecord;
 
     public JupyterHubAwsConfig(TerraformStack stack,
                                AwsConstruct cloudProvider,
-                               Properties properties) {
+                               Properties properties,
+                               Route53Record keycloakAliasRecord) {
         super(stack, properties);
-        this.cloudProvider    = cloudProvider;
-        this.jupyterDomain    = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
-        this.jupyterDnsZoneId = AWS_JUPYTER_DNS_ZONE.getValueFrom(properties);
-        this.jupyterCertArn   = AfonProperties.AWS_JUPYTER_CERT_ARN.getValueFrom(properties);
-        this.stack            = stack;
+        this.cloudProvider       = cloudProvider;
+        this.jupyterDomain       = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
+        this.jupyterDnsZoneId    = AWS_JUPYTER_DNS_ZONE.getValueFrom(properties);
+        this.jupyterCertArn      = AfonProperties.AWS_JUPYTER_CERT_ARN.getValueFrom(properties);
+        this.stack               = stack;
+        this.keycloakAliasRecord = keycloakAliasRecord;
     }
 
     @Override
@@ -60,9 +65,16 @@ public class JupyterHubAwsConfig extends JupyterHubConfig {
 
     @Override
     protected JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps) {
+        // oauth2-proxy performs OIDC discovery against the Keycloak hostname the moment it starts, so
+        // it must not be created until that hostname's Route 53 record exists. Without this edge
+        // Terraform is free to roll the proxy out alongside — or before — the record, and the pod
+        // resolves NXDOMAIN. The wait-for-issuer init container still covers DNS propagation lag,
+        // which no dependency edge can express.
+        List<ITerraformDependable> deps = new ArrayList<>(proxyDeps);
+        deps.add(keycloakAliasRecord);
         return new JupyterMfaConfig(
             this.stack,
-            proxyDeps,
+            deps,
             JupyterHubConfig.MFA_UPSTREAMS,
             jupyterDomain,
             OAUTH2_CLIENT_ID.getValueFrom(properties),
