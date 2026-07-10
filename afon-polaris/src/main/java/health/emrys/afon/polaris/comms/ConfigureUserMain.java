@@ -20,7 +20,9 @@ import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
 public class ConfigureUserMain {
 
-    private static final Logger                logger            = LoggerFactory.getLogger(ConfigureUserMain.class);
+    public static final String ROLE_NAME = "emrysrole4";
+
+    private static final Logger logger = LoggerFactory.getLogger(ConfigureUserMain.class);
     private static final Set<CatalogPrivilege> catalogPrivileges = Set.of(TABLE_READ_DATA, TABLE_WRITE_DATA, NAMESPACE_CREATE, TABLE_CREATE, NAMESPACE_FULL_METADATA);
 
     private final PolarisConfigurer     configurer;
@@ -35,12 +37,11 @@ public class ConfigureUserMain {
         }
         ConfigureUserMain app           = new ConfigureUserMain(properties);
         String            catalogName   = args[1];
-        String            principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
-        String            roleName      = "emrysrole4";
+        String principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
         try {
-            logger.info("Configuring Polaris User {} for catalog {} and role {}", principalName, catalogName, roleName);
-            app.configurePrivilegesFor(catalogName, roleName);
-            app.configureUser(principalName, roleName, catalogName);
+            logger.info("Configuring Polaris User {} for catalog {} and role {}", principalName, catalogName, ROLE_NAME);
+            app.configurePrivilegesFor(catalogName, ROLE_NAME);
+            app.configureUser(principalName, ROLE_NAME, catalogName);
         } catch (Exception x) {
             logger.error("Error while configuring user " + principalName, x);
         }
@@ -48,7 +49,7 @@ public class ConfigureUserMain {
 
     private final String accessToken;
 
-    ConfigureUserMain(Properties properties) {
+    public ConfigureUserMain(Properties properties) {
         AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(properties);
         accessToken = client.getAccessToken();
         logger.debug("POLARIS_TOKEN={}", accessToken);
@@ -56,7 +57,7 @@ public class ConfigureUserMain {
         permissions = new PermissionsConfigurer(client);
     }
 
-    private HttpResponse configureUser(
+    public HttpResponse configureUser(
             String principalName,
             String roleName,
             String catalogName) throws IncorrectConfigException, IOException {
