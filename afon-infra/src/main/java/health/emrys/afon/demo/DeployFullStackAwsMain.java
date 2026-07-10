@@ -6,7 +6,7 @@ public class DeployFullStackAwsMain implements StepsProvider {
     static final List<Step> steps(StepOperations stepOperations) {
         return List.of(
             stepOperations.cleanLocalAws(),
-            stepOperations.deployAwsSpark(),
+            stepOperations.deployFullAwsCluster(),
             stepOperations.waitForAwsPolaris(),
             stepOperations.initializeAllCatalogsInAws(),
             stepOperations.checkAwsSparkConnectorTalkingToAws()

@@ -80,6 +80,13 @@ public class StepOperations {
             () -> actions.startAwsPolaris());
     }
 
+    public Step deployFullAwsCluster() {
+        return new Step(
+            "aws_spark",
+            "deploy Spark in AWS",
+            () -> actions.startFullStackInAws());
+    }
+
     public Step deployAwsSpark() {
         return new Step(
             "aws_spark",

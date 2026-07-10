@@ -6,6 +6,7 @@ import ch.vorburger.exec.ManagedProcessException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.aws.AwsWholeStack;
+import health.emrys.afon.cdk.aws.PrometheusClusterDeploy;
 import health.emrys.afon.cdk.aws.SparkClusterDeployment;
 import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.azure.AzureWholeStack;
@@ -124,6 +125,11 @@ public class StepActions {
     public void startAzurePolaris() throws Exception {
         executeMainOf(AzureKubernetesPolaris.class, new String[]{});
         startManagedKubernetesStack(AzureKubernetesPolaris.ID);
+    }
+
+    public void startFullStackInAws() throws Exception {
+        executeMainOf(PrometheusClusterDeploy.class, new String[]{});
+        startManagedKubernetesStack(AWS);
     }
 
     public void startSparkClusterInAws() throws Exception {
