@@ -23,6 +23,7 @@ import health.emrys.afon.security.keycloak.OnboardingConfig;
 import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;
 import org.slf4j.Logger;
 
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -95,9 +96,16 @@ public abstract class JupyterHubConfig {
     private static final String SECRET_NAME      = "jupyterhub-secrets";
 
     /**
-     * JupyterHub is served under this sub-path so Guacamole can own the domain root.
+     * JupyterHub owns the domain root so that a bare visit to the domain lands on the hub, which
+     * auto-spawns the user's pod and then hands off to Guacamole (served under {@link #GUACAMOLE_PATH})
+     * to stream that pod's desktop.
      */
-    private static final String HUB_BASE_URL    = "/jupyter/";
+    private static final String HUB_BASE_URL    = "/";
+    /**
+     * Sub-path Guacamole is served under (its default servlet context) now that the hub owns root.
+     * The post-spawn redirect and the oauth2-proxy upstream both point here.
+     */
+    private static final String GUACAMOLE_PATH  = "/guacamole/";
     /**
      * KubeSpawner stamps this label (value = the user's slug) on each pod; the per-user VNC Service selects it.
      */
@@ -105,18 +113,15 @@ public abstract class JupyterHubConfig {
 
 
     /**
-     * Upstreams the oauth2-proxy MFA gate fronts, on a single domain. Guacamole owns the root; the
-     * JupyterHub hub ({@code /jupyter/hub/*}, for login/spawn/OAuth callback) and the spawned
-     * single-user notebooks ({@code /jupyter/user/*}) are both exposed under {@code /jupyter/}. All
-     * three sit behind the same OIDC/MFA gate. oauth2-proxy routes by longest path prefix, so
-     * {@code /jupyter/hub/*} and {@code /jupyter/user/*} hit proxy-public and everything else falls
-     * through to Guacamole. Exposing {@code /jupyter/user/*} means the post-spawn redirect to the
-     * notebook resolves instead of 404ing against Guacamole.
+     * Upstreams the oauth2-proxy MFA gate fronts, on a single domain, both behind the same OIDC/MFA
+     * gate. oauth2-proxy routes by longest path prefix: {@code /guacamole/*} hits Guacamole and
+     * everything else falls through to the JupyterHub public proxy (the hub at {@code /hub/*} and the
+     * spawned single-user notebooks at {@code /user/*}). The hub owns the root so a bare visit to the
+     * domain lands on it and auto-spawns the user's pod before handing off to Guacamole.
      */
     public static final List<String> MFA_UPSTREAMS = List.of(
-        "http://" + GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT,
-        "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL + "hub/",
-        "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL + "user/");
+        "http://" + GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT + GUACAMOLE_PATH,
+        "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL);
 
     private static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
     private static final Map<String, String> PROXY_LABELS = Map.of("app", "jupyterhub-proxy");
@@ -336,6 +341,9 @@ public abstract class JupyterHubConfig {
         Deployment.Builder
             .create(stack, "jupyterhubHubDeployment")
             .dependsOn(dependsOn)
+            // Longer than the in-config OIDC discovery poll (see jupyterhubConfigPy), so Terraform is
+            // still waiting when the hub finally reaches the issuer instead of giving up underneath it.
+            .timeouts(DeploymentTimeouts.builder().create("15m").build())
             .metadata(DeploymentMetadata.builder()
                                         .name("hub-deployment")
                                         .labels(HUB_LABELS)
@@ -415,15 +423,36 @@ public abstract class JupyterHubConfig {
      */
     private String jupyterhubConfigPy() {
         String issuer = AfonProperties.OIDC_ISSUER_URL.getValueFrom(properties);
-        logger.info("login at: https://{}/jupyter/hub/home", jupyterDomain());
+        logger.info("login at: https://{}/", jupyterDomain());
         return """
-               import os, json
+               import os, json, time
                from urllib.request import urlopen
-               
+
+               def _discover(url, deadline_s=600, interval_s=5):
+                   # The issuer is a public, ALB-backed hostname whose DNS record only appears once the
+                   # load balancer is provisioned — minutes after this pod is first scheduled. Poll in
+                   # process rather than letting the exception kill us: a crash here means the container
+                   # restarts under CrashLoopBackOff, and once that backoff reaches its 5-minute cap the
+                   # hub sits idle long past the point where the issuer became reachable.
+                   deadline = time.monotonic() + deadline_s
+                   while True:
+                       try:
+                           return json.load(urlopen(url))
+                       except Exception as e:
+                           if time.monotonic() >= deadline:
+                               raise
+                           print('waiting for OIDC issuer ' + url + ': ' + str(e), flush=True)
+                           time.sleep(interval_s)
+
                c = get_config()  # noqa
                
-               # --- Served under a sub-path so Guacamole can own the domain root. ---
+               # --- The hub owns the domain root. ---
                c.JupyterHub.base_url = '%7$s'
+               # A bare visit to the domain root auto-spawns the user's pod and then hands off to
+               # Guacamole, which streams that pod's VNC desktop. Sending root traffic to the spawn
+               # page makes it auto-submit (there is no options form); ?next redirects the browser to
+               # Guacamole once the pod is up, rather than to the (blocked) single-user web UI.
+               c.JupyterHub.default_url = '/hub/spawn?next=%13$s'
                
                # --- Proxy runs in its own pod (configurable-http-proxy), not inside the hub. ---
                c.ConfigurableHTTPProxy.should_start = False
@@ -434,8 +463,9 @@ public abstract class JupyterHubConfig {
                c.JupyterHub.hub_connect_ip = '%3$s'
                c.JupyterHub.hub_port = %4$d
                c.JupyterHub.cleanup_servers = False
-               # /jupyter/user/* is now exposed through oauth2-proxy, so let the hub redirect to the
-               # spawned notebook after spawn (previously suppressed because that path 404'd at the gate).
+               # /user/* is exposed through oauth2-proxy (the hub owns root), so the hub may redirect to
+               # the spawned notebook. In normal use ?next (above) sends the browser to Guacamole first;
+               # this is only the fallback when no next is supplied.
                c.JupyterHub.redirect_to_server = True
                
                # --- One pod per user, spawned on demand by KubeSpawner. ---
@@ -455,7 +485,7 @@ public abstract class JupyterHubConfig {
                #     auth_state and hand it to their pod. Endpoints come from the issuer's discovery
                #     document, keeping this provider-agnostic. ---
                _issuer = '%9$s'.rstrip('/')
-               _oidc = json.load(urlopen(_issuer + '/.well-known/openid-configuration'))
+               _oidc = _discover(_issuer + '/.well-known/openid-configuration')
                c.JupyterHub.authenticator_class = 'generic-oauth'
                c.GenericOAuthenticator.client_id = os.environ['OAUTH_CLIENT_ID']
                c.GenericOAuthenticator.client_secret = ***REMOVED***'OAUTH_CLIENT_SECRET']
@@ -492,7 +522,8 @@ public abstract class JupyterHubConfig {
             HUB_BASE_URL, GUAC_USER_LABEL,
             issuer, jupyterDomain(),
             pythonSetOf(onboarding.getUsers().stream().map(EmrysUser::email).toList()),
-            pythonSlugMap());
+            pythonSlugMap(),
+            URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8));
     }
 
     /**

@@ -32,6 +32,8 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
     protected final PolarisConfig polarisConfig;
     protected final AwsConstruct  cloudProvider;
 
+    private AwsKeyCloakDeploymentConfig keyCloakConfig;
+
     public AwsKubernetesPolaris(@NotNull Construct scope,
                                 SupportedCloudsEnum id,
                                 Properties properties) {
@@ -62,8 +64,16 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
                       .port(List.of(polarisConfig.POLARIS_PORTS))
                       .build())
             .build();
-        AwsKeyCloakDeploymentConfig keyCloakConfig = new AwsKeyCloakDeploymentConfig(this, properties, cloudProvider);
+        keyCloakConfig = new AwsKeyCloakDeploymentConfig(this, properties, cloudProvider);
         keyCloakConfig.configureHttpsAndDNS();
+    }
+
+    /**
+     * Keycloak's AWS wiring, exposed so subclasses can depend on its DNS record (see
+     * {@link AwsKeyCloakDeploymentConfig#getAliasRecord()}).
+     */
+    protected AwsKeyCloakDeploymentConfig getKeyCloakConfig() {
+        return keyCloakConfig;
     }
 
     public static void main(String[] args) {
