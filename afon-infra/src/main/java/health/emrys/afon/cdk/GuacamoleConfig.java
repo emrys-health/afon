@@ -22,6 +22,7 @@ import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplat
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1Metadata;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1Spec;
+import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1Timeouts;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplate;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpec;
@@ -320,7 +321,9 @@ public class GuacamoleConfig {
                 .env(List.of(
                         envVar("GUACD_HOSTNAME", "localhost"),
                         envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
-                        envVar("WEBAPP_CONTEXT", "ROOT"),
+                        // Served at the default /guacamole/ context (not ROOT): JupyterHub now owns the
+                        // domain root so that a bare visit auto-spawns the user's pod, then hands off to
+                        // Guacamole under /guacamole/ to stream that pod's desktop.
                         envVar("POSTGRESQL_HOSTNAME", db.host()),
                         envVar("POSTGRESQL_PORT", String.valueOf(db.port())),
                         envVar("POSTGRESQL_DATABASE", db.database()),
@@ -418,6 +421,9 @@ public class GuacamoleConfig {
 
         return JobV1.Builder.create(scope, "guacamoleDbInitJob")
                 .dependsOn(dependsOn)
+                // The provider waits only 1 minute for completion by default, most of which is spent
+                // pulling the two images before any SQL runs. The work itself takes about a second.
+                .timeouts(JobV1Timeouts.builder().create("10m").build())
                 .metadata(JobV1Metadata.builder().name(DB_INIT_JOB).namespace("default").build())
                 .spec(JobV1Spec.builder()
                               .backoffLimit(6)

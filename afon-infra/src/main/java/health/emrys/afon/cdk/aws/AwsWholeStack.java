@@ -68,7 +68,8 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         JupyterHubConfig jupyter = new JupyterHubAwsConfig(
             this,
             cloudProvider,
-            properties);
+            properties,
+            getKeyCloakConfig().getAliasRecord());
         NetworkConfiguration network = new NetworkConfiguration(this);
         // Every Service the hub deploy creates (guacamole-web, the per-user VNC services,
         // jupyterhub-proxy-public) fires the AWS LB Controller's mutating webhook
