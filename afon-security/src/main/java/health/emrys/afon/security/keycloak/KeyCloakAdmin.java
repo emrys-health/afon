@@ -5,6 +5,7 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.HttpResponse;
@@ -152,15 +153,19 @@ public class KeyCloakAdmin {
     }
 
     /**
-     * Ensures the realm exists and (idempotently) creates the confidential, browser-flow client that
+     * Ensures the realm exists and (idempotently) provisions the confidential, browser-flow client that
      * oauth2-proxy and JupyterHub use to log users in. Unlike {@link #createConfidentialClient} (a
      * direct-grant client for Polaris), this client has the authorization-code flow enabled and
      * registered redirect URIs, so the browser redirect from oauth2-proxy resolves - otherwise
      * KeyCloak returns "Client not found".
      *
+     * <p>Idempotent in the converging sense: an already-existing client is overwritten with the URIs
+     * below rather than left alone, since KeyCloak's database survives a cluster rebuild and would
+     * otherwise pin the callbacks of whichever deploy first created it.
+     *
      * @param redirectUris the exact callback URLs, e.g.
      *                     {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
-     *                     {@code https://jupyter.example/jupyter/hub/oauth_callback} (JupyterHub).
+     *                     {@code https://jupyter.example/hub/oauth_callback} (JupyterHub).
      */
     public void registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris) {
         try {
@@ -198,8 +203,70 @@ public class KeyCloakAdmin {
             // "+" tells KeyCloak to derive allowed CORS web origins from the redirect URIs.
             Map.entry("webOrigins", List.of("+"))
         ));
-        if (isFailure(postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "browser client " + clientId))) {
+        HttpResponse created = postJson(
+            adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "browser client " + clientId);
+        if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
+            // KeyCloak's DB outlives the cluster, so a client provisioned by an earlier deploy survives
+            // with whatever redirect URIs it was created with. Creating-if-absent would leave those
+            // stale — the browser then arrives with an unregistered redirect_uri and KeyCloak rejects
+            // the login with "Invalid parameter: redirect_uri". Overwrite so the client converges on
+            // the URIs this deploy actually uses.
+            updateBrowserClient(adminToken, realm, clientId, json);
+        } else if (isFailure(created)) {
             logger.warn("Could not create browser client {}", clientId);
+        }
+    }
+
+    /**
+     * Overwrites an existing client's representation, looking up its internal UUID by {@code clientId}
+     * (the admin API keys updates on the UUID, not the human-readable client ID).
+     */
+    private void updateBrowserClient(String adminToken, String realm, String clientId, String json)
+        throws IOException {
+        String uuid = clientUuid(adminToken, realm, clientId);
+        if (uuid == null) {
+            logger.warn("Browser client {} reported as existing but could not be looked up", clientId);
+            return;
+        }
+        String uri = format("%s/admin/realms/%s/clients/%s", baseUrl, realm, uuid);
+        if (isFailure(putJson(adminToken, uri, json, "browser client " + clientId))) {
+            logger.warn("Could not update browser client {}", clientId);
+        } else {
+            logger.info("Updated existing KeyCloak browser client {}", clientId);
+        }
+    }
+
+    /** The internal UUID KeyCloak assigns a client, or null when no such client exists. */
+    private String clientUuid(String adminToken, String realm, String clientId) throws IOException {
+        String uri = format("%s/admin/realms/%s/clients?clientId=%s",
+                            baseUrl, realm, URLEncoder.encode(clientId, StandardCharsets.UTF_8));
+        HttpGet get = new HttpGet(uri);
+        get.setHeader("Authorization", "Bearer " + adminToken);
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            return client.execute(get, response -> {
+                if (response.getCode() != HttpStatus.SC_OK) {
+                    return null;
+                }
+                List<?> found = MAPPER.readValue(response.getEntity().getContent(), List.class);
+                if (found.isEmpty()) {
+                    return null;
+                }
+                return (String) ((Map<?, ?>) found.get(0)).get("id");
+            });
+        }
+    }
+
+    private HttpResponse putJson(String adminToken, String uri, String json, String what) throws IOException {
+        logger.info("Calling PUT {} with: \n{}", uri, json);
+        HttpPut put = new HttpPut(uri);
+        put.setHeader("Authorization", "Bearer " + adminToken);
+        put.setHeader("Content-Type", "application/json");
+        put.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            return client.execute(put, response -> {
+                logger.info("PUT {} resulted in HTTP code {}", uri, response.getCode());
+                return response;
+            });
         }
     }
 
@@ -313,9 +380,10 @@ public class KeyCloakAdmin {
      */
     public static final String OAUTH2_PROXY_CALLBACK = "/oauth2/callback";
     /**
-     * JupyterHub's OAuthenticator callback path (HUB_BASE_URL + "hub/oauth_callback").
+     * JupyterHub's OAuthenticator callback path (HUB_BASE_URL + "hub/oauth_callback"). The hub now
+     * owns the domain root (base_url "/"), so this is "/hub/oauth_callback" rather than under /jupyter/.
      */
-    public static final String JUPYTERHUB_CALLBACK   = "/jupyter/hub/oauth_callback";
+    public static final String JUPYTERHUB_CALLBACK   = "/hub/oauth_callback";
 
     /**
      * Allows the realm/client/user to be provisioned independently of the containers, e.g. against an

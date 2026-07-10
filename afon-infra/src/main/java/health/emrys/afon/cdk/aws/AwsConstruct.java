@@ -704,9 +704,11 @@ public class AwsConstruct extends AbstractConstruct {
      * @param ingress       IngressV1 the data-source lookup depends on (so it resolves at apply time)
      * @param ingressK8sName the Ingress' Kubernetes metadata.name, used to match the ALB's
      *                       {@code ingress.k8s.aws/stack=default/<name>} tag
+     * @return the alias record, so callers can make workloads that resolve {@code domainName}
+     *         depend on it rather than racing its creation
      */
-    public void configureDNS(String constructId, String r53ZoneId, String domainName,
-                             Release release, IngressV1 ingress, String ingressK8sName) {
+    public Route53Record configureDNS(String constructId, String r53ZoneId, String domainName,
+                                      Release release, IngressV1 ingress, String ingressK8sName) {
         // We deliberately do NOT read the ALB hostname from the Ingress' status. The
         // hashicorp/kubernetes provider routinely returns a null status[0] for an
         // ALB-backed Ingress even when wait_for_load_balancer is set and the ALB is
@@ -727,7 +729,7 @@ public class AwsConstruct extends AbstractConstruct {
                 "ingress.k8s.aws/resource", "LoadBalancer"))
             .dependsOn(List.of(ingress))
             .build());
-        new Route53Record(
+        return new Route53Record(
             this, constructId, Route53RecordConfig
             .builder()
             .zoneId(r53ZoneId)

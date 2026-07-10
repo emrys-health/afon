@@ -5,6 +5,8 @@ import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplat
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFrom;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainer;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -82,9 +84,11 @@ public class JupyterMfaConfig {
                         ))
             .build();
 
+        String issuer = OIDC_ISSUER_URL.getValueFrom(properties);
+
         List<String> proxyArgs = new ArrayList<>(List.of(
             "--provider=oidc",
-            "--oidc-issuer-url=" + OIDC_ISSUER_URL.getValueFrom(properties),
+            "--oidc-issuer-url=" + issuer,
             "--email-domain=" + OIDC_EMAIL_DOMAIN.getValueFrom(properties),
             "--http-address=0.0.0.0:" + PROXY_PORT,
             "--cookie-secure=true",                           // set true when TLS terminates at this proxy
@@ -115,7 +119,8 @@ public class JupyterMfaConfig {
         List<ITerraformDependable> deps = new ArrayList<>(dependsOn);
         deps.add(oauthSecret);
 
-        DeploymentUtils.deploy(scope, deps, PROXY_LABELS, List.of(proxyContainer), List.of(), "oauth2-proxy");
+        DeploymentUtils.deploy(scope, deps, PROXY_LABELS, List.of(proxyContainer),
+                               List.of(waitForIssuer(issuer)), List.of(), "oauth2-proxy", "15m");
 
         Service.Builder.create(scope, PROXY_SVC_NAME)
                        .metadata(ServiceMetadata
@@ -136,6 +141,43 @@ public class JupyterMfaConfig {
                                                           .build()))
                                         .build())
                        .build();
+    }
+
+    /**
+     * Blocks until the OIDC issuer serves its discovery document.
+     *
+     * <p>oauth2-proxy fetches that document once, at startup, and exits if it cannot. The issuer is a
+     * public, load-balancer-backed hostname that does not resolve until the LB is provisioned and its
+     * DNS record propagates — minutes after this pod is first scheduled. Without this gate the proxy
+     * crashes, and once CrashLoopBackOff reaches its five-minute cap the pod sits idle long past the
+     * point the issuer became reachable, overrunning Terraform's rollout wait.
+     *
+     * <p>Unlike JupyterHub — whose config is Python we can make retry in process — oauth2-proxy is a
+     * binary, so the wait has to live beside it. Curl's {@code -f} also treats the load balancer's
+     * "no healthy targets" 5xx as a failure, so this waits for Keycloak to actually serve, not merely
+     * for the name to resolve. Deliberately unbounded: if the issuer never comes up, the pod stays in
+     * {@code Init:0/1} with this container's log naming exactly what it is waiting for, which is a far
+     * clearer failure than a crash loop.
+     */
+    private static DeploymentSpecTemplateSpecInitContainer waitForIssuer(String issuer) {
+        String discoveryUrl = issuer.replaceAll("/+$", "") + "/.well-known/openid-configuration";
+        String script = String.join("\n",
+            "until curl -sfo /dev/null \"$DISCOVERY_URL\"; do",
+            "  echo \"waiting for OIDC issuer $DISCOVERY_URL\"",
+            "  sleep 5",
+            "done",
+            "echo \"OIDC issuer reachable\"");
+        return DeploymentSpecTemplateSpecInitContainer
+            .builder()
+            .name("wait-for-issuer")
+            .image("curlimages/curl:8.11.1")
+            .command(List.of("sh", "-c", script))
+            .env(List.of(DeploymentSpecTemplateSpecInitContainerEnv
+                             .builder()
+                             .name("DISCOVERY_URL")
+                             .value(discoveryUrl)
+                             .build()))
+            .build();
     }
 
     private static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
