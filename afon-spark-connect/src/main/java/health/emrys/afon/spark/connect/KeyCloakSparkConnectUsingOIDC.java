@@ -7,9 +7,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Stream;
-
-import static health.emrys.afon.config.AfonProperties.KC_HOSTNAME;
 
 public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
 
@@ -34,8 +31,8 @@ public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
 
     public KeyCloakSparkConnectUsingOIDC(String polarisHost) throws IOException {
         super(polarisHost);
-        KeyCloakAdmin kcAdmin = new KeyCloakAdmin(KC_HOSTNAME.getValueFrom(properties), getSparkUser(), getSparkPassword());
-        kcAdminToken = kcAdmin.adminToken();
+        KeyCloakAdmin kcAdmin = new KeyCloakAdmin(properties);
+        kcAdminToken = kcAdmin.userToken(getSparkUser(), getSparkPassword());
     }
 
     protected Map<String, String> getWarehouseConfig(String warehouseName,
@@ -45,8 +42,10 @@ public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
         Map<String, String>               warehouseConfig = new HashMap<>();
         defaults
             .entrySet().stream()
-            .filter(x -> x.getValue().contains(getSparkUser() + ":" + getSparkPassword()))
+            .filter(x -> !x.getValue().contains(getSparkUser() + ":" + getSparkPassword()))
             .forEach(x -> warehouseConfig.put(x.getKey(), x.getValue()));
+
+        warehouseConfig.put(String.format("spark.sql.catalog.%s.token", warehouseName), kcAdminToken);
         return warehouseConfig;
     }
 }
