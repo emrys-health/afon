@@ -82,7 +82,10 @@ curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/tok
         HttpPost post = new HttpPost(keyCloakTokenUri);
         String   url  = urlEncode(form);
         post.setHeader(CONTENT_TYPE, "application/x-www-form-urlencoded");
-        logger.info("Requesting KeyCloak access token from {}", keyCloakTokenUri);
+        logger.info("Requesting KeyCloak access token from {} as {}/{}",
+                    keyCloakTokenUri,
+                    clientId,
+                    clientSecret);
         ClassicHttpResponse response = makeCall(url, post);
         return parseAccessToken(response);
     }

@@ -22,7 +22,7 @@ public class ConfigureUserMain {
 
     public static final String ROLE_NAME = "emrysrole4";
 
-    private static final Logger logger = LoggerFactory.getLogger(ConfigureUserMain.class);
+    private static final Logger                logger            = LoggerFactory.getLogger(ConfigureUserMain.class);
     private static final Set<CatalogPrivilege> catalogPrivileges = Set.of(TABLE_READ_DATA, TABLE_WRITE_DATA, NAMESPACE_CREATE, TABLE_CREATE, NAMESPACE_FULL_METADATA);
 
     private final PolarisConfigurer     configurer;
@@ -37,7 +37,7 @@ public class ConfigureUserMain {
         }
         ConfigureUserMain app           = new ConfigureUserMain(properties);
         String            catalogName   = args[1];
-        String principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
+        String            principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
         try {
             logger.info("Configuring Polaris User {} for catalog {} and role {}", principalName, catalogName, ROLE_NAME);
             app.configurePrivilegesFor(catalogName, ROLE_NAME);
@@ -58,9 +58,10 @@ public class ConfigureUserMain {
     }
 
     public HttpResponse configureUser(
-            String principalName,
-            String roleName,
-            String catalogName) throws IncorrectConfigException, IOException {
+        String principalName,
+        String roleName,
+        String catalogName
+    ) throws IncorrectConfigException, IOException {
         PrincipalWithCredentials principal         = configurer.configureUser(accessToken, principalName);
         String                   principalRoleName = roleName + "Principal";
         logger.info("Created Polaris User {}", principal);
@@ -86,7 +87,8 @@ public class ConfigureUserMain {
 
     private List<HttpResponse> configurePrivilegesFor(
         String catalogName,
-        String roleName) throws IOException, IncorrectConfigException {
+        String roleName
+    ) throws IOException, IncorrectConfigException {
         permissions.deleteRoleIfExists(roleName, catalogName);
         List<HttpResponse> results  = new ArrayList<>();
         HttpResponse       response = permissions.createCatalogRole(catalogName, roleName);

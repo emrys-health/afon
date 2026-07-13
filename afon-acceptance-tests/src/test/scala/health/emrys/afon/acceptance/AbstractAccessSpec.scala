@@ -16,13 +16,12 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 
-  val NUM_ROWS = 100
-
-  val FULL_NAMESPACE = s"${cloudProvider}.$namespace"
-
   def config: CloudConfigForPolaris
+
   val GrantCatalogAdmin = new CatalogAdminGrant(this, config)
-  val CatalogRoles = new CatalogRoles(this, config)
+  val CatalogRoles      = new CatalogRoles(this, config)
+  val NUM_ROWS          = 100
+  val FULL_NAMESPACE    = s"${cloudProvider}.$namespace"
 
   protected def createTableAndPopulate(): Unit = {
     spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).create()
@@ -36,7 +35,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val uri = getCreateCatalogURI
       Given(s"a Polaris endpoint at ${client.getEndpoint}")
       val json = config.catalogConfig
-      When(s"we call $uri with payload:\n$json")
+      When(s"we call $uri as user '${client.getClientId}' with payload:\n$json")
       client.postJsonCall(uri, json, accessToken)
       val uriGet = s"/api/catalog/v1/config?warehouse=${config.warehouseName()}"
       Then(s"Polaris acknowledges the catalog when we call $uriGet")
@@ -79,7 +78,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       When(s"we create a namespace with SQL '$sql'")
       spark.sql(sql)
       val uri = namespaceURI(config.warehouseName(), namespace)
-      Then(s"Polaris acknowledges the namespace exists when call '$uri")
+      Then(s"Polaris acknowledges the namespace exists when call as user '${client.getClientId}' '$uri")
       val response = client.getCall(uri, accessToken)
       assert(response.getCode == 200)
     }

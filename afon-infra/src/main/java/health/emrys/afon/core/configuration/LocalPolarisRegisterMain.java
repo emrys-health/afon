@@ -28,7 +28,6 @@ public class LocalPolarisRegisterMain {
     public static void main(String[] args) {
         AfonPolarisClientFactory clientFactory  = AfonPolarisClientFactory.clientFactory();
         RegisterTableConfig      conf           = new RegisterTableConfig(args);
-        AfonPolarisClient        client         = null;
         Properties               afonProperties = new AfonPropertiesLoader().getProperties();
         if (args.length > 4) {
             afonProperties.put(POLARIS_ENDPOINT.getPropertyName(), args[4]);
@@ -43,7 +42,7 @@ public class LocalPolarisRegisterMain {
         String kcHost = KC_HOSTNAME.getValueFrom(afonProperties);
         logger.info("KC host: {}", kcHost);
         afonProperties.put(KC_HOSTNAME.getPropertyName(), kcHost);
-        client = clientFactory.getPolarisClient(afonProperties);
+        AfonPolarisClient        client = clientFactory.getPolarisClient(afonProperties);
         LocalPolarisRegisterMain app    = new LocalPolarisRegisterMain(client, conf);
         List<String>             errors = app.createTableAndNamespace();
         if (!errors.isEmpty()) {
