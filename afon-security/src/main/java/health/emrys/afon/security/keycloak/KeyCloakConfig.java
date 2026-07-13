@@ -36,7 +36,9 @@ public class KeyCloakConfig {
 
     public static @NonNull String urlFor(String host, String protocol) {
         String url;
-        if ("HTTP".equalsIgnoreCase(protocol.toUpperCase())) {
+        if (host.toLowerCase().startsWith("http")) {
+            url = host;
+        } else if ("HTTP".equalsIgnoreCase(protocol.toUpperCase())) {
             url = format(
                 "%s://%s:%d",
                 protocol,
