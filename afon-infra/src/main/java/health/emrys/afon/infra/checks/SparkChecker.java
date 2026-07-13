@@ -33,6 +33,7 @@ abstract public class SparkChecker {
             logger.info("Finished without error");
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
+            throw new RuntimeException(e);
         }
     }
 
