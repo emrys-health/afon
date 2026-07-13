@@ -48,13 +48,15 @@ public class ConfigureUserMain {
     }
 
     private final String accessToken;
+    private final String adminClientId;
 
     public ConfigureUserMain(Properties properties) {
         AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(properties);
-        accessToken = client.getAccessToken();
+        accessToken   = client.getAccessToken();
+        configurer    = new PolarisConfigurer(client);
+        permissions   = new PermissionsConfigurer(client);
+        adminClientId = client.getClientId();
         logger.debug("POLARIS_TOKEN={}", accessToken);
-        configurer  = new PolarisConfigurer(client);
-        permissions = new PermissionsConfigurer(client);
     }
 
     public HttpResponse configureUser(
@@ -64,14 +66,18 @@ public class ConfigureUserMain {
     ) throws IncorrectConfigException, IOException {
         PrincipalWithCredentials principal         = configurer.configureUser(accessToken, principalName);
         String                   principalRoleName = roleName + "Principal";
-        logger.info("Created Polaris User {}", principal);
+        logger.info(
+            "Admin '{}' creating Polaris User {}",
+            adminClientId,
+            principal);
 
         // TODO - delete first?
         if (isFailure(permissions.createPrincipalRoles(principalRoleName))) {
-            logger.warn("Failed to create principal role {}", principalRoleName);
+            logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
         }
         if (isFailure(permissions.associateRoles(catalogName, principalRoleName, roleName))) {
-            logger.warn("Failed to associate role {} with principale role {} in catalog {}", roleName, principalRoleName, catalogName);
+            logger.warn("Admin {} failed to associate role {} with principale role {} in catalog {}",
+                        adminClientId, roleName, principalRoleName, catalogName);
         }
 
         HttpResponse response = permissions.associatePrincipalRoles(principalName, principalRoleName);
@@ -93,10 +99,10 @@ public class ConfigureUserMain {
         List<HttpResponse> results  = new ArrayList<>();
         HttpResponse       response = permissions.createCatalogRole(catalogName, roleName);
         if (isFailure(response)) {
-            logger.error("Could not create role {} frr catalog {}", roleName, catalogName);
+            logger.error("Admin {} could not create role {} for catalog {}", adminClientId, roleName, catalogName);
             results.add(response);
         } else {
-            logger.info("Created role {}", roleName);
+            logger.info("Admin {} created role {}", adminClientId, roleName);
             results.addAll(addPermissions(catalogName, roleName));
         }
         return results;
@@ -107,7 +113,11 @@ public class ConfigureUserMain {
         for (CatalogPrivilege privilege : catalogPrivileges) {
             HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
             if (isFailure(result)) {
-                logger.error("Could not grant role {} the privilege {} on  catalog {}", roleName, privilege, catalogName);
+                logger.error("Admin '{}' ould not grant role {} the privilege {} on  catalog {}",
+                             adminClientId,
+                             roleName,
+                             privilege,
+                             catalogName);
             }
             results.add(result);
         }
