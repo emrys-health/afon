@@ -58,6 +58,22 @@ public class DeploymentUtils {
             .metadata(metadata)
             .spec(podSpec.build())
             .build();
+        DeploymentSpec.Builder deploymentSpec = DeploymentSpec
+            .builder()
+            .selector(DeploymentSpecSelector
+                          .builder()
+                          .matchLabels(labels)
+                          .build())
+            .replicas("1")
+            .template(specTemplate);
+        // Kubernetes fails a rollout once its own progressDeadlineSeconds (default 600s / 10m)
+        // elapses, surfacing a "Deployment exceeded its progress deadline" condition that the
+        // provider reports as an error long before the Terraform create timeout below is reached.
+        // Keep the two in step so a caller raising createTimeout to cover a slow init container
+        // actually gets the extra wait rather than tripping the 10m Kubernetes default.
+        if (createTimeout != null) {
+            deploymentSpec.progressDeadlineSeconds(durationToSeconds(createTimeout));
+        }
         Deployment.Builder builder = Deployment.Builder.create(scope, name + "Deployment")
                                  .dependsOn(eksDependOn)
                                  .metadata(DeploymentMetadata
@@ -65,19 +81,31 @@ public class DeploymentUtils {
                                                .name(name + "-deployment")
                                                .labels(labels)
                                                .build())
-                                 .spec(DeploymentSpec
-                                           .builder()
-                                           .selector(DeploymentSpecSelector
-                                                         .builder()
-                                                         .matchLabels(labels)
-                                                         .build())
-                                           .replicas("1")
-                                           .template(specTemplate)
-                                           .build());
+                                 .spec(deploymentSpec.build());
         if (createTimeout != null) {
             builder.timeouts(DeploymentTimeouts.builder().create(createTimeout).build());
         }
         return builder.build();
+    }
+
+    /**
+     * Converts a Terraform-style Go duration (e.g. {@code "15m"}, {@code "600s"}, {@code "1h"}) to
+     * whole seconds for {@code progressDeadlineSeconds}. Supports {@code h}/{@code m}/{@code s} units,
+     * defaulting to seconds when no unit is given.
+     */
+    static Number durationToSeconds(String duration) {
+        String trimmed = duration.trim();
+        char unit = trimmed.charAt(trimmed.length() - 1);
+        long multiplier = switch (unit) {
+            case 'h' -> 3600;
+            case 'm' -> 60;
+            case 's' -> 1;
+            default  -> 0;
+        };
+        if (multiplier == 0) {
+            return Long.parseLong(trimmed);
+        }
+        return Long.parseLong(trimmed.substring(0, trimmed.length() - 1).trim()) * multiplier;
     }
 
     /**
