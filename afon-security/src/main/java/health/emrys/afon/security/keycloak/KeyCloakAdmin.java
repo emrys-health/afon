@@ -50,10 +50,18 @@ public class KeyCloakAdmin {
     }
 
     public KeyCloakAdmin(Properties properties, String kcHostname) {
+        this(KeyCloakConfig.urlFor(kcHostname, protocolFor(kcHostname)),
+             KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
+             KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
+    }
+
+    public KeyCloakAdmin(String kcHostname,
+                         String adminUser,
+                         String adminPassword) {
         this.baseUrl       = KeyCloakConfig.urlFor(kcHostname, protocolFor(kcHostname));
-        this.adminUser     = KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties);
-        this.adminPassword = KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties);
-        logger.info("KeyCloak Admin URL: {}", this.baseUrl);
+        this.adminUser     = adminUser;
+        this.adminPassword = adminPassword;
+        logger.info("KeyCloak Admin URL: {}. user = {}", this.baseUrl, this.adminUser);
     }
 
     /**
@@ -71,6 +79,7 @@ public class KeyCloakAdmin {
      */
     public void registerPolarisUser(String user, String userPassword, String email) {
         try {
+            logger.info("Running as {}/{}", adminUser, adminPassword);
             String adminToken = adminToken();
             createRealm(adminToken, KEYCLOAK_REALM);
             createConfidentialClient(adminToken, KEYCLOAK_REALM, user, userPassword);
@@ -403,6 +412,7 @@ public class KeyCloakAdmin {
                 email
             );
         } else {
+            logger.info("Using default user from afon.properties");
             admin.registerPolarisUser(
                 AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
                 AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
