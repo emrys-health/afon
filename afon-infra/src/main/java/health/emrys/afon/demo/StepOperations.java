@@ -316,8 +316,8 @@ public class StepOperations {
                 Properties properties = appProperties();
                 List<String> args = List.of(
                     warehouse.toString(),
-                    POLARIS_ID.getValueFrom(properties),
-                    POLARIS_SECRET.getValueFrom(properties),
+                    USER_POLARIS_ID.getValueFrom(properties),
+                    USER_POLARIS_SECRET.getValueFrom(properties),
                     domainName,
                     namespace);
                 actions.executeMainOf(
