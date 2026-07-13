@@ -3,10 +3,14 @@ package health.emrys.afon.core.configuration;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.InfraUtils.isFailure;
@@ -40,16 +44,60 @@ public class LocalPolarisRegisterMain {
         logger.info("KC host: {}", kcHost);
         afonProperties.put(KC_HOSTNAME.getPropertyName(), kcHost);
         client = clientFactory.getPolarisClient(afonProperties);
+        LocalPolarisRegisterMain app    = new LocalPolarisRegisterMain(client, conf);
+        List<String>             errors = app.createTableAndNamespace();
+        if (!errors.isEmpty()) {
+            throw new RuntimeException(errors.stream().collect(Collectors.joining("\n")));
+        }
+    }
+
+    private final AfonPolarisClient   client;
+    private final RegisterTableConfig conf;
+
+    LocalPolarisRegisterMain(AfonPolarisClient client, RegisterTableConfig conf) {
+        this.client = client;
+        this.conf   = conf;
+    }
+
+    private List<String> createTableAndNamespace() {
+        List<String> errors = new ArrayList<String>();
         try {
-            if (isFailure(conf.createNamespace(client))) {
-                logger.error("Cannot create namespace {}.{}", conf.getCatalog(), conf.getNamespace());
-            }
-            if (isFailure(conf.createTable(client))) {
-                logger.error("Cannot create table {}.{}.{}", conf.getCatalog(), conf.getNamespace(), conf.getTable());
-            }
+            errors.addAll(createNamespace());
+            errors.addAll(createTable());
         } catch (IOException e) {
             logger.error(e.getMessage(), e);
+            throw new RuntimeException(e);
         }
+        return errors;
+    }
+
+    private List<String> createTable() throws IOException {
+        ClassicHttpResponse response = conf.createTable(client);
+        if (isFailure(response)) {
+            String error = String.format(
+                "HTTP code %d table %s.%s.%s",
+                response.getCode(),
+                conf.getCatalog(),
+                conf.getNamespace(),
+                conf.getTable());
+            logger.error(error);
+            return List.of(error);
+        }
+        return List.of();
+    }
+
+    private List<String> createNamespace() throws IOException {
+        ClassicHttpResponse response = conf.createNamespace(client);
+        if (isFailure(response)) {
+            String error = String.format(
+                "HTTP code %d when creating namespace %s.%s",
+                response.getCode(),
+                conf.getCatalog(),
+                conf.getNamespace());
+            logger.error(error);
+            return List.of(error);
+        }
+        return List.of();
     }
 
 }
