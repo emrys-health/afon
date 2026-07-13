@@ -43,10 +43,6 @@ public class AfonPolarisClient {
         return format("%s/api/catalog/v1/oauth/tokens", endpoint);
     }
 
-    AfonPolarisClient(Properties properties) {
-        this(properties, "http");
-    }
-
     AfonPolarisClient(String httpsHost, Properties properties) {
         this(format("https://%s", httpsHost),
              POLARIS_ID.getValueFrom(properties),
@@ -192,5 +188,13 @@ public class AfonPolarisClient {
             assert response.getCode() == 200;
             return response;
         }
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public String getClientSecret() {
+        return clientSecret;
     }
 }
