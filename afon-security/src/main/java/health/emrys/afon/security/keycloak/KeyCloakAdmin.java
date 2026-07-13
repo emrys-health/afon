@@ -93,8 +93,38 @@ public class KeyCloakAdmin {
     }
 
     /**
+     * Obtains an access token for a provisioned Polaris user via the direct-access-grant (ROPC) flow
+     * against the {@code polaris} realm. The confidential client that {@link #createConfidentialClient}
+     * created for this user shares the user's name and secret, hence the doubled credentials.
+     */
+    public String userToken(String username, String password) throws IOException {
+        String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, KEYCLOAK_REALM);
+        String body = form(Map.of(
+            "grant_type",    "password",
+            "client_id",     username,
+            "client_secret", password,
+            "username",      username,
+            "password",      password
+        ));
+        HttpPost post = new HttpPost(uri);
+        post.setHeader("Content-Type", "application/x-www-form-urlencoded");
+        post.setEntity(new StringEntity(body));
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            return client.execute(post, response -> {
+                if (response.getCode() != HttpStatus.SC_OK) {
+                    throw new IOException("Could not obtain token for user " + username + ": HTTP " + response.getCode());
+                }
+                Map<?, ?> json = MAPPER.readValue(response.getEntity().getContent(), Map.class);
+                return (String) json.get("access_token");
+            });
+        }
+    }
+
+
+    /**
      * Authenticates against the master realm as the bootstrap admin and returns an access token for
      * the admin REST API.
+     * NOTE: this is the 'master' realm so only the admin user can call this.
      */
     public String adminToken() throws IOException {
         String uri = format("%s/realms/master/protocol/openid-connect/token", baseUrl);
