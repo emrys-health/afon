@@ -8,8 +8,8 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.KC_HOSTNAME;
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.infra.InfraUtils.isFailure;
 
 /**
  * Run with something like:
@@ -26,16 +26,27 @@ public class LocalPolarisRegisterMain {
         RegisterTableConfig      conf           = new RegisterTableConfig(args);
         AfonPolarisClient        client         = null;
         Properties               afonProperties = new AfonPropertiesLoader().getProperties();
-        if (args.length == 5) {
+        if (args.length > 4) {
             afonProperties.put(POLARIS_ENDPOINT.getPropertyName(), args[4]);
+        }
+        if (args.length > 5) {
+            String userId = args[5];
+            String secret = args[6];
+            logger.info("Creating the table as {}/{}", userId, secret);
+            afonProperties.put(POLARIS_ID.getPropertyName(), userId);
+            afonProperties.put(POLARIS_SECRET.getPropertyName(), secret);
         }
         String kcHost = KC_HOSTNAME.getValueFrom(afonProperties);
         logger.info("KC host: {}", kcHost);
         afonProperties.put(KC_HOSTNAME.getPropertyName(), kcHost);
         client = clientFactory.getPolarisClient(afonProperties);
         try {
-            conf.createNamespace(client);
-            conf.createTable(client);
+            if (isFailure(conf.createNamespace(client))) {
+                logger.error("Cannot create namespace {}.{}", conf.getCatalog(), conf.getNamespace());
+            }
+            if (isFailure(conf.createTable(client))) {
+                logger.error("Cannot create table {}.{}.{}", conf.getCatalog(), conf.getNamespace(), conf.getTable());
+            }
         } catch (IOException e) {
             logger.error(e.getMessage(), e);
         }

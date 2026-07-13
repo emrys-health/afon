@@ -34,7 +34,7 @@ public class RegisterTableConfig {
         metadata  = args[3];
     }
 
-    void createTable(AfonPolarisClient client) throws IOException {
+    ClassicHttpResponse createTable(AfonPolarisClient client) throws IOException {
         String uri = format("/api/catalog/v1/%s/namespaces/%s/register", catalog, namespace);
         String json = format("""
                                      {
@@ -45,9 +45,10 @@ public class RegisterTableConfig {
         logger.info(json);
         ClassicHttpResponse response = client.postJsonCall(uri, json, client.getAccessToken());
         logger.info("response: {}", response.getCode());
+        return response;
     }
 
-    void createNamespace(AfonPolarisClient client) throws IOException {
+    ClassicHttpResponse createNamespace(AfonPolarisClient client) throws IOException {
         String uri = format("/api/catalog/v1/%s/namespaces", catalog);
         String json = format("""
                                      {
@@ -57,5 +58,18 @@ public class RegisterTableConfig {
         logger.info(json);
         ClassicHttpResponse response = client.postJsonCall(uri, json, client.getAccessToken());
         logger.info("response: {}", response.getCode());
+        return response;
+    }
+
+    public String getTable() {
+        return table;
+    }
+
+    public String getNamespace() {
+        return namespace;
+    }
+
+    public SupportedCloudsEnum getCatalog() {
+        return catalog;
     }
 }
