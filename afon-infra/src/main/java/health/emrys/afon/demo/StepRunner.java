@@ -39,6 +39,7 @@ public class StepRunner {
             log.info("Successfully ran steps\n{}", humanReadable(steps));
         } catch (Exception e) {
             log.error("Error running steps", e);
+            throw new RuntimeException(e);
         }
     }
 

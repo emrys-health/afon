@@ -9,6 +9,7 @@ import health.emrys.afon.infra.PurgeAndPopulatePolaris;
 import health.emrys.afon.infra.checks.SparkChecker;
 import health.emrys.afon.infra.checks.SparkTestReader;
 import health.emrys.afon.infra.checks.SparkTestWriter;
+import health.emrys.afon.infra.onboarding.UserOnboarderMain;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -78,6 +79,13 @@ public class StepOperations {
             "aws_polaris",
             "deploy Polaris in AWS",
             () -> actions.startAwsPolaris());
+    }
+
+    public Step deployFullAwsCluster() {
+        return new Step(
+            "aws_spark",
+            "deploy Spark in AWS",
+            () -> actions.startFullStackInAws());
     }
 
     public Step deployAwsSpark() {
@@ -300,6 +308,11 @@ public class StepOperations {
                    warehouse.toString()),
             description,
             () -> {
+                actions.executeMainOf(
+                    UserOnboarderMain.class,
+                    new String[] {domainName, warehouse.toString()},
+                    NO_ENV_VARIABLES);
+
                 Properties properties = appProperties();
                 List<String> args = List.of(
                     warehouse.toString(),
