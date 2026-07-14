@@ -54,6 +54,7 @@ public class ContainerHelper {
         Properties properties = new AfonPropertiesLoader().getProperties();
         // KeyCloak must be up (and the Polaris realm provisioned) before Polaris starts, as Polaris
         // resolves its OIDC configuration from KeyCloak.
+        instance.startTrino(properties);
         instance.startKeyCloak(properties);
         instance.startPolaris(properties);
         instance.startSparkConnect(properties);
