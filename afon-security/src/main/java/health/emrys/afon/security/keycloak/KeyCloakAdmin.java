@@ -151,12 +151,40 @@ public class KeyCloakAdmin {
         }
     }
 
+    /** 10 hours: how long an issued access token stays valid, so an interactive session lasts a working day. */
+    private static final int ACCESS_TOKEN_LIFESPAN_SECONDS = 10 * 60 * 60;
+    /**
+     * The SSO session bounds cap a token's lifespan, so they must exceed {@link #ACCESS_TOKEN_LIFESPAN_SECONDS}
+     * or a freshly-minted token would be clipped short. Given headroom above the 10h token life.
+     */
+    private static final int SSO_SESSION_LIFESPAN_SECONDS  = 12 * 60 * 60;
+
+    /**
+     * Creates the realm if absent and, either way, converges its token lifespans. Polaris validates
+     * the bearer JWT offline (signature + {@code exp}), so the access token's own lifespan is what
+     * decides how long a pod can talk to Polaris; KeyCloak's 5-minute default is far too short. The
+     * SSO session bounds are raised in step because they otherwise cap the access token.
+     *
+     * <p>Upserts rather than create-if-absent: the realm outlives a cluster rebuild, so an
+     * already-existing one (created by an earlier deploy with the old 5-minute default) is updated to
+     * these lifespans rather than left stale.
+     */
     public void createRealm(String adminToken, String realm) throws IOException {
         String json = MAPPER.writeValueAsString(Map.of(
             "realm", realm,
-            "enabled", true
+            "enabled", true,
+            "accessTokenLifespan", ACCESS_TOKEN_LIFESPAN_SECONDS,
+            "ssoSessionMaxLifespan", SSO_SESSION_LIFESPAN_SECONDS,
+            "ssoSessionIdleTimeout", SSO_SESSION_LIFESPAN_SECONDS
         ));
-        if (isFailure(postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm))) {
+        HttpResponse created = postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm);
+        if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
+            if (isFailure(putJson(adminToken, format("%s/admin/realms/%s", baseUrl, realm), json, "realm " + realm))) {
+                logger.warn("Could not update KeyCloak realm '{}'", realm);
+            } else {
+                logger.info("Updated existing KeyCloak realm '{}' token lifespans", realm);
+            }
+        } else if (isFailure(created)) {
             logger.warn("Could not create KeyCloak realm '{}'", realm);
         }
     }
