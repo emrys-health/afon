@@ -43,7 +43,10 @@ public class ConfigureUserMain {
         String            catalogName   = args[1];
         String            principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
         try {
-            logger.info("Configuring Polaris User {} for catalog {} and role {}", principalName, catalogName, ROLE_NAME);
+            logger.info("Configuring Polaris user '{}' for catalog '{}' and role '{}'",
+                        principalName,
+                        catalogName,
+                        ROLE_NAME);
             app.configurePrivilegesFor(catalogName, ROLE_NAME);
             app.configureUser(principalName, ROLE_NAME, catalogName);
         } catch (Exception x) {
@@ -75,7 +78,12 @@ public class ConfigureUserMain {
             adminClientId,
             principal);
 
-        // TODO - delete first?
+        // A previous run may have left this principal role — and hence its catalog-role association —
+        // in place, which would make the create/associate below fail. Delete it first so both start
+        // from a clean slate; removing the principal role also drops its catalog-role association.
+        if (isFailure(permissions.deletePrincipalRoleIfExists(principalRoleName))) {
+            logger.warn("Admin {} could not delete principal role {}", adminClientId, principalRoleName);
+        }
         if (isFailure(permissions.createPrincipalRoles(principalRoleName))) {
             logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
         }
@@ -95,7 +103,7 @@ public class ConfigureUserMain {
         return response.getCode() / 100 != 2;
     }
 
-    private List<HttpResponse> configurePrivilegesFor(
+    public List<HttpResponse> configurePrivilegesFor(
         String catalogName,
         String roleName
     ) throws IOException, IncorrectConfigException {

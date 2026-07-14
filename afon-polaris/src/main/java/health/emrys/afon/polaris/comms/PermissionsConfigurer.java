@@ -59,6 +59,18 @@ public class PermissionsConfigurer {
         return response;
     }
 
+    /**
+     * Deletes the principal role if it is present, returning a 404 harmlessly when it is not. Polaris
+     * cascades this: removing a principal role also drops its associations with catalog roles, so this
+     * is enough to clear a stale role left by a previous run before it is recreated.
+     */
+    public HttpResponse deletePrincipalRoleIfExists(String principalRoleName) throws IOException {
+        String       uri      = principalRolesURI() + "/" + principalRoleName;
+        HttpResponse response = client.delete(uri, accessToken);
+        logger.info("Deleting principal role {}: HTTP code = {}", principalRoleName, response.getCode());
+        return response;
+    }
+
     public HttpResponse createPrincipalRoles(String principalRoleName) throws IOException, IncorrectConfigException {
         logger.info("Creating principal role {}", principalRoleName);
         String uri  = principalRolesURI();
