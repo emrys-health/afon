@@ -9,8 +9,8 @@ public interface OnboardingConfig {
      * Guacamole login); {@code slug} is a DNS/label-safe form used for the per-user VNC Service
      * name and the pod label, since an email address is valid as neither.
      */
-    public record EmrysUser(String userName, String email, String slug) {}
+    record EmrysUser(String userName, String email, String slug) {}
 
-    public List<EmrysUser> getUsers();
+    List<EmrysUser> getUsers();
 
 }

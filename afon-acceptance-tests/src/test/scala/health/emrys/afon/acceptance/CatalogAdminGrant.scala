@@ -34,10 +34,10 @@ class CatalogAdminGrant(test: GivenWhenThen,
   override def apply(): Any = {
     if (noisy) Given(s"a Polaris endpoint at ${client.getEndpoint}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
-    val uri = getCatalogAdminGrantsURI(warehouseName)
-    val json = dtos.catalogAdminGrants
+    val uri           = getCatalogAdminGrantsURI(warehouseName)
+    val json          = dtos.catalogAdminGrants
     if (noisy) When(s"we call '$uri' with payload:\n$json")
-    val response = client.putJsonCall(uri, json, accessToken)
+    val response      = client.putJsonCall(uri, json, accessToken)
     if (noisy) Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
     assert(response.getCode == REST_CODE_RESOURCE_CREATED)
   }

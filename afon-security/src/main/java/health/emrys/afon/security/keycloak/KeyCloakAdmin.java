@@ -50,10 +50,18 @@ public class KeyCloakAdmin {
     }
 
     public KeyCloakAdmin(Properties properties, String kcHostname) {
+        this(KeyCloakConfig.urlFor(kcHostname, protocolFor(kcHostname)),
+             KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
+             KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
+    }
+
+    public KeyCloakAdmin(String kcHostname,
+                         String adminUser,
+                         String adminPassword) {
         this.baseUrl       = KeyCloakConfig.urlFor(kcHostname, protocolFor(kcHostname));
-        this.adminUser     = KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties);
-        this.adminPassword = KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties);
-        logger.info("KeyCloak Admin URL: {}", this.baseUrl);
+        this.adminUser     = adminUser;
+        this.adminPassword = adminPassword;
+        logger.info("KeyCloak Admin URL: {}. user = {}", this.baseUrl, this.adminUser);
     }
 
     /**
@@ -71,6 +79,7 @@ public class KeyCloakAdmin {
      */
     public void registerPolarisUser(String user, String userPassword, String email) {
         try {
+            logger.info("Running as {}/{}", adminUser, adminPassword);
             String adminToken = adminToken();
             createRealm(adminToken, KEYCLOAK_REALM);
             createConfidentialClient(adminToken, KEYCLOAK_REALM, user, userPassword);
@@ -84,8 +93,38 @@ public class KeyCloakAdmin {
     }
 
     /**
+     * Obtains an access token for a provisioned Polaris user via the direct-access-grant (ROPC) flow
+     * against the {@code polaris} realm. The confidential client that {@link #createConfidentialClient}
+     * created for this user shares the user's name and secret, hence the doubled credentials.
+     */
+    public String userToken(String username, String password) throws IOException {
+        String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, KEYCLOAK_REALM);
+        String body = form(Map.of(
+            "grant_type",    "password",
+            "client_id",     username,
+            "client_secret", password,
+            "username",      username,
+            "password",      password
+        ));
+        HttpPost post = new HttpPost(uri);
+        post.setHeader("Content-Type", "application/x-www-form-urlencoded");
+        post.setEntity(new StringEntity(body));
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            return client.execute(post, response -> {
+                if (response.getCode() != HttpStatus.SC_OK) {
+                    throw new IOException("Could not obtain token for user " + username + ": HTTP " + response.getCode());
+                }
+                Map<?, ?> json = MAPPER.readValue(response.getEntity().getContent(), Map.class);
+                return (String) json.get("access_token");
+            });
+        }
+    }
+
+
+    /**
      * Authenticates against the master realm as the bootstrap admin and returns an access token for
      * the admin REST API.
+     * NOTE: this is the 'master' realm so only the admin user can call this.
      */
     public String adminToken() throws IOException {
         String uri = format("%s/realms/master/protocol/openid-connect/token", baseUrl);
@@ -112,12 +151,40 @@ public class KeyCloakAdmin {
         }
     }
 
+    /** 10 hours: how long an issued access token stays valid, so an interactive session lasts a working day. */
+    private static final int ACCESS_TOKEN_LIFESPAN_SECONDS = 10 * 60 * 60;
+    /**
+     * The SSO session bounds cap a token's lifespan, so they must exceed {@link #ACCESS_TOKEN_LIFESPAN_SECONDS}
+     * or a freshly-minted token would be clipped short. Given headroom above the 10h token life.
+     */
+    private static final int SSO_SESSION_LIFESPAN_SECONDS  = 12 * 60 * 60;
+
+    /**
+     * Creates the realm if absent and, either way, converges its token lifespans. Polaris validates
+     * the bearer JWT offline (signature + {@code exp}), so the access token's own lifespan is what
+     * decides how long a pod can talk to Polaris; KeyCloak's 5-minute default is far too short. The
+     * SSO session bounds are raised in step because they otherwise cap the access token.
+     *
+     * <p>Upserts rather than create-if-absent: the realm outlives a cluster rebuild, so an
+     * already-existing one (created by an earlier deploy with the old 5-minute default) is updated to
+     * these lifespans rather than left stale.
+     */
     public void createRealm(String adminToken, String realm) throws IOException {
         String json = MAPPER.writeValueAsString(Map.of(
             "realm", realm,
-            "enabled", true
+            "enabled", true,
+            "accessTokenLifespan", ACCESS_TOKEN_LIFESPAN_SECONDS,
+            "ssoSessionMaxLifespan", SSO_SESSION_LIFESPAN_SECONDS,
+            "ssoSessionIdleTimeout", SSO_SESSION_LIFESPAN_SECONDS
         ));
-        if (isFailure(postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm))) {
+        HttpResponse created = postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm);
+        if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
+            if (isFailure(putJson(adminToken, format("%s/admin/realms/%s", baseUrl, realm), json, "realm " + realm))) {
+                logger.warn("Could not update KeyCloak realm '{}'", realm);
+            } else {
+                logger.info("Updated existing KeyCloak realm '{}' token lifespans", realm);
+            }
+        } else if (isFailure(created)) {
             logger.warn("Could not create KeyCloak realm '{}'", realm);
         }
     }
@@ -403,6 +470,7 @@ public class KeyCloakAdmin {
                 email
             );
         } else {
+            logger.info("Using default user from afon.properties");
             admin.registerPolarisUser(
                 AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
                 AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),

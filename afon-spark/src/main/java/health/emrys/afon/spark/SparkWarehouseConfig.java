@@ -47,13 +47,6 @@ public class SparkWarehouseConfig {
         this.polarisProtocol = polarisProtocol;
     }
 
-    SparkWarehouseConfig(
-        String clientId,
-        String clientSecret,
-        String host) {
-        this(clientId, clientSecret, host, "http");
-    }
-
     public SparkConf sparkConf() throws IOException {
         return sparkConf(4);
     }
@@ -119,4 +112,11 @@ public class SparkWarehouseConfig {
         return conf;
     }
 
+    public String getClientId() {
+        return clientId;
+    }
+
+    public String getClientSecret() {
+        return clientSecret;
+    }
 }
