@@ -10,6 +10,7 @@ import health.emrys.afon.security.keycloak.KeyCloakConfig;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 
@@ -187,6 +188,7 @@ public class ContainerHelper {
                 logger.info("About to mount {}", propertiesPath);
                 trino.withFileSystemBind(propertiesPath, "/etc/trino/config.properties");
                 trino.setNetworkMode("host");
+                trino.withLogConsumer(new Slf4jLogConsumer(logger));
                 trino.start();
                 for (SupportedCloudsEnum catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
                     String containerDestination = format("%s/%s.properties", catalogPath, catalog);
