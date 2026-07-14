@@ -22,12 +22,32 @@ public class SparkKeyCloakPrinter {
     static final Logger log = org.slf4j.LoggerFactory.getLogger(SparkKeyCloakPrinter.class);
 
     public static void main(String[] args) {
-        SparkKeyCloakPrinter app         = new SparkKeyCloakPrinter(args[0]);
-        String               pySparkCode = app.pySparkTestCode();
+        String               polarisHost = args[0];
+        SparkKeyCloakPrinter app         = new SparkKeyCloakPrinter(polarisHost);
+        app.generateAndSavePySparkCode();
+    }
+
+    private final SparkWarehouseConfig config;
+
+    SparkKeyCloakPrinter(String polarisHost) {
+        log.info("Using {} as the Polaris host");
+        Properties properties = new AfonPropertiesLoader().getProperties();
+        properties.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisHost);
+        SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
+        config = configFactory.getConfig(properties);
+    }
+
+    private void generateAndSavePySparkCode() {
+        String pySparkCode = pySparkTestCode();
+        log.info("Config:\n\n{}", pySparkCode);
+        save(pySparkCode);
+    }
+
+    private static void save(String pySparkCode) {
         String filename = System.getProperty("java.io.tmpdir") + File.separator + "test.py";
         try {
-            try (FileOutputStream fos = new FileOutputStream(filename) ;
-                 PrintWriter out = new PrintWriter(fos) ;) {
+            try (FileOutputStream fos = new FileOutputStream(filename);
+                 PrintWriter out = new PrintWriter(fos);) {
                 out.print(pySparkCode);
             }
         } catch (Exception e) {
@@ -36,33 +56,40 @@ public class SparkKeyCloakPrinter {
         }
     }
 
-    private final SparkWarehouseConfig config;
-
-    SparkKeyCloakPrinter(String polarisHost) {
-        Properties                  properties    = new AfonPropertiesLoader().getProperties();
-        properties.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisHost);
-        SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
-        config = configFactory.getConfig(properties);
-    }
-
     private String pySparkTestCode() {
         final StringBuffer python = new StringBuffer("""
-                           from pyspark.sql import SparkSession
-                           
-                           spark = (SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002")
-                           """);
+                                                     from pyspark.sql import SparkSession
+                                                     import os as os
+                                                     
+                                                     OIDC_TOKEN = os.environ["OIDC_TOKEN"]
+                                                     spark = (SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002")
+                                                     """);
         for (SupportedCloudsEnum cloud : SupportedCloudsEnum.values()) {
+            python.append(format("# %s \n", cloud.name()));
             config.sparkConfigs(cloud).entrySet()
                   .forEach(entry -> {
                       String key   = entry.getKey();
                       String value = entry.getValue();
-                      python.append(format(
-                          """
-                          .config("%s", "%s")
-                          """, key, value));
+                      if (value.contains(config.getClientId() + ":" + config.getClientSecret())) {
+                          python.append(format(
+                              """
+                              .config("%s", OIDC_TOKEN)
+                              """, key, value));
+                      } else {
+                          python.append(format(
+                              """
+                              .config("%s", "%s")
+                              """, key, value));
+                      }
                   });
+            python.append("\n");
         }
-        python.append(").getOrCreate()\n");
+        python.append("""
+                      ).getOrCreate()
+                      
+                      print("Finished initializing spark session")
+                      """);
+        python.append(SparkContextConfigurationPrinter.awsSmokeTest("AwsAccessSpec"));
         return python.toString();
     }
 
