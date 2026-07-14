@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
+import static health.emrys.afon.infra.InfraUtils.isFailure;
 import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -95,10 +96,6 @@ public class PurgeAndPopulatePolaris {
             log.warn("Could not delete table {} in {}",  table, warehouse);
         }
         return response;
-    }
-
-    private static boolean isFailure(HttpResponse response) {
-        return response.getCode() / 100 != 2;
     }
 
     private void purgeRecursivelyForAllCatalogs(String domainName) {

@@ -22,8 +22,12 @@ public class ConfigureUserMain {
 
     public static final String ROLE_NAME = "emrysrole4";
 
-    private static final Logger logger = LoggerFactory.getLogger(ConfigureUserMain.class);
-    private static final Set<CatalogPrivilege> catalogPrivileges = Set.of(TABLE_READ_DATA, TABLE_WRITE_DATA, NAMESPACE_CREATE, TABLE_CREATE, NAMESPACE_FULL_METADATA);
+    private static final Logger                logger            = LoggerFactory.getLogger(ConfigureUserMain.class);
+    private static final Set<CatalogPrivilege> catalogPrivileges = Set.of(TABLE_READ_DATA,
+                                                                          TABLE_WRITE_DATA,
+                                                                          NAMESPACE_CREATE,
+                                                                          TABLE_CREATE,
+                                                                          NAMESPACE_FULL_METADATA);
 
     private final PolarisConfigurer     configurer;
     private final PermissionsConfigurer permissions;
@@ -37,9 +41,12 @@ public class ConfigureUserMain {
         }
         ConfigureUserMain app           = new ConfigureUserMain(properties);
         String            catalogName   = args[1];
-        String principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
+        String            principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
         try {
-            logger.info("Configuring Polaris User {} for catalog {} and role {}", principalName, catalogName, ROLE_NAME);
+            logger.info("Configuring Polaris user '{}' for catalog '{}' and role '{}'",
+                        principalName,
+                        catalogName,
+                        ROLE_NAME);
             app.configurePrivilegesFor(catalogName, ROLE_NAME);
             app.configureUser(principalName, ROLE_NAME, catalogName);
         } catch (Exception x) {
@@ -48,29 +55,41 @@ public class ConfigureUserMain {
     }
 
     private final String accessToken;
+    private final String adminClientId;
 
     public ConfigureUserMain(Properties properties) {
         AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(properties);
-        accessToken = client.getAccessToken();
+        accessToken   = client.getAccessToken();
+        configurer    = new PolarisConfigurer(client);
+        permissions   = new PermissionsConfigurer(client);
+        adminClientId = client.getClientId();
         logger.debug("POLARIS_TOKEN={}", accessToken);
-        configurer  = new PolarisConfigurer(client);
-        permissions = new PermissionsConfigurer(client);
     }
 
     public HttpResponse configureUser(
-            String principalName,
-            String roleName,
-            String catalogName) throws IncorrectConfigException, IOException {
+        String principalName,
+        String roleName,
+        String catalogName
+    ) throws IncorrectConfigException, IOException {
         PrincipalWithCredentials principal         = configurer.configureUser(accessToken, principalName);
         String                   principalRoleName = roleName + "Principal";
-        logger.info("Created Polaris User {}", principal);
+        logger.info(
+            "Admin '{}' creating Polaris User {}",
+            adminClientId,
+            principal);
 
-        // TODO - delete first?
+        // A previous run may have left this principal role — and hence its catalog-role association —
+        // in place, which would make the create/associate below fail. Delete it first so both start
+        // from a clean slate; removing the principal role also drops its catalog-role association.
+        if (isFailure(permissions.deletePrincipalRoleIfExists(principalRoleName))) {
+            logger.warn("Admin {} could not delete principal role {}", adminClientId, principalRoleName);
+        }
         if (isFailure(permissions.createPrincipalRoles(principalRoleName))) {
-            logger.warn("Failed to create principal role {}", principalRoleName);
+            logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
         }
         if (isFailure(permissions.associateRoles(catalogName, principalRoleName, roleName))) {
-            logger.warn("Failed to associate role {} with principale role {} in catalog {}", roleName, principalRoleName, catalogName);
+            logger.warn("Admin {} failed to associate role {} with principale role {} in catalog {}",
+                        adminClientId, roleName, principalRoleName, catalogName);
         }
 
         HttpResponse response = permissions.associatePrincipalRoles(principalName, principalRoleName);
@@ -84,17 +103,18 @@ public class ConfigureUserMain {
         return response.getCode() / 100 != 2;
     }
 
-    private List<HttpResponse> configurePrivilegesFor(
+    public List<HttpResponse> configurePrivilegesFor(
         String catalogName,
-        String roleName) throws IOException, IncorrectConfigException {
+        String roleName
+    ) throws IOException, IncorrectConfigException {
         permissions.deleteRoleIfExists(roleName, catalogName);
         List<HttpResponse> results  = new ArrayList<>();
         HttpResponse       response = permissions.createCatalogRole(catalogName, roleName);
         if (isFailure(response)) {
-            logger.error("Could not create role {} frr catalog {}", roleName, catalogName);
+            logger.error("Admin {} could not create role {} for catalog {}", adminClientId, roleName, catalogName);
             results.add(response);
         } else {
-            logger.info("Created role {}", roleName);
+            logger.info("Admin {} created role {}", adminClientId, roleName);
             results.addAll(addPermissions(catalogName, roleName));
         }
         return results;
@@ -105,7 +125,11 @@ public class ConfigureUserMain {
         for (CatalogPrivilege privilege : catalogPrivileges) {
             HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
             if (isFailure(result)) {
-                logger.error("Could not grant role {} the privilege {} on  catalog {}", roleName, privilege, catalogName);
+                logger.error("Admin '{}' ould not grant role {} the privilege {} on  catalog {}",
+                             adminClientId,
+                             roleName,
+                             privilege,
+                             catalogName);
             }
             results.add(result);
         }
