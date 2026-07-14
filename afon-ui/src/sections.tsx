@@ -69,7 +69,7 @@ export function CloudsSection({ draft, update }: { draft: DeploymentDraft; updat
     });
 
   return (
-    <Section step={1} title="Clouds" icon={<CloudIcon size={18} className="text-sky-400" />}>
+    <Section step={1} title="Clouds" icon={<CloudIcon size={18} className="text-emrys-deepteal" />}>
       <div className="flex gap-2">
         {(["aws", "azure", "gcp"] as Provider[]).map((p) => (
           <button key={p} className="btn-ghost" data-testid={`add-cloud-${p}`} onClick={() => addCloud(p)}>
@@ -92,9 +92,9 @@ export function CloudsSection({ draft, update }: { draft: DeploymentDraft; updat
 function CloudCard({ index, cloud, update }: { index: number; cloud: Cloud; update: Update }) {
   const set = (mutate: (c: Cloud) => void) => update((d) => mutate(d.clouds[index]));
   return (
-    <div className="space-y-3 rounded-lg border border-slate-800 bg-slate-950/60 p-4" data-testid={`cloud-${index}`}>
+    <div className="space-y-3 rounded-lg border border-slate-200 bg-emrys-mist/40 p-4" data-testid={`cloud-${index}`}>
       <div className="flex items-center justify-between">
-        <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-xs uppercase text-sky-300">
+        <span className="rounded bg-emrys-navy px-2 py-0.5 font-mono text-xs uppercase text-emrys-teal">
           {cloud.provider}
         </span>
         <button
@@ -148,7 +148,7 @@ function CloudCard({ index, cloud, update }: { index: number; cloud: Cloud; upda
 export function CatalogsSection({ draft, update }: { draft: DeploymentDraft; update: Update }) {
   const cloudIds = draft.clouds.map((c) => c.id);
   return (
-    <Section step={2} title="Catalogs" icon={<Database size={18} className="text-emerald-400" />}>
+    <Section step={2} title="Catalogs" icon={<Database size={18} className="text-emrys-teal" />}>
       <button
         className="btn-ghost"
         data-testid="add-catalog"
@@ -196,7 +196,7 @@ function CatalogRow({
 }) {
   const set = (mutate: (c: Catalog) => void) => update((d) => mutate(d.catalogs[index]));
   return (
-    <tr className="border-t border-slate-800">
+    <tr className="border-t border-slate-200">
       <td className="py-1.5 pr-2">
         <input
           className="input"
@@ -238,7 +238,7 @@ function CatalogRow({
               ))}
           </select>
         ) : (
-          <span className="text-slate-600">—</span>
+          <span className="text-slate-400">—</span>
         )}
       </td>
       <td className="pr-2">
@@ -289,7 +289,7 @@ export function EnginesSection({ draft, update }: { draft: DeploymentDraft; upda
     });
 
   return (
-    <Section step={3} title="Query engines" icon={<Cpu size={18} className="text-amber-400" />}>
+    <Section step={3} title="Query engines" icon={<Cpu size={18} className="text-emrys-orange" />}>
       <div className="flex gap-2">
         {(["spark", "trino", "snowflake"] as EngineType[]).map((t) => (
           <button
@@ -325,8 +325,8 @@ function EngineCard({
   const set = (mutate: (e: Engine) => void) => update((d) => mutate(d.engines[index]));
   const cloudIds = draft.clouds.map((c) => c.id);
   return (
-    <div className="space-y-3 rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-      <span className="font-mono text-sm text-amber-300">{engine.type}</span>
+    <div className="space-y-3 rounded-lg border border-slate-200 bg-emrys-mist/40 p-4">
+      <span className="font-mono text-sm font-semibold text-emrys-deepteal">{engine.type}</span>
       {engine.type === "snowflake" ? (
         <>
           <Field
@@ -343,7 +343,7 @@ function EngineCard({
                   <button
                     key={c.name}
                     className={`rounded px-2 py-0.5 text-xs ${
-                      selected ? "bg-amber-600 text-white" : "bg-slate-800 text-slate-400"
+                      selected ? "bg-emrys-deepteal text-white" : "bg-emrys-mist text-slate-500"
                     }`}
                     onClick={() =>
                       set((e) => {
@@ -417,7 +417,7 @@ export function WorkbenchSection({ draft, update }: { draft: DeploymentDraft; up
   const wb = draft.workbench;
 
   return (
-    <Section step={4} title="Workbench" icon={<Laptop size={18} className="text-violet-400" />}>
+    <Section step={4} title="Workbench" icon={<Laptop size={18} className="text-emrys-navy" />}>
       <div className="flex gap-2">
         {([null, "jupyter", "vscode", "rstudio"] as (WorkbenchType | null)[]).map((t) => (
           <button

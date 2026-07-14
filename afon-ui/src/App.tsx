@@ -44,10 +44,10 @@ export default function App() {
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Afon <span className="text-sky-400">deployment configuration</span>
+          <h1 className="text-2xl font-bold tracking-tight text-emrys-navy">
+            Afon <span className="text-emrys-deepteal">deployment configuration</span>
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-emrys-ink/70">
             Pure config generator — no credentials, no deploy button. Download the YAML,
             review it in a pull request, deploy with the CLI.
           </p>
@@ -56,7 +56,7 @@ export default function App() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_28rem]">
         <div className="space-y-6">
-          <Section step={0} title="Deployment" icon={<Settings2 size={18} className="text-slate-400" />}>
+          <Section step={0} title="Deployment" icon={<Settings2 size={18} className="text-emrys-ink/60" />}>
             <div className="grid grid-cols-3 gap-3">
               <Field
                 label="name"
@@ -103,21 +103,21 @@ export default function App() {
           </div>
 
           {errors.length > 0 ? (
-            <div className="space-y-1 rounded-md border border-rose-900 bg-rose-950/40 p-3" data-testid="errors">
+            <div className="space-y-1 rounded-md border border-red-200 bg-red-50 p-3" data-testid="errors">
               {errors.map((e, i) => (
-                <p key={i} className="flex items-start gap-1.5 text-xs text-rose-300">
+                <p key={i} className="flex items-start gap-1.5 text-xs text-red-700">
                   <FileWarning size={13} className="mt-0.5 shrink-0" /> {e}
                 </p>
               ))}
             </div>
           ) : (
-            <p className="flex items-center gap-1.5 text-xs text-emerald-400" data-testid="valid">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-emrys-deepteal" data-testid="valid">
               <CheckCircle2 size={13} /> Valid against afon-deployment.schema.json
             </p>
           )}
 
           <pre
-            className="flex-1 overflow-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-xs leading-relaxed text-slate-300"
+            className="flex-1 overflow-auto rounded-md bg-emrys-navy p-3 font-mono text-xs leading-relaxed text-emrys-mist"
             data-testid="yaml-preview"
           >
             {yaml}
