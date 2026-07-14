@@ -48,9 +48,11 @@ public class ContainerHelper {
     /**
      * Network alias used by Polaris (running on the same docker network) to reach KeyCloak.
      */
-    private static final String KEYCLOAK_ALIAS     = "keycloak";
-    public static final  String KEYCLOAK_HOSTNAME  = "localhost";
-    public static final  String KEYCLOACK_PROTOCOL = "http";
+    private static final String KEYCLOAK_ALIAS       = "keycloak";
+    public static final  String KEYCLOAK_HOSTNAME    = "localhost";
+    public static final  String KEYCLOACK_PROTOCOL   = "http";
+    public static final  String POLARIS_NETWORK_HOST = "polaris-service";
+    public static final  int    POLARIS_PORT         = 8181;
 
     /**
      * For testing.
@@ -69,7 +71,7 @@ public class ContainerHelper {
         logger.info("That's all folks!");
     }
 
-    private final Network network = Network.newNetwork();
+    private final Network                     network      = Network.newNetwork();
     private final SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
 
     private GenericContainer<?> polaris;
@@ -100,7 +102,7 @@ public class ContainerHelper {
             // Fixed binding so the host-side KeyCloakAdmin can reach it at localhost:8080.
             keyCloak.setPortBindings(List.of(KEYCLOAK_PORT + ":" + KEYCLOAK_PORT));
             logger.info("Starting KeyCloak docker container. This usually takes about 20s, longer if " +
-                        "it's downloading the image.");
+                            "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
             new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME)
@@ -124,12 +126,12 @@ public class ContainerHelper {
                         entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
             );
             String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger" +
-                             ".netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
+                ".netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
             String envString = envs.collect(Collectors.joining(" "))
-                               + " -Dspark.master=local[4]"
-                               + " -Dspark.connect.grpc.interceptor.classes=org.apache.spark.sql.connect.service" +
-                               ".LoggingInterceptor"
-                               + " " + logging;
+                + " -Dspark.master=local[4]"
+                + " -Dspark.connect.grpc.interceptor.classes=org.apache.spark.sql.connect.service" +
+                ".LoggingInterceptor"
+                + " " + logging;
             sparkConnect.withEnv("spark.driver.extraJavaOptions", logging);
             sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC", "DEBUG");
             sparkConnect.withEnv("LOG4J_LOGGER_ORG_APACHE_SPARK_SQL_CONNECT", "DEBUG");
@@ -152,8 +154,9 @@ public class ContainerHelper {
                 .withNetwork(network)
                 // Declare the ports so the HTTP wait strategy can resolve them (the fixed bindings
                 // below pin the host ports to the same numbers).
-                .withExposedPorts(8181, 8182, DEBUG_PORT)
+                .withExposedPorts(POLARIS_PORT, 8182, DEBUG_PORT)
                 .withCommand("sh", "-c", POLARIS_CMD)
+                .withNetworkAliases(POLARIS_NETWORK_HOST)
                 .withEnv(ENVIRONMENT_VARIABLE, format("POLARIS,%s,%s", polarisId, polarisSecret))
                 // GCP
                 .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
@@ -177,7 +180,7 @@ public class ContainerHelper {
 
             polaris.setPortBindings(List.of("8181:8181", "8182:8182", DEBUG_PORT + ":" + DEBUG_PORT));
             logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading " +
-                        "the image.");
+                            "the image.");
             polaris.start();
             polaris.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
         }
@@ -187,11 +190,12 @@ public class ContainerHelper {
         if (trino == null) {
             try {
                 trino = new GenericContainer<>("trinodb/trino@sha256:5b5e0a97f599a30a2e23c7c7061e4e4d546a914b4fad2a2a002998140ceb4006");
-                String catalogPath = "/etc/trino/catalog";
+                String catalogPath    = "/etc/trino/catalog";
                 String propertiesPath = trinoConfigPropertiesFile().getAbsolutePath();
                 logger.info("About to mount {}", propertiesPath);
                 trino.withFileSystemBind(propertiesPath, "/etc/trino/config.properties");
-                trino.setNetworkMode("host");
+                trino.setPortBindings(List.of("8090:8090"));
+                trino.withNetwork(network);
 //                trino.withLogConsumer(new Slf4jLogConsumer(logger));
                 trino.start();
                 for (SupportedCloudsEnum catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
@@ -225,11 +229,14 @@ public class ContainerHelper {
     public static String trinoLocalConfig(
         Properties properties,
         SupportedCloudsEnum catalog) {
+        String polarisDomainName = "http://" + POLARIS_NETWORK_HOST + ":" + POLARIS_PORT;
+        String keyCloakUrl       = tokenEndpoint(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL);
+        logger.info("Trino sees Polaris as {} and KeyCloak as {}", polarisDomainName, keyCloakUrl);
         TrinoServerConfiguration trinoConfig = new KeyCloakTrinoServerConfiguration(
-            POLARIS_ENDPOINT.getValueFrom(properties),
+            polarisDomainName,
             properties,
             // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
-            tokenEndpoint(KEYCLOAK_HOSTNAME, KEYCLOACK_PROTOCOL)
+            keyCloakUrl
         );
         return trinoConfig.catalogProperties(catalog);
     }
