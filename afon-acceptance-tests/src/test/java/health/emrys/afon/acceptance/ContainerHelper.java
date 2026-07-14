@@ -182,13 +182,13 @@ public class ContainerHelper {
     public synchronized void startTrino(Properties properties) {
         if (trino == null) {
             try {
-                trino = new GenericContainer<>("trinodb/trino:latest");
+                trino = new GenericContainer<>("trinodb/trino@sha256:5b5e0a97f599a30a2e23c7c7061e4e4d546a914b4fad2a2a002998140ceb4006");
                 String catalogPath = "/etc/trino/catalog";
                 String propertiesPath = trinoConfigPropertiesFile().getAbsolutePath();
                 logger.info("About to mount {}", propertiesPath);
                 trino.withFileSystemBind(propertiesPath, "/etc/trino/config.properties");
                 trino.setNetworkMode("host");
-                trino.withLogConsumer(new Slf4jLogConsumer(logger));
+//                trino.withLogConsumer(new Slf4jLogConsumer(logger));
                 trino.start();
                 for (SupportedCloudsEnum catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
                     String containerDestination = format("%s/%s.properties", catalogPath, catalog);
