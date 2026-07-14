@@ -4,7 +4,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
-import health.emrys.afon.cdk.JupyterConfig;
+import health.emrys.afon.cdk.JupyterDeployment;
 
 import java.util.List;
 
@@ -48,7 +48,7 @@ public interface ProvisionedCloud {
      * A Jupyter deployment wired for this cloud's ingress/DNS/OAuth specifics.
      * Migration shim: workbench selection generalises in Phase 3.
      */
-    JupyterConfig newJupyterConfig();
+    JupyterDeployment newJupyterConfig();
 
     /**
      * Whether Jupyter pods get the restrictive egress {@code NetworkPolicy}

@@ -18,7 +18,8 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.EmrysCloud;
-import health.emrys.afon.cdk.JupyterConfig;
+import health.emrys.afon.cdk.JupyterDeployment;
+import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.KeyCloakDeploymentConfig;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
@@ -167,8 +168,24 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud, 
     }
 
     @Override
-    public JupyterConfig newJupyterConfig() {
-        return new JupyterAwsConfig(this, cloudProvider, properties);
+    public JupyterDeployment newJupyterConfig() {
+        JupyterHubConfig jupyterHub = new JupyterHubAwsConfig(
+            this,
+            cloudProvider,
+            properties,
+            getKeyCloakConfig().getAliasRecord());
+        return dependsOn -> {
+            // Every Service the hub deploy creates (guacamole-web, the per-user VNC services,
+            // jupyterhub-proxy-public) fires the AWS LB Controller's mutating webhook
+            // (mservice.elbv2.k8s.aws), which intercepts all Service creations — not just
+            // type: LoadBalancer. Depend on the controller's Helm release — installed atomically,
+            // so Terraform waits for its pods to be Ready — otherwise the webhook Service can still
+            // have zero endpoints and the apply fails with "no endpoints available for service
+            // aws-load-balancer-webhook-service". Same reasoning as sparkExternalService's LB Service.
+            List<ITerraformDependable> jupyterDependables = new ArrayList<>(dependsOn);
+            jupyterDependables.add(cloudProvider.getLbRelease());
+            return jupyterHub.deployJupyterHub(jupyterDependables);
+        };
     }
 
     /**

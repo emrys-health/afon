@@ -14,7 +14,8 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
-import health.emrys.afon.cdk.JupyterConfig;
+import health.emrys.afon.cdk.JupyterDeployment;
+import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.JupyterMfaConfig;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.cdk.TFUtils;
@@ -161,12 +162,12 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack implements Prov
     }
 
     @Override
-    public JupyterConfig newJupyterConfig() {
+    public JupyterDeployment newJupyterConfig() {
         String jupyterDomainName = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
         var util = new TFUtils(
             this, jupyterDomainName, JUPYTER_TLS_SECRET,
             PROXY_PORT, PROXY_SVC_NAME, JUPYTER_INGRESS);
-        return new JupyterConfig(this, properties) {
+        JupyterHubConfig jupyterHub = new JupyterHubConfig(this, properties) {
 
             @Override
             protected void configureHttpsAndDNS() {
@@ -184,14 +185,30 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack implements Prov
                 return new JupyterMfaConfig(
                     AzureKubernetesPolaris.this,
                     proxyDeps,
-                    "http://guacamole-web:8080",
+                    JupyterHubConfig.MFA_UPSTREAMS,
                     jupyterDomainName,
                     AZURE_OAUTH2_CLIENT_ID.getValueFrom(properties),
                     AZURE_OAUTH2_CLIENT_SECRET.getValueFrom(properties),
                     AZURE_OAUTH2_COOKIE_SECRET.getValueFrom(properties)
                     );
             }
+
+            @Override
+            protected String jupyterDomain() {
+                return jupyterDomainName;
+            }
+
+            @Override
+            protected String oauthClientId() {
+                return AZURE_OAUTH2_CLIENT_ID.getValueFrom(properties);
+            }
+
+            @Override
+            protected String oauthClientSecret() {
+                return AZURE_OAUTH2_CLIENT_SECRET.getValueFrom(properties);
+            }
         };
+        return jupyterHub::deployJupyterHub;
     }
 
     /**

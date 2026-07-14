@@ -1,6 +1,6 @@
 package health.emrys.afon.platform;
 
-import health.emrys.afon.cdk.JupyterConfig;
+import health.emrys.afon.cdk.JupyterDeployment;
 import health.emrys.afon.cdk.NetworkConfiguration;
 import health.emrys.afon.config.deployment.WorkbenchSpec;
 
@@ -31,7 +31,7 @@ public class JupyterWorkbenchDeployer implements WorkbenchDeployer {
     }
 
     public void deployUsingProperties(ProvisionedCloud target) {
-        JupyterConfig       jupyter       = target.newJupyterConfig();
+        JupyterDeployment   jupyter       = target.newJupyterConfig();
         Map<String, String> jupyterLabels = jupyter.deployJupyter(target.dependables());
         if (target.lockDownJupyterEgress()) {
             new NetworkConfiguration(target.stack())

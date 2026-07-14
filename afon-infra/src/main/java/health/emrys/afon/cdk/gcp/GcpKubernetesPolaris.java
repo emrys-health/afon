@@ -16,7 +16,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
-import health.emrys.afon.cdk.JupyterConfig;
+import health.emrys.afon.cdk.JupyterDeployment;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.cdk.TFUtils;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -132,7 +132,7 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack implements Provisio
     }
 
     @Override
-    public JupyterConfig newJupyterConfig() {
+    public JupyterDeployment newJupyterConfig() {
         throw new UnsupportedOperationException(
             "No workbench has been deployed to GCP yet; see docs/config_driven_architecture.md");
     }

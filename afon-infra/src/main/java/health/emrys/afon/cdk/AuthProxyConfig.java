@@ -2,6 +2,8 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainer;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -75,6 +77,24 @@ public class AuthProxyConfig {
                            String clientSecret,
                            String cookieSecret,
                            String emailDomain) {
+        this(scope, dependsOn, names, List.of(upstreamUrl), domain,
+             clientId, clientSecret, cookieSecret, emailDomain);
+    }
+
+    /**
+     * Variant accepting several upstreams. oauth2-proxy mounts each upstream at the path component
+     * of its URL (longest-prefix match), so a single MFA gate can front several apps on one domain
+     * — e.g. JupyterHub at {@code /} and Guacamole at {@code /guacamole/}.
+     */
+    public AuthProxyConfig(Construct scope,
+                           List<ITerraformDependable> dependsOn,
+                           Names names,
+                           List<String> upstreamUrls,
+                           String domain,
+                           String clientId,
+                           String clientSecret,
+                           String cookieSecret,
+                           String emailDomain) {
         this.proxyName = names.proxyName();
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
@@ -95,19 +115,27 @@ public class AuthProxyConfig {
                         ))
             .build();
 
-        List<String> argsForOAuthProxy = List.of(
+        String issuer = OIDC_ISSUER_URL.getValueFrom(properties);
+
+        List<String> args = new ArrayList<>(List.of(
             "--provider=oidc",
-            "--oidc-issuer-url=" + OIDC_ISSUER_URL.getValueFrom(properties),
-            "--upstream=" + upstreamUrl,
+            "--oidc-issuer-url=" + issuer));
+        args.addAll(emailArgs(properties, emailDomain));
+        args.addAll(List.of(
             "--http-address=0.0.0.0:" + PROXY_PORT,
             "--cookie-secure=true",                           // set true when TLS terminates at this proxy
+            // Accept id_tokens whose email is unverified: this Keycloak has no SMTP verification flow,
+            // so users are provisioned with emailVerified=true, but manually-created users may not be.
+            "--insecure-oidc-allow-unverified-email=true",
+            // Forward the authenticated identity to upstreams as X-Forwarded-Email. Guacamole's
+            // header-auth extension reads this to log the user in with no second login page.
+            "--pass-user-headers=true",
             "--skip-provider-button=false",
             "--ping-path=/ping",
-            format("--redirect-url=https://%s/oauth2/callback", domain)
-                                                );
-        List<String> args = new ArrayList<>();
-        args.addAll(emailArgs(properties, emailDomain));
-        args.addAll(argsForOAuthProxy);
+            format("--redirect-url=https://%s/oauth2/callback", domain)));
+        // One --upstream per app; oauth2-proxy routes by the path component of each URL.
+        upstreamUrls.forEach(url -> args.add("--upstream=" + url));
+
         DeploymentSpecTemplateSpecContainer proxyContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name(names.proxyName())
@@ -123,7 +151,8 @@ public class AuthProxyConfig {
         List<ITerraformDependable> deps = new ArrayList<>(dependsOn);
         deps.add(oauthSecret);
 
-        DeploymentUtils.deploy(scope, deps, proxyLabels, List.of(proxyContainer), List.of(), names.proxyName());
+        DeploymentUtils.deploy(scope, deps, proxyLabels, List.of(proxyContainer),
+                               List.of(waitForIssuer(issuer)), List.of(), names.proxyName(), "15m");
 
         Service.Builder.create(scope, names.proxyName())
                        .metadata(ServiceMetadata
@@ -149,6 +178,43 @@ public class AuthProxyConfig {
     /** The Kubernetes Service name traffic should be routed to. */
     public String proxyServiceName() {
         return proxyName;
+    }
+
+    /**
+     * Blocks until the OIDC issuer serves its discovery document.
+     *
+     * <p>oauth2-proxy fetches that document once, at startup, and exits if it cannot. The issuer is a
+     * public, load-balancer-backed hostname that does not resolve until the LB is provisioned and its
+     * DNS record propagates — minutes after this pod is first scheduled. Without this gate the proxy
+     * crashes, and once CrashLoopBackOff reaches its five-minute cap the pod sits idle long past the
+     * point the issuer became reachable, overrunning Terraform's rollout wait.
+     *
+     * <p>Unlike JupyterHub — whose config is Python we can make retry in process — oauth2-proxy is a
+     * binary, so the wait has to live beside it. Curl's {@code -f} also treats the load balancer's
+     * "no healthy targets" 5xx as a failure, so this waits for Keycloak to actually serve, not merely
+     * for the name to resolve. Deliberately unbounded: if the issuer never comes up, the pod stays in
+     * {@code Init:0/1} with this container's log naming exactly what it is waiting for, which is a far
+     * clearer failure than a crash loop.
+     */
+    private static DeploymentSpecTemplateSpecInitContainer waitForIssuer(String issuer) {
+        String discoveryUrl = issuer.replaceAll("/+$", "") + "/.well-known/openid-configuration";
+        String script = String.join("\n",
+            "until curl -sfo /dev/null \"$DISCOVERY_URL\"; do",
+            "  echo \"waiting for OIDC issuer $DISCOVERY_URL\"",
+            "  sleep 5",
+            "done",
+            "echo \"OIDC issuer reachable\"");
+        return DeploymentSpecTemplateSpecInitContainer
+            .builder()
+            .name("wait-for-issuer")
+            .image("curlimages/curl:8.11.1")
+            .command(List.of("sh", "-c", script))
+            .env(List.of(DeploymentSpecTemplateSpecInitContainerEnv
+                             .builder()
+                             .name("DISCOVERY_URL")
+                             .value(discoveryUrl)
+                             .build()))
+            .build();
     }
 
     protected @NonNull List<String> emailArgs(Properties properties, String emailDomain) {

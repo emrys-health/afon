@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.AppConfig;
 import health.emrys.afon.cdk.aws.AwsKubernetesPolaris;
-import health.emrys.afon.cdk.aws.SparkClusterDeployment;
+import health.emrys.afon.cdk.aws.TrinoClusterDeployment;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.config.deployment.AfonDeploymentConfig;
 import health.emrys.afon.config.deployment.CloudSpec;
@@ -82,7 +82,7 @@ public class DeploymentPlannerTest {
 
         Path legacyOut = tmp.resolve("legacy");
         App  legacyApp = new App(AppConfig.builder().outdir(legacyOut.toString()).build());
-        new SparkClusterDeployment(legacyApp, AwsKubernetesPolaris.ID, properties);
+        new TrinoClusterDeployment(legacyApp, AwsKubernetesPolaris.ID, properties);
         legacyApp.synth();
 
         Path plannerOut = tmp.resolve("planner");
