@@ -23,7 +23,11 @@ public class ConfigureUserMain {
     public static final String ROLE_NAME = "emrysrole4";
 
     private static final Logger                logger            = LoggerFactory.getLogger(ConfigureUserMain.class);
-    private static final Set<CatalogPrivilege> catalogPrivileges = Set.of(TABLE_READ_DATA, TABLE_WRITE_DATA, NAMESPACE_CREATE, TABLE_CREATE, NAMESPACE_FULL_METADATA);
+    private static final Set<CatalogPrivilege> catalogPrivileges = Set.of(TABLE_READ_DATA,
+                                                                          TABLE_WRITE_DATA,
+                                                                          NAMESPACE_CREATE,
+                                                                          TABLE_CREATE,
+                                                                          NAMESPACE_FULL_METADATA);
 
     private final PolarisConfigurer     configurer;
     private final PermissionsConfigurer permissions;
