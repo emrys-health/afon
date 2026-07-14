@@ -205,7 +205,7 @@ public class SparkContextConfigurationPrinter {
             """, tableName, tableName);
     }
 
-    private static @NotNull String awsSmokeTest(String tableName) {
+    static @NotNull String awsSmokeTest(String tableName) {
         return format(
             """
             #
