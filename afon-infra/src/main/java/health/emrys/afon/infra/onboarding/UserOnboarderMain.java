@@ -15,6 +15,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.polaris.comms.ConfigureUserMain.ROLE_NAME;
 
 public class UserOnboarderMain {
 
@@ -51,8 +52,9 @@ public class UserOnboarderMain {
 
     private void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
         ConfigureUserMain polarisConfiguration = new ConfigureUserMain(properties);
+        polarisConfiguration.configurePrivilegesFor(warehouse, ROLE_NAME);
         for (EmrysUser user : onboardingConfig.getUsers()) {
-            polarisConfiguration.configureUser(user.userName(), ConfigureUserMain.ROLE_NAME, warehouse);
+            polarisConfiguration.configureUser(user.userName(), ROLE_NAME, warehouse);
         }
     }
 
