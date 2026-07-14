@@ -183,14 +183,19 @@ public class ContainerHelper {
             try {
                 trino = new GenericContainer<>("trinodb/trino:latest");
                 String catalogPath = "/etc/trino/catalog";
-                trino.withFileSystemBind(trinoConfigPropertiesFile().getAbsolutePath(), "/etc/trino/config.properties");
+                String propertiesPath = trinoConfigPropertiesFile().getAbsolutePath();
+                logger.info("About to mount {}", propertiesPath);
+                trino.withFileSystemBind(propertiesPath, "/etc/trino/config.properties");
                 trino.setNetworkMode("host");
                 trino.start();
                 for (SupportedCloudsEnum catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
+                    String containerDestination = format("%s/%s.properties", catalogPath, catalog);
+                    logger.info("Copying config file to container: {}", containerDestination);
                     trino.copyFileToContainer(
                         Transferable.of(trinoLocalConfig(properties, catalog).getBytes()),
-                        format("%s/%s.properties", catalogPath, catalog));
+                        containerDestination);
                 }
+                logger.info("Started Trino with container ID: {}", trino.getContainerId());
             } catch (Exception e) {
                 throw new RuntimeException("Cannot start Trino container", e);
             }
