@@ -408,7 +408,7 @@ public class KeyCloakAdmin {
                     if (code == HttpStatus.SC_CREATED) {
                         logger.info("Created KeyCloak {}", what);
                     } else if (code == HttpStatus.SC_CONFLICT) {
-                        logger.info("KeyCloak {} already exists - leaving it untouched", what);
+                        logger.warn("KeyCloak {} already exists", what);
                     } else {
                         throw new IOException(format("Could not create KeyCloak %s: HTTP %d", what, code));
                     }
