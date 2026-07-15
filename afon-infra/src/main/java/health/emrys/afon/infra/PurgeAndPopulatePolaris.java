@@ -45,7 +45,7 @@ public class PurgeAndPopulatePolaris {
         this.domainName  = domainName;
         this.client      = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
         this.accessToken = client.getAccessToken();
-        log.info("POLARIS_TOKEN={}", accessToken);
+        log.debug("For {}/{}:\nPOLARIS_TOKEN={}", client.getClientId(), client.getClientSecret(), accessToken);
     }
 
     private final String       domainName;
