@@ -53,17 +53,21 @@ public class UserOnboarderMain {
     }
 
     private void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
-        KeyCloakAdmin kcAmdin    = new KeyCloakAdmin(properties);
-        String        adminToken = kcAmdin.adminToken();
-        kcAmdin.createRealm(adminToken, KEYCLOAK_REALM);
-        for (EmrysUser user : onboardingConfig.getUsers()) {
-            kcAmdin.createUser(adminToken, KEYCLOAK_REALM, user.userName(), user.password(), user.email());
-        }
+        configureKeyCloak();
 
         ConfigureUserMain polarisConfiguration = new ConfigureUserMain(properties);
         polarisConfiguration.configurePrivilegesFor(warehouse, ROLE_NAME);
         for (EmrysUser user : onboardingConfig.getUsers()) {
             polarisConfiguration.configureUser(user.userName(), ROLE_NAME, warehouse);
+        }
+    }
+
+    private void configureKeyCloak() throws IOException {
+        KeyCloakAdmin kcAmdin    = new KeyCloakAdmin(properties);
+        String        adminToken = kcAmdin.adminToken();
+        kcAmdin.createRealm(adminToken, KEYCLOAK_REALM);
+        for (EmrysUser user : onboardingConfig.getUsers()) {
+            kcAmdin.createUser(adminToken, KEYCLOAK_REALM, user.userName(), user.password(), user.email());
         }
     }
 
