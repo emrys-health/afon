@@ -25,13 +25,19 @@ public class KeyCloakHelper {
         // Use KeyCloak instead of Polaris' internal token store.
         env.put("polaris.authentication.type", "external");
         env.put("polaris.authentication.authenticator.type", "default");
-        // Map the token's client identity to a Polaris principal and its roles. We use the 'azp'
-        // (authorized party) claim rather than 'preferred_username': for a client_credentials grant
-        // KeyCloak sets preferred_username to "service-account-<clientId>" (e.g. "service-account-root"),
-        // which does not match the bootstrapped Polaris principal. 'azp' is the bare client id ("root"),
-        // which is the principal Polaris was bootstrapped with (see polaris.bootstrap.credentials).
+        // Map the token to a Polaris principal by the 'preferred_username' claim so that a human's
+        // browser-login token resolves to *their own* Polaris principal: KeyCloak stamps
+        // preferred_username with the user's username (e.g. "will"), and each user is provisioned a
+        // Polaris principal of that same name (see UserOnboarderMain). This lets the login token that
+        // JupyterHub already captures be used directly against Polaris, per-user, with no ROPC.
+        //
+        // The catch: a client_credentials grant (the admin/provisioning client, and — until it moves
+        // to the login token — Spark) gets preferred_username="service-account-<clientId>", which is
+        // not a principal. Those service clients therefore carry a KeyCloak protocol mapper that
+        // overrides preferred_username back to the bare clientId (see KeyCloakAdmin.createConfidentialClient),
+        // so "root" still resolves to the bootstrapped principal (polaris.bootstrap.credentials).
         env.put("polaris.oidc.principal-mapper.type", "default");
-        env.put("polaris.oidc.principal-mapper.name-claim-path", "azp");
+        env.put("polaris.oidc.principal-mapper.name-claim-path", "preferred_username");
         env.put("polaris.oidc.principal-roles-mapper.type", "default");
         // Point Quarkus OIDC at the KeyCloak realm. OIDC is disabled by default, so enable the tenant.
         env.put("quarkus.oidc.tenant-enabled", "true");
