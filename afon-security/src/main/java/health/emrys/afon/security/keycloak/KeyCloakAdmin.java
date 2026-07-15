@@ -207,12 +207,48 @@ public class KeyCloakAdmin {
             "publicClient", false,
             "serviceAccountsEnabled", true,
             "directAccessGrantsEnabled", true,
-            "standardFlowEnabled", false
+            "standardFlowEnabled", false,
+            "protocolMappers", List.of(preferredUsernameMapper(clientId))
         ));
-        if (isFailure(postJson(adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "client " + clientId))) {
+        HttpResponse created = postJson(
+            adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "client " + clientId);
+        if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
+            // KeyCloak's DB outlives the cluster, so a client an earlier deploy created (without the
+            // mapper below) survives. Converge it, or a client_credentials token would still present
+            // preferred_username="service-account-<clientId>" and fail Polaris' principal lookup.
+            String uuid = clientUuid(adminToken, realm, clientId);
+            if (uuid == null
+                || isFailure(putJson(adminToken, format("%s/admin/realms/%s/clients/%s", baseUrl, realm, uuid),
+                                     json, "client " + clientId))) {
+                logger.warn("Could not update confidential client {}", clientId);
+            } else {
+                logger.info("Updated existing KeyCloak confidential client {}", clientId);
+            }
+        } else if (isFailure(created)) {
             logger.warn("Could not create confidential client {}", clientId);
         }
+    }
 
+    /**
+     * A protocol mapper that forces the access token's {@code preferred_username} to the bare
+     * {@code clientId}. Needed because Polaris maps the principal from {@code preferred_username}
+     * (see {@link health.emrys.afon.polaris.keycloak.KeyCloakHelper}), yet a {@code client_credentials}
+     * grant otherwise yields {@code service-account-<clientId>}, which is not a Polaris principal. This
+     * overrides it so the service client resolves to its bootstrapped principal (e.g. {@code root}).
+     */
+    private static Map<String, Object> preferredUsernameMapper(String clientId) {
+        return Map.of(
+            "name", "preferred_username-as-clientId",
+            "protocol", "openid-connect",
+            "protocolMapper", "oidc-hardcoded-claim-mapper",
+            "config", Map.of(
+                "claim.name", "preferred_username",
+                "claim.value", clientId,
+                "jsonType.label", "String",
+                "access.token.claim", "true",
+                "id.token.claim", "false",
+                "userinfo.token.claim", "false"
+            ));
     }
 
     private boolean isFailure(HttpResponse response) {
