@@ -555,12 +555,17 @@ public class KeyCloakAdmin {
             // Provision the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
             // "sign in" on the OAuth splash yields KeyCloak's "Client not found".
             String jupyterDomain = AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties);
-            admin.registerBrowserClient(
-                AfonProperties.OAUTH2_CLIENT_ID.getValueFrom(properties),
-                AfonProperties.OAUTH2_CLIENT_SECRET.getValueFrom(properties),
-                List.of(
-                    "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
-                    "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
+            admin.registerBrowser(properties, jupyterDomain);
         }
     }
+
+    public void registerBrowser(Properties properties, String jupyterDomain) {
+        registerBrowserClient(
+            AfonProperties.OAUTH2_CLIENT_ID.getValueFrom(properties),
+            AfonProperties.OAUTH2_CLIENT_SECRET.getValueFrom(properties),
+            List.of(
+                "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
+                "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
+    }
+
 }
