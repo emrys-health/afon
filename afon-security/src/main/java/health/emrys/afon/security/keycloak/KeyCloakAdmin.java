@@ -98,6 +98,7 @@ public class KeyCloakAdmin {
      * created for this user shares the user's name and secret, hence the doubled credentials.
      */
     public String userToken(String username, String password) throws IOException {
+        logger.info("Getting token for {}/{}", username, password);
         String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, KEYCLOAK_REALM);
         String body = form(Map.of(
             "grant_type",    "password",
@@ -207,15 +208,11 @@ public class KeyCloakAdmin {
             "publicClient", false,
             "serviceAccountsEnabled", true,
             "directAccessGrantsEnabled", true,
-            "standardFlowEnabled", false,
-            "protocolMappers", List.of(preferredUsernameMapper(clientId))
+            "standardFlowEnabled", false
         ));
         HttpResponse created = postJson(
             adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "client " + clientId);
         if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
-            // KeyCloak's DB outlives the cluster, so a client an earlier deploy created (without the
-            // mapper below) survives. Converge it, or a client_credentials token would still present
-            // preferred_username="service-account-<clientId>" and fail Polaris' principal lookup.
             String uuid = clientUuid(adminToken, realm, clientId);
             if (uuid == null
                 || isFailure(putJson(adminToken, format("%s/admin/realms/%s/clients/%s", baseUrl, realm, uuid),
@@ -227,28 +224,68 @@ public class KeyCloakAdmin {
         } else if (isFailure(created)) {
             logger.warn("Could not create confidential client {}", clientId);
         }
+        // A client_credentials grant carries preferred_username="service-account-<clientId>", which is
+        // not a Polaris principal. Stamp the bare clientId onto the dedicated 'polaris_principal' claim
+        // Polaris maps on, so this service client resolves to its bootstrapped principal (e.g. "root").
+        ensureClientMapper(adminToken, realm, clientId, hardcodedPrincipalMapper(clientId));
     }
 
+    /** The dedicated claim Polaris reads the principal name from (see KeyCloakHelper). */
+    private static final String PRINCIPAL_CLAIM = "polaris_principal";
+
     /**
-     * A protocol mapper that forces the access token's {@code preferred_username} to the bare
-     * {@code clientId}. Needed because Polaris maps the principal from {@code preferred_username}
-     * (see {@link health.emrys.afon.polaris.keycloak.KeyCloakHelper}), yet a {@code client_credentials}
-     * grant otherwise yields {@code service-account-<clientId>}, which is not a Polaris principal. This
-     * overrides it so the service client resolves to its bootstrapped principal (e.g. {@code root}).
+     * A hardcoded-claim mapper that sets {@link #PRINCIPAL_CLAIM} to {@code clientId}, for
+     * client_credentials (service-account) tokens whose {@code preferred_username} is unusable.
      */
-    private static Map<String, Object> preferredUsernameMapper(String clientId) {
+    private static Map<String, Object> hardcodedPrincipalMapper(String clientId) {
         return Map.of(
-            "name", "preferred_username-as-clientId",
+            "name", PRINCIPAL_CLAIM + "-from-clientId",
             "protocol", "openid-connect",
             "protocolMapper", "oidc-hardcoded-claim-mapper",
             "config", Map.of(
-                "claim.name", "preferred_username",
+                "claim.name", PRINCIPAL_CLAIM,
                 "claim.value", clientId,
                 "jsonType.label", "String",
                 "access.token.claim", "true",
                 "id.token.claim", "false",
                 "userinfo.token.claim", "false"
             ));
+    }
+
+    /**
+     * A user-property mapper that copies the logged-in user's {@code username} into
+     * {@link #PRINCIPAL_CLAIM}, so a human's browser-login token resolves to their own Polaris principal.
+     */
+    private static Map<String, Object> usernamePrincipalMapper() {
+        return Map.of(
+            "name", PRINCIPAL_CLAIM + "-from-username",
+            "protocol", "openid-connect",
+            "protocolMapper", "oidc-usermodel-property-mapper",
+            "config", Map.of(
+                "user.attribute", "username",
+                "claim.name", PRINCIPAL_CLAIM,
+                "jsonType.label", "String",
+                "access.token.claim", "true",
+                "id.token.claim", "false",
+                "userinfo.token.claim", "false"
+            ));
+    }
+
+    /**
+     * Idempotently attaches a protocol mapper to a client via the protocol-mappers sub-resource. A
+     * client PUT does not reliably update mappers on an existing client, so mappers are managed here
+     * on their own endpoint; an already-present mapper (409) is left as-is.
+     */
+    private void ensureClientMapper(String adminToken, String realm, String clientId,
+                                    Map<String, Object> mapper) throws IOException {
+        String uuid = clientUuid(adminToken, realm, clientId);
+        if (uuid == null) {
+            logger.warn("Cannot attach protocol mapper: client {} not found", clientId);
+            return;
+        }
+        String uri  = format("%s/admin/realms/%s/clients/%s/protocol-mappers/models", baseUrl, realm, uuid);
+        String json = MAPPER.writeValueAsString(mapper);
+        postJson(adminToken, uri, json, "protocol mapper " + mapper.get("name") + " on " + clientId);
     }
 
     private boolean isFailure(HttpResponse response) {
@@ -318,6 +355,9 @@ public class KeyCloakAdmin {
         } else if (isFailure(created)) {
             logger.warn("Could not create browser client {}", clientId);
         }
+        // Human logins go through this client; copy their username into the claim Polaris maps on so
+        // the captured login token resolves to that user's Polaris principal (e.g. "will").
+        ensureClientMapper(adminToken, realm, clientId, usernamePrincipalMapper());
     }
 
     /**

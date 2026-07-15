@@ -105,11 +105,16 @@ public class ContainerHelper {
                             "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
-            new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME)
+            KeyCloakAdmin keyCloakAdmin = new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME);
+            keyCloakAdmin
+                .registerPolarisUser(
+                    KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
+                    KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
+            keyCloakAdmin
                 .registerPolarisUser(
                     USER_POLARIS_ID.getValueFrom(properties),
                     USER_POLARIS_SECRET.getValueFrom(properties));
-            new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME)
+            keyCloakAdmin
                 .registerPolarisUser(
                     POLARIS_ID.getValueFrom(properties),
                     POLARIS_SECRET.getValueFrom(properties));

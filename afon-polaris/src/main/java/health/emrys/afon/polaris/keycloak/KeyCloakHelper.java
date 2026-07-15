@@ -25,19 +25,18 @@ public class KeyCloakHelper {
         // Use KeyCloak instead of Polaris' internal token store.
         env.put("polaris.authentication.type", "external");
         env.put("polaris.authentication.authenticator.type", "default");
-        // Map the token to a Polaris principal by the 'preferred_username' claim so that a human's
-        // browser-login token resolves to *their own* Polaris principal: KeyCloak stamps
-        // preferred_username with the user's username (e.g. "will"), and each user is provisioned a
-        // Polaris principal of that same name (see UserOnboarderMain). This lets the login token that
-        // JupyterHub already captures be used directly against Polaris, per-user, with no ROPC.
-        //
-        // The catch: a client_credentials grant (the admin/provisioning client, and — until it moves
-        // to the login token — Spark) gets preferred_username="service-account-<clientId>", which is
-        // not a principal. Those service clients therefore carry a KeyCloak protocol mapper that
-        // overrides preferred_username back to the bare clientId (see KeyCloakAdmin.createConfidentialClient),
-        // so "root" still resolves to the bootstrapped principal (polaris.bootstrap.credentials).
+        // Map the token to a Polaris principal by a dedicated 'polaris_principal' claim that KeyCloak
+        // protocol mappers stamp onto every token (see KeyCloakAdmin):
+        //   - human browser logins   -> polaris_principal = the user's username (e.g. "will")
+        //   - client_credentials     -> polaris_principal = the bare clientId (e.g. "will" / "root")
+        // and each user/service is provisioned a Polaris principal of that same name (UserOnboarderMain,
+        // polaris.bootstrap.credentials). A dedicated claim is used rather than 'preferred_username'
+        // because that built-in claim differs by grant type — a client_credentials grant yields
+        // "service-account-<clientId>" — and a mapper cannot reliably override the built-in field
+        // (KeyCloak serialises the built-in value over the mapped one). 'polaris_principal' has no
+        // built-in mapper to collide with, so both grant types resolve to the intended principal.
         env.put("polaris.oidc.principal-mapper.type", "default");
-        env.put("polaris.oidc.principal-mapper.name-claim-path", "preferred_username");
+        env.put("polaris.oidc.principal-mapper.name-claim-path", "polaris_principal");
         env.put("polaris.oidc.principal-roles-mapper.type", "default");
         // Point Quarkus OIDC at the KeyCloak realm. OIDC is disabled by default, so enable the tenant.
         env.put("quarkus.oidc.tenant-enabled", "true");

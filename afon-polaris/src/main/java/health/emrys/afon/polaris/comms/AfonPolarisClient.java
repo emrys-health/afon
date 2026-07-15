@@ -3,6 +3,7 @@ package health.emrys.afon.polaris.comms;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import health.emrys.afon.config.ConfigUtils;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -43,8 +44,8 @@ public class AfonPolarisClient {
         return format("%s/api/catalog/v1/oauth/tokens", endpoint);
     }
 
-    AfonPolarisClient(String httpsHost, Properties properties) {
-        this(format("https://%s", httpsHost),
+    AfonPolarisClient(String hostname, Properties properties) {
+        this(format("%s://%s", ConfigUtils.protocolFor(hostname), hostname),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
     }
