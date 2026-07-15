@@ -1,7 +1,6 @@
 package health.emrys.afon.infra.onboarding;
 
 import health.emrys.afon.cdk.Onboarding;
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.ConfigureUserMain;
@@ -12,14 +11,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.polaris.comms.ConfigureUserMain.ROLE_NAME;
-import static health.emrys.afon.security.keycloak.KeyCloakAdmin.JUPYTERHUB_CALLBACK;
-import static health.emrys.afon.security.keycloak.KeyCloakAdmin.OAUTH2_PROXY_CALLBACK;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 
 public class UserOnboarderMain {
@@ -33,7 +29,7 @@ public class UserOnboarderMain {
         String            catalog       = args[1];
         String            jupyterDomain = args[2];
         try {
-            app.registerBrowser(jupyterDomain);
+            app.configureKeyCloak(jupyterDomain);
             app.onboardAll(catalog); // just for a smoke test
         } catch (Exception e) {
             log.error(
@@ -55,9 +51,6 @@ public class UserOnboarderMain {
     }
 
     public void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
-        log.info("CONFIGURING KEYCLOAK");
-        configureKeyCloak();
-
         log.info("CONFIGURING POLARIS");
         ConfigureUserMain polarisConfiguration = new ConfigureUserMain(properties);
         polarisConfiguration.configurePrivilegesFor(warehouse, ROLE_NAME);
@@ -66,16 +59,9 @@ public class UserOnboarderMain {
         }
     }
 
-    private void registerBrowser(String jupyterDomain) {
-        kcAdmin.registerBrowserClient(
-            AfonProperties.OAUTH2_CLIENT_ID.getValueFrom(properties),
-            AfonProperties.OAUTH2_CLIENT_SECRET.getValueFrom(properties),
-            List.of(
-                "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
-                "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
-    }
-
-    private void configureKeyCloak() throws IOException {
+    private void configureKeyCloak(String jupyterDomain) throws IOException {
+        log.info("CONFIGURING KEYCLOAK");
+        kcAdmin.registerBrowser(properties, jupyterDomain);
         String adminToken = kcAdmin.adminToken();
         kcAdmin.createRealm(adminToken, KEYCLOAK_REALM);
         for (EmrysUser user : onboardingConfig.getUsers()) {

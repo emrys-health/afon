@@ -61,11 +61,17 @@
             <artifactId>afon-security</artifactId>
             <version>${parent.version}</version>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>${parent.groupId}</groupId>-->
-<!--            <artifactId>afon-infra</artifactId>-->
-<!--            <version>${parent.version}</version>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>${parent.groupId}</groupId>
+            <artifactId>afon-infra</artifactId>
+            <version>${parent.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>eks</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>com.github.vertical-blank</groupId>
             <artifactId>sql-formatter</artifactId>

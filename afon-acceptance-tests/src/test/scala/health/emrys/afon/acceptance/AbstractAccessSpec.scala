@@ -12,13 +12,13 @@ import health.emrys.afon.trino.SmokeTest
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
-//import health.emrys.afon.acceptance.AcceptanceTestConfig
-//import health.emrys.afon.infra.onboarding.UserOnboarderMain
-//import health.emrys.afon.security.keycloak.OnboardingConfig
-//import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser
-//import org.scalatest.GivenWhenThen
-//import uk.co.odinconsultants.documentation_utils.SpecPretifier
-//import java.util
+import health.emrys.afon.acceptance.AcceptanceTestConfig
+import health.emrys.afon.infra.onboarding.UserOnboarderMain
+import health.emrys.afon.security.keycloak.OnboardingConfig
+import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser
+import org.scalatest.GivenWhenThen
+import uk.co.odinconsultants.documentation_utils.SpecPretifier
+import java.util
 
 abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 
@@ -130,21 +130,21 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     }
   }
 
-//  val User = new EmrysUser("user", "email@test.com", "slug", "password")
-//
-//  val onboardingConfig = new OnboardingConfig() {
-//    override def getUsers: util.List[EmrysUser] = util.List.of(User)
-//  }
-//
-//  "Polaris and KeyCloak" should {
-//    "talk to each other" in {
-//      Given("A KeyCloak instance")
-//      val onboarding = new UserOnboarderMain(onboardingConfig, AcceptanceTestConfig.instance.getProperties)
-//      When(s"we onboard a user '$User' for catalog ${config.warehouseName()}'")
-//      onboarding.onboardAll(config.warehouseName())
-//      Then("there are no problems")
-//    }
-//  }
+  val User = new EmrysUser("user", "email@test.com", "slug", "password")
+
+  val onboardingConfig = new OnboardingConfig() {
+    override def getUsers: util.List[EmrysUser] = util.List.of(User)
+  }
+
+  "Polaris and KeyCloak" should {
+    "talk to each other" in {
+      Given("A KeyCloak instance")
+      val onboarding = new UserOnboarderMain(onboardingConfig, AcceptanceTestConfig.instance.getProperties)
+      When(s"we onboard a user '$User' for catalog ${config.warehouseName()}'")
+      onboarding.onboardAll(config.warehouseName())
+      Then("there are no problems")
+    }
+  }
 
   "Trino" should {
     val properties          = new AfonPropertiesLoader().getProperties
