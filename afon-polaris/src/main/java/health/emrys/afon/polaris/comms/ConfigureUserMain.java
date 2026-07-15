@@ -14,8 +14,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.config.AfonProperties.USER_POLARIS_ID;
+import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
+import static java.lang.String.format;
 import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
 public class ConfigureUserMain {
@@ -58,12 +59,14 @@ public class ConfigureUserMain {
     private final String adminClientId;
 
     public ConfigureUserMain(Properties properties) {
-        AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(properties);
+        AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(
+            POLARIS_ENDPOINT.getValueFrom(properties),
+            properties); // For service-account-root/s3cr3t: POLARIS_TOKEN=null
         accessToken   = client.getAccessToken();
         configurer    = new PolarisConfigurer(client);
         permissions   = new PermissionsConfigurer(client);
         adminClientId = client.getClientId();
-        logger.debug("POLARIS_TOKEN={}", accessToken);
+        logger.debug("For {}/{}:\nPOLARIS_TOKEN={}", client.getClientId(), client.getClientSecret(), accessToken);
     }
 
     public HttpResponse configureUser(

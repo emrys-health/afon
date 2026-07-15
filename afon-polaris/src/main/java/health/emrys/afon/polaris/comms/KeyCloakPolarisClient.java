@@ -50,8 +50,8 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
-    KeyCloakPolarisClient(String httpsHost, Properties properties) {
-        super(httpsHost, properties);
+    KeyCloakPolarisClient(String polarisHost, Properties properties) {
+        super(polarisHost, properties);
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
