@@ -25,15 +25,20 @@ public class TrinoServerConfiguration {
     }
 
     public String catalogProperties(AfonProperties.SupportedCloudsEnum cloud) {
-        String protocol = "https";
-        if (polarisDomainName.toLowerCase().contains("localhost")) {
-            protocol = "http";
+        String protocol = "https://";
+        if (polarisDomainName.toLowerCase().contains("localhost")
+            || polarisDomainName.toLowerCase().contains("127.0.0.1")) {
+            protocol = "http://";
+        }
+        if (polarisDomainName.toLowerCase().startsWith("http:") // if the domain name already contains the protocol, use it
+            || polarisDomainName.toLowerCase().startsWith("https:")) {
+            protocol = "";
         }
         return format(
             """
             connector.name=iceberg
             iceberg.catalog.type=rest
-            iceberg.rest-catalog.uri=%S://%s/api/catalog/
+            iceberg.rest-catalog.uri=%s%s/api/catalog/
             iceberg.rest-catalog.warehouse=%s
             iceberg.rest-catalog.vended-credentials-enabled=true
             iceberg.rest-catalog.security=OAUTH2
