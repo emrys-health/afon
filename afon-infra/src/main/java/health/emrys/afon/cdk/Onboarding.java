@@ -12,8 +12,8 @@ public class Onboarding implements OnboardingConfig {
      * TODO - read from a CSV file
      */
     private final List<EmrysUser> users = List.of(
-        new EmrysUser("phil", "phil.henry@emrys.health", "phil-henry"),
-        new EmrysUser("will", "will@emrys.health", "will"));
+        new EmrysUser("phil", "phil.henry@emrys.health", "phil-henry", "s3cr3t"),
+        new EmrysUser("will", "will@emrys.health", "will", "s3cr3t"));
 
 
     public List<EmrysUser> getUsers() {

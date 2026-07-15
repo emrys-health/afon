@@ -5,6 +5,7 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.ConfigureUserMain;
+import health.emrys.afon.security.keycloak.KeyCloakAdmin;
 import health.emrys.afon.security.keycloak.OnboardingConfig;
 import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.polaris.comms.ConfigureUserMain.ROLE_NAME;
+import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 
 public class UserOnboarderMain {
 
@@ -51,6 +53,13 @@ public class UserOnboarderMain {
     }
 
     private void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
+        KeyCloakAdmin kcAmdin    = new KeyCloakAdmin(properties);
+        String        adminToken = kcAmdin.adminToken();
+        kcAmdin.createRealm(adminToken, KEYCLOAK_REALM);
+        for (EmrysUser user : onboardingConfig.getUsers()) {
+            kcAmdin.createUser(adminToken, KEYCLOAK_REALM, user.userName(), user.password(), user.email());
+        }
+
         ConfigureUserMain polarisConfiguration = new ConfigureUserMain(properties);
         polarisConfiguration.configurePrivilegesFor(warehouse, ROLE_NAME);
         for (EmrysUser user : onboardingConfig.getUsers()) {
