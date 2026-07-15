@@ -30,7 +30,8 @@ public class TrinoServerConfiguration {
             || polarisDomainName.toLowerCase().contains("127.0.0.1")) {
             protocol = "http://";
         }
-        if (polarisDomainName.toLowerCase().startsWith("http:")) {
+        if (polarisDomainName.toLowerCase().startsWith("http:") // if the domain name already contains the protocol, use it
+            || polarisDomainName.toLowerCase().startsWith("https:")) {
             protocol = "";
         }
         return format(
