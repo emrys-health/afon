@@ -43,6 +43,8 @@ public class StepOperations {
     private final String azurePolarisDomainName;
     private final String clusterName;
     private final String gcpPolarisDomainName;
+    private final String awsJupyterDomain;
+    private final String azureJupyterDomain;
 
     public StepOperations(StepActions actions) {
         Properties properties = appProperties();
@@ -53,6 +55,8 @@ public class StepOperations {
         this.azurePolarisDomainName = AZURE_DOMAIN_NAME.getValueFrom(properties);
         this.gcpPolarisDomainName   = GCP_DOMAIN_NAME.getValueFrom(properties);
         this.clusterName            = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+        this.awsJupyterDomain       = AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties);
+        this.azureJupyterDomain     = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
     }
 
     public Step cleanLocalAws() {
@@ -135,14 +139,16 @@ public class StepOperations {
     }
 
     public @NonNull Step purgeForeignCatalogFrom(String domainName,
-                                                 SupportedCloudsEnum catalog) {
+                                                 SupportedCloudsEnum catalog
+    ) {
         return purgeEverythingFor(domainName, catalog, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
     }
 
     public @NonNull Step purgeEverythingFor(String domainName,
                                             SupportedCloudsEnum catalog,
                                             String namespace,
-                                            String tableName) {
+                                            String tableName
+    ) {
         return new Step(
             format("%s_purge_%s", machineNameFrom(domainName), catalog.toString()),
             format("remove all persisted references to %s in Polaris at `%s`", namespace, domainName),
@@ -258,15 +264,18 @@ public class StepOperations {
     }
 
     public Step checkSparkConnectorTalkingToAzure() {
-        return sparkTestUsing(AZURE,
-                              format("local Spark call that uses %s", azurePolarisDomainName),
-                              EXTERNAL_NAMESPACE,
-                              SparkTestWriter.class,
-                              azurePolarisDomainName);
+        return sparkTestUsing(
+            AZURE,
+            format("local Spark call that uses %s", azurePolarisDomainName),
+            EXTERNAL_NAMESPACE,
+            SparkTestWriter.class,
+            azurePolarisDomainName,
+            azureJupyterDomain);
     }
 
     public @NonNull Step awsSparkTestUsing(SupportedCloudsEnum warehouse,
-                                           String namespace) {
+                                           String namespace
+    ) {
         return awsSparkWriteTestUsing(
             warehouse,
             format(
@@ -277,12 +286,14 @@ public class StepOperations {
 
     private Step awsSparkWriteTestUsing(SupportedCloudsEnum warehouse,
                                         String description,
-                                        String namespace) {
-        return sparkTestUsing(warehouse, description, namespace, SparkTestWriter.class, awsPolarisDomainName);
+                                        String namespace
+    ) {
+        return sparkTestUsing(warehouse, description, namespace, SparkTestWriter.class, awsPolarisDomainName, awsJupyterDomain);
     }
 
     Step awsSparkReadTestUsing(SupportedCloudsEnum warehouse,
-                               String namespace) {
+                               String namespace
+    ) {
         return sparkTestUsing(
             warehouse,
             format(
@@ -291,26 +302,30 @@ public class StepOperations {
                 namespace,
                 SparkChecker.TABLE,
                 awsPolarisDomainName
-                  ),
+            ),
             namespace,
             SparkTestReader.class,
-            awsPolarisDomainName);
+            awsPolarisDomainName,
+            awsJupyterDomain);
     }
 
     private @NonNull Step sparkTestUsing(SupportedCloudsEnum warehouse,
                                          String description,
                                          String namespace,
                                          Class<? extends SparkChecker> clazz,
-                                         String domainName) {
+                                         String domainName,
+                                         String jupyterDomainName
+    ) {
         return new Step(
-            format("%s_spark_talks_to_%s",
-                   machineNameFrom(domainName),
-                   warehouse.toString()),
+            format(
+                "%s_spark_talks_to_%s",
+                machineNameFrom(domainName),
+                warehouse.toString()),
             description,
             () -> {
                 actions.executeMainOf(
                     UserOnboarderMain.class,
-                    new String[] {domainName, warehouse.toString()},
+                    new String[]{domainName, warehouse.toString(), jupyterDomainName},
                     NO_ENV_VARIABLES);
 
                 Properties properties = appProperties();
@@ -450,12 +465,13 @@ public class StepOperations {
                           BASE_LOCATION = '%s/';
                         """, SNOWFLAKE_OUT_DIR),
 
-                    format("""
-                    INSERT INTO my_azure_iceberg_table (value)
-                    VALUES
-                        ('Alice_%s'),
-                        ('Bob_%s');
-                    """, formatted, formatted)
+                    format(
+                        """
+                        INSERT INTO my_azure_iceberg_table (value)
+                        VALUES
+                            ('Alice_%s'),
+                            ('Bob_%s');
+                        """, formatted, formatted)
                 });
             }
         );
@@ -477,7 +493,8 @@ public class StepOperations {
     }
 
     private static @NonNull String firstFile(String glob,
-                                             boolean descendingOrder) {
+                                             boolean descendingOrder
+    ) {
         log.info("Querying Azure for {}", glob);
         AzureReader          lister    = new AzureReader();
         List<BlobItem>       list      = new ArrayList<>(lister.list(glob));
@@ -502,7 +519,8 @@ public class StepOperations {
 
     public Step registerTableInAws(String jsonMetadataFQN,
                                    SupportedCloudsEnum warehouse,
-                                   String tableName) {
+                                   String tableName
+    ) {
         return new Step(
             format("%s_table_in_aws_polaris", warehouse.toString()),
             format("Create `%s` table in the AWS Polaris", warehouse.name()),

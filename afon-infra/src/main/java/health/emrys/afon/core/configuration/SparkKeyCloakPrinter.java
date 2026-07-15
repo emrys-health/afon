@@ -73,8 +73,8 @@ public class SparkKeyCloakPrinter {
                       if (value.contains(config.getClientId() + ":" + config.getClientSecret())) {
                           python.append(format(
                               """
-                              .config("%s", OIDC_TOKEN)
-                              """, key, value));
+                              .config("spark.sql.catalog.%s.token", OIDC_TOKEN)
+                              """, cloud, value));
                       } else {
                           python.append(format(
                               """
