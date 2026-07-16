@@ -4,6 +4,7 @@ import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.File;
@@ -12,6 +13,7 @@ import java.io.PrintWriter;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
 import static java.lang.String.format;
 
 /**
@@ -66,7 +68,8 @@ public class SparkKeyCloakPrinter {
                                                      """);
         for (SupportedCloudsEnum cloud : SupportedCloudsEnum.values()) {
             python.append(format("# %s \n", cloud.name()));
-            config.sparkConfigs(cloud).entrySet()
+            String sparkCatalog = toSparkName(cloud);
+            config.sparkConfigs(sparkCatalog, cloud.toString()).entrySet()
                   .forEach(entry -> {
                       String key   = entry.getKey();
                       String value = entry.getValue();
@@ -74,7 +77,7 @@ public class SparkKeyCloakPrinter {
                           python.append(format(
                               """
                               .config("spark.sql.catalog.%s.token", OIDC_TOKEN)
-                              """, cloud, value));
+                              """, sparkCatalog, value));
                       } else {
                           python.append(format(
                               """
@@ -89,8 +92,23 @@ public class SparkKeyCloakPrinter {
                       
                       print("Finished initializing spark session")
                       """);
-        python.append(SparkContextConfigurationPrinter.awsSmokeTest("AwsAccessSpec"));
+        python.append(awsSmokeTest("AwsAccessSpec"));
         return python.toString();
+    }
+
+    private static @NonNull String toSparkName(SupportedCloudsEnum cloud) {
+        return "test_" + cloud;
+    }
+
+    String awsSmokeTest(String tableName) {
+        return format(
+            """
+            #
+            # AWS
+            #
+            df_read = spark.read.table("%s.acceptancetests.%s")
+            df_read.show()
+            """, toSparkName(AWS), tableName);
     }
 
 }
