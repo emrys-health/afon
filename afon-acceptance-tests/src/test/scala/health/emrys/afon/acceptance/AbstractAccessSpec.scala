@@ -144,17 +144,19 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       assert(ContainerHelper.instance.startKeyCloak(properties) != null)
       assert(ContainerHelper.instance.startPolaris(properties) != null)
 
-      When(s"we onboard a user '$User' for catalog ${config.warehouseName()}'")
+      When(s"we onboard a user '$User' for catalog ${config.warehouseName()}' in Polaris")
       val onboarding = new UserOnboarderMain(onboardingConfig, properties)
       onboarding.onboardAll(config.warehouseName())
-      onboarding.configureKeyCloak("jupyter.com")
+      And("in KeyCloak")
+      onboarding.configureKeyCloak("NotUsed.com")
 
+      Then(s"we can get a token from KeyCloak for user '$UserName' in Realm '$KEYCLOAK_REALM'")
       val kcAdmin = new KeyCloakAdmin("localhost", UserName, UserPassword)
-      val token = kcAdmin.getToken(KEYCLOAK_REALM)
+      assert(kcAdmin.getToken(KEYCLOAK_REALM) != null)
 
       val uriGet = tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
       val polarisClient = AcceptanceTestConfig.instance.polarisClientFor(UserName, UserPassword)
-      Then(s"user '$UserName' can see the table when they call Polaris at $uriGet'")
+      And(s"user '$UserName' can see the table when they call Polaris at $uriGet'")
       val response = polarisClient.getCall(uriGet, polarisClient.getAccessToken())
       assert(!InfraUtils.isFailure(response))
     }
