@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
@@ -54,9 +55,7 @@ public class UserOnboarderMain {
         log.info("CONFIGURING POLARIS");
         ConfigureUserMain polarisConfiguration = new ConfigureUserMain(properties);
         polarisConfiguration.configurePrivilegesFor(warehouse, ROLE_NAME);
-        for (EmrysUser user : onboardingConfig.getUsers()) {
-            polarisConfiguration.configureUser(user.userName(), ROLE_NAME, warehouse);
-        }
+        polarisConfiguration.configureAll(warehouse, onboardingConfig);
     }
 
     public void configureKeyCloak(String jupyterDomain) throws IOException {

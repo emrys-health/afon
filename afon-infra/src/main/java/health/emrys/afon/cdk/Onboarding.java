@@ -3,6 +3,7 @@ package health.emrys.afon.cdk;
 import health.emrys.afon.security.keycloak.OnboardingConfig;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Onboarding implements OnboardingConfig {
 
@@ -24,4 +25,8 @@ public class Onboarding implements OnboardingConfig {
         return users;
     }
 
+    @Override
+    public String toString() {
+        return getUsers().stream().map(x -> x.userName()).collect(Collectors.joining("\n"));
+    }
 }

@@ -2,6 +2,7 @@ package health.emrys.afon.polaris.comms;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.security.keycloak.OnboardingConfig;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
@@ -14,9 +15,8 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
-import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
-import static java.lang.String.format;
+import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperties.USER_POLARIS_ID;
 import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
 public class ConfigureUserMain {
@@ -24,11 +24,12 @@ public class ConfigureUserMain {
     public static final String ROLE_NAME = "emrysrole4";
 
     private static final Logger                logger            = LoggerFactory.getLogger(ConfigureUserMain.class);
-    private static final Set<CatalogPrivilege> catalogPrivileges = Set.of(TABLE_READ_DATA,
-                                                                          TABLE_WRITE_DATA,
-                                                                          NAMESPACE_CREATE,
-                                                                          TABLE_CREATE,
-                                                                          NAMESPACE_FULL_METADATA);
+    private static final Set<CatalogPrivilege> catalogPrivileges = Set.of(
+        TABLE_READ_DATA,
+        TABLE_WRITE_DATA,
+        NAMESPACE_CREATE,
+        TABLE_CREATE,
+        NAMESPACE_FULL_METADATA);
 
     private final PolarisConfigurer     configurer;
     private final PermissionsConfigurer permissions;
@@ -44,10 +45,6 @@ public class ConfigureUserMain {
         String            catalogName   = args[1];
         String            principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
         try {
-            logger.info("Configuring Polaris user '{}' for catalog '{}' and role '{}'",
-                        principalName,
-                        catalogName,
-                        ROLE_NAME);
             app.configurePrivilegesFor(catalogName, ROLE_NAME);
             app.configureUser(principalName, ROLE_NAME, catalogName);
         } catch (Exception x) {
@@ -69,11 +66,23 @@ public class ConfigureUserMain {
         logger.debug("For {}/{}:\nPOLARIS_TOKEN={}", client.getClientId(), client.getClientSecret(), accessToken);
     }
 
-    public HttpResponse configureUser(
+    public void configureAll(String warehouse,
+                             OnboardingConfig onboarding
+    ) throws IncorrectConfigException, IOException {
+        for (OnboardingConfig.EmrysUser user : onboarding.getUsers()) {
+            configureUser(user.userName(), ROLE_NAME, warehouse);
+        }
+    }
+
+    private HttpResponse configureUser(
         String principalName,
         String roleName,
         String catalogName
     ) throws IncorrectConfigException, IOException {
+        logger.info(
+            "Configuring Polaris user '{}' for catalog '{}'",
+            principalName,
+            catalogName);
         PrincipalWithCredentials principal         = configurer.configureUser(accessToken, principalName);
         String                   principalRoleName = roleName + "Principal";
         logger.info(
@@ -91,8 +100,9 @@ public class ConfigureUserMain {
             logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
         }
         if (isFailure(permissions.associateRoles(catalogName, principalRoleName, roleName))) {
-            logger.warn("Admin {} failed to associate role {} with principale role {} in catalog {}",
-                        adminClientId, roleName, principalRoleName, catalogName);
+            logger.warn(
+                "Admin {} failed to associate role {} with principale role {} in catalog {}",
+                adminClientId, roleName, principalRoleName, catalogName);
         }
 
         HttpResponse response = permissions.associatePrincipalRoles(principalName, principalRoleName);
@@ -110,6 +120,10 @@ public class ConfigureUserMain {
         String catalogName,
         String roleName
     ) throws IOException, IncorrectConfigException {
+        logger.info(
+            "Configuring Polaris  catalog '{}' and role '{}'",
+            catalogName,
+            ROLE_NAME);
         permissions.deleteRoleIfExists(roleName, catalogName);
         List<HttpResponse> results  = new ArrayList<>();
         HttpResponse       response = permissions.createCatalogRole(catalogName, roleName);
@@ -128,11 +142,12 @@ public class ConfigureUserMain {
         for (CatalogPrivilege privilege : catalogPrivileges) {
             HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
             if (isFailure(result)) {
-                logger.error("Admin '{}' ould not grant role {} the privilege {} on  catalog {}",
-                             adminClientId,
-                             roleName,
-                             privilege,
-                             catalogName);
+                logger.error(
+                    "Admin '{}' ould not grant role {} the privilege {} on  catalog {}",
+                    adminClientId,
+                    roleName,
+                    privilege,
+                    catalogName);
             }
             results.add(result);
         }
