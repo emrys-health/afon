@@ -59,13 +59,13 @@ public class UserOnboarderMain {
         }
     }
 
-    private void configureKeyCloak(String jupyterDomain) throws IOException {
+    public void configureKeyCloak(String jupyterDomain) throws IOException {
         log.info("CONFIGURING KEYCLOAK");
         kcAdmin.registerBrowser(properties, jupyterDomain);
         String adminToken = kcAdmin.adminToken();
         kcAdmin.createRealm(adminToken, KEYCLOAK_REALM);
         for (EmrysUser user : onboardingConfig.getUsers()) {
-            kcAdmin.createUser(adminToken, KEYCLOAK_REALM, user.userName(), user.password(), user.email());
+            kcAdmin.createUser(adminToken, KEYCLOAK_REALM, user);
             kcAdmin.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.userName(), user.password());
         }
     }

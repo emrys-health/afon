@@ -4,20 +4,20 @@ import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.config.AfonPropertiesLoader
+import health.emrys.afon.infra.InfraUtils
+import health.emrys.afon.infra.onboarding.UserOnboarderMain
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.comms.PolarisConfigurer
 import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
+import health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM
+import health.emrys.afon.security.keycloak.{KeyCloakAdmin, KeyCloakConfig, OnboardingConfig}
+import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser
 import health.emrys.afon.trino.SmokeTest
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
-import health.emrys.afon.acceptance.AcceptanceTestConfig
-import health.emrys.afon.infra.onboarding.UserOnboarderMain
-import health.emrys.afon.security.keycloak.OnboardingConfig
-import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser
-import org.scalatest.GivenWhenThen
-import uk.co.odinconsultants.documentation_utils.SpecPretifier
+
 import java.util
 
 abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
@@ -130,19 +130,33 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     }
   }
 
-  val User = new EmrysUser("user", "email@test.com", "slug", "password")
-
-  val onboardingConfig = new OnboardingConfig() {
-    override def getUsers: util.List[EmrysUser] = util.List.of(User)
-  }
-
   "Polaris and KeyCloak" should {
-    "talk to each other" in {
-      Given("A KeyCloak instance")
-      val onboarding = new UserOnboarderMain(onboardingConfig, AcceptanceTestConfig.instance.getProperties)
+    val UserName      = "userX"
+    val UserPassword  = "password"
+    val properties    = AcceptanceTestConfig.instance.getProperties
+    val User          = new EmrysUser(UserName, "email@test.com", "slug", UserPassword, "first", "second")
+
+    val onboardingConfig = new OnboardingConfig() {
+      override def getUsers: util.List[EmrysUser] = util.List.of(User)
+    }
+    "agree on the token" in {
+      Given("A KeyCloak and Polaris instance")
+      assert(ContainerHelper.instance.startKeyCloak(properties) != null)
+      assert(ContainerHelper.instance.startPolaris(properties) != null)
+
       When(s"we onboard a user '$User' for catalog ${config.warehouseName()}'")
+      val onboarding = new UserOnboarderMain(onboardingConfig, properties)
       onboarding.onboardAll(config.warehouseName())
-      Then("there are no problems")
+      onboarding.configureKeyCloak("jupyter.com")
+
+      val kcAdmin = new KeyCloakAdmin("localhost", UserName, UserPassword)
+      val token = kcAdmin.getToken(KEYCLOAK_REALM)
+
+      val uriGet = tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
+      val polarisClient = AcceptanceTestConfig.instance.polarisClientFor(UserName, UserPassword)
+      Then(s"user '$UserName' can see the table when they call Polaris at $uriGet'")
+      val response = polarisClient.getCall(uriGet, polarisClient.getAccessToken())
+      assert(!InfraUtils.isFailure(response))
     }
   }
 

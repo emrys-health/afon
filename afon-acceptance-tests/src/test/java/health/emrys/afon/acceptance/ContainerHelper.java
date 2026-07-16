@@ -82,7 +82,7 @@ public class ContainerHelper {
     private ContainerHelper() {
     }
 
-    public synchronized void startKeyCloak(Properties properties) {
+    public synchronized GenericContainer<?> startKeyCloak(Properties properties) {
         if (keyCloak == null) {
             keyCloak = new GenericContainer<>(KEYCLOAK_IMAGE)
                 .withNetwork(network)
@@ -119,6 +119,7 @@ public class ContainerHelper {
                     POLARIS_ID.getValueFrom(properties),
                     POLARIS_SECRET.getValueFrom(properties));
         }
+        return keyCloak;
     }
 
     public synchronized void startSparkConnect(Properties properties) {
@@ -149,7 +150,7 @@ public class ContainerHelper {
         }
     }
 
-    public synchronized void startPolaris(Properties properties) {
+    public synchronized GenericContainer<?> startPolaris(Properties properties) {
         if (polaris == null) {
             String googleCreds   = GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties);
             String polarisId     = POLARIS_ID.getValueFrom(properties);
@@ -189,6 +190,7 @@ public class ContainerHelper {
             polaris.start();
             polaris.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
         }
+        return polaris;
     }
 
     public synchronized void startTrino(Properties properties) {

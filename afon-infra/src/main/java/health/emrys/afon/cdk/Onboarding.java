@@ -16,8 +16,8 @@ public class Onboarding implements OnboardingConfig {
         // Error = Could not create KeyCloak user 'phil' in realm 'polaris': HTTP 409 but no user with that
         // username exists. The email 'phil.henry@emrys.health' is most likely already held by another user
         // (realm duplicateEmailsAllowed=false).
-        new EmrysUser("phil", "phil.henryX@emrys.health", "phil-henry", "s3cr3t"),
-        new EmrysUser("will", "will@emrys.health", "will", "s3cr3t"));
+        new EmrysUser("phil", "phil.henryX@emrys.health", "phil-henry", "s3cr3t", "phillip", "henry"),
+        new EmrysUser("will", "will@emrys.health", "will", "s3cr3t", "william", "browne"));
 
 
     public List<EmrysUser> getUsers() {
