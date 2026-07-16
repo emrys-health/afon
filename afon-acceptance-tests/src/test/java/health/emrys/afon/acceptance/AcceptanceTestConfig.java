@@ -43,14 +43,10 @@ public class AcceptanceTestConfig {
         this.adminClientSecret = ***REMOVED***
         this.properties        = properties;
         startContainers(properties);
-        this.polarisAdminClient         = clientFactory.getPolarisClient(
-            POLARIS_ENDPOINT.getValueFrom(properties),
-            adminClientId,
-            adminClientSecret,
-            ContainerHelper.KEYCLOAK_HOSTNAME);
-        this.polarisClient              = clientFactory.getPolarisClient(properties);
-        this.awsCloudConfigForPolaris   = new AwsCloudConfigForPolaris(properties);
-        this.awsTrino                   = new AwsCloudConfigForPolaris(properties) {
+        this.polarisAdminClient       = polarisClientFor(adminClientId, adminClientSecret);
+        this.polarisClient            = clientFactory.getPolarisClient(properties);
+        this.awsCloudConfigForPolaris = new AwsCloudConfigForPolaris(properties);
+        this.awsTrino                 = new AwsCloudConfigForPolaris(properties) {
             @Override
             public String getBucketUri() {
                 return bucketToUrl(AWS_S3_BUCKET_NAME_TRINO.getValueFrom(properties));
@@ -97,6 +93,14 @@ public class AcceptanceTestConfig {
                     AZURE_STORAGE_ACCOUNT.getValueFrom(properties));
             }
         };
+    }
+
+    public AfonPolarisClient polarisClientFor(String clientId, String clientSecret) {
+        return clientFactory.getPolarisClient(
+            POLARIS_ENDPOINT.getValueFrom(this.properties),
+            clientId,
+            clientSecret,
+            ContainerHelper.KEYCLOAK_HOSTNAME);
     }
 
     private static void startContainers(Properties properties) {

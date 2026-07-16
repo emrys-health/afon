@@ -69,7 +69,7 @@ public class KeyCloakAdmin {
      * is left untouched.
      */
     public void registerPolarisUser(String user, String userPassword) {
-        registerPolarisUser(user, userPassword, null);
+        registerPolarisUser(OnboardingConfig.createUser(user, userPassword));
     }
 
     /**
@@ -77,16 +77,16 @@ public class KeyCloakAdmin {
      * A verified email is required for logins that go through oauth2-proxy, which rejects id_tokens
      * whose email is unverified. Pass {@code null}/blank to leave the email unset.
      */
-    public void registerPolarisUser(String user, String userPassword, String email) {
+    public void registerPolarisUser(OnboardingConfig.EmrysUser emrysUser) {
         try {
             logger.info("Running as {}/{}", adminUser, adminPassword);
             String adminToken = adminToken();
             createRealm(adminToken, KEYCLOAK_REALM);
-            createConfidentialClient(adminToken, KEYCLOAK_REALM, user, userPassword);
-            createUser(adminToken, KEYCLOAK_REALM, user, userPassword, email);
+            createConfidentialClient(adminToken, KEYCLOAK_REALM, emrysUser.userName(), emrysUser.password());
+            createUser(adminToken, KEYCLOAK_REALM, emrysUser);
             logger.info(
                 "KeyCloak realm '{}' provisioned with client/user '{}' (email '{}')",
-                KEYCLOAK_REALM, user, email);
+                KEYCLOAK_REALM, emrysUser.userName(), emrysUser.email());
         } catch (IOException e) {
             throw new RuntimeException("Failed to provision KeyCloak for Polaris", e);
         }
@@ -128,7 +128,11 @@ public class KeyCloakAdmin {
      * NOTE: this is the 'master' realm so only the admin user can call this.
      */
     public String adminToken() throws IOException {
-        String uri = format("%s/realms/master/protocol/openid-connect/token", baseUrl);
+        return getToken("master");
+    }
+
+    public String getToken(String realm) throws IOException {
+        String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, realm);
         String body = form(Map.of(
             "grant_type", "password",
             "client_id", "admin-cli",
@@ -415,37 +419,41 @@ public class KeyCloakAdmin {
 
     public void createUser(String adminToken,
                            String realm,
-                           String username,
-                           String password,
-                           String email
+                           OnboardingConfig.EmrysUser emrysUser
     ) throws IOException {
         Map<String, Object> user = new HashMap<>();
-        user.put("username", username);
+        user.put("username", emrysUser.userName());
         user.put("enabled", true);
         // emailVerified is always true because oauth2-proxy rejects logins whose id_token email is
         // unverified; there is no SMTP verification flow behind this Keycloak.
         user.put("emailVerified", true);
-        if (email != null && !email.isBlank()) {
-            user.put("email", email);
+        if (emrysUser.email() != null && !emrysUser.email().isBlank()) {
+            user.put("email", emrysUser.email());
+        }
+        if (emrysUser.firstName() != null && !emrysUser.firstName().isBlank()) {
+            user.put("firstName", emrysUser.firstName());
+        }
+        if (emrysUser.lastName() != null && !emrysUser.lastName().isBlank()) {
+            user.put("lastName", emrysUser.lastName());
         }
         user.put(
             "credentials", List.of(Map.of(
                 "type", "password",
-                "value", password,
+                "value", emrysUser.password(),
                 "temporary", false
             )));
         String json = MAPPER.writeValueAsString(user);
-        int    code = postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + username).getCode();
+        int    code = postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + emrysUser.userName()).getCode();
         // A 409 on POST /users is ambiguous: it means the username already exists (genuinely
         // idempotent - fine) OR that some other unique field collides, typically a duplicate email
         // when the realm has duplicateEmailsAllowed=false. In the latter case the user is NOT created,
         // so silently treating the 409 as success (as postJson does) leaves logins failing with
         // user_not_found. Confirm the user really exists; if not, fail loudly with the likely cause.
-        if (code == HttpStatus.SC_CONFLICT && !userExists(adminToken, realm, username)) {
+        if (code == HttpStatus.SC_CONFLICT && !userExists(adminToken, realm, emrysUser.userName())) {
             throw new IOException(format(
                 "Could not create KeyCloak user '%s' in realm '%s': HTTP 409 but no user with that "
                 + "username exists. The email '%s' is most likely already held by another user "
-                + "(realm duplicateEmailsAllowed=false).", username, realm, email));
+                + "(realm duplicateEmailsAllowed=false).", emrysUser.userName(), realm, emrysUser.email()));
         }
     }
 
@@ -540,17 +548,18 @@ public class KeyCloakAdmin {
             String password = args[1];
             String email    = args[2];
             logger.info("user ID = {}, password = {}, email = {}", userID, password, email);
-            admin.registerPolarisUser(
+            admin.registerPolarisUser(OnboardingConfig.createUser(
                 userID,
                 password,
                 email
-            );
+            ));
         } else {
             logger.info("Using default user from afon.properties");
-            admin.registerPolarisUser(
+            admin.registerPolarisUser(OnboardingConfig.createUser(
                 AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
                 AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
-                AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, ""));
+                AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, ""))
+            );
 
             // Provision the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
             // "sign in" on the OAuth splash yields KeyCloak's "Client not found".
