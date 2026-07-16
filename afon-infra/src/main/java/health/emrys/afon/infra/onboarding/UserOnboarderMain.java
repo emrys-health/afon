@@ -54,7 +54,7 @@ public class UserOnboarderMain {
     public void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
         log.info("CONFIGURING POLARIS");
         ConfigureUserMain polarisConfiguration = new ConfigureUserMain(properties);
-        polarisConfiguration.configurePrivilegesFor(warehouse, ROLE_NAME);
+        polarisConfiguration.configurePrivilegesFor(warehouse);
         polarisConfiguration.configureAll(warehouse, onboardingConfig);
     }
 
