@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 
+import static health.emrys.afon.polaris.comms.ConfigureUserMain.isFailure;
 import static java.lang.String.format;
 
 public class PolarisConfigurer {
@@ -126,17 +127,22 @@ public class PolarisConfigurer {
         String      uri  = principalsURI();
         PolarisDTOs dtos = new PolarisDTOs(new JsonMaker());
         String      json = dtos.principalCreation(principalName);
-        deletePrincipalIfPresent(accessToken, principalName);
+        if (isFailure(deletePrincipalIfPresent(accessToken, principalName))) {
+            log.warn("Could not delete principal {}", principalName);
+        }
+        log.info(format("Creating user %s", principalName));
         try (ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
              InputStream is = response.getEntity().getContent()) {
             return dtos.fromJson(is, PrincipalWithCredentials.class);
         }
     }
 
-    private void deletePrincipalIfPresent(String accessToken, String principalName) throws IOException {
+    private ClassicHttpResponse deletePrincipalIfPresent(String accessToken, String principalName) throws IOException {
+        log.info("Deleting principal {}", principalName);
         String uri = principalsURI() + "/" + principalName;
         try (ClassicHttpResponse delete = client.delete(uri, accessToken)) {
             log.info("Deleting {} resulted in HTTP code {}", principalName, delete.getCode());
+            return delete;
         }
     }
 }
