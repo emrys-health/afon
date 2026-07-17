@@ -209,20 +209,16 @@ public class StepActions {
         }
     }
 
-    public void startCloud(Path jsonDirectory) throws ManagedProcessException {
-        startCloud(jsonDirectory, List.of());
-    }
-
     public void startCloud(Path jsonDirectory, List<String> bootstrapTargets) throws ManagedProcessException {
         run("tofu", jsonDirectory, "init");
         if (!bootstrapTargets.isEmpty()) {
-            List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve"));
+            List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=20"));
             phaseOne.addAll(bootstrapTargets);
             log.info("Bootstrapping EKS before the full apply: {}", phaseOne);
             run("tofu", jsonDirectory, phaseOne.toArray(new String[0]));
         }
         OutputStream suppressedStdOut = OutputStream.nullOutputStream();
-        run("tofu", jsonDirectory, suppressedStdOut, "apply", "--auto-approve");
+        run("tofu", jsonDirectory, suppressedStdOut, "apply", "--auto-approve", "-parallelism=20");
     }
 
     /**
