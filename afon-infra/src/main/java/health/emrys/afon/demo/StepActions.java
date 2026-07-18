@@ -102,7 +102,19 @@ public class StepActions {
         try {
             log.info("Stopping {} if it's running already...", path);
             run("tofu", path, "init");
-            run("tofu", path, "destroy", "--auto-approve");
+            if (run("tofu", path, "destroy", "--auto-approve") != 0) {
+                String msg = String.format("""
+                Failed to destroy %s. Your environment may be in an unstable state.
+                It may be that something irrelevant (like a Helm chart) is blocking the destroy.
+                If so, remove it with something like:
+                    tofu state rm 'helm_release.prometheusRelease'
+                and tofu destroy again.
+                
+                If you're sure nothing in the environment is still running, delete directory %s
+                """, path, path);
+                log.error(msg);
+                throw new RuntimeException(msg);
+            }
         } catch (Exception e) {
             log.error("Failed to call tofu destroy in " + path, e);
         }
@@ -258,11 +270,11 @@ public class StepActions {
         return targets;
     }
 
-    public void run(String command, Path path, String... commands) throws ManagedProcessException {
-        run(command, path, System.out, commands);
+    public int run(String command, Path path, String... commands) throws ManagedProcessException {
+        return run(command, path, System.out, commands);
     }
 
-    public void run(String command, Path path, OutputStream stdOut, String... commands) throws ManagedProcessException {
+    public int run(String command, Path path, OutputStream stdOut, String... commands) throws ManagedProcessException {
         ManagedProcessBuilder pb = new ManagedProcessBuilder(command);
         for (String cmd : commands) {
             pb.addArgument(cmd);
@@ -279,6 +291,7 @@ public class StepActions {
         p.isAlive();
         p.waitForExit();
         log.info("Command {} finished with value {}", command, p.exitValue());
+        return p.exitValue();
     }
 
     public void deleteTerraformStateFiles(SupportedCloudsEnum id) throws IOException {
