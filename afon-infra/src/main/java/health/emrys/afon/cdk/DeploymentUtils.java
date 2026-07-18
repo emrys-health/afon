@@ -76,6 +76,13 @@ public class DeploymentUtils {
         }
         Deployment.Builder builder = Deployment.Builder.create(scope, name + "Deployment")
                                  .dependsOn(eksDependOn)
+                                 // Don't block the apply waiting for pods to become Ready. These are
+                                 // app workloads reached at runtime via ALB/ingress — nothing downstream
+                                 // in Terraform depends on their readiness, so waiting only burns wall-clock
+                                 // under the 15-minute EKS auth token and risks the token expiring
+                                 // mid-rollout (which is how oauth2-proxy failed). Trade-off: a genuinely
+                                 // broken rollout won't fail the apply — surface it via monitoring/kubectl.
+                                 .waitForRollout(false)
                                  .metadata(DeploymentMetadata
                                                .builder()
                                                .name(name + "-deployment")
