@@ -101,12 +101,15 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
         this.addOverride(
             "terraform.required_providers.helm", Map.of(
                 "source", "hashicorp/helm",
-                "version", "3.1.1"   // 👈 Pin exact version
+                "version", "3.2.0"   // 👈 Pin exact version
                                                        ));
         this.addOverride(
             "terraform.required_providers.kubernetes", Map.of(
                 "source", "hashicorp/kubernetes",
-                "version", "3.0.1"   // 👈 Pin exact version
+                // 3.2.1 fixes "Unexpected Identity Change" errors when a resource takes
+                // extended time to become ready (as happened when an EKS token expired
+                // mid-rollout of oauth2-proxy). Do not downgrade below 3.2.1.
+                "version", "3.2.1"   // 👈 Pin exact version
                                                              ));
 
         csiSecretsDriver(dependables);

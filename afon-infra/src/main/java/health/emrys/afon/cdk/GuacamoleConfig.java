@@ -240,6 +240,10 @@ public class GuacamoleConfig {
 
         Deployment.Builder.create(scope, "guacamoleDeployment")
                 .dependsOn(deps)
+                // See DeploymentUtils.deploy: don't burn the 15-minute EKS token window waiting for
+                // pod readiness on an app workload nothing downstream depends on. Trade-off: a broken
+                // rollout won't fail the apply — surface it via monitoring/kubectl.
+                .waitForRollout(false)
                 .metadata(DeploymentMetadata.builder()
                                             .name("guacamole-deployment")
                                             .labels(LABELS)
@@ -344,6 +348,10 @@ public class GuacamoleConfig {
 
         Deployment.Builder.create(scope, "guacamoleDeployment")
                 .dependsOn(deployDeps)
+                // See DeploymentUtils.deploy: don't burn the 15-minute EKS token window waiting for
+                // pod readiness on an app workload nothing downstream depends on. Trade-off: a broken
+                // rollout won't fail the apply — surface it via monitoring/kubectl.
+                .waitForRollout(false)
                 .metadata(DeploymentMetadata.builder()
                                             .name("guacamole-deployment")
                                             .labels(LABELS)
