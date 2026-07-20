@@ -233,11 +233,12 @@ public class StepOperations {
                     log.error("""
                                   An error like:
                                   
-                                  PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
+                                  PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException:
+                                  unable to find valid certification path to requested target
                                   
-                                  can be because the certificates have not yet ready.
-                                  If this is the case, try re-running this step. 
-                                  I've seen second attemps work out of the box.
+                                  can be because the certificates are not yet ready, it seems.
+                                  If this is the case, try re-running this step.
+                                  I've seen second attempts work without any other intervention.
                                   """, e);
                     throw e;
                 }
