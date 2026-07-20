@@ -212,6 +212,12 @@ public class ContainerHelper {
                         Transferable.of(trinoLocalConfig(properties, catalog).getBytes()),
                         containerDestination);
                 }
+                trino.copyFileToContainer(
+                    Transferable.of("""
+                        io.trino=DEBUG
+                        """.getBytes()),
+                        "/etc/trino/log.properties"
+                );
                 logger.info("Started Trino with container ID: {}", trino.getContainerId());
             } catch (Exception e) {
                 throw new RuntimeException("Cannot start Trino container", e);
