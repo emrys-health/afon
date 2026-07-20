@@ -26,6 +26,14 @@ public class PrometheusClusterDeploy extends TrinoClusterDeployment {
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
         dependablesAndLoadBalancers.addAll(loadBalancers);
         dependablesAndLoadBalancers.addAll(cloudProvider.getDependables());
+        // kube-prometheus-stack, Loki and Promtail all create Services, and the AWS LB
+        // Controller's mservice.elbv2.k8s.aws webhook (failurePolicy=Fail) intercepts every
+        // Service creation, not just type: LoadBalancer. Wait on the controller's Helm release
+        // — installed atomically, so Helm blocks until its pods are Ready — otherwise the
+        // webhook Service still has zero endpoints and the release fails with "no endpoints
+        // available for service aws-load-balancer-webhook-service" (11 of them, one per
+        // Service in the chart). Same reasoning as Jupyter's and Keycloak's Services.
+        dependablesAndLoadBalancers.addAll(cloudProvider.getServiceDependables());
         deployPrometheus(dependablesAndLoadBalancers, properties);
         Release loki = deployLoki(dependablesAndLoadBalancers, properties);
         deployPromtail(dependablesAndLoadBalancers, loki, properties);
