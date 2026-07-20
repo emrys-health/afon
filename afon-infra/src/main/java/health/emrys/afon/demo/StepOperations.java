@@ -223,10 +223,25 @@ public class StepOperations {
         return new Step(
             "all_catalogs_in_" + machineNameFrom(domainName),
             "configure all the the catalogs in Polaris at " + domainName,
-            () -> actions.executeMainOf(
-                PurgeAndPopulatePolaris.class,
-                new String[]{domainName},
-                NO_ENV_VARIABLES));
+            () -> {
+                try {
+                    actions.executeMainOf(
+                        PurgeAndPopulatePolaris.class,
+                        new String[]{domainName},
+                        NO_ENV_VARIABLES);
+                } catch (Exception e) {
+                    log.error("""
+                                  An error like:
+                                  
+                                  PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
+                                  
+                                  can be because the certificates have not yet ready.
+                                  If this is the case, try re-running this step. 
+                                  I've seen second attemps work out of the box.
+                                  """, e);
+                    throw e;
+                }
+            });
     }
 
     public Step waitForAwsPolaris() {
