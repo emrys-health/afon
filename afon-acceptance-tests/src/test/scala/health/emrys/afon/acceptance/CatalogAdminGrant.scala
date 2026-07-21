@@ -10,6 +10,7 @@ import org.scalatest.GivenWhenThen
 abstract class PolarisFixture extends Function0[Any] {
 
   val REST_CODE_RESOURCE_CREATED = 201
+  val REST_CODE_CONFLICT          = 409
 
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
   val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
@@ -59,9 +60,10 @@ class CatalogRoles(test: GivenWhenThen,
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
 
     if (noisy) When(s"we create a catalog role name called '$catalogRoleName'")
-    assert(permissions
+    val createCode = permissions
       .createCatalogRole(warehouseName, catalogRoleName)
-      .getCode == REST_CODE_RESOURCE_CREATED)
+      .getCode
+    assert(createCode == REST_CODE_RESOURCE_CREATED || createCode == REST_CODE_CONFLICT)
 
     val privileges = Set(TABLE_READ_DATA, TABLE_WRITE_DATA, NAMESPACE_CREATE, TABLE_CREATE, NAMESPACE_FULL_METADATA)
     if (noisy) When(s"we add to the catalog role '$catalogRoleName' permissions:\n${privileges.mkString("\n")}")
