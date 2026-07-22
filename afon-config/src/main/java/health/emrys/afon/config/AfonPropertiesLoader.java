@@ -4,15 +4,17 @@ import org.slf4j.Logger;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class AfonPropertiesLoader {
 
-    private static final Logger logger = getLogger(AfonPropertiesLoader.class);
+    private static final Logger       logger         = getLogger(AfonPropertiesLoader.class);
     private static final List<String> PROPERTY_FILES = List.of(PROJECT_PROPERTIES_FILE, ENV_PROPERTIES_FILE);
 
     static {
@@ -24,7 +26,8 @@ public class AfonPropertiesLoader {
         }
     }
 
-    private final Properties properties;
+    private final Properties  properties;
+    private final Set<String> confidentialProperties = new HashSet<>();
 
     public static Properties add(String credentials, Properties properties) {
         String[] creds = credentials.split(":");
@@ -63,14 +66,17 @@ public class AfonPropertiesLoader {
 
     private void readProperties(String prepend) throws IOException {
         for (String file : PROPERTY_FILES) {
-            Properties props = new Properties();
-            String     filename  = prepend + file;
+            Properties props    = new Properties();
+            String     filename = prepend + file;
             logger.info("Reading properties file {}", filename);
             props.load(new FileInputStream(filename));
             logger.info("{} has {} items", filename, props.size());
             properties.putAll(props);
+            if (file == ENV_PROPERTIES_FILE) {
+                confidentialProperties.addAll(props.keySet().stream().map(x -> x.toString()).toList());
+            }
         }
-        for (String property: AfonProperty.getAllProperties()) {
+        for (String property : AfonProperty.getAllProperties()) {
             if (System.getProperty(property) != null) {
                 logger.info("Using the environment variables to define property '{}'", property);
                 properties.put(property, System.getProperty(property));
@@ -78,6 +84,11 @@ public class AfonPropertiesLoader {
         }
     }
 
+    public Properties getConfidentialProperties() {
+        Properties copy = new Properties();
+        confidentialProperties.stream().forEach(prop -> copy.put(prop, properties.getProperty(prop)));
+        return copy;
+    }
 
     public Properties getProperties() {
         Properties copy = new Properties();
