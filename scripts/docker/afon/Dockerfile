@@ -1,5 +1,7 @@
 FROM ubuntu:22.04
 
+ARG TARGETARCH
+RUN echo "Building for $TARGETARCH"
 ARG TOFU_VERSION=1.11.6
 ARG AWS_CLI_VERSION=2.30.1
 ARG KUBECTL_VERSION=v1.32.1
@@ -22,7 +24,8 @@ RUN apt-get update && apt-get install -y \
     less \
     tar \
     ca-certificates \
-    gnupg
+    gnupg \
+    python-is-python3
 
 RUN curl -L https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse \
     -o openjdk.tar.gz \
@@ -30,7 +33,7 @@ RUN curl -L https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/x
  && tar -xzf openjdk.tar.gz -C $JAVA_HOME --strip-components=1 \
  && rm openjdk.tar.gz
 
-RUN curl -L https://downloads.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
+RUN curl -L https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
     -o maven.tar.gz \
  && mkdir -p $MAVEN_HOME \
  && tar -xzf maven.tar.gz -C $MAVEN_HOME --strip-components=1 \
@@ -70,7 +73,7 @@ RUN curl -L https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
 # Add Microsoft signing key + repo and install exact version
 RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
     | install -o root -g root -m 644 /dev/stdin /usr/share/keyrings/microsoft.gpg \
- && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ jammy main" \
+ && echo "deb [arch=${TARGETARCH} signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ jammy main" \
     > /etc/apt/sources.list.d/azure-cli.list \
  && apt-get update \
  && apt-get install -y azure-cli=${AZ_CLI_VERSION}-1~jammy
