@@ -13,14 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PolarisConfigTest {
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisConfigTest.class);
 
     @Test
     public void testConfigScript() {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
         String               script     = PolarisConfig.getProviderCredentials(properties, "test");
-        logger.info("\n" + script);
         PolarisConstants.POLARIS_PROPERTIES
             .forEach(x -> {
                 String propertyName = x.getPropertyName();
