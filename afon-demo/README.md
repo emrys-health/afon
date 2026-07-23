@@ -27,7 +27,7 @@ Doing so will generate the client ID and secret you then put in `env.properties`
 
 # Deployment
 
-Note 1: Run everything in the `afon-infra` directory.
+Note 1: Run everything in the `afon-demo` directory.
 
 Note 2: If you really foul things up, you'll leave the environment in an unstable state.
 Consult the `*Nuke.java` files to destroy your environment totally. 
