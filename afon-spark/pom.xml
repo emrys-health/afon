@@ -53,5 +53,9 @@
             <artifactId>bundle</artifactId>
             <version>2.34.6</version>
         </dependency>
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-storage</artifactId>
+        </dependency>
     </dependencies>
 </project>
