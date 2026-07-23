@@ -52,14 +52,14 @@
         <module>afon-config</module>
         <module>afon-iceberg</module>
         <module>afon-infra</module>
-        <module>afon-demo</module>
         <module>afon-polaris</module>
         <module>afon-security</module>
         <module>afon-spark</module>
         <module>afon-spark-connect</module>
         <module>afon-snowflake</module>
         <module>afon-trino</module>
-        <module>afon-acceptance-tests</module>
+        <module>afon-acceptance</module>
+        <module>afon-demo</module>
         <module>afon-samples</module>
     </modules>
 
