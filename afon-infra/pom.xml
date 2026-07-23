@@ -6,17 +6,16 @@
 
     <parent>
         <groupId>health.emrys</groupId>
-        <artifactId>Afon</artifactId>
-        <version>0.1</version>
+        <artifactId>afon</artifactId>
+        <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>${project.parent.groupId}</groupId>
     <artifactId>afon-infra</artifactId>
-    <version>${parent.version}</version>
 
     <properties>
         <aws.java.sdk.version>2.34.6</aws.java.sdk.version>
         <exec.args></exec.args>
+        <exec.mainClass></exec.mainClass>
     </properties>
 
     <dependencyManagement>
@@ -33,9 +32,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>${project.parent.groupId}</groupId>
+            <groupId>${project.groupId}</groupId>
             <artifactId>afon-spark</artifactId>
-            <version>${parent.version}</version>
+            <version>${project.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
@@ -56,14 +55,19 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>${project.parent.groupId}</groupId>
+            <groupId>${project.groupId}</groupId>
             <artifactId>afon-polaris</artifactId>
-            <version>${parent.version}</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>${project.parent.groupId}</groupId>
-            <artifactId>afon-security</artifactId>
-            <version>${parent.version}</version>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>afon-snowflake</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>afon-trino</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.kubernetes</groupId>
@@ -124,18 +128,6 @@
             <groupId>ch.vorburger.exec</groupId>
             <artifactId>exec</artifactId>
             <version>3.3.2</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>${parent.groupId}</groupId>
-            <artifactId>afon-snowflake</artifactId>
-            <version>${parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>health.emrys</groupId>
-            <artifactId>afon-trino</artifactId>
-            <version>0.1</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>io.github.classgraph</groupId>
@@ -155,7 +147,6 @@
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
-                        <version>3.1.0</version>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
                             <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
