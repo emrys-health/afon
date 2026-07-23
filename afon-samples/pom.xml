@@ -6,29 +6,22 @@
 
     <parent>
         <groupId>health.emrys</groupId>
-        <artifactId>Afon</artifactId>
-        <version>0.1</version>
+        <artifactId>afon</artifactId>
+        <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <version>${project.parent.version}</version>
     <artifactId>afon-samples</artifactId>
 
-    <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-    </properties>
-
     <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>afon-infra</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-spark-runtime-${spark.compat.version}_${scala.compat.version}</artifactId>
             <version>${iceberg.version}</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>health.emrys</groupId>
-            <artifactId>afon-infra</artifactId>
-            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
