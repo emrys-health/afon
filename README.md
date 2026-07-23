@@ -218,10 +218,10 @@ mvn -DPOLARIS_ENDPOINT=emryspolarisazure.click compile \
 
 ### Run acceptance tests
 
-The acceptance tests in `afon-acceptance-tests` verify that cross-cloud access works correctly — including that access to "forbidden" buckets is properly denied.
+The acceptance tests in `afon-acceptance` verify that cross-cloud access works correctly — including that access to "forbidden" buckets is properly denied.
 
 ```shell
-cd afon-acceptance-tests
+cd afon-acceptance
 mvn test
 ```
 
