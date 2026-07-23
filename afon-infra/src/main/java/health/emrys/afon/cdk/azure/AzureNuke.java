@@ -15,6 +15,11 @@ public class AzureNuke {
     private final String resourceGroup;
     private final String subscription;
 
+    public static void main(String[] args) {
+        var app = new AzureNuke();
+        System.out.println("\u001B[31m" + app.cleanUpHint() + "\u001B[0m");
+    }
+
     public AzureNuke() {
         this(new AfonPropertiesLoader().getProperties());
     }

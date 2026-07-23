@@ -47,7 +47,7 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                         
                         For example:
                         
-                        `mvn compile -Pdemo -Dexec.mainClass="%s"  -Dexec.args="%s"  exec:exec`
+                        `mvn exec:exec -Pexec -Dexec.mainClass="%s"  -Dexec.args="%s"`
                         """,
                         String.join(("\n1. "), stepArray),
                         clazz.getCanonicalName(),

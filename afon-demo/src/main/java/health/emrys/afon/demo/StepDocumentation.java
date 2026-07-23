@@ -38,8 +38,8 @@ public class StepDocumentation extends StepActions {
                 format("-D%s=%s ", x.getKey(), x.getValue())
                 ).collect(Collectors.joining());
         }
-        return format("%s compile -Dexec.mainClass=%s %s exec:%s",
-                      overridesArgLine, clazz.getName(), argLine, command);
+        return format("%s exec:%s -Dexec.mainClass=%s %s",
+                      overridesArgLine, command, clazz.getName(), argLine);
     }
 
     public StepDocumentation(OutputStream out) {
