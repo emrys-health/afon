@@ -6,64 +6,23 @@
 
     <parent>
         <groupId>health.emrys</groupId>
-        <artifactId>Afon</artifactId>
-        <version>0.1</version>
+        <artifactId>afon</artifactId>
+        <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>health.emrys</groupId>
     <artifactId>afon-spark-connect</artifactId>
-    <version>${parent.version}</version>
-
-    <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spark.version>4.0.1</spark.version>
-        <scala.compat.version>2.13</scala.compat.version>
-        <scala.version>2.13.18</scala.version>
-    </properties>
 
     <dependencies>
         <dependency>
-            <groupId>org.scala-lang</groupId>
-            <artifactId>scala-library</artifactId>
-            <version>${scala.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.scala-lang.modules</groupId>
-            <artifactId>scala-collection-compat_${scala.compat.version}</artifactId>
-            <version>2.10.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.compat.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-hive_${scala.compat.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-catalyst_${scala.compat.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>compile</scope>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>afon-spark</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-connect_${scala.compat.version}</artifactId>
             <version>${spark.version}</version>
         </dependency>
-        <dependency>
-            <groupId>health.emrys</groupId>
-            <artifactId>afon-spark</artifactId>
-            <version>0.1</version>
-            <scope>compile</scope>
-        </dependency>
     </dependencies>
-
 
 </project>
