@@ -14,8 +14,6 @@
 
     <properties>
         <aws.java.sdk.version>2.34.6</aws.java.sdk.version>
-        <exec.args></exec.args>
-        <exec.mainClass></exec.mainClass>
     </properties>
 
     <dependencyManagement>
@@ -135,26 +133,5 @@
             <version>4.8.179</version>
         </dependency>
     </dependencies>
-
-    <profiles>
-        <profile>
-            <id>demo</id>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <configuration>
-                            <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 
 </project>
