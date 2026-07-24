@@ -4,13 +4,14 @@ Afon is the core infrastructure project that deploys [Apache Polaris](https://po
 
 ---
 
-## Quickstart — How I set it up
+## Quickstart — How to set up
 
 ### Prerequisites
 
 Install the following on your machine:
 
-- **Java 17** (enforced by the Maven enforcer plugin)
+- **Git**
+- **Java 17** (enforced by the Maven build)
 - **Maven**
 - **Docker**
 - **OpenTofu** (Terraform-compatible)
@@ -25,10 +26,6 @@ Install the following on your machine:
 git clone https://github.com/emrys-health/afon-core.git
 cd afon-core
 ./afon.sh -a build -p -acceptance # builds components without running acceptance tests 
-./afon.sh -a build -p acceptance # builds components running acceptance tests 
-./afon.sh -a build -p acceptance -c aws # builds components running acceptance tests for aws
-./afon.sh -a build -p acceptance -c azure # builds components running acceptance tests for azure
-./afon.sh -a build -p acceptance -c gcp # NOTE: not working ATM
 ```
 
 ### 2. Configure properties
@@ -149,7 +146,7 @@ https://emrysjupyter.click/guacamole
 
 ---
 
-## Tutorials — How I use it effectively
+## Tutorials — How to use it effectively
 
 ### Query data across clouds with Spark
 
@@ -227,7 +224,10 @@ To configure a single catalog on a specific endpoint:
 The acceptance tests in `afon-acceptance` verify that cross-cloud access works correctly — including that access to "forbidden" buckets is properly denied.
 
 ```shell
-./afon.sh -a build -p acceptance
+./afon.sh -a build -p acceptance # builds components running acceptance tests for all cloud providers
+./afon.sh -a build -p acceptance -c aws # builds components running acceptance tests for aws
+./afon.sh -a build -p acceptance -c azure # builds components running acceptance tests for azure
+./afon.sh -a build -p acceptance -c gcp # builds components running acceptance tests for gcp
 ```
 
 Test specs include:
