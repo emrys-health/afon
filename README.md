@@ -29,12 +29,13 @@ cd afon-core
 
 ### 2. Configure properties
 
-Afon uses two properties files in the project root:
+Afon uses two types properties files in the project root:
 
 - **`afon.properties`** — non-sensitive configuration (bucket names, domain names, regions, Polaris credentials). Copy the example and fill in your cloud-specific values:
 
 ```shell
-cp afon.properties afon.properties  # or create from the template in README.md
+cp afon.properties.example afon.properties  
+cp afon-<cloud>.properties.example afon-<cloud>.properties
 ```
 
 Key properties to set:
@@ -46,18 +47,19 @@ Key properties to set:
 | `AWS_S3_BUCKET_NAME` | `emrys-afon-bucket` | Primary S3 bucket |
 | `AWS_S3_EXTERNAL_BUCKET_NAME` | `emrys-afon-bucket-2` | External S3 bucket |
 | `AWS_POLARIS_DOMAIN_NAME` | `emryspolaris.click` | Domain for AWS Polaris |
-| `GCP_BUCKET_NAME` | `emrys_afon_core` | GCS bucket |
-| `GCP_DOMAIN_NAME` | `emryspolarisgcp.click` | Domain for GCP Polaris |
 | `AZURE_BUCKET` | `afonstorage` | Azure Blob container |
 | `AZURE_STORAGE_ACCOUNT` | `afonstorageaccount` | Azure storage account |
 | `AZURE_DOMAIN_NAME` | `emryspolarisazure.click` | Domain for Azure Polaris |
+| `GCP_BUCKET_NAME` | `emrys_afon_core` | GCS bucket |
+| `GCP_DOMAIN_NAME` | `emryspolarisgcp.click` | Domain for GCP Polaris |
 | `POLARIS_ID` | `root` | Polaris client ID |
 | `POLARIS_SECRET` | `s3cr3t` | Polaris client secret |
 
-- **`env.properties`** — sensitive credentials. Copy from `env.properties.example` and fill in:
+- **`env.properties`** — sensitive credentials. Copy from `env.properties.example` and `env-<cloud>.properties.example` and fill in:
 
 ```shell
 cp env.properties.example env.properties
+cp env-<cloud>.properties.example env-<cloud>.properties
 ```
 
 Required sensitive properties:
@@ -84,12 +86,15 @@ Source your properties file, then run the cloud setup scripts:
 set -a && source afon.properties && set +a
 
 # AWS
+set -a && source afon-aws.properties && set +a
 ./scripts/aws/create.sh
 
 # Azure
+set -a && source afon-azure.properties && set +a
 ./scripts/azure/create.sh
 
 # GCP
+set -a && source afon-gcp.properties && set +a
 ./scripts/gcp/create.sh
 ```
 
@@ -107,9 +112,6 @@ You need domain names that point to each cloud's Kubernetes ingress. See [DNS Co
 ### 5. Generate infrastructure documentation
 
 ```shell
-cd afon-demo
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DocumentExternalCatalogsMain
-or from top-level
 ./afon.sh -a exec --exec-class health.emrys.afon.demo.DocumentExternalCatalogsMain 
 ```
 
@@ -122,9 +124,6 @@ cat target/aws_azure_external_catalogs.md
 ### 6. Deploy the demo
 
 ```shell
-cd afon-demo
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain
-or from top-level
 ./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployExternalCatalogsMain
 ```
 
@@ -155,9 +154,6 @@ Afon deploys Polaris as a REST catalog server. Spark connects to Polaris, which 
 **Generate PySpark code for Jupyter:**
 
 ```shell
-cd afon-demo
-mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.SparkContextConfigurationPrinter
-or from top-level
 ./afon.sh -a exec --exec-class health.emrys.afon.core.configuration.SparkContextConfigurationPrinter
 ```
 
@@ -209,9 +205,6 @@ df_joined.show()
 When a new Polaris instance starts, it has no catalogs. You can configure all catalogs at once:
 
 ```shell
-cd afon-demo
-mvn exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris -Dexec.args="emryspolaris.click"
-or
 ./afon.sh -a exec --exec-class health.emrys.afon.infra.PurgeAndPopulatePolaris \
   --exec-args "emryspolaris.click"
 ```
@@ -221,10 +214,6 @@ This creates catalogs for AWS, GCP, Azure, and their external/forbidden variants
 To configure a single catalog on a specific endpoint:
 
 ```shell
-cd afon-demo
-mvn exec:java -Dexec.mainClass=health.emrys.afon.infra.EndpointPolarisConfiguration \
-  -Dexec.args="AZURE" -DPOLARIS_ENDPOINT=emryspolarisazure.click 
-or
 ./afon.sh -a exec --exec-class health.emrys.afon.infra.EndpointPolarisConfiguration \
   --exec-args "AZURE" --exec-envs "POLARIS_ENDPOINT=emryspolarisazure.click"
 ```
@@ -256,8 +245,7 @@ Test specs include:
 The full AWS stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-cd afon-demo
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeployFullStackAwsMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployFullStackAwsMain
 ```
 
 Steps executed:
@@ -271,8 +259,7 @@ Steps executed:
 ### Deploy Polaris to GCP only
 
 ```shell
-cd afon-demo
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeployGcpPolarisMain  
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployGcpPolarisMain  
 ```
 
 Steps: `clean_gcp` → `gcp_polaris` → `waitFor_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
@@ -280,8 +267,7 @@ Steps: `clean_gcp` → `gcp_polaris` → `waitFor_emryspolarisgcp` → `all_cata
 ### Deploy Polaris to Azure only
 
 ```shell
-cd afon-demo
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeployAzurePolarisMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployAzurePolarisMain  
 ```
 
 Steps: `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
@@ -291,8 +277,7 @@ Steps: `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `all_c
 This deploys both AWS and Azure Polaris instances and configures AWS Polaris to federate to Azure Polaris for cross-cloud querying.
 
 ```shell
-cd afon-demo
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployExternalCatalogsMain  
 ```
 
 Steps: `clean_aws` → `aws_spark` → `waitFor_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
@@ -338,20 +323,19 @@ Afon can configure Snowflake to read Iceberg tables from any cloud via Polaris a
 **Read GCP data via AWS Polaris:**
 
 ```shell
-cd afon-demo
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingGcpViaAwsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeploySnowflakeReadingGcpViaAwsMain  
 ```
 
 **Read Azure data via AWS Polaris:**
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingAzureViaAwsMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeploySnowflakeReadingAzureViaAwsMain  
 ```
 
 **Read AWS data via AWS Polaris:**
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingAwsViaAwsMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeploySnowflakeReadingAwsViaAwsMain  
 ```
 
 These deploy the full AWS stack, write test data to the target cloud, then create a Snowflake catalog integration and iceberg table that reads through Polaris.
@@ -369,7 +353,7 @@ See `afon-snowflake/README.md` for the full guide. In summary:
 The deployment is automated via:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeWritingAzureViaAwsMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeploySnowflakeWritingAzureViaAwsMain  
 ```
 
 ### Set up monitoring
@@ -377,8 +361,7 @@ mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeWrit
 Install monitoring components on AWS:
 
 ```shell
-cd afon-demo
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.PrometheusClusterDeploy
 cd cdktf.out/stacks/aws
 tofu apply --auto-approve
 ```
@@ -422,12 +405,10 @@ tofu destroy --auto-approve
 **Nuke scripts (when Terraform state is lost or things are stuck):**
 
 ```shell
-cd afon-demo
 # AWS
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.cdk.aws.AwsNuke
-
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.AwsNuke
 # Azure
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.cdk.azure.AzureNuke
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.azure.AzureNuke
 ```
 
 These output shell scripts that destroy everything. You may need to run them multiple times for VPCs to disappear.
@@ -455,11 +436,9 @@ az network dns record-set a delete \
 If a deployment fails partway through, you can resume from a specific step:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass="health.emrys.afon.demo.DeployExternalCatalogsMain" \
-  -Dexec.args="az_polaris"
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployExternalCatalogsMain \ 
+  --exec-args "az_polaris"
 ```
-
-Use `exec:exec` (not `exec:java`) when resuming with `-Dexec.args`.
 
 ### Diagnose Polaris issues
 
@@ -657,11 +636,7 @@ df_joined.show()
 **Write:**
 
 ```shell
-cd afon-demo
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestWriter \
-  -Dexec.args="azure_external root s3cr3t emryspolaris.click namespaceph"
-or 
-./afon.sh -a exec --exec-class health.emrys.afon.infra.checks.SparkTestWriter \
+./afon.sh -a exec --exec-class health.emrys.afon.infra.checks.SparkTestWriter \ 
   --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
@@ -670,9 +645,8 @@ This creates a namespace, creates an Iceberg table, and writes three rows ("appl
 **Read:**
 
 ```shell
-cd afon-demo
-mvn exec:java -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestReader \
-  -Dexec.args="azure_external root s3cr3t emryspolaris.click namespaceph"
+./afon.sh -a exec --exec-class health.emrys.afon.infra.checks.SparkTestReader \ 
+  --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
 ### Create sample patient data
@@ -680,8 +654,7 @@ mvn exec:java -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestReader \
 The `afon-samples` module contains a sample data generator:
 
 ```shell
-cd afon-samples
-mvn exec:java -Dexec.mainClass=health.emrys.afon.samples.PatientDataMain 
+./afon.sh -a exec --exec-class health.emrys.afon.samples.PatientDataMain 
 ```
 
 This creates `patients` (in AWS) and `occupancy` (in GCP) tables with 10,000 rows each, demonstrating cross-cloud data placement.
@@ -801,13 +774,6 @@ AWS_JUPYTER_DNS_ZONE=YOUR_JUPYTER_DNS_ZONE_ID
 AWS_JUPYTER_CERT_ARN=arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
 AWS_POLARIS_CERT_ARN=arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
 
-### GCP
-GCP_BUCKET_NAME=your_org_afon
-GCP_BUCKET_NAME_FORBIDDEN=your_org_afon_forbidden
-GCP_EXTERNAL_BUCKET_NAME=your_org_afon_external
-GCP_SERVICE_ACCOUNT=your-sa@your-project.iam.gserviceaccount.com
-GCP_DOMAIN_NAME=your-polaris-gcp.yourdomain.com
-
 ### Azure
 AZURE_EXTERNAL_BUCKET=yourstorage-external
 AZURE_BUCKET_FORBIDDEN=yourstorage-forbidden
@@ -818,6 +784,13 @@ AZURE_REGION=uksouth
 AZURE_RESOURCE_GROUP=your_resource_group
 AZURE_DOMAIN_NAME=your-polaris-azure.yourdomain.com
 AZURE_JUPYTER_DOMAIN_NAME=your-jupyter-azure.yourdomain.com
+
+### GCP
+GCP_BUCKET_NAME=your_org_afon
+GCP_BUCKET_NAME_FORBIDDEN=your_org_afon_forbidden
+GCP_EXTERNAL_BUCKET_NAME=your_org_afon_external
+GCP_SERVICE_ACCOUNT=your-sa@your-project.iam.gserviceaccount.com
+GCP_DOMAIN_NAME=your-polaris-gcp.yourdomain.com
 
 ### Snowflake
 SNOWFLAKE_JDBC_URL=jdbc:snowflake://YOUR_ACCOUNT.snowflakecomputing.com/
@@ -830,14 +803,14 @@ SNOWFLAKE_JDBC_URL=jdbc:snowflake://YOUR_ACCOUNT.snowflakecomputing.com/
 AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY
 AWS_SECRET_ACCESS_KEY=YOUR_SECRET_KEY
 
-# GCP
-GOOGLE_APPLICATION_CREDENTIALS=CONTENTS_OF_APPLICATION_DEFAULT_CREDENTIALS_JSON_WITH_NEWLINES_REMOVED
-
 # Azure
 AZURE_CLIENT_ID=YOUR_CLIENT_ID
 AZURE_TENANT_ID=YOUR_TENANT_ID
 AZURE_CLIENT_SECRET=***REMOVED***
 DATABRICKS_TOKEN=YOUR_DATABRICKS_TOKEN
+
+# GCP
+GOOGLE_APPLICATION_CREDENTIALS=CONTENTS_OF_APPLICATION_DEFAULT_CREDENTIALS_JSON_WITH_NEWLINES_REMOVED
 
 # OAuth2 (for Jupyter/Guacamole)
 OAUTH2_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
@@ -871,25 +844,24 @@ SNOWFLAKE_PRIVATE_KEY=YOUR_SNOWFLAKE_PRIVATE_KEY
 ### Production deployment commands
 
 ```shell
-cd afon-demo
 # Full AWS stack (Polaris + Spark + Jupyter)
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeployFullStackAwsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployFullStackAwsMain 
 
 # Azure Polaris (standalone)
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeployAzurePolarisMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployAzurePolarisMain
 
 # GCP Polaris (standalone)
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeployGcpPolarisMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployGcpPolarisMain 
 
 # Cross-cloud external catalogs (AWS + Azure federation)
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeployExternalCatalogsMain 
 
 # Snowflake reading cross-cloud data
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingGcpViaAwsMain
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingAzureViaAwsMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeploySnowflakeReadingGcpViaAwsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeploySnowflakeReadingAzureViaAwsMain 
 
 # Snowflake writing to Azure
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeWritingAzureViaAwsMain
+./afon.sh -a exec --exec-class health.emrys.afon.demo.DeploySnowflakeWritingAzureViaAwsMain 
 ```
 
 ### Production monitoring setup
@@ -897,8 +869,7 @@ mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeWrit
 1. **Install monitoring stack:**
 
 ```shell
-cd afon-demo
-mvn exec:java -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.PrometheusClusterDeploy
 cd cdktf.out/stacks/aws
 tofu apply --auto-approve
 ```
@@ -963,11 +934,10 @@ tofu destroy --auto-approve
 **When Terraform state is corrupted or resources are stuck:**
 
 ```shell
-cd afon-demo
 # Generate nuke scripts
-mvn exec:java -Dexec.mainClass=health.emrys.afon.cdk.aws.AwsNuke 
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.AwsNuke 
 # Run the output script (may need multiple passes for VPCs to disappear)
-mvn exec:java -Dexec.mainClass=health.emrys.afon.cdk.azure.AzureNuke
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.azure.AzureNuke
 ```
 
 **When Azure Terraform import is needed:**

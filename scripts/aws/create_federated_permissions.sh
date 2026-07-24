@@ -1,6 +1,6 @@
 # Note: you must source a properties file before running this script
 # For example:
-# set -a && source afon.properties && set +a
+# set -a && source afon.properties && source afon-aws.properties && set +a
 
 aws iam create-role --role-name GlueIcebergRole --assume-role-policy-document "{
    \"Version\": \"2012-10-17\",

@@ -132,6 +132,9 @@ venv.bak/
 .terraform.lock.hcl
 cdktf.out
 env.properties
+env-aws.properties
+env-azure.properties
+env-gcp.properties
 .idea
 
 # Spyder project settings

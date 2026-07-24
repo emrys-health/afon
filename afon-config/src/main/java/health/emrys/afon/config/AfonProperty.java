@@ -8,26 +8,26 @@ import static java.util.Set.copyOf;
 
 public class AfonProperty {
 
-    private static final Set<String> ALL_PROPERTIES = new HashSet<>();
+    private static final Set<String> ALL_NAMES = new HashSet<>();
 
-    private final String propertyName;
+    private final String name;
 
-    AfonProperty(String propertyName) {
-        this.propertyName = propertyName;
-        if (ALL_PROPERTIES.contains(propertyName)) {
-            throw new IllegalArgumentException("Property " + propertyName + " is already defined");
+    AfonProperty(String name) {
+        this.name = name;
+        if (ALL_NAMES.contains(name)) {
+            throw new IllegalArgumentException("Property " + name + " is already defined");
         }
-        ALL_PROPERTIES.add(propertyName);
+        ALL_NAMES.add(name);
     }
 
-    public static Set<String> getAllProperties() {
-        return copyOf(ALL_PROPERTIES);
+    public static Set<String> getAllNames() {
+        return copyOf(ALL_NAMES);
     }
 
     public String getValueFrom(Properties properties) {
-        String value = properties.getProperty(propertyName);
+        String value = properties.getProperty(name);
         if (value == null) {
-            throw new IllegalArgumentException("Property " + propertyName + " not found");
+            throw new IllegalArgumentException("Property " + name + " not found");
         }
         return value;
     }
@@ -38,10 +38,10 @@ public class AfonProperty {
      * KeyCloak scheme, which defaults to https for real deployments but is overridden to http in tests).
      */
     public String getValueFrom(Properties properties, String defaultValue) {
-        return properties.getProperty(propertyName, defaultValue);
+        return properties.getProperty(name, defaultValue);
     }
 
     public String getPropertyName() {
-        return propertyName;
+        return name;
     }
 }
