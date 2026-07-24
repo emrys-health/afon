@@ -12,13 +12,16 @@ exec_mvn () {
 }
 
 usage (){
-  echo "Usage: $0 [--action|-a <action>] [--profiles|-p <profiles>] [--dry-run] [--help|-h]"
+  echo "Usage: $0 [--action|-a <action>] [--profiles|-p <profiles>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
   echo "          [--exec-class <mainClass>]"
-  echo "actions: build|exec"
+  echo "actions:  build|exec"
+  echo "profiles: acceptance|samples|demo"
+  echo "cloud:    aws|azure|gcp"
 }
 
 ACTION="build"
 PROFILES=
+CLOUD=
 DRY_RUN=false
 EXEC_CLASS=
 EXEC_ARGS=
@@ -34,6 +37,8 @@ while [[ $# -gt 0 ]]; do
       ACTION="$2"; shift 2 ;;
     --profiles|-p)
       PROFILES="$2"; shift 2 ;;
+    --cloud|-c)
+      CLOUD="$2"; shift 2 ;;
     --dry-run)
       DRY_RUN=true; shift ;;
     --exec-class)
@@ -60,6 +65,15 @@ if [ -n "$PROFILES" ] ; then
   MVN_PROFILES="-P$PROFILES"
 fi
 
+if [ -n "$CLOUD" ] ; then
+  echo "Using cloud $CLOUD"
+    if [ -n "$MVN_PROFILES" ] ; then
+      MVN_PROFILES="$MVN_PROFILES,$CLOUD"
+    else
+      MVN_PROFILES="-P$CLOUD"
+    fi
+fi
+
 CWD=`pwd`
 MVN_CMD="mvn -s $CWD/settings.xml $MVN_PROFILES"
 
@@ -67,6 +81,9 @@ case $ACTION in
 
   build)
     MVN_GOALS="clean install"
+    if [ -n "$CLOUD" ] ; then
+      MVN_ENVS="-Dafon.cloud=$CLOUD"
+    fi
     exec_mvn
     ;;
   exec)
