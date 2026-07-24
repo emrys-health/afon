@@ -1,7 +1,8 @@
-package health.emrys.afon.acceptance
+package health.emrys.afon.acceptance.gcp
 
-import SparkHelper.sparkWarehouse
-import health.emrys.afon.config.AfonProperties.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS, GCP_SERVICE_ACCOUNT}
+import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
+import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
+import health.emrys.afon.config.AfonProperties.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{GoogleCloudConfigForPolaris, JsonMaker}
 import health.emrys.afon.polaris.comms.PolarisConfigurer
