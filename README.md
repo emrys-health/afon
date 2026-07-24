@@ -25,6 +25,10 @@ Install the following on your machine:
 git clone https://github.com/emrys-health/afon-core.git
 cd afon-core
 ./afon.sh -a build -p -acceptance # builds components without running acceptance tests 
+./afon.sh -a build -p acceptance # builds components running acceptance tests 
+./afon.sh -a build -p acceptance -c aws # builds components running acceptance tests for aws
+./afon.sh -a build -p acceptance -c azure # builds components running acceptance tests for azure
+./afon.sh -a build -p acceptance -c gcp # NOTE: not working ATM
 ```
 
 ### 2. Configure properties

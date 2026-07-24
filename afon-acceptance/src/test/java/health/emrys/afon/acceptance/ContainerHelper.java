@@ -167,7 +167,7 @@ public class ContainerHelper {
                 // GCP
                 .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
                 .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
-            POLARIS_PROPERTIES.forEach((x) -> {
+            getPolarisProperties().forEach((x) -> {
                 polaris.withEnv(x.getPropertyName(), x.getValueFrom(properties));
             });
             // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
