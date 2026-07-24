@@ -1,6 +1,6 @@
 # Note: you must source a properties file before running this script
 # For example:
-# set -a && source afon.properties && set +a
+# set -a && source afon.properties && source afon-gcp.properties && set +a
 
 # The call to "gcloud auth application-default login ..." below required me to use my browser to authenticate so I am not sure how best to automate it:
 gcloud storage buckets create "gs://$GCP_BUCKET_NAME" --location=europe-west2 && \
