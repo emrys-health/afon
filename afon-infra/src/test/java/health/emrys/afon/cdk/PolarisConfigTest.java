@@ -19,7 +19,7 @@ class PolarisConfigTest {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
         String               script     = PolarisConfig.getProviderCredentials(properties, "test");
-        PolarisConstants.POLARIS_PROPERTIES
+        PolarisConstants.getPolarisProperties()
             .forEach(x -> {
                 String propertyName = x.getPropertyName();
                 assertTrue(script.contains(propertyName), propertyName);

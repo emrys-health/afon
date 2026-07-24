@@ -20,8 +20,7 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.TFUtils.clusterIpService;
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.polaris.PolarisConstants.POLARIS_IMAGE_NAME;
-import static health.emrys.afon.polaris.PolarisConstants.POLARIS_PROPERTIES;
+import static health.emrys.afon.polaris.PolarisConstants.*;
 import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
@@ -68,7 +67,7 @@ public class PolarisConfig extends Construct {
     static String getProviderCredentials(
         Properties properties,
         String deploymentId) {
-        List<String> exports = POLARIS_PROPERTIES
+        List<String> exports = getPolarisProperties()
             .stream()
             .map(x -> format("export %s=%s", x.getPropertyName(), x.getValueFrom(properties)))
             .sorted()
