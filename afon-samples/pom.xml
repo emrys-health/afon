@@ -12,6 +12,11 @@
 
     <artifactId>afon-samples</artifactId>
 
+    <properties>
+        <exec.args></exec.args>
+        <exec.mainClass></exec.mainClass>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
@@ -22,6 +27,23 @@
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-spark-runtime-${spark.compat.version}_${scala.compat.version}</artifactId>
             <version>${iceberg.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang.modules</groupId>
+            <artifactId>scala-collection-compat_${scala.compat.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_${scala.compat.version}</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
@@ -43,4 +65,26 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>exec</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <configuration>
+                            <executable>${java.home}/bin/java</executable>
+                            <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>

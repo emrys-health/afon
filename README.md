@@ -660,6 +660,9 @@ df_joined.show()
 cd afon-demo
 mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestWriter \
   -Dexec.args="azure_external root s3cr3t emryspolaris.click namespaceph"
+or 
+./afon.sh -a exec --exec-class health.emrys.afon.infra.checks.SparkTestWriter \
+  --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
 This creates a namespace, creates an Iceberg table, and writes three rows ("apple", "banana", "cherry").
