@@ -34,7 +34,7 @@ public class SparkKeyCloakPrinter {
     SparkKeyCloakPrinter(String polarisHost) {
         log.info("Using {} as the Polaris host");
         Properties properties = new AfonPropertiesLoader().getProperties();
-        properties.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisHost);
+        properties.setProperty(POLARIS_ENDPOINT.getName(), polarisHost);
         SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
         config = configFactory.getConfig(properties);
     }

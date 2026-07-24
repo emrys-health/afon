@@ -178,7 +178,7 @@ public class StepOperations {
                 // swap the buckets
                 Properties properties = new Properties();
                 properties.setProperty(
-                    AZURE_BUCKET.getPropertyName(),
+                    AZURE_BUCKET.getName(),
                     AZURE_EXTERNAL_BUCKET.getValueFrom(appProperties()));
                 actions.createSingleCatalogsFor(domainName, AZURE, properties);
             });

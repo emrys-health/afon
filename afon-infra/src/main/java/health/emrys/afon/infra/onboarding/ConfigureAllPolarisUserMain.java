@@ -20,7 +20,7 @@ public class ConfigureAllPolarisUserMain {
     public static void main(String[] args) {
         Properties properties = new AfonPropertiesLoader().getProperties();
         if (args.length > 0) {
-            properties.put(POLARIS_ENDPOINT.getPropertyName(), args[0]);
+            properties.put(POLARIS_ENDPOINT.getName(), args[0]);
         }
         ConfigureUserMain app         = new ConfigureUserMain(properties);
         String            catalogName = args[1];

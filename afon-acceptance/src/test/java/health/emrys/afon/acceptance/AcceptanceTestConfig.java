@@ -38,7 +38,7 @@ public class AcceptanceTestConfig {
     private final AfonPolarisClient           polarisClient;
 
     private AcceptanceTestConfig(Properties properties) {
-        properties.put(KC_HOSTNAME.getPropertyName(), ContainerHelper.KEYCLOAK_HOSTNAME);
+        properties.put(KC_HOSTNAME.getName(), ContainerHelper.KEYCLOAK_HOSTNAME);
         this.adminClientId     = POLARIS_ID.getValueFrom(properties);
         this.adminClientSecret = ***REMOVED***
         this.properties        = properties;

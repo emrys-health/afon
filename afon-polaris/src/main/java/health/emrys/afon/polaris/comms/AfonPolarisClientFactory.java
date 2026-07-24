@@ -21,7 +21,7 @@ public class AfonPolarisClientFactory {
     public AfonPolarisClient getPolarisClient(String polarisHost, Properties properties) {
         Properties props = new Properties();
         props.putAll(properties);
-        props.setProperty(POLARIS_ENDPOINT.getPropertyName(), polarisHost);
+        props.setProperty(POLARIS_ENDPOINT.getName(), polarisHost);
         return new KeyCloakPolarisClient(polarisHost, properties);
     }
 
@@ -31,18 +31,18 @@ public class AfonPolarisClientFactory {
 
     public AfonPolarisClient getPolarisClient(String endpoint, String clientId, String clientSecret) {
         Properties props = new AfonPropertiesLoader().getProperties();
-        props.setProperty(POLARIS_ENDPOINT.getPropertyName(), endpoint);
-        props.setProperty(POLARIS_ID.getPropertyName(), clientId);
-        props.setProperty(POLARIS_SECRET.getPropertyName(), clientSecret);
+        props.setProperty(POLARIS_ENDPOINT.getName(), endpoint);
+        props.setProperty(POLARIS_ID.getName(), clientId);
+        props.setProperty(POLARIS_SECRET.getName(), clientSecret);
         return new KeyCloakPolarisClient(props);
     }
 
     public AfonPolarisClient getPolarisClient(String endpoint, String clientId, String clientSecret, String kcHost) {
         Properties props = new AfonPropertiesLoader().getProperties();
-        props.setProperty(POLARIS_ENDPOINT.getPropertyName(), endpoint);
-        props.setProperty(POLARIS_ID.getPropertyName(), clientId);
-        props.setProperty(POLARIS_SECRET.getPropertyName(), clientSecret);
-        props.setProperty(KC_HOSTNAME.getPropertyName(), kcHost);
+        props.setProperty(POLARIS_ENDPOINT.getName(), endpoint);
+        props.setProperty(POLARIS_ID.getName(), clientId);
+        props.setProperty(POLARIS_SECRET.getName(), clientSecret);
+        props.setProperty(KC_HOSTNAME.getName(), kcHost);
         return new KeyCloakPolarisClient(props);
     }
 

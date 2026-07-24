@@ -4,7 +4,6 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.PolarisConstants;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
 
 import java.util.Map;
 import java.util.Properties;
@@ -21,7 +20,7 @@ class PolarisConfigTest {
         String               script     = PolarisConfig.getProviderCredentials(properties, "test");
         PolarisConstants.getPolarisProperties()
             .forEach(x -> {
-                String propertyName = x.getPropertyName();
+                String propertyName = x.getName();
                 assertTrue(script.contains(propertyName), propertyName);
                 assertTrue(script.contains(x.getValueFrom(properties)), propertyName);
             });

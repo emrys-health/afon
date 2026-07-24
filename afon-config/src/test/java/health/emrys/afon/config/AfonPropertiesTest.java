@@ -10,15 +10,15 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class AfonPropertiesLoaderTest {
+public class AfonPropertiesTest {
     @BeforeAll
     public static void initializeConstants() throws ClassNotFoundException {
         Class.forName(AfonProperties.class.getName());
     }
 
     @Test
-    public void testAllProperties() {
-        assertThat(AfonProperty.getAllNames()).hasSizeGreaterThan(0);
+    public void testAllPropertyNames() {
+        assertThat(AfonProperties.getAllNames()).hasSizeGreaterThan(0);
     }
 
     @Test
@@ -37,16 +37,16 @@ public class AfonPropertiesLoaderTest {
         System.setProperty(AfonPropertiesLoader.CLOUD_SYSTEM_PROPERTY, "aws");
         try {
             Properties properties = new AfonPropertiesLoader().getProperties();
-            assertThat(properties.getProperty(AfonProperties.CLUSTER_NAME.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
-            assertThat(properties.getProperty(AfonProperties.AWS_REGION.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.AWS_REGION.getName()))
                     .as("aws properties are loaded")
                     .isNotNull();
-            assertThat(properties.getProperty(AfonProperties.AZURE_REGION.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.AZURE_REGION.getName()))
                     .as("azure properties are not loaded")
                     .isNull();
-            assertThat(properties.getProperty(AfonProperties.GCP_BUCKET_NAME.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.GCP_BUCKET_NAME.getName()))
                     .as("gcp properties are not loaded")
                     .isNull();
         } finally {
@@ -59,16 +59,16 @@ public class AfonPropertiesLoaderTest {
         System.setProperty(AfonPropertiesLoader.CLOUD_SYSTEM_PROPERTY, "azure");
         try {
             Properties properties = new AfonPropertiesLoader().getProperties();
-            assertThat(properties.getProperty(AfonProperties.CLUSTER_NAME.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
-            assertThat(properties.getProperty(AfonProperties.AZURE_REGION.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.AZURE_REGION.getName()))
                     .as("azure properties are loaded")
                     .isNotNull();
-            assertThat(properties.getProperty(AfonProperties.AWS_REGION.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.AWS_REGION.getName()))
                     .as("aws properties are not loaded")
                     .isNull();
-            assertThat(properties.getProperty(AfonProperties.GCP_BUCKET_NAME.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.GCP_BUCKET_NAME.getName()))
                     .as("gcp properties are not loaded")
                     .isNull();
         } finally {
@@ -81,16 +81,16 @@ public class AfonPropertiesLoaderTest {
         System.setProperty(AfonPropertiesLoader.CLOUD_SYSTEM_PROPERTY, "gcp");
         try {
             Properties properties = new AfonPropertiesLoader().getProperties();
-            assertThat(properties.getProperty(AfonProperties.CLUSTER_NAME.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
-            assertThat(properties.getProperty(AfonProperties.GCP_BUCKET_NAME.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.GCP_BUCKET_NAME.getName()))
                     .as("gcp properties are loaded")
                     .isNotNull();
-            assertThat(properties.getProperty(AfonProperties.AZURE_REGION.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.AZURE_REGION.getName()))
                     .as("azure properties are not loaded")
                     .isNull();
-            assertThat(properties.getProperty(AfonProperties.AWS_REGION.getPropertyName()))
+            assertThat(properties.getProperty(AfonProperties.AWS_REGION.getName()))
                     .as("aws properties are not loaded")
                     .isNull();
         } finally {
@@ -99,13 +99,13 @@ public class AfonPropertiesLoaderTest {
     }
 
     private void checkExpectedValuesNotEmpty(Properties properties) {
-        for (String property : AfonProperty.getAllNames()) {
+        for (String property : AfonProperties.getAllNames()) {
             assertThat(properties.get(property)).isNotEqualTo("");
         }
     }
 
     private static void checkOnlyExpectedInPropertiesFile(Properties properties) {
-        Set<String> expectedProperties = AfonProperty.getAllNames();
+        Set<String> expectedProperties = AfonProperties.getAllNames();
         for (Object property : properties.keySet()) {
             assertTrue(
                     expectedProperties.contains(property.toString()),
@@ -114,7 +114,7 @@ public class AfonPropertiesLoaderTest {
     }
 
     private static void checkAllExpectedInPropertiesFile(Properties properties) {
-        for (String property : AfonProperty.getAllNames()) {
+        for (String property : AfonProperties.getAllNames()) {
             assertThat(properties.get(property)).as("property = %s", property).isNotNull();
         }
     }

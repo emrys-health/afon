@@ -33,7 +33,7 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
     val config            = new GoogleCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new health.emrys.afon.acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
-    properties.setProperty(GCP_BUCKET_NAME.getPropertyName, BUCKET) // bit of a hack - TODO clean me up
+    properties.setProperty(GCP_BUCKET_NAME.getName, BUCKET) // bit of a hack - TODO clean me up
 
     "be registered with Polaris" in {
       Given(s"a catalog called '$FEDERATED_CATALOG_NAME' has already been created in GCP'")

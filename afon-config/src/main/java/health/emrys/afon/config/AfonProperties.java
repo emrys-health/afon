@@ -1,6 +1,8 @@
 package health.emrys.afon.config;
 
-import org.slf4j.Logger;
+import java.lang.reflect.Field;
+import java.util.HashSet;
+import java.util.Set;
 
 public class AfonProperties {
 
@@ -119,5 +121,15 @@ public class AfonProperties {
         public String toString() {
             return String.valueOf(value);
         }
+    }
+
+    public static Set<String> getAllNames(){
+        Set<String> names = new HashSet<>();
+        for (Field field : AfonProperties.class.getDeclaredFields()) {
+            if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+                names.add(field.getName());
+            }
+        }
+        return names;
     }
 }
