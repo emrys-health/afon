@@ -52,12 +52,6 @@ public class PolarisConstants {
                             AZURE_TENANT_ID));
                     break;
                 default:
-                    // add all cloud providers
-                    set.addAll(Set.of(AWS_ACCESS_KEY_ID,
-                            AWS_SECRET_ACCESS_KEY,
-                            AWS_REGION, AZURE_CLIENT_SECRET,
-                            AZURE_CLIENT_ID,
-                            AZURE_TENANT_ID));
             }
         } else {
             // add all cloud providers
