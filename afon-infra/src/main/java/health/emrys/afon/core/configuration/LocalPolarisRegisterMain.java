@@ -30,18 +30,18 @@ public class LocalPolarisRegisterMain {
         RegisterTableConfig      conf           = new RegisterTableConfig(args);
         Properties               afonProperties = new AfonPropertiesLoader().getProperties();
         if (args.length > 4) {
-            afonProperties.put(POLARIS_ENDPOINT.getPropertyName(), args[4]);
+            afonProperties.put(POLARIS_ENDPOINT.getName(), args[4]);
         }
         if (args.length > 5) {
             String userId = args[5];
             String secret = args[6];
             logger.info("Creating the table as {}/{}", userId, secret);
-            afonProperties.put(POLARIS_ID.getPropertyName(), userId);
-            afonProperties.put(POLARIS_SECRET.getPropertyName(), secret);
+            afonProperties.put(POLARIS_ID.getName(), userId);
+            afonProperties.put(POLARIS_SECRET.getName(), secret);
         }
         String kcHost = KC_HOSTNAME.getValueFrom(afonProperties);
         logger.info("KC host: {}", kcHost);
-        afonProperties.put(KC_HOSTNAME.getPropertyName(), kcHost);
+        afonProperties.put(KC_HOSTNAME.getName(), kcHost);
         AfonPolarisClient        client = clientFactory.getPolarisClient(afonProperties);
         LocalPolarisRegisterMain app    = new LocalPolarisRegisterMain(client, conf);
         List<String>             errors = app.createTableAndNamespace();

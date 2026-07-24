@@ -32,7 +32,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
   "An external table" should {
     val properties        = new AfonPropertiesLoader().getProperties
-    properties.setProperty(AZURE_BUCKET.getPropertyName, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
+    properties.setProperty(AZURE_BUCKET.getName, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
     val config            = new AzureCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))

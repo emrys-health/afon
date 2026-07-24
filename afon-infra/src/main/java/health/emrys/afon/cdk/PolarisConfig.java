@@ -69,7 +69,7 @@ public class PolarisConfig extends Construct {
         String deploymentId) {
         List<String> exports = getPolarisProperties()
             .stream()
-            .map(x -> format("export %s=%s", x.getPropertyName(), x.getValueFrom(properties)))
+            .map(x -> format("export %s=%s", x.getName(), x.getValueFrom(properties)))
             .sorted()
             .toList();
 
@@ -105,7 +105,7 @@ public class PolarisConfig extends Construct {
             """,
             kcConfig,
             String.join("\n", exports),
-            GOOGLE_APPLICATION_CREDENTIALS.getPropertyName(),
+            GOOGLE_APPLICATION_CREDENTIALS.getName(),
             SECRETS_DIR + "/" + GCP_CRED_FILE
         );
     }

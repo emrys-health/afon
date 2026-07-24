@@ -16,12 +16,14 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class AfonPropertiesLoader {
 
     /**
-     * General properties live here. Cloud-specific properties live alongside it in
+     * Application properties live in {@code afon.properties}.
+     * Cloud-specific properties live alongside it in
      * {@code afon-<cloud>.properties} (e.g. {@code afon-aws.properties}).
      */
     public static final String APP_PROPERTIES_FILE = "afon.properties";
     /**
-     * Sensitive secrets live in here. Cloud-specific secrets live alongside it in
+     * Sensitive secrets live in {@code env.properties}
+     * Cloud-specific secrets live alongside it in
      * {@code env-<cloud>.properties} (e.g. {@code env-aws.properties}).
      */
     public static final String ENV_PROPERTIES_FILE = "env.properties";
@@ -36,7 +38,7 @@ public class AfonPropertiesLoader {
 
     static {
         try {
-            logger.info("Initializing properties");
+            logger.debug("Initializing properties");
             Class.forName(AfonProperties.class.getName());
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
@@ -51,14 +53,14 @@ public class AfonPropertiesLoader {
         if (creds.length != 2) {
             logger.error("Incorrect access token {}. The token should have a ':' delimiting ID from Secret", credentials);
         }
-        properties.setProperty(POLARIS_ID.getPropertyName(), creds[0]);
-        properties.setProperty(POLARIS_SECRET.getPropertyName(), creds[1]);
+        properties.setProperty(POLARIS_ID.getName(), creds[0]);
+        properties.setProperty(POLARIS_SECRET.getName(), creds[1]);
         return properties;
     }
 
     public AfonPropertiesLoader(String overrideFile) throws IOException {
         this();
-        logger.info("Loading properties from {}", overrideFile);
+        logger.debug("Loading properties from {}", overrideFile);
         FileInputStream fis = new FileInputStream(overrideFile);
         properties.load(fis);
         fis.close();
@@ -70,12 +72,12 @@ public class AfonPropertiesLoader {
             // are we running as a build?
             readProperties("../");
         } catch (IOException e) {
-            logger.info("Could not read properties files in parent directory. Trying in this...");
+            logger.warn("Could not read properties files in parent directory. Trying in this...");
             try {
                 // ...or in the IDE?
                 readProperties("");
             } catch (IOException ex) {
-                logger.warn("Could not find propery files");
+                logger.error("Could not find propery files");
                 throw new RuntimeException(ex); // urgh, the properties file is not there
             }
         }
@@ -92,20 +94,20 @@ public class AfonPropertiesLoader {
             if (file.startsWith("env")) {
                 confidentialKeys.addAll(props.keySet().stream().map(x -> x.toString()).toList());
             }
+
         }
-        for (String property : AfonProperty.getAllNames()) {
+        for (String property : AfonProperties.getAllNames()) {
             if (System.getProperty(property) != null) {
-                logger.info("Using the environment variables to define property '{}'", property);
+                logger.debug("Using the environment variables to define property '{}'", property);
                 properties.put(property, System.getProperty(property));
             }
         }
     }
 
     /**
-     * Common {@code afon.properties}, then its cloud-specific file(s), then the equivalent for the
-     * sensitive {@code env.properties} (loaded last so secrets can override either). In both families,
+     * Lists the {@code afon.properties} and {@code env.properties} and its cloud-specific file(s).
      * {@link AfonPropertiesLoader#CLOUD_SYSTEM_PROPERTY} selects a single cloud; otherwise every cloud's file
-     * is loaded, since some deployments (e.g. cross-cloud federation) need more than one cloud's
+     * is listed, since some deployments (e.g. cross-cloud federation) need more than one cloud's
      * properties in the same run.
      */
     private List<String> propertyFiles() {

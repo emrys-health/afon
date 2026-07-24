@@ -44,7 +44,7 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
         polarisClient   = new PolarisConfigureMain();
         String endpoint = format("%s:443", state.getPolarisHost());
         logger.info("Calling Polaris endpoint: {}", endpoint);
-        properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getPropertyName(), endpoint);
+        properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getName(), endpoint);
     }
 
     public Properties getClusterProperties() {

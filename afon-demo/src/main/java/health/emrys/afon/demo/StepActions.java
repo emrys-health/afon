@@ -339,7 +339,7 @@ public class StepActions {
     public void createSingleCatalogsFor(String domainName,
                                         SupportedCloudsEnum catalog,
                                         Properties properties) throws Exception {
-        properties.put(POLARIS_ENDPOINT.getPropertyName(), domainName);
+        properties.put(POLARIS_ENDPOINT.getName(), domainName);
         executeMainOf(EndpointPolarisConfiguration.class,
                       new String[] {catalog.name()},
                       properties);
