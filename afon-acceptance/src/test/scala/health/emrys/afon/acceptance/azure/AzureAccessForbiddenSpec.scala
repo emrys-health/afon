@@ -2,10 +2,13 @@ package health.emrys.afon.acceptance.azure
 
 import health.emrys.afon.acceptance.SparkHelper.spark
 import health.emrys.afon.acceptance.{AbstractAccessForbiddenSpec, AcceptanceTestConfig, FileHelper}
+import health.emrys.afon.acceptance.tags.{Azure, Forbidden}
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_FORBIDDEN
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 
+@Azure
+@Forbidden
 class AzureAccessForbiddenSpec extends AbstractAccessForbiddenSpec with AzureTableCreation {
 
   def config: CloudConfigForPolaris = AcceptanceTestConfig.instance.getAzureForbidden
