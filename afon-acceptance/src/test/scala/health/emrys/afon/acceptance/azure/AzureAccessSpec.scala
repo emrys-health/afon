@@ -1,11 +1,9 @@
-package health.emrys.afon.acceptance
+package health.emrys.afon.acceptance.azure
 
-import SparkHelper.spark
+import health.emrys.afon.acceptance.SparkHelper.spark
+import health.emrys.afon.acceptance.{AbstractAccessSpec, AcceptanceTestConfig}
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
-import uk.co.odinconsultants.documentation_utils.Datum
-
-import java.lang.reflect.Field
 
 class AzureAccessSpec extends AbstractAccessSpec with AzureTableCreation {
 

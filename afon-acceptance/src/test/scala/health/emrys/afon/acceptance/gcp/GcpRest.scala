@@ -1,4 +1,4 @@
-package health.emrys.afon.acceptance
+package health.emrys.afon.acceptance.gcp
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
