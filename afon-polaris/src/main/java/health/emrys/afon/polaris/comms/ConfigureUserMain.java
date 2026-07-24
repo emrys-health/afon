@@ -42,7 +42,7 @@ public class ConfigureUserMain {
         if (args.length > 0) {
             String endpoint = args[0];
             logger.info("Using endpoint {}", endpoint);
-            properties.put(POLARIS_ENDPOINT.getPropertyName(), endpoint);
+            properties.put(POLARIS_ENDPOINT.getName(), endpoint);
         }
         ConfigureUserMain app           = new ConfigureUserMain(properties);
         String            catalogName   = args[1];

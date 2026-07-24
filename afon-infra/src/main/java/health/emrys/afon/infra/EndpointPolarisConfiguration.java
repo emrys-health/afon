@@ -30,7 +30,7 @@ public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration {
 
     public EndpointPolarisConfiguration(String host) {
         this(new AfonPropertiesLoader().getProperties());
-        properties.put(POLARIS_ENDPOINT.getPropertyName(), host);
+        properties.put(POLARIS_ENDPOINT.getName(), host);
     }
 
     public EndpointPolarisConfiguration(Properties properties) {

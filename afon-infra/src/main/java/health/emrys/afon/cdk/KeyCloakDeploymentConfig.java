@@ -63,7 +63,7 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
             KC_DB_PASSWORD);
 
         Map<String, String> secretsMap = kcProperties.stream().collect(Collectors.toMap(
-            AfonProperty::getPropertyName,
+            AfonProperty::getName,
             x -> x.getValueFrom(properties)
         ));
 
@@ -89,7 +89,7 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
                           : KC_HOSTNAME.getValueFrom(properties);
 
         List<DeploymentSpecTemplateSpecContainerEnv> envs = new ArrayList<>();
-        envs.add(envVar(KC_DB.getPropertyName(), KC_DB.getValueFrom(properties)));
+        envs.add(envVar(KC_DB.getName(), KC_DB.getValueFrom(properties)));
         // KC 26 proxy v2: trust the AWS load balancer's X-Forwarded-* headers. This replaces the
         // deprecated KC_PROXY=edge (which KC 26 warns about). Without it Keycloak treats the
         // TLS-terminated request as plain http and omits the Secure flag from its AUTH_SESSION_ID /
@@ -97,9 +97,9 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
         envs.add(envVar("KC_PROXY_HEADERS", "xforwarded"));
         envs.add(envVar("KC_HOSTNAME_STRICT", "true"));
         envs.add(envVar("KC_HTTP_ENABLED", "true"));
-        envs.add(envVar(KC_HOSTNAME.getPropertyName(), hostname));
+        envs.add(envVar(KC_HOSTNAME.getName(), hostname));
         kcProperties.stream().forEach(x -> envs.add(
-            envFromSecret(x.getPropertyName(), SECRET_NAME, x.getPropertyName()))
+            envFromSecret(x.getName(), SECRET_NAME, x.getName()))
         );
 
         List<String> args = List.of("start");

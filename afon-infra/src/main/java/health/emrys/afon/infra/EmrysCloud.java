@@ -36,9 +36,9 @@ public class EmrysCloud implements ClusterCredentials {
         Properties           properties = loader.getProperties();
         clusterState = new ClusterState();
         Properties props = add(clusterState.getCredentials(), properties);
-        props.setProperty(POLARIS_ENDPOINT.getPropertyName(), clusterState.getPolarisHost());
-        polarisId     = props.getProperty(AfonProperties.POLARIS_ID.getPropertyName());
-        polarisSecret = props.getProperty(AfonProperties.POLARIS_SECRET.getPropertyName());
+        props.setProperty(POLARIS_ENDPOINT.getName(), clusterState.getPolarisHost());
+        polarisId     = props.getProperty(AfonProperties.POLARIS_ID.getName());
+        polarisSecret = props.getProperty(AfonProperties.POLARIS_SECRET.getName());
         client        = clientFactory.getPolarisClient(props, "https");
         accessToken   = client.getAccessToken();
     }

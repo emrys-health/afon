@@ -11,12 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.polaris.comms.ConfigureUserMain.ROLE_NAME;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 
 public class UserOnboarderMain {
@@ -25,7 +23,7 @@ public class UserOnboarderMain {
 
     public static void main(String[] args) throws Exception {
         Properties properties = new AfonPropertiesLoader().getProperties();
-        properties.put(POLARIS_ENDPOINT.getPropertyName(), args[0]);
+        properties.put(POLARIS_ENDPOINT.getName(), args[0]);
         UserOnboarderMain app           = new UserOnboarderMain(new Onboarding(), properties);
         String            catalog       = args[1];
         String            jupyterDomain = args[2];
