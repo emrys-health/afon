@@ -2,6 +2,7 @@ package health.emrys.afon.acceptance.gcp
 
 import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
+import health.emrys.afon.acceptance.tags.{External, Gcp}
 import health.emrys.afon.config.AfonProperties.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{GoogleCloudConfigForPolaris, JsonMaker}
@@ -16,7 +17,9 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 import java.util.Properties
 
-class ExternalGcpTableSpec  extends SpecPretifier with GivenWhenThen {
+@Gcp
+@External
+class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
 
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
   val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
