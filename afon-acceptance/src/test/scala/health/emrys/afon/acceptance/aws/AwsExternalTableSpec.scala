@@ -1,9 +1,11 @@
-package health.emrys.afon.acceptance
+package health.emrys.afon.acceptance.aws
 
 import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
-import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_BUCKET_NAME, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
+import health.emrys.afon.acceptance.tags.{Aws, External}
+import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant, CatalogRoles}
+import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
 import health.emrys.afon.config.AfonPropertiesLoader
-import health.emrys.afon.polaris.catalogs.{AwsCloudConfigForPolaris, GlueCloudConfigForPolaris}
+import health.emrys.afon.polaris.catalogs.GlueCloudConfigForPolaris
 import health.emrys.afon.polaris.comms.PolarisConfigurer
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
@@ -12,6 +14,8 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 /**
  * You'll need to run `scripts/aws/create_federated_permissions.sh` first if it's not been done already.
  */
+@Aws
+@External
 class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
 
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient

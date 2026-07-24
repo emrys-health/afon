@@ -3,6 +3,7 @@ package health.emrys.afon.acceptance.azure
 import health.emrys.afon.acceptance
 import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
+import health.emrys.afon.acceptance.tags.{Azure, External}
 import health.emrys.afon.config.AfonProperties.{AZURE_BUCKET, DATABRICKS_TOKEN}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, JsonMaker}
@@ -20,7 +21,9 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
  * Test Databricks is actually ready to receive calls with:
  * curl -X GET   https://adb-7405611337270626.6.azuredatabricks.net/api/2.1/unity-catalog/iceberg-rest/v1/catalogs/phdbx/namespaces/default   -H "Authorization: Bearer $DATABRICKS_TOKEN"
  */
-class ExternalAzureDBxTableSpec extends SpecPretifier with GivenWhenThen {
+@Azure
+@External
+class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
   val client      = AcceptanceTestConfig.instance.getPolarisAdminClient
   val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
