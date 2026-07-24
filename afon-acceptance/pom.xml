@@ -101,4 +101,74 @@
         </plugins>
     </build>
 
+    <profiles>
+        <profile>
+            <id>aws</id>
+            <properties>
+                <tagsToInclude>health.emrys.afon.acceptance.tags.Aws</tagsToInclude>
+                <tagsToExclude>health.emrys.afon.acceptance.tags.None</tagsToExclude>
+            </properties>
+        </profile>
+        <profile>
+            <id>aws-only</id>
+            <properties>
+                <tagsToInclude>health.emrys.afon.acceptance.tags.Aws</tagsToInclude>
+                <tagsToExclude>health.emrys.afon.acceptance.tags.Azure,health.emrys.afon.acceptance.tags.Gcp</tagsToExclude>
+            </properties>
+        </profile>
+        <profile>
+            <id>azure</id>
+            <properties>
+                <tagsToInclude>health.emrys.afon.acceptance.tags.Azure</tagsToInclude>
+                <tagsToExclude>health.emrys.afon.acceptance.tags.None</tagsToExclude>
+            </properties>
+        </profile>
+        <profile>
+            <id>azure-only</id>
+            <properties>
+                <tagsToInclude>health.emrys.afon.acceptance.tags.Azure</tagsToInclude>
+                <tagsToExclude>health.emrys.afon.acceptance.tags.Aws,health.emrys.afon.acceptance.tags.Gcp</tagsToExclude>
+            </properties>
+        </profile>
+        <profile>
+            <id>gcp</id>
+            <properties>
+                <tagsToInclude>health.emrys.afon.acceptance.tags.Gcp</tagsToInclude>
+                <tagsToExclude>health.emrys.afon.acceptance.tags.None</tagsToExclude>
+            </properties>
+        </profile>
+        <profile>
+            <id>gcp-only</id>
+            <properties>
+                <tagsToInclude>health.emrys.afon.acceptance.tags.Gcp</tagsToInclude>
+                <tagsToExclude>health.emrys.afon.acceptance.tags.Aws,health.emrys.afon.acceptance.tags.Azure</tagsToExclude>
+            </properties>
+        </profile>
+        <profile>
+            <id>tags</id>
+            <properties>
+                <tagsToInclude></tagsToInclude>
+                <tagsToExclude></tagsToExclude>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>net.alchim31.maven</groupId>
+                        <artifactId>scala-maven-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.scalatest</groupId>
+                        <artifactId>scalatest-maven-plugin</artifactId>
+                        <configuration>
+                            <tagsToInclude>${tagsToInclude}</tagsToInclude>
+                            <tagsToExclude>${tagsToExclude}</tagsToExclude>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+
+
 </project>

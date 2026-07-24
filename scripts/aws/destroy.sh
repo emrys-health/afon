@@ -1,6 +1,6 @@
 # Note: you must source a properties file before running this script
 # For example:
-# set -a && source afon.properties && set +a
+# set -a && source afon.properties && source afon-aws.properties && set +a
 
 aws iam detach-role-policy --role-name S3ReadWriteRole --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
 aws iam delete-role --role-name S3ReadWriteRole

@@ -4,17 +4,6 @@ import org.slf4j.Logger;
 
 public class AfonProperties {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AfonProperties.class);
-
-    /**
-     * General details live here
-     */
-    public static final String PROJECT_PROPERTIES_FILE = "afon.properties";
-    /**
-     * Sensitive details live in here.
-     */
-    public static final String ENV_PROPERTIES_FILE     = "env.properties";
-
     public static final AfonProperty CLUSTER_NAME                 = new AfonProperty("CLUSTER_NAME");
     // AWS
     public static final AfonProperty AWS_S3_BUCKET_NAME           = new AfonProperty("AWS_S3_BUCKET_NAME");
