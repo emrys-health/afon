@@ -2,8 +2,13 @@
 set -euo pipefail
 
 exec_mvn () {
-  echo "Executing $MVN_CMD $MVN_GOALS $MVN_ARGS $MVN_ENVS"
-  $MVN_CMD $MVN_GOALS "$MVN_ARGS" "$MVN_ENVS"
+  if [ -n "$MVN_ARGS" ] ; then
+    echo "Executing $MVN_CMD \"$MVN_ARGS\" $MVN_ENVS $MVN_GOALS"
+    $MVN_CMD "$MVN_ARGS" $MVN_ENVS $MVN_GOALS
+  else
+    echo "Executing $MVN_CMD $MVN_ENVS $MVN_GOALS"
+    $MVN_CMD $MVN_ENVS $MVN_GOALS
+  fi
 }
 
 usage (){
@@ -13,12 +18,15 @@ usage (){
 }
 
 ACTION="build"
-PROFILES=""
-MVN_PROFILES=""
+PROFILES=
 DRY_RUN=false
-EXEC_CLASS=""
-EXEC_ARGS=""
-EXEC_ENVS=""
+EXEC_CLASS=
+EXEC_ARGS=
+EXEC_ENVS=
+MVN_PROFILES=
+MVN_GOALS=
+MVN_ARGS=
+MVN_ENVS=
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
