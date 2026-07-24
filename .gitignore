@@ -131,7 +131,6 @@ venv.bak/
 *.tfstate.backup
 .terraform.lock.hcl
 cdktf.out
-*pom.xml
 env.properties
 .idea
 
