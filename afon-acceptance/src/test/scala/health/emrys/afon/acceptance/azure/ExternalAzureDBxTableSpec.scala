@@ -1,10 +1,11 @@
-package health.emrys.afon.acceptance
+package health.emrys.afon.acceptance.azure
 
-import SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance
+import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
+import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.config.AfonProperties.{AZURE_BUCKET, DATABRICKS_TOKEN}
 import health.emrys.afon.config.AfonPropertiesLoader
-import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, AzureUtils, JsonMaker}
+import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, JsonMaker}
 import health.emrys.afon.polaris.comms.PolarisConfigurer
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
 import org.apache.polaris.core.admin.model._

@@ -1,4 +1,4 @@
-package health.emrys.afon.acceptance
+package health.emrys.afon.acceptance.azure
 
 import uk.co.odinconsultants.documentation_utils.Datum
 

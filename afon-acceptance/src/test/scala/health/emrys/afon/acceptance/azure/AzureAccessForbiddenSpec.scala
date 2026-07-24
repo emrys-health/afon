@@ -1,7 +1,7 @@
-package health.emrys.afon.acceptance.security
+package health.emrys.afon.acceptance.azure
 
 import health.emrys.afon.acceptance.SparkHelper.spark
-import health.emrys.afon.acceptance.{AcceptanceTestConfig, AzureTableCreation, FileHelper}
+import health.emrys.afon.acceptance.{AbstractAccessForbiddenSpec, AcceptanceTestConfig, FileHelper}
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE_FORBIDDEN
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
