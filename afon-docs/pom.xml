@@ -37,7 +37,7 @@
                         <artifactId>exec-maven-plugin</artifactId>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>-classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
+                            <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
                         </configuration>
                     </plugin>
                 </plugins>

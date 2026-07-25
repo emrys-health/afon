@@ -1,13 +1,13 @@
 # Deploying the environment
 
-In `afon-infro`, run:
+In `afon-ops`, run:
 ```shell
-mvn  compile -Dexec.mainClass=health.emrys.afon.opsDeployFullStackAwsMain  exec:exec -Pdemo
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployFullStackAwsMain
 ```
 
 If you need to add tables to Polaris, run something like:
 ```shell
-mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click phil s3cr3t" exec:java
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click phil s3cr3t"
 ```
 (This is just an old table that `afon-acceptancetests` created.
 The salient file in any Iceberg table is the `*.metadata.json` one).
