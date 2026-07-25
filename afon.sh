@@ -13,7 +13,7 @@ exec_mvn () {
 
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--profiles|-p <profiles>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
-  echo "          [--exec-class <mainClass>]"
+  echo "          [--exec-class <mainClass>] [--exec-type docs|ops]"
   echo "actions:  build|exec"
   echo "profiles: acceptance|samples|demo"
   echo "cloud:    aws|azure|gcp"
@@ -26,6 +26,7 @@ DRY_RUN=false
 EXEC_CLASS=
 EXEC_ARGS=
 EXEC_ENVS=
+EXEC_TYPE=
 MVN_PROFILES=
 MVN_GOALS=
 MVN_ARGS=
@@ -47,6 +48,8 @@ while [[ $# -gt 0 ]]; do
       EXEC_ARGS="$2"; shift 2 ;;
     --exec-envs)
       EXEC_ENVS="$2"; shift 2 ;;
+    --exec-type)
+      EXEC_TYPE="$2"; shift 2 ;;
     --help|-h)
       usage; exit 0 ;;
     *)
@@ -87,6 +90,12 @@ case $ACTION in
     exec_mvn
     ;;
   exec)
+    if [ -n "$EXEC_TYPE" ] ; then
+      echo "Using exec type '$EXEC_TYPE'"
+    else
+      echo "Exec type not specified.  Defaulting to 'ops'."
+      EXEC_TYPE="ops"
+    fi
     if [ -z "$EXEC_CLASS" ] ; then
       echo "Action exec requires option --exec-class"
       usage; exit 1
@@ -99,7 +108,7 @@ case $ACTION in
       MVN_ENVS="-D$EXEC_ENVS"
       MVN_ENVS="${MVN_ENVS/ / -D}"
     fi
-    cd $CWD/afon-ops
+    cd $CWD/afon-$EXEC_TYPE
     exec_mvn
     ;;
   *)

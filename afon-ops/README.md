@@ -43,10 +43,10 @@ There's no particular reason for this other than expediency.
 To actually run all the steps in each deployment above, run:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.opsDeployFullStackAwsMain
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.opsDeployGcpPolarisMain
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.opsDeployAzurePolarisMain
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.opsDeployExternalCatalogsMain
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployFullStackAwsMain
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployGcpPolarisMain
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployAzurePolarisMain
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployExternalCatalogsMain
 ```
 
 Note that the credentials in your `env.properties` are used by the deployed Polaris instance.
