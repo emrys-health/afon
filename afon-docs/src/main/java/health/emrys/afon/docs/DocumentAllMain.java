@@ -1,6 +1,7 @@
 package health.emrys.afon.docs;
 
-import io.github.classgraph.*;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ScanResult;
 import org.slf4j.Logger;
 
 import static org.slf4j.LoggerFactory.getLogger;
@@ -10,7 +11,7 @@ public class DocumentAllMain {
     public static void main(String[] args) {
         try (ScanResult scanResult = new ClassGraph()
             .enableClassInfo()
-            .acceptPackages("health.emrys.afon.ops")
+            .acceptPackages("health.emrys.afon.docs")
             .scan()) {
 
             scanResult.getAllClasses()

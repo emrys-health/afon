@@ -10,7 +10,6 @@ import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
-import static health.emrys.afon.steps.StepDocumentation.mvnArgumentsToRun;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -26,9 +25,9 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
             mvnDeploy = String.format(
                 """
                 
-                To run the actual deployment, run:
+                To execute, run:
                 ```shell
-                mvn %s -Pdemo
+                mvn -Pexec %s 
                 ```
                 """, StepDocumentation.mvnArgumentsToRun(clazz, null, "exec"));
             Object o = clazz.getConstructor(new Class[]{}).newInstance(new Object[]{});
@@ -47,7 +46,7 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                         
                         `-Dexec.args="STEP_FROM_LIST_ABOVE"`
                         
-                        and the steps will continue starting at that one and the goal should be `exec:exec` not `exec:java`.
+                        and the steps will continue starting at that one.
                         
                         For example:
                         
@@ -60,10 +59,10 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                 }
             }
         } catch (ClassNotFoundException e) {
-            log.warn("Cannot find the deployment class for " + this.getClass().getSimpleName(), e);
+            log.warn("Cannot find the class for " + this.getClass().getSimpleName(), e);
         } catch (NoSuchMethodException | InvocationTargetException | InstantiationException |
                  IllegalAccessException e) {
-            log.warn("Could not find the steps for the deploy class", e);
+            log.warn("Could not find the steps for the class", e);
         }
         return String.format(
             """
@@ -84,7 +83,7 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
 
     public Class<?> getDeployHomologue() throws ClassNotFoundException {
         String name = this.getClass().getName();
-        return Class.forName(name.replace("Document", "Deploy"));
+        return Class.forName(name.replace("docs.Document", "ops.Deploy"));
     }
 
     abstract public String getSupplementaryIntro();
