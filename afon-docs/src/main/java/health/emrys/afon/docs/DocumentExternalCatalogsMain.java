@@ -1,7 +1,7 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.azure.AzureNuke;
-import health.emrys.afon.demo.DeployExternalCatalogsMain;
+import health.emrys.afon.ops.DeployExternalCatalogsMain;
 import health.emrys.afon.steps.Step;
 import health.emrys.afon.steps.StepOperations;
 

@@ -1,4 +1,4 @@
-package health.emrys.afon.demo;
+package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.steps.Step;

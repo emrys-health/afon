@@ -42,7 +42,7 @@ public class AwsPlainKubernetes extends TerraformStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsPlainKubernetes(app, "demo", new AfonPropertiesLoader().getProperties());
+        new AwsPlainKubernetes(app, "ops", new AfonPropertiesLoader().getProperties());
         app.synth();
     }
 }

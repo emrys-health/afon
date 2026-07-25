@@ -5,7 +5,7 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 
-import health.emrys.afon.demo.DeploySnowflakeReadingAzureViaAwsMain;
+import health.emrys.afon.ops.DeploySnowflakeReadingAzureViaAwsMain;
 import health.emrys.afon.steps.Step;
 import health.emrys.afon.steps.StepOperations;
 

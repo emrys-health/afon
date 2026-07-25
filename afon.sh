@@ -99,7 +99,7 @@ case $ACTION in
       MVN_ENVS="-D$EXEC_ENVS"
       MVN_ENVS="${MVN_ENVS/ / -D}"
     fi
-    cd $CWD/afon-demo
+    cd $CWD/afon-ops
     exec_mvn
     ;;
   *)

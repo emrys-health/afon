@@ -19,7 +19,7 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>afon-demo</artifactId>
+            <artifactId>afon-ops</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
@@ -37,7 +37,7 @@
                         <artifactId>exec-maven-plugin</artifactId>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
+                            <commandlineArgs>-classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
                         </configuration>
                     </plugin>
                 </plugins>

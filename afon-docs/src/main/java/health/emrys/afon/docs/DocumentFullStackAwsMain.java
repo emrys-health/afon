@@ -4,7 +4,7 @@ import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.cdk.aws.AwsNuke;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.demo.DeployFullStackAwsMain;
+import health.emrys.afon.ops.DeployFullStackAwsMain;
 import health.emrys.afon.steps.Step;
 import health.emrys.afon.steps.StepOperations;
 

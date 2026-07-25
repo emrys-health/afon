@@ -27,7 +27,7 @@ Doing so will generate the client ID and secret you then put in `env.properties`
 
 # Deployment
 
-Note 1: Run everything in the `afon-demo` directory.
+Note 1: Run everything in the `afon-ops` directory.
 
 Note 2: If you really foul things up, you'll leave the environment in an unstable state.
 Consult the `*Nuke.java` files to destroy your environment totally. 
@@ -43,10 +43,10 @@ There's no particular reason for this other than expediency.
 To actually run all the steps in each deployment above, run:
 
 ```shell
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployFullStackAwsMain exec:java
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployGcpPolarisMain exec:java
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployAzurePolarisMain exec:java
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain exec:java
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.opsDeployFullStackAwsMain
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.opsDeployGcpPolarisMain
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.opsDeployAzurePolarisMain
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.opsDeployExternalCatalogsMain
 ```
 
 Note that the credentials in your `env.properties` are used by the deployed Polaris instance.
@@ -181,7 +181,7 @@ az network dns zone create  --resource-group afon_resource_group  --name emryspo
 For some suggests as to what to execute, running this:
 
 ```shell
-mvn -Dexec.mainClass=health.emrys.afon.core.configuration.SparkContextConfigurationPrinter exec:java
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.core.configuration.SparkContextConfigurationPrinter
 ```
 
 will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
@@ -192,13 +192,13 @@ When a new version of Polaris is started up, it has nothing in it.
 So, create the warehouses with:
 
 ```shell
-mvn -Dexec.mainClass=health.emrys.afon.infra.ClusterPolarisConfiguration exec:java
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.infra.ClusterPolarisConfiguration
 ```
 
 and register tables with something like:
 
 ```shell
-mvn exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
 ```
 
 or similar.
@@ -221,7 +221,7 @@ Run `health.emrys.afon.cdk.aws.AwsNuke` to print out helpful command lines.
 In particular, the output of this script should blatt everything:
 
 ```shell
-mvn -Dexec.mainClass=health.emrys.afon.cdk.aws.AwsNuke exec:java
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.cdk.aws.AwsNuke
 ```
 
 This is a shell script. 
