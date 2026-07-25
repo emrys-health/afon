@@ -70,15 +70,15 @@ public class AfonPropertiesLoader {
         properties = new Properties();
         try {
             // are we running as a build?
-            readProperties("../");
+            readProperties("../config");
         } catch (IOException e) {
             logger.warn("Could not read properties files in parent directory. Trying in this...");
             try {
                 // ...or in the IDE?
-                readProperties("");
+                readProperties("config");
             } catch (IOException ex) {
-                logger.error("Could not find propery files");
-                throw new RuntimeException(ex); // urgh, the properties file is not there
+                logger.error("Could not find properties files");
+                throw new RuntimeException(ex); // urgh, the properties file not found
             }
         }
     }
@@ -86,7 +86,7 @@ public class AfonPropertiesLoader {
     private void readProperties(String prepend) throws IOException {
         for (String file : propertyFiles()) {
             Properties props    = new Properties();
-            String     filename = prepend + file;
+            String     filename = prepend + "/" + file;
             logger.info("Reading properties file {}", filename);
             props.load(new FileInputStream(filename));
             logger.info("{} has {} items", filename, props.size());
