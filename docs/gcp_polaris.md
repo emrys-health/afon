@@ -2,7 +2,7 @@
 
 To create this documentation, run:
 ```
-mvn  compile -Dexec.mainClass=health.emrys.afon.demo.DocumentGcpPolarisMain  exec:java
+mvn  compile -Dexec.mainClass=health.emrys.afon.docs.DocumentGcpPolarisMain  exec:java
 ```
 
 To run the actual deployment, run:

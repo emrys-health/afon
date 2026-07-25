@@ -113,7 +113,7 @@ You need domain names that point to each cloud's Kubernetes ingress. See [DNS Co
 ### 5. Generate infrastructure documentation
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.demo.DocumentExternalCatalogsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.docs.DocumentExternalCatalogsMain 
 ```
 
 Read the generated docs:

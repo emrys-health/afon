@@ -2,7 +2,7 @@
 
 To create this documentation, run:
 ```
-mvn  compile -Dexec.mainClass=health.emrys.afon.demo.DocumentSnowflakeReadingAzureViaAwsMain  exec:java
+mvn  compile -Dexec.mainClass=health.emrys.afon.docs.DocumentSnowflakeReadingAzureViaAwsMain  exec:java
 ```
 
 To run the actual deployment, run:

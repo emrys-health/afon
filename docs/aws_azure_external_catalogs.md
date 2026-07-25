@@ -2,7 +2,7 @@
 
 To create this documentation, run:
 ```
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.demo.DocumentExternalCatalogsMain 
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.docs.DocumentExternalCatalogsMain 
 ```
 
 To run the actual deployment, run:
