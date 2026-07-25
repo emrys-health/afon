@@ -7,7 +7,7 @@ mvn  compile -Dexec.mainClass=health.emrys.afon.docs.DocumentGcpPolarisMain  exe
 
 To run the actual deployment, run:
 ```shell
-mvn  compile -Dexec.mainClass=health.emrys.afon.demo.DeployGcpPolarisMain  exec:exec -Pdemo
+mvn  compile -Dexec.mainClass=health.emrys.afon.opsDeployGcpPolarisMain  exec:exec -Pdemo
 ```
 
 

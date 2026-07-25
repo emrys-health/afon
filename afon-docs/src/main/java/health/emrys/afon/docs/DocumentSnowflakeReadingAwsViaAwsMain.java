@@ -3,7 +3,7 @@ package health.emrys.afon.docs;
 import java.io.IOException;
 import java.util.List;
 
-import health.emrys.afon.demo.DeploySnowflakeReadingAwsViaAwsMain;
+import health.emrys.afon.ops.DeploySnowflakeReadingAwsViaAwsMain;
 import health.emrys.afon.steps.Step;
 import health.emrys.afon.steps.StepOperations;
 

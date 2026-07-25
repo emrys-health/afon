@@ -3,7 +3,7 @@ package health.emrys.afon.docs;
 import health.emrys.afon.cdk.azure.AzureNuke;
 import health.emrys.afon.steps.Step;
 import health.emrys.afon.steps.StepOperations;
-import health.emrys.afon.demo.DeployAzurePolarisMain;
+import health.emrys.afon.ops.DeployAzurePolarisMain;
 import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.List;

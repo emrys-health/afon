@@ -2,7 +2,7 @@ package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.gcp.GcpConstruct;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.demo.DeployGcpPolarisMain;
+import health.emrys.afon.ops.DeployGcpPolarisMain;
 import health.emrys.afon.steps.Step;
 import health.emrys.afon.steps.StepOperations;
 

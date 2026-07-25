@@ -7,7 +7,7 @@ mvn  compile -Dexec.mainClass=health.emrys.afon.docs.DocumentAzurePolarisMain  e
 
 To run the actual deployment, run:
 ```shell
-mvn  compile -Dexec.mainClass=health.emrys.afon.demo.DeployAzurePolarisMain  exec:exec -Pdemo
+mvn  compile -Dexec.mainClass=health.emrys.afon.opsDeployAzurePolarisMain  exec:exec -Pdemo
 ```
 
 
