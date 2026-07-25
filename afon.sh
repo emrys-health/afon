@@ -11,21 +11,58 @@ exec_mvn () {
   fi
 }
 
+exec_jvm(){
+      if [ -z "$EXEC_CLASS" ] ; then
+        echo "Action exec requires option --exec-class"
+        usage; exit 1
+      fi
+      MVN_GOALS="exec:exec -Pexec -Dexec.mainClass=$EXEC_CLASS"
+      if [ -n "$EXEC_ARGS" ] ; then
+        MVN_ARGS="-Dexec.args=\"$EXEC_ARGS\""
+      fi
+      if [ -n "$EXEC_ENVS" ] ; then
+        MVN_ENVS="-D$EXEC_ENVS"
+        MVN_ENVS="${MVN_ENVS/ / -D}"
+      fi
+      if [ -z "$EXEC_TYPE" ] ; then
+        echo "Action exec requires option --exec-type"
+        usage; exit 1
+      fi
+      cd $CWD/afon-$EXEC_TYPE
+      exec_mvn
+}
+
+exec_script(){
+      if [ -z "$EXEC_SCRIPT" ] ; then
+        echo "Action exec requires option --exec-script"
+        usage; exit 1
+      fi
+      if [ -z "$CLOUD" ] ; then
+        echo "Script requires option --cloud"
+        usage; exit 1
+      fi
+      set -a && source $CWD/config/afon.properties && source $CWD/config/afon-$CLOUD.properties && set +a
+      $CWD/scripts/$CLOUD/$EXEC_SCRIPT
+}
+
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--profiles|-p <profiles>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
-  echo "          [--exec-class <mainClass>] [--exec-type docs|ops]"
+  echo "          [--exec-class <mainClass>] [--exec-type|-t <types>]"
+  echo "          [--exec-script <script-name>]"
   echo "actions:  build|exec"
   echo "profiles: acceptance|samples|demo"
   echo "cloud:    aws|azure|gcp"
+  echo "types:    docs|ops|samples|script"
 }
 
-ACTION="build"
+ACTION=
 PROFILES=
 CLOUD=
 DRY_RUN=false
 EXEC_CLASS=
 EXEC_ARGS=
 EXEC_ENVS=
+EXEC_SCRIPT=
 EXEC_TYPE=
 MVN_PROFILES=
 MVN_GOALS=
@@ -48,7 +85,9 @@ while [[ $# -gt 0 ]]; do
       EXEC_ARGS="$2"; shift 2 ;;
     --exec-envs)
       EXEC_ENVS="$2"; shift 2 ;;
-    --exec-type)
+    --exec-script)
+      EXEC_SCRIPT="$2"; shift 2 ;;
+    --exec-type|-t)
       EXEC_TYPE="$2"; shift 2 ;;
     --help|-h)
       usage; exit 0 ;;
@@ -96,20 +135,11 @@ case $ACTION in
       echo "Exec type not specified.  Defaulting to 'ops'."
       EXEC_TYPE="ops"
     fi
-    if [ -z "$EXEC_CLASS" ] ; then
-      echo "Action exec requires option --exec-class"
-      usage; exit 1
+    if [ "$EXEC_TYPE" == "script" ] ; then
+      exec_script
+    else
+      exec_jvm
     fi
-    MVN_GOALS="exec:exec -Pexec -Dexec.mainClass=$EXEC_CLASS"
-    if [ -n "$EXEC_ARGS" ] ; then
-      MVN_ARGS="-Dexec.args=\"$EXEC_ARGS\""
-    fi
-    if [ -n "$EXEC_ENVS" ] ; then
-      MVN_ENVS="-D$EXEC_ENVS"
-      MVN_ENVS="${MVN_ENVS/ / -D}"
-    fi
-    cd $CWD/afon-$EXEC_TYPE
-    exec_mvn
     ;;
   *)
     echo "Unknown action $ACTION"
