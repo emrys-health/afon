@@ -136,6 +136,7 @@ env-aws.properties
 env-azure.properties
 env-gcp.properties
 .idea
+iam_policy.json
 
 # Spyder project settings
 .spyderproject
