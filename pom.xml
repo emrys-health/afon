@@ -89,6 +89,15 @@
             </modules>
         </profile>
         <profile>
+            <id>docs</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <modules>
+                <module>afon-docs</module>
+            </modules>
+        </profile>
+        <profile>
             <id>samples</id>
             <activation>
                 <activeByDefault>true</activeByDefault>

@@ -1,9 +1,11 @@
 package health.emrys.afon.demo;
 
+import health.emrys.afon.steps.*;
+
 import java.util.List;
 
 public class DeployFullStackAwsMain implements StepsProvider {
-    static final List<Step> steps(StepOperations stepOperations) {
+    public static List<Step> steps(StepOperations stepOperations) {
         return List.of(
             stepOperations.cleanLocalAws(),
             stepOperations.deployFullAwsCluster(),
