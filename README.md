@@ -1,6 +1,6 @@
 # Afon Documentation
 
-Afon is the core infrastructure project that deploys [Apache Polaris](https://polaris.apache.org/) across AWS, Azure, and GCP to enable secure cross-cloud querying of Iceberg tables via Spark and Snowflake.
+Afon is an infrastructure project that deploys [Apache Polaris](https://polaris.apache.org/) across cloud providers (AWS, Azure and GCP) to enable secure cross-cloud querying of Iceberg tables via Spark and Snowflake.
 
 ---
 
@@ -30,11 +30,12 @@ cd afon-core
 
 ### 2. Configure properties
 
-Afon uses two types properties files in the project root:
+Afon uses two types properties files in the config dir:
 
-- **`afon.properties`** — non-sensitive configuration (bucket names, domain names, regions, Polaris credentials). Copy the example and fill in your cloud-specific values:
+- **`afon.properties`** — non-sensitive configuration (bucket names, domain names, regions, Polaris credentials). Copy the examples and fill in your cloud-specific values:
 
 ```shell
+cd config
 cp afon.properties.example afon.properties  
 cp afon-<cloud>.properties.example afon-<cloud>.properties
 ```
@@ -59,6 +60,7 @@ Key properties to set:
 - **`env.properties`** — sensitive credentials. Copy from `env.properties.example` and `env-<cloud>.properties.example` and fill in:
 
 ```shell
+cd config
 cp env.properties.example env.properties
 cp env-<cloud>.properties.example env-<cloud>.properties
 ```
@@ -125,7 +127,7 @@ cat target/aws_azure_external_catalogs.md
 ### 6. Deploy the demo
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployExternalCatalogsMain
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployExternalCatalogsMain
 ```
 
 This deploys Polaris to AWS and Azure, populates catalogs, and runs a Spark smoke test. It takes approximately 45 minutes.
@@ -232,7 +234,7 @@ The acceptance tests in `afon-acceptance` verify that cross-cloud access works c
 
 Test specs include:
 
-- `AwsAccessSpec` — write and read Iceberg tables via AWS Polaris to S3
+- `AwsAccessSpec` — write and read Iceberg tables via AWS Polaris to s3
 - `GcpAccessSpec` — write and read via AWS Polaris to GCS
 - `AzureAccessSpec` — write and read via AWS Polaris to Azure Blob
 - `ExternalAzureDBxTableSpec` — cross-cloud: Spark talks to AWS Polaris which federates to Azure Polaris
@@ -249,7 +251,7 @@ Test specs include:
 The full AWS stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployFullStackAwsMain
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployFullStackAwsMain
 ```
 
 Steps executed:
@@ -263,7 +265,7 @@ Steps executed:
 ### Deploy Polaris to GCP only
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployGcpPolarisMain  
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployGcpPolarisMain  
 ```
 
 Steps: `clean_gcp` → `gcp_polaris` → `waitFor_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
@@ -271,7 +273,7 @@ Steps: `clean_gcp` → `gcp_polaris` → `waitFor_emryspolarisgcp` → `all_cata
 ### Deploy Polaris to Azure only
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployAzurePolarisMain  
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployAzurePolarisMain  
 ```
 
 Steps: `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
@@ -281,7 +283,7 @@ Steps: `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `all_c
 This deploys both AWS and Azure Polaris instances and configures AWS Polaris to federate to Azure Polaris for cross-cloud querying.
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployExternalCatalogsMain  
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployExternalCatalogsMain  
 ```
 
 Steps: `clean_aws` → `aws_spark` → `waitFor_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
@@ -327,19 +329,19 @@ Afon can configure Snowflake to read Iceberg tables from any cloud via Polaris a
 **Read GCP data via AWS Polaris:**
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeploySnowflakeReadingGcpViaAwsMain  
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingGcpViaAwsMain  
 ```
 
 **Read Azure data via AWS Polaris:**
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeploySnowflakeReadingAzureViaAwsMain  
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingAzureViaAwsMain  
 ```
 
 **Read AWS data via AWS Polaris:**
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeploySnowflakeReadingAwsViaAwsMain  
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingAwsViaAwsMain  
 ```
 
 These deploy the full AWS stack, write test data to the target cloud, then create a Snowflake catalog integration and iceberg table that reads through Polaris.
@@ -357,7 +359,7 @@ See `afon-snowflake/README.md` for the full guide. In summary:
 The deployment is automated via:
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeploySnowflakeWritingAzureViaAwsMain  
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeWritingAzureViaAwsMain  
 ```
 
 ### Set up monitoring
@@ -440,7 +442,7 @@ az network dns record-set a delete \
 If a deployment fails partway through, you can resume from a specific step:
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployExternalCatalogsMain \ 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployExternalCatalogsMain \ 
   --exec-args "az_polaris"
 ```
 
@@ -532,20 +534,20 @@ The `SupportedCloudsEnum` defines the catalog types:
 
 ### Properties system
 
-Afon uses a two-file properties system:
+Afon uses a two-file properties system (which live in config dir):
 
 - **`afon.properties`** — non-sensitive configuration, safe to check into version control (though the current repo includes real values for the Emrys demo environment)
 - **`env.properties`** — sensitive credentials, should never be committed
 
 Both are loaded by `AfonPropertiesLoader`, which tries the parent directory first (when running as a build) then the current directory (when running in an IDE). System properties can override any value.
 
-All known properties are defined as `AfonProperty` constants in `AfonProperties.java`. Each property knows its own name and can extract its value from a `Properties` object.
+All known properties are defined as `AfonProperty` constants in `AfonProperties`. Each property knows its own name and can extract its value from a `Properties` object.
 
 The `SupportedCloudsEnum` enum defines the cloud types that Polaris can manage, used throughout the codebase to select the right storage configuration and credential vending logic.
 
-### Deployment step system
+### Executable step system
 
-Deployments are composed of reusable steps:
+Executables are composed of reusable steps:
 
 - **`Step`** — a named unit of work with a description and a runnable action
 - **`StepOperations`** — factory methods that create `Step` instances for common operations (clean, deploy, wait, configure, test)
@@ -593,7 +595,7 @@ In the deployed environment, Spark runs as a Spark Connect server in Kubernetes.
 
 ---
 
-## Examples — What can I do with it
+## Examples
 
 ### PySpark cross-cloud join
 
@@ -849,23 +851,23 @@ SNOWFLAKE_PRIVATE_KEY=YOUR_SNOWFLAKE_PRIVATE_KEY
 
 ```shell
 # Full AWS stack (Polaris + Spark + Jupyter)
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployFullStackAwsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployFullStackAwsMain 
 
 # Azure Polaris (standalone)
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployAzurePolarisMain
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployAzurePolarisMain
 
 # GCP Polaris (standalone)
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployGcpPolarisMain 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployGcpPolarisMain 
 
 # Cross-cloud external catalogs (AWS + Azure federation)
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeployExternalCatalogsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployExternalCatalogsMain 
 
 # Snowflake reading cross-cloud data
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeploySnowflakeReadingGcpViaAwsMain 
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeploySnowflakeReadingAzureViaAwsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingGcpViaAwsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingAzureViaAwsMain 
 
 # Snowflake writing to Azure
-./afon.sh -a exec --exec-class health.emrys.afon.opsDeploySnowflakeWritingAzureViaAwsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeWritingAzureViaAwsMain 
 ```
 
 ### Production monitoring setup

@@ -14,7 +14,7 @@ These include running:
 ### External Database
 
 We also assume that you have a Database to store the Polaris metadata.
-Credentials to access that live in [env.properties](../env.properties)
+Credentials to access that live in [env.properties](../config/env.properties)
 
 ### OAuth Provider
 
@@ -79,7 +79,7 @@ For example, for Emrys's AWS Polaris:
 TOKEN=$(curl -X POST "https://emryspolaris.click/api/catalog/v1/oauth/tokens" -H "Content-Type: application/x-www-form-urlencoded" -d "grant_type=client_credentials&client_id=root&client_secret=s3cr3t&scope=PRINCIPAL_ROLE:ALL" | jq -r '.access_token')
 curl -X GET "https://emryspolaris.click/api/catalog/v1/aws/namespaces/acceptancetests/tables/AwsAccessSpec251117511401" -H "Authorization: Bearer ${ACCESS_TOKEN}"  | jq
 ```
-Note how this uses credentials and domain names you can find in the `afon-core/*.properties` files.
+Note how this uses credentials and domain names you can find in the `config/*.properties` files.
 
 #### Domain names
 
