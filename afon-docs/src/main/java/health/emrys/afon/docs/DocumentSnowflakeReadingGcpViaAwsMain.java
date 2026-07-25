@@ -5,7 +5,7 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
 
-import health.emrys.afon.demo.DeploySnowflakeReadingGcpViaAwsMain;
+import health.emrys.afon.ops.DeploySnowflakeReadingGcpViaAwsMain;
 import health.emrys.afon.steps.Step;
 import health.emrys.afon.steps.StepOperations;
 

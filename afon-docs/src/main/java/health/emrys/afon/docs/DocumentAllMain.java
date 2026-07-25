@@ -10,7 +10,7 @@ public class DocumentAllMain {
     public static void main(String[] args) {
         try (ScanResult scanResult = new ClassGraph()
             .enableClassInfo()
-            .acceptPackages("health.emrys.afon.demo")
+            .acceptPackages("health.emrys.afon.ops")
             .scan()) {
 
             scanResult.getAllClasses()

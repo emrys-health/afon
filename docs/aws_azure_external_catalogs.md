@@ -7,7 +7,7 @@ mvn  exec:java -Dexec.mainClass=health.emrys.afon.docs.DocumentExternalCatalogsM
 
 To run the actual deployment, run:
 ```shell
-mvn  exec:exec -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain  -Pdemo
+mvn  exec:exec -Dexec.mainClass=health.emrys.afon.opsDeployExternalCatalogsMain  -Pdemo
 ```
 
 

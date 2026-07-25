@@ -2,7 +2,7 @@
 
 In `afon-infro`, run:
 ```shell
-mvn  compile -Dexec.mainClass=health.emrys.afon.demo.DeployFullStackAwsMain  exec:exec -Pdemo
+mvn  compile -Dexec.mainClass=health.emrys.afon.opsDeployFullStackAwsMain  exec:exec -Pdemo
 ```
 
 If you need to add tables to Polaris, run something like:

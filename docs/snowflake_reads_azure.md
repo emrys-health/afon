@@ -7,7 +7,7 @@ mvn  compile -Dexec.mainClass=health.emrys.afon.docs.DocumentSnowflakeReadingAzu
 
 To run the actual deployment, run:
 ```shell
-mvn  compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingAzureViaAwsMain  exec:exec -Pdemo
+mvn  compile -Dexec.mainClass=health.emrys.afon.opsDeploySnowflakeReadingAzureViaAwsMain  exec:exec -Pdemo
 ```
 
 

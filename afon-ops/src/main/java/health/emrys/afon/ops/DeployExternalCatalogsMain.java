@@ -1,4 +1,4 @@
-package health.emrys.afon.demo;
+package health.emrys.afon.ops;
 
 import health.emrys.afon.steps.*;
 import org.slf4j.Logger;
@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * This sets the cloud environments up just as they were for the TDA demo of 23/3/26.
+ * This sets the cloud environments up just as they were for the TDA ops of 23/3/26.
  * The main thing is:
  * - we have all the catalogs in AWS plus the external one that talks to:
  * - an Azure Polaris with an Azure catalog
