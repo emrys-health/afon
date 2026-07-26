@@ -1,6 +1,6 @@
 # Automated acceptance tests
 
-These tests are run against cloud infra.
+These tests are run against cloud cluster, using the afon-ops module.
 
 There is a once only preparation for them. 
 Scripts to set AWS, GCP and Azure live at:

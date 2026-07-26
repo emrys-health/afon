@@ -1,10 +1,10 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.steps.Step;
-import health.emrys.afon.steps.StepDocumentation;
-import health.emrys.afon.steps.StepOperations;
-import health.emrys.afon.steps.StepRunner;
+import health.emrys.afon.ops.steps.Step;
+import health.emrys.afon.ops.steps.StepDocumentation;
+import health.emrys.afon.ops.steps.StepOperations;
+import health.emrys.afon.ops.steps.StepRunner;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;

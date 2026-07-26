@@ -203,7 +203,7 @@ df_joined.show()
 When a new Polaris instance starts, it has no catalogs. You can configure all catalogs at once:
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.infra.PurgeAndPopulatePolaris \
+./afon.sh -a exec --exec-class health.emrys.afon.ops.PurgeAndPopulatePolarisMain \
   --exec-args "emryspolaris.click"
 ```
 
@@ -212,7 +212,7 @@ This creates catalogs for AWS, GCP, Azure, and their external/forbidden variants
 To configure a single catalog on a specific endpoint:
 
 ```shell
-./afon.sh -a exec -t ops --exec-class health.emrys.afon.infra.EndpointPolarisConfiguration \
+./afon.sh -a exec -t ops --exec-class health.emrys.afon.ops.ConfigureEndpointPolarisMain \
   --exec-args "AZURE" --exec-envs "POLARIS_ENDPOINT=emryspolarisazure.click"
 ```
 

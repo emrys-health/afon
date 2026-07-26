@@ -1,4 +1,4 @@
-package health.emrys.afon.steps;
+package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.config.AfonProperties;

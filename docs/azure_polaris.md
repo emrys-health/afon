@@ -68,7 +68,7 @@ will show you the IP address when the DNS servers have updated.
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris -Dexec.args="emryspolarisazure.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.ops.PurgeAndPopulatePolarisMain -Dexec.args="emryspolarisazure.click"
 ```
 
 # Problems running `tofu destroy`?

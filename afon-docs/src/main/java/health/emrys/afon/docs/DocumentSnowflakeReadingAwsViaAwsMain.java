@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.util.List;
 
 import health.emrys.afon.ops.DeploySnowflakeReadingAwsViaAwsMain;
-import health.emrys.afon.steps.Step;
-import health.emrys.afon.steps.StepOperations;
+import health.emrys.afon.ops.steps.Step;
+import health.emrys.afon.ops.steps.StepOperations;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
 

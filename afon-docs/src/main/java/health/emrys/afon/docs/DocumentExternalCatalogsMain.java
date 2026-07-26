@@ -2,8 +2,8 @@ package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.azure.AzureNuke;
 import health.emrys.afon.ops.DeployExternalCatalogsMain;
-import health.emrys.afon.steps.Step;
-import health.emrys.afon.steps.StepOperations;
+import health.emrys.afon.ops.steps.Step;
+import health.emrys.afon.ops.steps.StepOperations;
 
 import org.slf4j.Logger;
 

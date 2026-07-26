@@ -77,14 +77,14 @@ will show you the IP address when the DNS servers have updated.
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris -Dexec.args="emryspolaris.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.ops.PurgeAndPopulatePolarisMain -Dexec.args="emryspolaris.click"
 ```
 
 ### Run Spark locally such that it talks to the AWS Polaris, writes a table to aws
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.onboard.OnboardAllUsersMain -Dexec.args="emryspolaris.click aws emrysjupyter.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.ops.OnboardAllUsersMain -Dexec.args="emryspolaris.click aws emrysjupyter.click"
 ```
 
 In the top level directory 
@@ -126,21 +126,21 @@ will show you the IP address when the DNS servers have updated.
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris -Dexec.args="emryspolarisazure.click AZURE namespaceph test_table"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.ops.PurgeAndPopulatePolarisMain -Dexec.args="emryspolarisazure.click AZURE namespaceph test_table"
 ```
 
 ### Create a catalog in the Polaris at `emryspolarisazure.click`
 In the top level directory 
 run
 ```shell
-mvn -DAZURE_BUCKET=afonstorage-2 -DPOLARIS_ENDPOINT=emryspolarisazure.click  exec:java -Dexec.mainClass=health.emrys.afon.infra.EndpointPolarisConfiguration -Dexec.args="AZURE"
+mvn -DAZURE_BUCKET=afonstorage-2 -DPOLARIS_ENDPOINT=emryspolarisazure.click  exec:java -Dexec.mainClass=health.emrys.afon.ops.ConfigureEndpointPolarisMain -Dexec.args="AZURE"
 ```
 
 ### Run Spark locally such that it talks to emryspolaris.click which defers to AZURE_DOMAIN_NAME
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.onboard.OnboardAllUsersMain -Dexec.args="emryspolaris.click azure_external emrysjupyter.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.ops.OnboardAllUsersMain -Dexec.args="emryspolaris.click azure_external emrysjupyter.click"
 ```
 
 In the top level directory 

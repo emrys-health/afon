@@ -1,8 +1,7 @@
-package health.emrys.afon.onboard;
+package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.Onboarding;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.config.ConfigureUserMain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +21,7 @@ public class ConfigureAllPolarisUsersMain {
         if (args.length > 0) {
             properties.put(POLARIS_ENDPOINT.getName(), args[0]);
         }
-        ConfigureUserMain app         = new ConfigureUserMain(properties);
+        ConfigurePolarisUserMain app         = new ConfigurePolarisUserMain(properties);
         String            catalogName = args[1];
         Onboarding        onboarding  = new Onboarding();
         try {

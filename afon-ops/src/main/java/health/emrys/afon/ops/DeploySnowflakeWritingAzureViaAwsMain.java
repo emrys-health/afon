@@ -1,9 +1,9 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.steps.Step;
-import health.emrys.afon.steps.StepOperations;
-import health.emrys.afon.steps.StepRunner;
-import health.emrys.afon.steps.StepsProvider;
+import health.emrys.afon.ops.steps.Step;
+import health.emrys.afon.ops.steps.StepOperations;
+import health.emrys.afon.ops.steps.StepRunner;
+import health.emrys.afon.ops.steps.StepsProvider;
 
 import java.util.ArrayList;
 import java.util.List;

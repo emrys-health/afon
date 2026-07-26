@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.steps.*;
+import health.emrys.afon.ops.steps.*;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;

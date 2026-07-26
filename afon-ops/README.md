@@ -192,7 +192,7 @@ When a new version of Polaris is started up, it has nothing in it.
 So, create the warehouses with:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.infra.ClusterPolarisConfiguration
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.ConfigureClusterPolarisMain
 ```
 
 and register tables with something like:

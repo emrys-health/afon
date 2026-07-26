@@ -78,14 +78,14 @@ will show you the IP address when the DNS servers have updated.
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris -Dexec.args="emryspolaris.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.ops.PurgeAndPopulatePolarisMain -Dexec.args="emryspolaris.click"
 ```
 
 ### Run Spark locally such that it talks to the AWS Polaris, writes a table to aws
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.onboard.OnboardAllUsersMain -Dexec.args="emryspolaris.click aws emrysjupyter.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.ops.OnboardAllUsersMain -Dexec.args="emryspolaris.click aws emrysjupyter.click"
 ```
 
 In the top level directory 
@@ -98,7 +98,7 @@ mvn  exec:java -Dexec.mainClass=health.emrys.afon.spark.SparkTestWriter -Dexec.a
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.onboard.OnboardAllUsersMain -Dexec.args="emryspolaris.click azure emrysjupyter.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.ops.OnboardAllUsersMain -Dexec.args="emryspolaris.click azure emrysjupyter.click"
 ```
 
 In the top level directory 

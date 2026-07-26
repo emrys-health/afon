@@ -81,14 +81,14 @@ will show you the IP address when the DNS servers have updated.
 In the top level directory 
 run
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.infra.PurgeAndPopulatePolaris --exec-args "emryspolaris.click"
+./afon.sh -a exec --exec-class health.emrys.afon.ops.PurgeAndPopulatePolarisMain --exec-args "emryspolaris.click"
 ```
 
 ### Run Spark locally such that it talks to the AWS Polaris, writes a table to aws
 In the top level directory 
 run
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.onboard.OnboardAllUsersMain --exec-args "emryspolaris.click aws emrysjupyter.click"
+./afon.sh -a exec --exec-class health.emrys.afon.ops.OnboardAllUsersMain --exec-args "emryspolaris.click aws emrysjupyter.click"
 ```
 
 In the top level directory 
@@ -154,13 +154,13 @@ VALUES
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris -Dexec.args="emryspolaris.click AZURE acceptancetests test_table"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.ops.PurgeAndPopulatePolarisMain -Dexec.args="emryspolaris.click AZURE acceptancetests test_table"
 ```
 
 In the top level directory 
 run
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.infra.EndpointPolarisConfiguration --exec-args "AZURE" --exec-envs "POLARIS_ENDPOINT=emryspolaris.click"
+./afon.sh -a exec --exec-class health.emrys.afon.ops.ConfigureEndpointPolarisMain --exec-args "AZURE" --exec-envs "POLARIS_ENDPOINT=emryspolaris.click"
 ```
 
 ### Create `AZURE` table in the AWS Polaris
@@ -174,7 +174,7 @@ run
 In the top level directory 
 run
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.onboard.OnboardAllUsersMain --exec-args
+./afon.sh -a exec --exec-class health.emrys.afon.ops.OnboardAllUsersMain --exec-args
 "emryspolaris.click azure emrysjupyter.click"
 ```
 

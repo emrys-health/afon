@@ -5,8 +5,8 @@ import health.emrys.afon.cdk.aws.AwsNuke;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.DeployFullStackAwsMain;
-import health.emrys.afon.steps.Step;
-import health.emrys.afon.steps.StepOperations;
+import health.emrys.afon.ops.steps.Step;
+import health.emrys.afon.ops.steps.StepOperations;
 
 import org.slf4j.Logger;
 
