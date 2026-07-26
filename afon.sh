@@ -47,7 +47,7 @@ exec_script(){
 
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--profiles|-p <profiles>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
-  echo "          [--exec-class <mainClass>] [--exec-type|-t <types>]"
+  echo "          [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
   echo "actions:  build|exec"
   echo "profiles: acceptance|docs|ops|samples"

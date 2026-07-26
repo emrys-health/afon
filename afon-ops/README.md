@@ -181,7 +181,7 @@ az network dns zone create  --resource-group afon_resource_group  --name emryspo
 For some suggests as to what to execute, running this:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.core.configuration.SparkContextConfigurationPrinter
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.GeneratePySparkContextMain
 ```
 
 will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
@@ -198,7 +198,7 @@ mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.infra.ClusterPolarisConf
 and register tables with something like:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.core.configuration.PolarisRegisterMain  -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
+mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.RegisterPolarisMain  -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
 ```
 
 or similar.

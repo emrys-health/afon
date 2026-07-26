@@ -19,7 +19,7 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
         steps.addAll(List.of(
             stepOperations.snowflakeWritesToAzure(),
             stepOperations.purgeAzureFromAwsPolarisAndRecreate(),
-            stepOperations.registerMostRecentSnowflakeAzureTableInAws(),
+            stepOperations.registerMostRecentSnowflakeAzureTableInAws(RegisterLocalPolarisMain.class),
             stepOperations.awsSparkReadTestUsing(AZURE, ACCEPTANCE_TEST_NAMESPACE)
                       )
                     );

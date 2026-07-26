@@ -1,4 +1,4 @@
-package health.emrys.afon.core.configuration;
+package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -29,9 +29,9 @@ import static java.lang.String.format;
  * then
  * aws s3 presign s3://emrys-afon-bucket/afon-iceberg-0.1.jar --expires-in 14400
  */
-public class SparkContextConfigurationPrinter {
+public class GeneratePySparkContextMain {
 
-    static final  Logger logger = org.slf4j.LoggerFactory.getLogger(SparkContextConfigurationPrinter.class);
+    static final  Logger logger = org.slf4j.LoggerFactory.getLogger(GeneratePySparkContextMain.class);
     private final String polarisId;
     private final String polarisSecret;
     private final String polarisHost;
@@ -43,8 +43,8 @@ public class SparkContextConfigurationPrinter {
                 polarisCloud = SupportedCloudsEnum.valueOf(args[0]);
             }
             ClusterCredentials emrysCloud = createClusterCredentials(polarisCloud);
-            var                app        = new SparkContextConfigurationPrinter(emrysCloud);
-            app.printSparkConfig();
+            var                app        = new GeneratePySparkContextMain(emrysCloud);
+            app.generatePySparkCode();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -52,7 +52,7 @@ public class SparkContextConfigurationPrinter {
 
     private final SparkWarehouseConfig polarisConfig;
 
-    public SparkContextConfigurationPrinter(ClusterCredentials emrysCloud) {
+    public GeneratePySparkContextMain(ClusterCredentials emrysCloud) {
         polarisId     = emrysCloud.getPolarisId();
         polarisSecret = emrysCloud.getPolarisSecret();
         polarisHost   = emrysCloud.getPolarisHost();
@@ -63,7 +63,7 @@ public class SparkContextConfigurationPrinter {
         );
     }
 
-    public void printSparkConfig() {
+    private void generatePySparkCode() {
         String tableName = tableName();
         System.out.println("\u001B[32m");
         System.out.println("""
