@@ -5,7 +5,7 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.k8s.ClusterState;
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.comms.PolarisConfigureMain;
+import health.emrys.afon.polaris.config.ConfigurePolarisMain;
 import io.kubernetes.client.openapi.ApiException;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
@@ -25,7 +25,7 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
-    private final PolarisConfigureMain polarisClient;
+    private final ConfigurePolarisMain polarisClient;
     private final ClusterState         state;
 
     public static void main(String[] args) {
@@ -41,7 +41,7 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
     public ClusterPolarisConfiguration() throws IncorrectConfigException, IOException, ApiException {
         super(new AfonPropertiesLoader().getProperties());
         state           = new ClusterState();
-        polarisClient   = new PolarisConfigureMain();
+        polarisClient   = new ConfigurePolarisMain();
         String endpoint = format("%s:443", state.getPolarisHost());
         logger.info("Calling Polaris endpoint: {}", endpoint);
         properties.setProperty(AfonProperties.POLARIS_ENDPOINT.getName(), endpoint);

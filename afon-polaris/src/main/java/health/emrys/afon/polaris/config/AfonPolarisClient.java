@@ -1,4 +1,4 @@
-package health.emrys.afon.polaris.comms;
+package health.emrys.afon.polaris.config;
 
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;

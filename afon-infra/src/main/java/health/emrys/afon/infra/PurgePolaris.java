@@ -3,12 +3,11 @@ package health.emrys.afon.infra;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.comms.AfonPolarisClient;
-import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 
 import java.io.IOException;
 
-import static health.emrys.afon.polaris.comms.PolarisConfigurer.catalogsURI;
+import static health.emrys.afon.polaris.config.PolarisConfigurer.catalogsURI;
 
 public class PurgePolaris {
 

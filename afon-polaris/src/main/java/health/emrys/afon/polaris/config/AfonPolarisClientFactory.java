@@ -1,4 +1,4 @@
-package health.emrys.afon.polaris.comms;
+package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
 

@@ -7,7 +7,7 @@ import health.emrys.afon.acceptance.tags.{Azure, External}
 import health.emrys.afon.config.AfonProperties.{AZURE_BUCKET, DATABRICKS_TOKEN}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, JsonMaker}
-import health.emrys.afon.polaris.comms.PolarisConfigurer
+import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
 import org.apache.polaris.core.admin.model._
 import org.apache.spark.sql.SparkSession
