@@ -2,8 +2,8 @@ package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.PolarisHelper.principalRoleName
 import health.emrys.afon.polaris.catalogs.{CloudConfigForPolaris, JsonMaker, PolarisDTOs}
-import health.emrys.afon.polaris.comms.PermissionsConfigurer
-import health.emrys.afon.polaris.comms.PolarisConfigurer._
+import health.emrys.afon.polaris.config.PermissionsConfigurer
+import health.emrys.afon.polaris.config.PolarisConfigurer._
 import org.apache.polaris.core.admin.model.CatalogPrivilege._
 import org.scalatest.GivenWhenThen
 

@@ -3,8 +3,7 @@ package health.emrys.afon.infra;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.comms.AfonPolarisClient;
-import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 
 import java.util.Map;
 import java.util.Properties;

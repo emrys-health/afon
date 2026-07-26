@@ -6,7 +6,7 @@ import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant, Ca
 import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.GlueCloudConfigForPolaris
-import health.emrys.afon.polaris.comms.PolarisConfigurer
+import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier

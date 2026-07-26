@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.comms.AfonPolarisClient;
-import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.AfonPolarisClient;
+import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.ParseException;
@@ -20,7 +20,7 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.infra.InfraUtils.isFailure;
-import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
+import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class PurgeAndPopulatePolaris {

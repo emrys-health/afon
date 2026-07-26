@@ -1,8 +1,8 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.comms.AfonPolarisClient;
-import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.AfonPolarisClient;
+import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
 

@@ -1,4 +1,4 @@
-package health.emrys.afon.polaris.comms;
+package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.apache.hc.client5.http.classic.methods.HttpPost;

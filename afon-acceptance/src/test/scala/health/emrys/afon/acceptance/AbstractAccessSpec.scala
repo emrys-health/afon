@@ -8,8 +8,8 @@ import health.emrys.afon.infra.InfraUtils
 import health.emrys.afon.onboard.OnboardAllUsersMain
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
-import health.emrys.afon.polaris.comms.PolarisConfigurer
-import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
+import health.emrys.afon.polaris.config.PolarisConfigurer
+import health.emrys.afon.polaris.config.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
 import health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.{KeyCloakAdmin, KeyCloakConfig, OnboardingConfig}
 import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser

@@ -1,4 +1,4 @@
-package health.emrys.afon.polaris.comms;
+package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.catalogs.JsonMaker;
@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import static health.emrys.afon.polaris.comms.PolarisConfigurer.*;
+import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 
 public class PermissionsConfigurer {
     private static final Logger logger = LoggerFactory.getLogger(PermissionsConfigurer.class);

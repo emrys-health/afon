@@ -6,7 +6,7 @@ import health.emrys.afon.acceptance.tags.{External, Gcp}
 import health.emrys.afon.config.AfonProperties.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.polaris.catalogs.{GoogleCloudConfigForPolaris, JsonMaker}
-import health.emrys.afon.polaris.comms.PolarisConfigurer
+import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.iceberg.gcp.auth.GoogleAuthManager
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum

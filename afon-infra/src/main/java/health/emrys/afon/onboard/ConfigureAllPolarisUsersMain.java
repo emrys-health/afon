@@ -2,7 +2,7 @@ package health.emrys.afon.onboard;
 
 import health.emrys.afon.cdk.Onboarding;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.comms.ConfigureUserMain;
+import health.emrys.afon.polaris.config.ConfigureUserMain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
