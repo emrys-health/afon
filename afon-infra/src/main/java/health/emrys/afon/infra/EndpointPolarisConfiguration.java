@@ -15,16 +15,11 @@ import static health.emrys.afon.config.AfonProperties.*;
  * although you will need to point your K8s current environment at the cloud and run
  * PolarisCredentialGrabber to get the POLARIS_ID and POLARIS_SECRET.
  */
-public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration {
-
-    public static void main(String[] args) throws Exception {
-        EndpointPolarisConfiguration app = new EndpointPolarisConfiguration();
-        parse(args, app);
-    }
+public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration implements AutoCloseable {
 
     private final String credentials;
 
-    EndpointPolarisConfiguration() {
+    public EndpointPolarisConfiguration() {
         this(new AfonPropertiesLoader().getProperties());
     }
 
@@ -43,4 +38,8 @@ public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration {
         return credentials;
     }
 
+    @Override
+    public void close() throws Exception {
+
+    }
 }

@@ -1,9 +1,10 @@
-package health.emrys.afon.infra;
+package health.emrys.afon.ops;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.infra.EndpointPolarisConfiguration;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
@@ -23,13 +24,13 @@ import static health.emrys.afon.infra.InfraUtils.isFailure;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
-public class PurgeAndPopulatePolaris {
+public class PurgeAndPopulatePolarisMain {
 
-    private static final Logger log = getLogger(PurgeAndPopulatePolaris.class);
+    private static final Logger log = getLogger(PurgeAndPopulatePolarisMain.class);
 
     public static void main(String[] args) throws Exception {
         String                  host = args[0];
-        PurgeAndPopulatePolaris app  = new PurgeAndPopulatePolaris(host);
+        PurgeAndPopulatePolarisMain app  = new PurgeAndPopulatePolarisMain(host);
         if (args.length == 1) {
             app.createAllCatalogs();
         } else if (args.length == 4) {
@@ -40,7 +41,7 @@ public class PurgeAndPopulatePolaris {
     private final AfonPolarisClient client;
     private final String            accessToken;
 
-    public PurgeAndPopulatePolaris(String domainName) {
+    public PurgeAndPopulatePolarisMain(String domainName) {
         AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
         this.domainName  = domainName;
         this.client      = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());

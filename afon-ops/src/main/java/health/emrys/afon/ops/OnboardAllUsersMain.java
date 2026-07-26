@@ -1,9 +1,8 @@
-package health.emrys.afon.onboard;
+package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.Onboarding;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.config.ConfigureUserMain;
 import health.emrys.afon.security.keycloak.KeyCloakAdmin;
 import health.emrys.afon.security.keycloak.OnboardingConfig;
 import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;
@@ -51,7 +50,7 @@ public class OnboardAllUsersMain {
 
     public void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
         log.info("CONFIGURING POLARIS");
-        ConfigureUserMain polarisConfiguration = new ConfigureUserMain(properties);
+        ConfigurePolarisUserMain polarisConfiguration = new ConfigurePolarisUserMain(properties);
         polarisConfiguration.configurePrivilegesFor(warehouse);
         polarisConfiguration.configureAll(warehouse, onboardingConfig);
     }

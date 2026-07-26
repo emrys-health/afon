@@ -1,7 +1,7 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.steps.Step;
-import health.emrys.afon.steps.StepOperations;
+import health.emrys.afon.ops.steps.Step;
+import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
 

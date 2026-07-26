@@ -1,9 +1,9 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.steps.Step;
-import health.emrys.afon.steps.StepDocumentation;
-import health.emrys.afon.steps.StepOperations;
-import health.emrys.afon.steps.StepsProvider;
+import health.emrys.afon.ops.steps.Step;
+import health.emrys.afon.ops.steps.StepDocumentation;
+import health.emrys.afon.ops.steps.StepOperations;
+import health.emrys.afon.ops.steps.StepsProvider;
 import org.slf4j.Logger;
 
 import java.io.OutputStream;

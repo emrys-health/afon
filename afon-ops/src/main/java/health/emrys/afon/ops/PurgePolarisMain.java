@@ -1,4 +1,4 @@
-package health.emrys.afon.infra;
+package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -9,7 +9,7 @@ import java.io.IOException;
 
 import static health.emrys.afon.polaris.config.PolarisConfigurer.catalogsURI;
 
-public class PurgePolaris {
+public class PurgePolarisMain {
 
     public static void main(String[] args) throws IncorrectConfigException, IOException {
         AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();

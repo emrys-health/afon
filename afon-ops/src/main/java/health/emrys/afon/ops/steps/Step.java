@@ -1,6 +1,5 @@
-package health.emrys.afon.steps;
+package health.emrys.afon.ops.steps;
 
-import org.apache.spark.api.java.function.package$;
 import org.slf4j.Logger;
 
 import static org.slf4j.LoggerFactory.getLogger;
