@@ -1,4 +1,4 @@
-package health.emrys.afon.steps;
+package health.emrys.afon.ops.steps;
 
 import com.azure.storage.blob.models.BlobItem;
 import health.emrys.afon.cdk.aws.AwsWholeStack;
@@ -6,8 +6,8 @@ import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.PurgeAndPopulatePolaris;
-import health.emrys.afon.onboard.OnboardAllUsersMain;
+import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
+import health.emrys.afon.ops.OnboardAllUsersMain;
 import health.emrys.afon.spark.SparkChecker;
 import health.emrys.afon.spark.SparkTestReader;
 import health.emrys.afon.spark.SparkTestWriter;
@@ -154,7 +154,7 @@ public class StepOperations {
             format("%s_purge_%s", machineNameFrom(domainName), catalog.toString()),
             format("remove all persisted references to %s in Polaris at `%s`", namespace, domainName),
             () -> actions.executeMainOf(
-                PurgeAndPopulatePolaris.class,
+                PurgeAndPopulatePolarisMain.class,
                 new String[]{domainName, catalog.name(), namespace, tableName},
                 NO_ENV_VARIABLES));
     }
@@ -227,7 +227,7 @@ public class StepOperations {
             () -> {
                 try {
                     actions.executeMainOf(
-                        PurgeAndPopulatePolaris.class,
+                        PurgeAndPopulatePolarisMain.class,
                         new String[]{domainName},
                         NO_ENV_VARIABLES);
                 } catch (Exception e) {

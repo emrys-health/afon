@@ -2,7 +2,7 @@ package health.emrys.afon.infra;
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.polaris.catalogs.*;
-import health.emrys.afon.polaris.config.ConfigurePolarisMain;
+import health.emrys.afon.polaris.config.PolarisConfigClient;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
@@ -27,29 +27,28 @@ public abstract class AbstractPolarisConfiguration {
         SupportedCloudsEnum.GCP_EXTERNAL, ExternalGcpCloudConfigForPolaris::new
                                                                 );
     protected final          Properties properties;
-    private final ConfigurePolarisMain polarisClient;
+    private final PolarisConfigClient polarisClient;
 
     protected AbstractPolarisConfiguration(Properties properties) {
         this.properties = properties;
-        polarisClient   = new ConfigurePolarisMain();
+        polarisClient   = new PolarisConfigClient();
     }
 
-    protected static void parse(String[] args,
-                                AbstractPolarisConfiguration app)
+    public void configure(String[] args)
     throws IncorrectConfigException, IOException {
-        logger.info("Calling {} with arguments {}", app.getClass().getSimpleName(), String.join(" ", args));
+        logger.info("Calling {} with arguments {}", getClass().getSimpleName(), String.join(" ", args));
         if (args.length == 0) {
-            app.initializePolaris();
+            initializePolaris();
         } else if (args.length == 1) {
             SupportedCloudsEnum cloud = SupportedCloudsEnum.valueOf(args[0]);
-            app.initialize(cloud, app.properties);
+            initialize(cloud, properties);
         } else if (args.length == 2) {
             SupportedCloudsEnum cloud    = SupportedCloudsEnum.valueOf(args[0]);
             Properties          external = new Properties();
-            external.putAll(app.properties);
+            external.putAll(properties);
             String credential = args[1];
             logger.info("Credential: " + credential);
-            app.initialize(cloud, add(credential, external));
+            initialize(cloud, add(credential, external));
         }
     }
 
