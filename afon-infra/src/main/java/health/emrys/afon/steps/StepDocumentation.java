@@ -106,8 +106,8 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public void executeMainOf(Class clazz, String[] args, Properties overrides) throws Exception {
-        String fullArgs = mvnArgumentsToRun(clazz, args, overrides, "java");
+    public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
+        String fullArgs = mvnArgumentsToRun(mainClass, args, overrides, "java");
         run("mvn",
             null,
             fullArgs);

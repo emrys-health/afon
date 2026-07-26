@@ -494,7 +494,7 @@ public class StepOperations {
         );
     }
 
-    public Step registerMostRecentSnowflakeAzureTableInAws(Class registerTableMainClass) {
+    public Step registerMostRecentSnowflakeAzureTableInAws(Class<?> registerTableMainClass) {
         String glob = format(
             "%s/%s*metadata.json",
             ACCEPTANCE_TEST_NAMESPACE,
@@ -536,7 +536,7 @@ public class StepOperations {
 
     public Step registerTableInAws(String jsonMetadataFQN,
                                    SupportedCloudsEnum warehouse,
-                                   String tableName, Class registerTableMainClass
+                                   String tableName, Class<?> registerTableMainClass
     ) {
         return new Step(
             format("%s_table_in_aws_polaris", warehouse.toString()),
