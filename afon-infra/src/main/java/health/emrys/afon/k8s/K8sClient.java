@@ -1,4 +1,4 @@
-package health.emrys.afon.infra.k8s;
+package health.emrys.afon.k8s;
 
 
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;

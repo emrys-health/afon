@@ -88,13 +88,13 @@ run
 In the top level directory 
 run
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.infra.onboarding.UserOnboarderMain --exec-args "emryspolaris.click aws emrysjupyter.click"
+./afon.sh -a exec --exec-class health.emrys.afon.onboard.OnboardAllUsersMain --exec-args "emryspolaris.click aws emrysjupyter.click"
 ```
 
 In the top level directory 
 run
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.infra.checks.SparkTestWriter --exec-args "aws will s3cr3t emryspolaris.click namespaceph"
+./afon.sh -a exec --exec-class health.emrys.afon.spark.SparkTestWriter --exec-args "aws will s3cr3t emryspolaris.click namespaceph"
 ```
 
 ### Call Snowflake so it writes sample data to Azure blob storage
@@ -174,14 +174,14 @@ run
 In the top level directory 
 run
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.infra.onboarding.UserOnboarderMain --exec-args
+./afon.sh -a exec --exec-class health.emrys.afon.onboard.OnboardAllUsersMain --exec-args
 "emryspolaris.click azure emrysjupyter.click"
 ```
 
 In the top level directory 
 run
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.infra.checks.SparkTestReader --exec-args "azure will s3cr3t emryspolaris.click acceptancetests"
+./afon.sh -a exec --exec-class health.emrys.afon.spark.SparkTestReader --exec-args "azure will s3cr3t emryspolaris.click acceptancetests"
 ```
 
 

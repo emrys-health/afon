@@ -2,7 +2,7 @@ package health.emrys.afon.infra;
 
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.k8s.EksInfoClient;
+import health.emrys.afon.k8s.EksInfoClient;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import io.kubernetes.client.openapi.ApiException;
 import org.slf4j.Logger;
