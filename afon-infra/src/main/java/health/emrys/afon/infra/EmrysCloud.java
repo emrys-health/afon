@@ -2,7 +2,7 @@ package health.emrys.afon.infra;
 
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.k8s.ClusterState;
+import health.emrys.afon.k8s.ClusterState;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
 import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;

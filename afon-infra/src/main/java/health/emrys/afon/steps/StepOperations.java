@@ -7,10 +7,10 @@ import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
-import health.emrys.afon.infra.checks.SparkChecker;
-import health.emrys.afon.infra.checks.SparkTestReader;
-import health.emrys.afon.infra.checks.SparkTestWriter;
-import health.emrys.afon.infra.onboarding.UserOnboarderMain;
+import health.emrys.afon.onboard.OnboardAllUsersMain;
+import health.emrys.afon.spark.SparkChecker;
+import health.emrys.afon.spark.SparkTestReader;
+import health.emrys.afon.spark.SparkTestWriter;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -23,7 +23,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.infra.checks.SparkChecker.EXTERNAL_NAMESPACE;
+import static health.emrys.afon.spark.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
@@ -341,7 +341,7 @@ public class StepOperations {
             description,
             () -> {
                 actions.executeMainOf(
-                    UserOnboarderMain.class,
+                    OnboardAllUsersMain.class,
                     new String[]{domainName, warehouse.toString(), jupyterDomainName},
                     NO_ENV_VARIABLES);
 

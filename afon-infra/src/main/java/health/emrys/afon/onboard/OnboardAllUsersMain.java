@@ -1,4 +1,4 @@
-package health.emrys.afon.infra.onboarding;
+package health.emrys.afon.onboard;
 
 import health.emrys.afon.cdk.Onboarding;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -17,14 +17,14 @@ import java.util.stream.Collectors;
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 
-public class UserOnboarderMain {
+public class OnboardAllUsersMain {
 
-    private static final Logger log = LoggerFactory.getLogger(UserOnboarderMain.class);
+    private static final Logger log = LoggerFactory.getLogger(OnboardAllUsersMain.class);
 
     public static void main(String[] args) throws Exception {
         Properties properties = new AfonPropertiesLoader().getProperties();
         properties.put(POLARIS_ENDPOINT.getName(), args[0]);
-        UserOnboarderMain app           = new UserOnboarderMain(new Onboarding(), properties);
+        OnboardAllUsersMain app           = new OnboardAllUsersMain(new Onboarding(), properties);
         String            catalog       = args[1];
         String            jupyterDomain = args[2];
         try {
@@ -43,7 +43,7 @@ public class UserOnboarderMain {
     private final Properties       properties;
     private final KeyCloakAdmin    kcAdmin;
 
-    public UserOnboarderMain(OnboardingConfig onboardingConfig, Properties properties) {
+    public OnboardAllUsersMain(OnboardingConfig onboardingConfig, Properties properties) {
         this.onboardingConfig = onboardingConfig;
         this.properties       = properties;
         kcAdmin               = new KeyCloakAdmin(properties);

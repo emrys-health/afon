@@ -85,26 +85,26 @@ mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris 
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.onboarding.UserOnboarderMain -Dexec.args="emryspolaris.click aws emrysjupyter.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.onboard.OnboardAllUsersMain -Dexec.args="emryspolaris.click aws emrysjupyter.click"
 ```
 
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestWriter -Dexec.args="aws will s3cr3t emryspolaris.click namespaceph"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.spark.SparkTestWriter -Dexec.args="aws will s3cr3t emryspolaris.click namespaceph"
 ```
 
 ### Run Spark locally such that it talks to the AWS Polaris, writes a table to azure
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.onboarding.UserOnboarderMain -Dexec.args="emryspolaris.click azure emrysjupyter.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.onboard.OnboardAllUsersMain -Dexec.args="emryspolaris.click azure emrysjupyter.click"
 ```
 
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestWriter -Dexec.args="azure will s3cr3t emryspolaris.click namespaceph"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.spark.SparkTestWriter -Dexec.args="azure will s3cr3t emryspolaris.click namespaceph"
 ```
 
 ### Call Snowflake that uses AWS Polaris to get the credentials to read from AZURE storage

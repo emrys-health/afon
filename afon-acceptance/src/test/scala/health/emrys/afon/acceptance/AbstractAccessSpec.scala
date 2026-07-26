@@ -5,7 +5,7 @@ import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trin
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.config.AfonPropertiesLoader
 import health.emrys.afon.infra.InfraUtils
-import health.emrys.afon.infra.onboarding.UserOnboarderMain
+import health.emrys.afon.onboard.OnboardAllUsersMain
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.comms.PolarisConfigurer
@@ -145,7 +145,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       assert(ContainerHelper.instance.startPolaris(properties) != null)
 
       When(s"we onboard a user '$User' for catalog ${config.warehouseName()}' in Polaris")
-      val onboarding = new UserOnboarderMain(onboardingConfig, properties)
+      val onboarding = new OnboardAllUsersMain(onboardingConfig, properties)
       onboarding.onboardAll(config.warehouseName())
       And("in KeyCloak")
       onboarding.configureKeyCloak("NotUsed.com")
