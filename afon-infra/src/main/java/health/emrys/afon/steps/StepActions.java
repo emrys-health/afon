@@ -179,7 +179,7 @@ public class StepActions {
     // AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click
 
     /**
-     * @param storageCloud eg, GCP
+     * @param storageCloud eg GCP
      * @param metadataLocation eg gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325-b437-20900bbcf2a3.metadata.json
      * @param polarisDomainNAme eg emryspolaris.click
      * @param tableName eg AwsAccessSpec
@@ -189,7 +189,7 @@ public class StepActions {
     public void registerTable(SupportedCloudsEnum storageCloud,
                               String metadataLocation,
                               String polarisDomainNAme,
-                              String tableName, Class registerTableMainClass) throws Exception {
+                              String tableName, Class<?> registerTableMainClass) throws Exception {
         executeMainOf(registerTableMainClass,
                       new String[]{storageCloud.name(),
                                    ACCEPTANCE_TEST_NAMESPACE,
@@ -198,19 +198,19 @@ public class StepActions {
                                    polarisDomainNAme});
     }
 
-    private void executeMainOf(Class clazz, String[] args) throws Exception {
-        executeMainOf(clazz, args, new Properties());
+    private void executeMainOf(Class mainClass, String[] args) throws Exception {
+        executeMainOf(mainClass, args, new Properties());
     }
 
-    public void executeMainOf(Class clazz, String[] args, Properties overrides) throws Exception {
+    public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
         log.info("Running {} with arguments {} and overrides {}",
-                 clazz.getName(),
+                 mainClass.getName(),
                  String.join(" ", args),
                  overrides);
 
         Properties original = saveAndSetSystem(overrides);
         try {
-            Method main = clazz.getDeclaredMethod("main", String[].class);
+            Method main = mainClass.getDeclaredMethod("main", String[].class);
             String[] mainArgs = Arrays
                 .stream(args)
                 .filter(s -> s != null && !s.isEmpty())
