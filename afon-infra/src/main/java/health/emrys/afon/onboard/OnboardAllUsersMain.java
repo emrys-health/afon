@@ -3,7 +3,7 @@ package health.emrys.afon.onboard;
 import health.emrys.afon.cdk.Onboarding;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.comms.ConfigureUserMain;
+import health.emrys.afon.polaris.config.ConfigureUserMain;
 import health.emrys.afon.security.keycloak.KeyCloakAdmin;
 import health.emrys.afon.security.keycloak.OnboardingConfig;
 import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;

@@ -2,7 +2,7 @@ package health.emrys.afon.infra;
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.polaris.catalogs.*;
-import health.emrys.afon.polaris.comms.PolarisConfigureMain;
+import health.emrys.afon.polaris.config.ConfigurePolarisMain;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
@@ -27,11 +27,11 @@ public abstract class AbstractPolarisConfiguration {
         SupportedCloudsEnum.GCP_EXTERNAL, ExternalGcpCloudConfigForPolaris::new
                                                                 );
     protected final          Properties properties;
-    private final PolarisConfigureMain polarisClient;
+    private final ConfigurePolarisMain polarisClient;
 
     protected AbstractPolarisConfiguration(Properties properties) {
         this.properties = properties;
-        polarisClient   = new PolarisConfigureMain();
+        polarisClient   = new ConfigurePolarisMain();
     }
 
     protected static void parse(String[] args,

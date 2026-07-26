@@ -1,4 +1,4 @@
-package health.emrys.afon.polaris.comms;
+package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 
-import static health.emrys.afon.polaris.comms.ConfigureUserMain.isFailure;
+import static health.emrys.afon.polaris.config.ConfigureUserMain.isFailure;
 import static java.lang.String.format;
 
 public class PolarisConfigurer {

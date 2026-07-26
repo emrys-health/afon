@@ -1,4 +1,4 @@
-package health.emrys.afon.polaris.comms;
+package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -17,15 +17,15 @@ import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 
-public class PolarisConfigureMain {
+public class ConfigurePolarisMain {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisConfigureMain.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(ConfigurePolarisMain.class);
 
     private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
 
     public static void main(String[] args) {
         try {
-            PolarisConfigureMain app = new PolarisConfigureMain();
+            ConfigurePolarisMain app = new ConfigurePolarisMain();
             if (args.length == 0) {
                 logger.info("Running smoke test");
                 app.smokeTest();
@@ -61,7 +61,7 @@ public class PolarisConfigureMain {
         for (CloudConfigForPolaris config : configs) {
             logger.info("Configuring {}", config.warehouseName());
             HttpResponse[] responses = callPolaris(properties, config);
-            Arrays.stream(responses).forEach(PolarisConfigureMain::logIfProblem);
+            Arrays.stream(responses).forEach(ConfigurePolarisMain::logIfProblem);
             allResponses.addAll(Arrays.asList(responses));
         }
         return allResponses;

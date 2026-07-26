@@ -2,7 +2,7 @@ package health.emrys.afon.infra;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.k8s.ClusterState;
-import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import org.slf4j.Logger;
 
 import java.util.Properties;

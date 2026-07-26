@@ -5,7 +5,7 @@ import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
 import health.emrys.afon.acceptance.PolarisHelper.{principalName, principalRoleName}
 import health.emrys.afon.config.AfonProperties
 import health.emrys.afon.polaris.catalogs.{JsonMaker, PolarisDTOs}
-import health.emrys.afon.polaris.comms.{PermissionsConfigurer, PolarisConfigurer}
+import health.emrys.afon.polaris.config.{PermissionsConfigurer, PolarisConfigurer}
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials
 
 object PolarisHelper {

@@ -4,8 +4,8 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.k8s.ClusterState;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.comms.AfonPolarisClient;
-import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.AfonPolarisClient;
+import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import io.kubernetes.client.openapi.ApiException;
 
 import java.io.IOException;

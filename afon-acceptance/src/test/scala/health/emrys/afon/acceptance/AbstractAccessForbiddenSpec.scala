@@ -3,7 +3,7 @@ package health.emrys.afon.acceptance
 import health.emrys.afon.acceptance.SparkHelper.spark
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
-import health.emrys.afon.polaris.comms.PolarisConfigurer.getCreateCatalogURI
+import health.emrys.afon.polaris.config.PolarisConfigurer.getCreateCatalogURI
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
