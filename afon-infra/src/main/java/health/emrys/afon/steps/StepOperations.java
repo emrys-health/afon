@@ -494,13 +494,13 @@ public class StepOperations {
         );
     }
 
-    public Step registerMostRecentSnowflakeAzureTableInAws() {
+    public Step registerMostRecentSnowflakeAzureTableInAws(Class registerTableMainClass) {
         String glob = format(
             "%s/%s*metadata.json",
             ACCEPTANCE_TEST_NAMESPACE,
             SNOWFLAKE_OUT_DIR);
         String json = firstFile(glob, true); // firstFileInLatestDirectoryMatching(glob);
-        return registerTableInAws(json, AZURE, SparkChecker.TABLE);
+        return registerTableInAws(json, AZURE, SparkChecker.TABLE, registerTableMainClass);
     }
 
     public @NonNull Step purgeAzureFromAwsPolarisAndRecreate() {
@@ -536,7 +536,7 @@ public class StepOperations {
 
     public Step registerTableInAws(String jsonMetadataFQN,
                                    SupportedCloudsEnum warehouse,
-                                   String tableName
+                                   String tableName, Class registerTableMainClass
     ) {
         return new Step(
             format("%s_table_in_aws_polaris", warehouse.toString()),
@@ -546,7 +546,7 @@ public class StepOperations {
                     warehouse,
                     jsonMetadataFQN,
                     awsPolarisDomainName,
-                    tableName);
+                    tableName, registerTableMainClass);
             }
         );
     }

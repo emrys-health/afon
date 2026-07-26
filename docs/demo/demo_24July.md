@@ -1,13 +1,13 @@
 # Deploying the environment
 
-In `afon-ops`, run:
+Run:
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployFullStackAwsMain
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployFullStackAwsMain
 ```
 
 If you need to add tables to Polaris, run something like:
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click phil s3cr3t"
+./afon.sh -a exec --exec-class health.emrys.afon.ops.RegisterLocalPolarisMain --exec-args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click phil s3cr3t"
 ```
 (This is just an old table that `afon-acceptancetests` created.
 The salient file in any Iceberg table is the `*.metadata.json` one).
@@ -26,4 +26,4 @@ kubectl cp ./CrossCloudJoinExample.ipynb $POD:/home/jovyan/CrossCloudJoinExample
 ```
 Give it a second or two and your notebook will appear in your Jupyter pod. 
 
-When you're finished, go to `afon-infra/cdktf.out/stacks/aws/` and run `tofu destory --auto-approve`.
+When you're finished, go to `afon-ops/cdktf.out/stacks/aws/` and run `tofu destory --auto-approve`.
