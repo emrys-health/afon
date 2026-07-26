@@ -1,11 +1,9 @@
-package health.emrys.afon.infra.checks;
+package health.emrys.afon.spark;
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.infra.ClusterCredentials;
 import health.emrys.afon.infra.PolarisClusterCredentials;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.spark.SparkWarehouseConfig;
-import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import io.kubernetes.client.openapi.ApiException;
 import org.apache.spark.SparkContext;
 import org.apache.spark.sql.SparkSession;

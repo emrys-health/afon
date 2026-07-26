@@ -637,7 +637,7 @@ df_joined.show()
 **Write:**
 
 ```shell
-./afon.sh -a exec -t ops --exec-class health.emrys.afon.infra.checks.SparkTestWriter \ 
+./afon.sh -a exec -t ops --exec-class health.emrys.afon.spark.SparkTestWriter \ 
   --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
@@ -646,7 +646,7 @@ This creates a namespace, creates an Iceberg table, and writes three rows ("appl
 **Read:**
 
 ```shell
-./afon.sh -a exec -t ops --exec-class health.emrys.afon.infra.checks.SparkTestReader \ 
+./afon.sh -a exec -t ops --exec-class health.emrys.afon.spark.SparkTestReader \ 
   --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 

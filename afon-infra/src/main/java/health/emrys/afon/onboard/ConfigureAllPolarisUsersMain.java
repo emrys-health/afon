@@ -1,4 +1,4 @@
-package health.emrys.afon.infra.onboarding;
+package health.emrys.afon.onboard;
 
 import health.emrys.afon.cdk.Onboarding;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -10,9 +10,9 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 
-public class ConfigureAllPolarisUserMain {
+public class ConfigureAllPolarisUsersMain {
 
-    private static final Logger logger = LoggerFactory.getLogger(ConfigureAllPolarisUserMain.class);
+    private static final Logger logger = LoggerFactory.getLogger(ConfigureAllPolarisUsersMain.class);
 
     /**
      * Configures ALL users

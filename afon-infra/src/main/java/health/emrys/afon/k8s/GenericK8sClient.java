@@ -1,4 +1,4 @@
-package health.emrys.afon.infra.k8s;
+package health.emrys.afon.k8s;
 
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;

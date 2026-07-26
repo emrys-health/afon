@@ -84,13 +84,13 @@ mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris 
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.onboarding.UserOnboarderMain -Dexec.args="emryspolaris.click aws emrysjupyter.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.onboard.OnboardAllUsersMain -Dexec.args="emryspolaris.click aws emrysjupyter.click"
 ```
 
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestWriter -Dexec.args="aws will s3cr3t emryspolaris.click namespaceph"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.spark.SparkTestWriter -Dexec.args="aws will s3cr3t emryspolaris.click namespaceph"
 ```
 
 ### Clean the local azure directory (if it exists)
@@ -140,13 +140,13 @@ mvn -DAZURE_BUCKET=afonstorage-2 -DPOLARIS_ENDPOINT=emryspolarisazure.click  exe
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.onboarding.UserOnboarderMain -Dexec.args="emryspolaris.click azure_external emrysjupyter.click"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.onboard.OnboardAllUsersMain -Dexec.args="emryspolaris.click azure_external emrysjupyter.click"
 ```
 
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestWriter -Dexec.args="azure_external will s3cr3t emryspolaris.click namespaceph"
+mvn  exec:java -Dexec.mainClass=health.emrys.afon.spark.SparkTestWriter -Dexec.args="azure_external will s3cr3t emryspolaris.click namespaceph"
 ```
 
 # Problems destroying the stack?
