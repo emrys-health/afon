@@ -1,13 +1,13 @@
 # Introduction
 
 To create this documentation, run:
-```
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.docs.DocumentSnowflakeWritingAzureViaAwsMain 
+```shell
+./afon.sh -a exec --exec-class health.emrys.afon.docs.DocumentSnowflakeWritingAzureViaAwsMain 
 ```
 
 To execute, run:
 ```shell
-mvn -Pexec  exec:exec -Dexec.mainClass=health.emrys.afon.ops.DeploySnowflakeWritingAzureViaAwsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeWritingAzureViaAwsMain 
 ```
 
 
@@ -24,13 +24,17 @@ The steps to run are:
 
 If the job fails on a given step, you can add this switch to the mvn command above:
 
-`-Dexec.args="STEP_FROM_LIST_ABOVE"`
+```
+--exec-args "STEP_FROM_LIST_ABOVE"
+```
 
 and the steps will continue starting at that one.
 
 For example:
 
-`mvn exec:exec -Pexec -Dexec.mainClass="health.emrys.afon.ops.DeploySnowflakeWritingAzureViaAwsMain"  -Dexec.args="emryspolaris_spark_talks_to_azure"`
+```shell
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeWritingAzureViaAwsMain  --exec-args "emryspolaris_spark_talks_to_azure"
+```
 
 ## What it does
 This e2e test has Snowlfake write to Azure blob storage, registers its
@@ -51,7 +55,7 @@ Delete `./terraform.aws*`
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.cdk.aws.PrometheusClusterDeploy 
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeploy 
 ```
 
 In `cdktf.out/stacks/aws` 
@@ -77,20 +81,20 @@ will show you the IP address when the DNS servers have updated.
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris -Dexec.args="emryspolaris.click"
+./afon.sh -a exec --exec-class health.emrys.afon.infra.PurgeAndPopulatePolaris --exec-args "emryspolaris.click"
 ```
 
 ### Run Spark locally such that it talks to the AWS Polaris, writes a table to aws
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.onboarding.UserOnboarderMain -Dexec.args="emryspolaris.click aws emrysjupyter.click"
+./afon.sh -a exec --exec-class health.emrys.afon.infra.onboarding.UserOnboarderMain --exec-args "emryspolaris.click aws emrysjupyter.click"
 ```
 
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestWriter -Dexec.args="aws will s3cr3t emryspolaris.click namespaceph"
+./afon.sh -a exec --exec-class health.emrys.afon.infra.checks.SparkTestWriter --exec-args "aws will s3cr3t emryspolaris.click namespaceph"
 ```
 
 ### Call Snowflake so it writes sample data to Azure blob storage
@@ -156,27 +160,28 @@ mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris 
 In the top level directory 
 run
 ```shell
-mvn -DPOLARIS_ENDPOINT=emryspolaris.click  exec:java -Dexec.mainClass=health.emrys.afon.infra.EndpointPolarisConfiguration -Dexec.args="AZURE"
+./afon.sh -a exec --exec-class health.emrys.afon.infra.EndpointPolarisConfiguration --exec-args "AZURE" --exec-envs "POLARIS_ENDPOINT=emryspolaris.click"
 ```
 
 ### Create `AZURE` table in the AWS Polaris
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="AZURE acceptancetests test_table abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/my_project_folder.YKTSOJxS/metadata/00001-1092216f-da5a-4ab9-b659-bebdf1c00d2b.metadata.json emryspolaris.click"
+./afon.sh -a exec --exec-class health.emrys.afon.ops.RegisterLocalPolarisMain --exec-args "AZURE acceptancetests test_table abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/my_project_folder.YKTSOJxS/metadata/00001-1092216f-da5a-4ab9-b659-bebdf1c00d2b.metadata.json emryspolaris.click"
 ```
 
 ### Read via Spark table `azure.acceptancetests.test_table` by calling `emryspolaris.click`
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.onboarding.UserOnboarderMain -Dexec.args="emryspolaris.click azure emrysjupyter.click"
+./afon.sh -a exec --exec-class health.emrys.afon.infra.onboarding.UserOnboarderMain --exec-args
+"emryspolaris.click azure emrysjupyter.click"
 ```
 
 In the top level directory 
 run
 ```shell
-mvn  exec:java -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestReader -Dexec.args="azure will s3cr3t emryspolaris.click acceptancetests"
+./afon.sh -a exec --exec-class health.emrys.afon.infra.checks.SparkTestReader --exec-args "azure will s3cr3t emryspolaris.click acceptancetests"
 ```
 
 

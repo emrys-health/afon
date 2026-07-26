@@ -1,4 +1,4 @@
-package health.emrys.afon.core.configuration;
+package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
@@ -16,18 +16,18 @@ import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.infra.InfraUtils.isFailure;
 
 /**
- * Run with something like:
+ * Run with args
  * <code>
- * mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="GCP acceptancetests GcpAccessSpec260430301114 gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325-b437-20900bbcf2a3.metadata.json  emryspolaris.click" exec:java
+ * -Dexec.args="GCP acceptancetests GcpAccessSpec260430301114 gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325-b437-20900bbcf2a3.metadata.json  emryspolaris.click"
  * </code>
  */
-public class LocalPolarisRegisterMain {
+public class RegisterLocalPolarisMain {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(LocalPolarisRegisterMain.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(RegisterLocalPolarisMain.class);
 
     public static void main(String[] args) {
         AfonPolarisClientFactory clientFactory  = AfonPolarisClientFactory.clientFactory();
-        RegisterTableConfig      conf           = new RegisterTableConfig(args);
+        RegisterPolarisMain.RegisterTableConfig conf           = new RegisterPolarisMain.RegisterTableConfig(args);
         Properties               afonProperties = new AfonPropertiesLoader().getProperties();
         if (args.length > 4) {
             afonProperties.put(POLARIS_ENDPOINT.getName(), args[4]);
@@ -43,7 +43,7 @@ public class LocalPolarisRegisterMain {
         logger.info("KC host: {}", kcHost);
         afonProperties.put(KC_HOSTNAME.getName(), kcHost);
         AfonPolarisClient        client = clientFactory.getPolarisClient(afonProperties);
-        LocalPolarisRegisterMain app    = new LocalPolarisRegisterMain(client, conf);
+        RegisterLocalPolarisMain app    = new RegisterLocalPolarisMain(client, conf);
         List<String>             errors = app.createTableAndNamespace();
         if (!errors.isEmpty()) {
             throw new RuntimeException(errors.stream().collect(Collectors.joining("\n")));
@@ -51,9 +51,9 @@ public class LocalPolarisRegisterMain {
     }
 
     private final AfonPolarisClient   client;
-    private final RegisterTableConfig conf;
+    private final RegisterPolarisMain.RegisterTableConfig conf;
 
-    LocalPolarisRegisterMain(AfonPolarisClient client, RegisterTableConfig conf) {
+    RegisterLocalPolarisMain(AfonPolarisClient client, RegisterPolarisMain.RegisterTableConfig conf) {
         this.client = client;
         this.conf   = conf;
     }

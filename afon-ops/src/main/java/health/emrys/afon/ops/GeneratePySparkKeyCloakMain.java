@@ -1,4 +1,4 @@
-package health.emrys.afon.core.configuration;
+package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -19,19 +19,19 @@ import static java.lang.String.format;
 /**
  * Write some PySpark code that can be run in the cloud assuming you're using KeyClaok as te IdP.
  */
-public class SparkKeyCloakPrinter {
+public class GeneratePySparkKeyCloakMain {
 
-    static final Logger log = org.slf4j.LoggerFactory.getLogger(SparkKeyCloakPrinter.class);
+    static final Logger log = org.slf4j.LoggerFactory.getLogger(GeneratePySparkKeyCloakMain.class);
 
     public static void main(String[] args) {
         String               polarisHost = args[0];
-        SparkKeyCloakPrinter app         = new SparkKeyCloakPrinter(polarisHost);
+        GeneratePySparkKeyCloakMain app         = new GeneratePySparkKeyCloakMain(polarisHost);
         app.generateAndSavePySparkCode();
     }
 
     private final SparkWarehouseConfig config;
 
-    SparkKeyCloakPrinter(String polarisHost) {
+    GeneratePySparkKeyCloakMain(String polarisHost) {
         log.info("Using {} as the Polaris host");
         Properties properties = new AfonPropertiesLoader().getProperties();
         properties.setProperty(POLARIS_ENDPOINT.getName(), polarisHost);

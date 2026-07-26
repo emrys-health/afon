@@ -12,7 +12,6 @@ import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.azure.AzureWholeStack;
 import health.emrys.afon.cdk.gcp.GcpKubernetesPolaris;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
-import health.emrys.afon.core.configuration.LocalPolarisRegisterMain;
 import health.emrys.afon.infra.EndpointPolarisConfiguration;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
@@ -184,13 +183,14 @@ public class StepActions {
      * @param metadataLocation eg gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325-b437-20900bbcf2a3.metadata.json
      * @param polarisDomainNAme eg emryspolaris.click
      * @param tableName eg AwsAccessSpec
+     * @param registerTableMainClass eg RegisterLocalPolarisMain.class
      * @throws Exception
      */
     public void registerTable(SupportedCloudsEnum storageCloud,
                               String metadataLocation,
                               String polarisDomainNAme,
-                              String tableName) throws Exception {
-        executeMainOf(LocalPolarisRegisterMain.class,
+                              String tableName, Class registerTableMainClass) throws Exception {
+        executeMainOf(registerTableMainClass,
                       new String[]{storageCloud.name(),
                                    ACCEPTANCE_TEST_NAMESPACE,
                                    tableName,
