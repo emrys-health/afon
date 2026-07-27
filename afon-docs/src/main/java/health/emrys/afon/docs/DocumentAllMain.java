@@ -21,9 +21,9 @@ public class DocumentAllMain {
                                       && !info.getSimpleName().equals(DocumentAllMain.class.getSimpleName()))
                       .forEach(info -> {
                           try {
-                              Class<?> clazz = info.loadClass();
-                              log.info("Running {}", clazz.getSimpleName());
-                              clazz.getMethod("main", String[].class).invoke(null, (Object) args);
+                              Class<?> documentClass = info.loadClass();
+                              log.info("Running {}", documentClass.getSimpleName());
+                              documentClass.getMethod("main", String[].class).invoke(null, (Object) args);
                           } catch (Exception e) {
                               log.error("Cannot run " + info, e);
                           }
