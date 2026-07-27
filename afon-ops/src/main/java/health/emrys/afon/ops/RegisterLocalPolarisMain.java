@@ -13,7 +13,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.cluster.InfraUtils.isFailure;
+import static health.emrys.afon.cluster.ClusterUtils.isFailure;
 
 /**
  * Run with args
