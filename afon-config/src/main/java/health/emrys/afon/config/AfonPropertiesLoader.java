@@ -2,6 +2,7 @@ package health.emrys.afon.config;
 
 import org.slf4j.Logger;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -68,33 +69,35 @@ public class AfonPropertiesLoader {
 
     public AfonPropertiesLoader() {
         properties = new Properties();
+        String dir = System.getProperty("afon.home", "..");
+        String configDir = dir + "/config";
         try {
-            // are we running as a build?
-            readProperties("../config");
+            readProperties(configDir);
         } catch (IOException e) {
-            logger.warn("Could not read properties files in parent directory. Trying in this...");
+            logger.warn("Could not read properties files in {}", configDir);
+            String altDir = "config";
             try {
                 // ...or in the IDE?
-                readProperties("config");
+                readProperties(altDir);
             } catch (IOException ex) {
-                logger.error("Could not find properties files");
+                logger.error("Could not read properties files in {}", altDir);
                 throw new RuntimeException(ex); // urgh, the properties file not found
             }
         }
     }
 
-    private void readProperties(String prepend) throws IOException {
+    private void readProperties(String dir) throws IOException {
+        logger.info("Loading properties from {}", dir);
         for (String file : propertyFiles()) {
             Properties props    = new Properties();
-            String     filename = prepend + "/" + file;
-            logger.info("Reading properties file {}", filename);
+            String     filename = dir + "/" + file;
+            logger.info("Reading properties from {}", filename);
             props.load(new FileInputStream(filename));
             logger.info("{} has {} items", filename, props.size());
             properties.putAll(props);
             if (file.startsWith("env")) {
                 confidentialKeys.addAll(props.keySet().stream().map(x -> x.toString()).toList());
             }
-
         }
         for (String property : AfonProperties.getAllNames()) {
             if (System.getProperty(property) != null) {
