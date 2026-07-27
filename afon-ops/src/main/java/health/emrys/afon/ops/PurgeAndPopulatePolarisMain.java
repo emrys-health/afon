@@ -20,7 +20,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.cluster.InfraUtils.isFailure;
+import static health.emrys.afon.cluster.ClusterUtils.isFailure;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
