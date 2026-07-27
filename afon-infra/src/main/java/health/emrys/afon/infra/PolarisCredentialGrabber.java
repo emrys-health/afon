@@ -1,8 +1,8 @@
 package health.emrys.afon.infra;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.k8s.ClusterState;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.PolarisConfigClient;
 import org.slf4j.Logger;
 
 import java.util.Properties;
@@ -17,7 +17,7 @@ public class PolarisCredentialGrabber {
         try {
             var          clusterConfig     = new ClusterPolarisConfiguration();
             ClusterState clusterState      = clusterConfig.getClusterState();
-            Properties   clusterProperties = AfonPropertiesLoader.add(clusterState.getCredentials(), clusterConfig.getClusterProperties());
+            Properties   clusterProperties = PolarisConfigClient.addPolarisCredentialsTo(clusterState.getCredentials(), clusterConfig.getClusterProperties());
             var          client            = clientFactory.getPolarisClient(clusterProperties, "https");
             logger.info("Polaris credential: {}", clusterState.getCredentials());
             logger.info("Polaris access key: {}", client.getAccessToken());
