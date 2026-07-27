@@ -1,4 +1,4 @@
-A healthy looking stack looks something like:
+A healthy looking cluster looks something like:
 ```shell
 $ kubectl get pods -A
 NAMESPACE     NAME                                                       READY   STATUS    RESTARTS      AGE
