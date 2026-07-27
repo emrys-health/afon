@@ -57,7 +57,7 @@
         <module>afon-spark-connect</module>
         <module>afon-snowflake</module>
         <module>afon-trino</module>
-        <module>afon-infra</module>
+        <module>afon-cluster</module>
         <module>afon-ops</module>
         <module>afon-docs</module>
     </modules>

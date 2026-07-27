@@ -12,7 +12,7 @@ import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.azure.AzureWholeStack;
 import health.emrys.afon.cdk.gcp.GcpKubernetesPolaris;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
-import health.emrys.afon.infra.EndpointPolarisConfiguration;
+import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;

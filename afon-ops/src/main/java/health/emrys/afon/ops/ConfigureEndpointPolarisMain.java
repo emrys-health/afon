@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.infra.EndpointPolarisConfiguration;
+import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 
 public class ConfigureEndpointPolarisMain {
 

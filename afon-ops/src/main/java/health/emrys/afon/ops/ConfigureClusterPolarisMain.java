@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.infra.ClusterPolarisConfiguration;
+import health.emrys.afon.cluster.ClusterPolarisConfiguration;
 
 public class ConfigureClusterPolarisMain {
 
