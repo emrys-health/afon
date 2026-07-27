@@ -16,7 +16,7 @@ import health.emrys.afon.cdk.NetworkConfiguration;
 import health.emrys.afon.cdk.SparkConfig;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
@@ -153,7 +153,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
             .build();
     }
 
-    private void csiSecretsDriver(List<@NotNull ITerraformDependable> eksDependOn) {
+    private void csiSecretsDriver(List<@NonNull ITerraformDependable> eksDependOn) {
         Release.Builder.create(this, "secrets-store-csi-driver")
                        .dependsOn(eksDependOn)
                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())

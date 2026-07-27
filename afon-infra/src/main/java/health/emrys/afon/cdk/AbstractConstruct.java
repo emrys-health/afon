@@ -1,15 +1,15 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 public abstract class AbstractConstruct extends Construct implements CloudProvider {
 
-    private final @NotNull String             id;
+    private final @NonNull String             id;
     private                KubernetesProvider kubernetesProvider;
 
-    public AbstractConstruct(@NotNull Construct scope, @NotNull String id) {
+    public AbstractConstruct(@NonNull Construct scope, @NonNull String id) {
         super(scope, id);
         this.id = id;
     }

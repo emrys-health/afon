@@ -9,7 +9,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
@@ -34,8 +34,8 @@ public class SparkClusterDeployment extends AwsWholeStack {
     static final String NO_SPARK_LB_FINALIZERS = "kubectl patch service spark-master-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
     protected final String awsPolarisDomainName;
 
-    public SparkClusterDeployment(@NotNull Construct scope,
-                                  @NotNull SupportedCloudsEnum id,
+    public SparkClusterDeployment(@NonNull Construct scope,
+                                  @NonNull SupportedCloudsEnum id,
                                   Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());

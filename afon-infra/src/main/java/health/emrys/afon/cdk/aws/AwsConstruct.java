@@ -48,7 +48,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMe
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.AbstractConstruct;
 import health.emrys.afon.config.AfonProperties;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.constructs.Construct;
@@ -753,7 +753,7 @@ public class AwsConstruct extends AbstractConstruct {
         return helmInstallLoadBalancer(serviceAccountName, loadBalancerRole);
     }
 
-    private @NotNull String configureServiceAccount(Construct scope, IamRole loadBalancerRole) {
+    private @NonNull String configureServiceAccount(Construct scope, IamRole loadBalancerRole) {
         DataAwsEksCluster clusterData        = associateOIDCProvider(scope);
         String            serviceAccountName = "aws-load-balancer-controller";
 
@@ -798,7 +798,7 @@ public class AwsConstruct extends AbstractConstruct {
         return serviceAccountName;
     }
 
-    private @NotNull DataAwsEksCluster associateOIDCProvider(Construct scope) {
+    private @NonNull DataAwsEksCluster associateOIDCProvider(Construct scope) {
         // 1. Fetch the EKS Cluster details to get the OIDC Issuer URL
         DataAwsEksCluster clusterData = new DataAwsEksCluster(
             scope, "EksClusterData",

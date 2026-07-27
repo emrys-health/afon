@@ -4,7 +4,7 @@ import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import health.emrys.afon.cdk.KeyCloakDeploymentConfig;
 import health.emrys.afon.config.AfonProperties;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.Properties;
@@ -19,9 +19,9 @@ public class AwsKeyCloakDeploymentConfig extends KeyCloakDeploymentConfig<AwsCon
     private Route53Record aliasRecord;
 
     public AwsKeyCloakDeploymentConfig(
-        @NotNull Construct scope,
-        @NotNull Properties properties,
-        @NotNull AwsConstruct cloudProvider) {
+        @NonNull Construct scope,
+        @NonNull Properties properties,
+        @NonNull AwsConstruct cloudProvider) {
         super(scope, properties, cloudProvider);
         dnsZone  = AfonProperties.AWS_KEYCLOAK_DNS_ZONE.getValueFrom(properties);
         certArn  = AfonProperties.AWS_KEYCLOAK_CERT_ARN.getValueFrom(properties);

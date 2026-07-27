@@ -1,6 +1,6 @@
 package health.emrys.afon.security.keycloak;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.util.HashMap;

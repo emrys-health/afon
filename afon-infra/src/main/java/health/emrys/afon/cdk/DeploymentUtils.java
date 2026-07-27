@@ -2,7 +2,7 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.LinkedHashMap;
@@ -13,7 +13,7 @@ public class DeploymentUtils {
 
     public static Deployment deploy(
         Construct                                   scope,
-        List<@NotNull ITerraformDependable>         eksDependOn,
+        List<@NonNull ITerraformDependable>         eksDependOn,
         Map<String, String>                         labels,
         List<DeploymentSpecTemplateSpecContainer>   containers,
         List<DeploymentSpecTemplateSpecVolume>      volumes,
@@ -32,7 +32,7 @@ public class DeploymentUtils {
      */
     public static Deployment deploy(
         Construct                                     scope,
-        List<@NotNull ITerraformDependable>           eksDependOn,
+        List<@NonNull ITerraformDependable>           eksDependOn,
         Map<String, String>                           labels,
         List<DeploymentSpecTemplateSpecContainer>     containers,
         List<DeploymentSpecTemplateSpecInitContainer> initContainers,

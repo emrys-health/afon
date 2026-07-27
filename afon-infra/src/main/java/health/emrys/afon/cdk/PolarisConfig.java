@@ -9,7 +9,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
 import health.emrys.afon.security.keycloak.KeyCloakConfig;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -39,7 +39,7 @@ public class PolarisConfig extends Construct {
 
     public Map<String, String> polarisLabels;
 
-    public PolarisConfig(@NotNull Construct scope, @NotNull String id, CloudProvider cloudProvider) {
+    public PolarisConfig(@NonNull Construct scope, @NonNull String id, CloudProvider cloudProvider) {
         super(scope, id);
         // Configure the Kubernetes Provider
         cloudProvider.configureK8s();

@@ -5,7 +5,7 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.ClusterCredentials;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.time.LocalDateTime;
@@ -185,7 +185,7 @@ public class GeneratePySparkContextMain {
             table, catalog, catalog_table, table);
     }
 
-    private static @NotNull String azureSmokeTest(String tableName) {
+    private static @NonNull String azureSmokeTest(String tableName) {
         return format(
             """
             #
@@ -205,7 +205,7 @@ public class GeneratePySparkContextMain {
             """, tableName, tableName);
     }
 
-    static @NotNull String awsSmokeTest(String tableName) {
+    static @NonNull String awsSmokeTest(String tableName) {
         return format(
             """
             #
@@ -226,7 +226,7 @@ public class GeneratePySparkContextMain {
             """, tableName, tableName, tableName);
     }
 
-    private static @NotNull String gcpSmokeTest(String tableName) {
+    private static @NonNull String gcpSmokeTest(String tableName) {
         return format(
             """
             #

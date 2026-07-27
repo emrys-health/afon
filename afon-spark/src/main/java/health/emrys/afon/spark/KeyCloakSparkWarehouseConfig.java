@@ -1,7 +1,7 @@
 package health.emrys.afon.spark;
 
 import health.emrys.afon.security.keycloak.KeyCloakConfig;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -52,7 +52,7 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
         return addOauthServer(sparkCatalog, super.sparkConfigs(sparkCatalog));
     }
 
-    private @NotNull Map<String, String> addOauthServer(String sparkCatalog, Map<String, String> actual) {
+    private @NonNull Map<String, String> addOauthServer(String sparkCatalog, Map<String, String> actual) {
         Map<String, String> conf    = new HashMap<>(actual);
         conf.put(format("spark.sql.catalog.%s.oauth2-server-uri", sparkCatalog), oauth2ServerUri);
         conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), KEYCLOAK_SCOPE);

@@ -7,7 +7,7 @@ import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
@@ -19,8 +19,8 @@ public class PrometheusClusterDeployment extends TrinoClusterDeployment {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PrometheusClusterDeployment.class);
 
-    public PrometheusClusterDeployment(@NotNull Construct scope,
-                                       @NotNull SupportedCloudsEnum id,
+    public PrometheusClusterDeployment(@NonNull Construct scope,
+                                       @NonNull SupportedCloudsEnum id,
                                        Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
@@ -66,7 +66,7 @@ public class PrometheusClusterDeployment extends TrinoClusterDeployment {
         new MonitoredService("hubble-relay",    "k8s-app",                "hubble-relay",    "metrics")
     );
 
-    private void deployPrometheus(List<@NotNull ITerraformDependable> eksDependOn, Properties properties) {
+    private void deployPrometheus(List<@NonNull ITerraformDependable> eksDependOn, Properties properties) {
         // Configuration Overrides for the Helm Chart
         // We use the ReleaseSet.builder() for the `set` block in Terraform
         final List<ReleaseSet> chartOverrides = List.of(
@@ -156,7 +156,7 @@ public class PrometheusClusterDeployment extends TrinoClusterDeployment {
      * Grafana that kube-prometheus-stack already deploys, wired up by
      * {@link #grafanaLokiDatasourceValues()}.
      */
-    private Release deployLoki(List<@NotNull ITerraformDependable> eksDependOn, Properties properties) {
+    private Release deployLoki(List<@NonNull ITerraformDependable> eksDependOn, Properties properties) {
         return Release.Builder
             .create(this, "lokiRelease")
             .name("loki")
@@ -179,7 +179,7 @@ public class PrometheusClusterDeployment extends TrinoClusterDeployment {
      * lines to the {@code default} namespace, so Loki only stores what the
      * user asked for.
      */
-    private void deployPromtail(List<@NotNull ITerraformDependable> eksDependOn, Release loki, Properties properties) {
+    private void deployPromtail(List<@NonNull ITerraformDependable> eksDependOn, Release loki, Properties properties) {
         List<ITerraformDependable> deps = new ArrayList<>(eksDependOn);
         deps.add(loki);
         Release.Builder
