@@ -57,19 +57,12 @@ public class Documenter {
         }
     }
 
-    static @NonNull Path documentationPath() {
-        String docsDir = "docs";
+    @NonNull
+    static Path documentationPath() {
+        String docsDir = "target/docs";
         Path   docs    = Path.of(docsDir);
         if (!docs.toFile().exists()) {
-            String absolutePathModule = docs.toFile().getAbsolutePath();
-            log.info("No directory '{}'. Looking in parent",
-                     absolutePathModule);
-            docs = Paths.get("").toAbsolutePath().getParent().resolve(docsDir);
-            if (!docs.toFile().exists()) {
-                throw new RuntimeException(format("Cannot find directory %s nor %s",
-                                                  absolutePathModule,
-                                                  docs.toFile().getAbsolutePath()));
-            }
+            docs.toFile().mkdirs();
         }
         return docs;
     }
