@@ -1,4 +1,4 @@
-package health.emrys.afon.spark;
+package health.emrys.afon.ops.spark;
 
 import org.apache.spark.sql.SparkSession;
 import org.jspecify.annotations.NonNull;

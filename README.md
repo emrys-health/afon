@@ -107,16 +107,18 @@ You need domain names that point to each cloud's Kubernetes ingress. See [DNS Co
 3. Update the domain registrar's nameservers to point at the cloud's nameservers
 4. Request SSL certificates (e.g. via AWS Certificate Manager or Let's Encrypt)
 
-### 5. Generate infrastructure documentation
+### 5. Generate docs
+
+Docs are generated as part of the build.  To copy them to a docs dir:
 
 ```shell
-./afon.sh -a exec -t docs --exec-class health.emrys.afon.docs.DocumentExternalCatalogsMain 
+./afon.sh -a docs --docs-dir ~/afon-docs
 ```
 
 Read the generated docs:
 
 ```shell
-cat target/aws_azure_external_catalogs.md
+cat ~/afon-docs/ops/aws_azure_external_catalogs.md
 ```
 
 ### 6. Deploy the catalogs
@@ -637,7 +639,7 @@ df_joined.show()
 **Write:**
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.spark.SparkTestWriter \ 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.spark.SparkTestWriter \ 
   --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
@@ -646,7 +648,7 @@ This creates a namespace, creates an Iceberg table, and writes three rows ("appl
 **Read:**
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.spark.SparkTestReader \ 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.spark.SparkTestReader \ 
   --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
