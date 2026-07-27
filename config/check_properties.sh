@@ -1,0 +1,2 @@
+for FILE in $(ls *.example) ; do { export REAL=$(echo $FILE | perl -pe s/\\.[a-zA-Z0-9]*$//g ) ; ls $REAL || echo "no file called
+ $FILE" ; for KEY in $(grep = $FILE | grep -v ^# $FILE | perl -pe s/=.*//g) ; do {  grep ^$KEY= $REAL > /dev/null || echo "no $KEY in $FILE" ; } done } done
