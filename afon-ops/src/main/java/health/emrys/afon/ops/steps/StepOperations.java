@@ -8,9 +8,9 @@ import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
 import health.emrys.afon.ops.OnboardAllUsersMain;
-import health.emrys.afon.spark.SparkChecker;
-import health.emrys.afon.spark.SparkTestReader;
-import health.emrys.afon.spark.SparkTestWriter;
+import health.emrys.afon.ops.spark.SparkChecker;
+import health.emrys.afon.ops.spark.SparkTestReader;
+import health.emrys.afon.ops.spark.SparkTestWriter;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -23,7 +23,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
-import static health.emrys.afon.spark.SparkChecker.EXTERNAL_NAMESPACE;
+import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;

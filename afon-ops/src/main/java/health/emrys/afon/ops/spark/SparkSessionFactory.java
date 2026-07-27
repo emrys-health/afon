@@ -1,9 +1,11 @@
-package health.emrys.afon.spark;
+package health.emrys.afon.ops.spark;
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.cluster.PolarisClusterCredentials;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.spark.SparkWarehouseConfig;
+import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import io.kubernetes.client.openapi.ApiException;
 import org.apache.spark.SparkContext;
 import org.apache.spark.sql.SparkSession;
@@ -25,11 +27,11 @@ public class SparkSessionFactory {
     public static SparkSession localSparkClusterPolaris(String[] warehouseNames,
                                                         SupportedCloudsEnum polarisCloud)
     throws IOException {
-        ClusterCredentials emrysCloud = PolarisClusterCredentials.createClusterCredentials(polarisCloud);
+        ClusterCredentials credentials = PolarisClusterCredentials.createClusterCredentials(polarisCloud);
         return new SparkSessionFactory(
-            emrysCloud.getPolarisId(),
-            emrysCloud.getPolarisSecret(),
-            emrysCloud.getPolarisHost(),
+            credentials.getPolarisId(),
+            credentials.getPolarisSecret(),
+            credentials.getPolarisHost(),
             "https",
             warehouseNames
         ).createSparkSession();
