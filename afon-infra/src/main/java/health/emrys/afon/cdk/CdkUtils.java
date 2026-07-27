@@ -8,7 +8,7 @@ import java.util.List;
 
 public class CdkUtils {
 
-    static @NotNull List<LocalExecProvisioner> uponDestroyRun(String... commands) {
+    public static @NotNull List<LocalExecProvisioner> uponDestroyRun(String... commands) {
         return Arrays.stream(commands).map(command ->
                                                    LocalExecProvisioner
                                                            .builder()
@@ -19,7 +19,7 @@ public class CdkUtils {
                                           ).toList();
     }
 
-    static @NotNull List<LocalExecProvisioner> uponCreateRun(String... commands) {
+    public static @NotNull List<LocalExecProvisioner> uponCreateRun(String... commands) {
         return Arrays.stream(commands).map(command ->
                                                    LocalExecProvisioner
                                                            .builder()

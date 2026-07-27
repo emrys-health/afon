@@ -3,6 +3,7 @@
 # set -a && source afon.properties && set +a
 
 aws s3api create-bucket --bucket $AWS_S3_EXTERNAL_BUCKET_NAME   --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION && \
+aws s3api create-bucket --bucket $AWS_S3_BUCKET_NAME_TRINO      --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION && \
 aws s3api create-bucket --bucket $AWS_S3_BUCKET_NAME            --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION && \
 aws s3api create-bucket --bucket $AWS_S3_BUCKET_NAME_FORBIDDEN  --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION && \
 aws iam create-role --role-name S3ReadWriteRole --assume-role-policy-document "{
@@ -43,6 +44,18 @@ aws iam create-policy --policy-name AfonBucketWhiteList  --policy-document "{
       \"Effect\": \"Allow\",
       \"Action\": \"s3:*\",
       \"Resource\": \"arn:aws:s3:::$AWS_S3_EXTERNAL_BUCKET_NAME/*\"
+    },
+    {
+      \"Sid\": \"AllowBucketEmrysAfonBucketTrinoList\",
+      \"Effect\": \"Allow\",
+      \"Action\": \"s3:ListBucket\",
+      \"Resource\": \"arn:aws:s3:::$AWS_S3_BUCKET_NAME_TRINO\"
+    },
+    {
+      \"Sid\": \"AllowBucketEmrysAfonBucketTrinoObjects\",
+      \"Effect\": \"Allow\",
+      \"Action\": \"s3:*\",
+      \"Resource\": \"arn:aws:s3:::$AWS_S3_BUCKET_NAME_TRINO/*\"
     }
   ]
 }" && \

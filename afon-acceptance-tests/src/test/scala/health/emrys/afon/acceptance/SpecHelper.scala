@@ -10,7 +10,7 @@ import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
 
 trait SpecHelper {
-  private val simpleTableName: String = this.getClass.getSimpleName.replace("$", "_")
+  private val simpleTableName: String = this.getClass.getSimpleName.replace("$", "_").toLowerCase()
 
   val now: LocalDateTime = LocalDateTime.now
   val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyMMddmmHHss")

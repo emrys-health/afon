@@ -4,16 +4,15 @@ import health.emrys.afon.acceptance.PolarisHelper.principalRoleName
 import health.emrys.afon.polaris.catalogs.{CloudConfigForPolaris, JsonMaker, PolarisDTOs}
 import health.emrys.afon.polaris.comms.PermissionsConfigurer
 import health.emrys.afon.polaris.comms.PolarisConfigurer._
-import org.apache.polaris.core.admin.model.CatalogPrivilege
-import org.apache.polaris.core.admin.model.CatalogPrivilege.{NAMESPACE_CREATE, NAMESPACE_FULL_METADATA, TABLE_CREATE, TABLE_READ_DATA, TABLE_WRITE_DATA, VIEW_FULL_METADATA}
+import org.apache.polaris.core.admin.model.CatalogPrivilege._
 import org.scalatest.GivenWhenThen
 
 abstract class PolarisFixture extends Function0[Any] {
 
   val REST_CODE_RESOURCE_CREATED = 201
 
-  val client = AcceptanceTestConfig.instance.getPolarisClient
-  val accessToken = AcceptanceTestConfig.instance.getAccessToken()
+  val client = AcceptanceTestConfig.instance.getPolarisAdminClient
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
   val dtos = new PolarisDTOs(new JsonMaker())
 
 }
@@ -27,25 +26,27 @@ abstract class PolarisFixture extends Function0[Any] {
  */
 class CatalogAdminGrant(test: GivenWhenThen,
                         config: CloudConfigForPolaris,
-                        warehouseNameOpt: Option[String] = None) extends PolarisFixture {
+                        warehouseNameOpt: Option[String] = None,
+                        noisy: Boolean = true) extends PolarisFixture {
 
   import test._
 
   override def apply(): Any = {
-    Given(s"a Polaris endpoint at ${client.getEndpoint}")
+    if (noisy) Given(s"a Polaris endpoint at ${client.getEndpoint}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
-    val uri = getCatalogAdminGrantsURI(warehouseName)
-    val json = dtos.catalogAdminGrants
-    When(s"we call '$uri' with payload:\n$json")
-    val response = client.putJsonCall(uri, json, accessToken)
-    Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
+    val uri           = getCatalogAdminGrantsURI(warehouseName)
+    val json          = dtos.catalogAdminGrants
+    if (noisy) When(s"we call '$uri' with payload:\n$json")
+    val response      = client.putJsonCall(uri, json, accessToken)
+    if (noisy) Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
     assert(response.getCode == REST_CODE_RESOURCE_CREATED)
   }
 }
 
 class CatalogRoles(test: GivenWhenThen,
                    config: CloudConfigForPolaris,
-                   warehouseNameOpt: Option[String] = None) extends PolarisFixture {
+                   warehouseNameOpt: Option[String] = None,
+                   noisy: Boolean = true) extends PolarisFixture {
 
   import test._
 
@@ -53,29 +54,29 @@ class CatalogRoles(test: GivenWhenThen,
   val permissions = new PermissionsConfigurer(client)
 
   def apply = {
-    Given(s"a Polaris endpoint at ${client.getEndpoint}")
-    And(s"a principal that's already been created:\n${PolarisHelper.principal.getPrincipal}")
+    if (noisy) Given(s"a Polaris endpoint at ${client.getEndpoint}")
+    if (noisy) And(s"a principal that's already been created:\n${PolarisHelper.principal.getPrincipal}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
 
-    When(s"we create a catalog role name called '$catalogRoleName'")
+    if (noisy) When(s"we create a catalog role name called '$catalogRoleName'")
     assert(permissions
       .createCatalogRole(warehouseName, catalogRoleName)
       .getCode == REST_CODE_RESOURCE_CREATED)
 
     val privileges = Set(TABLE_READ_DATA, TABLE_WRITE_DATA, NAMESPACE_CREATE, TABLE_CREATE, NAMESPACE_FULL_METADATA)
-    When(s"we add to the catalog role '$catalogRoleName' permissions:\n${privileges.mkString("\n")}")
+    if (noisy) When(s"we add to the catalog role '$catalogRoleName' permissions:\n${privileges.mkString("\n")}")
     privileges.foreach(privilege =>
       assert(permissions
         .createCatalogRoleGrant(warehouseName, privilege, catalogRoleName)
         .getCode == REST_CODE_RESOURCE_CREATED)
     )
 
-    When(s"we associate principal role '$principalRoleName' with catalog role name '$catalogRoleName'")
+    if (noisy) When(s"we associate principal role '$principalRoleName' with catalog role name '$catalogRoleName'")
     assert(permissions
       .associateRoles(warehouseName, principalRoleName, catalogRoleName)
       .getCode == REST_CODE_RESOURCE_CREATED)
 
-    Then(s"Polaris indicates the HTTP requests lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
+    if (noisy) Then(s"Polaris indicates the HTTP requests lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
   }
 
 }

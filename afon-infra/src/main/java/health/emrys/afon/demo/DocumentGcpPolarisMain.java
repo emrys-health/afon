@@ -1,11 +1,14 @@
 package health.emrys.afon.demo;
 
-import health.emrys.afon.cdk.GcpConstruct;
+import health.emrys.afon.cdk.gcp.GcpConstruct;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
@@ -35,6 +38,7 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
 
     @Override
     public String getFurtherNotes() {
+        Properties properties = new AfonPropertiesLoader().getProperties();
         return String.format("""
             # Problems running `tofu destroy`?
             If you see:
@@ -63,7 +67,16 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
             ```shell
             %s
             ```
-            """, GcpConstruct.nukeGcp());
+            
+            Nuke the cluset with:
+            ```
+            gcloud container clusters list
+            gcloud container clusters delete %s --region=europe-west2
+            ```
+            """,
+             GcpConstruct.nukeGcp(),
+             CLUSTER_NAME.getValueFrom(properties)
+        );
     }
 
 }

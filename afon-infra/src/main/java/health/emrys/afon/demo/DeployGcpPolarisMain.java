@@ -1,6 +1,6 @@
 package health.emrys.afon.demo;
 
-import health.emrys.afon.cdk.GcpKubernetesPolaris;
+import health.emrys.afon.cdk.gcp.GcpKubernetesPolaris;
 
 import java.util.List;
 

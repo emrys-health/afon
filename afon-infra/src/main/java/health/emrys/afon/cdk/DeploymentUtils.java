@@ -18,6 +18,27 @@ public class DeploymentUtils {
         List<DeploymentSpecTemplateSpecContainer>   containers,
         List<DeploymentSpecTemplateSpecVolume>      volumes,
         String                                      name) {
+        return deploy(scope, eksDependOn, labels, containers, List.of(), volumes, name, null);
+    }
+
+    /**
+     * As {@link #deploy(Construct, List, Map, List, List, String)}, additionally taking init containers
+     * that must succeed before the main containers start, and an optional Terraform create timeout.
+     *
+     * @param createTimeout how long Terraform waits for the rollout, e.g. {@code "15m"}; the provider
+     *                      default of 10m applies when {@code null}. Set this above the time any init
+     *                      container may spend blocking, or Terraform gives up while the pod is still
+     *                      legitimately waiting.
+     */
+    public static Deployment deploy(
+        Construct                                     scope,
+        List<@NotNull ITerraformDependable>           eksDependOn,
+        Map<String, String>                           labels,
+        List<DeploymentSpecTemplateSpecContainer>     containers,
+        List<DeploymentSpecTemplateSpecInitContainer> initContainers,
+        List<DeploymentSpecTemplateSpecVolume>        volumes,
+        String                                        name,
+        String                                        createTimeout) {
         // Mirror `app` onto the canonical Kubernetes label so Hubble UI shows
         // a real workload name rather than "Unknown App". Only the pod template
         // gets the extra label — the selector and Deployment metadata keep the
@@ -25,31 +46,73 @@ public class DeploymentUtils {
         // resources (selectors are immutable once a Deployment exists).
         Map<String, String> podLabels = withAppKubernetesIoName(labels);
         DeploymentSpecTemplateMetadata metadata = DeploymentSpecTemplateMetadata.builder().labels(podLabels).build();
+        DeploymentSpecTemplateSpec.Builder podSpec = DeploymentSpecTemplateSpec.builder()
+                                                                               .container(containers)
+                                                                               .volume(volumes);
+        // Left unset when empty so callers that pass none keep emitting no init_container block at all.
+        if (!initContainers.isEmpty()) {
+            podSpec.initContainer(initContainers);
+        }
         DeploymentSpecTemplate specTemplate = DeploymentSpecTemplate
             .builder()
             .metadata(metadata)
-            .spec(DeploymentSpecTemplateSpec.builder()
-                                            .container(containers)
-                                            .volume(volumes)
-                                            .build())
+            .spec(podSpec.build())
             .build();
-        return Deployment.Builder.create(scope, name + "Deployment")
+        DeploymentSpec.Builder deploymentSpec = DeploymentSpec
+            .builder()
+            .selector(DeploymentSpecSelector
+                          .builder()
+                          .matchLabels(labels)
+                          .build())
+            .replicas("1")
+            .template(specTemplate);
+        // Kubernetes fails a rollout once its own progressDeadlineSeconds (default 600s / 10m)
+        // elapses, surfacing a "Deployment exceeded its progress deadline" condition that the
+        // provider reports as an error long before the Terraform create timeout below is reached.
+        // Keep the two in step so a caller raising createTimeout to cover a slow init container
+        // actually gets the extra wait rather than tripping the 10m Kubernetes default.
+        if (createTimeout != null) {
+            deploymentSpec.progressDeadlineSeconds(durationToSeconds(createTimeout));
+        }
+        Deployment.Builder builder = Deployment.Builder.create(scope, name + "Deployment")
                                  .dependsOn(eksDependOn)
+                                 // Don't block the apply waiting for pods to become Ready. These are
+                                 // app workloads reached at runtime via ALB/ingress — nothing downstream
+                                 // in Terraform depends on their readiness, so waiting only burns wall-clock
+                                 // under the 15-minute EKS auth token and risks the token expiring
+                                 // mid-rollout (which is how oauth2-proxy failed). Trade-off: a genuinely
+                                 // broken rollout won't fail the apply — surface it via monitoring/kubectl.
+                                 .waitForRollout(false)
                                  .metadata(DeploymentMetadata
                                                .builder()
                                                .name(name + "-deployment")
                                                .labels(labels)
                                                .build())
-                                 .spec(DeploymentSpec
-                                           .builder()
-                                           .selector(DeploymentSpecSelector
-                                                         .builder()
-                                                         .matchLabels(labels)
-                                                         .build())
-                                           .replicas("1")
-                                           .template(specTemplate)
-                                           .build())
-                                 .build();
+                                 .spec(deploymentSpec.build());
+        if (createTimeout != null) {
+            builder.timeouts(DeploymentTimeouts.builder().create(createTimeout).build());
+        }
+        return builder.build();
+    }
+
+    /**
+     * Converts a Terraform-style Go duration (e.g. {@code "15m"}, {@code "600s"}, {@code "1h"}) to
+     * whole seconds for {@code progressDeadlineSeconds}. Supports {@code h}/{@code m}/{@code s} units,
+     * defaulting to seconds when no unit is given.
+     */
+    static Number durationToSeconds(String duration) {
+        String trimmed = duration.trim();
+        char unit = trimmed.charAt(trimmed.length() - 1);
+        long multiplier = switch (unit) {
+            case 'h' -> 3600;
+            case 'm' -> 60;
+            case 's' -> 1;
+            default  -> 0;
+        };
+        if (multiplier == 0) {
+            return Long.parseLong(trimmed);
+        }
+        return Long.parseLong(trimmed.substring(0, trimmed.length() - 1).trim()) * multiplier;
     }
 
     /**

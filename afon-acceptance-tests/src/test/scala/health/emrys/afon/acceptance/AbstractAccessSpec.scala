@@ -1,39 +1,47 @@
 package health.emrys.afon.acceptance
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
+import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
+import health.emrys.afon.config.AfonPropertiesLoader
+import health.emrys.afon.infra.InfraUtils
+import health.emrys.afon.infra.onboarding.UserOnboarderMain
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.comms.PolarisConfigurer
 import health.emrys.afon.polaris.comms.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
+import health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM
+import health.emrys.afon.security.keycloak.{KeyCloakAdmin, KeyCloakConfig, OnboardingConfig}
+import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser
+import health.emrys.afon.trino.SmokeTest
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
+import java.util
 
 abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 
-  val NUM_ROWS = 100
-
-  val FULL_NAMESPACE = s"${cloudProvider}.$namespace"
-
   def config: CloudConfigForPolaris
+
   val GrantCatalogAdmin = new CatalogAdminGrant(this, config)
-  val CatalogRoles = new CatalogRoles(this, config)
+  val CatalogRoles      = new CatalogRoles(this, config)
+  val NUM_ROWS          = 100
+  val FULL_NAMESPACE    = s"${cloudProvider}.$namespace"
 
   protected def createTableAndPopulate(): Unit = {
     spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).create()
   }
 
-  val client = AcceptanceTestConfig.instance.getPolarisClient
-  val accessToken = AcceptanceTestConfig.instance.getAccessToken()
 
   "Polaris" should {
+    val client      = AcceptanceTestConfig.instance.getPolarisAdminClient
+    val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
     "be told about the catalog" in {
       val uri = getCreateCatalogURI
       Given(s"a Polaris endpoint at ${client.getEndpoint}")
       val json = config.catalogConfig
-      When(s"we call $uri with payload:\n$json")
+      When(s"we call $uri as user '${client.getClientId}' with payload:\n$json")
       client.postJsonCall(uri, json, accessToken)
       val uriGet = s"/api/catalog/v1/config?warehouse=${config.warehouseName()}"
       Then(s"Polaris acknowledges the catalog when we call $uriGet")
@@ -62,6 +70,8 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   }
 
   s"A table" should {
+    val client      = AcceptanceTestConfig.instance.getPolarisClient
+    val accessToken = AcceptanceTestConfig.instance.getAccessToken()
     "have a namespace" in {
       import scala.jdk.CollectionConverters._
       val conf = SparkHelper.sparkWarehouse.sparkConfigs(cloudProvider).asScala.map {
@@ -74,7 +84,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       When(s"we create a namespace with SQL '$sql'")
       spark.sql(sql)
       val uri = namespaceURI(config.warehouseName(), namespace)
-      Then(s"Polaris acknowledges the namespace exists when call '$uri")
+      Then(s"Polaris acknowledges the namespace exists when call as user '${client.getClientId}' '$uri")
       val response = client.getCall(uri, accessToken)
       assert(response.getCode == 200)
     }
@@ -119,6 +129,64 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       }
     }
   }
+
+  "Polaris and KeyCloak" should {
+    val UserName      = "userX"
+    val UserPassword  = "password"
+    val properties    = AcceptanceTestConfig.instance.getProperties
+    val User          = new EmrysUser(UserName, "email@test.com", "slug", UserPassword, "first", "second")
+
+    val onboardingConfig = new OnboardingConfig() {
+      override def getUsers: util.List[EmrysUser] = util.List.of(User)
+    }
+    "agree on the token" in {
+      Given("A KeyCloak and Polaris instance")
+      assert(ContainerHelper.instance.startKeyCloak(properties) != null)
+      assert(ContainerHelper.instance.startPolaris(properties) != null)
+
+      When(s"we onboard a user '$User' for catalog ${config.warehouseName()}' in Polaris")
+      val onboarding = new UserOnboarderMain(onboardingConfig, properties)
+      onboarding.onboardAll(config.warehouseName())
+      And("in KeyCloak")
+      onboarding.configureKeyCloak("NotUsed.com")
+
+      Then(s"we can get a token from KeyCloak for user '$UserName' in Realm '$KEYCLOAK_REALM'")
+      val kcAdmin = new KeyCloakAdmin("localhost", UserName, UserPassword)
+      assert(kcAdmin.getToken(KEYCLOAK_REALM) != null)
+
+      val uriGet = tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
+      val polarisClient = AcceptanceTestConfig.instance.polarisClientFor(UserName, UserPassword)
+      And(s"user '$UserName' can see the table when they call Polaris at $uriGet'")
+      val response = polarisClient.getCall(uriGet, polarisClient.getAccessToken())
+      assert(!InfraUtils.isFailure(response))
+    }
+  }
+
+  "Trino" should {
+    val properties          = new AfonPropertiesLoader().getProperties
+    "vend credentials" in {
+      Given(s"a catalog called ${config.warehouseName()} in Polaris")
+
+      val tableName = tableNameFQN.toLowerCase()
+      And(s"a table called $tableName with $NUM_ROWS rows in cloud storage")
+
+      And(
+        s"""a Trino instance with $cloudProvider.properties of:
+           |
+           |${trinoLocalConfig(properties, cloudProvider)}""".stripMargin)
+
+      val trinoHttp = trinoConfigProperties().get("discovery.uri").toString
+      val url = s"jdbc:trino://${trinoHttp.substring(trinoHttp.indexOf("//") + 2)}/"
+      When(s"we connect to $url")
+      val smokeTest = new SmokeTest(url)
+      val sql = s"SELECT COUNT(*) FROM $tableName"
+      And(s"execute SQL: ${formatSQL(sql)}")
+      val result = smokeTest.readTable(sql)
+      Then(s"the result is $result")
+      assert(Integer.parseInt(result) == NUM_ROWS)
+    }
+  }
+
 }
 
 object AbstractAccessSpec {
