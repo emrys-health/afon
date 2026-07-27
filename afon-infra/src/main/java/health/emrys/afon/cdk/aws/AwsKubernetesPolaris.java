@@ -12,7 +12,7 @@ import health.emrys.afon.cdk.KeyCloakDeploymentConfig;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
@@ -34,7 +34,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
 
     private AwsKeyCloakDeploymentConfig keyCloakConfig;
 
-    public AwsKubernetesPolaris(@NotNull Construct scope,
+    public AwsKubernetesPolaris(@NonNull Construct scope,
                                 SupportedCloudsEnum id,
                                 Properties properties) {
         super(scope, id.toString());

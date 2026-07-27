@@ -8,7 +8,7 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonProperty;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.*;
@@ -49,9 +49,9 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
     protected final     T               cloudProvider;
 
     public KeyCloakDeploymentConfig(
-        @NotNull Construct scope,
-        @NotNull Properties properties,
-        @NotNull T cloudProvider) {
+        @NonNull Construct scope,
+        @NonNull Properties properties,
+        @NonNull T cloudProvider) {
         super(scope, APP_NAME + "_scope");
         this.cloudProvider = cloudProvider;
 

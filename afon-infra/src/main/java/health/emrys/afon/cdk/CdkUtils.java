@@ -1,14 +1,14 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.LocalExecProvisioner;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Arrays;
 import java.util.List;
 
 public class CdkUtils {
 
-    public static @NotNull List<LocalExecProvisioner> uponDestroyRun(String... commands) {
+    public static @NonNull List<LocalExecProvisioner> uponDestroyRun(String... commands) {
         return Arrays.stream(commands).map(command ->
                                                    LocalExecProvisioner
                                                            .builder()
@@ -19,7 +19,7 @@ public class CdkUtils {
                                           ).toList();
     }
 
-    public static @NotNull List<LocalExecProvisioner> uponCreateRun(String... commands) {
+    public static @NonNull List<LocalExecProvisioner> uponCreateRun(String... commands) {
         return Arrays.stream(commands).map(command ->
                                                    LocalExecProvisioner
                                                            .builder()

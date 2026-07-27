@@ -10,7 +10,7 @@ import com.hashicorp.cdktf.providers.kubernetes.cluster_role_binding_v1.ClusterR
 import com.hashicorp.cdktf.providers.kubernetes.cluster_role_v1.ClusterRoleV1;
 import com.hashicorp.cdktf.providers.kubernetes.cluster_role_v1.ClusterRoleV1Metadata;
 import com.hashicorp.cdktf.providers.kubernetes.cluster_role_v1.ClusterRoleV1Rule;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -19,8 +19,8 @@ public class SparkConfig extends Construct {
 
     public final ClusterRoleBindingV1 operatorReady;
 
-    public SparkConfig(@NotNull Construct scope,
-                       @NotNull String id,
+    public SparkConfig(@NonNull Construct scope,
+                       @NonNull String id,
                        List<? extends ITerraformDependable> eksDependOn) {
         super(scope, id);
         // INSTALL SPARK OPERATOR (CRD CONTROLLER)

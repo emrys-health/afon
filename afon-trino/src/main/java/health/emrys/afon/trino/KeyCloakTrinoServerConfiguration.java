@@ -1,12 +1,8 @@
 package health.emrys.afon.trino;
 
-import health.emrys.afon.config.AfonProperties;
-import org.checkerframework.checker.nullness.qual.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Properties;
-
-import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
-import static java.lang.String.format;
 
 /**
  * A {@link TrinoServerConfiguration} for a Polaris running in external-auth mode (KeyCloak as the

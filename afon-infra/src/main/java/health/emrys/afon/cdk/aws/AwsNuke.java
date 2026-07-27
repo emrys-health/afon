@@ -2,7 +2,7 @@ package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
@@ -41,7 +41,7 @@ public class AwsNuke {
         componentNames = new AwsComponentNames(properties);
     }
 
-    @NotNull String cleanSecurityGroupsCommand(String vpcId) {
+    @NonNull String cleanSecurityGroupsCommand(String vpcId) {
         String region = "eu-west-2"; // TODO make configuratble
         return format(
             """
@@ -63,7 +63,7 @@ public class AwsNuke {
      * loud (echoes the resolved VPC and a stderr warning if it cannot be resolved) so a future
      * failure is visible in the tofu output rather than silently no-ops into a 20 min hang.
      */
-    @NotNull String cleanELBs() {
+    @NonNull String cleanELBs() {
         return format(
             """
             VPCS=$(%s)
@@ -109,18 +109,18 @@ public class AwsNuke {
             getVPCsCommand(), componentNames.getVpcId());
     }
 
-    @NotNull String getVPCCommand() {
+    @NonNull String getVPCCommand() {
         return format("export VPC=$(%s)", getVPCsCommand());
     }
 
-    @NotNull String getVPCsCommand() {
+    @NonNull String getVPCsCommand() {
         return format(
             """
             aws ec2 describe-vpcs --query "Vpcs[?Tags[?Key=='Name' && Value=='%s']].VpcId"   --output text""",
             componentNames.getVpcId());
     }
 
-    @NotNull String cleanEksCommand() {
+    @NonNull String cleanEksCommand() {
         return format("eksctl delete cluster --name %s --region eu-west-2", clusterName);
     }
 
@@ -226,7 +226,7 @@ public class AwsNuke {
                      );
     }
 
-    public @NotNull List<LocalExecProvisioner> destroySGsAndVPC() {
+    public @NonNull List<LocalExecProvisioner> destroySGsAndVPC() {
         return uponDestroyRun(format(
             """
             %s

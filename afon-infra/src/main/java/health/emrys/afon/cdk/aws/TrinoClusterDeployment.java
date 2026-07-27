@@ -3,7 +3,7 @@ package health.emrys.afon.cdk.aws;
 import com.hashicorp.cdktf.ITerraformDependable;
 import health.emrys.afon.cdk.TrinoWorkloads;
 import health.emrys.afon.config.AfonProperties;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Properties;
 
 public class TrinoClusterDeployment extends SparkClusterDeployment {
-    public TrinoClusterDeployment(@NotNull Construct scope, AfonProperties.@NotNull SupportedCloudsEnum id, Properties properties) {
+    public TrinoClusterDeployment(@NonNull Construct scope, AfonProperties.@NonNull SupportedCloudsEnum id, Properties properties) {
         super(scope, id, properties);
         // Trino only needs the cluster reachable (not the Spark operator), so it depends on the
         // EKS dependables rather than eksDependOn.
