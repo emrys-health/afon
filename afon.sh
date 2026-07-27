@@ -123,6 +123,7 @@ case $ACTION in
 
   build)
     MVN_GOALS="clean install"
+    MVN_ENVS="$MVN_ENVS -Dafon.home=$CWD"
     if [ -n "$CLOUD" ] ; then
       MVN_ENVS="-Dafon.cloud=$CLOUD"
     fi
