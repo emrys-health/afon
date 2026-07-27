@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.function.Function;
 
-import static health.emrys.afon.config.AfonPropertiesLoader.add;
+import static health.emrys.afon.polaris.config.PolarisConfigClient.addPolarisCredentialsTo;
 
 public abstract class AbstractPolarisConfiguration {
 
@@ -48,7 +48,7 @@ public abstract class AbstractPolarisConfiguration {
             external.putAll(properties);
             String credential = args[1];
             logger.info("Credential: " + credential);
-            initialize(cloud, add(credential, external));
+            initialize(cloud, addPolarisCredentialsTo(credential, external));
         }
     }
 

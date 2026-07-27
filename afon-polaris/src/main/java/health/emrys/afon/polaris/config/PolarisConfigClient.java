@@ -12,11 +12,30 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
+
 public class PolarisConfigClient {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisConfigClient.class);
 
     public PolarisConfigClient() {
+    }
+
+    /**
+     * Adds id:secret credentials to properties using keys {@link POLARIS_ID} and {@link POLARIS_SECRET}.
+     * @param credentials the id:secret String
+     * @param properties the Properties to add to
+     * @return The updated properties
+     */
+    public static Properties addPolarisCredentialsTo(String credentials, Properties properties) {
+        String[] creds = credentials.split(":");
+        if (creds.length != 2) {
+            logger.error("Incorrect access token {}. The token should have a ':' delimiting ID from Secret", credentials);
+        }
+        properties.setProperty(POLARIS_ID.getName(), creds[0]);
+        properties.setProperty(POLARIS_SECRET.getName(), creds[1]);
+        return properties;
     }
 
     public List<HttpResponse> createAllCatalogs(Properties properties, String credentials) throws IncorrectConfigException, IOException {
@@ -32,7 +51,7 @@ public class PolarisConfigClient {
 
     public List<HttpResponse> createCatalogs(Properties properties, String credentials, CloudConfigForPolaris[] configs) throws IOException, IncorrectConfigException {
         List<HttpResponse> allResponses = new ArrayList<HttpResponse>();
-        properties = AfonPropertiesLoader.add(credentials, properties);
+        properties = addPolarisCredentialsTo(credentials, properties);
         for (CloudConfigForPolaris config : configs) {
             logger.info("Configuring {}", config.warehouseName());
             HttpResponse[] responses = callPolaris(properties, config);

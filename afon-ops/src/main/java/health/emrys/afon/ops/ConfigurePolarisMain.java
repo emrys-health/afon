@@ -17,14 +17,14 @@ public class ConfigurePolarisMain {
                 logger.info("Running smoke test");
                 client.smokeTest();
             } else {
-                AfonPropertiesLoader loader = null;
+                AfonPropertiesLoader loader = new AfonPropertiesLoader();
+                Properties properties;
                 if (args.length == 1) {
-                    loader = new AfonPropertiesLoader();
+                    properties = loader.getProperties();
                 } else {
-                    loader = new AfonPropertiesLoader(args[1]);
+                    properties = loader.getProperties(args[1]);
                 }
-                Properties props = loader.getProperties();
-                client.createAllCatalogs(props, args[0]);
+                client.createAllCatalogs(properties, args[0]);
             }
         } catch (Exception e) {
             e.printStackTrace();

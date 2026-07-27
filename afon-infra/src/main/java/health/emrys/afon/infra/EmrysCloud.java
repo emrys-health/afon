@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.config.AfonPropertiesLoader.add;
+import static health.emrys.afon.polaris.config.PolarisConfigClient.addPolarisCredentialsTo;
 
 /**
  * This class gets the credenital from the logs.
@@ -35,7 +35,7 @@ public class EmrysCloud implements ClusterCredentials {
         AfonPropertiesLoader loader     = new AfonPropertiesLoader();
         Properties           properties = loader.getProperties();
         clusterState = new ClusterState();
-        Properties props = add(clusterState.getCredentials(), properties);
+        Properties props = addPolarisCredentialsTo(clusterState.getCredentials(), properties);
         props.setProperty(POLARIS_ENDPOINT.getName(), clusterState.getPolarisHost());
         polarisId     = props.getProperty(AfonProperties.POLARIS_ID.getName());
         polarisSecret = props.getProperty(AfonProperties.POLARIS_SECRET.getName());
