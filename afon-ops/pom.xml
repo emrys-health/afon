@@ -19,7 +19,7 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>afon-infra</artifactId>
+            <artifactId>afon-cluster</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
