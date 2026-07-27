@@ -17,53 +17,48 @@ public class StepDocumentation extends StepActions {
 
     private final PrintWriter out;
 
-    public static @NonNull String mvnArgumentsToRun(Class clazz,
-                                                    String[] args,
-                                                    String command) {
-        return mvnArgumentsToRun(clazz, args, new Properties(), command);
+    public static @NonNull String afonArgumentsToRun(Class clazz,
+                                                     String[] args,
+                                                     String command) {
+        return afonArgumentsToRun(clazz, args, new Properties(), command);
     }
 
 
-    public static @NonNull String mvnArgumentsToRun(Class clazz,
-                                                    String[] args,
-                                                    Properties overrides,
-                                                    String command) {
+    public static @NonNull String afonArgumentsToRun(Class clazz,
+                                                     String[] args,
+                                                     Properties overrides,
+                                                     String command) {
         String argLine = "";
         if (args != null && args.length > 0) {
-            argLine = format("-Dexec.args=\"%s\"", String.join(" ", args));
+            argLine = format("%s", String.join(" ", args));
+            if (!argLine.isEmpty()){
+                argLine=format("--exec-args \"%s\"", argLine);
+            }
         }
         String overridesArgLine = "";
         if (overrides != null && overrides.size() > 0) {
             overridesArgLine = overrides.entrySet().stream().map(x ->
-                format("-D%s=%s ", x.getKey(), x.getValue())
+                format("%s=%s ", x.getKey(), x.getValue())
                 ).collect(Collectors.joining());
+            if (!overridesArgLine.isEmpty()){
+                overridesArgLine=format("--exec-envs \"%s\"", overridesArgLine);
+            }
         }
-        return format("%s exec:%s -Dexec.mainClass=%s %s",
-                      overridesArgLine, command, clazz.getName(), argLine);
+        return format("-a %s --exec-class %s %s %s",
+                      command, clazz.getName(), argLine, overridesArgLine);
     }
 
     public StepDocumentation(OutputStream out) {
         this.out = new PrintWriter(out);
     }
 
-    @Override
-    public void delete(Path x) {
-        out.println(format("Delete `%s`", x));
-        out.flush();
-    }
 
     @Override
-    public void runSnowflakeSql(String[] statements) {
-        out.println("Run Snowflake SQL:");
-        for (String sql : statements) {
-            out.println(format(
-                """
-                ```sql
-                %s
-                ```
-                """, sql));
-            out.flush();
-        }
+    public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
+        String fullArgs = afonArgumentsToRun(mainClass, args, overrides, "exec");
+        run("./afon.sh",
+                null,
+                fullArgs);
     }
 
     @Override
@@ -106,10 +101,24 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
-        String fullArgs = mvnArgumentsToRun(mainClass, args, overrides, "java");
-        run("mvn",
-            null,
-            fullArgs);
+    public void delete(Path x) {
+        out.println(format("Delete `%s`", x));
+        out.flush();
     }
+
+    @Override
+    public void runSnowflakeSql(String[] statements) {
+        out.println("Run Snowflake SQL:");
+        for (String sql : statements) {
+            out.println(format(
+                    """
+                    ```sql
+                    %s
+                    ```
+                    """, sql));
+            out.flush();
+        }
+    }
+
+
 }
