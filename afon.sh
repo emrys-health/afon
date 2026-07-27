@@ -45,11 +45,18 @@ exec_script(){
       $CWD/scripts/$CLOUD/$EXEC_SCRIPT
 }
 
+version(){
+  mvn help:evaluate -Dexpression=project.version -q -DforceStdout
+}
+
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--profiles|-p <profiles>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
   echo "          [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
-  echo "actions:  build|exec"
+  echo "actions:  build|docs|exec"
+  echo "          build: executes the mvn build"
+  echo "          docs:  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
+  echo "          exec:  executes the jvm classes from ops (see the docs for details)"
   echo "profiles: acceptance|ops|samples"
   echo "cloud:    aws|azure|gcp"
   echo "types:    ops|samples|script"
@@ -68,6 +75,7 @@ MVN_PROFILES=
 MVN_GOALS=
 MVN_ARGS=
 MVN_ENVS=
+VERSION=
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -128,6 +136,14 @@ case $ACTION in
       MVN_ENVS="-Dafon.cloud=$CLOUD"
     fi
     exec_mvn
+    ;;
+  docs)
+    VERSION=$(version)
+    OUTPUT_DIR=afon-docs/target
+    mkdir -p $OUTPUT_DIR
+    mvn -q dependency:copy -Dartifact=health.emrys:afon-docs:$VERSION:zip:ops -DoutputDirectory=$OUTPUT_DIR
+    unzip -qu $OUTPUT_DIR/afon-docs-$VERSION-ops.zip -d $OUTPUT_DIR/ops
+    echo "Copied docs to $OUTPUT_DIR/ops"
     ;;
   exec)
     if [ -n "$EXEC_TYPE" ] ; then

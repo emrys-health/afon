@@ -59,6 +59,7 @@
         <module>afon-trino</module>
         <module>afon-infra</module>
         <module>afon-ops</module>
+        <module>afon-docs</module>
     </modules>
 
     <profiles>
@@ -78,15 +79,6 @@
             </activation>
             <modules>
                 <module>afon-distribution</module>
-            </modules>
-        </profile>
-        <profile>
-            <id>docs</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-docs</module>
             </modules>
         </profile>
         <profile>
