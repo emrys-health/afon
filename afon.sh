@@ -144,13 +144,13 @@ case $ACTION in
   docs)
     VERSION=$(version)
     if [ -z "$DOCS_DIR" ]; then
-      DOCS_DIR=afon-docs/target
+      DOCS_DIR=afon-docs/target/docs
     fi
     mkdir -p $DOCS_DIR
-    ARTIFACT="health.emrys:afon-docs:$VERSION:zip:ops"
+    ARTIFACT="health.emrys:afon-docs:$VERSION:zip:docs"
     mvn -q dependency:copy -Dartifact=$ARTIFACT -DoutputDirectory=$DOCS_DIR
-    unzip -qu $DOCS_DIR/afon-docs-$VERSION-ops.zip -d $DOCS_DIR/ops
-    echo "Copied $ARTIFACT to $DOCS_DIR/ops"
+    unzip -qu $DOCS_DIR/afon-docs-$VERSION-docs.zip -d $DOCS_DIR
+    echo "Copied $ARTIFACT to $DOCS_DIR"
     ;;
   exec)
     if [ -n "$EXEC_TYPE" ] ; then
