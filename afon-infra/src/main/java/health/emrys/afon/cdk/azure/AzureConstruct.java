@@ -44,7 +44,7 @@ import static java.lang.String.format;
 
 public class AzureConstruct extends AbstractConstruct {
 
-    private static final String             KUBERNETES_VERSION = "1.33";
+    private static final String             KUBERNETES_VERSION = "1.36.2";
     /** Well-known AKS AAD server application ID; kubelogin requests a token for this audience. */
     private static final String             AKS_AAD_SERVER_ID  = "6dae42f8-4368-4678-94ff-3960e28e3630";
     private static final String             VNET_CIDR          = "10.1.0.0/16";
@@ -82,8 +82,29 @@ public class AzureConstruct extends AbstractConstruct {
      * With the local admin account disabled, authentication is AAD-only, so the identity
      * running {@code tofu} must be granted an Azure RBAC role on the cluster — otherwise
      * apply/destroy of in-cluster resources fails with Unauthorized.
+     *
+     * <p>An Azure RBAC assignment returns immediately from ARM but takes some minutes to
+     * propagate to the AKS authorization webhook, so a same-run apply of in-cluster
+     * resources can still be Forbidden. The create-time provisioner blocks until
+     * {@code kubectl auth can-i} confirms the grant is effective; because the in-cluster
+     * resources depend on this assignment, they will not start until it does.
      */
     private void grantClusterAdmin() {
+        LocalExecProvisioner waitForRbac = LocalExecProvisioner
+            .builder()
+            .when("create")
+            .type("local-exec")
+            .command(format(
+                "az aks get-credentials --resource-group %s --name %s --overwrite-existing && " +
+                    "for i in $(seq 1 30); do " +
+                    "kubelogin convert-kubeconfig -l azurecli >/dev/null 2>&1; " +
+                    "kubectl auth can-i create deployments -n default >/dev/null 2>&1 && exit 0; " +
+                    "sleep 10; " +
+                    "done; " +
+                    "echo 'Cluster Admin RBAC did not propagate within 5 minutes' >&2; exit 1",
+                resourceGroup, clusterName))
+            .build();
+
         clusterAdminAssignment = new RoleAssignment(
             this, "tofu-cluster-admin", RoleAssignmentConfig
             .builder()
@@ -91,6 +112,7 @@ public class AzureConstruct extends AbstractConstruct {
             .principalType("User")
             .roleDefinitionName("Azure Kubernetes Service RBAC Cluster Admin")
             .scope(aksCluster.getId())
+            .provisioners(List.of(waitForRbac))
             .build());
     }
 
@@ -352,6 +374,10 @@ public class AzureConstruct extends AbstractConstruct {
                     .build())
             .roleBasedAccessControlEnabled(true)
             .localAccountDisabled(true)
+            // The live cluster already has the OIDC issuer enabled; Azure refuses to
+            // disable it once on (OIDCIssuerFeatureCannotBeDisabled), so declare it
+            // enabled to avoid a spurious update diff.
+            .oidcIssuerEnabled(true)
             .identity(KubernetesClusterIdentity
                           .builder()
                           .type("UserAssigned")
