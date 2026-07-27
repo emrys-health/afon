@@ -50,9 +50,9 @@ usage (){
   echo "          [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
   echo "actions:  build|exec"
-  echo "profiles: acceptance|docs|ops|samples"
+  echo "profiles: acceptance|ops|samples"
   echo "cloud:    aws|azure|gcp"
-  echo "types:    docs|ops|samples|script"
+  echo "types:    ops|samples|script"
 }
 
 ACTION=
