@@ -30,7 +30,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AbstractConstruct;
 import health.emrys.afon.config.AfonProperties;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -54,8 +54,8 @@ public class AzureConstruct extends AbstractConstruct {
     private              KubernetesProvider k8sProvider;
     private              HelmProvider       helmProvider;
 
-    public AzureConstruct(@NotNull Construct scope,
-                          @NotNull String id,
+    public AzureConstruct(@NonNull Construct scope,
+                          @NonNull String id,
                           Properties properties) {
         super(scope, id);
         clusterName    = AfonProperties.CLUSTER_NAME.getValueFrom(properties);

@@ -6,7 +6,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.trino.TrinoServerConfiguration;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.LinkedHashMap;
@@ -60,10 +60,10 @@ public class TrinoWorkloads {
      *                     registered as a catalog, exactly as Spark configures every cloud.
      * @param dependsOn    must include the cluster's dependables (so the API server is reachable).
      */
-    public void deploy(@NotNull Construct scope,
-                       @NotNull HelmProvider helmProvider,
-                       @NotNull SupportedCloudsEnum id,
-                       @NotNull List<? extends ITerraformDependable> dependsOn) {
+    public void deploy(@NonNull Construct scope,
+                       @NonNull HelmProvider helmProvider,
+                       @NonNull SupportedCloudsEnum id,
+                       @NonNull List<? extends ITerraformDependable> dependsOn) {
         Map<String, Object> values = Map.of(
             "image", Map.of("tag", IMAGE_TAG),
             "server", Map.of("workers", WORKERS), // Integer type

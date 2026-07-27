@@ -10,7 +10,7 @@ import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import io.kubernetes.client.openapi.ApiException;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.io.IOException;
@@ -53,9 +53,9 @@ public class SparkWorkloads {
      *                  cluster's own dependables.
      */
     public void deploy(
-        @NotNull Construct scope,
-        @NotNull SupportedCloudsEnum id,
-        @NotNull List<? extends ITerraformDependable> dependsOn) {
+        @NonNull Construct scope,
+        @NonNull SupportedCloudsEnum id,
+        @NonNull List<? extends ITerraformDependable> dependsOn) {
         final Map<String, Object> sparkClusterManifest = Map.of(
             "apiVersion", "spark.apache.org/v1alpha1",
             "kind", "SparkCluster",
@@ -207,7 +207,7 @@ public class SparkWorkloads {
         }
     }
 
-    private static @NotNull Map<String, String> sparkCloudProperties(String polarisDomainName) {
+    private static @NonNull Map<String, String> sparkCloudProperties(String polarisDomainName) {
         var                         toReturn     = new HashMap<String, String>();
         SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
