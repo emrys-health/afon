@@ -18,18 +18,18 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
     private static final Logger log = getLogger(AbstractDocumentMetadata.class);
 
     public String getDescription() {
-        String mvnDeploy        = "";
+        String afonExec        = "";
         String stepInstructions = "";
         try {
             Class<?> clazz = getDeployHomologue();
-            mvnDeploy = String.format(
+            afonExec = String.format(
                 """
                 
                 To execute, run:
                 ```shell
-                mvn -Pexec %s 
+               ./afon.sh %s 
                 ```
-                """, StepDocumentation.mvnArgumentsToRun(clazz, null, "exec"));
+                """, StepDocumentation.afonArgumentsToRun(clazz, null, "exec"));
             Object o = clazz.getConstructor(new Class[]{}).newInstance(new Object[]{});
             if (o instanceof StepsProvider) {
                 StepOperations dummyOps  = new StepOperations(new StepDocumentation(OutputStream.nullOutputStream()));
@@ -44,13 +44,13 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                         
                         If the job fails on a given step, you can add this switch to the mvn command above:
                         
-                        `-Dexec.args="STEP_FROM_LIST_ABOVE"`
+                        `--exec-args "STEP_FROM_LIST_ABOVE"`
                         
                         and the steps will continue starting at that one.
                         
                         For example:
                         
-                        `mvn exec:exec -Pexec -Dexec.mainClass="%s"  -Dexec.args="%s"`
+                        `./afon.sh -a exec --exec-class "%s" --exec-args "%s"`
                         """,
                         String.join(("\n1. "), stepArray),
                         clazz.getCanonicalName(),
@@ -68,15 +68,15 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
             """
             # Introduction
             
-            To create this documentation, run:
+            To generate the documentation, run:
             ```
-            mvn %s
+            ./afon.sh -a build -p docs
             ```
             %s
             %s
             %s
-            """, StepDocumentation.mvnArgumentsToRun(this.getClass(), null, "java"),
-            mvnDeploy,
+            """,
+            afonExec,
             stepInstructions,
             getSupplementaryIntro());
     }
