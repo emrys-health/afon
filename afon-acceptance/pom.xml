@@ -67,14 +67,15 @@
             <plugin>
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
+                <configuration>
+                    <tagsToInclude>health.emrys.afon.acceptance.tags.Access,health.emrys.afon.acceptance.tags.External,health.emrys.afon.acceptance.tags.Forbidden</tagsToInclude>
+                </configuration>
             </plugin>
         </plugins>
     </build>
 
     <!-- Pity scalatest-maven-plugin does not support empty values for tagsToInclude.
          Consider moving to maven-surefire-plugin as the scala code will have been compiled to bytecode.
-         Also, setting afon.cloud system property in the plugin does not work and it needs to be set
-         in command line (-Dafon.cloud=<>). Suspect is that the static use in AfonProperty may be to blame.
     -->
     <profiles>
         <profile>
