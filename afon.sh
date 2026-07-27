@@ -51,6 +51,7 @@ version(){
 
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--profiles|-p <profiles>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
+  echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
   echo "actions:  build|docs|exec"
@@ -66,6 +67,7 @@ ACTION=
 PROFILES=
 CLOUD=
 DRY_RUN=false
+DOCS_DIR=
 EXEC_CLASS=
 EXEC_ARGS=
 EXEC_ENVS=
@@ -87,6 +89,8 @@ while [[ $# -gt 0 ]]; do
       CLOUD="$2"; shift 2 ;;
     --dry-run)
       DRY_RUN=true; shift ;;
+    --docs-dir|-d)
+      DOCS_DIR="$2"; shift 2 ;;
     --exec-class)
       EXEC_CLASS="$2"; shift 2 ;;
     --exec-args)
@@ -139,11 +143,14 @@ case $ACTION in
     ;;
   docs)
     VERSION=$(version)
-    OUTPUT_DIR=afon-docs/target
-    mkdir -p $OUTPUT_DIR
-    mvn -q dependency:copy -Dartifact=health.emrys:afon-docs:$VERSION:zip:ops -DoutputDirectory=$OUTPUT_DIR
-    unzip -qu $OUTPUT_DIR/afon-docs-$VERSION-ops.zip -d $OUTPUT_DIR/ops
-    echo "Copied docs to $OUTPUT_DIR/ops"
+    if [ -z "$DOCS_DIR" ]; then
+      DOCS_DIR=afon-docs/target
+    fi
+    mkdir -p $DOCS_DIR
+    ARTIFACT="health.emrys:afon-docs:$VERSION:zip:ops"
+    mvn -q dependency:copy -Dartifact=$ARTIFACT -DoutputDirectory=$DOCS_DIR
+    unzip -qu $DOCS_DIR/afon-docs-$VERSION-ops.zip -d $DOCS_DIR/ops
+    echo "Copied $ARTIFACT to $DOCS_DIR/ops"
     ;;
   exec)
     if [ -n "$EXEC_TYPE" ] ; then
