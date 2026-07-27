@@ -2,7 +2,7 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.infra.ClusterCredentials;
+import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -17,7 +17,7 @@ import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
-import static health.emrys.afon.infra.PolarisClusterCredentials.createClusterCredentials;
+import static health.emrys.afon.cluster.PolarisClusterCredentials.createClusterCredentials;
 import static java.lang.String.format;
 
 /**
