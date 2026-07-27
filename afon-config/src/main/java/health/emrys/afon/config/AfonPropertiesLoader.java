@@ -1,17 +1,12 @@
 package health.emrys.afon.config;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 
-import static health.emrys.afon.config.AfonProperties.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class AfonPropertiesLoader {
@@ -49,51 +44,32 @@ public class AfonPropertiesLoader {
     private final Properties  properties;
     private final Set<String> confidentialKeys = new HashSet<>();
 
-    public static Properties add(String credentials, Properties properties) {
-        String[] creds = credentials.split(":");
-        if (creds.length != 2) {
-            logger.error("Incorrect access token {}. The token should have a ':' delimiting ID from Secret", credentials);
-        }
-        properties.setProperty(POLARIS_ID.getName(), creds[0]);
-        properties.setProperty(POLARIS_SECRET.getName(), creds[1]);
-        return properties;
-    }
-
-    public AfonPropertiesLoader(String overrideFile) throws IOException {
-        this();
-        logger.debug("Loading properties from {}", overrideFile);
-        FileInputStream fis = new FileInputStream(overrideFile);
-        properties.load(fis);
-        fis.close();
-    }
-
     public AfonPropertiesLoader() {
         properties = new Properties();
+    }
+
+    private void loadProperties() {
         String dir = System.getProperty("afon.home", "..");
         String configDir = dir + "/config";
         try {
-            readProperties(configDir);
+            loadPropertiesFromDir(configDir);
         } catch (IOException e) {
-            logger.warn("Could not read properties files in {}", configDir);
+            logger.warn("Failed to load properties files in {}", configDir);
             String altDir = "config";
             try {
                 // ...or in the IDE?
-                readProperties(altDir);
+                loadPropertiesFromDir(altDir);
             } catch (IOException ex) {
-                logger.error("Could not read properties files in {}", altDir);
+                logger.error("Failed to load properties files  in {}", altDir);
                 throw new RuntimeException(ex); // urgh, the properties file not found
             }
         }
     }
 
-    private void readProperties(String dir) throws IOException {
+    private void loadPropertiesFromDir(String dir) throws IOException {
         logger.info("Loading properties from {}", dir);
         for (String file : propertyFiles()) {
-            Properties props    = new Properties();
-            String     filename = dir + "/" + file;
-            logger.info("Reading properties from {}", filename);
-            props.load(new FileInputStream(filename));
-            logger.info("{} has {} items", filename, props.size());
+            Properties props = loadPropertiesFromFile(dir, file);
             properties.putAll(props);
             if (file.startsWith("env")) {
                 confidentialKeys.addAll(props.keySet().stream().map(x -> x.toString()).toList());
@@ -105,6 +81,23 @@ public class AfonPropertiesLoader {
                 properties.put(property, System.getProperty(property));
             }
         }
+    }
+
+    private @NonNull Properties loadPropertiesFromFile(String dir, String file) throws IOException {
+        String     filename = dir + "/" + file;
+        return loadPropertiesFromFile(filename);
+    }
+
+    private @NonNull Properties loadPropertiesFromFile(String filename) throws IOException {
+        Properties props    = new Properties();
+        try {
+            props.load(new FileInputStream(filename));
+            logger.info("Loaded {} items from {}", props.size(), filename);
+        } catch ( IOException e ){
+            logger.warn("Failed to load properties from {}", filename);
+            throw e;
+        }
+        return props;
     }
 
     /**
@@ -143,8 +136,19 @@ public class AfonPropertiesLoader {
     }
 
     public Properties getProperties() {
+        if ( properties.isEmpty() ){
+            // lazy loading and only once
+            loadProperties();
+        }
         Properties copy = new Properties();
         copy.putAll(properties);
         return copy;
     }
+
+    public Properties getProperties(String overrideFile) throws IOException {
+        Properties properties = getProperties();
+        properties.putAll(loadPropertiesFromFile(overrideFile));
+        return properties;
+    }
+
 }

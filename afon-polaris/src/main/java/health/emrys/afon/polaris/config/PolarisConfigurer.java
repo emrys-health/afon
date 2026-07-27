@@ -18,7 +18,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.AWS_S3_BUCKET_NAME_TRINO;
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.config.AfonPropertiesLoader.add;
+import static health.emrys.afon.polaris.config.PolarisConfigClient.addPolarisCredentialsTo;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 import static java.lang.String.format;
 
@@ -169,7 +169,7 @@ public class PolarisConfigurer {
 
     public List<HttpResponse> createCatalogs(Properties properties, String credentials, CloudConfigForPolaris[] configs) throws IOException, IncorrectConfigException {
         List<HttpResponse> allResponses = new ArrayList<>();
-        properties = add(credentials, properties);
+        properties = addPolarisCredentialsTo(credentials, properties);
         for (CloudConfigForPolaris config : configs) {
             logger.info("Configuring {}", config.warehouseName());
             HttpResponse[] responses = callPolaris(properties, config);
