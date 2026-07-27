@@ -194,7 +194,7 @@ public class SparkWorkloads {
             "spark.driver.userClassPathFirst", "true",
             "spark.executor.userClassPathFirst", "true",
             "spark.log.level", "DEBUG",
-            "spark.connect.grpc.interceptor.classes", "org.apache.spark.sql.connect.service.LoggingInterceptor",
+//            "spark.connect.grpc.interceptor.classes", "org.apache.spark.sql.connect.service.LoggingInterceptor", // No! this logs patient data too!
             "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
         );
         try {
