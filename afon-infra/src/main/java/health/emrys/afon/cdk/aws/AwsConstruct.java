@@ -457,7 +457,7 @@ public class AwsConstruct extends AbstractConstruct {
                 // The matching ServiceMonitor toggles (prometheus.serviceMonitor.enabled,
                 // operator.prometheus.serviceMonitor.enabled) are intentionally LEFT OFF:
                 // they need monitoring.coreos.com CRDs which kube-prometheus-stack
-                // installs in a later stack (PrometheusClusterDeploy). The ServiceMonitor
+                // installs in a later stack (PrometheusClusterDeployment). The ServiceMonitor
                 // for Cilium is therefore created on the Prometheus side once those CRDs
                 // exist.
                 createValue("prometheus.enabled", "true"),

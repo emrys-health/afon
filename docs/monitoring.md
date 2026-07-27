@@ -1,9 +1,9 @@
 # Monitoring
 
-To install the monitoring components on AWS, run in `afon-infra`:
+To install the monitoring components on AWS, run:
 
 ```shell
-mvn compile -Dexec.mainClass=health.emrys.afon.cdk.aws.PrometheusClusterDeploy exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeployment
 ```
 
 and `tofu apply` the file it generates in `cdktf.out/stacks/aws`.
