@@ -1,12 +1,20 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformResource;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFrom;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
+import com.hashicorp.cdktf.providers.kubernetes.service.Service;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -19,8 +27,14 @@ import static java.lang.String.format;
 
 public class TFUtils {
 
+    public static final String                     NO_POLARIS_FINALIZERS
+        = finalizeIngress(POLARIS_INGRESS_NAME);
     public static final List<LocalExecProvisioner> POLARIS_PROVISIONERS
-        = uponDestroyRun(PolarisConfig.NO_POLARIS_FINALIZERS);
+        = uponDestroyRun(NO_POLARIS_FINALIZERS);
+
+    public static String finalizeIngress(String service) {
+        return format("kubectl patch ingress %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
+    }
 
     public static DeploymentSpecTemplateSpecContainerEnv envVar(String name, String value) {
         return DeploymentSpecTemplateSpecContainerEnv.builder()
@@ -29,10 +43,56 @@ public class TFUtils {
                                                      .build();
     }
 
-    public static Release installNginxIngress(Construct construct,
-                                              HelmProvider helmProvider,
-                                              final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
-                                              Map<String, String> annotations) {
+    public static @NonNull Service clusterIpService(java.util.List<? extends ITerraformDependable> dependsOn,
+                                                    Map<String, String> labels,
+                                                    String serviceName,
+                                                    List<ServiceSpecPort> ports,
+                                                    Construct scope) {
+        return typedService("ClusterIP", dependsOn, labels, serviceName, ports, scope);
+    }
+
+    /**
+     * A NodePort service is required when the backing workload is exposed via the AWS Load
+     * Balancer Controller with the default {@code target-type: instance}: the ALB forwards to a
+     * node port on each EC2 node, so a ClusterIP service (which has no node port) makes the LBC
+     * fail with "TargetGroup port is empty" and the ALB then serves "Backend service does not
+     * exist".
+     */
+    public static @NonNull Service nodePortService(java.util.List<? extends ITerraformDependable> dependsOn,
+                                                   Map<String, String> labels,
+                                                   String serviceName,
+                                                   List<ServiceSpecPort> ports,
+                                                   Construct scope) {
+        return typedService("NodePort", dependsOn, labels, serviceName, ports, scope);
+    }
+
+    private static @NonNull Service typedService(String type,
+                                                 java.util.List<? extends ITerraformDependable> dependsOn,
+                                                 Map<String, String> labels,
+                                                 String serviceName,
+                                                 List<ServiceSpecPort> ports,
+                                                 Construct scope) {
+        return Service.Builder
+            .create(scope, serviceName)
+            .metadata(ServiceMetadata
+                          .builder()
+                          .name(serviceName)
+                          .build())
+            .dependsOn(dependsOn)
+            .spec(ServiceSpec
+                      .builder()
+                      .selector(labels)
+                      .type(type)
+                      .port(ports)
+                      .build())
+            .build();
+    }
+
+    public static Release installNginxIngress(
+        Construct construct,
+        HelmProvider helmProvider,
+        final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
+        Map<String, String> annotations) {
         var builder = Release.Builder
             .create(construct, "nginx-ingress")
             .provider(helmProvider)
@@ -55,6 +115,22 @@ public class TFUtils {
         return builder.build();
     }
 
+    static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
+        String envName, String secretName, String secretKey) {
+        return DeploymentSpecTemplateSpecContainerEnv
+            .builder()
+            .name(envName)
+            .valueFrom(DeploymentSpecTemplateSpecContainerEnvValueFrom
+                           .builder()
+                           .secretKeyRef(DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef
+                                             .builder()
+                                             .name(secretName)
+                                             .key(secretKey)
+                                             .build())
+                           .build())
+            .build();
+    }
+
     private final String    domainName;
     private final String    tlsSecretName;
     private final int       port;
@@ -62,12 +138,13 @@ public class TFUtils {
     private final Construct construct;
     private final String    ingressName;
 
-    public TFUtils(Construct construct,
-                   String domainName,
-                   String tlsSecretName,
-                   int port,
-                   String internalService,
-                   String ingressName) {
+    public TFUtils(
+        Construct construct,
+        String domainName,
+        String tlsSecretName,
+        int port,
+        String internalService,
+        String ingressName) {
         this.domainName      = domainName;
         this.tlsSecretName   = tlsSecretName;
         this.port            = port;
@@ -76,8 +153,9 @@ public class TFUtils {
         this.ingressName     = ingressName;
     }
 
-    public IngressV1 createIngress(List<TerraformResource> dependencies,
-                                   Optional<List<LocalExecProvisioner>> ingressProvisioners) {
+    public IngressV1 createIngress(
+        List<TerraformResource> dependencies,
+        Optional<List<LocalExecProvisioner>> ingressProvisioners) {
         IngressV1SpecRuleHttpPathBackendServicePort port = IngressV1SpecRuleHttpPathBackendServicePort
             .builder()
             .number(this.port)
@@ -113,7 +191,7 @@ public class TFUtils {
                     .hosts(List.of(domainName))
                     .secretName(tlsSecretName)
                     .build()
-                        ))
+            ))
             .rule(List.of(ingressV1SpecRule))
             .build();
         IngressV1.Builder ingressBuilder = IngressV1.Builder
@@ -123,7 +201,7 @@ public class TFUtils {
                           .name(ingressName)
                           .annotations(Map.of(
                               "cert-manager.io/cluster-issuer", "letsencrypt-prod"
-                                             ))
+                          ))
                           .build())
             .dependsOn(dependencies)
             .spec(nginxSpec)
@@ -140,9 +218,10 @@ public class TFUtils {
      * (before cert-manager's CRDs are registered) and fail with
      * "Failed to construct REST client".
      */
-    public Release installCertManager(Construct construct,
-                                      HelmProvider helmProvider,
-                                      final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn) {
+    public Release installCertManager(
+        Construct construct,
+        HelmProvider helmProvider,
+        final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn) {
         String clusterIssuerYaml = format(
             """
             kubectl apply -f - <<'YAML'

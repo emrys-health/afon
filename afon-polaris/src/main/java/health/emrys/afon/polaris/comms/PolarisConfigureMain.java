@@ -1,5 +1,6 @@
 package health.emrys.afon.polaris.comms;
 
+import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.HttpResponse;
@@ -11,12 +12,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.AWS_S3_BUCKET_NAME_TRINO;
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonPropertiesLoader.add;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 
 public class PolarisConfigureMain {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisConfigureMain.class);
+
+    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
 
     public static void main(String[] args) {
         try {
@@ -71,7 +76,17 @@ public class PolarisConfigureMain {
     private void smokeTest() throws Exception {
         AfonPropertiesLoader  loader     = new AfonPropertiesLoader();
         Properties            properties = loader.getProperties();
-        CloudConfigForPolaris config     = new AwsCloudConfigForPolaris(properties);
+        CloudConfigForPolaris config     = new AwsCloudConfigForPolaris(properties) {
+            @Override
+            public String getBucketUri() {
+                return bucketToUrl(AWS_S3_BUCKET_NAME_TRINO.getValueFrom(properties));
+            }
+
+            @Override
+            public String warehouseName() {
+                return AfonProperties.SupportedCloudsEnum.AWS_TRINO.toString();
+            }
+        };
         logger.info("Configuring {}", config.warehouseName());
         callPolaris(properties, config);
     }
@@ -81,7 +96,7 @@ public class PolarisConfigureMain {
         if (POLARIS_ENDPOINT.getValueFrom(properties).toLowerCase().contains("localhost")) {
             protocol = "http";
         }
-        var    client      = new AfonPolarisClient(properties, protocol);
+        var    client      = clientFactory.getPolarisClient(properties, protocol);
         var    configurer  = new PolarisConfigurer(client);
         String accessToken = client.getAccessToken();
         logger.info("Access token {}", accessToken);

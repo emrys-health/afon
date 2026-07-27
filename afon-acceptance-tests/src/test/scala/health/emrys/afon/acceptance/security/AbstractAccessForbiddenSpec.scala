@@ -15,8 +15,8 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
 
   override def cloudProvider: SupportedCloudsEnum
 
-  val client = AcceptanceTestConfig.instance.getPolarisClient
-  val accessToken = AcceptanceTestConfig.instance.getAccessToken()
+  val client = AcceptanceTestConfig.instance.getPolarisAdminClient
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
   val GrantCatalogAdmin = new CatalogAdminGrant(this, config)
   val CatalogRoles = new CatalogRoles(this, config)
   val NAMESPACE = "forbidden"

@@ -3,6 +3,7 @@ package health.emrys.afon.infra;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.k8s.ClusterState;
 import health.emrys.afon.polaris.comms.AfonPolarisClient;
+import health.emrys.afon.polaris.comms.AfonPolarisClientFactory;
 import org.slf4j.Logger;
 
 import java.util.Properties;
@@ -13,11 +14,12 @@ public class PolarisCredentialGrabber {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCredentialGrabber.class);
 
     public static void main(String[] args) {
+        final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
         try {
             var          clusterConfig     = new ClusterPolarisConfiguration();
             ClusterState clusterState      = clusterConfig.getClusterState();
             Properties   clusterProperties = AfonPropertiesLoader.add(clusterState.getCredentials(), clusterConfig.getClusterProperties());
-            var          client            = new AfonPolarisClient(clusterProperties, "https");
+            var          client            = clientFactory.getPolarisClient(clusterProperties, "https");
             logger.info("Polaris credential: {}", clusterState.getCredentials());
             logger.info("Polaris access key: {}", client.getAccessToken());
         } catch (Exception e) {

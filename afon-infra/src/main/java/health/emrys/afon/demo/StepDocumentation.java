@@ -67,7 +67,7 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public void run(String command, Path path, OutputStream stdOut, String... commands) throws ManagedProcessException {
+    public int run(String command, Path path, OutputStream stdOut, String... commands) throws ManagedProcessException {
         if (path != null) {
             out.println(format("In `%s` ", path));
         } else {
@@ -80,6 +80,7 @@ public class StepDocumentation extends StepActions {
                                ```
                                """, command, String.join(" ", commands)));
         out.flush();
+        return 0;
     }
 
     @Override

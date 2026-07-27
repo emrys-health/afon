@@ -16,11 +16,12 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.PolarisConfig.NO_JUPYTER_FINALIZERS;
+import static health.emrys.afon.cdk.TFUtils.finalizeIngress;
 import static health.emrys.afon.cdk.TFUtils.envVar;
 import static health.emrys.afon.infra.Defaults.JUPYTER_SERVICE_NAME;
 
-abstract class JupyterConfig {
+public abstract class JupyterConfig {
+    public static final  String          NO_JUPYTER_FINALIZERS = finalizeIngress("jupyter-ingress");
     /**
      * One in-pod X session per entry. Each session pairs a Guacamole login (used to
      * authenticate against the Guacamole web UI) with the VNC port serving that
@@ -50,7 +51,7 @@ abstract class JupyterConfig {
         this.properties = properties;
     }
 
-    Map<String, String> deployJupyter(List<ITerraformDependable> eksDependOn) {
+    public Map<String, String> deployJupyter(List<ITerraformDependable> eksDependOn) {
         final Map<String, String> jupyterLabels = Map.of("app", "jupyter");
 
         // Disable Jupyter's built-in token/password auth via env vars — oauth2-proxy handles authentication.

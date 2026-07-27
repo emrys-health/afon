@@ -234,11 +234,11 @@ There, you can run `tofu apply --auto-approve` (or `tofu destroy --auto-approve`
 In all cloud providers, deleting the Polaris deployment is fine.
 However, destroying the whole stack in AWS is problematic.
 It appears that there are lingering AWS infrastructure components.
-Run `health.emrys.afon.cdk.AwsNuke` to print out helpful command lines.
+Run `health.emrys.afon.cdk.aws.AwsNuke` to print out helpful command lines.
 In particular, the output of this script should blatt everything:
 
 ```shell
-mvn -Dexec.mainClass=health.emrys.afon.cdk.AwsNuke exec:java
+mvn -Dexec.mainClass=health.emrys.afon.cdk.aws.AwsNuke exec:java
 ```
 
 This is a shell script. 

@@ -1,6 +1,6 @@
 package health.emrys.afon.demo;
 
-import health.emrys.afon.cdk.AzureNuke;
+import health.emrys.afon.cdk.azure.AzureNuke;
 import org.slf4j.Logger;
 
 import java.io.IOException;

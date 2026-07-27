@@ -31,9 +31,14 @@
             <version>${parent.version}</version>
         </dependency>
         <dependency>
+            <groupId>${parent.groupId}</groupId>
+            <artifactId>afon-security</artifactId>
+            <version>${parent.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
             <artifactId>httpclient5-fluent</artifactId>
-            <version>5.5</version>
+            <version>${httpclient5-fluent.version}</version>
         </dependency>
     </dependencies>
     

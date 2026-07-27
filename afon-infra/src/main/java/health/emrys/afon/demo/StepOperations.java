@@ -1,14 +1,15 @@
 package health.emrys.afon.demo;
 
 import com.azure.storage.blob.models.BlobItem;
-import health.emrys.afon.cdk.AwsWholeStack;
-import health.emrys.afon.cdk.AzureKubernetesPolaris;
+import health.emrys.afon.cdk.aws.AwsWholeStack;
+import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.infra.PurgeAndPopulatePolaris;
 import health.emrys.afon.infra.checks.SparkChecker;
 import health.emrys.afon.infra.checks.SparkTestReader;
 import health.emrys.afon.infra.checks.SparkTestWriter;
+import health.emrys.afon.infra.onboarding.UserOnboarderMain;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -42,6 +43,8 @@ public class StepOperations {
     private final String azurePolarisDomainName;
     private final String clusterName;
     private final String gcpPolarisDomainName;
+    private final String awsJupyterDomain;
+    private final String azureJupyterDomain;
 
     public StepOperations(StepActions actions) {
         Properties properties = appProperties();
@@ -52,6 +55,8 @@ public class StepOperations {
         this.azurePolarisDomainName = AZURE_DOMAIN_NAME.getValueFrom(properties);
         this.gcpPolarisDomainName   = GCP_DOMAIN_NAME.getValueFrom(properties);
         this.clusterName            = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+        this.awsJupyterDomain       = AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties);
+        this.azureJupyterDomain     = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
     }
 
     public Step cleanLocalAws() {
@@ -78,6 +83,13 @@ public class StepOperations {
             "aws_polaris",
             "deploy Polaris in AWS",
             () -> actions.startAwsPolaris());
+    }
+
+    public Step deployFullAwsCluster() {
+        return new Step(
+            "aws_spark",
+            "deploy Spark in AWS",
+            () -> actions.startFullStackInAws());
     }
 
     public Step deployAwsSpark() {
@@ -127,14 +139,16 @@ public class StepOperations {
     }
 
     public @NonNull Step purgeForeignCatalogFrom(String domainName,
-                                                 SupportedCloudsEnum catalog) {
+                                                 SupportedCloudsEnum catalog
+    ) {
         return purgeEverythingFor(domainName, catalog, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
     }
 
     public @NonNull Step purgeEverythingFor(String domainName,
                                             SupportedCloudsEnum catalog,
                                             String namespace,
-                                            String tableName) {
+                                            String tableName
+    ) {
         return new Step(
             format("%s_purge_%s", machineNameFrom(domainName), catalog.toString()),
             format("remove all persisted references to %s in Polaris at `%s`", namespace, domainName),
@@ -209,10 +223,26 @@ public class StepOperations {
         return new Step(
             "all_catalogs_in_" + machineNameFrom(domainName),
             "configure all the the catalogs in Polaris at " + domainName,
-            () -> actions.executeMainOf(
-                PurgeAndPopulatePolaris.class,
-                new String[]{domainName},
-                NO_ENV_VARIABLES));
+            () -> {
+                try {
+                    actions.executeMainOf(
+                        PurgeAndPopulatePolaris.class,
+                        new String[]{domainName},
+                        NO_ENV_VARIABLES);
+                } catch (Exception e) {
+                    log.error("""
+                                  An error like:
+                                  
+                                  PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException:
+                                  unable to find valid certification path to requested target
+                                  
+                                  can be because the certificates are not yet ready, it seems.
+                                  If this is the case, try re-running this step.
+                                  I've seen second attempts work without any other intervention.
+                                  """, e);
+                    throw e;
+                }
+            });
     }
 
     public Step waitForAwsPolaris() {
@@ -250,15 +280,18 @@ public class StepOperations {
     }
 
     public Step checkSparkConnectorTalkingToAzure() {
-        return sparkTestUsing(AZURE,
-                              format("local Spark call that uses %s", azurePolarisDomainName),
-                              EXTERNAL_NAMESPACE,
-                              SparkTestWriter.class,
-                              azurePolarisDomainName);
+        return sparkTestUsing(
+            AZURE,
+            format("local Spark call that uses %s", azurePolarisDomainName),
+            EXTERNAL_NAMESPACE,
+            SparkTestWriter.class,
+            azurePolarisDomainName,
+            azureJupyterDomain);
     }
 
     public @NonNull Step awsSparkTestUsing(SupportedCloudsEnum warehouse,
-                                           String namespace) {
+                                           String namespace
+    ) {
         return awsSparkWriteTestUsing(
             warehouse,
             format(
@@ -269,12 +302,14 @@ public class StepOperations {
 
     private Step awsSparkWriteTestUsing(SupportedCloudsEnum warehouse,
                                         String description,
-                                        String namespace) {
-        return sparkTestUsing(warehouse, description, namespace, SparkTestWriter.class, awsPolarisDomainName);
+                                        String namespace
+    ) {
+        return sparkTestUsing(warehouse, description, namespace, SparkTestWriter.class, awsPolarisDomainName, awsJupyterDomain);
     }
 
     Step awsSparkReadTestUsing(SupportedCloudsEnum warehouse,
-                               String namespace) {
+                               String namespace
+    ) {
         return sparkTestUsing(
             warehouse,
             format(
@@ -283,28 +318,37 @@ public class StepOperations {
                 namespace,
                 SparkChecker.TABLE,
                 awsPolarisDomainName
-                  ),
+            ),
             namespace,
             SparkTestReader.class,
-            awsPolarisDomainName);
+            awsPolarisDomainName,
+            awsJupyterDomain);
     }
 
     private @NonNull Step sparkTestUsing(SupportedCloudsEnum warehouse,
                                          String description,
                                          String namespace,
                                          Class<? extends SparkChecker> clazz,
-                                         String domainName) {
+                                         String domainName,
+                                         String jupyterDomainName
+    ) {
         return new Step(
-            format("%s_spark_talks_to_%s",
-                   machineNameFrom(domainName),
-                   warehouse.toString()),
+            format(
+                "%s_spark_talks_to_%s",
+                machineNameFrom(domainName),
+                warehouse.toString()),
             description,
             () -> {
+                actions.executeMainOf(
+                    UserOnboarderMain.class,
+                    new String[]{domainName, warehouse.toString(), jupyterDomainName},
+                    NO_ENV_VARIABLES);
+
                 Properties properties = appProperties();
                 List<String> args = List.of(
                     warehouse.toString(),
-                    POLARIS_ID.getValueFrom(properties),
-                    POLARIS_SECRET.getValueFrom(properties),
+                    USER_POLARIS_ID.getValueFrom(properties),
+                    USER_POLARIS_SECRET.getValueFrom(properties),
                     domainName,
                     namespace);
                 actions.executeMainOf(
@@ -437,12 +481,13 @@ public class StepOperations {
                           BASE_LOCATION = '%s/';
                         """, SNOWFLAKE_OUT_DIR),
 
-                    format("""
-                    INSERT INTO my_azure_iceberg_table (value)
-                    VALUES
-                        ('Alice_%s'),
-                        ('Bob_%s');
-                    """, formatted, formatted)
+                    format(
+                        """
+                        INSERT INTO my_azure_iceberg_table (value)
+                        VALUES
+                            ('Alice_%s'),
+                            ('Bob_%s');
+                        """, formatted, formatted)
                 });
             }
         );
@@ -464,7 +509,8 @@ public class StepOperations {
     }
 
     private static @NonNull String firstFile(String glob,
-                                             boolean descendingOrder) {
+                                             boolean descendingOrder
+    ) {
         log.info("Querying Azure for {}", glob);
         AzureReader          lister    = new AzureReader();
         List<BlobItem>       list      = new ArrayList<>(lister.list(glob));
@@ -489,7 +535,8 @@ public class StepOperations {
 
     public Step registerTableInAws(String jsonMetadataFQN,
                                    SupportedCloudsEnum warehouse,
-                                   String tableName) {
+                                   String tableName
+    ) {
         return new Step(
             format("%s_table_in_aws_polaris", warehouse.toString()),
             format("Create `%s` table in the AWS Polaris", warehouse.name()),

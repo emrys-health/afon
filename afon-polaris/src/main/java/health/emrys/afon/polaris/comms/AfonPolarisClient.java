@@ -3,6 +3,7 @@ package health.emrys.afon.polaris.comms;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import health.emrys.afon.config.ConfigUtils;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -36,24 +37,20 @@ public class AfonPolarisClient {
     static final String CONTENT_TYPE = "Content-Type";
 
     private final String endpoint;
-    private final String clientId;
-    private final String clientSecret;
+    protected final String clientId;
+    protected final String clientSecret;
 
     public static @NonNull String getTokenUri(String endpoint) {
         return format("%s/api/catalog/v1/oauth/tokens", endpoint);
     }
 
-    public AfonPolarisClient(Properties properties) {
-        this(properties, "http");
-    }
-
-    public AfonPolarisClient(String httpsHost, Properties properties) {
-        this(format("https://%s", httpsHost),
+    AfonPolarisClient(String hostname, Properties properties) {
+        this(format("%s://%s", ConfigUtils.protocolFor(hostname), hostname),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
     }
 
-    public AfonPolarisClient(Properties properties, String protocol) {
+    AfonPolarisClient(Properties properties, String protocol) {
         this(format("%s://%s", protocol, POLARIS_ENDPOINT.getValueFrom(properties)),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
@@ -108,7 +105,7 @@ public class AfonPolarisClient {
     }
 
     public ClassicHttpResponse delete(String uri, String accessToken) throws IOException {
-        logger.info("Deleting with uri {}", uri);
+        logger.info("Deleting with uri {} at {}", uri, endpoint);
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpDelete          delete  = new HttpDelete(endpoint + uri);
             addAccessTokenToHeaders(delete, accessToken);
@@ -149,10 +146,12 @@ public class AfonPolarisClient {
         return makeCallWithToken(json, new HttpPost(url), accessToken);
     }
 
-    public ClassicHttpResponse getCall(String uri,
+    public ClassicHttpResponse getCall(String url,
                                        String accessToken) throws IOException {
+        String  uri     = endpoint + url;
+        logger.info("Calling {}", url);
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet request = new HttpGet(endpoint + uri);
+            HttpGet request = new HttpGet(uri);
             addAccessTokenToHeaders(request, accessToken);
             ClassicHttpResponse response = client.execute(request);
             logger.info(format("%s:%d", request, response.getCode()));
@@ -173,7 +172,7 @@ public class AfonPolarisClient {
         request.setHeader("Authorization", "Bearer " + accessToken);
     }
 
-    private static String parseAccessToken(ClassicHttpResponse response) throws IOException {
+    protected static String parseAccessToken(ClassicHttpResponse response) throws IOException {
         ObjectMapper        mapper                  = JsonMapper
             .builder().enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION).build();
         Map<String, Object> tokenResponse           = mapper.readValue(response.getEntity().getContent(), Map.class);
@@ -181,7 +180,7 @@ public class AfonPolarisClient {
         return accessTokenFromResponse;
     }
 
-    private ClassicHttpResponse makeCall(String payload,
+    protected ClassicHttpResponse makeCall(String payload,
                                          BasicClassicHttpRequest post) throws IOException {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             post.setEntity(new StringEntity(payload));
@@ -190,5 +189,13 @@ public class AfonPolarisClient {
             assert response.getCode() == 200;
             return response;
         }
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public String getClientSecret() {
+        return clientSecret;
     }
 }

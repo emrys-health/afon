@@ -7,13 +7,18 @@ import health.emrys.afon.polaris.catalogs.PolarisDTOs;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
 
+import static health.emrys.afon.polaris.comms.ConfigureUserMain.isFailure;
 import static java.lang.String.format;
 
 public class PolarisConfigurer {
+
+    private static final Logger log = LoggerFactory.getLogger(PolarisConfigurer.class);
 
     private final AfonPolarisClient client;
 
@@ -72,14 +77,21 @@ public class PolarisConfigurer {
             warehouseName);
     }
 
-    public static String namespaceURI(String warehouseName,
-                                      String namespace) {
-        return format("/api/catalog/v1/%s/namespaces/%s", warehouseName, namespace);
+    public static String namespaceURI(
+        String warehouseName) {
+        return format("/api/catalog/v1/%s/namespaces/", warehouseName);
     }
 
-    public static String tableURI(String warehouseName,
-                                  String namespace,
-                                  String tableName) {
+    public static String namespaceURI(
+        String warehouseName,
+        String namespace) {
+        return format("%s/%s", namespaceURI(warehouseName), namespace);
+    }
+
+    public static String tableURI(
+        String warehouseName,
+        String namespace,
+        String tableName) {
         return format(
             "/api/catalog/v1/%s/namespaces/%s/tables/%s",
             warehouseName, namespace, tableName);
@@ -92,8 +104,9 @@ public class PolarisConfigurer {
     /**
      * Everything you need to initialize Polaris in one method.
      */
-    public HttpResponse[] configurCatalogFor(CloudConfigForPolaris config,
-                                             String accessToken) throws IOException, IncorrectConfigException {
+    public HttpResponse[] configurCatalogFor(
+        CloudConfigForPolaris config,
+        String accessToken) throws IOException, IncorrectConfigException {
         String warehouseName = config.warehouseName();
         client.delete(catalogsURI(warehouseName), accessToken); // this failing is expected if there is no catalog
         return new HttpResponse[]{
@@ -108,15 +121,28 @@ public class PolarisConfigurer {
             };
     }
 
-    public PrincipalWithCredentials configureUser(String accessToken,
-                                                  String principalName) throws IncorrectConfigException, IOException {
-        String              uri      = principalsURI();
-        PolarisDTOs         dtos     = new PolarisDTOs(new JsonMaker());
-        String              json     = dtos.principalCreation(principalName);
-        ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
-        try (InputStream is = response.getEntity().getContent()) {
-            JsonMaker jsonMaker = new JsonMaker();
-            return jsonMaker.fromJson(is, PrincipalWithCredentials.class);
+    public PrincipalWithCredentials configureUser(
+        String accessToken,
+        String principalName) throws IncorrectConfigException, IOException {
+        String      uri  = principalsURI();
+        PolarisDTOs dtos = new PolarisDTOs(new JsonMaker());
+        String      json = dtos.principalCreation(principalName);
+        if (isFailure(deletePrincipalIfPresent(accessToken, principalName))) {
+            log.warn("Could not delete principal {}", principalName);
+        }
+        log.info(format("Creating user %s", principalName));
+        try (ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
+             InputStream is = response.getEntity().getContent()) {
+            return dtos.fromJson(is, PrincipalWithCredentials.class);
+        }
+    }
+
+    private ClassicHttpResponse deletePrincipalIfPresent(String accessToken, String principalName) throws IOException {
+        log.info("Deleting principal {}", principalName);
+        String uri = principalsURI() + "/" + principalName;
+        try (ClassicHttpResponse delete = client.delete(uri, accessToken)) {
+            log.info("Deleting {} resulted in HTTP code {}", principalName, delete.getCode());
+            return delete;
         }
     }
 }
