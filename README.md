@@ -233,8 +233,8 @@ Test specs include:
 
 - `AwsAccessSpec` — write and read Iceberg tables via AWS Polaris to s3
 - `GcpAccessSpec` — write and read via AWS Polaris to GCS
-- `AzureAccessSpec` — write and read via AWS Polaris to Azure Blob
-- `ExternalAzureDBxTableSpec` — cross-cloud: Spark talks to AWS Polaris which federates to Azure Polaris
+- `AzureAccessSpec` — write and read via AWS Polaris to Azure
+- `ExternalAzureTableSpec` — cross-cloud: Spark talks to AWS Polaris which federates to Azure Polaris
 - `ExternalGcpTableSpec` — cross-cloud: Spark talks to AWS Polaris which federates to GCP Polaris
 - `ExternalGlueTableSpec` — federated Glue catalog access
 - `AwsAccessForbiddenSpec` / `GcpAccessForbiddenSpec` / `AzureAccessForbiddenSpec` — verify that access to forbidden buckets is denied
@@ -285,7 +285,7 @@ This deploys both AWS and Azure Polaris instances and configures AWS Polaris to 
 
 Steps: `clean_aws` → `aws_spark` → `waitFor_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
 
-### How to set up DNS and domain names
+### Set up DNS and domain names
 
 Polaris requires HTTPS for encrypted communication, which requires domain names recognised by a Certificate Authority.
 
@@ -313,7 +313,7 @@ Note the nameservers and update your registrar.
 aws route53 list-hosted-zones-by-name --dns-name yourdomain.click
 ```
 
-Update the `AWS_XXX_DNS_ZONE` values in `afon.properties`. Request a certificate via [AWS Certificate Manager](https://console.aws.amazon.com/acm/certificates/list) and press "Create Record in Route 53" to prove ownership.
+Update the `AWS_XXX_DNS_ZONE` values in `afon-aws.properties`. Request a certificate via [AWS Certificate Manager](https://console.aws.amazon.com/acm/certificates/list) and press "Create Record in Route 53" to prove ownership.
 
 **Domain delegation:**
 
@@ -588,7 +588,6 @@ In the deployed environment, Spark runs as a Spark Connect server in Kubernetes.
 - **Forbidden buckets** — Each cloud has a "forbidden" bucket that the IAM roles do NOT grant access to. Acceptance tests verify that Polaris correctly denies access to these buckets.
 - **Jupyter access** — Jupyter is served via Apache Guacamole (pixel streaming via X11 VNC) behind an OAuth2 proxy that delegates to Google. This requires `OAUTH2_CLIENT_ID`, `OAUTH2_CLIENT_SECRET`, and `OAUTH2_COOKIE_SECRET`.
 - **Network policies** — Kubernetes network policies restrict pod-to-pod communication. The `NetworkConfiguration` class sets up policies between Jupyter, Spark, and Polaris pods.
-- **Pomerium** — An alternative auth proxy configuration is available in `afon-pomerium/`.
 
 ---
 
