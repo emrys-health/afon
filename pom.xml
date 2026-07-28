@@ -49,6 +49,7 @@
     </properties>
 
     <modules>
+        <module>afon-logging</module>
         <module>afon-config</module>
         <module>afon-iceberg</module>
         <module>afon-polaris</module>
