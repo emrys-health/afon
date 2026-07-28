@@ -61,7 +61,7 @@ version(){
 
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
-  echo "          [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
+  echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
@@ -69,14 +69,16 @@ usage (){
   echo "          build: executes the mvn build"
   echo "          docs:  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
   echo "          exec:  executes the jvm classes from ops (see the docs for details)"
-  echo "cloud:    the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
-  echo "types:    the exec types.  One of ops|samples|script.  Defaults to 'ops'."
-  echo "goals:    the build goals.  Defaults to 'clean install'."
-  echo "profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
-  echo "docs-dir: the output dir for the docs."
+  echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
+  echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
+  echo "build-args:     the build args.  eg '-DskipTests'."
+  echo "build-goals:    the build goals.  Defaults to 'clean install'."
+  echo "build-profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
+  echo "docs-dir:       the output dir for the docs."
 }
 
 ACTION=
+BUILD_ARGS=
 BUILD_GOALS=
 BUILD_PROFILES=
 CLOUD=
@@ -97,7 +99,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --action|-a)
       ACTION="$2"; shift 2 ;;
-    --build-goald|-g)
+    --build-args)
+      BUILD_ARGS="$2"; shift 2 ;;
+    --build-goals|-g)
       BUILD_GOALS="$2"; shift 2 ;;
     --build-profiles|-p)
       BUILD_PROFILES="$2"; shift 2 ;;
@@ -154,6 +158,9 @@ case $ACTION in
       MVN_GOALS="$BUILD_GOALS"
     else
       MVN_GOALS="clean install"
+    fi
+    if [ -n "$BUILD_ARGS" ] ; then
+      MVN_ARGS="$BUILD_ARGS"
     fi
     MVN_ENVS="$MVN_ENVS -Dafon.home=$CWD"
     if [ -n "$CLOUD" ] ; then
