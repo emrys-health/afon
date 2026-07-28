@@ -60,7 +60,8 @@ version(){
 }
 
 usage (){
-  echo "Usage: $0 [--action|-a <action>] [--profiles|-p <profiles>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
+  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
+  echo "          [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
@@ -68,13 +69,16 @@ usage (){
   echo "          build: executes the mvn build"
   echo "          docs:  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
   echo "          exec:  executes the jvm classes from ops (see the docs for details)"
-  echo "profiles: acceptance|ops|samples"
-  echo "cloud:    aws|azure|gcp"
-  echo "types:    ops|samples|script"
+  echo "cloud:    the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
+  echo "types:    the exec types.  One of ops|samples|script.  Defaults to 'ops'."
+  echo "goals:    the build goals.  Defaults to 'clean install'."
+  echo "profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
+  echo "docs-dir: the output dir for the docs."
 }
 
 ACTION=
-PROFILES=
+BUILD_GOALS=
+BUILD_PROFILES=
 CLOUD=
 DRY_RUN=false
 DOCS_DIR=
@@ -93,8 +97,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --action|-a)
       ACTION="$2"; shift 2 ;;
-    --profiles|-p)
-      PROFILES="$2"; shift 2 ;;
+    --build-goald|-g)
+      BUILD_GOALS="$2"; shift 2 ;;
+    --build-profiles|-p)
+      BUILD_PROFILES="$2"; shift 2 ;;
     --cloud|-c)
       CLOUD="$2"; shift 2 ;;
     --dry-run)
@@ -124,9 +130,9 @@ if [ "$ACTION" == "" ] ; then
   echo "Action not specified. Defaulting to $ACTION"
 fi
 
-if [ -n "$PROFILES" ] ; then
-  echo "Using profiles $PROFILES"
-  MVN_PROFILES="-P$PROFILES"
+if [ -n "$BUILD_PROFILES" ] ; then
+  echo "Using build profiles $BUILD_PROFILES"
+  MVN_PROFILES="-P$BUILD_PROFILES"
 fi
 
 if [ -n "$CLOUD" ] ; then
@@ -144,7 +150,11 @@ MVN_CMD="mvn -s $CWD/settings.xml $MVN_PROFILES"
 case $ACTION in
 
   build)
-    MVN_GOALS="clean install"
+    if [ -n "$BUILD_GOALS" ] ; then
+      MVN_GOALS="$BUILD_GOALS"
+    else
+      MVN_GOALS="clean install"
+    fi
     MVN_ENVS="$MVN_ENVS -Dafon.home=$CWD"
     if [ -n "$CLOUD" ] ; then
       MVN_ENVS="-Dafon.cloud=$CLOUD"
