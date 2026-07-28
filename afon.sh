@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+check_acceptance(){
+  SCENARIOS_FILE="afon-acceptance/target/surefire-reports/scenarios.txt"
+  if [ -f "$SCENARIOS_FILE" ]; then
+    echo "Checking all acceptance specs have been run in $SCENARIOS_FILE"
+    for SPEC in $(find afon-acceptance -name \*Spec.scala 2>/dev/null | perl -pe s/.*\\///g | perl -pe s/.scala//g | grep -v Abstract) ; do {
+      grep $SPEC $SCENARIOS_FILE >/dev/null || echo "$SPEC has not been run"
+    } done
+  fi
+}
+
 exec_mvn () {
   if [ -n "$MVN_ARGS" ] ; then
     echo "Executing $MVN_CMD \"$MVN_ARGS\" $MVN_ENVS $MVN_GOALS"
@@ -140,6 +150,7 @@ case $ACTION in
       MVN_ENVS="-Dafon.cloud=$CLOUD"
     fi
     exec_mvn
+    check_acceptance
     ;;
   docs)
     VERSION=$(version)
