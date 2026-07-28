@@ -21,7 +21,7 @@ public class SmokeTestSparkConnect {
      *
      * You'll need to register the table with:
      * <pre>
-mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click" exec:java
+mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click" exec:java
      * </pre>
      */
     public static void main(String[] args) {
@@ -31,7 +31,7 @@ mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRe
                 .appName("test2")
                 .remote("sc://localhost:15002/;token=deadbeef")
                 .getOrCreate();
-        String tableName = "aws.acceptancetests.AwsAccessSpec251117511401"; // aws_trino.acceptancetests.AwsAccessSpec
+        String tableName = "aws.acceptancetests.AwsAccessSpec"; // aws_trino.acceptancetests.AwsAccessSpec
         log.info("Reading table {}", tableName);
         spark.read().table(tableName).show();
     }

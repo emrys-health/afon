@@ -13,6 +13,11 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
 
+/**
+ * You may need to register some data in Polaris to run this.
+ * If so, try running something like:
+ * mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click" exec:java
+ */
 public class KeyCloakSparkConnect {
 
     private static final Logger log = LoggerFactory.getLogger(KeyCloakSparkConnect.class);
@@ -55,7 +60,11 @@ public class KeyCloakSparkConnect {
         );
         String tableName = warehouse + ".acceptancetests.AwsAccessSpec"; // aws_trino.acceptancetests.AwsAccessSpec
         log.info("Reading table {}", tableName);
-        spark.read().table(tableName).show();
+//        spark.read().table(tableName).show(); //  this works but...
+        // ...unlike the line above, running this:
+        // kubectl logs -f  spark-connector-0-driver | grep SELECT
+        // shows the actual query in Spark Connect's log. Otherwise, grep "scan-report"
+        spark.sql(String.format("SELECT * FROM %s WHERE randomInt > -1", tableName)).show();
     }
 
     private SparkSession sparkWithWarehouseCalled(
