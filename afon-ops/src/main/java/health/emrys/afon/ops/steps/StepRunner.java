@@ -44,7 +44,7 @@ public class StepRunner {
     }
 
     static @NonNull String humanReadable(List<Step> steps) {
-        return String.join("\n", steps.stream().map(x -> x.getName()).toList());
+        return String.join(" > ", steps.stream().map(x -> x.getName()).toList());
     }
 
 }
