@@ -22,8 +22,6 @@ echo "Permissioning bucket $AZURE_BUCKET" && \
 az role assignment create  --role "Storage Blob Data Contributor" --assignee $APP_ID --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET" && \
 echo "Permissioning bucket $AZURE_EXTERNAL_BUCKET" && \
 az role assignment create  --role "Storage Blob Data Contributor" --assignee $APP_ID --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_EXTERNAL_BUCKET" && \
-echo "Permissioning bucket $AZURE_BUCKET_FORBIDDEN" && \
-az role assignment create  --role "Storage Blob Data Contributor" --assignee $APP_ID --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET_FORBIDDEN" && \
 echo "Assigning roles" && \
 az role assignment create  --role "Storage Blob Delegator" --assignee $APP_ID --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT" && \
 echo "Environment created. Now put these details in your Polaris environment variables:"
