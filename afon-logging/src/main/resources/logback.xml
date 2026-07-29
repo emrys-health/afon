@@ -18,9 +18,9 @@
     </encoder>
   </appender>
 
-  <root level="DEBUG">
-    <appender-ref ref="FILE_CORE"/>
-  </root>
+<!--  <root level="DEBUG">-->
+<!--    <appender-ref ref="FILE_CORE"/>-->
+<!--  </root>-->
 
   <logger name="health.emrys.afon" level="${LEVEL}" additivity="false">
     <appender-ref ref="FILE_CORE"/>
