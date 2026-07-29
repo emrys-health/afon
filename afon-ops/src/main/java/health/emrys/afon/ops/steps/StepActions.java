@@ -55,7 +55,10 @@ public class StepActions {
                             long    start         = System.currentTimeMillis();
                             int     timeout       = 1_200_000;
                             logger.info("Checking DNS for {}", domain);
-                            while (!stopResolving && System.currentTimeMillis() - start < timeout) {
+                            while (!stopResolving) {
+                                long elapsed = System.currentTimeMillis() - start;
+                                logger.info("Waiting on DNS for {}, time elapsed {}s (until timeout {}s)", domain, elapsed/1000, timeout/1000);
+                                if (!(elapsed < timeout)) break;
                                 try {
                                     InetAddress[] addresses = InetAddress.getAllByName(domain);
                                     stopResolving = addresses != null && addresses.length > 0;

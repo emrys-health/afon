@@ -3,27 +3,27 @@
 Afon is an infrastructure project that deploys [Apache Polaris](https://polaris.apache.org/) across cloud providers (AWS, Azure and GCP) to enable secure cross-cloud querying of Iceberg tables via Spark and Snowflake.
 
 ---
-
 ## Quickstart — How to set up
 
 ### Env setup
 
-Env setup requires *bash* installed on your machine.  For linux and macos it is installed by default.  For Windows, install with https://gitforwindows.org.
+Env setup requires *bash* installed on your machine.  
+For linux and macos bash is provided.  For windows, install Git Bash from https://gitforwindows.org.
 
 ```shell
 ./afon.sh -a setup --setup-os [linux|macos]
 ```
 
-The folloing packages are installed: 
-- **Git**
-- **JDK** (JDK 17 enforced by the Maven build)
-- **Maven**
-- **Docker**
-- **OpenTofu** (Terraform-compatible)
-- **Kubernetes CLI** (`kubectl`)
-- **AWS CLI**
-- **Azure CLI**
-- **GCP CLI**
+The following packages are installed: 
+- git
+- jdk
+- maven
+- docker
+- opentofu
+- kubernetes-cli 
+- {aws, azure, gcp}-cli
+
+NB: JDK 17 is currently enforced by the Maven build.
 
 ### 1. Clone and build
 

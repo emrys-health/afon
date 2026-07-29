@@ -1,23 +1,31 @@
 # Monitoring
 
-To install the monitoring components on AWS, run:
+To install the monitoring components on AWS:
+
+- Run:
 
 ```shell
 ./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeployment
 ```
 
-and `tofu apply` the file it generates in `cdktf.out/stacks/aws`.
-This installs Prometheus, Hubble etc.
+- Run: 
+```shell
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.PrometheusClusterDeployment
+cd cdktf.out/stacks/aws
+tofu apply --auto-approve
+```
+
+This installs all the tools (prometheus, etc ...).
 
 ### Tools
 
-We currently (1/6/26) have:
+We currently have:
 
-1. **Prometheus** running in the cloud to capture metrics
-1. **Loki** running in the cloud to view logs. Note that Loki writes logs to S3 (see below)
-1. **Grafana** running locally to view metrics and logs
-1. **Hubble** running in the cloud to view network traffic (and optionally, **Hubble CLI** running locally to query Hubble) 
-
+- prometheus: running in the cloud to capture metrics 
+- loki: running in the cloud to view logs. Note that loki writes logs to S3 (see below)
+- grafana: running locally to view metrics and logs
+- hubble: running in the cloud to view network traffic
+  - Optionally, hubble-clie running locally to query hubble
 
 ### Prometheus
 
