@@ -1,0 +1,18 @@
+### Global
+
+CLUSTER_NAME=
+POLARIS_ID=
+POLARIS_SECRET=
+POLARIS_ENDPOINT=
+USER_POLARIS_ID=
+USER_POLARIS_SECRET=
+# Optional verified email for the Polaris user; only needed if it logs in via oauth2-proxy.
+USER_POLARIS_EMAIL=
+JUPYTER_VNC_PASSWORD=
+OIDC_ISSUER_URL=
+OIDC_EMAIL_DOMAIN=*
+KC_HOSTNAME=
+# Public scheme KeyCloak advertises in its issuer URLs. Defaults to https if omitted; behind the
+# AWS load balancer (which terminates TLS) this must be https so oauth2-proxy accepts the issuer.
+KC_PROTOCOL=
+SNOWFLAKE_JDBC_URL=

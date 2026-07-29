@@ -2,9 +2,12 @@ package health.emrys.afon.polaris;
 
 import health.emrys.afon.config.AfonProperty;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
+import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 
 public class PolarisConstants {
     /**
@@ -32,17 +35,34 @@ public class PolarisConstants {
 
     public static final String POLARIS_IMAGE_NAME = "apache/polaris:1.5.0";
 
-    public static final Set<AfonProperty> POLARIS_PROPERTIES
-        = Set.of(
-        AWS_ACCESS_KEY_ID,
-        AWS_SECRET_ACCESS_KEY,
-        AWS_REGION,
-        AZURE_CLIENT_SECRET,
-        AZURE_CLIENT_ID,
-        AZURE_TENANT_ID,
-        POLARIS_ID,
-        POLARIS_SECRET
-                );
+    public static final Set<AfonProperty> getPolarisProperties(){
+        Set<AfonProperty> set = new HashSet<>();
+        set.addAll(Set.of(POLARIS_ID, POLARIS_SECRET));
+        String id = System.getProperty("afon.cloud");
+        if ( id != null ){
+            switch ( id ){
+                case "aws":
+                    set.addAll(Set.of(AWS_ACCESS_KEY_ID,
+                            AWS_SECRET_ACCESS_KEY,
+                            AWS_REGION));
+                    break;
+                case "azure":
+                    set.addAll(Set.of(AZURE_CLIENT_SECRET,
+                            AZURE_CLIENT_ID,
+                            AZURE_TENANT_ID));
+                    break;
+                default:
+            }
+        } else {
+            // add all cloud providers
+            set.addAll(Set.of(AWS_ACCESS_KEY_ID,
+                    AWS_SECRET_ACCESS_KEY,
+                    AWS_REGION, AZURE_CLIENT_SECRET,
+                    AZURE_CLIENT_ID,
+                    AZURE_TENANT_ID));
 
+        }
+        return set;
+    }
 
 }

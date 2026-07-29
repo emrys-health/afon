@@ -1,6 +1,6 @@
 # Note: you must source a properties file before running this script
 # For example:
-# set -a && source afon.properties && set +a
+# set -a && source afon.properties && source afon-azure.properties && set +a
 
 echo creating $AZURE_RESOURCE_GROUP in $AZURE_REGION
 az group create  --name $AZURE_RESOURCE_GROUP   --location $AZURE_REGION && \

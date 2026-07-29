@@ -1,47 +1,38 @@
 package health.emrys.afon.config;
 
-import java.util.HashSet;
 import java.util.Properties;
-import java.util.Set;
-
-import static java.util.Set.copyOf;
 
 public class AfonProperty {
 
-    private static final Set<String> ALL_PROPERTIES = new HashSet<>();
+    private final String name;
 
-    private final String propertyName;
-
-    AfonProperty(String propertyName) {
-        this.propertyName = propertyName;
-        if (ALL_PROPERTIES.contains(propertyName)) {
-            throw new IllegalArgumentException("Property " + propertyName + " is already defined");
-        }
-        ALL_PROPERTIES.add(propertyName);
+    public AfonProperty(String name) {
+        this.name = name;
     }
 
-    public static Set<String> getAllProperties() {
-        return copyOf(ALL_PROPERTIES);
+    public String getName() {
+        return name;
     }
 
     public String getValueFrom(Properties properties) {
-        String value = properties.getProperty(propertyName);
+        String value = properties.getProperty(name);
         if (value == null) {
-            throw new IllegalArgumentException("Property " + propertyName + " not found");
+            throw new IllegalArgumentException("Property " + name + " not found");
         }
         return value;
     }
 
     /**
      * As {@link #getValueFrom(Properties)} but falls back to {@code defaultValue} when the property is
-     * absent, instead of throwing. Use for optional properties that have a sensible default (e.g. the
+     * absent, instead of throwing an {@link IllegalArgumentException}.
+     * Use for optional properties that have a sensible default (e.g. the
      * KeyCloak scheme, which defaults to https for real deployments but is overridden to http in tests).
      */
     public String getValueFrom(Properties properties, String defaultValue) {
-        return properties.getProperty(propertyName, defaultValue);
+        return properties.getProperty(name, defaultValue);
     }
 
-    public String getPropertyName() {
-        return propertyName;
+    public String toString(){
+        return name;
     }
 }

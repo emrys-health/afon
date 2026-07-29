@@ -6,29 +6,44 @@
 
     <parent>
         <groupId>health.emrys</groupId>
-        <artifactId>Afon</artifactId>
-        <version>0.1</version>
+        <artifactId>afon</artifactId>
+        <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <version>${project.parent.version}</version>
     <artifactId>afon-samples</artifactId>
 
     <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <exec.args></exec.args>
+        <exec.mainClass></exec.mainClass>
     </properties>
 
     <dependencies>
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>afon-ops</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-spark-runtime-${spark.compat.version}_${scala.compat.version}</artifactId>
             <version>${iceberg.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>health.emrys</groupId>
-            <artifactId>afon-infra</artifactId>
-            <version>${project.parent.version}</version>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang.modules</groupId>
+            <artifactId>scala-collection-compat_${scala.compat.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_${scala.compat.version}</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
@@ -37,5 +52,39 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.scalatest</groupId>
+                <artifactId>scalatest-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>exec</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <configuration>
+                            <executable>${java.home}/bin/java</executable>
+                            <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

@@ -6,37 +6,27 @@
 
     <parent>
         <groupId>health.emrys</groupId>
-        <artifactId>Afon</artifactId>
-        <version>0.1</version>
+        <artifactId>afon</artifactId>
+        <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>health.emrys</groupId>
     <artifactId>afon-iceberg</artifactId>
-    <version>0.1</version>
-
-    <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-    </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-spark-runtime-${spark.compat.version}_${scala.compat.version}</artifactId>
             <version>${iceberg.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-core-http-netty</artifactId>
             <version>1.15.6</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-storage-file-datalake</artifactId>
             <version>12.22.0</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -44,56 +34,4 @@
             <version>${hadoop.version}</version>
         </dependency>
     </dependencies>
-
-    <profiles>
-        <profile>
-            <id>uber</id>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-shade-plugin</artifactId>
-                        <version>3.5.3</version>
-                        <executions>
-                            <execution>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>shade</goal>
-                                </goals>
-                                <configuration>
-                                    <artifactSet>
-                                        <excludes>
-<!--                                            <exclude>org.apache.iceberg:iceberg-spark-runtime-*:*</exclude>-->
-                                            <exclude>org.apache.iceberg:iceberg-api:*:*</exclude>
-                                            <exclude>org.apache.iceberg:iceberg-aws:*:*</exclude>
-                                            <exclude>org.apache.iceberg:iceberg-azure:*:*</exclude>
-                                            <exclude>org.apache.iceberg:iceberg-common:*:*</exclude>
-                                            <exclude>org.apache.iceberg:iceberg-core:*:*</exclude>
-                                            <exclude>org.apache.iceberg:iceberg-gcp:*:*</exclude>
-                                            <exclude>org.scala-lang*:*:*</exclude>
-                                            <exclude>com.fasterxml*:*:*</exclude>
-                                        </excludes>
-                                    </artifactSet>
-                                    <!-- Name of the resulting uber-jar -->
-                                    <finalName>${project.artifactId}-${project.version}-uber</finalName>
-                                    <filters>
-                                        <filter>
-                                            <artifact>*:*</artifact>
-                                            <excludes>
-                                                <exclude>META-INF/**/*</exclude>
-                                            </excludes>
-                                        </filter>
-                                    </filters>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
-    
 </project>

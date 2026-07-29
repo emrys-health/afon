@@ -1,0 +1,58 @@
+package health.emrys.afon.ops.steps;
+
+import org.slf4j.Logger;
+
+import static org.slf4j.LoggerFactory.getLogger;
+
+public class Step {
+
+    private static final Logger logger = getLogger(Step.class);
+
+    public static final Step NoOp = new Step(
+        "noop", "No operation", new ThrowableRunnable() {
+        @Override
+        public void run() {
+            logger.debug("No operation");
+        }
+    });
+
+    private final String            name;
+    private final String            description;
+    private final ThrowableRunnable function;
+
+    public Step(String name, String description, ThrowableRunnable function) {
+        this.name        = name;
+        this.description = description;
+        this.function    = function;
+    }
+
+    public String getName(){
+        return name;
+    }
+
+    public String getDescription(){
+        return description;
+    }
+
+    public ThrowableRunnable getFunction(){
+        return function;
+    }
+
+    @Override
+    public String toString() {
+        return "Step{" +
+            "name='" + name + '\'' +
+            ", description='" + description + '\'' +
+            '}';
+    }
+
+    public Step andThen(Step other) {
+        return new Step(
+            String.format("%s_then_%s", this.name, other.name),
+            description + " then " + other.description,
+            () -> {
+                this.function.run();
+                other.function.run();
+            });
+    }
+}

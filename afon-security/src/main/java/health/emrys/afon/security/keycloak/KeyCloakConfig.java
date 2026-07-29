@@ -1,6 +1,6 @@
 package health.emrys.afon.security.keycloak;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.util.HashMap;
@@ -70,8 +70,8 @@ public class KeyCloakConfig {
 
     public Map<String, String> configUsing() {
         Map<String, String> config = new HashMap<>();
-        config.put(KC_BOOTSTRAP_ADMIN_USERNAME.getPropertyName(), KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties));
-        config.put(KC_BOOTSTRAP_ADMIN_PASSWORD.getPropertyName(), KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
+        config.put(KC_BOOTSTRAP_ADMIN_USERNAME.getName(), KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties));
+        config.put(KC_BOOTSTRAP_ADMIN_PASSWORD.getName(), KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
         config.put("KC_HTTP_ENABLED", "true");
         // Run KeyCloak at DEBUG level to aid diagnosing OIDC/token issues.
         config.put("KC_LOG_LEVEL", "DEBUG");

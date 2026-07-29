@@ -44,7 +44,7 @@ public class KeyCloakSparkConnect {
     public KeyCloakSparkConnect(String polarisEndpoint) {
         this();
         log.info("Using Polaris Endpoint {}", polarisEndpoint);
-        properties.put(POLARIS_ENDPOINT.getPropertyName(), polarisEndpoint);
+        properties.put(POLARIS_ENDPOINT.getName(), polarisEndpoint);
         sparkConfig = configFactory.getConfig(properties);
     }
 
