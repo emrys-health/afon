@@ -2,15 +2,14 @@
 
 To install the monitoring components on AWS:
 
-- Run:
+- Generate config files and executes tofu:
 
 ```shell
 ./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeployment
 ```
 
-- Run: 
+The tofu/terraform executions can be done directly via:
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.cdk.PrometheusClusterDeployment
 cd cdktf.out/stacks/aws
 tofu apply --auto-approve
 ```
@@ -25,20 +24,21 @@ We currently have:
 - loki: running in the cloud to view logs. Note that loki writes logs to S3 (see below)
 - grafana: running locally to view metrics and logs
 - hubble: running in the cloud to view network traffic
-  - Optionally, hubble-clie running locally to query hubble
+- hubble-cli: running locally to query hubble
 
 ### Prometheus
 
 Have Grafana tunnel into the Kubernetes cluster with:
 
 ```shell
-docker run -d --name grafana --network=host grafana/grafana
+docker run -d --name grafana -p 3000:3000 grafana/grafana 
 
 kubectl port-forward  svc/kube-prometheus-stack-prometheus 9090:9090
 ```
 
-then point your browser at `http://localhost:3000` and log into Grafana with `admin`/`admin`.
-Add a Data Source that's `http://localhost:9090` and you should see nearly 2000 metrics.
+Point a browser at `http://localhost:3000` and log into Grafana with `admin`/`admin`.
+Add Data Source `http://localhost:9090` 
+One should see nearly 2000 metrics.
 
 ### Hubble
 
@@ -48,7 +48,8 @@ Tunnel into Kubernetes with:
 kubectl port-forward svc/hubble-ui -n kube-system 12000:80
 ```
 
-then point your browser at `http://localhost:12000` and you should see the network flows between pods.
+Point a browser at `http://localhost:12000` 
+One should see the network flows between pods.
 
 ![image](pics/hubble-ui.png)
 
@@ -59,7 +60,9 @@ kubectl -n kube-system port-forward svc/hubble-relay 4245:80
 ```
 
 Install the [Hubble CLI](https://docs.cilium.io/en/stable/observability/hubble/setup/)
-and run `hubble observe`. This will print out somthing like:
+
+Run `hubble observe`. This will print out something like:
+
 ```shell
 $ hubble observe
 Jun  1 09:05:34.677: 10.0.1.196:40327 (host) -> 18.169.47.27:443 (world) to-network FORWARDED (TCP Flags: ACK, PSH)
@@ -88,20 +91,21 @@ and a value that's whatever `CLUSTER_NAME` is in `afon.properties`.
 You should now be able to logs in `Drilldown -> Logs` in the Grafana GUI.
 You may need to refresh your browser.
 
-As currently configured (20/05/26), Loki persists its logs to the bucket defined 
-by `AWS_S3_BUCKET_NAME` in `afon.properties`.
+Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in `afon-aws.properties`.
 
 ### Blob storage size
 
-In AWS, run something like:
+AWS: 
 ```shell
 aws s3 ls s3://emrys-afon-bucket/acceptancetests/ --recursive --summarize | grep "Total Size
 ```
-In GCP, something like:
+
+GCP:
 ```shell
 gcloud storage du -s gs://emrys_afon_core/acceptancetests/**
 ```
-And in Azure, something like:
+
+Azure:
 ```shell
 az storage blob list   --account-name afonstorageaccount   --container-name afonstorage  --prefix acceptancetests/   --query "[].properties.contentLength"   --output tsv | awk '{sum+=$1} END {printf "%.2f kb\n", sum/1024}'
 ```
