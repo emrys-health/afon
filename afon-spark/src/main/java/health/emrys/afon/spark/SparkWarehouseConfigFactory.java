@@ -1,7 +1,7 @@
 package health.emrys.afon.spark;
 
 import health.emrys.afon.config.AfonPropertiesLoader;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Properties;
 
@@ -13,17 +13,17 @@ public class SparkWarehouseConfigFactory {
         return new SparkWarehouseConfigFactory();
     }
 
-    private static @NotNull Properties propertiesWith(String clientId, String clientSecret, String host) {
+    private static @NonNull Properties propertiesWith(String clientId, String clientSecret, String host) {
         Properties properties = new AfonPropertiesLoader().getProperties();
-        properties.put(POLARIS_ENDPOINT.getPropertyName(), host);
+        properties.put(POLARIS_ENDPOINT.getName(), host);
         return propertiesWith(clientId, clientSecret, properties);
     }
 
-    private static @NotNull Properties propertiesWith(String clientId, String clientSecret, Properties defaults) {
+    private static @NonNull Properties propertiesWith(String clientId, String clientSecret, Properties defaults) {
         Properties properties = new Properties();
         properties.putAll(defaults);
-        properties.put(POLARIS_ID.getPropertyName(), clientId);
-        properties.put(POLARIS_SECRET.getPropertyName(), clientSecret);
+        properties.put(POLARIS_ID.getName(), clientId);
+        properties.put(POLARIS_SECRET.getName(), clientSecret);
         return properties;
     }
 

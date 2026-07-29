@@ -1,0 +1,12 @@
+# Get AZURE_CLIENT_ID with: az ad app list --display-name AfonMultiTenantApp --query "[].appId" -o tsv
+AZURE_CLIENT_ID=
+# this was output with: az ad app credential reset --id $AZURE_CLIENT_ID
+AZURE_TENANT_ID=
+AZURE_CLIENT_SECRET=
+AZURE_CONNECTION_STRING=
+# Generate this with something like databricks tokens create --lifetime-seconds 31536000 --comment "PH CLI Token"
+DATABRICKS_TOKEN=
+
+AZURE_OAUTH2_CLIENT_ID=
+AZURE_OAUTH2_CLIENT_SECRET=
+AZURE_OAUTH2_COOKIE_SECRET=

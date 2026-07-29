@@ -1,3 +1,7 @@
+# Afon
+
+logs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -131,9 +135,12 @@ venv.bak/
 *.tfstate.backup
 .terraform.lock.hcl
 cdktf.out
-*pom.xml
 env.properties
+env-aws.properties
+env-azure.properties
+env-gcp.properties
 .idea
+iam_policy.json
 
 # Spyder project settings
 .spyderproject

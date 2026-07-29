@@ -1,40 +1,48 @@
 # Afon Documentation
 
-Afon is the core infrastructure project that deploys [Apache Polaris](https://polaris.apache.org/) across AWS, Azure, and GCP to enable secure cross-cloud querying of Iceberg tables via Spark and Snowflake.
+Afon is an infrastructure project that deploys [Apache Polaris](https://polaris.apache.org/) across cloud providers (AWS, Azure and GCP) to enable secure cross-cloud querying of Iceberg tables via Spark and Snowflake.
 
 ---
+## Quickstart — How to set up
 
-## Quickstart — How I set it up
+### Env setup
 
-### Prerequisites
+Env setup requires *bash* installed on your machine.  
+For linux and macos bash is provided.  For windows, install Git Bash from https://gitforwindows.org.
 
-Install the following on your machine:
+```shell
+./afon.sh -a setup --setup-os [linux|macos]
+```
 
-- **Java 17** (enforced by the Maven enforcer plugin)
-- **Maven**
-- **Docker**
-- **OpenTofu** (Terraform-compatible)
-- **Kubernetes CLI** (`kubectl`)
-- **AWS CLI**
-- **Azure CLI**
-- **GCloud CLI**
+The following packages are installed: 
+- git
+- jdk
+- maven
+- docker
+- opentofu
+- kubernetes-cli 
+- {aws, azure, gcp}-cli
+
+NB: JDK 17 is currently enforced by the Maven build.
 
 ### 1. Clone and build
 
 ```shell
 git clone https://github.com/emrys-health/afon-core.git
 cd afon-core
-mvn clean install
+./afon.sh -a build -p -acceptance # builds all components without running acceptance tests 
 ```
 
 ### 2. Configure properties
 
-Afon uses two properties files in the project root:
+Afon uses two types properties files in the config dir:
 
-- **`afon.properties`** — non-sensitive configuration (bucket names, domain names, regions, Polaris credentials). Copy the example and fill in your cloud-specific values:
+- **`afon.properties`** — non-sensitive configuration (bucket names, domain names, regions, Polaris credentials). Copy the examples and fill in your cloud-specific values:
 
 ```shell
-cp afon.properties afon.properties  # or create from the template in README.md
+cd config
+cp afon.properties.example afon.properties  
+cp afon-<cloud>.properties.example afon-<cloud>.properties
 ```
 
 Key properties to set:
@@ -46,18 +54,20 @@ Key properties to set:
 | `AWS_S3_BUCKET_NAME` | `emrys-afon-bucket` | Primary S3 bucket |
 | `AWS_S3_EXTERNAL_BUCKET_NAME` | `emrys-afon-bucket-2` | External S3 bucket |
 | `AWS_POLARIS_DOMAIN_NAME` | `emryspolaris.click` | Domain for AWS Polaris |
-| `GCP_BUCKET_NAME` | `emrys_afon_core` | GCS bucket |
-| `GCP_DOMAIN_NAME` | `emryspolarisgcp.click` | Domain for GCP Polaris |
 | `AZURE_BUCKET` | `afonstorage` | Azure Blob container |
 | `AZURE_STORAGE_ACCOUNT` | `afonstorageaccount` | Azure storage account |
 | `AZURE_DOMAIN_NAME` | `emryspolarisazure.click` | Domain for Azure Polaris |
+| `GCP_BUCKET_NAME` | `emrys_afon_core` | GCS bucket |
+| `GCP_DOMAIN_NAME` | `emryspolarisgcp.click` | Domain for GCP Polaris |
 | `POLARIS_ID` | `root` | Polaris client ID |
 | `POLARIS_SECRET` | `s3cr3t` | Polaris client secret |
 
-- **`env.properties`** — sensitive credentials. Copy from `env.properties.example` and fill in:
+- **`env.properties`** — sensitive credentials. Copy from `env.properties.example` and `env-<cloud>.properties.example` and fill in:
 
 ```shell
+cd config
 cp env.properties.example env.properties
+cp env-<cloud>.properties.example env-<cloud>.properties
 ```
 
 Required sensitive properties:
@@ -78,19 +88,17 @@ Required sensitive properties:
 
 ### 3. Set up cloud infrastructure
 
-Source your properties file, then run the cloud setup scripts:
+Run the cloud setup scripts:
 
 ```shell
-set -a && source afon.properties && set +a
-
 # AWS
-./scripts/aws/create.sh
+./afon.sh -a exec -t script -c aws --exec-script create.sh 
 
 # Azure
-./scripts/azure/create.sh
+./afon.sh -a exec -t script -c azure --exec-script create.sh 
 
 # GCP
-./scripts/gcp/create.sh
+./afon.sh -a exec -t script -c gcp --exec-script create.sh 
 ```
 
 These scripts create storage buckets, IAM roles, service accounts, and DNS zones.
@@ -104,23 +112,24 @@ You need domain names that point to each cloud's Kubernetes ingress. See [DNS Co
 3. Update the domain registrar's nameservers to point at the cloud's nameservers
 4. Request SSL certificates (e.g. via AWS Certificate Manager or Let's Encrypt)
 
-### 5. Generate infrastructure documentation
+### 5. Generate docs
+
+Docs are generated as part of the build.  To copy them to a docs dir:
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DocumentExternalCatalogsMain exec:java
+./afon.sh -a docs --docs-dir ~/afon-docs
 ```
 
 Read the generated docs:
 
 ```shell
-cat target/aws_azure_external_catalogs.md
+cat ~/afon-docs/ops/aws_azure_external_catalogs.md
 ```
 
-### 6. Deploy the demo
+### 6. Deploy the catalogs
 
 ```shell
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployExternalCatalogsMain
 ```
 
 This deploys Polaris to AWS and Azure, populates catalogs, and runs a Spark smoke test. It takes approximately 45 minutes.
@@ -141,7 +150,7 @@ https://emrysjupyter.click/guacamole
 
 ---
 
-## Tutorials — How I use it effectively
+## Tutorials — How to use it effectively
 
 ### Query data across clouds with Spark
 
@@ -150,8 +159,7 @@ Afon deploys Polaris as a REST catalog server. Spark connects to Polaris, which 
 **Generate PySpark code for Jupyter:**
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.SparkContextConfigurationPrinter exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.ops.GeneratePySparkContextMain
 ```
 
 This prints ready-to-run PySpark code that:
@@ -202,8 +210,8 @@ df_joined.show()
 When a new Polaris instance starts, it has no catalogs. You can configure all catalogs at once:
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.infra.PurgeAndPopulatePolaris -Dexec.args="emryspolaris.click" exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.ops.PurgeAndPopulatePolarisMain \
+  --exec-args "emryspolaris.click"
 ```
 
 This creates catalogs for AWS, GCP, Azure, and their external/forbidden variants in a single call.
@@ -211,26 +219,27 @@ This creates catalogs for AWS, GCP, Azure, and their external/forbidden variants
 To configure a single catalog on a specific endpoint:
 
 ```shell
-mvn -DPOLARIS_ENDPOINT=emryspolarisazure.click compile \
-  -Dexec.mainClass=health.emrys.afon.infra.EndpointPolarisConfiguration \
-  -Dexec.args="AZURE" exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.ops.ConfigureEndpointPolarisMain \
+  --exec-args "AZURE" --exec-envs "POLARIS_ENDPOINT=emryspolarisazure.click"
 ```
 
 ### Run acceptance tests
 
-The acceptance tests in `afon-acceptance-tests` verify that cross-cloud access works correctly — including that access to "forbidden" buckets is properly denied.
+The acceptance tests in `afon-acceptance` verify that cross-cloud access works correctly — including that access to "forbidden" buckets is properly denied.
 
 ```shell
-cd afon-acceptance-tests
-mvn test
+./afon.sh -a build -p acceptance # builds components running acceptance tests for all cloud providers
+./afon.sh -a build -p acceptance -c aws # builds components running acceptance tests for aws
+./afon.sh -a build -p acceptance -c azure # builds components running acceptance tests for azure
+./afon.sh -a build -p acceptance -c gcp # builds components running acceptance tests for gcp
 ```
 
 Test specs include:
 
-- `AwsAccessSpec` — write and read Iceberg tables via AWS Polaris to S3
+- `AwsAccessSpec` — write and read Iceberg tables via AWS Polaris to s3
 - `GcpAccessSpec` — write and read via AWS Polaris to GCS
-- `AzureAccessSpec` — write and read via AWS Polaris to Azure Blob
-- `ExternalAzureDBxTableSpec` — cross-cloud: Spark talks to AWS Polaris which federates to Azure Polaris
+- `AzureAccessSpec` — write and read via AWS Polaris to Azure
+- `ExternalAzureTableSpec` — cross-cloud: Spark talks to AWS Polaris which federates to Azure Polaris
 - `ExternalGcpTableSpec` — cross-cloud: Spark talks to AWS Polaris which federates to GCP Polaris
 - `ExternalGlueTableSpec` — federated Glue catalog access
 - `AwsAccessForbiddenSpec` / `GcpAccessForbiddenSpec` / `AzureAccessForbiddenSpec` — verify that access to forbidden buckets is denied
@@ -244,8 +253,7 @@ Test specs include:
 The full AWS stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployFullStackAwsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployFullStackAwsMain
 ```
 
 Steps executed:
@@ -259,8 +267,7 @@ Steps executed:
 ### Deploy Polaris to GCP only
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployGcpPolarisMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployGcpPolarisMain  
 ```
 
 Steps: `clean_gcp` → `gcp_polaris` → `waitFor_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
@@ -268,8 +275,7 @@ Steps: `clean_gcp` → `gcp_polaris` → `waitFor_emryspolarisgcp` → `all_cata
 ### Deploy Polaris to Azure only
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployAzurePolarisMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployAzurePolarisMain  
 ```
 
 Steps: `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
@@ -279,13 +285,12 @@ Steps: `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `all_c
 This deploys both AWS and Azure Polaris instances and configures AWS Polaris to federate to Azure Polaris for cross-cloud querying.
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployExternalCatalogsMain  
 ```
 
 Steps: `clean_aws` → `aws_spark` → `waitFor_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
 
-### How to set up DNS and domain names
+### Set up DNS and domain names
 
 Polaris requires HTTPS for encrypted communication, which requires domain names recognised by a Certificate Authority.
 
@@ -313,7 +318,7 @@ Note the nameservers and update your registrar.
 aws route53 list-hosted-zones-by-name --dns-name yourdomain.click
 ```
 
-Update the `AWS_XXX_DNS_ZONE` values in `afon.properties`. Request a certificate via [AWS Certificate Manager](https://console.aws.amazon.com/acm/certificates/list) and press "Create Record in Route 53" to prove ownership.
+Update the `AWS_XXX_DNS_ZONE` values in `afon-aws.properties`. Request a certificate via [AWS Certificate Manager](https://console.aws.amazon.com/acm/certificates/list) and press "Create Record in Route 53" to prove ownership.
 
 **Domain delegation:**
 
@@ -326,20 +331,19 @@ Afon can configure Snowflake to read Iceberg tables from any cloud via Polaris a
 **Read GCP data via AWS Polaris:**
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingGcpViaAwsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingGcpViaAwsMain  
 ```
 
 **Read Azure data via AWS Polaris:**
 
 ```shell
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingAzureViaAwsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingAzureViaAwsMain  
 ```
 
 **Read AWS data via AWS Polaris:**
 
 ```shell
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingAwsViaAwsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingAwsViaAwsMain  
 ```
 
 These deploy the full AWS stack, write test data to the target cloud, then create a Snowflake catalog integration and iceberg table that reads through Polaris.
@@ -357,7 +361,7 @@ See `afon-snowflake/README.md` for the full guide. In summary:
 The deployment is automated via:
 
 ```shell
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeWritingAzureViaAwsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeWritingAzureViaAwsMain  
 ```
 
 ### Set up monitoring
@@ -365,8 +369,7 @@ mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeWritingAzureV
 Install monitoring components on AWS:
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.PrometheusClusterDeployment
 cd cdktf.out/stacks/aws
 tofu apply --auto-approve
 ```
@@ -411,11 +414,9 @@ tofu destroy --auto-approve
 
 ```shell
 # AWS
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.cdk.AwsNuke exec:java
-
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.AwsNuke
 # Azure
-mvn compile -Dexec.mainClass=health.emrys.afon.cdk.AzureNuke exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.azure.AzureNuke
 ```
 
 These output shell scripts that destroy everything. You may need to run them multiple times for VPCs to disappear.
@@ -443,11 +444,9 @@ az network dns record-set a delete \
 If a deployment fails partway through, you can resume from a specific step:
 
 ```shell
-mvn compile -Pdemo -Dexec.mainClass="health.emrys.afon.demo.DeployExternalCatalogsMain" \
-  -Dexec.args="az_polaris" exec:exec
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployExternalCatalogsMain \ 
+  --exec-args "az_polaris"
 ```
-
-Use `exec:exec` (not `exec:java`) when resuming with `-Dexec.args`.
 
 ### Diagnose Polaris issues
 
@@ -491,23 +490,23 @@ Afon's architecture has four layers:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Query Engines                                           │
-│  (Spark / Snowflake / Trino)                             │
+│  Query Engines                                          │
+│  (Spark / Snowflake / Trino)                            │
 └──────────────────────┬──────────────────────────────────┘
                        │ REST API (Iceberg REST Catalog)
 ┌──────────────────────▼──────────────────────────────────┐
-│  Apache Polaris                                          │
-│  (runs in Kubernetes, one per cloud)                     │
-│  - Catalog management (internal + federated/external)    │
-│  - Credential vending (short-lived tokens)               │
-│  - Metadata stored in external Postgres                  │
+│  Apache Polaris                                         │
+│  (runs in Kubernetes, one per cloud)                    │
+│  - Catalog management (internal + federated/external)   │
+│  - Credential vending (short-lived tokens)              │
+│  - Metadata stored in external Postgres                 │
 └──────────────────────┬──────────────────────────────────┘
                        │ Vended credentials
 ┌──────────────────────▼──────────────────────────────────┐
-│  Cloud Storage                                           │
-│  (AWS S3 / GCP GCS / Azure Blob Storage)                 │
-│  - Iceberg table data files (Parquet)                    │
-│  - Iceberg metadata files (manifests, snapshots)         │
+│  Cloud Storage                                          │
+│  (AWS S3 / GCP GCS / Azure Blob Storage)              │
+│  - Iceberg table data files (Parquet)                   │
+│  - Iceberg metadata files (manifests, snapshots)        │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -537,20 +536,20 @@ The `SupportedCloudsEnum` defines the catalog types:
 
 ### Properties system
 
-Afon uses a two-file properties system:
+Afon uses a two-file properties system (which live in config dir):
 
 - **`afon.properties`** — non-sensitive configuration, safe to check into version control (though the current repo includes real values for the Emrys demo environment)
 - **`env.properties`** — sensitive credentials, should never be committed
 
 Both are loaded by `AfonPropertiesLoader`, which tries the parent directory first (when running as a build) then the current directory (when running in an IDE). System properties can override any value.
 
-All known properties are defined as `AfonProperty` constants in `AfonProperties.java`. Each property knows its own name and can extract its value from a `Properties` object.
+All known properties are defined as `AfonProperty` constants in `AfonProperties`. Each property knows its own name and can extract its value from a `Properties` object.
 
 The `SupportedCloudsEnum` enum defines the cloud types that Polaris can manage, used throughout the codebase to select the right storage configuration and credential vending logic.
 
-### Deployment step system
+### Executable step system
 
-Deployments are composed of reusable steps:
+Executables are composed of reusable steps:
 
 - **`Step`** — a named unit of work with a description and a runnable action
 - **`StepOperations`** — factory methods that create `Step` instances for common operations (clean, deploy, wait, configure, test)
@@ -594,15 +593,14 @@ In the deployed environment, Spark runs as a Spark Connect server in Kubernetes.
 - **Forbidden buckets** — Each cloud has a "forbidden" bucket that the IAM roles do NOT grant access to. Acceptance tests verify that Polaris correctly denies access to these buckets.
 - **Jupyter access** — Jupyter is served via Apache Guacamole (pixel streaming via X11 VNC) behind an OAuth2 proxy that delegates to Google. This requires `OAUTH2_CLIENT_ID`, `OAUTH2_CLIENT_SECRET`, and `OAUTH2_COOKIE_SECRET`.
 - **Network policies** — Kubernetes network policies restrict pod-to-pod communication. The `NetworkConfiguration` class sets up policies between Jupyter, Spark, and Polaris pods.
-- **Pomerium** — An alternative auth proxy configuration is available in `afon-pomerium/`.
 
 ---
 
-## Examples — What can I do with it
+## Examples
 
 ### PySpark cross-cloud join
 
-Generated by `SparkContextConfigurationPrinter`, this writes data to three clouds and joins it:
+Generated by `GeneratePySparkContextMain`, this writes data to three clouds and joins it:
 
 ```python
 from pyspark.sql import SparkSession
@@ -645,9 +643,8 @@ df_joined.show()
 **Write:**
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestWriter \
-  -Dexec.args="azure_external root s3cr3t emryspolaris.click namespaceph" exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.ops.spark.SparkTestWriter \ 
+  --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
 This creates a namespace, creates an Iceberg table, and writes three rows ("apple", "banana", "cherry").
@@ -655,8 +652,8 @@ This creates a namespace, creates an Iceberg table, and writes three rows ("appl
 **Read:**
 
 ```shell
-mvn compile -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestReader \
-  -Dexec.args="azure_external root s3cr3t emryspolaris.click namespaceph" exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.ops.spark.SparkTestReader \ 
+  --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
 ### Create sample patient data
@@ -664,8 +661,7 @@ mvn compile -Dexec.mainClass=health.emrys.afon.infra.checks.SparkTestReader \
 The `afon-samples` module contains a sample data generator:
 
 ```shell
-cd afon-samples
-mvn compile -Dexec.mainClass=health.emrys.afon.samples.PatientDataMain exec:java
+./afon.sh -a exec -t samples --exec-class health.emrys.afon.samples.PatientDataMain 
 ```
 
 This creates `patients` (in AWS) and `occupancy` (in GCP) tables with 10,000 rows each, demonstrating cross-cloud data placement.
@@ -785,13 +781,6 @@ AWS_JUPYTER_DNS_ZONE=YOUR_JUPYTER_DNS_ZONE_ID
 AWS_JUPYTER_CERT_ARN=arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
 AWS_POLARIS_CERT_ARN=arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
 
-### GCP
-GCP_BUCKET_NAME=your_org_afon
-GCP_BUCKET_NAME_FORBIDDEN=your_org_afon_forbidden
-GCP_EXTERNAL_BUCKET_NAME=your_org_afon_external
-GCP_SERVICE_ACCOUNT=your-sa@your-project.iam.gserviceaccount.com
-GCP_DOMAIN_NAME=your-polaris-gcp.yourdomain.com
-
 ### Azure
 AZURE_EXTERNAL_BUCKET=yourstorage-external
 AZURE_BUCKET_FORBIDDEN=yourstorage-forbidden
@@ -802,6 +791,13 @@ AZURE_REGION=uksouth
 AZURE_RESOURCE_GROUP=your_resource_group
 AZURE_DOMAIN_NAME=your-polaris-azure.yourdomain.com
 AZURE_JUPYTER_DOMAIN_NAME=your-jupyter-azure.yourdomain.com
+
+### GCP
+GCP_BUCKET_NAME=your_org_afon
+GCP_BUCKET_NAME_FORBIDDEN=your_org_afon_forbidden
+GCP_EXTERNAL_BUCKET_NAME=your_org_afon_external
+GCP_SERVICE_ACCOUNT=your-sa@your-project.iam.gserviceaccount.com
+GCP_DOMAIN_NAME=your-polaris-gcp.yourdomain.com
 
 ### Snowflake
 SNOWFLAKE_JDBC_URL=jdbc:snowflake://YOUR_ACCOUNT.snowflakecomputing.com/
@@ -814,14 +810,14 @@ SNOWFLAKE_JDBC_URL=jdbc:snowflake://YOUR_ACCOUNT.snowflakecomputing.com/
 AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY
 AWS_SECRET_ACCESS_KEY=YOUR_SECRET_KEY
 
-# GCP
-GOOGLE_APPLICATION_CREDENTIALS=CONTENTS_OF_APPLICATION_DEFAULT_CREDENTIALS_JSON_WITH_NEWLINES_REMOVED
-
 # Azure
 AZURE_CLIENT_ID=YOUR_CLIENT_ID
 AZURE_TENANT_ID=YOUR_TENANT_ID
 AZURE_CLIENT_SECRET=YOUR_CLIENT_SECRET
 DATABRICKS_TOKEN=YOUR_DATABRICKS_TOKEN
+
+# GCP
+GOOGLE_APPLICATION_CREDENTIALS=CONTENTS_OF_APPLICATION_DEFAULT_CREDENTIALS_JSON_WITH_NEWLINES_REMOVED
 
 # OAuth2 (for Jupyter/Guacamole)
 OAUTH2_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
@@ -856,24 +852,23 @@ SNOWFLAKE_PRIVATE_KEY=YOUR_SNOWFLAKE_PRIVATE_KEY
 
 ```shell
 # Full AWS stack (Polaris + Spark + Jupyter)
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployFullStackAwsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployFullStackAwsMain 
 
 # Azure Polaris (standalone)
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployAzurePolarisMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployAzurePolarisMain
 
 # GCP Polaris (standalone)
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployGcpPolarisMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployGcpPolarisMain 
 
 # Cross-cloud external catalogs (AWS + Azure federation)
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployExternalCatalogsMain 
 
 # Snowflake reading cross-cloud data
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingGcpViaAwsMain exec:exec -Pdemo
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeReadingAzureViaAwsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingGcpViaAwsMain 
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeReadingAzureViaAwsMain 
 
 # Snowflake writing to Azure
-mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeWritingAzureViaAwsMain exec:exec -Pdemo
+./afon.sh -a exec --exec-class health.emrys.afon.ops.DeploySnowflakeWritingAzureViaAwsMain 
 ```
 
 ### Production monitoring setup
@@ -881,8 +876,7 @@ mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeploySnowflakeWritingAzureV
 1. **Install monitoring stack:**
 
 ```shell
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.cdk.PrometheusClusterDeploy exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.PrometheusClusterDeployment
 cd cdktf.out/stacks/aws
 tofu apply --auto-approve
 ```
@@ -948,11 +942,9 @@ tofu destroy --auto-approve
 
 ```shell
 # Generate nuke scripts
-cd afon-infra
-mvn compile -Dexec.mainClass=health.emrys.afon.cdk.AwsNuke exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.AwsNuke 
 # Run the output script (may need multiple passes for VPCs to disappear)
-
-mvn compile -Dexec.mainClass=health.emrys.afon.cdk.AzureNuke exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.azure.AzureNuke
 ```
 
 **When Azure Terraform import is needed:**

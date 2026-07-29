@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.polaris.comms.AfonPolarisClient.getTokenUri;
+import static health.emrys.afon.polaris.config.AfonPolarisClient.getTokenUri;
 
 abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolaris {
     private final @NonNull String clientId;
