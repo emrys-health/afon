@@ -6,10 +6,15 @@ Afon is an infrastructure project that deploys [Apache Polaris](https://polaris.
 
 ## Quickstart — How to set up
 
-### Prerequisites
+### Env setup
 
-Install the following on your machine:
+Env setup requires *bash* installed on your machine.  For linux and macos it is installed by default.  For Windows, install with https://gitforwindows.org.
 
+```shell
+./afon.sh -a setup --setup-os [linux|macos]
+```
+
+The folloing packages are installed: 
 - **Git**
 - **JDK** (JDK 17 enforced by the Maven build)
 - **Maven**
@@ -19,18 +24,6 @@ Install the following on your machine:
 - **AWS CLI**
 - **Azure CLI**
 - **GCP CLI**
-
-*TODO:*  
-1. Configure automated way to set up local env on different OS (eg apt on Linux, brew on macOS)
-2. Provide shell script to verify and validate local env
-
-```shell
-# linux
-sudo apt install git-all default-jdk maven docker tofu kubectl
-
-# macos
-brew install git openjdk maven docker opentofu kubernetes-cli
-```
 
 ### 1. Clone and build
 
