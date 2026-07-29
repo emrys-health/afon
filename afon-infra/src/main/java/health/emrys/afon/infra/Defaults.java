@@ -15,4 +15,7 @@ public interface Defaults {
     String SPARK_SERVICE_ACCOUNT_NAME = "spark-application-sa";
 
     String TRINO_SERVICE_NAME = "trino";
+
+    String DUCKDB_POD_NAME     = "duckdb";
+    String DUCKDB_SERVICE_NAME = "duckdb";
 }
