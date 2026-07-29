@@ -30,7 +30,7 @@ import static java.util.Comparator.comparing;
 
 public class StepOperations {
 
-    private static final Logger log = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
 
     private static final Properties NO_ENV_VARIABLES   = new Properties();
     public static final  String     POLARIS_TABLE_NAME = "sf_table";
@@ -68,7 +68,7 @@ public class StepOperations {
                 try {
                     actions.deleteStack(AwsWholeStack.ID);
                 } catch (Exception ex) {
-                    log.error(
+                    logger.error(
                         format(
                             """
                             You may need to run:
@@ -231,7 +231,7 @@ public class StepOperations {
                         new String[]{domainName},
                         NO_ENV_VARIABLES);
                 } catch (Exception e) {
-                    log.error("""
+                    logger.error("""
                                   An error like:
                                   
                                   PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException:
@@ -377,7 +377,7 @@ public class StepOperations {
             format("Call Snowflake that uses AWS Polaris to get the credentials to read from %s storage", warehouse.name()),
             () -> {
                 Properties properties = appProperties();
-                log.warn("Calling Snowflake. Note that some of these statements can take a long time");
+                logger.warn("Calling Snowflake. Note that some of these statements can take a long time");
                 actions.runSnowflakeSql(new String[]{
                     "USE DATABASE SNOWFLAKE_LEARNING_DB",
 
@@ -512,7 +512,7 @@ public class StepOperations {
     private static @NonNull String firstFile(String glob,
                                              boolean descendingOrder
     ) {
-        log.info("Querying Azure for {}", glob);
+        logger.info("Querying Azure for {}", glob);
         AzureReader lister    = new AzureReader();
         List<BlobItem>       list      = new ArrayList<>(lister.list(glob));
         Comparator<BlobItem> comparing = comparing((BlobItem o) -> o.getProperties().getCreationTime());
@@ -524,7 +524,7 @@ public class StepOperations {
             .sorted(comparing)
             .findFirst()
             .get();
-        log.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
+        logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
         String bucket  = AZURE_BUCKET.getValueFrom(appProperties());
         String account = AZURE_STORAGE_ACCOUNT.getValueFrom(appProperties());
         return format(

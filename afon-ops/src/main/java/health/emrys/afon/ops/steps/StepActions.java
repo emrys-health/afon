@@ -43,7 +43,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 public class StepActions {
 
-    private static final Logger log = getLogger(StepActions.class);
+    private static final Logger logger = getLogger(StepActions.class);
     public static final String TERRAFORM_STATE_FILE_PATTERN = "terraform.";
 
     public Step waitFor(String domain) {
@@ -54,7 +54,7 @@ public class StepActions {
                             boolean stopResolving = false;
                             long    start         = System.currentTimeMillis();
                             int     timeout       = 1_200_000;
-                            log.info("Checking DNS for {}", domain);
+                            logger.info("Checking DNS for {}", domain);
                             while (!stopResolving && System.currentTimeMillis() - start < timeout) {
                                 try {
                                     InetAddress[] addresses = InetAddress.getAllByName(domain);
@@ -75,7 +75,7 @@ public class StepActions {
 
     private boolean isWaitingInterrupted(int timeout) {
         int pauseMs = 15_000;
-        log.info("Waiting {}s. Maximum = {}s", pauseMs / 1000, timeout / 1000);
+        logger.debug("Waiting {}s. Maximum = {}s", pauseMs / 1000, timeout / 1000);
         try {
             Thread.sleep(pauseMs);
         } catch (InterruptedException e) {
@@ -88,10 +88,10 @@ public class StepActions {
         Path toDelete = cdktfPath(id);
         if (toDelete.toFile().exists()) {
             attemptGracefulDestroy(toDelete);
-            log.info("Deleting {}", toDelete);
+            logger.info("Deleting {}", toDelete);
             delete(toDelete);
         } else {
-            log.info("Directory {} does not exist so starting afresh", toDelete);
+            logger.warn("Directory {} does not exist so starting afresh", toDelete);
         }
         deleteTerraformStateFiles(id);
         return toDelete;
@@ -99,7 +99,7 @@ public class StepActions {
 
     private void attemptGracefulDestroy(Path path) {
         try {
-            log.info("Stopping {} if it's running already...", path);
+            logger.info("Stopping {} if it's running already...", path);
             run("tofu", path, "init");
             if (run("tofu", path, "destroy", "--auto-approve") != 0) {
                 String msg = String.format("""
@@ -111,11 +111,11 @@ public class StepActions {
                 
                 If you're sure nothing in the environment is still running, delete directory %s
                 """, path, path);
-                log.error(msg);
+                logger.error(msg);
                 throw new RuntimeException(msg);
             }
         } catch (Exception e) {
-            log.error("Failed to call tofu destroy in " + path, e);
+            logger.error("Failed to call tofu destroy in " + path, e);
         }
     }
 
@@ -203,7 +203,7 @@ public class StepActions {
     }
 
     public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
-        log.info("Running {} with arguments {} and overrides {}",
+        logger.info("Running {} with arguments {} and overrides {}",
                  mainClass.getName(),
                  String.join(" ", args),
                  overrides);
@@ -226,7 +226,7 @@ public class StepActions {
         if (!bootstrapTargets.isEmpty()) {
             List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
             phaseOne.addAll(bootstrapTargets);
-            log.info("Bootstrapping EKS before the full apply: {}", phaseOne);
+            logger.info("Bootstrapping EKS before the full apply: {}", phaseOne);
             run("tofu", jsonDirectory, phaseOne.toArray(new String[0]));
         }
         OutputStream suppressedStdOut = OutputStream.nullOutputStream();
@@ -264,7 +264,7 @@ public class StepActions {
                          .forEachRemaining(name -> targets.add("-target=" + type + "." + name));
             }
         } catch (IOException e) {
-            log.warn("Could not read {} to compute cluster bootstrap targets; "
+            logger.warn("Could not read {} to compute cluster bootstrap targets; "
                      + "proceeding with a single apply", json, e);
         }
         return targets;
@@ -290,7 +290,7 @@ public class StepActions {
         p.start();
         p.isAlive();
         p.waitForExit();
-        log.info("Command {} finished with value {}", command, p.exitValue());
+        logger.info("Command {} finished with value {}", command, p.exitValue());
         return p.exitValue();
     }
 
@@ -304,10 +304,10 @@ public class StepActions {
         try (Connection conn = factory.getConnection();
              Statement stmt = conn.createStatement()) {
             for (String sql : statements) {
-                log.info("Running sql:\n{}", sql);
+                logger.info("Running sql:\n{}", sql);
                 ResultSet rs = stmt.executeQuery(sql);
                 while (rs.next()) {
-                    log.info(rs.getString(1));
+                    logger.info(rs.getString(1));
                 }
             }
             conn.commit();
@@ -328,7 +328,7 @@ public class StepActions {
     }
 
     public void delete(Path x) {
-        log.info("Deleting {}", x);
+        logger.info("Deleting {}", x);
         try {
             PathUtils.delete(x);
         } catch (IOException e) {
@@ -349,7 +349,7 @@ public class StepActions {
         properties.keySet().forEach(propKey -> {
             String key   = propKey.toString();
             String value = original.getProperty(key);
-            log.info("Restoring system property {} = {}", key, value);
+            logger.info("Restoring system property {} = {}", key, value);
             if (value != null) {
                 System.setProperty(key, value);
             }  else {
@@ -367,7 +367,7 @@ public class StepActions {
                 original.put(key, systemProp);
             }
             String value = properties.getProperty(key);
-            log.info("Setting system property {} = {}", key, value);
+            logger.info("Setting system property {} = {}", key, value);
             System.setProperty(key, value);
         });
         return original;

@@ -7,7 +7,7 @@ import java.util.List;
 
 public class StepRunner {
 
-    private static final Logger log = org.slf4j.LoggerFactory.getLogger(StepRunner.class);
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepRunner.class);
 
     public void run(StepsProvider stepsProvider, String[] args) {
         List<Step> steps = stepsProvider.stepsUsing(new StepOperations(new StepActions()));
@@ -20,25 +20,24 @@ public class StepRunner {
     }
 
     public void runFrom(List<Step> steps, String firstStepToRun) {
-        log.info("Running everything from {} (inclusive) onwards out of {}", humanReadable(steps), firstStepToRun);
+        logger.info("Running all steps from {} (inclusive) onwards out of {}", humanReadable(steps), firstStepToRun);
         int    index = steps.stream().map(s -> s.getName()).toList().lastIndexOf(firstStepToRun);
         if (index == -1) {
-            log.error("Step {} not found", firstStepToRun);
+            logger.error("Step {} not found", firstStepToRun);
         } else {
             runSteps(steps.subList(index, steps.size()));
         }
     }
 
     public void runSteps(List<Step> steps) {
-        log.info("StepOperations:\n{}", humanReadable(steps));
+        logger.info("\u001B[32mSteps to run: {}\u001B[0m", humanReadable(steps));
         try {
             for (Step step : steps) {
-                log.info("\u001B[32mRunning step {}\u001B[0m", step.getName());
+                logger.info("\u001B[32mRunning step {}\u001B[0m", step.getName());
                 step.getFunction().run();
             }
-            log.info("Successfully ran steps\n{}", humanReadable(steps));
         } catch (Exception e) {
-            log.error("Error running steps", e);
+            logger.error("Failed running steps", e);
             throw new RuntimeException(e);
         }
     }
