@@ -49,8 +49,9 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                         and the steps will continue starting at that one.
                         
                         For example:
-                        
-                        `./afon.sh -a exec --exec-class "%s" --exec-args "%s"`
+                        ```shell
+                        ./afon.sh -a exec --exec-class "%s" --exec-args "%s"
+                        ```
                         """,
                         String.join(("\n1. "), stepArray),
                         clazz.getCanonicalName(),
@@ -69,8 +70,11 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
             # Introduction
             
             To generate the documentation, run:
-            ```
-            ./afon.sh -a build -p docs
+            ```shell
+            # builds docs
+            ./afon.sh -a build -p -acceptance
+            # retrieves docs and copies them to docs dir (specified by --docs-dir)
+            ./afon.sh -a docs --docs-dir ~/afon-docs
             ```
             %s
             %s
