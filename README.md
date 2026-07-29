@@ -11,21 +11,33 @@ Afon is an infrastructure project that deploys [Apache Polaris](https://polaris.
 Install the following on your machine:
 
 - **Git**
-- **Java 17** (enforced by the Maven build)
+- **JDK** (JDK 17 enforced by the Maven build)
 - **Maven**
 - **Docker**
 - **OpenTofu** (Terraform-compatible)
 - **Kubernetes CLI** (`kubectl`)
 - **AWS CLI**
 - **Azure CLI**
-- **GCloud CLI**
+- **GCP CLI**
+
+*TODO:*  
+1. Configure automated way to set up local env on different OS (eg apt on Linux, brew on macOS)
+2. Provide shell script to verify and validate local env
+
+```shell
+# linux
+sudo apt install git-all default-jdk maven docker tofu kubectl
+
+# macos
+brew install git openjdk maven docker opentofu kubernetes-cli
+```
 
 ### 1. Clone and build
 
 ```shell
 git clone https://github.com/emrys-health/afon-core.git
 cd afon-core
-./afon.sh -a build -p -acceptance # builds components without running acceptance tests 
+./afon.sh -a build -p -acceptance # builds all components without running acceptance tests 
 ```
 
 ### 2. Configure properties
