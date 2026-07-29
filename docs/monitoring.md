@@ -36,7 +36,6 @@ Install [kubefwd](https://kubefwd.com)
 sudo -E kubefwd svc -n default --tui
 ```
 
-
 ### Prometheus
 
 Have Grafana tunnel into the Kubernetes cluster with:
@@ -50,6 +49,9 @@ kubectl port-forward  svc/kube-prometheus-stack-prometheus 9090:9090
 Point a browser at `http://localhost:3000` and log into Grafana with `admin`/`admin`.
 Add Data Source `http://localhost:9090` 
 One should see nearly 2000 metrics.
+
+NOTE:  If getting connection refused when adding the data source, use http://host.docker.internal:9090 in place of http://localhost:9090 (see https://github.com/grafana/grafana/issues/46434)
+
 
 ### Hubble
 
