@@ -14,6 +14,8 @@ import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.duckdb.DuckDbConfig.DUCKDB_IMAGE;
+import static health.emrys.afon.duckdb.DuckDbConfig.KEEP_ALIVE;
 import static health.emrys.afon.infra.Defaults.DUCKDB_POD_NAME;
 
 /**
@@ -33,16 +35,7 @@ import static health.emrys.afon.infra.Defaults.DUCKDB_POD_NAME;
  */
 public class DuckDBWorkloads {
 
-    /**
-     * Community image that ships the {@code duckdb} CLI on its PATH; pinned for reproducibility,
-     * exactly as {@link TrinoWorkloads} pins its chart/image versions.
-     */
-    private static final String DUCKDB_IMAGE = "davidgasquez/duckdb:latest";
-    /**
-     * DuckDB is embedded, so the container has no server to run; keep the pod alive so it can be
-     * {@code kubectl exec}'d into. {@code sleep infinity} is the idiomatic keep-alive.
-     */
-    private static final List<String> KEEP_ALIVE = List.of("sleep", "infinity");
+
 
     /**
      * Applies the DuckDB pod manifest against the cluster targeted by the active kubeconfig. The

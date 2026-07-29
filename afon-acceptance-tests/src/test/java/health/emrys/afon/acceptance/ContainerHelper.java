@@ -32,6 +32,8 @@ import java.util.stream.Stream;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
+import static health.emrys.afon.duckdb.DuckDbConfig.DUCKDB_IMAGE;
+import static health.emrys.afon.duckdb.DuckDbConfig.KEEP_ALIVE;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.*;
@@ -84,11 +86,13 @@ public class ContainerHelper {
     private final Object polarisLock      = new Object();
     private final Object trinoLock        = new Object();
     private final Object sparkConnectLock = new Object();
+    private final Object duckDbLock       = new Object();
 
-    private volatile GenericContainer<?> polaris;
-    private volatile GenericContainer<?> trino;
-    private volatile GenericContainer<?> sparkConnect;
-    private volatile GenericContainer<?> keyCloak;
+    private GenericContainer<?> polaris;
+    private GenericContainer<?> trino;
+    private GenericContainer<?> sparkConnect;
+    private GenericContainer<?> keyCloak;
+    private GenericContainer<?> duckDb;
 
     private ContainerHelper() {
     }
@@ -106,7 +110,7 @@ public class ContainerHelper {
      * it is used, so its lambdas run freely.
      */
     public void startAll(Properties properties) {
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = Executors.newFixedThreadPool(3);
         try {
             CompletableFuture<Void> keyCloakThenPolaris = CompletableFuture.runAsync(() -> {
                 startKeyCloak(properties);
@@ -114,10 +118,22 @@ public class ContainerHelper {
             }, executor);
             CompletableFuture<Void> trino = CompletableFuture.runAsync(
                 () -> startTrino(properties), executor);
+            CompletableFuture<Void> duckDb = CompletableFuture.runAsync(
+                () -> startDuckDB(), executor);
             // Block until every container is started; join() rethrows any startup failure.
-            CompletableFuture.allOf(keyCloakThenPolaris, trino).join();
+            CompletableFuture.allOf(keyCloakThenPolaris, trino, duckDb).join();
         } finally {
             executor.shutdown();
+        }
+    }
+
+    public void startDuckDB() {
+        synchronized (duckDbLock) {
+            if (duckDb == null) {
+                duckDb = new GenericContainer<>(DUCKDB_IMAGE);
+                duckDb.withCommand(KEEP_ALIVE.stream().collect(Collectors.joining(" ")));
+                duckDb.start();
+            }
         }
     }
 

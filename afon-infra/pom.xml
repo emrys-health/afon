@@ -133,8 +133,14 @@
         </dependency>
         <dependency>
             <groupId>health.emrys</groupId>
+            <artifactId>afon-duckdb</artifactId>
+            <version>${parent.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>health.emrys</groupId>
             <artifactId>afon-trino</artifactId>
-            <version>0.1</version>
+            <version>${parent.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
