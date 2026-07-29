@@ -11,7 +11,17 @@ check_acceptance(){
   fi
 }
 
-exec_mvn () {
+mvn_envs(){
+  MVN_ENVS="-Dafon.home=$CWD"
+  if [ -n "$CLOUD" ] ; then
+    MVN_ENVS="$MVN_ENVS -Dafon.cloud=$CLOUD"
+  fi
+  if [ -n "$LOGGING" ] ; then
+    MVN_ENVS="$MVN_ENVS -Dafon.logging=$LOGGING"
+  fi
+}
+
+exec_mvn() {
   if [ -n "$MVN_ARGS" ] ; then
     echo "Executing $MVN_CMD \"$MVN_ARGS\" $MVN_ENVS $MVN_GOALS"
     $MVN_CMD "$MVN_ARGS" $MVN_ENVS $MVN_GOALS
@@ -31,8 +41,8 @@ exec_jvm(){
         MVN_ARGS="-Dexec.args=\"$EXEC_ARGS\""
       fi
       if [ -n "$EXEC_ENVS" ] ; then
-        MVN_ENVS="-D$EXEC_ENVS"
-        MVN_ENVS="${MVN_ENVS/ / -D}"
+        EXEC_ENVS="${EXEC_ENVS/ / -D}"
+        MVN_ENVS="$MVN_ENVS -D$EXEC_ENVS"
       fi
       if [ -z "$EXEC_TYPE" ] ; then
         echo "Action exec requires option --exec-type"
@@ -60,7 +70,8 @@ version(){
 }
 
 usage (){
-  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--help|-h]"
+  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h]"
+  echo "          [--logging-level|-l <logging>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
@@ -70,11 +81,13 @@ usage (){
   echo "          docs:  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
   echo "          exec:  executes the jvm classes from ops (see the docs for details)"
   echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
-  echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
+  echo "logging-level:  the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "build-args:     the build args.  eg '-DskipTests'."
   echo "build-goals:    the build goals.  Defaults to 'clean install'."
   echo "build-profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
   echo "docs-dir:       the output dir for the docs."
+  echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
+  echo "mvn-quiet:      the flag to hush the mvn output"
 }
 
 ACTION=
@@ -82,6 +95,7 @@ BUILD_ARGS=
 BUILD_GOALS=
 BUILD_PROFILES=
 CLOUD=
+LOGGING=
 DRY_RUN=false
 DOCS_DIR=
 EXEC_CLASS=
@@ -93,6 +107,7 @@ MVN_PROFILES=
 MVN_GOALS=
 MVN_ARGS=
 MVN_ENVS=
+MVN_QUIET=
 VERSION=
 
 while [[ $# -gt 0 ]]; do
@@ -121,6 +136,10 @@ while [[ $# -gt 0 ]]; do
       EXEC_SCRIPT="$2"; shift 2 ;;
     --exec-type|-t)
       EXEC_TYPE="$2"; shift 2 ;;
+    --logging|-l)
+      LOGGING="$2"; shift 2 ;;
+    --mvn-quiet)
+      MVN_QUIET=true; shift ;;
     --help|-h)
       usage; exit 0 ;;
     *)
@@ -149,7 +168,11 @@ if [ -n "$CLOUD" ] ; then
 fi
 
 CWD=`pwd`
-MVN_CMD="mvn -s $CWD/settings.xml $MVN_PROFILES"
+MVN_CMD="mvn"
+if [ -n "$MVN_QUIET" ] ; then
+  MVN_CMD="$MVN_CMD -q"
+fi
+MVN_CMD="$MVN_CMD -s $CWD/settings.xml $MVN_PROFILES"
 
 case $ACTION in
 
@@ -162,10 +185,7 @@ case $ACTION in
     if [ -n "$BUILD_ARGS" ] ; then
       MVN_ARGS="$BUILD_ARGS"
     fi
-    MVN_ENVS="$MVN_ENVS -Dafon.home=$CWD"
-    if [ -n "$CLOUD" ] ; then
-      MVN_ENVS="-Dafon.cloud=$CLOUD"
-    fi
+    mvn_envs
     exec_mvn
     check_acceptance
     ;;
@@ -190,6 +210,7 @@ case $ACTION in
     if [ "$EXEC_TYPE" == "script" ] ; then
       exec_script
     else
+      mvn_envs
       exec_jvm
     fi
     ;;

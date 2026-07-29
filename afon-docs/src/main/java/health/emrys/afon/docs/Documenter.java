@@ -11,10 +11,9 @@ import org.slf4j.Logger;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Properties;
 
 import static java.lang.String.format;
@@ -96,27 +95,25 @@ public class Documenter {
     }
 
     private static String redact(String documentation) {
-        Properties cofidential   = new AfonPropertiesLoader().getConfidentialProperties();
-        for (String verboten : cofidential
+        Properties confidential   = new AfonPropertiesLoader().getConfidentialProperties();
+        for (String redact : confidential
                 .values()
                 .stream()
                 .map(x -> x.toString())
-                .filter(x -> !x.equals("emrys")) // this is innocent although we should change OAUTH2_CLIENT_ID
+                .filter(x -> !x.equals("emrys")) // this is innocent, although we should change OAUTH2_CLIENT_ID
                 .toList()) {
-            String  old = documentation;
-            documentation = documentation.replace(verboten, "REDACTED");
-            if (!old.equals(documentation)) {
-                log.info("Redacted {}", verboten);
+            String  original = documentation;
+            documentation = documentation.replace(redact, "REDACTED");
+            if (!original.equals(documentation)) {
+                log.info("Redacted {}", redact);
             }
         }
         return documentation;
     }
 
     private void writeSteps(OutputStream fos) {
-        StepOperations stepOperations = new StepOperations(new StepDocumentation(fos));
-        List<Step>     steps          = documentMetadata.steps(stepOperations);
-        StepRunner app            = new StepRunner();
-        app.runSteps(steps.stream().map(x -> decorating(x, fos)).toList());
+        List<Step> steps = documentMetadata.steps(new StepOperations(new StepDocumentation(fos)));
+        new StepRunner().runSteps(steps.stream().map(x -> decorating(x, fos)).toList());
     }
 
     private Step decorating(Step step, OutputStream outputStream) {
