@@ -24,6 +24,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -74,147 +77,191 @@ public class ContainerHelper {
     private final Network                     network      = Network.newNetwork();
     private final SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
 
-    private GenericContainer<?> polaris;
-    private GenericContainer<?> trino;
-    private GenericContainer<?> sparkConnect;
-    private GenericContainer<?> keyCloak;
+    // Per-container locks so different containers can be started concurrently (see
+    // AcceptanceTestConfig.startContainers) while still guarding each container against a
+    // double-start. A single monitor on {@code this} would serialise unrelated containers.
+    private final Object keyCloakLock     = new Object();
+    private final Object polarisLock      = new Object();
+    private final Object trinoLock        = new Object();
+    private final Object sparkConnectLock = new Object();
+
+    private volatile GenericContainer<?> polaris;
+    private volatile GenericContainer<?> trino;
+    private volatile GenericContainer<?> sparkConnect;
+    private volatile GenericContainer<?> keyCloak;
 
     private ContainerHelper() {
     }
 
-    public synchronized GenericContainer<?> startKeyCloak(Properties properties) {
-        if (keyCloak == null) {
-            keyCloak = new GenericContainer<>(KEYCLOAK_IMAGE)
-                .withNetwork(network)
-                .withNetworkAliases(KEYCLOAK_ALIAS)
-                // Declare the port so the HTTP wait strategy can resolve it (the fixed binding below
-                // pins the host port to the same number).
-                .withExposedPorts(KEYCLOAK_PORT)
-                .withCommand("start-dev")
-                .waitingFor(Wait.forHttp("/realms/master")
-                                .forPort(KEYCLOAK_PORT)
-                                .forStatusCode(200)
-                                .withStartupTimeout(Duration.ofMinutes(3)));
-            KeyCloakConfig kcConfig = new KeyCloakConfig(properties);
-            kcConfig.configUsing().entrySet().forEach(entry ->
-                                                          keyCloak.withEnv(entry.getKey(), entry.getValue())
-            );
-            // Fixed binding so the host-side KeyCloakAdmin can reach it at localhost:8080.
-            keyCloak.setPortBindings(List.of(KEYCLOAK_PORT + ":" + KEYCLOAK_PORT));
-            logger.info("Starting KeyCloak docker container. This usually takes about 20s, longer if " +
-                            "it's downloading the image.");
-            keyCloak.start();
-            // Provision the realm, client and user/password that Polaris will trust.
-            KeyCloakAdmin keyCloakAdmin = new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME);
-            keyCloakAdmin
-                .registerPolarisUser(
-                    KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
-                    KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
-            keyCloakAdmin
-                .registerPolarisUser(
+    /**
+     * Starts every container the acceptance tests need, concurrently, returning only once all of
+     * them are up. KeyCloak must be fully provisioned (realm + users) before Polaris starts, since
+     * Polaris resolves its OIDC configuration from KeyCloak — so those two run in sequence on one
+     * thread, in parallel with Trino, which has no such dependency.
+     *
+     * <p>The async tasks live here rather than in the caller on purpose: this must be callable
+     * from a class's static initialiser without deadlocking. A pool thread invoking a lambda of a
+     * class that is mid-initialisation would block waiting for that init to finish, while the
+     * initialising thread blocks on {@code join()}. This class is already initialised by the time
+     * it is used, so its lambdas run freely.
+     */
+    public void startAll(Properties properties) {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            CompletableFuture<Void> keyCloakThenPolaris = CompletableFuture.runAsync(() -> {
+                startKeyCloak(properties);
+                startPolaris(properties);
+            }, executor);
+            CompletableFuture<Void> trino = CompletableFuture.runAsync(
+                () -> startTrino(properties), executor);
+            // Block until every container is started; join() rethrows any startup failure.
+            CompletableFuture.allOf(keyCloakThenPolaris, trino).join();
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    public GenericContainer<?> startKeyCloak(Properties properties) {
+        synchronized (keyCloakLock) {
+            if (keyCloak == null) {
+                keyCloak = new GenericContainer<>(KEYCLOAK_IMAGE)
+                    .withNetwork(network)
+                    .withNetworkAliases(KEYCLOAK_ALIAS)
+                    // Declare the port so the HTTP wait strategy can resolve it (the fixed binding below
+                    // pins the host port to the same number).
+                    .withExposedPorts(KEYCLOAK_PORT)
+                    .withCommand("start-dev")
+                    .waitingFor(Wait.forHttp("/realms/master")
+                                    .forPort(KEYCLOAK_PORT)
+                                    .forStatusCode(200)
+                                    .withStartupTimeout(Duration.ofMinutes(3)));
+                KeyCloakConfig kcConfig = new KeyCloakConfig(properties);
+                kcConfig.configUsing().entrySet().forEach(entry ->
+                                                              keyCloak.withEnv(entry.getKey(), entry.getValue())
+                );
+                // Fixed binding so the host-side KeyCloakAdmin can reach it at localhost:8080.
+                keyCloak.setPortBindings(List.of(KEYCLOAK_PORT + ":" + KEYCLOAK_PORT));
+                logger.info("Starting KeyCloak docker container. This usually takes about 20s, longer if " +
+                                "it's downloading the image.");
+                keyCloak.start();
+                // Provision the realm, client and user/password that Polaris will trust.
+                KeyCloakAdmin keyCloakAdmin = new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME);
+                keyCloakAdmin
+                    .registerPolarisUser(
+                        KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
+                        KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
+                keyCloakAdmin
+                    .registerPolarisUser(
+                        USER_POLARIS_ID.getValueFrom(properties),
+                        USER_POLARIS_SECRET.getValueFrom(properties));
+                keyCloakAdmin
+                    .registerPolarisUser(
+                        POLARIS_ID.getValueFrom(properties),
+                        POLARIS_SECRET.getValueFrom(properties));
+            }
+            return keyCloak;
+        }
+    }
+
+    public void startSparkConnect(Properties properties) {
+        synchronized (sparkConnectLock) {
+            if (sparkConnect == null) {
+                sparkConnect = new GenericContainer<>(SPARK_IMAGE);
+                SparkWarehouseConfig config = sparkFactory.getConfig(properties);
+                Stream<String> envs = Arrays.stream(values()).flatMap(
+                    cloudProvider ->
+                        config.sparkConfigs(cloudProvider).entrySet().stream().map(
+                            entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
+                );
+                String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger" +
+                    ".netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
+                String envString = envs.collect(Collectors.joining(" "))
+                    + " -Dspark.master=local[4]"
+                    + " -Dspark.connect.grpc.interceptor.classes=org.apache.spark.sql.connect.service" +
+                    ".LoggingInterceptor"
+                    + " " + logging;
+                sparkConnect.withEnv("spark.driver.extraJavaOptions", logging);
+                sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC", "DEBUG");
+                sparkConnect.withEnv("LOG4J_LOGGER_ORG_APACHE_SPARK_SQL_CONNECT", "DEBUG");
+                sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC_NETTY", "TRACE");
+                logger.info("Spark connect env: {}", envString);
+
+                sparkConnect.withEnv("SPARK_SUBMIT_OPTS", envString);
+                sparkConnect.setNetworkMode("host");
+                sparkConnect.start();
+            }
+        }
+    }
+
+    public GenericContainer<?> startPolaris(Properties properties) {
+        synchronized (polarisLock) {
+            if (polaris == null) {
+                String googleCreds   = GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties);
+                String polarisId     = POLARIS_ID.getValueFrom(properties);
+                String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
+                polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
+                    // Same network as KeyCloak so Polaris can reach it via the KEYCLOAK_ALIAS host name.
+                    .withNetwork(network)
+                    // Declare the ports so the HTTP wait strategy can resolve them (the fixed bindings
+                    // below pin the host ports to the same numbers).
+                    .withExposedPorts(POLARIS_PORT, 8182, DEBUG_PORT)
+                    .withCommand("sh", "-c", POLARIS_CMD)
+                    .withNetworkAliases(POLARIS_NETWORK_HOST)
+                    .withEnv(ENVIRONMENT_VARIABLE, format("POLARIS,%s,%s", polarisId, polarisSecret))
+                    // GCP
+                    .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
+                    .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
+                POLARIS_PROPERTIES.forEach((x) -> {
+                    polaris.withEnv(x.getPropertyName(), x.getValueFrom(properties));
+                });
+                // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
+                polarisOidcEnv(
+                    internalRealmUrl(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL),
                     USER_POLARIS_ID.getValueFrom(properties),
-                    USER_POLARIS_SECRET.getValueFrom(properties));
-            keyCloakAdmin
-                .registerPolarisUser(
-                    POLARIS_ID.getValueFrom(properties),
-                    POLARIS_SECRET.getValueFrom(properties));
-        }
-        return keyCloak;
-    }
+                    USER_POLARIS_SECRET.getValueFrom(properties)).forEach(polaris::withEnv);
+                Map.of(
+                       "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
+                       "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
+                       "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL", "DEBUG",
+                       "QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL", "DEBUG"
+                   )
+                   .entrySet()
+                   .forEach(x -> polaris.withEnv(x.getKey(), x.getValue()));
 
-    public synchronized void startSparkConnect(Properties properties) {
-        if (sparkConnect == null) {
-            sparkConnect = new GenericContainer<>(SPARK_IMAGE);
-            SparkWarehouseConfig config = sparkFactory.getConfig(properties);
-            Stream<String> envs = Arrays.stream(values()).flatMap(
-                cloudProvider ->
-                    config.sparkConfigs(cloudProvider).entrySet().stream().map(
-                        entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
-            );
-            String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger" +
-                ".netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
-            String envString = envs.collect(Collectors.joining(" "))
-                + " -Dspark.master=local[4]"
-                + " -Dspark.connect.grpc.interceptor.classes=org.apache.spark.sql.connect.service" +
-                ".LoggingInterceptor"
-                + " " + logging;
-            sparkConnect.withEnv("spark.driver.extraJavaOptions", logging);
-            sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC", "DEBUG");
-            sparkConnect.withEnv("LOG4J_LOGGER_ORG_APACHE_SPARK_SQL_CONNECT", "DEBUG");
-            sparkConnect.withEnv("LOG4J_LOGGER_IO_GRPC_NETTY", "TRACE");
-            logger.info("Spark connect env: {}", envString);
-
-            sparkConnect.withEnv("SPARK_SUBMIT_OPTS", envString);
-            sparkConnect.setNetworkMode("host");
-            sparkConnect.start();
+                polaris.setPortBindings(List.of("8181:8181", "8182:8182", DEBUG_PORT + ":" + DEBUG_PORT));
+                logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading " +
+                                "the image.");
+                polaris.start();
+                polaris.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
+            }
+            return polaris;
         }
     }
 
-    public synchronized GenericContainer<?> startPolaris(Properties properties) {
-        if (polaris == null) {
-            String googleCreds   = GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties);
-            String polarisId     = POLARIS_ID.getValueFrom(properties);
-            String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
-            polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
-                // Same network as KeyCloak so Polaris can reach it via the KEYCLOAK_ALIAS host name.
-                .withNetwork(network)
-                // Declare the ports so the HTTP wait strategy can resolve them (the fixed bindings
-                // below pin the host ports to the same numbers).
-                .withExposedPorts(POLARIS_PORT, 8182, DEBUG_PORT)
-                .withCommand("sh", "-c", POLARIS_CMD)
-                .withNetworkAliases(POLARIS_NETWORK_HOST)
-                .withEnv(ENVIRONMENT_VARIABLE, format("POLARIS,%s,%s", polarisId, polarisSecret))
-                // GCP
-                .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
-                .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
-            POLARIS_PROPERTIES.forEach((x) -> {
-                polaris.withEnv(x.getPropertyName(), x.getValueFrom(properties));
-            });
-            // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
-            polarisOidcEnv(
-                internalRealmUrl(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL),
-                USER_POLARIS_ID.getValueFrom(properties),
-                USER_POLARIS_SECRET.getValueFrom(properties)).forEach(polaris::withEnv);
-            Map.of(
-                   "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
-                   "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
-                   "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL", "DEBUG",
-                   "QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL", "DEBUG"
-               )
-               .entrySet()
-               .forEach(x -> polaris.withEnv(x.getKey(), x.getValue()));
-
-            polaris.setPortBindings(List.of("8181:8181", "8182:8182", DEBUG_PORT + ":" + DEBUG_PORT));
-            logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading " +
-                            "the image.");
-            polaris.start();
-            polaris.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
-        }
-        return polaris;
-    }
-
-    public synchronized void startTrino(Properties properties) {
-        if (trino == null) {
-            try {
-                trino = new GenericContainer<>("trinodb/trino@sha256:5b5e0a97f599a30a2e23c7c7061e4e4d546a914b4fad2a2a002998140ceb4006");
-                String catalogPath    = "/etc/trino/catalog";
-                String propertiesPath = trinoConfigPropertiesFile().getAbsolutePath();
-                logger.info("About to mount {}", propertiesPath);
-                trino.withFileSystemBind(propertiesPath, "/etc/trino/config.properties");
-                trino.setPortBindings(List.of("8090:8090"));
-                trino.withNetwork(network);
+    public void startTrino(Properties properties) {
+        synchronized (trinoLock) {
+            if (trino == null) {
+                try {
+                    trino = new GenericContainer<>("trinodb/trino@sha256:5b5e0a97f599a30a2e23c7c7061e4e4d546a914b4fad2a2a002998140ceb4006");
+                    String catalogPath    = "/etc/trino/catalog";
+                    String propertiesPath = trinoConfigPropertiesFile().getAbsolutePath();
+                    logger.info("About to mount {}", propertiesPath);
+                    trino.withFileSystemBind(propertiesPath, "/etc/trino/config.properties");
+                    trino.setPortBindings(List.of("8090:8090"));
+                    trino.withNetwork(network);
 //                trino.withLogConsumer(new Slf4jLogConsumer(logger));
-                trino.start();
-                for (SupportedCloudsEnum catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
-                    String containerDestination = format("%s/%s.properties", catalogPath, catalog);
-                    logger.info("Copying config file to container: {}", containerDestination);
-                    trino.copyFileToContainer(
-                        Transferable.of(trinoLocalConfig(properties, catalog).getBytes()),
-                        containerDestination);
+                    trino.start();
+                    for (SupportedCloudsEnum catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
+                        String containerDestination = format("%s/%s.properties", catalogPath, catalog);
+                        logger.info("Copying config file to container: {}", containerDestination);
+                        trino.copyFileToContainer(
+                            Transferable.of(trinoLocalConfig(properties, catalog).getBytes()),
+                            containerDestination);
+                    }
+                    logger.info("Started Trino with container ID: {}", trino.getContainerId());
+                } catch (Exception e) {
+                    throw new RuntimeException("Cannot start Trino container", e);
                 }
-                logger.info("Started Trino with container ID: {}", trino.getContainerId());
-            } catch (Exception e) {
-                throw new RuntimeException("Cannot start Trino container", e);
             }
         }
     }

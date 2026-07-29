@@ -104,10 +104,12 @@ public class AcceptanceTestConfig {
     }
 
     private static void startContainers(Properties properties) {
-        ContainerHelper containerHelper = ContainerHelper.instance;
-        containerHelper.startKeyCloak(properties);
-        containerHelper.startPolaris(properties);
-        containerHelper.startTrino(properties);
+        // Delegated to ContainerHelper deliberately: this runs inside AcceptanceTestConfig's static
+        // initialiser, so the async tasks must NOT be lambdas of this class. A pool thread invoking
+        // such a lambda would have to initialise AcceptanceTestConfig first, block waiting for the
+        // main thread to finish initialising it, while the main thread blocks on join() — deadlock.
+        // ContainerHelper is already initialised, so its lambdas run freely on the pool threads.
+        ContainerHelper.instance.startAll(properties);
     }
 
     public AfonPolarisClient getPolarisClient() {
