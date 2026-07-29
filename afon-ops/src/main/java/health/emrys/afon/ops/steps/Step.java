@@ -6,13 +6,13 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 public class Step {
 
-    private static final Logger log = getLogger(Step.class);
+    private static final Logger logger = getLogger(Step.class);
 
     public static final Step NoOp = new Step(
         "noop", "No operation", new ThrowableRunnable() {
         @Override
         public void run() {
-            log.debug("No operation");
+            logger.debug("No operation");
         }
     });
 
