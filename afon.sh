@@ -68,13 +68,13 @@ exec_script(){
 setup_env(){
   case $SETUP_OS in
     linux)
-      sudo apt install git openjdk-17-jdk maven docker tofu kubectl awscli azure-cli google-cloud-cli
+      sudo apt install git openjdk-17-jdk maven docker tofu kubectl kubefwd awscli azure-cli google-cloud-cli
       ;;
     macos)
-      brew install git openjdk@17 maven docker opentofu kubernetes-cli awscli azure-cli gcloud-cli
+      brew install git openjdk@17 maven docker opentofu kubernetes-cli kubefwd awscli azure-cli gcloud-cli
       ;;
     *)
-      echo "Unknown action $SETUP_OS"
+      echo "Setup not supported for $SETUP_OS"
       ;;
   esac
 }

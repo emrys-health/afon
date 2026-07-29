@@ -26,6 +26,17 @@ We currently have:
 - hubble: running in the cloud to view network traffic
 - hubble-cli: running locally to query hubble
 
+### Kube port forwarding
+
+Direct invocation of `kubectl portforward` may be problematic in some envs. 
+
+Install [kubefwd](https://kubefwd.com) 
+
+```shell
+sudo -E kubefwd svc -n default --tui
+```
+
+
 ### Prometheus
 
 Have Grafana tunnel into the Kubernetes cluster with:
