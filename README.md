@@ -369,7 +369,7 @@ The deployment is automated via:
 Install monitoring components on AWS:
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.cdk.PrometheusClusterDeployment
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeployment
 cd cdktf.out/stacks/aws
 tofu apply --auto-approve
 ```
@@ -876,7 +876,7 @@ SNOWFLAKE_PRIVATE_KEY=YOUR_SNOWFLAKE_PRIVATE_KEY
 1. **Install monitoring stack:**
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.cdk.PrometheusClusterDeployment
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeployment
 cd cdktf.out/stacks/aws
 tofu apply --auto-approve
 ```
