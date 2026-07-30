@@ -142,7 +142,7 @@
             <version>${parent.version}</version>
         </dependency>
         <dependency>
-            <groupId>health.emrys</groupId>
+            <groupId>${parent.groupId}</groupId>
             <artifactId>afon-duckdb</artifactId>
             <version>${parent.version}</version>
             <scope>compile</scope>

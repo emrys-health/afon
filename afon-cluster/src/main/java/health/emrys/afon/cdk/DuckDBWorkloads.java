@@ -16,7 +16,7 @@ import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.duckdb.DuckDbConfig.DUCKDB_IMAGE;
 import static health.emrys.afon.duckdb.DuckDbConfig.KEEP_ALIVE;
-import static health.emrys.afon.infra.Defaults.DUCKDB_POD_NAME;
+import static health.emrys.afon.cluster.Defaults.DUCKDB_POD_NAME;
 
 /**
  * Cloud-agnostic deployment of a DuckDB pod — the counterpart to {@link SparkWorkloads} and
