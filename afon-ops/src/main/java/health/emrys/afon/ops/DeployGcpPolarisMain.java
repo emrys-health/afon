@@ -20,8 +20,7 @@ public class DeployGcpPolarisMain implements StepsProvider {
     }
 
     public static void main(String[] args) {
-        StepRunner app = new StepRunner();
-        app.run(new DeployGcpPolarisMain(), args);
+        new StepRunner().runUsing(new DeployGcpPolarisMain(), args);
     }
 
     @Override

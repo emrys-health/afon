@@ -16,22 +16,6 @@ public class DeleteCatalogsMain {
     private final        String            accessToken;
     private final        AfonPolarisClient client;
 
-    public static void main(String[] args) {
-        DeleteCatalogsMain app = new DeleteCatalogsMain();
-        if (args.length == 0) {
-            app.deleteAll();
-        } else if (args.length == 1) {
-            String uri = catalogsURI(args[0]);
-            app.delete(uri);
-        } else if (args.length == 2) {
-            String uri = namespaceURI(args[0], args[1]);
-            app.delete(uri);
-        } else if (args.length == 3) {
-            String uri = tableURI(args[0], args[1], args[2]);
-            app.delete(uri);
-        }
-    }
-
     private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
 
     DeleteCatalogsMain() {
@@ -55,6 +39,22 @@ public class DeleteCatalogsMain {
             client.delete(uri, accessToken);
         } catch (IOException e) {
             logger.error("Error while deleting catalog " + uri, e);
+        }
+    }
+
+    public static void main(String[] args) {
+        DeleteCatalogsMain app = new DeleteCatalogsMain();
+        if (args.length == 0) {
+            app.deleteAll();
+        } else if (args.length == 1) {
+            String uri = catalogsURI(args[0]);
+            app.delete(uri);
+        } else if (args.length == 2) {
+            String uri = namespaceURI(args[0], args[1]);
+            app.delete(uri);
+        } else if (args.length == 3) {
+            String uri = tableURI(args[0], args[1], args[2]);
+            app.delete(uri);
         }
     }
 

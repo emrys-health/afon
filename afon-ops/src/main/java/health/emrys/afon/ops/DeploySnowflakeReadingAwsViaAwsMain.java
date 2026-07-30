@@ -12,7 +12,13 @@ public class DeploySnowflakeReadingAwsViaAwsMain implements StepsProvider {
 
     public static List<Step> steps(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
-        steps.addAll(DeployFullStackAwsMain.steps(stepOperations));
+        steps.addAll(List.of(
+                stepOperations.cleanLocalAws(),
+                stepOperations.deployFullAwsCluster(),
+                stepOperations.waitForAwsPolaris(),
+                stepOperations.initializeAllCatalogsInAws(),
+                stepOperations.checkAwsSparkConnectorTalkingToAws()
+        ));
         steps.add(stepOperations.checkAwsSparkConnectorTalkingToAws());
         steps.add(stepOperations.snowflakeReadsAwsViaPolaris());
         return steps;
@@ -24,8 +30,7 @@ public class DeploySnowflakeReadingAwsViaAwsMain implements StepsProvider {
     }
 
     public static void main(String[] args) {
-        StepRunner app = new StepRunner();
-        app.run(new DeploySnowflakeReadingAwsViaAwsMain(), args);
+        new StepRunner().runUsing(new DeploySnowflakeReadingAwsViaAwsMain(), args);
     }
 
 }

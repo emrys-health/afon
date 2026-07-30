@@ -15,7 +15,13 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
 
     public static List<Step> steps(StepOperations stepOperations) {
         ArrayList<Step> steps = new ArrayList<>();
-        steps.addAll(DeployFullStackAwsMain.steps(stepOperations));
+        steps.addAll(List.of(
+                stepOperations.cleanLocalAws(),
+                stepOperations.deployFullAwsCluster(),
+                stepOperations.waitForAwsPolaris(),
+                stepOperations.initializeAllCatalogsInAws(),
+                stepOperations.checkAwsSparkConnectorTalkingToAws()
+        ));
         steps.addAll(List.of(
             stepOperations.snowflakeWritesToAzure(),
             stepOperations.purgeAzureFromAwsPolarisAndRecreate(),
@@ -32,7 +38,6 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
     }
 
     public static void main(String[] args) {
-        StepRunner app = new StepRunner();
-        app.run(new DeploySnowflakeWritingAzureViaAwsMain(), args);
+        new StepRunner().runUsing(new DeploySnowflakeWritingAzureViaAwsMain(), args);
     }
 }

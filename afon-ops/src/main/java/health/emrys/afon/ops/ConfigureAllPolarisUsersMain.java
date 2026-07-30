@@ -13,9 +13,6 @@ public class ConfigureAllPolarisUsersMain {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigureAllPolarisUsersMain.class);
 
-    /**
-     * Configures ALL users
-     */
     public static void main(String[] args) {
         Properties properties = new AfonPropertiesLoader().getProperties();
         if (args.length > 0) {
@@ -27,8 +24,8 @@ public class ConfigureAllPolarisUsersMain {
         try {
             app.configurePrivilegesFor(catalogName);
             app.configureAll(catalogName, onboarding);
-        } catch (Exception x) {
-            logger.error("Error while configuring users " + onboarding, x);
+        } catch (Exception e) {
+            logger.error("Error configuring polaris users " + onboarding, e);
         }
     }
 
