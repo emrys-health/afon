@@ -1,0 +1,39 @@
+package health.emrys.afon.cluster;
+
+import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.PolarisConfigClient;
+import org.slf4j.Logger;
+
+import java.util.Properties;
+
+@Deprecated()
+public class PolarisCredentialGrabber {
+
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCredentialGrabber.class);
+
+    public static void main(String[] args) {
+        final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+        try {
+            var          clusterConfig     = new ClusterPolarisConfiguration();
+            ClusterState clusterState      = clusterConfig.getClusterState();
+            Properties   clusterProperties = PolarisConfigClient.addPolarisCredentialsTo(clusterState.getCredentials(), clusterConfig.getClusterProperties());
+            var          client            = clientFactory.getPolarisClient(clusterProperties, "https");
+            logger.info("Polaris credential: {}", clusterState.getCredentials());
+            logger.info("Polaris access key: {}", client.getAccessToken());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private final LogParser logParser;
+
+    public PolarisCredentialGrabber() {
+        logParser = new LogParser();
+    }
+
+    public String getCredentials(String logs) {
+        return logParser.searchForTextAfter("realm: POLARIS root principal credentials: ", logs);
+    }
+
+
+}

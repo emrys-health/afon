@@ -1,19 +1,10 @@
 package health.emrys.afon.config;
 
-import org.slf4j.Logger;
+import java.lang.reflect.Field;
+import java.util.HashSet;
+import java.util.Set;
 
 public class AfonProperties {
-
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AfonProperties.class);
-
-    /**
-     * General details live here
-     */
-    public static final String PROJECT_PROPERTIES_FILE = "afon.properties";
-    /**
-     * Sensitive details live in here.
-     */
-    public static final String ENV_PROPERTIES_FILE     = "env.properties";
 
     public static final AfonProperty CLUSTER_NAME                 = new AfonProperty("CLUSTER_NAME");
     // AWS
@@ -130,5 +121,15 @@ public class AfonProperties {
         public String toString() {
             return String.valueOf(value);
         }
+    }
+
+    public static Set<String> getAllNames(){
+        Set<String> names = new HashSet<>();
+        for (Field field : AfonProperties.class.getDeclaredFields()) {
+            if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+                names.add(field.getName());
+            }
+        }
+        return names;
     }
 }

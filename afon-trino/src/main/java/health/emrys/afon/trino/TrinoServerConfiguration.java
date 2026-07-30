@@ -1,7 +1,7 @@
 package health.emrys.afon.trino;
 
 import health.emrys.afon.config.AfonProperties;
-import org.checkerframework.checker.nullness.qual.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Properties;
 

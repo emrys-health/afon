@@ -1,36 +1,57 @@
 # Monitoring
 
-To install the monitoring components on AWS, run in `afon-infra`:
+To install the monitoring components on AWS:
+
+- Generate config files and executes tofu:
 
 ```shell
-mvn compile -Dexec.mainClass=health.emrys.afon.cdk.aws.PrometheusClusterDeploy exec:java
+./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeployment
 ```
 
-and `tofu apply` the file it generates in `cdktf.out/stacks/aws`.
-This installs Prometheus, Hubble etc.
+The tofu/terraform executions can be done directly via:
+```shell
+cd cdktf.out/stacks/aws
+tofu apply --auto-approve
+```
+
+This installs all the tools (prometheus, etc ...).
 
 ### Tools
 
-We currently (1/6/26) have:
+We currently have:
 
-1. **Prometheus** running in the cloud to capture metrics
-1. **Loki** running in the cloud to view logs. Note that Loki writes logs to S3 (see below)
-1. **Grafana** running locally to view metrics and logs
-1. **Hubble** running in the cloud to view network traffic (and optionally, **Hubble CLI** running locally to query Hubble) 
+- prometheus: running in the cloud to capture metrics 
+- loki: running in the cloud to view logs. Note that loki writes logs to S3 (see below)
+- grafana: running locally to view metrics and logs
+- hubble: running in the cloud to view network traffic
+- hubble-cli: running locally to query hubble
 
+### Kube port forwarding
+
+Direct invocation of `kubectl portforward` may be problematic in some envs. 
+
+Install [kubefwd](https://kubefwd.com) 
+
+```shell
+sudo -E kubefwd svc -n default --tui
+```
 
 ### Prometheus
 
 Have Grafana tunnel into the Kubernetes cluster with:
 
 ```shell
-docker run -d --name grafana --network=host grafana/grafana
+docker run -d --name grafana -p 3000:3000 grafana/grafana 
 
 kubectl port-forward  svc/kube-prometheus-stack-prometheus 9090:9090
 ```
 
-then point your browser at `http://localhost:3000` and log into Grafana with `admin`/`admin`.
-Add a Data Source that's `http://localhost:9090` and you should see nearly 2000 metrics.
+Point a browser at `http://localhost:3000` and log into Grafana with `admin`/`admin`.
+Add Data Source `http://localhost:9090` 
+One should see nearly 2000 metrics.
+
+NOTE:  If getting connection refused when adding the data source, use http://host.docker.internal:9090 in place of http://localhost:9090 (see https://github.com/grafana/grafana/issues/46434)
+
 
 ### Hubble
 
@@ -40,7 +61,8 @@ Tunnel into Kubernetes with:
 kubectl port-forward svc/hubble-ui -n kube-system 12000:80
 ```
 
-then point your browser at `http://localhost:12000` and you should see the network flows between pods.
+Point a browser at `http://localhost:12000` 
+One should see the network flows between pods.
 
 ![image](pics/hubble-ui.png)
 
@@ -51,7 +73,9 @@ kubectl -n kube-system port-forward svc/hubble-relay 4245:80
 ```
 
 Install the [Hubble CLI](https://docs.cilium.io/en/stable/observability/hubble/setup/)
-and run `hubble observe`. This will print out somthing like:
+
+Run `hubble observe`. This will print out something like:
+
 ```shell
 $ hubble observe
 Jun  1 09:05:34.677: 10.0.1.196:40327 (host) -> 18.169.47.27:443 (world) to-network FORWARDED (TCP Flags: ACK, PSH)
@@ -80,20 +104,21 @@ and a value that's whatever `CLUSTER_NAME` is in `afon.properties`.
 You should now be able to logs in `Drilldown -> Logs` in the Grafana GUI.
 You may need to refresh your browser.
 
-As currently configured (20/05/26), Loki persists its logs to the bucket defined 
-by `AWS_S3_BUCKET_NAME` in `afon.properties`.
+Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in `afon-aws.properties`.
 
 ### Blob storage size
 
-In AWS, run something like:
+AWS: 
 ```shell
 aws s3 ls s3://emrys-afon-bucket/acceptancetests/ --recursive --summarize | grep "Total Size
 ```
-In GCP, something like:
+
+GCP:
 ```shell
 gcloud storage du -s gs://emrys_afon_core/acceptancetests/**
 ```
-And in Azure, something like:
+
+Azure:
 ```shell
 az storage blob list   --account-name afonstorageaccount   --container-name afonstorage  --prefix acceptancetests/   --query "[].properties.contentLength"   --output tsv | awk '{sum+=$1} END {printf "%.2f kb\n", sum/1024}'
 ```
