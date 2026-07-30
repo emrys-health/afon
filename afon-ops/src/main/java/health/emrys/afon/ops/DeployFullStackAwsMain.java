@@ -5,7 +5,9 @@ import health.emrys.afon.ops.steps.*;
 import java.util.List;
 
 public class DeployFullStackAwsMain implements StepsProvider {
-    public static List<Step> steps(StepOperations stepOperations) {
+
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
             stepOperations.cleanLocalAws(),
             stepOperations.deployFullAwsCluster(),
@@ -14,19 +16,9 @@ public class DeployFullStackAwsMain implements StepsProvider {
             stepOperations.checkAwsSparkConnectorTalkingToAws()
                       );
     }
+
     public static void main(String[] args) {
-        StepRunner app = new StepRunner();
-        List<Step> steps = steps(new StepOperations(new StepActions()));
-        if (args.length == 0) {
-            app.runSteps(steps);
-        } else {
-            String firstStep  = args[0];
-            app.runFrom(steps, firstStep);
-        }
+        new StepRunner().runUsing(new DeployFullStackAwsMain(), args);
     }
 
-    @Override
-    public List<Step> stepsUsing(StepOperations stepOperations) {
-        return steps(stepOperations);
-    }
 }

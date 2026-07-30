@@ -12,7 +12,13 @@ public class DeploySnowflakeReadingGcpViaAwsMain implements StepsProvider {
 
     public static List<Step> steps(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
-        steps.addAll(DeployFullStackAwsMain.steps(stepOperations));
+        steps.addAll(List.of(
+                stepOperations.cleanLocalAws(),
+                stepOperations.deployFullAwsCluster(),
+                stepOperations.waitForAwsPolaris(),
+                stepOperations.initializeAllCatalogsInAws(),
+                stepOperations.checkAwsSparkConnectorTalkingToAws()
+        ));
         steps.add(stepOperations.checkAwsSparkConnectorReadingGcp());
         steps.add(stepOperations.snowflakeReadsGcpViaPolaris());
         return steps;
@@ -24,8 +30,7 @@ public class DeploySnowflakeReadingGcpViaAwsMain implements StepsProvider {
     }
 
     public static void main(String[] args) {
-        StepRunner app = new StepRunner();
-        app.run(new DeploySnowflakeReadingGcpViaAwsMain(), args);
+        new StepRunner().runUsing(new DeploySnowflakeReadingGcpViaAwsMain(), args);
     }
 
 }

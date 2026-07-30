@@ -3,12 +3,13 @@ package health.emrys.afon.ops;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.config.PolarisConfigClient;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 
 public class ConfigurePolarisMain {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(ConfigurePolarisMain.class);
+    static final Logger logger = LoggerFactory.getLogger(ConfigurePolarisMain.class);
 
     public static void main(String[] args) {
         try {
@@ -27,7 +28,7 @@ public class ConfigurePolarisMain {
                 client.createAllCatalogs(properties, args[0]);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error configuring polaris", e);
         }
     }
 

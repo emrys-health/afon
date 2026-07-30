@@ -17,26 +17,6 @@ public class RegisterPolarisMain {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(RegisterPolarisMain.class);
 
-    public static void main(String[] args) {
-        final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
-        try (ClusterState state = new ClusterState()) {
-            RegisterTableConfig conf        = new RegisterTableConfig(args);
-            String              endpoint    = format("https://%s", state.getPolarisHost());
-            String              accessToken = state.getCredentials();
-            String[]            creds       = accessToken.split(":");
-            AfonPolarisClient client = clientFactory.getPolarisClient(
-                endpoint,
-                creds[0],
-                creds[1]);
-
-            conf.createNamespace(client);
-            conf.createTable(client);
-            logger.info("Finished without error. Shutting down resources...");
-        } catch (Exception e) {
-            logger.error("Could not register table", e);
-        }
-    }
-
     public static class RegisterTableConfig {
 
         static final Logger logger = org.slf4j.LoggerFactory.getLogger(RegisterTableConfig.class);
@@ -99,4 +79,26 @@ public class RegisterPolarisMain {
             return catalog;
         }
     }
+
+    public static void main(String[] args) {
+        final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+        try (ClusterState state = new ClusterState()) {
+            RegisterTableConfig conf        = new RegisterTableConfig(args);
+            String              endpoint    = format("https://%s", state.getPolarisHost());
+            String              accessToken = state.getCredentials();
+            String[]            creds       = accessToken.split(":");
+            AfonPolarisClient client = clientFactory.getPolarisClient(
+                    endpoint,
+                    creds[0],
+                    creds[1]);
+
+            conf.createNamespace(client);
+            conf.createTable(client);
+            logger.info("Finished without error. Shutting down resources...");
+        } catch (Exception e) {
+            logger.error("Failed to register table", e);
+        }
+    }
+
+
 }

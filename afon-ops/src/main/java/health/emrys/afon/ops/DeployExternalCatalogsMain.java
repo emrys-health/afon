@@ -19,7 +19,13 @@ public class DeployExternalCatalogsMain implements StepsProvider {
 
     public static final List<Step> steps(StepOperations stepOperations) {
         List<Step> stackSteps = new ArrayList<>();
-        stackSteps.addAll(DeployFullStackAwsMain.steps(stepOperations));
+        stackSteps.addAll(List.of(
+                stepOperations.cleanLocalAws(),
+                stepOperations.deployFullAwsCluster(),
+                stepOperations.waitForAwsPolaris(),
+                stepOperations.initializeAllCatalogsInAws(),
+                stepOperations.checkAwsSparkConnectorTalkingToAws()
+        ));
         stackSteps.addAll(List.of(
             stepOperations.cleanLocalAzure(),
             stepOperations.deployAzurePolaris(),
@@ -33,14 +39,7 @@ public class DeployExternalCatalogsMain implements StepsProvider {
     }
 
     public static void main(String[] args) {
-        List<Step> steps = steps(new StepOperations(new StepActions()));
-        StepRunner app = new StepRunner();
-        if (args.length == 0) {
-            app.runSteps(steps);
-        } else {
-            String firstStep  = args[0];
-            app.runFrom(steps, firstStep);
-        }
+        new StepRunner().runUsing(new DeployExternalCatalogsMain(), args);
     }
 
     @Override

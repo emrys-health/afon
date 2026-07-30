@@ -1,9 +1,9 @@
 package health.emrys.afon.docs;
 
+import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.azure.AzureNuke;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
-import health.emrys.afon.ops.DeployAzurePolarisMain;
 import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.List;
@@ -31,7 +31,12 @@ public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return DeployAzurePolarisMain.steps(stepOperations);
+        return List.of(
+            stepOperations.cleanLocal(AzureKubernetesPolaris.ID),
+            stepOperations.deployAzurePolaris(),
+            stepOperations.waitForAzurePolaris(),
+            stepOperations.initializeAllCatalogsInAzure()
+                      );
     }
 
     @Override

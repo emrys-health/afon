@@ -10,23 +10,18 @@ import java.util.List;
 
 public class DeployFullStackAzureMain implements StepsProvider {
 
-    public static List<Step> steps(StepOperations ops) {
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            ops.cleanLocal(AzureKubernetesPolaris.ID),
-            ops.deployWholeStackAzure(),
-            ops.waitForAzurePolaris(),
-            ops.initializeAllCatalogsInAzure(),
-            ops.checkSparkConnectorTalkingToAzure()
+            stepOperations.cleanLocal(AzureKubernetesPolaris.ID),
+            stepOperations.deployWholeStackAzure(),
+            stepOperations.waitForAzurePolaris(),
+            stepOperations.initializeAllCatalogsInAzure(),
+            stepOperations.checkSparkConnectorTalkingToAzure()
                       );
     }
 
     public static void main(String[] args) {
-        StepRunner app = new StepRunner();
-        app.run(new DeployFullStackAzureMain(), args);
-    }
-
-    @Override
-    public List<Step> stepsUsing(StepOperations stepOperations) {
-        return steps(stepOperations);
+        new StepRunner().runUsing(new DeployFullStackAzureMain(), args);
     }
 }

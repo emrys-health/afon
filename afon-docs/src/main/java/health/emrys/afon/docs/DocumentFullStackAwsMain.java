@@ -4,7 +4,6 @@ import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.cdk.aws.AwsNuke;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.ops.DeployFullStackAwsMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
@@ -35,7 +34,13 @@ public class DocumentFullStackAwsMain extends AbstractDocumentMetadata {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return DeployFullStackAwsMain.steps(stepOperations);
+        return List.of(
+            stepOperations.cleanLocalAws(),
+            stepOperations.deployFullAwsCluster(),
+            stepOperations.waitForAwsPolaris(),
+            stepOperations.initializeAllCatalogsInAws(),
+            stepOperations.checkAwsSparkConnectorTalkingToAws()
+                      );
     }
 
     public String getFurtherNotes() {

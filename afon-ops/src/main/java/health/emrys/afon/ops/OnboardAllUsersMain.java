@@ -18,25 +18,7 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 
 public class OnboardAllUsersMain {
 
-    private static final Logger log = LoggerFactory.getLogger(OnboardAllUsersMain.class);
-
-    public static void main(String[] args) throws Exception {
-        Properties properties = new AfonPropertiesLoader().getProperties();
-        properties.put(POLARIS_ENDPOINT.getName(), args[0]);
-        OnboardAllUsersMain app           = new OnboardAllUsersMain(new Onboarding(), properties);
-        String            catalog       = args[1];
-        String            jupyterDomain = args[2];
-        try {
-            app.configureKeyCloak(jupyterDomain);
-            app.onboardAll(catalog); // just for a smoke test
-        } catch (Exception e) {
-            log.error(
-                "Could not onboard all users:\n{}\nError = {}",
-                app.onboardingConfig.getUsers().stream().map(x -> x.userName()).collect(Collectors.joining("\n")),
-                e.getMessage());
-            throw new RuntimeException(e);
-        }
-    }
+    private static final Logger logger = LoggerFactory.getLogger(OnboardAllUsersMain.class);
 
     private final OnboardingConfig onboardingConfig;
     private final Properties       properties;
@@ -49,14 +31,14 @@ public class OnboardAllUsersMain {
     }
 
     public void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
-        log.info("CONFIGURING POLARIS");
+        logger.info("CONFIGURING POLARIS");
         ConfigurePolarisUserMain polarisConfiguration = new ConfigurePolarisUserMain(properties);
         polarisConfiguration.configurePrivilegesFor(warehouse);
         polarisConfiguration.configureAll(warehouse, onboardingConfig);
     }
 
     public void configureKeyCloak(String jupyterDomain) throws IOException {
-        log.info("CONFIGURING KEYCLOAK");
+        logger.info("CONFIGURING KEYCLOAK");
         kcAdmin.registerBrowser(properties, jupyterDomain);
         String adminToken = kcAdmin.adminToken();
         kcAdmin.createRealm(adminToken, KEYCLOAK_REALM);
@@ -65,5 +47,24 @@ public class OnboardAllUsersMain {
             kcAdmin.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.userName(), user.password());
         }
     }
+
+    public static void main(String[] args) {
+        Properties properties = new AfonPropertiesLoader().getProperties();
+        properties.put(POLARIS_ENDPOINT.getName(), args[0]);
+        OnboardAllUsersMain app           = new OnboardAllUsersMain(new Onboarding(), properties);
+        String            catalog       = args[1];
+        String            jupyterDomain = args[2];
+        try {
+            app.configureKeyCloak(jupyterDomain);
+            app.onboardAll(catalog); // just for a smoke test
+        } catch (Exception e) {
+            logger.error(
+                    "Failed to onboard all users:\n{}\nError = {}",
+                    app.onboardingConfig.getUsers().stream().map(x -> x.userName()).collect(Collectors.joining("\n")),
+                    e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
 
 }

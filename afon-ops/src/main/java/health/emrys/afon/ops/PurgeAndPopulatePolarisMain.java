@@ -26,17 +26,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 public class PurgeAndPopulatePolarisMain {
 
-    private static final Logger log = getLogger(PurgeAndPopulatePolarisMain.class);
-
-    public static void main(String[] args) throws Exception {
-        String                  host = args[0];
-        PurgeAndPopulatePolarisMain app  = new PurgeAndPopulatePolarisMain(host);
-        if (args.length == 1) {
-            app.createAllCatalogs();
-        } else if (args.length == 4) {
-            app.cleanTable(SupportedCloudsEnum.valueOf(args[1]), args[2], args[3]);
-        }
-    }
+    private static final Logger logger = getLogger(PurgeAndPopulatePolarisMain.class);
 
     private final AfonPolarisClient client;
     private final String            accessToken;
@@ -46,7 +36,7 @@ public class PurgeAndPopulatePolarisMain {
         this.domainName  = domainName;
         this.client      = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
         this.accessToken = client.getAccessToken();
-        log.debug("For {}/{}:\nPOLARIS_TOKEN={}", client.getClientId(), client.getClientSecret(), accessToken);
+        logger.debug("For {}/{}:\nPOLARIS_TOKEN={}", client.getClientId(), client.getClientSecret(), accessToken);
     }
 
     private final String       domainName;
@@ -61,7 +51,7 @@ public class PurgeAndPopulatePolarisMain {
     private List<HttpResponse> cleanAllTables(
         SupportedCloudsEnum warehouse,
         String namespace) throws IOException, ParseException {
-        log.info("Attempting to delete tables from {}.{}", warehouse, namespace);
+        logger.info("Attempting to delete tables from {}.{}", warehouse, namespace);
         String url = listTables(warehouse.toString(), namespace);
         List<HttpResponse> responses = new ArrayList<>();
         for (JsonNode node : getAll(url, "identifiers")) {
@@ -78,7 +68,7 @@ public class PurgeAndPopulatePolarisMain {
         JsonNode            root        = mapper.readTree(EntityUtils.toString(response.getEntity()));
         JsonNode            identifiers = root.get(rootNodeName);
         if (identifiers == null || !identifiers.isArray()) {
-            log.warn("Calling {} did not yield JSON with a root node of {}", url, rootNodeName);
+            logger.warn("Calling {} did not yield JSON with a root node of {}", url, rootNodeName);
             return Collections.emptyList();
         }
         return identifiers;
@@ -88,13 +78,13 @@ public class PurgeAndPopulatePolarisMain {
         SupportedCloudsEnum warehouse,
         String namespace,
         String table) throws IOException {
-        log.info(
+        logger.info(
             "Attempting to delete table {} in warehouse {} from namespace {} in {}",
             table, warehouse, namespace, domainName);
         String       accessToken = client.getAccessToken();
         HttpResponse response    = client.delete(tableURI(warehouse.toString(), namespace, table), accessToken);
         if (isFailure(response)) {
-            log.warn("Could not delete table {} in {}",  table, warehouse);
+            logger.warn("Could not delete table {} in {}",  table, warehouse);
         }
         return response;
     }
@@ -116,7 +106,7 @@ public class PurgeAndPopulatePolarisMain {
                 client.delete(catalogsURI(warehouse.toString()), accessToken);
                 purgeRolesOf(warehouse);
             } catch (IOException | ParseException e) {
-                log.warn(
+                logger.warn(
                     "Failed to delete catalog {} in {}. Error is {}. Ignoring and continuing.",
                     warehouse, domainName, e.getMessage());
             }
@@ -127,8 +117,23 @@ public class PurgeAndPopulatePolarisMain {
         String uri = catalogRolesURI(warehouse.toString());
         for (JsonNode node : getAll(uri, "roles")) {
             String role = node.get("name").toString().replace("\"", "");
-            log.info("Deleting role {} from catalog {}", role, warehouse);
+            logger.info("Deleting role {} from catalog {}", role, warehouse);
             client.delete(String.format("%s/%s", uri, role), accessToken);
+        }
+    }
+
+    public static void main(String[] args) {
+        String                  host = args[0];
+        PurgeAndPopulatePolarisMain app  = new PurgeAndPopulatePolarisMain(host);
+        try {
+            if (args.length == 1) {
+                app.createAllCatalogs();
+            } else if (args.length == 4) {
+                app.cleanTable(SupportedCloudsEnum.valueOf(args[1]), args[2], args[3]);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to purge and populate polaris for host {}", host, e);
+            throw new RuntimeException(e);
         }
     }
 

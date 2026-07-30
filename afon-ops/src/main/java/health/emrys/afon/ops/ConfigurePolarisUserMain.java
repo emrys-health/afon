@@ -38,27 +38,6 @@ public class ConfigurePolarisUserMain {
     private final PolarisConfigurer configurer;
     private final PermissionsConfigurer permissions;
 
-    /**
-     * Configures a SINGLE user
-     */
-    public static void main(String[] args) {
-        Properties properties = new AfonPropertiesLoader().getProperties();
-        if (args.length > 0) {
-            String endpoint = args[0];
-            logger.info("Using endpoint {}", endpoint);
-            properties.put(POLARIS_ENDPOINT.getName(), endpoint);
-        }
-        ConfigurePolarisUserMain app           = new ConfigurePolarisUserMain(properties);
-        String            catalogName   = args[1];
-        String            principalName = args.length > 2 ? args[2] : USER_POLARIS_ID.getValueFrom(properties);
-        try {
-            app.configurePrivilegesFor(catalogName);
-            app.configureUser(principalName, catalogName);
-        } catch (Exception x) {
-            logger.error("Error while configuring user " + principalName, x);
-        }
-    }
-
     private final String accessToken;
     private final String adminClientId;
     private final String roleName;
@@ -163,4 +142,33 @@ public class ConfigurePolarisUserMain {
         }
         return results;
     }
+
+    public static void main(String[] args) {
+        String endpoint = null;
+        String catalogName = null;
+        if (args.length > 1) {
+            endpoint = args[0];
+            catalogName = args[1];
+            logger.info("Using endpoint {} and catalog name {}", endpoint, catalogName);
+        }
+        String principalName = null;
+        if (args.length > 2){
+            principalName = args[2];
+        }
+        Properties properties = new AfonPropertiesLoader().getProperties();
+        if (principalName == null) {
+            principalName = USER_POLARIS_ID.getValueFrom(properties);
+        }
+        if ( endpoint != null ) {
+            properties.put(POLARIS_ENDPOINT.getName(), endpoint);
+        }
+        ConfigurePolarisUserMain app = new ConfigurePolarisUserMain(properties);
+        try {
+            app.configurePrivilegesFor(catalogName);
+            app.configureUser(principalName, catalogName);
+        } catch (Exception e) {
+            logger.error("Error configuring user " + principalName, e);
+        }
+    }
+
 }
