@@ -9,20 +9,32 @@ import java.util.*;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+/**
+ * Properties loader allows the retrieval of properties of different type along with their cloud-variants.
+ *
+ * Application properties live in {@code afon.properties}.
+ * Cloud-specific properties live alongside it in
+ * {@code afon-<cloud>.properties} (e.g. {@code afon-aws.properties}).
+ *
+ * Sensitive secrets live in {@code env.properties}
+ * Cloud-specific secrets live alongside it in
+ * {@code env-<cloud>.properties} (e.g. {@code env-aws.properties}).
+ */
 public class AfonPropertiesLoader {
 
     /**
+     * Property types.
+     *
      * Application properties live in {@code afon.properties}.
      * Cloud-specific properties live alongside it in
      * {@code afon-<cloud>.properties} (e.g. {@code afon-aws.properties}).
-     */
-    public static final String APP_PROPERTIES_FILE = "afon.properties";
-    /**
+     *
      * Sensitive secrets live in {@code env.properties}
      * Cloud-specific secrets live alongside it in
      * {@code env-<cloud>.properties} (e.g. {@code env-aws.properties}).
      */
-    public static final String ENV_PROPERTIES_FILE = "env.properties";
+    private static final List<String> ALL_TYPES = List.of("afon", "env");
+
     /**
      * System property selecting properties for a given {@code afon-<cloud>.properties} and
      * {@code env-<cloud>.properties} to load; when unset, every cloud's files are loaded together,
@@ -41,34 +53,48 @@ public class AfonPropertiesLoader {
         }
     }
 
+    private final List<String> types;
     private final Properties  properties;
     private final Set<String> confidentialKeys = new HashSet<>();
 
     public AfonPropertiesLoader() {
+        this(ALL_TYPES);
+    }
+
+    public AfonPropertiesLoader(List<String> types) {
+        this.types = types;
         properties = new Properties();
     }
 
     private void loadProperties() {
-        String dir = System.getProperty("afon.home", "..");
-        String configDir = dir + "/config";
+        types.forEach(type -> loadProperties(type));
+    }
+
+    private void loadProperties(String type) {
+        String configDir = configDir();
+
         try {
-            loadPropertiesFromDir(configDir);
+            loadPropertiesFromDir(type, configDir);
         } catch (IOException e) {
-            logger.warn("Failed to load properties files in {}", configDir);
+            logger.warn("Failed to load {} properties files in {}", type, configDir);
             String altDir = "config";
             try {
                 // ...or in the IDE?
-                loadPropertiesFromDir(altDir);
+                loadPropertiesFromDir(type, altDir);
             } catch (IOException ex) {
-                logger.error("Failed to load properties files  in {}", altDir);
+                logger.warn("Failed to load {} properties files in {}", type, altDir);
                 throw new RuntimeException(ex); // urgh, the properties file not found
             }
         }
     }
 
-    private void loadPropertiesFromDir(String dir) throws IOException {
-        logger.info("Loading properties from {}", dir);
-        for (String file : propertyFiles()) {
+    private @NonNull String configDir() {
+        return System.getProperty("afon.home", "..") + "/config";
+    }
+
+    private void loadPropertiesFromDir(String type, String dir) throws IOException {
+        logger.info("Loading {} properties from {}", type, dir);
+        for (String file : propertyFiles(type)) {
             Properties props = loadPropertiesFromFile(dir, file);
             properties.putAll(props);
             if (file.startsWith("env")) {
@@ -83,50 +109,24 @@ public class AfonPropertiesLoader {
         }
     }
 
-    private @NonNull Properties loadPropertiesFromFile(String dir, String file) throws IOException {
-        String     filename = dir + "/" + file;
-        return loadPropertiesFromFile(filename);
-    }
-
-    private @NonNull Properties loadPropertiesFromFile(String filename) throws IOException {
-        Properties props    = new Properties();
-        try {
-            props.load(new FileInputStream(filename));
-            logger.info("Loaded {} items from {}", props.size(), filename);
-        } catch ( IOException e ){
-            logger.warn("Failed to load properties from {}", filename);
-            throw e;
-        }
-        return props;
-    }
-
     /**
      * Lists the {@code afon.properties} and {@code env.properties} and its cloud-specific file(s).
      * {@link AfonPropertiesLoader#CLOUD_SYSTEM_PROPERTY} selects a single cloud; otherwise every cloud's file
      * is listed, since some deployments (e.g. cross-cloud federation) need more than one cloud's
      * properties in the same run.
      */
-    private List<String> propertyFiles() {
+    private List<String> propertyFiles(String type) {
         List<String> files = new ArrayList<>();
-        files.addAll(withCloudVariants(APP_PROPERTIES_FILE, "afon"));
-        files.addAll(withCloudVariants(ENV_PROPERTIES_FILE, "env"));
-        return files;
-    }
-
-    private List<String> withCloudVariants(String commonFile, String prefix) {
-        List<String> files = new ArrayList<>();
-        files.add(commonFile);
+        // first add common properties
+        files.add(fileName(type, null));
+        // then add could properties
         String cloud = System.getProperty(CLOUD_SYSTEM_PROPERTY);
         if (cloud != null && !cloud.isBlank()) {
-            files.add(cloudPropertiesFile(prefix, cloud));
+            files.add(fileName(type, cloud));
         } else {
-            ALL_CLOUDS.forEach(c -> files.add(cloudPropertiesFile(prefix, c)));
+            ALL_CLOUDS.forEach(c -> files.add(fileName(type, c)));
         }
         return files;
-    }
-
-    private static String cloudPropertiesFile(String prefix, String cloud) {
-        return prefix + "-" + cloud.toLowerCase() + ".properties";
     }
 
     public Properties getConfidentialProperties() {
@@ -149,6 +149,31 @@ public class AfonPropertiesLoader {
         Properties properties = getProperties();
         properties.putAll(loadPropertiesFromFile(overrideFile));
         return properties;
+    }
+
+    private @NonNull Properties loadPropertiesFromFile(String dir, String file) throws IOException {
+        String     filename = dir + "/" + file;
+        return loadPropertiesFromFile(filename);
+    }
+
+    private @NonNull Properties loadPropertiesFromFile(String filename) throws IOException {
+        Properties props    = new Properties();
+        try {
+            props.load(new FileInputStream(filename));
+            logger.info("Loaded {} items from {}", props.size(), filename);
+        } catch ( IOException e ){
+            logger.warn("Failed to load properties from {}", filename);
+            throw e;
+        }
+        return props;
+    }
+
+    private static String fileName(String type, String cloud) {
+        if (cloud != null) {
+            return type + "-" + cloud.toLowerCase() + ".properties";
+        } else {
+            return type + ".properties";
+        }
     }
 
 }

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
@@ -17,12 +18,22 @@ public class AfonPropertiesTest {
     }
 
     @Test
-    public void testAllPropertyNames() {
+    public void testLoadPropertiesWhenFilesAreMissing(){
+        AfonPropertiesLoader loader = new AfonPropertiesLoader(List.of("missing"));
+        try {
+            loader.getProperties();
+        } catch ( RuntimeException e ){
+            assertThat(e.getMessage()).endsWith("missing.properties (No such file or directory)");
+        }
+    }
+
+    @Test
+    public void testRetrieveAllPropertyNames() {
         assertThat(AfonProperties.getAllNames()).hasSizeGreaterThan(0);
     }
 
     @Test
-    public void testAllPropertiesInProjectConfigFileAreRecognised() throws IOException {
+    public void testLoadAllProperties() throws IOException {
         AfonPropertiesLoader loader = new AfonPropertiesLoader();
         Properties properties = loader.getProperties();
         assertThat(properties).hasSizeGreaterThan(0);
