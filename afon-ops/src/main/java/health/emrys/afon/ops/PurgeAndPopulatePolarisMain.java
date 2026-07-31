@@ -2,9 +2,10 @@ package health.emrys.afon.ops;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
-import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
+import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
@@ -19,8 +20,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
 import static health.emrys.afon.cluster.ClusterUtils.isFailure;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.*;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -49,7 +50,7 @@ public class PurgeAndPopulatePolarisMain {
     }
 
     private List<HttpResponse> cleanAllTables(
-        SupportedCloudsEnum warehouse,
+        AfonCloud warehouse,
         String namespace) throws IOException, ParseException {
         logger.info("Attempting to delete tables from {}.{}", warehouse, namespace);
         String url = listTables(warehouse.toString(), namespace);
@@ -75,7 +76,7 @@ public class PurgeAndPopulatePolarisMain {
     }
 
     public HttpResponse cleanTable(
-        SupportedCloudsEnum warehouse,
+        AfonCloud warehouse,
         String namespace,
         String table) throws IOException {
         logger.info(
@@ -90,7 +91,7 @@ public class PurgeAndPopulatePolarisMain {
     }
 
     private void purgeRecursivelyForAllCatalogs(String domainName) {
-        for (SupportedCloudsEnum warehouse : List.of(AZURE, AWS, GCP)) {
+        for (AfonCloud warehouse : List.of(AZURE, AWS, GCP)) {
             try {
                 for (JsonNode namespaces : getAll(namespaceURI(warehouse.toString()), "namespaces")) {
                     if (namespaces.isArray()) {
@@ -113,7 +114,7 @@ public class PurgeAndPopulatePolarisMain {
         }
     }
 
-    private void purgeRolesOf(SupportedCloudsEnum warehouse) throws IOException, ParseException {
+    private void purgeRolesOf(AfonCloud warehouse) throws IOException, ParseException {
         String uri = catalogRolesURI(warehouse.toString());
         for (JsonNode node : getAll(uri, "roles")) {
             String role = node.get("name").toString().replace("\"", "");
@@ -129,7 +130,7 @@ public class PurgeAndPopulatePolarisMain {
             if (args.length == 1) {
                 app.createAllCatalogs();
             } else if (args.length == 4) {
-                app.cleanTable(SupportedCloudsEnum.valueOf(args[1]), args[2], args[3]);
+                app.cleanTable(AfonProperties.AfonCloud.valueOf(args[1]), args[2], args[3]);
             }
         } catch (Exception e) {
             logger.error("Failed to purge and populate polaris for host {}", host, e);

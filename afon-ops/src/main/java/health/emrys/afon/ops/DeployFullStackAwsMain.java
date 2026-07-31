@@ -9,8 +9,8 @@ public class DeployFullStackAwsMain implements StepsProvider {
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            stepOperations.cleanLocalAws(),
-            stepOperations.deployFullAwsCluster(),
+            stepOperations.deleteAwsStack(),
+            stepOperations.deployAwsFullCluster(),
             stepOperations.waitForAwsPolaris(),
             stepOperations.initializeAllCatalogsInAws(),
             stepOperations.checkAwsSparkConnectorTalkingToAws()

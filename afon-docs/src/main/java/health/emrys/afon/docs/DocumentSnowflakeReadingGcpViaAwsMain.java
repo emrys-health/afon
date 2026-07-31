@@ -3,7 +3,7 @@ package health.emrys.afon.docs;
 import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
 
 import health.emrys.afon.ops.DeploySnowflakeReadingGcpViaAwsMain;
 import health.emrys.afon.ops.steps.Step;

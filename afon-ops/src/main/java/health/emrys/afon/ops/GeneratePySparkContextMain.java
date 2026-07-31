@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -15,8 +16,8 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
 import static health.emrys.afon.cluster.PolarisClusterCredentials.createClusterCredentials;
 import static java.lang.String.format;
 
@@ -38,9 +39,9 @@ public class GeneratePySparkContextMain {
 
     public static final void main(String[] args) {
         try {
-            SupportedCloudsEnum polarisCloud = SupportedCloudsEnum.AWS;
+            AfonCloud polarisCloud = AfonCloud.AWS;
             if (args.length > 0) {
-                polarisCloud = SupportedCloudsEnum.valueOf(args[0]);
+                polarisCloud = AfonProperties.AfonCloud.valueOf(args[0]);
             }
             ClusterCredentials emrysCloud = createClusterCredentials(polarisCloud);
             var                app        = new GeneratePySparkContextMain(emrysCloud);
@@ -142,14 +143,14 @@ public class GeneratePySparkContextMain {
                                     REPLACE_INVALID_CHARACTERS = TRUE
                                   """));
         System.out.println("\u001B[0m");
-        for (SupportedCloudsEnum cloud : SupportedCloudsEnum.values()) {
+        for (AfonCloud cloud : AfonCloud.values()) {
             Map<String, String> configs = polarisConfig.sparkConfigs(cloud);
             System.out.println("# " + cloud);
             configs.forEach((key, value) -> System.out.println(format(".config('%s', '%s')", key, value)));
         }
     }
 
-    private String snowflakeSql(SupportedCloudsEnum cloud, String catalog_table) {
+    private String snowflakeSql(AfonCloud cloud, String catalog_table) {
         String     catalog    = "iceberg_" + cloud.name();
         String     table      = format("my_%s_table", cloud.name());
         Properties properties = new AfonPropertiesLoader().getProperties();

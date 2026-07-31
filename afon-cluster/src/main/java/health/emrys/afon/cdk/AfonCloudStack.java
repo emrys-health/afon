@@ -1,0 +1,9 @@
+package health.emrys.afon.cdk;
+
+import health.emrys.afon.config.AfonProperties.AfonCloud;
+
+public interface AfonCloudStack {
+    AfonCloud getId();
+
+    String getPolarisDomainName();
+}

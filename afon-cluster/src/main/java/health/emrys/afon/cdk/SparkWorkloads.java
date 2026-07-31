@@ -4,24 +4,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.config.AfonProperties.USER_POLARIS_ID;
+import static health.emrys.afon.config.AfonProperties.USER_POLARIS_SECRET;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 
 /**
@@ -51,7 +48,7 @@ public class SparkWorkloads {
      */
     public void deploy(
         @NonNull Construct scope,
-        @NonNull SupportedCloudsEnum id,
+        @NonNull AfonCloud id,
         @NonNull List<? extends ITerraformDependable> dependsOn) {
         final Map<String, Object> sparkClusterManifest = Map.of(
             "apiVersion", "spark.apache.org/v1alpha1",
@@ -215,7 +212,7 @@ public class SparkWorkloads {
             polarisDomainName,
             "https"
         );
-        for (SupportedCloudsEnum cloudProvider : SupportedCloudsEnum.values()) {
+        for (AfonCloud cloudProvider : AfonCloud.values()) {
             Map<String, String> configs = sparkWarehouseConfig.sparkConfigs(cloudProvider);
             toReturn.putAll(configs);
         }

@@ -7,7 +7,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.cdk.SparkWorkloads;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_NAME;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 
 /**
  * This was initially run as a step after its superclass so it could be configured with domain names etc.
@@ -35,7 +36,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
     protected final String awsPolarisDomainName;
 
     public SparkClusterDeployment(@NonNull Construct scope,
-                                  @NonNull SupportedCloudsEnum id,
+                                  @NonNull AfonCloud id,
                                   Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
@@ -115,7 +116,7 @@ public class SparkClusterDeployment extends AwsWholeStack {
     private static void createSparkDeploymentTerraformFile() {
         logger.info("Creating JSON for a Spark cluster");
         final App app = new App();
-        new SparkClusterDeployment(app, AwsKubernetesPolaris.ID, new AfonPropertiesLoader().getProperties());
+        new SparkClusterDeployment(app, AWS, new AfonPropertiesLoader().getProperties());
         app.synth();
     }
 

@@ -6,8 +6,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
 
 public class PolarisConstants {
     /**

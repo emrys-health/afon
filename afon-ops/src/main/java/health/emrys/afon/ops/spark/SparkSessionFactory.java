@@ -1,8 +1,8 @@
 package health.emrys.afon.ops.spark;
 
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.cluster.PolarisClusterCredentials;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -20,12 +20,12 @@ public class SparkSessionFactory {
 
     private static final Logger logger = getLogger(SparkSessionFactory.class);
 
-    public static SparkSession localSparkClusterPolaris(SupportedCloudsEnum polarisCloud) throws IncorrectConfigException, IOException, ApiException {
+    public static SparkSession localSparkClusterPolaris(AfonCloud polarisCloud) throws IncorrectConfigException, IOException, ApiException {
         return localSparkClusterPolaris(SUPPORTED_CLOUD_NAMES, polarisCloud);
     }
 
     public static SparkSession localSparkClusterPolaris(String[] warehouseNames,
-                                                        SupportedCloudsEnum polarisCloud)
+                                                        AfonCloud polarisCloud)
     throws IOException {
         ClusterCredentials credentials = PolarisClusterCredentials.createClusterCredentials(polarisCloud);
         return new SparkSessionFactory(

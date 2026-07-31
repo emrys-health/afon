@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.*;
@@ -205,7 +205,7 @@ public class ContainerHelper {
                 trino.withNetwork(network);
 //                trino.withLogConsumer(new Slf4jLogConsumer(logger));
                 trino.start();
-                for (SupportedCloudsEnum catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
+                for (AfonCloud catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
                     String containerDestination = format("%s/%s.properties", catalogPath, catalog);
                     logger.info("Copying config file to container: {}", containerDestination);
                     trino.copyFileToContainer(
@@ -235,7 +235,7 @@ public class ContainerHelper {
 
     public static String trinoLocalConfig(
         Properties properties,
-        SupportedCloudsEnum catalog) {
+        AfonCloud catalog) {
         String polarisDomainName = "http://" + POLARIS_NETWORK_HOST + ":" + POLARIS_PORT;
         String keyCloakUrl       = tokenEndpoint(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL);
         logger.info("Trino sees Polaris as {} and KeyCloak as {}", polarisDomainName, keyCloakUrl);

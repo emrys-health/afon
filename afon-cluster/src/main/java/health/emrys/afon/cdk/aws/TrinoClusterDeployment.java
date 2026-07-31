@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Properties;
 
 public class TrinoClusterDeployment extends SparkClusterDeployment {
-    public TrinoClusterDeployment(@NonNull Construct scope, AfonProperties.@NonNull SupportedCloudsEnum id, Properties properties) {
+    public TrinoClusterDeployment(@NonNull Construct scope, AfonProperties.@NonNull AfonCloud id, Properties properties) {
         super(scope, id, properties);
         // Trino only needs the cluster reachable (not the Spark operator), so it depends on the
         // EKS dependables rather than eksDependOn.

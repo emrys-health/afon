@@ -1,7 +1,7 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.SparkHelper.spark
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
+import health.emrys.afon.config.AfonProperties.AfonCloud
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.config.PolarisConfigurer.getCreateCatalogURI
 import org.scalatest.GivenWhenThen
@@ -11,7 +11,7 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
 
   def config: CloudConfigForPolaris
 
-  override def cloudProvider: SupportedCloudsEnum
+  override def cloudProvider: AfonCloud
 
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
   val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()

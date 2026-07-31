@@ -1,6 +1,7 @@
 package health.emrys.afon.cluster;
 
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.polaris.catalogs.*;
 import health.emrys.afon.polaris.config.PolarisConfigClient;
 import org.apache.hc.core5.http.HttpResponse;
@@ -18,13 +19,13 @@ public abstract class AbstractPolarisConfiguration {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractPolarisConfiguration.class);
 
-    protected static final Map<SupportedCloudsEnum, Function<Properties, CloudConfigForPolaris>>
+    protected static final Map<AfonProperties.AfonCloud, Function<Properties, CloudConfigForPolaris>>
                                       CLOUD_TO_PROVIDER = Map.of(
-        SupportedCloudsEnum.AWS, AwsCloudConfigForPolaris::new,
-        SupportedCloudsEnum.AZURE, AzureCloudConfigForPolaris::new,
-        SupportedCloudsEnum.GCP, GoogleCloudConfigForPolaris::new,
-        SupportedCloudsEnum.AZURE_EXTERNAL, ExternalAzureCloudConfigForPolaris::new,
-        SupportedCloudsEnum.GCP_EXTERNAL, ExternalGcpCloudConfigForPolaris::new
+        AfonProperties.AfonCloud.AWS, AwsCloudConfigForPolaris::new,
+        AfonCloud.AZURE, AzureCloudConfigForPolaris::new,
+        AfonCloud.GCP, GoogleCloudConfigForPolaris::new,
+        AfonProperties.AfonCloud.AZURE_EXTERNAL, ExternalAzureCloudConfigForPolaris::new,
+        AfonProperties.AfonCloud.GCP_EXTERNAL, ExternalGcpCloudConfigForPolaris::new
                                                                 );
     protected final          Properties properties;
     private final PolarisConfigClient polarisClient;
@@ -40,10 +41,10 @@ public abstract class AbstractPolarisConfiguration {
         if (args.length == 0) {
             initializePolaris();
         } else if (args.length == 1) {
-            SupportedCloudsEnum cloud = SupportedCloudsEnum.valueOf(args[0]);
+            AfonCloud cloud = AfonCloud.valueOf(args[0]);
             initialize(cloud, properties);
         } else if (args.length == 2) {
-            SupportedCloudsEnum cloud    = SupportedCloudsEnum.valueOf(args[0]);
+            AfonCloud cloud    = AfonCloud.valueOf(args[0]);
             Properties          external = new Properties();
             external.putAll(properties);
             String credential = args[1];
@@ -63,11 +64,11 @@ public abstract class AbstractPolarisConfiguration {
         return responses;
     }
 
-    public List<HttpResponse> initialize(SupportedCloudsEnum cloud) throws IncorrectConfigException, IOException {
+    public List<HttpResponse> initialize(AfonCloud cloud) throws IncorrectConfigException, IOException {
         return initialize(cloud, properties);
     }
 
-    public List<HttpResponse> initialize(SupportedCloudsEnum cloud, Properties properties) throws IncorrectConfigException, IOException {
+    public List<HttpResponse> initialize(AfonCloud cloud, Properties properties) throws IncorrectConfigException, IOException {
         CloudConfigForPolaris cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
         return initializePolaris(new CloudConfigForPolaris[]{cloudConfig});
     }

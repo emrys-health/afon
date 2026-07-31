@@ -12,9 +12,9 @@ import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 
 /**
- * This helps to create a catalog called SupportedCloudsEnum.AZURE_EXTERNAL_BUCKET
+ * This helps to create a catalog called AfonCloud.AZURE_EXTERNAL_BUCKET
  * in whichever Polaris is the current that points to a remove catalog called
- * SupportedCloudsEnum.AZURE in emryspolarisazure.click
+ * AfonCloud.AZURE in emryspolarisazure.click
  */
 public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
     private final @NonNull String bucketUrl;
@@ -36,7 +36,7 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
 
     @Override
     protected String getRemoteCatalogName() {
-        return SupportedCloudsEnum.AZURE.toString();
+        return AfonCloud.AZURE.toString();
     }
 
     @Override
@@ -59,6 +59,6 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
     }
 
     public String warehouseName() {
-        return SupportedCloudsEnum.AZURE_EXTERNAL.toString();
+        return AfonCloud.AZURE_EXTERNAL.toString();
     }
 }

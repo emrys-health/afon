@@ -8,7 +8,7 @@ import health.emrys.afon.ops.steps.StepsProvider;
 import java.util.ArrayList;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 
 public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
@@ -16,8 +16,8 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
     public static List<Step> steps(StepOperations stepOperations) {
         ArrayList<Step> steps = new ArrayList<>();
         steps.addAll(List.of(
-                stepOperations.cleanLocalAws(),
-                stepOperations.deployFullAwsCluster(),
+                stepOperations.deleteAwsStack(),
+                stepOperations.deployAwsFullCluster(),
                 stepOperations.waitForAwsPolaris(),
                 stepOperations.initializeAllCatalogsInAws(),
                 stepOperations.checkAwsSparkConnectorTalkingToAws()

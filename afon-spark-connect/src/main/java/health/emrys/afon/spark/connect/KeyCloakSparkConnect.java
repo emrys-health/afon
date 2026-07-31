@@ -56,7 +56,7 @@ public class KeyCloakSparkConnect {
         String warehouse = "test_warehouse";
         SparkSession spark = sparkWithWarehouseCalled(
             warehouse,
-            AfonProperties.SupportedCloudsEnum.AWS.toString()
+            AfonProperties.AfonCloud.AWS.toString()
         );
         String tableName = warehouse + ".acceptancetests.AwsAccessSpec"; // aws_trino.acceptancetests.AwsAccessSpec
         log.info("Reading table {}", tableName);

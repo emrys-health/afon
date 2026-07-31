@@ -3,7 +3,7 @@ package health.emrys.afon.docs;
 import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
 import health.emrys.afon.ops.DeploySnowflakeReadingAzureViaAwsMain;
 import health.emrys.afon.ops.steps.Step;

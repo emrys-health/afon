@@ -21,6 +21,7 @@ import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_PORT;
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_SVC_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
 public class AzureWholeStack extends AzureKubernetesPolaris {
 
@@ -54,7 +55,7 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
 
         // deploy the Spark workers and driver pointing at Azure Polaris
         SparkWorkloads sparkDeployer = new SparkWorkloads(AZURE_DOMAIN_NAME.getValueFrom(properties));
-        sparkDeployer.deploy(this, ID, sparkDependsOn);
+        sparkDeployer.deploy(this, AZURE, sparkDependsOn);
 
         String jupyterDomainName = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
         var util = new TFUtils(
@@ -106,7 +107,7 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AzureWholeStack(app, ID.toString(), new AfonPropertiesLoader().getProperties());
+        new AzureWholeStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
         app.synth();
     }
 

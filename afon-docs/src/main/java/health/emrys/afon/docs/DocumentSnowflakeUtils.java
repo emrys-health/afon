@@ -1,10 +1,10 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 
 public class DocumentSnowflakeUtils {
 
-    public static String getSupplementaryIntro(AfonProperties.SupportedCloudsEnum warehouse) {
+    public static String getSupplementaryIntro(AfonCloud warehouse) {
         return String.format("""
                ### Summary of this deployment
                

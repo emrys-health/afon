@@ -1,6 +1,5 @@
 package health.emrys.afon.polaris.catalogs;
 
-import org.apache.polaris.core.admin.model.AwsStorageConfigInfo;
 import org.apache.polaris.core.admin.model.Catalog;
 import org.apache.polaris.core.admin.model.CreateCatalogRequest;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
@@ -38,7 +37,7 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
 
     @Override
     public String warehouseName() {
-        return SupportedCloudsEnum.AWS.toString();
+        return AfonCloud.AWS.toString();
     }
 
     @Override
