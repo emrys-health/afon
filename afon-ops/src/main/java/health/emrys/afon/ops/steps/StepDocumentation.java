@@ -52,7 +52,6 @@ public class StepDocumentation extends StepActions {
         this.out = new PrintWriter(out);
     }
 
-
     @Override
     public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
         String fullArgs = afonArgumentsToRun(mainClass, args, overrides, "exec");
@@ -101,8 +100,8 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public void delete(Path x) {
-        out.println(format("Delete `%s`", x));
+    public void deletePath(Path path) {
+        out.println(format("Delete `%s`", path));
         out.flush();
     }
 
