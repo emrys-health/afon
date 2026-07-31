@@ -1,6 +1,7 @@
 package health.emrys.afon.config;
 
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -9,10 +10,23 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 
+import static org.slf4j.LoggerFactory.getLogger;
+
 /**
  * A {@link AfonUserProvider} backed by a CSV file of users.
+ *
+ * Fields are:
+ * username,password,email,slug,firstName,lastName
+ *
+ * The first two fields are mandatory.
+ *
+ * The csv files are loaded from the config dir located in ${afon.home}/config.
+ * The system property ${afon.home} by default points to the root of the project
+ * and can be overridden.
  */
 public class FileUserProvider implements AfonUserProvider {
+
+    private static final Logger logger  = getLogger(FileUserProvider.class);
 
     /**
      * User files.
@@ -36,22 +50,33 @@ public class FileUserProvider implements AfonUserProvider {
     }
 
     private void loadUsers(String file) {
-        String pathname = configDir() + "/" + file;
+        String dir = configDir();
+        String pathname = dir + "/" + file;
+        logger.info("Loading {} users from {}", file, dir);
         Scanner scanner = null;
         try {
             scanner = new Scanner(new File(pathname));
         } catch (FileNotFoundException e) {
+            logger.warn("Failed to load users from {}", file);
             throw new RuntimeException(e);
         }
+        List<AfonUser> list = new ArrayList<>();
         while (scanner.hasNextLine()) {
             String[] fields = scanner.nextLine().split(",");
             if ( fields.length > 1 ) {
-                users.add(AfonUserProvider.createUser(fields));
+                try {
+                    list.add(AfonUserProvider.createUser(fields));
+                } catch (RuntimeException e) {
+                    logger.warn("Failed to create user", e);
+                }
             }
         }
+        users.addAll(list);
+        logger.info("Loaded {} users from {}", list.size(), pathname);
     }
 
     public List<AfonUser> getUsers() {
+        // lazily load users
         if ( users.isEmpty() ){
             loadUsers();
         }

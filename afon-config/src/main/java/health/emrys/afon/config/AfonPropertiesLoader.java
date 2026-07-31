@@ -19,21 +19,14 @@ import static org.slf4j.LoggerFactory.getLogger;
  * Sensitive secrets live in {@code env.properties}
  * Cloud-specific secrets live alongside it in
  * {@code env-<cloud>.properties} (e.g. {@code env-aws.properties}).
+ *
+ * The properties files are loaded from the config dir located in ${afon.home}/config.
+ * The system property ${afon.home} by default points to the root of the project
+ * and can be overridden.
  */
 public class AfonPropertiesLoader {
 
-    /**
-     * Property types.
-     *
-     * Application properties live in {@code afon.properties}.
-     * Cloud-specific properties live alongside it in
-     * {@code afon-<cloud>.properties} (e.g. {@code afon-aws.properties}).
-     *
-     * Sensitive secrets live in {@code env.properties}
-     * Cloud-specific secrets live alongside it in
-     * {@code env-<cloud>.properties} (e.g. {@code env-aws.properties}).
-     */
-    private static final List<String> ALL_TYPES = List.of("afon", "env");
+    private static final Logger logger = getLogger(AfonPropertiesLoader.class);
 
     /**
      * System property selecting properties for a given {@code afon-<cloud>.properties} and
@@ -41,8 +34,16 @@ public class AfonPropertiesLoader {
      * since some deployments (e.g. cross-cloud federation) need more than one cloud's properties at the same time.
      */
     public static final String CLOUD_SYSTEM_PROPERTY = "afon.cloud";
+
+    /**
+     * Property types
+     */
+    private static final List<String> ALL_TYPES = List.of("afon", "env");
+
+    /**
+     * Cloud types
+     */
     private static final List<String> ALL_CLOUDS = List.of("aws", "azure", "gcp");
-    private static final Logger       logger     = getLogger(AfonPropertiesLoader.class);
 
     static {
         try {
