@@ -1,6 +1,5 @@
 package health.emrys.afon.trino;
 
-import health.emrys.afon.config.AfonProperties;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Properties;
@@ -24,7 +23,7 @@ public class TrinoServerConfiguration {
         this.polarisSecret     = USER_POLARIS_SECRET.getValueFrom(properties);
     }
 
-    public String catalogProperties(AfonProperties.SupportedCloudsEnum cloud) {
+    public String catalogProperties(AfonCloud cloud) {
         String protocol = "https://";
         if (polarisDomainName.toLowerCase().contains("localhost")
             || polarisDomainName.toLowerCase().contains("127.0.0.1")) {
@@ -69,7 +68,7 @@ public class TrinoServerConfiguration {
      * The object-store plugin Trino uses to read a warehouse's data files; vended credentials
      * from Polaris supply the actual access. Selected from the cloud-name prefix.
      */
-    private String fileSystemProperties(AfonProperties.SupportedCloudsEnum cloud) {
+    private String fileSystemProperties(AfonCloud cloud) {
         String name = cloud.toString();
         if (name.startsWith("aws")) {
             return format("fs.s3.enabled=true%ns3.region=%s%n", awsRegion);

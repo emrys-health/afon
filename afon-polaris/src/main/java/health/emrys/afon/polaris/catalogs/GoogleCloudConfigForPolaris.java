@@ -43,7 +43,7 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
 
     @Override
     public String warehouseName() {
-        return SupportedCloudsEnum.GCP.toString();
+        return AfonCloud.GCP.toString();
     }
 
     protected String getBucketUri() {

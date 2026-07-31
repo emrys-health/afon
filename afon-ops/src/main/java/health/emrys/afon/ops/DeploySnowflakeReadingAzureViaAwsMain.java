@@ -13,8 +13,8 @@ public class DeploySnowflakeReadingAzureViaAwsMain implements StepsProvider {
     public static List<Step> steps(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(List.of(
-                stepOperations.cleanLocalAws(),
-                stepOperations.deployFullAwsCluster(),
+                stepOperations.deleteAwsStack(),
+                stepOperations.deployAwsFullCluster(),
                 stepOperations.waitForAwsPolaris(),
                 stepOperations.initializeAllCatalogsInAws(),
                 stepOperations.checkAwsSparkConnectorTalkingToAws()

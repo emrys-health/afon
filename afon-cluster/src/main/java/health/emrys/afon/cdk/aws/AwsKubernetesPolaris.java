@@ -7,10 +7,9 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.EmrysCloud;
-import health.emrys.afon.cdk.KeyCloakDeploymentConfig;
+import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.cdk.PolarisConfig;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -21,13 +20,11 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 
-public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
+public class AwsKubernetesPolaris extends TerraformStack implements AfonCloudStack {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsKubernetesPolaris.class);
-
-    public static final SupportedCloudsEnum ID               = AWS;
 
     protected final PolarisConfig polarisConfig;
     protected final AwsConstruct  cloudProvider;
@@ -35,7 +32,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
     private AwsKeyCloakDeploymentConfig keyCloakConfig;
 
     public AwsKubernetesPolaris(@NonNull Construct scope,
-                                SupportedCloudsEnum id,
+                                AfonCloud id,
                                 Properties properties) {
         super(scope, id.toString());
         NullProvider.Builder.create(this, "nullProvider")
@@ -78,14 +75,14 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsKubernetesPolaris(app, ID, new AfonPropertiesLoader().getProperties());
+        new AwsKubernetesPolaris(app, AWS, new AfonPropertiesLoader().getProperties());
         app.synth();
         logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu-apply");
     }
 
     @Override
-    public SupportedCloudsEnum getId() {
-        return ID;
+    public AfonCloud getId() {
+        return AWS;
     }
 
     @Override

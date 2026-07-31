@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import org.slf4j.Logger;
@@ -18,7 +18,7 @@ public class PurgePolarisMain {
                 AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
                 var client = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
                 String accessToken = client.getAccessToken();
-                for (AfonProperties.SupportedCloudsEnum warehouse : AfonProperties.SupportedCloudsEnum.values()) {
+                for (AfonCloud warehouse : AfonCloud.values()) {
                     client.delete(catalogsURI(warehouse.toString()), accessToken);
                 }
             } catch (Exception e) {

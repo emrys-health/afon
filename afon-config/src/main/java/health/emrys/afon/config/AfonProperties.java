@@ -101,20 +101,20 @@ public class AfonProperties {
     public static final AfonProperty SNOWFLAKE_JDBC_URL    = new AfonProperty("SNOWFLAKE_JDBC_URL");
     public static final AfonProperty SNOWFLAKE_PRIVATE_KEY = new AfonProperty("SNOWFLAKE_PRIVATE_KEY");
 
-    public enum SupportedCloudsEnum {
+    public enum AfonCloud {
         AWS("aws"),
         AWS_FORBIDDEN("aws_forbidden"),
         AWS_TRINO("aws_trino"),
+        AZURE("azure"),
         AZURE_EXTERNAL("azure_external"),
         AZURE_FORBIDDEN("azure_forbidden"),
-        AZURE("azure"),
         GCP("gcp"),
-        GCP_FORBIDDEN("gcp_forbidden"),
-        GCP_EXTERNAL("gcp_external");
+        GCP_EXTERNAL("gcp_external"),
+        GCP_FORBIDDEN("gcp_forbidden");
 
         private String value;
 
-        SupportedCloudsEnum(String value) {
+        AfonCloud(String value) {
             this.value = value;
         }
 

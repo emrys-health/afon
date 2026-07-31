@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -13,7 +13,7 @@ import java.io.PrintWriter;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 import static java.lang.String.format;
 
 /**
@@ -66,7 +66,7 @@ public class GeneratePySparkKeyCloakMain {
                                                      OIDC_TOKEN = os.environ["OIDC_TOKEN"]
                                                      spark = (SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002")
                                                      """);
-        for (SupportedCloudsEnum cloud : SupportedCloudsEnum.values()) {
+        for (AfonCloud cloud : AfonCloud.values()) {
             python.append(format("# %s \n", cloud.name()));
             String sparkCatalog = toSparkName(cloud);
             config.sparkConfigs(sparkCatalog, cloud.toString()).entrySet()
@@ -96,7 +96,7 @@ public class GeneratePySparkKeyCloakMain {
         return python.toString();
     }
 
-    private static @NonNull String toSparkName(SupportedCloudsEnum cloud) {
+    private static @NonNull String toSparkName(AfonCloud cloud) {
         return "test_" + cloud;
     }
 

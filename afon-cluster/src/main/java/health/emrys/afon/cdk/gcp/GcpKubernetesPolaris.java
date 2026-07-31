@@ -21,6 +21,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.TFUtils.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
 
 public class GcpKubernetesPolaris extends GcpKubernetesStack {
 
@@ -77,7 +78,7 @@ public class GcpKubernetesPolaris extends GcpKubernetesStack {
     public static void main(String[] args) {
         final App  app        = new App();
         Properties properties = new AfonPropertiesLoader().getProperties();
-        new GcpKubernetesPolaris(app, ID.toString(), properties);
+        new GcpKubernetesPolaris(app, GCP.toString(), properties);
         app.synth();
     }
 }

@@ -5,7 +5,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -15,12 +15,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+
 public class PrometheusClusterDeployment extends TrinoClusterDeployment {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(PrometheusClusterDeployment.class);
 
     public PrometheusClusterDeployment(@NonNull Construct scope,
-                                       @NonNull SupportedCloudsEnum id,
+                                       @NonNull AfonCloud id,
                                        Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
@@ -152,9 +154,9 @@ public class PrometheusClusterDeployment extends TrinoClusterDeployment {
      * {@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY}).
      *
      * <p>The companion log shipper is installed by
-     * {@link #deployPromtail(List, Release)}; logs are queried in the same
+     * {@link #deployPromtail(List, Release, Properties)}; logs are queried in the same
      * Grafana that kube-prometheus-stack already deploys, wired up by
-     * {@link #grafanaLokiDatasourceValues()}.
+     * {@link #grafanaLokiDatasourceValues(Properties)}.
      */
     private Release deployLoki(List<@NonNull ITerraformDependable> eksDependOn, Properties properties) {
         return Release.Builder
@@ -336,7 +338,7 @@ public class PrometheusClusterDeployment extends TrinoClusterDeployment {
         logger.info("Creating JSON for Prometheus");
         final App app = new App();
         try {
-            new PrometheusClusterDeployment(app, AwsKubernetesPolaris.ID, new AfonPropertiesLoader().getProperties());
+            new PrometheusClusterDeployment(app, AWS, new AfonPropertiesLoader().getProperties());
             app.synth();
         } catch (RuntimeException e) {
             logAndThrow(e);

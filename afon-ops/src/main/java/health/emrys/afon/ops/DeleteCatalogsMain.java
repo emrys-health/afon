@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
@@ -26,7 +26,7 @@ public class DeleteCatalogsMain {
     }
 
     private void deleteAll() {
-        for (SupportedCloudsEnum warehouse : SupportedCloudsEnum.values()) {
+        for (AfonCloud warehouse : AfonCloud.values()) {
             String warehouseName = warehouse.toString();
             String uri           = catalogsURI(warehouseName);
             delete(uri);

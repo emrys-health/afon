@@ -20,14 +20,14 @@ public class DeployExternalCatalogsMain implements StepsProvider {
     public static final List<Step> steps(StepOperations stepOperations) {
         List<Step> stackSteps = new ArrayList<>();
         stackSteps.addAll(List.of(
-                stepOperations.cleanLocalAws(),
-                stepOperations.deployFullAwsCluster(),
+                stepOperations.deleteAwsStack(),
+                stepOperations.deployAwsFullCluster(),
                 stepOperations.waitForAwsPolaris(),
                 stepOperations.initializeAllCatalogsInAws(),
                 stepOperations.checkAwsSparkConnectorTalkingToAws()
         ));
         stackSteps.addAll(List.of(
-            stepOperations.cleanLocalAzure(),
+            stepOperations.deleteAzureStack(),
             stepOperations.deployAzurePolaris(),
             stepOperations.waitForAzurePolaris(),
             stepOperations.purgeForeignCatalogFromAzure(),

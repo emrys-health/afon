@@ -78,7 +78,7 @@ public class PolarisConfigClient {
 
             @Override
             public String warehouseName() {
-                return AfonProperties.SupportedCloudsEnum.AWS_TRINO.toString();
+                return AfonProperties.AfonCloud.AWS_TRINO.toString();
             }
         };
         logger.info("Configuring {}", config.warehouseName());

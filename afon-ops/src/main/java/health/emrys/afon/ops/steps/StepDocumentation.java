@@ -1,7 +1,7 @@
 package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
@@ -92,7 +92,7 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public void deleteTerraformStateFiles(AfonProperties.SupportedCloudsEnum id) throws IOException {
+    public void deleteTerraformStateFiles(AfonCloud id) throws IOException {
         out.println(format("""
                            Delete `./%s%s*`
                            """, TERRAFORM_STATE_FILE_PATTERN, id));

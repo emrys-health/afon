@@ -5,14 +5,9 @@ import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import health.emrys.afon.cdk.aws.AwsWholeStack;
-import health.emrys.afon.cdk.aws.PrometheusClusterDeployment;
-import health.emrys.afon.cdk.aws.SparkClusterDeployment;
-import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
-import health.emrys.afon.cdk.azure.AzureWholeStack;
-import health.emrys.afon.cdk.gcp.GcpKubernetesPolaris;
+import com.hashicorp.cdktf.TerraformStack;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -37,7 +32,6 @@ import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -46,7 +40,7 @@ public class StepActions {
     private static final Logger logger = getLogger(StepActions.class);
     static final String TERRAFORM_STATE_FILE_PATTERN = "terraform.";
 
-    @NonNull Path deleteStack(SupportedCloudsEnum id) throws IOException {
+    @NonNull Path deleteStack(AfonCloud id) throws IOException {
         Path stackDir = stackDir(id);
         if (stackDir.toFile().exists()) {
             tofuDestroy(stackDir);
@@ -58,12 +52,12 @@ public class StepActions {
         return stackDir;
     }
 
-    void deleteTerraformStateFiles(SupportedCloudsEnum id) throws IOException {
+    void deleteTerraformStateFiles(AfonCloud id) throws IOException {
         deleteTerraformStateFiles(List.of(".", ".."), id);
     }
 
     private void deleteTerraformStateFiles(List<String> dirs,
-                                           SupportedCloudsEnum id) throws IOException {
+                                           AfonCloud id) throws IOException {
         for ( String dir : dirs ){
             Files.list(Path.of(dir))
                     .filter(x -> {
@@ -77,37 +71,12 @@ public class StepActions {
         }
     }
 
-    void startGcpPolaris() throws Exception {
-        executeMainOf(GcpKubernetesPolaris.class, new String[]{});
-        startManagedKubernetesStack(GcpKubernetesPolaris.ID);
+    void startStack(Class<? extends TerraformStack> stackClass, AfonCloud id) throws Exception {
+        executeMainOf(stackClass, new String[]{});
+        startManagedStack(id);
     }
 
-    void startFullStackAzure() throws Exception {
-        executeMainOf(AzureWholeStack.class, new String[]{});
-        startManagedKubernetesStack(AzureKubernetesPolaris.ID);
-    }
-
-    void startAzurePolaris() throws Exception {
-        executeMainOf(AzureKubernetesPolaris.class, new String[]{});
-        startManagedKubernetesStack(AzureKubernetesPolaris.ID);
-    }
-
-    void startFullStackInAws() throws Exception {
-        executeMainOf(PrometheusClusterDeployment.class, new String[]{});
-        startManagedKubernetesStack(AWS);
-    }
-
-    void startSparkClusterInAws() throws Exception {
-        executeMainOf(SparkClusterDeployment.class, new String[]{});
-        startManagedKubernetesStack(AWS);
-    }
-
-    void startAwsPolaris() throws Exception {
-        executeMainOf(AwsWholeStack.class, new String[]{});
-        startManagedKubernetesStack(AWS);
-    }
-
-    private void startManagedKubernetesStack(SupportedCloudsEnum id) throws ManagedProcessException {
+    private void startManagedStack(AfonCloud id) throws ManagedProcessException {
         // The kubernetes/helm providers are configured from the managed cluster's endpoint and
         // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
         // (plugin-framework) providers, those must be known at plan time, otherwise apply fails
@@ -163,7 +132,7 @@ public class StepActions {
         }
     }
 
-    private @NonNull Path stackDir(SupportedCloudsEnum id) {
+    private @NonNull Path stackDir(AfonCloud id) {
         return Path.of("cdktf.out", "stacks", id.toString());
     }
 
@@ -175,7 +144,7 @@ public class StepActions {
      * @param registerTableMainClass eg RegisterLocalPolarisMain.class
      * @throws Exception
      */
-    public void registerTable(SupportedCloudsEnum storageCloud,
+    public void registerTable(AfonCloud storageCloud,
                               String metadataLocation,
                               String polarisDomainNAme,
                               String tableName, Class<?> registerTableMainClass) throws Exception {
@@ -287,12 +256,12 @@ public class StepActions {
     }
     
     void createSingleCatalogsFor(String domainName,
-                                        SupportedCloudsEnum catalog) throws Exception {
+                                        AfonCloud catalog) throws Exception {
         createSingleCatalogsFor(domainName, catalog, new Properties());
     }
 
     void createSingleCatalogsFor(String domainName,
-                                        SupportedCloudsEnum catalog,
+                                        AfonCloud catalog,
                                         Properties properties) throws Exception {
         properties.put(POLARIS_ENDPOINT.getName(), domainName);
         executeMainOf(EndpointPolarisConfiguration.class,

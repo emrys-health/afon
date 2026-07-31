@@ -1,6 +1,6 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.SQLConf$;
 import org.apache.spark.sql.internal.StaticSQLConf$;
@@ -22,7 +22,7 @@ public class SparkWarehouseConfig {
     public static final String SPARK_IMAGE = "ph1ll1phenry/spark_jars:4.0.1";
 
     public static final  String[] SUPPORTED_CLOUD_NAMES =
-        Arrays.stream(SupportedCloudsEnum.values()).map(x -> x.toString()).toArray(String[]::new);
+        Arrays.stream(AfonCloud.values()).map(x -> x.toString()).toArray(String[]::new);
     private static final Logger   log                   = LoggerFactory.getLogger(SparkWarehouseConfig.class);
 
     private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
@@ -76,7 +76,7 @@ public class SparkWarehouseConfig {
         });
     }
 
-    public Map<String, String> sparkConfigs(SupportedCloudsEnum sparkCatalog) {
+    public Map<String, String> sparkConfigs(AfonCloud sparkCatalog) {
         return sparkConfigs(sparkCatalog.toString());
     }
 

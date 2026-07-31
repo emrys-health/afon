@@ -7,7 +7,7 @@ import health.emrys.afon.ops.DeploySnowflakeReadingAwsViaAwsMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AWS;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 
 public class DocumentSnowflakeReadingAwsViaAwsMain extends AbstractDocumentMetadata {
 

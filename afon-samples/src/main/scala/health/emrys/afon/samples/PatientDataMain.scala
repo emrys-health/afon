@@ -1,8 +1,8 @@
 package health.emrys.afon.samples
 
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum._
+import health.emrys.afon.config.AfonProperties.AfonCloud._
 import health.emrys.afon.cluster.ClusterPolarisConfiguration
+import health.emrys.afon.config.AfonProperties.AfonCloud
 import health.emrys.afon.samples.SampleData.{occupancyDataset, patientDataset}
 import health.emrys.afon.ops.spark.SparkSessionFactory
 import org.apache.spark.sql.SparkSession
@@ -47,7 +47,7 @@ object PatientDataMain {
     occupancyDataset(spark, n).writeTo(fqn_occupancy).options(Map("mode" -> "overwrite")).create()
   }
 
-  private def prepareNamespace(spark: SparkSession, supportedCloud: SupportedCloudsEnum): Unit = {
+  private def prepareNamespace(spark: SparkSession, supportedCloud: AfonCloud): Unit = {
     val cloud = supportedCloud.toString()
     //    spark.sql(f"DROP SCHEMA IF EXISTS $cloud.$NAMESPACE")
     //    spark.sql(f"DROP NAMESPACE IF EXISTS $cloud.$NAMESPACE")
@@ -55,6 +55,6 @@ object PatientDataMain {
   }
 
   private def initSpark(): SparkSession = {
-    SparkSessionFactory.localSparkClusterPolaris(SupportedCloudsEnum.AWS)  // AWS for argument's sake...
+    SparkSessionFactory.localSparkClusterPolaris(AfonCloud.AWS)  // AWS for argument's sake...
   }
 }

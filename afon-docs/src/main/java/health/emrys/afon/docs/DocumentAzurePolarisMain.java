@@ -1,13 +1,14 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.azure.AzureNuke;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import org.slf4j.Logger;
+
 import java.io.IOException;
 import java.util.List;
 
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
@@ -32,7 +33,7 @@ public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
     @Override
     public List<Step> steps(StepOperations stepOperations) {
         return List.of(
-            stepOperations.cleanLocal(AzureKubernetesPolaris.ID),
+            stepOperations.deleteStack(AZURE),
             stepOperations.deployAzurePolaris(),
             stepOperations.waitForAzurePolaris(),
             stepOperations.initializeAllCatalogsInAzure()

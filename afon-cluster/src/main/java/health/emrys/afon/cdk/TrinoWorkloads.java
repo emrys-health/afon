@@ -5,7 +5,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import health.emrys.afon.cluster.Defaults;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
@@ -23,7 +23,7 @@ import java.util.Properties;
  * cert-manager / nginx / the Spark operator (all Helm {@link Release}s).
  *
  * <p>Catalogs follow {@code SparkWarehouseConfig}: one Iceberg REST catalog per
- * {@link SupportedCloudsEnum}, all pointing at the same Polaris host with {@code warehouse} set
+ * {@link AfonCloud}, all pointing at the same Polaris host with {@code warehouse} set
  * to the cloud's Polaris catalog name. They are passed through the chart's {@code
  * additionalCatalogs} value, so the chart's default {@code tpch}/{@code tpcds} catalogs remain.
  */
@@ -63,7 +63,7 @@ public class TrinoWorkloads {
      */
     public void deploy(@NonNull Construct scope,
                        @NonNull HelmProvider helmProvider,
-                       @NonNull SupportedCloudsEnum id,
+                       @NonNull AfonCloud id,
                        @NonNull List<? extends ITerraformDependable> dependsOn) {
         Map<String, Object> values = Map.of(
             "image", Map.of("tag", IMAGE_TAG),
@@ -97,11 +97,11 @@ public class TrinoWorkloads {
      * One catalog per supported cloud, keyed by the cloud name (the chart writes each entry to
      * {@code <name>.properties}). Mirrors {@code SparkWarehouseConfig.sparkConfigs}.
      */
-    private Map<String, String> catalogFiles(SupportedCloudsEnum defaultCatalog) {
+    private Map<String, String> catalogFiles(AfonCloud defaultCatalog) {
         // LinkedHashMap so the default catalog is emitted first for readability.
         Map<String, String> catalogs = new LinkedHashMap<>();
         catalogs.put(defaultCatalog.toString(), trinoConfig.catalogProperties(defaultCatalog));
-        for (SupportedCloudsEnum cloud : SupportedCloudsEnum.values()) {
+        for (AfonCloud cloud : AfonCloud.values()) {
             if (cloud == defaultCatalog) {
                 continue;
             }

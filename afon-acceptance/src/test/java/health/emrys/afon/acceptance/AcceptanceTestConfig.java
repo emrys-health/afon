@@ -54,7 +54,7 @@ public class AcceptanceTestConfig {
 
             @Override
             public String warehouseName() {
-                return SupportedCloudsEnum.AWS_TRINO.toString();
+                return AfonCloud.AWS_TRINO.toString();
             }
         };
         this.awsForbidden               = new AwsCloudConfigForPolaris(properties) {
@@ -65,13 +65,13 @@ public class AcceptanceTestConfig {
 
             @Override
             public String warehouseName() {
-                return SupportedCloudsEnum.AWS_FORBIDDEN.toString();
+                return AfonCloud.AWS_FORBIDDEN.toString();
             }
         };
         this.gcpForbidden               = new GoogleCloudConfigForPolaris(properties) {
             @Override
             public String warehouseName() {
-                return SupportedCloudsEnum.GCP_FORBIDDEN.toString();
+                return AfonCloud.GCP_FORBIDDEN.toString();
             }
 
             @Override
@@ -83,7 +83,7 @@ public class AcceptanceTestConfig {
         this.azureCloudConfigForPolaris = new AzureCloudConfigForPolaris(properties);
         this.azureForbidden             = new AzureCloudConfigForPolaris(properties) {
             public String warehouseName() {
-                return SupportedCloudsEnum.AZURE_FORBIDDEN.toString();
+                return AfonCloud.AZURE_FORBIDDEN.toString();
             }
 
             @Override

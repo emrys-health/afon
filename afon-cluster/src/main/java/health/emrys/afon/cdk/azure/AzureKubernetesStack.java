@@ -2,19 +2,18 @@ package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
-import health.emrys.afon.cdk.EmrysCloud;
+import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import software.constructs.Construct;
 
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.AZURE;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
-class AzureKubernetesStack extends TerraformStack implements EmrysCloud {
+class AzureKubernetesStack extends TerraformStack implements AfonCloudStack {
 
-    public static final SupportedCloudsEnum ID = AZURE;
     protected final     AzureConstruct      cloudProvider;
     protected final     String              azurePolarisDomainName;
 
@@ -27,13 +26,13 @@ class AzureKubernetesStack extends TerraformStack implements EmrysCloud {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AzureKubernetesStack(app, ID.toString(), new AfonPropertiesLoader().getProperties());
+        new AzureKubernetesStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
         app.synth();
     }
 
     @Override
-    public SupportedCloudsEnum getId() {
-        return ID;
+    public AfonCloud getId() {
+        return AZURE;
     }
 
     @Override

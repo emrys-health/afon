@@ -3,19 +3,18 @@ package health.emrys.afon.cdk.gcp;
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.EmrysCloud;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.cdk.AfonCloudStack;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import software.constructs.Construct;
 
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.GCP_DOMAIN_NAME;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
 
-class GcpKubernetesStack extends TerraformStack implements EmrysCloud {
+class GcpKubernetesStack extends TerraformStack implements AfonCloudStack {
 
-    public static final SupportedCloudsEnum ID = GCP;
     protected final     GcpConstruct        cloudProvider;
     protected final     String              gcpDomainName;
     private final       Properties          properties;
@@ -31,13 +30,13 @@ class GcpKubernetesStack extends TerraformStack implements EmrysCloud {
     public static void main(String[] args) {
         final App  app        = new App();
         Properties properties = new AfonPropertiesLoader().getProperties();
-        new GcpKubernetesStack(app, ID.toString(), properties);
+        new GcpKubernetesStack(app, GCP.toString(), properties);
         app.synth();
     }
 
     @Override
-    public SupportedCloudsEnum getId() {
-        return ID;
+    public AfonCloud getId() {
+        return GCP;
     }
 
     @Override

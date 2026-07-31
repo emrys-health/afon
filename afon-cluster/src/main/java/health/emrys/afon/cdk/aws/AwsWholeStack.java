@@ -14,7 +14,7 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.NetworkConfiguration;
 import health.emrys.afon.cdk.SparkConfig;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
+import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -28,6 +28,7 @@ import java.util.Properties;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 
 /***
  * Creates the markup to create the full stack in AWS.
@@ -61,7 +62,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
     private         String        DELETE_CRDS;
 
     public AwsWholeStack(final Construct scope,
-                         final SupportedCloudsEnum id,
+                         final AfonCloud id,
                          final Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
@@ -169,7 +170,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsWholeStack(app, ID, new AfonPropertiesLoader().getProperties());
+        new AwsWholeStack(app, AWS, new AfonPropertiesLoader().getProperties());
         app.synth();
         logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu " +
                     "-apply");

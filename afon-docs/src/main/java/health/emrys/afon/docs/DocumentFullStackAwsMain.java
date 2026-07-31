@@ -35,8 +35,8 @@ public class DocumentFullStackAwsMain extends AbstractDocumentMetadata {
     @Override
     public List<Step> steps(StepOperations stepOperations) {
         return List.of(
-            stepOperations.cleanLocalAws(),
-            stepOperations.deployFullAwsCluster(),
+            stepOperations.deleteAwsStack(),
+            stepOperations.deployAwsFullCluster(),
             stepOperations.waitForAwsPolaris(),
             stepOperations.initializeAllCatalogsInAws(),
             stepOperations.checkAwsSparkConnectorTalkingToAws()

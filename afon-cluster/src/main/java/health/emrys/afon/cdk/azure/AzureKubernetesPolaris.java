@@ -24,6 +24,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.TFUtils.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
 public class AzureKubernetesPolaris extends AzureKubernetesStack {
 
@@ -94,7 +95,7 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AzureKubernetesPolaris(app, ID.toString(), new AfonPropertiesLoader().getProperties());
+        new AzureKubernetesPolaris(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
         app.synth();
     }
 }

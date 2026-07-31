@@ -2,8 +2,12 @@ package health.emrys.afon.ops.steps;
 
 import com.azure.storage.blob.models.BlobItem;
 import health.emrys.afon.cdk.aws.AwsWholeStack;
+import health.emrys.afon.cdk.aws.PrometheusClusterDeployment;
+import health.emrys.afon.cdk.aws.SparkClusterDeployment;
 import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.azure.AzureReader;
+import health.emrys.afon.cdk.azure.AzureWholeStack;
+import health.emrys.afon.cdk.gcp.GcpKubernetesPolaris;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.OnboardAllUsersMain;
@@ -22,7 +26,7 @@ import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.*;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.*;
 import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
@@ -60,13 +64,17 @@ public class StepOperations {
         this.azureJupyterDomain     = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
     }
 
-    public Step cleanLocalAws() {
+    private static Properties appProperties() {
+        return new AfonPropertiesLoader().getProperties();
+    }
+
+    public Step deleteAwsStack() {
         return new Step(
             "clean_aws",
             "clean the local AWS directory (if it exists)",
             () -> {
                 try {
-                    actions.deleteStack(AwsWholeStack.ID);
+                    actions.deleteStack(AWS);
                 } catch (Exception ex) {
                     logger.error(
                         format(
@@ -79,12 +87,12 @@ public class StepOperations {
             });
     }
 
-    public Step cleanLocalAzure() {
-        return cleanLocal(AzureKubernetesPolaris.ID);
+    public Step deleteAzureStack() {
+        return deleteStack(AZURE);
     }
 
     @NonNull
-    public Step cleanLocal(SupportedCloudsEnum id) {
+    public Step deleteStack(AfonCloud id) {
         return new Step(
                 "clean_" + id,
                 format("clean the local %s directory (if it exists)", id),
@@ -93,47 +101,46 @@ public class StepOperations {
                 });
     }
 
-
     public Step deployAwsPolaris() {
         return new Step(
             "aws_polaris",
             "deploy Polaris in AWS",
-            () -> actions.startAwsPolaris());
+            () -> actions.startStack(AwsWholeStack.class, AWS));
     }
 
-    public Step deployFullAwsCluster() {
+    public Step deployAwsFullCluster() {
         return new Step(
             "aws_spark",
             "deploy Spark in AWS",
-            () -> actions.startFullStackInAws());
+            () -> actions.startStack(PrometheusClusterDeployment.class, AWS));
     }
 
     public Step deployAwsSpark() {
         return new Step(
             "aws_spark",
             "deploy Spark in AWS",
-            () -> actions.startSparkClusterInAws());
+            () -> actions.startStack(SparkClusterDeployment.class, AWS));
     }
 
     public Step deployGcpPolaris() {
         return new Step(
             "gcp_polaris",
             "deploy Polaris in GCP",
-            () -> actions.startGcpPolaris());
+            () -> actions.startStack(GcpKubernetesPolaris.class, GCP));
     }
 
-    public Step deployWholeStackAzure() {
+    public Step deployAzureWholeStack() {
         return new Step(
             "az_sre",
             "deploy SRE in Azure",
-            () -> actions.startFullStackAzure());
+            () -> actions.startStack(AzureWholeStack.class, AZURE));
     }
 
     public Step deployAzurePolaris() {
         return new Step(
             "az_polaris",
             "deploy Polaris in Azure",
-            () -> actions.startAzurePolaris());
+            () -> actions.startStack(AzureKubernetesPolaris.class, AZURE));
     }
 
     public Step purgeForeignCatalogFromAzure() {
@@ -141,13 +148,13 @@ public class StepOperations {
     }
 
     public @NonNull Step purgeForeignCatalogFrom(String domainName,
-                                                 SupportedCloudsEnum catalog
+                                                 AfonCloud catalog
     ) {
         return purgeEverythingFor(domainName, catalog, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
     }
 
     public @NonNull Step purgeEverythingFor(String domainName,
-                                            SupportedCloudsEnum catalog,
+                                            AfonCloud catalog,
                                             String namespace,
                                             String tableName
     ) {
@@ -184,10 +191,6 @@ public class StepOperations {
                     AZURE_EXTERNAL_BUCKET.getValueFrom(appProperties()));
                 actions.createSingleCatalogsFor(domainName, AZURE, properties);
             });
-    }
-
-    private static Properties appProperties() {
-        return new AfonPropertiesLoader().getProperties();
     }
 
     public Step createExternalAzureCatalogInAzure() {
@@ -291,7 +294,7 @@ public class StepOperations {
             azureJupyterDomain);
     }
 
-    public @NonNull Step awsSparkTestUsing(SupportedCloudsEnum warehouse,
+    public @NonNull Step awsSparkTestUsing(AfonCloud warehouse,
                                            String namespace
     ) {
         return awsSparkWriteTestUsing(
@@ -302,15 +305,15 @@ public class StepOperations {
             namespace);
     }
 
-    private Step awsSparkWriteTestUsing(SupportedCloudsEnum warehouse,
+    private Step awsSparkWriteTestUsing(AfonCloud warehouse,
                                         String description,
                                         String namespace
     ) {
         return sparkTestUsing(warehouse, description, namespace, SparkTestWriter.class, awsPolarisDomainName, awsJupyterDomain);
     }
 
-    public Step awsSparkReadTestUsing(SupportedCloudsEnum warehouse,
-                               String namespace
+    public Step awsSparkReadTestUsing(AfonCloud warehouse,
+                                      String namespace
     ) {
         return sparkTestUsing(
             warehouse,
@@ -327,7 +330,7 @@ public class StepOperations {
             awsJupyterDomain);
     }
 
-    private @NonNull Step sparkTestUsing(SupportedCloudsEnum warehouse,
+    private @NonNull Step sparkTestUsing(AfonCloud warehouse,
                                          String description,
                                          String namespace,
                                          Class<? extends SparkChecker> clazz,
@@ -372,7 +375,7 @@ public class StepOperations {
         return snowflakeReadViaPolaris(AWS);
     }
 
-    private @NonNull Step snowflakeReadViaPolaris(SupportedCloudsEnum warehouse) {
+    private @NonNull Step snowflakeReadViaPolaris(AfonCloud warehouse) {
         return new Step(
             "snowflake_reads_" + warehouse.toString(),
             format("Call Snowflake that uses AWS Polaris to get the credentials to read from %s storage", warehouse.name()),
@@ -526,8 +529,9 @@ public class StepOperations {
             .findFirst()
             .get();
         logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
-        String bucket  = AZURE_BUCKET.getValueFrom(appProperties());
-        String account = AZURE_STORAGE_ACCOUNT.getValueFrom(appProperties());
+        Properties properties = appProperties();
+        String bucket  = AZURE_BUCKET.getValueFrom(properties);
+        String account = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
         return format(
             "abfss://%s@%s.dfs.core.windows.net/%s",
             bucket,
@@ -536,7 +540,7 @@ public class StepOperations {
     }
 
     public Step registerTableInAws(String jsonMetadataFQN,
-                                   SupportedCloudsEnum warehouse,
+                                   AfonCloud warehouse,
                                    String tableName, Class<?> registerTableMainClass
     ) {
         return new Step(
