@@ -36,7 +36,7 @@ import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
  * Don't forget to
  * <UL>
  *     <LI>
- *          set environment variables, something like <pre>KUBE_CONFIG_PATH=/home/henryp/.kube/config</pre>
+ *          set environment variables, something like <pre>KUBE_CONFIG_PATH=$HOME/.kube/config</pre>
  *     </LI>
  *      <LI>
  *          <pre>unalias aws</pre> if you're using the Dockerized version and put the actual binary in your

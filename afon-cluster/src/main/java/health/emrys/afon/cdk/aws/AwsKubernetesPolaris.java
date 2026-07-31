@@ -80,8 +80,7 @@ public class AwsKubernetesPolaris extends TerraformStack implements EmrysCloud {
         final App app = new App();
         new AwsKubernetesPolaris(app, ID, new AfonPropertiesLoader().getProperties());
         app.synth();
-        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu " +
-                        "-apply");
+        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu-apply");
     }
 
     @Override

@@ -27,42 +27,44 @@ Doing so will generate the client ID and secret you then put in `env.properties`
 
 # Deployment
 
-Note 1: Run everything in the `afon-ops` directory.
+Run everything from the top-level dir.
 
-Note 2: If you really foul things up, you'll leave the environment in an unstable state.
-Consult the `*Nuke.java` files to destroy your environment totally. 
-They will output shell scripts that you can run. 
+NOTE: Only AWS has the full stack. 
+Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.
+
+NOTE: If you really foul things up, you'll leave the environment in an unstable state.
+Consult the `*Nuke.java` files to destroy your environment totally.
+They will output shell scripts that you can run.
 You may need to run them multiple times for the VPC to disappear from your cloud.
 
-Note 3: only AWS has the full stack. 
-Azure and GCP just host Polaris at the moment.
-There's no particular reason for this other than expediency.
 
 ### Automated deployment
 
 To actually run all the steps in each deployment above, run:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployFullStackAwsMain
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployGcpPolarisMain
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployAzurePolarisMain
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.DeployExternalCatalogsMain
+./afon.sh -a exec --exec-class ops.DeployFullStackAwsMain
+./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain
+./afon.sh -a exec --exec-class ops.DeployGcpPolarisMain
+./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain
 ```
 
-Note that the credentials in your `env.properties` are used by the deployed Polaris instance.
+Note that the credentials in your `config/env*.properties` are used by the deployed Polaris instance.
 
-### Deploying the demo
+### Deploying the environment
 
-To deploy the environment (as of the demo to the advising team, 23/3/26) then run this:
+To deploy the environment, run:
 
-`mvn compile -Dexec.mainClass=health.emrys.afon.demo.DeployExternalCatalogsMain exec:exec`
+```shell
+./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain
+```
 
-This should create an AWS and Azure K8s cluster both running a Polaris, populate it and run against them a simple Spark test locally.
+This will create an AWS and Azure K8s cluster both running a Polaris, populate it and run against them a simple Spark test locally.
 
 # Viewing the SRE
 
 You can view Jupyter at [`https://emrysjupyter.click/guacamole`](https://emrysjupyter.click/guacamole) 
-(or whichever domain you have defined in the `afon.properties` file).
+(or whichever domain you have defined in the `config/afon*.properties` file).
 
 Note that we use Apache Guacamole to stream pixels, and X11 VNC to render the images on the server side
 (see `start-vnc.sh`).
@@ -133,7 +135,7 @@ You can find the domain name servers for your cloud provider in its web GUI if y
 Pointing the domain names at an IP address in Kubernetes is easy in AWS as the whole thing is integrated.
 It's a bit harder in Azure and GCP.
 
-I've bought (from AWS Route 53) the names:
+The following domain names are provided (from AWS Route 53):
 ```
 emryspolaris.click
 emryspolarisgcp.click
@@ -192,23 +194,24 @@ When a new version of Polaris is started up, it has nothing in it.
 So, create the warehouses with:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.ConfigureClusterPolarisMain
+./afon.sh -a exec --exec-class ops.ConfigureClusterPolarisMain
 ```
 
 and register tables with something like:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.RegisterPolarisMain  -Dexec.args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
+./afon.sh -a exec --exec-class ops.RegisterPolarisMain --exec-args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
 ```
-
-or similar.
 
 # What the Java code does
 
-The Java code creates the config to create the cloud environment but it delegates to OpenTofu to execute it.
+The Java code creates the config to create the cloud environment and delegates it to tofu to execute it.
 
-After the Java is run, you can fiddle with the environmemt if you run `cd ./cdktf.out/stacks/YOUR_DEPLOYMENT`.
-There, you can run `tofu apply --auto-approve` (or `tofu destroy --auto-approve` if you want to tear the stack down).
+After the Java is run, the tofu plan is in `afon-ops/cdktf.out/stacks/{aws,azure,gcp}`.
+Thereafter, you can run tofu apply or destroy commands via 
+```shell
+./afon.sh -a tofu-{apply,destroy}
+```
 
 # Future improvements
 
@@ -221,7 +224,7 @@ Run `health.emrys.afon.cdk.aws.AwsNuke` to print out helpful command lines.
 In particular, the output of this script should blatt everything:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.cdk.aws.AwsNuke
+./afon.sh -a exec --exec-class cdk.aws.AwsNuke
 ```
 
 This is a shell script. 
