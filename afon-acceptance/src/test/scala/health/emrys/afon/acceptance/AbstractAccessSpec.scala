@@ -134,7 +134,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     val UserName      = "userX"
     val UserPassword  = "password"
     val properties    = AcceptanceTestConfig.instance.getProperties
-    val User          = new AfonUser(UserName, "email@test.com", "slug", UserPassword, "first", "second")
+    val User          = new AfonUser(UserName, UserPassword, "email@test.com", "slug", "first", "second")
 
     val onboardingConfig = new AfonUserProvider() {
       override def getUsers: util.List[AfonUser] = util.List.of(User)

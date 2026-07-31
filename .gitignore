@@ -1,5 +1,7 @@
 # Afon
 
+config/env*.properties
+config/users.csv
 logs/
 
 # Byte-compiled / optimized / DLL files
@@ -135,10 +137,6 @@ venv.bak/
 *.tfstate.backup
 .terraform.lock.hcl
 cdktf.out
-env.properties
-env-aws.properties
-env-azure.properties
-env-gcp.properties
 .idea
 iam_policy.json
 

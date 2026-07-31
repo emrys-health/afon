@@ -20,7 +20,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.AfonUsers;
+import health.emrys.afon.config.FileUserProvider;
 import org.slf4j.Logger;
 
 import java.net.URLEncoder;
@@ -129,7 +129,7 @@ public abstract class JupyterHubConfig {
     private final   TerraformStack                stack;
     private final   String                        jupyterPassword;
     private final   List<GuacamoleConfig.Session> sessions;
-    private final   AfonUserProvider              userProvider = new AfonUsers();
+    private final   AfonUserProvider              userProvider = new FileUserProvider();
     protected final   Properties                  properties;
 
     public JupyterHubConfig(
