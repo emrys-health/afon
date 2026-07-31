@@ -11,8 +11,8 @@ import health.emrys.afon.cdk.aws.SparkClusterDeployment;
 import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.azure.AzureWholeStack;
 import health.emrys.afon.cdk.gcp.GcpKubernetesPolaris;
-import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
+import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -44,114 +44,65 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class StepActions {
 
     private static final Logger logger = getLogger(StepActions.class);
-    public static final String TERRAFORM_STATE_FILE_PATTERN = "terraform.";
+    static final String TERRAFORM_STATE_FILE_PATTERN = "terraform.";
 
-    public Step waitFor(String domain) {
-        return new Step(
-            stepNameWaitingFor(domain),
-            "wait for internet DNS servers to recognise " + domain,
-            () -> {
-                            boolean stopResolving = false;
-                            long    start         = System.currentTimeMillis();
-                            int     timeout       = 1_200_000;
-                            logger.info("Checking DNS for {}", domain);
-                            while (!stopResolving) {
-                                long elapsed = System.currentTimeMillis() - start;
-                                logger.info("Waiting on DNS for {}, time elapsed {}s (until timeout {}s)", domain, elapsed/1000, timeout/1000);
-                                if (!(elapsed < timeout)) break;
-                                try {
-                                    InetAddress[] addresses = InetAddress.getAllByName(domain);
-                                    stopResolving = addresses != null && addresses.length > 0;
-                                    if (!stopResolving) {
-                                        stopResolving = isWaitingInterrupted(timeout);
-                                    }
-                                } catch (UnknownHostException e) {
-                                    stopResolving = isWaitingInterrupted(timeout);
-                                }
-                            }
-                        });
-    }
-
-    static @NonNull String stepNameWaitingFor(String domain) {
-        return "waitFor_" + domain.substring(0, domain.indexOf('.'));
-    }
-
-    private boolean isWaitingInterrupted(int timeout) {
-        int pauseMs = 15_000;
-        logger.debug("Waiting {}s. Maximum = {}s", pauseMs / 1000, timeout / 1000);
-        try {
-            Thread.sleep(pauseMs);
-        } catch (InterruptedException e) {
-            return true;
-        }
-        return false;
-    }
-
-    public @NonNull Path deleteStack(SupportedCloudsEnum id) throws IOException {
-        Path toDelete = cdktfPath(id);
-        if (toDelete.toFile().exists()) {
-            attemptGracefulDestroy(toDelete);
-            logger.info("Deleting {}", toDelete);
-            delete(toDelete);
+    @NonNull Path deleteStack(SupportedCloudsEnum id) throws IOException {
+        Path stackDir = stackDir(id);
+        if (stackDir.toFile().exists()) {
+            tofuDestroy(stackDir);
+            deletePath(stackDir);
         } else {
-            logger.warn("Directory {} does not exist so starting afresh", toDelete);
+            logger.warn("Directory {} does not exist so starting afresh", stackDir);
         }
         deleteTerraformStateFiles(id);
-        return toDelete;
+        return stackDir;
     }
 
-    private void attemptGracefulDestroy(Path path) {
-        try {
-            logger.info("Stopping {} if it's running already...", path);
-            run("tofu", path, "init");
-            if (run("tofu", path, "destroy", "--auto-approve") != 0) {
-                String msg = String.format("""
-                Failed to destroy %s. Your environment may be in an unstable state.
-                It may be that something irrelevant (like a Helm chart) is blocking the destroy.
-                If so, remove it with something like:
-                    tofu state rm 'helm_release.prometheusRelease'
-                and tofu destroy again.
-                
-                If you're sure nothing in the environment is still running, delete directory %s
-                """, path, path);
-                logger.error(msg);
-                throw new RuntimeException(msg);
-            }
-        } catch (Exception e) {
-            logger.error("Failed to call tofu destroy in " + path, e);
+    void deleteTerraformStateFiles(SupportedCloudsEnum id) throws IOException {
+        deleteTerraformStateFiles(List.of(".", ".."), id);
+    }
+
+    private void deleteTerraformStateFiles(List<String> dirs,
+                                           SupportedCloudsEnum id) throws IOException {
+        for ( String dir : dirs ){
+            Files.list(Path.of(dir))
+                    .filter(x -> {
+                        String fileName = x.getFileName().toString();
+                        return fileName.startsWith(TERRAFORM_STATE_FILE_PATTERN + id)
+                                && fileName.endsWith(".tfstate");
+                    })
+                    .forEach(x -> {
+                        deletePath(x);
+                    });
         }
     }
 
-    public @NonNull Path cdktfPath(SupportedCloudsEnum id) {
-        return Path.of("cdktf.out", "stacks", id.toString());
-    }
-
-    public void startGcpPolaris() throws Exception {
+    void startGcpPolaris() throws Exception {
         executeMainOf(GcpKubernetesPolaris.class, new String[]{});
         startManagedKubernetesStack(GcpKubernetesPolaris.ID);
     }
 
-    public void startFullStackAzure() throws Exception {
+    void startFullStackAzure() throws Exception {
         executeMainOf(AzureWholeStack.class, new String[]{});
         startManagedKubernetesStack(AzureKubernetesPolaris.ID);
     }
 
-    public void startAzurePolaris() throws Exception {
+    void startAzurePolaris() throws Exception {
         executeMainOf(AzureKubernetesPolaris.class, new String[]{});
         startManagedKubernetesStack(AzureKubernetesPolaris.ID);
     }
 
-    public void startFullStackInAws() throws Exception {
+    void startFullStackInAws() throws Exception {
         executeMainOf(PrometheusClusterDeployment.class, new String[]{});
         startManagedKubernetesStack(AWS);
     }
 
-    public void startSparkClusterInAws() throws Exception {
+    void startSparkClusterInAws() throws Exception {
         executeMainOf(SparkClusterDeployment.class, new String[]{});
         startManagedKubernetesStack(AWS);
     }
 
-    public void startAwsPolaris() throws Exception {
+    void startAwsPolaris() throws Exception {
         executeMainOf(AwsWholeStack.class, new String[]{});
         startManagedKubernetesStack(AWS);
     }
@@ -174,12 +125,47 @@ public class StepActions {
         // google_container_cluster resource and uses GKE's built-in CNI, so the targeted apply
         // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
         // Stacks without a managed cluster yield no targets and skip straight to the full apply.
-        Path         jsonDirectory    = cdktfPath(id);
-        List<String> bootstrapTargets = clusterBootstrapTargets(jsonDirectory);
-        startCloud(jsonDirectory, bootstrapTargets);
+        Path         stackDir    = stackDir(id);
+        List<String> bootstrapTargets = clusterBootstrapTargets(stackDir);
+        tofuApply(stackDir, bootstrapTargets);
     }
 
-    // AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click
+    private void tofuApply(Path tofuDir, List<String> bootstrapTargets) throws ManagedProcessException {
+        run("tofu", tofuDir, "init");
+        if (!bootstrapTargets.isEmpty()) {
+            List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
+            phaseOne.addAll(bootstrapTargets);
+            logger.info("Bootstrapping EKS before the full apply: {}", phaseOne);
+            run("tofu", tofuDir, phaseOne.toArray(new String[0]));
+        }
+        run("tofu", tofuDir, OutputStream.nullOutputStream(), "apply", "--auto-approve", "-parallelism=5");
+    }
+
+    private void tofuDestroy(Path tofuDir) {
+        try {
+            logger.info("Stopping {} if it's running already...", tofuDir);
+            run("tofu", tofuDir, "init");
+            if (run("tofu", tofuDir, "destroy", "--auto-approve") != 0) {
+                String msg = String.format("""
+                Failed to destroy %s. Your environment may be in an unstable state.
+                It may be that something irrelevant (like a Helm chart) is blocking the destroy.
+                If so, remove it with something like:
+                    tofu state rm 'helm_release.prometheusRelease'
+                and tofu destroy again.
+                
+                If you're sure nothing in the environment is still running, delete directory %s
+                """, tofuDir, tofuDir);
+                logger.error(msg);
+                throw new RuntimeException(msg);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to call tofu destroy in " + tofuDir, e);
+        }
+    }
+
+    private @NonNull Path stackDir(SupportedCloudsEnum id) {
+        return Path.of("cdktf.out", "stacks", id.toString());
+    }
 
     /**
      * @param storageCloud eg GCP
@@ -205,13 +191,13 @@ public class StepActions {
         executeMainOf(mainClass, args, new Properties());
     }
 
-    public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
+    void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
         logger.info("Running {} with arguments {} and overrides {}",
                  mainClass.getName(),
                  String.join(" ", args),
                  overrides);
 
-        Properties original = saveAndSetSystem(overrides);
+        Properties original = setSystemProperties(overrides);
         try {
             Method main = mainClass.getDeclaredMethod("main", String[].class);
             String[] mainArgs = Arrays
@@ -222,18 +208,6 @@ public class StepActions {
         } finally {
             restoreSystemProperties(overrides, original);
         }
-    }
-
-    public void startCloud(Path jsonDirectory, List<String> bootstrapTargets) throws ManagedProcessException {
-        run("tofu", jsonDirectory, "init");
-        if (!bootstrapTargets.isEmpty()) {
-            List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
-            phaseOne.addAll(bootstrapTargets);
-            logger.info("Bootstrapping EKS before the full apply: {}", phaseOne);
-            run("tofu", jsonDirectory, phaseOne.toArray(new String[0]));
-        }
-        OutputStream suppressedStdOut = OutputStream.nullOutputStream();
-        run("tofu", jsonDirectory, suppressedStdOut, "apply", "--auto-approve", "-parallelism=5");
     }
 
     /**
@@ -248,27 +222,27 @@ public class StepActions {
         List.of("aws_eks_cluster", "azurerm_kubernetes_cluster", "google_container_cluster");
 
     /**
-     * Reads {@code cdk.tf.json} in the given stack directory and returns {@code -target=...}
+     * Reads config file {@code cdk.tf.json} in the given stack dir and returns {@code -target=...}
      * arguments for any managed Kubernetes cluster it declares, so the cluster can be created in
      * a first apply phase. This makes the cluster endpoint/credentials known at plan time for the
      * second, full apply, which is what the v3 kubernetes/helm providers require. Returns an
      * empty list (and logs nothing fatal) when the file is absent or declares no such cluster.
      */
-    private List<String> clusterBootstrapTargets(Path jsonDirectory) {
+    private List<String> clusterBootstrapTargets(Path stackDir) {
         List<String> targets = new ArrayList<>();
-        Path json = jsonDirectory.resolve("cdk.tf.json");
-        if (!json.toFile().exists()) {
+        Path config = stackDir.resolve("cdk.tf.json");
+        if (!config.toFile().exists()) {
             return targets;
         }
         try {
-            JsonNode resources = new ObjectMapper().readTree(json.toFile()).path("resource");
+            JsonNode resources = new ObjectMapper().readTree(config.toFile()).path("resource");
             for (String type : MANAGED_CLUSTER_RESOURCE_TYPES) {
                 resources.path(type).fieldNames()
                          .forEachRemaining(name -> targets.add("-target=" + type + "." + name));
             }
         } catch (IOException e) {
-            logger.warn("Could not read {} to compute cluster bootstrap targets; "
-                     + "proceeding with a single apply", json, e);
+            logger.warn("Could not read config file {} to compute cluster bootstrap targets; "
+                     + "proceeding with a single apply", config, e);
         }
         return targets;
     }
@@ -297,11 +271,6 @@ public class StepActions {
         return p.exitValue();
     }
 
-    public void deleteTerraformStateFiles(SupportedCloudsEnum id) throws IOException {
-        deleteTerraformIn(".", id);
-        deleteTerraformIn("..", id);
-    }
-
     public void runSnowflakeSql(String[] statements) throws NoSuchAlgorithmException, InvalidKeySpecException, SQLException {
         SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory();
         try (Connection conn = factory.getConnection();
@@ -317,29 +286,12 @@ public class StepActions {
         }
     }
     
-    private void deleteTerraformIn(String directory,
-                                   SupportedCloudsEnum id) throws IOException {
-        Files.list(Path.of(directory))
-             .filter(x -> {
-                 String fileName = x.getFileName().toString();
-                 return fileName.startsWith(TERRAFORM_STATE_FILE_PATTERN + id)
-                     && fileName.endsWith(".tfstate");
-             })
-             .forEach(x -> {
-                delete(x);
-            });
+    void createSingleCatalogsFor(String domainName,
+                                        SupportedCloudsEnum catalog) throws Exception {
+        createSingleCatalogsFor(domainName, catalog, new Properties());
     }
 
-    public void delete(Path x) {
-        logger.info("Deleting {}", x);
-        try {
-            PathUtils.delete(x);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public void createSingleCatalogsFor(String domainName,
+    void createSingleCatalogsFor(String domainName,
                                         SupportedCloudsEnum catalog,
                                         Properties properties) throws Exception {
         properties.put(POLARIS_ENDPOINT.getName(), domainName);
@@ -348,9 +300,18 @@ public class StepActions {
                       properties);
     }
 
-    private static void restoreSystemProperties(Properties properties, Properties original) {
-        properties.keySet().forEach(propKey -> {
-            String key   = propKey.toString();
+    void deletePath(Path path) {
+        logger.info("Deleting path {}", path);
+        try {
+            PathUtils.delete(path);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void restoreSystemProperties(Properties properties, Properties original) {
+        properties.keySet().forEach(mapKey -> {
+            String key   = mapKey.toString();
             String value = original.getProperty(key);
             logger.info("Restoring system property {} = {}", key, value);
             if (value != null) {
@@ -361,13 +322,13 @@ public class StepActions {
         });
     }
 
-    private static @NonNull Properties saveAndSetSystem(Properties properties) {
+    private @NonNull Properties setSystemProperties(Properties properties) {
         Properties original = new Properties();
         properties.keySet().forEach(mapKey -> {
-            String key          = mapKey.toString();
-            String systemProp   = System.getProperty(key);
-            if (systemProp != null) {
-                original.put(key, systemProp);
+            String key        = mapKey.toString();
+            String property   = System.getProperty(key);
+            if (property != null) {
+                original.put(key, property);
             }
             String value = properties.getProperty(key);
             logger.info("Setting system property {} = {}", key, value);
@@ -376,9 +337,45 @@ public class StepActions {
         return original;
     }
 
-    public void createSingleCatalogsFor(String domainName,
-                                        SupportedCloudsEnum catalog) throws Exception {
-        createSingleCatalogsFor(domainName, catalog, new Properties());
+    public Step waitFor(String domain) {
+        return new Step(
+                stepNameWaitingFor(domain),
+                "wait for internet DNS servers to recognise " + domain,
+                () -> {
+                    boolean stopResolving = false;
+                    long    start         = System.currentTimeMillis();
+                    int     timeout       = 1_200_000;
+                    logger.info("Checking DNS for {}", domain);
+                    while (!stopResolving) {
+                        long elapsed = System.currentTimeMillis() - start;
+                        logger.info("Waiting on DNS for {}, time elapsed {}s (until timeout {}s)", domain, elapsed/1000, timeout/1000);
+                        if (!(elapsed < timeout)) break;
+                        try {
+                            InetAddress[] addresses = InetAddress.getAllByName(domain);
+                            stopResolving = addresses != null && addresses.length > 0;
+                            if (!stopResolving) {
+                                stopResolving = isWaitingInterrupted(timeout);
+                            }
+                        } catch (UnknownHostException e) {
+                            stopResolving = isWaitingInterrupted(timeout);
+                        }
+                    }
+                });
+    }
+
+    static @NonNull String stepNameWaitingFor(String domain) {
+        return "waitFor_" + domain.substring(0, domain.indexOf('.'));
+    }
+
+    private boolean isWaitingInterrupted(int timeout) {
+        int pauseMs = 15_000;
+        logger.debug("Waiting {}s. Maximum = {}s", pauseMs / 1000, timeout / 1000);
+        try {
+            Thread.sleep(pauseMs);
+        } catch (InterruptedException e) {
+            return true;
+        }
+        return false;
     }
 
 }

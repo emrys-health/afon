@@ -6,8 +6,8 @@ import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
 import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
 import health.emrys.afon.ops.OnboardAllUsersMain;
+import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
 import health.emrys.afon.ops.spark.SparkChecker;
 import health.emrys.afon.ops.spark.SparkTestReader;
 import health.emrys.afon.ops.spark.SparkTestWriter;
@@ -79,6 +79,21 @@ public class StepOperations {
             });
     }
 
+    public Step cleanLocalAzure() {
+        return cleanLocal(AzureKubernetesPolaris.ID);
+    }
+
+    @NonNull
+    public Step cleanLocal(SupportedCloudsEnum id) {
+        return new Step(
+                "clean_" + id,
+                format("clean the local %s directory (if it exists)", id),
+                () -> {
+                    actions.deleteStack(id);
+                });
+    }
+
+
     public Step deployAwsPolaris() {
         return new Step(
             "aws_polaris",
@@ -105,20 +120,6 @@ public class StepOperations {
             "gcp_polaris",
             "deploy Polaris in GCP",
             () -> actions.startGcpPolaris());
-    }
-
-    public Step cleanLocalAzure() {
-        return cleanLocal(AzureKubernetesPolaris.ID);
-    }
-
-    @NonNull
-    public Step cleanLocal(SupportedCloudsEnum id) {
-        return new Step(
-            "clean_" + id,
-            format("clean the local %s directory (if it exists)", id),
-            () -> {
-                actions.deleteStack(id);
-            });
     }
 
     public Step deployWholeStackAzure() {
