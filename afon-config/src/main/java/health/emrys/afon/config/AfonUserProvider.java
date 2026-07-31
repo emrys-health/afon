@@ -14,17 +14,35 @@ public interface AfonUserProvider {
     Pattern RFC_1123_LABEL = Pattern.compile("[a-z0-9]([-a-z0-9]*[a-z0-9])?");
     int RFC_1123_MAX_LENGTH = 63;
 
-    static AfonUser createUser(String username, String password, String email) {
-        return new AfonUser(username,
-                email,
-                null,
-                password,
-                "undefined first name",
-                "undefined last name");
-    }
 
     static AfonUser createUser(String username, String password) {
         return createUser(username, password, null);
+    }
+
+    static AfonUser createUser(String username, String password, String email) {
+        return new AfonUser(username, password, email, null, "undefined", "undefined");
+    }
+
+    static AfonUser createUser(String username, String password, String email, String slug) {
+        return new AfonUser(username, password, email, slug, "undefined", "undefined");
+    }
+
+    static AfonUser createUser(String username, String password, String email, String slug, String firstName, String lastName) {
+        return new AfonUser(username, password, email, slug, firstName, lastName);
+    }
+
+    static AfonUser createUser(String... fields) {
+        if ( fields.length == 6){
+            return createUser(fields[0], fields[1], fields[2], fields[3], fields[4], fields[5]);
+        } else if ( fields.length == 4 ){
+            return createUser(fields[0], fields[1], fields[2], fields[3]);
+        } else if ( fields.length == 3  ){
+            return createUser(fields[0], fields[1], fields[2]);
+        } else if ( fields.length == 2 ){
+            return createUser(fields[0], fields[1]);
+        } else {
+            throw new RuntimeException("Invalid user fields: "+List.of(fields));
+        }
     }
 
     /**
@@ -44,13 +62,11 @@ public interface AfonUserProvider {
      * name and the pod label, since an email address is valid as neither.
      */
     record AfonUser(String username,   // for login via KeyCloak
-                    String email,
-                    // used to identify users across systems vai X-Forwarded-Email header stamped by OAuth2-Proxy
-                    String slug,       // must be RFC-1123 DNS  compliant, therefore cannot use email for the slug
                     String password,   // for login via KeyCloak
-                    String firstName,  // need first and last name for user registration to be complete in KeyCloak
-                    String lastName
-    ) {
+                    String email, // for user auth across systems via X-Forwarded-Email header stamped by OAuth2-Proxy
+                    String slug,       // must be RFC-1123 DNS compliant, therefore cannot use email for the slug
+                    String firstName,  // needed for user registration in KeyCloak
+                    String lastName) { // needed for user registration in KeyCloak
         public AfonUser {
             // KeyCloak lower-cases e-mail addresses, so the identity that arrives at runtime (as the
             // JupyterHub username and oauth2-proxy's X-Forwarded-Email header) is always lower case.

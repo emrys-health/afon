@@ -33,7 +33,9 @@ cd afon-core
 ./afon.sh -a build -p -acceptance # builds all components without running acceptance tests 
 ```
 
-### 2. Configure properties
+### 2. Configure properties & users
+
+#### Properties 
 
 Afon uses two types properties files in the config dir:
 
@@ -85,6 +87,15 @@ Required sensitive properties:
 | `OAUTH2_COOKIE_SECRET` | `openssl rand -hex 16` |
 | `POLARIS_DB_PASSWORD` | Your external Postgres password |
 | `POLARIS_DB_HOST` | Your external Postgres host |
+
+#### Users 
+
+- **`users.csv`** — list of users, one per line. Copy the example and fill in your values:
+
+```shell
+cd config
+cp users.csv.example users.csv
+```
 
 ### 3. Set up cloud infrastructure
 
