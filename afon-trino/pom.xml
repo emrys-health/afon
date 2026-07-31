@@ -14,7 +14,7 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>afon-config</artifactId>
+            <artifactId>afon-security</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

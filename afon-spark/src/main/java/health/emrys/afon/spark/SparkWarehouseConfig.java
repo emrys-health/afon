@@ -1,6 +1,5 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.SupportedCloudsEnum;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.SQLConf$;
@@ -13,9 +12,8 @@ import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 
-import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
+import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static java.lang.String.format;
 import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 

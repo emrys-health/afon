@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.ConfigUtils.protocolFor;
+import static health.emrys.afon.security.SecurityUtils.protocolFor;
 import static java.lang.String.format;
 
 /**
