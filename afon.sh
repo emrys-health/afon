@@ -8,10 +8,14 @@ usage (){
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
-  echo "actions:  build|docs|exec|setup"
-  echo "          build: executes the mvn build"
-  echo "          docs:  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
-  echo "          exec:  executes the jvm classes from ops (see the docs for details)"
+  echo "          [--setup-os <os>]"
+  echo "          [--tofu-apply] [--tofu-destroy]"
+  echo "actions:  build|docs|exec|setup|tofu-{apply|destroy}"
+  echo "          build :  executes the mvn build"
+  echo "          docs  :  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
+  echo "          exec  :  executes the jvm classes from ops (see the docs for details)"
+  echo "          setup :  sets up the "
+  echo "          tofu-*:  executes the tofu commands.  One of apply|destroy"
   echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging-level:  the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "build-args:     the build args.  eg '-DskipTests'."
@@ -97,6 +101,18 @@ exec_script(){
   fi
   set -a && source $CWD/config/afon.properties && source $CWD/config/afon-$CLOUD.properties && set +a
   $CWD/scripts/$CLOUD/$EXEC_SCRIPT
+}
+
+exec_tofu(){
+  TOFU_DIR="afon-ops/cdktf.out/stacks/$CLOUD"
+  if [ ! -d "$TOFU_DIR" ] ; then
+     echo "Dir $TOFU_DIR not found.  Execute deploy or configure actions first."
+     usage; exit 0
+  fi
+  TOFU_ACTION=${ACTION#tofu-}
+  TOFU_CMD="tofu -chdir=$TOFU_DIR $TOFU_ACTION -auto-approve"
+  echo "Executing $TOFU_CMD"
+  $TOFU_CMD
 }
 
 setup_env(){
@@ -249,6 +265,13 @@ case $ACTION in
     ;;
   setup)
     setup_env
+    ;;
+  tofu-*)
+    if [ -z "$CLOUD" ]; then
+      CLOUD="aws"
+      echo "Defaulting to cloud $CLOUD"
+    fi
+    exec_tofu
     ;;
   *)
     echo "Unknown action $ACTION"

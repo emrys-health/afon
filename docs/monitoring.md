@@ -10,8 +10,7 @@ To install the monitoring components on AWS:
 
 The tofu/terraform executions can be done directly via:
 ```shell
-cd cdktf.out/stacks/aws
-tofu apply --auto-approve
+./afon.sh -a tofu-apply
 ```
 
 This installs all the tools (prometheus, etc ...).

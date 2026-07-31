@@ -370,8 +370,7 @@ Install monitoring components on AWS:
 
 ```shell
 ./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeployment
-cd cdktf.out/stacks/aws
-tofu apply --auto-approve
+./afon.sh -a tofu-apply -c aws
 ```
 
 This installs Prometheus, Loki, Grafana, and Hubble.
@@ -877,8 +876,8 @@ SNOWFLAKE_PRIVATE_KEY=YOUR_SNOWFLAKE_PRIVATE_KEY
 
 ```shell
 ./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeployment
-cd cdktf.out/stacks/aws
-tofu apply --auto-approve
+./afon.sh -a tofu-apply -c aws
+
 ```
 
 2. **Run Grafana locally:**
