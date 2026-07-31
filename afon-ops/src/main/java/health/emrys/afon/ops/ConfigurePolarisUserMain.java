@@ -6,7 +6,7 @@ import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import health.emrys.afon.polaris.config.PermissionsConfigurer;
 import health.emrys.afon.polaris.config.PolarisConfigurer;
-import health.emrys.afon.security.keycloak.OnboardingConfig;
+import health.emrys.afon.config.AfonUserProvider;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
@@ -61,7 +61,7 @@ public class ConfigurePolarisUserMain {
     }
 
     public void configureAll(String warehouse,
-                             OnboardingConfig onboarding
+                             AfonUserProvider onboarding
     ) throws IncorrectConfigException, IOException {
         // A previous run may have left this principal role — and hence its catalog-role association —
         // in place, which would make the create/associate below fail. Delete it first so both start
@@ -72,8 +72,8 @@ public class ConfigurePolarisUserMain {
         if (PolarisConfigurer.isFailure(permissions.createPrincipalRoles(principalRoleName))) {
             logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
         }
-        for (OnboardingConfig.EmrysUser user : onboarding.getUsers()) {
-            configureUser(user.userName(), warehouse);
+        for (AfonUserProvider.AfonUser user : onboarding.getUsers()) {
+            configureUser(user.username(), warehouse);
         }
     }
 

@@ -3,6 +3,7 @@ package health.emrys.afon.security.keycloak;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonUserProvider;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -29,10 +30,8 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Provisions, via the KeyCloak admin REST API, the realm, client and user/password that Polaris
- * trusts. After this has run, a client can obtain a token from KeyCloak using
+ * trusts. After registration, a client can obtain a token from KeyCloak.
  *
- * <p>Uses no extra dependencies beyond the Apache HttpClient5 + Jackson already on the classpath.
- * <p>
  * Note in KeyCloak parlance, client is an app and user is a human
  */
 public class KeyCloakAdmin {
@@ -69,7 +68,7 @@ public class KeyCloakAdmin {
      * is left untouched.
      */
     public void registerPolarisUser(String user, String userPassword) {
-        registerPolarisUser(OnboardingConfig.createUser(user, userPassword));
+        registerPolarisUser(AfonUserProvider.createUser(user, userPassword));
     }
 
     /**
@@ -77,16 +76,16 @@ public class KeyCloakAdmin {
      * A verified email is required for logins that go through oauth2-proxy, which rejects id_tokens
      * whose email is unverified. Pass {@code null}/blank to leave the email unset.
      */
-    public void registerPolarisUser(OnboardingConfig.EmrysUser emrysUser) {
+    public void registerPolarisUser(AfonUserProvider.AfonUser user) {
         try {
             logger.info("Running as {}/{}", adminUser, adminPassword);
             String adminToken = adminToken();
             createRealm(adminToken, KEYCLOAK_REALM);
-            createConfidentialClient(adminToken, KEYCLOAK_REALM, emrysUser.userName(), emrysUser.password());
-            createUser(adminToken, KEYCLOAK_REALM, emrysUser);
+            createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
+            createUser(adminToken, KEYCLOAK_REALM, user);
             logger.info(
                 "KeyCloak realm '{}' provisioned with client/user '{}' (email '{}')",
-                KEYCLOAK_REALM, emrysUser.userName(), emrysUser.email());
+                KEYCLOAK_REALM, user.username(), user.email());
         } catch (IOException e) {
             throw new RuntimeException("Failed to provision KeyCloak for Polaris", e);
         }
@@ -419,41 +418,41 @@ public class KeyCloakAdmin {
 
     public void createUser(String adminToken,
                            String realm,
-                           OnboardingConfig.EmrysUser emrysUser
+                           AfonUserProvider.AfonUser user
     ) throws IOException {
-        Map<String, Object> user = new HashMap<>();
-        user.put("username", emrysUser.userName());
-        user.put("enabled", true);
+        Map<String, Object> userObject = new HashMap<>();
+        userObject.put("username", user.username());
+        userObject.put("enabled", true);
         // emailVerified is always true because oauth2-proxy rejects logins whose id_token email is
         // unverified; there is no SMTP verification flow behind this Keycloak.
-        user.put("emailVerified", true);
-        if (emrysUser.email() != null && !emrysUser.email().isBlank()) {
-            user.put("email", emrysUser.email());
+        userObject.put("emailVerified", true);
+        if (user.email() != null && !user.email().isBlank()) {
+            userObject.put("email", user.email());
         }
-        if (emrysUser.firstName() != null && !emrysUser.firstName().isBlank()) {
-            user.put("firstName", emrysUser.firstName());
+        if (user.firstName() != null && !user.firstName().isBlank()) {
+            userObject.put("firstName", user.firstName());
         }
-        if (emrysUser.lastName() != null && !emrysUser.lastName().isBlank()) {
-            user.put("lastName", emrysUser.lastName());
+        if (user.lastName() != null && !user.lastName().isBlank()) {
+            userObject.put("lastName", user.lastName());
         }
-        user.put(
+        userObject.put(
             "credentials", List.of(Map.of(
                 "type", "password",
-                "value", emrysUser.password(),
+                "value", user.password(),
                 "temporary", false
             )));
-        String json = MAPPER.writeValueAsString(user);
-        int    code = postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + emrysUser.userName()).getCode();
+        String json = MAPPER.writeValueAsString(userObject);
+        int    code = postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + user.username()).getCode();
         // A 409 on POST /users is ambiguous: it means the username already exists (genuinely
         // idempotent - fine) OR that some other unique field collides, typically a duplicate email
         // when the realm has duplicateEmailsAllowed=false. In the latter case the user is NOT created,
         // so silently treating the 409 as success (as postJson does) leaves logins failing with
         // user_not_found. Confirm the user really exists; if not, fail loudly with the likely cause.
-        if (code == HttpStatus.SC_CONFLICT && !userExists(adminToken, realm, emrysUser.userName())) {
+        if (code == HttpStatus.SC_CONFLICT && !userExists(adminToken, realm, user.username())) {
             throw new IOException(format(
                 "Could not create KeyCloak user '%s' in realm '%s': HTTP 409 but no user with that "
                 + "username exists. The email '%s' is most likely already held by another user "
-                + "(realm duplicateEmailsAllowed=false).", emrysUser.userName(), realm, emrysUser.email()));
+                + "(realm duplicateEmailsAllowed=false).", user.username(), realm, user.email()));
         }
     }
 
@@ -548,14 +547,14 @@ public class KeyCloakAdmin {
             String password = args[1];
             String email    = args[2];
             logger.info("user ID = {}, password = {}, email = {}", userID, password, email);
-            admin.registerPolarisUser(OnboardingConfig.createUser(
+            admin.registerPolarisUser(AfonUserProvider.createUser(
                 userID,
                 password,
                 email
             ));
         } else {
             logger.info("Using default user from afon.properties");
-            admin.registerPolarisUser(OnboardingConfig.createUser(
+            admin.registerPolarisUser(AfonUserProvider.createUser(
                 AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
                 AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
                 AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, ""))

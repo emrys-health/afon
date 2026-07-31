@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.cdk.Onboarding;
+import health.emrys.afon.config.AfonUsers;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,12 +20,12 @@ public class ConfigureAllPolarisUsersMain {
         }
         ConfigurePolarisUserMain app         = new ConfigurePolarisUserMain(properties);
         String            catalogName = args[1];
-        Onboarding        onboarding  = new Onboarding();
+        AfonUsers afonUsers = new AfonUsers();
         try {
             app.configurePrivilegesFor(catalogName);
-            app.configureAll(catalogName, onboarding);
+            app.configureAll(catalogName, afonUsers);
         } catch (Exception e) {
-            logger.error("Error configuring polaris users " + onboarding, e);
+            logger.error("Error configuring polaris users " + afonUsers, e);
         }
     }
 

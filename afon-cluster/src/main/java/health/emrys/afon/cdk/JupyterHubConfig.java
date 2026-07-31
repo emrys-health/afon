@@ -19,8 +19,8 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.security.keycloak.OnboardingConfig;
-import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;
+import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.AfonUsers;
 import org.slf4j.Logger;
 
 import java.net.URLEncoder;
@@ -109,7 +109,7 @@ public abstract class JupyterHubConfig {
     /**
      * KubeSpawner stamps this label (value = the user's slug) on each pod; the per-user VNC Service selects it.
      */
-    private static final String GUAC_USER_LABEL = "guacamole-user";
+    private static final String GUACAMOLE_USER = "guacamole-user";
 
 
     /**
@@ -129,8 +129,8 @@ public abstract class JupyterHubConfig {
     private final   TerraformStack                stack;
     private final   String                        jupyterPassword;
     private final   List<GuacamoleConfig.Session> sessions;
-    private final   OnboardingConfig              onboarding = new Onboarding();
-    protected final Properties                    properties;
+    private final   AfonUserProvider              userProvider = new AfonUsers();
+    protected final   Properties                  properties;
 
     public JupyterHubConfig(
         TerraformStack stack,
@@ -141,7 +141,7 @@ public abstract class JupyterHubConfig {
         // One Guacamole login per user, keyed by email; each streams that user's own pod desktop on
         // the single VNC port (each user now has their own pod rather than sharing ports on one).
         this.sessions = new ArrayList<>();
-        for (EmrysUser user : onboarding.getUsers()) {
+        for (AfonUserProvider.AfonUser user : userProvider.getUsers()) {
             sessions.add(new GuacamoleConfig.Session(user.email(), jupyterPassword, VNC_PORT));
         }
     }
@@ -255,7 +255,7 @@ public abstract class JupyterHubConfig {
         // logged into JupyterHub and spawned it.
         Map<String, String>        emailToVncHost = new LinkedHashMap<>();
         List<ITerraformDependable> guacamoleDeps  = new ArrayList<>(eksDependOn);
-        for (EmrysUser user : onboarding.getUsers()) {
+        for (AfonUserProvider.AfonUser user : userProvider.getUsers()) {
             emailToVncHost.put(user.email(), vncServiceName(user.slug()));
             List<ServiceSpecPort> userPorts = List.of(ServiceSpecPort.builder()
                                                         .name("vnc")
@@ -263,7 +263,7 @@ public abstract class JupyterHubConfig {
                                                         .targetPort(String.valueOf(VNC_PORT))
                                                         .protocol("TCP")
                                                         .build());
-            Map<String, String> guacUserConfig = Map.of(GUAC_USER_LABEL, user.slug());
+            Map<String, String> guacUserConfig = Map.of(GUACAMOLE_USER, user.slug());
             guacamoleDeps.add(clusterIpService(eksDependOn, guacUserConfig, vncServiceName(user.slug()), userPorts, stack));
         }
 
@@ -519,9 +519,9 @@ public abstract class JupyterHubConfig {
             PROXY_API_SVC, PROXY_API,
             HUB_SVC, HUB_PORT,
             SINGLEUSER_IMAGE, SINGLEUSER_PORT,
-            HUB_BASE_URL, GUAC_USER_LABEL,
+            HUB_BASE_URL, GUACAMOLE_USER,
             issuer, jupyterDomain(),
-            pythonSetOf(onboarding.getUsers().stream().map(EmrysUser::email).toList()),
+            pythonSetOf(userProvider.getUsers().stream().map(AfonUserProvider.AfonUser::email).toList()),
             pythonSlugMap(),
             URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8));
     }
@@ -537,7 +537,7 @@ public abstract class JupyterHubConfig {
      * Renders the email->slug dict literal body (no braces): {@code 'a@x': 'a', 'b@x': 'b'}.
      */
     private String pythonSlugMap() {
-        return onboarding.getUsers().stream()
+        return userProvider.getUsers().stream()
                          .map(u -> "'" + u.email() + "': '" + u.slug() + "'")
                          .reduce((a, b) -> a + ", " + b)
                          .orElse("");

@@ -1,11 +1,11 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.cdk.Onboarding;
+import health.emrys.afon.config.AfonUsers;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.security.keycloak.KeyCloakAdmin;
-import health.emrys.afon.security.keycloak.OnboardingConfig;
-import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser;
+import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.AfonUserProvider.AfonUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,21 +20,21 @@ public class OnboardAllUsersMain {
 
     private static final Logger logger = LoggerFactory.getLogger(OnboardAllUsersMain.class);
 
-    private final OnboardingConfig onboardingConfig;
+    private final AfonUserProvider userProvider;
     private final Properties       properties;
     private final KeyCloakAdmin    kcAdmin;
 
-    public OnboardAllUsersMain(OnboardingConfig onboardingConfig, Properties properties) {
-        this.onboardingConfig = onboardingConfig;
-        this.properties       = properties;
-        kcAdmin               = new KeyCloakAdmin(properties);
+    public OnboardAllUsersMain(AfonUserProvider userProvider, Properties properties) {
+        this.userProvider = userProvider;
+        this.properties = properties;
+        this.kcAdmin = new KeyCloakAdmin(properties);
     }
 
     public void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
         logger.info("CONFIGURING POLARIS");
         ConfigurePolarisUserMain polarisConfiguration = new ConfigurePolarisUserMain(properties);
         polarisConfiguration.configurePrivilegesFor(warehouse);
-        polarisConfiguration.configureAll(warehouse, onboardingConfig);
+        polarisConfiguration.configureAll(warehouse, userProvider);
     }
 
     public void configureKeyCloak(String jupyterDomain) throws IOException {
@@ -42,16 +42,16 @@ public class OnboardAllUsersMain {
         kcAdmin.registerBrowser(properties, jupyterDomain);
         String adminToken = kcAdmin.adminToken();
         kcAdmin.createRealm(adminToken, KEYCLOAK_REALM);
-        for (EmrysUser user : onboardingConfig.getUsers()) {
+        for (AfonUser user : userProvider.getUsers()) {
             kcAdmin.createUser(adminToken, KEYCLOAK_REALM, user);
-            kcAdmin.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.userName(), user.password());
+            kcAdmin.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
         }
     }
 
     public static void main(String[] args) {
         Properties properties = new AfonPropertiesLoader().getProperties();
         properties.put(POLARIS_ENDPOINT.getName(), args[0]);
-        OnboardAllUsersMain app           = new OnboardAllUsersMain(new Onboarding(), properties);
+        OnboardAllUsersMain app           = new OnboardAllUsersMain(new AfonUsers(), properties);
         String            catalog       = args[1];
         String            jupyterDomain = args[2];
         try {
@@ -60,7 +60,7 @@ public class OnboardAllUsersMain {
         } catch (Exception e) {
             logger.error(
                     "Failed to onboard all users:\n{}\nError = {}",
-                    app.onboardingConfig.getUsers().stream().map(x -> x.userName()).collect(Collectors.joining("\n")),
+                    app.userProvider.getUsers().stream().map(x -> x.username()).collect(Collectors.joining("\n")),
                     e.getMessage());
             throw new RuntimeException(e);
         }
