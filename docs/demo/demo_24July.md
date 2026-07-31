@@ -2,12 +2,12 @@
 
 Run:
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.ops.DeployFullStackAwsMain
+./afon.sh -a exec --exec-class ops.DeployFullStackAwsMain
 ```
 
 If you need to add tables to Polaris, run something like:
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.ops.RegisterLocalPolarisMain --exec-args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click phil s3cr3t"
+./afon.sh -a exec --exec-class ops.RegisterLocalPolarisMain --exec-args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click phil s3cr3t"
 ```
 (This is just an old table that `afon-acceptancetests` created.
 The salient file in any Iceberg table is the `*.metadata.json` one).

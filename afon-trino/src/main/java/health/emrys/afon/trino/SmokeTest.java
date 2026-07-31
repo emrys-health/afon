@@ -8,10 +8,10 @@ import java.util.Properties;
  * <pre>kubectl port-forward svc/trino 8080:8080</pre>
  * Populate the cloud Polaris with something like:
  * <pre>
- ./afon.sh -a exec --exec-class health.emrys.afon.ops.RegisterLocalPolarisMain --exec-args "GCP acceptancetests smoketesttable260601231212 gs://emrys_afon_core/acceptancetests/smoketesttable260601231212/metadata/00000-0cf4c26f-668b-474c-9542-618d3fba2e19.metadata.json  emryspolaris.click"
+ ./afon.sh -a exec --exec-class ops.RegisterLocalPolarisMain --exec-args "GCP acceptancetests smoketesttable260601231212 gs://emrys_afon_core/acceptancetests/smoketesttable260601231212/metadata/00000-0cf4c26f-668b-474c-9542-618d3fba2e19.metadata.json  emryspolaris.click"
 </pre>
  * or <pre>
- ./afon.sh -a exec --exec-class health.emrys.afon.ops.RegisterLocalPolarisMain --exec-args "AZURE acceptancetests smoketesttable260601231212 abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable260601231212/metadata/00001-ba11f3b6-6920-4007-9368-ab913506716f.metadata.json  emryspolaris.click"
+ ./afon.sh -a exec --exec-class ops.RegisterLocalPolarisMain --exec-args "AZURE acceptancetests smoketesttable260601231212 abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable260601231212/metadata/00001-ba11f3b6-6920-4007-9368-ab913506716f.metadata.json  emryspolaris.click"
 </pre>
  *
  */
