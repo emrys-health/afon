@@ -4,15 +4,15 @@ import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.cluster.ClusterUtils
-import health.emrys.afon.config.AfonPropertiesLoader
+import health.emrys.afon.config.AfonUserProvider.AfonUser
+import health.emrys.afon.config.{AfonPropertiesLoader, AfonUserProvider}
 import health.emrys.afon.ops.OnboardAllUsersMain
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import health.emrys.afon.polaris.config.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
 import health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM
-import health.emrys.afon.security.keycloak.{KeyCloakAdmin, KeyCloakConfig, OnboardingConfig}
-import health.emrys.afon.security.keycloak.OnboardingConfig.EmrysUser
+import health.emrys.afon.security.keycloak.{KeyCloakAdmin, KeyCloakConfig}
 import health.emrys.afon.trino.SmokeTest
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
@@ -134,10 +134,10 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     val UserName      = "userX"
     val UserPassword  = "password"
     val properties    = AcceptanceTestConfig.instance.getProperties
-    val User          = new EmrysUser(UserName, "email@test.com", "slug", UserPassword, "first", "second")
+    val User          = new AfonUser(UserName, "email@test.com", "slug", UserPassword, "first", "second")
 
-    val onboardingConfig = new OnboardingConfig() {
-      override def getUsers: util.List[EmrysUser] = util.List.of(User)
+    val onboardingConfig = new AfonUserProvider() {
+      override def getUsers: util.List[AfonUser] = util.List.of(User)
     }
     "agree on the token" in {
       Given("A KeyCloak and Polaris instance")
