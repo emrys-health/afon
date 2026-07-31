@@ -4,8 +4,8 @@ import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.security.keycloak.KeyCloakAdmin;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.AfonUserProvider.AfonUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

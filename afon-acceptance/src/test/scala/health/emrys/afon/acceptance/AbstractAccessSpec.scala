@@ -4,8 +4,7 @@ import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.cluster.ClusterUtils
-import health.emrys.afon.config.AfonUserProvider.AfonUser
-import health.emrys.afon.config.{AfonPropertiesLoader, AfonUserProvider}
+import health.emrys.afon.config.{AfonPropertiesLoader, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.OnboardAllUsersMain
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY

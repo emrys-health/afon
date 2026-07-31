@@ -6,6 +6,7 @@ import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import health.emrys.afon.polaris.config.PermissionsConfigurer;
 import health.emrys.afon.polaris.config.PolarisConfigurer;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
@@ -72,7 +73,7 @@ public class ConfigurePolarisUserMain {
         if (PolarisConfigurer.isFailure(permissions.createPrincipalRoles(principalRoleName))) {
             logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
         }
-        for (AfonUserProvider.AfonUser user : onboarding.getUsers()) {
+        for (AfonUser user : onboarding.getUsers()) {
             configureUser(user.username(), warehouse);
         }
     }

@@ -19,6 +19,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FileUserProvider;
 import org.slf4j.Logger;
@@ -141,7 +142,7 @@ public abstract class JupyterHubConfig {
         // One Guacamole login per user, keyed by email; each streams that user's own pod desktop on
         // the single VNC port (each user now has their own pod rather than sharing ports on one).
         this.sessions = new ArrayList<>();
-        for (AfonUserProvider.AfonUser user : userProvider.getUsers()) {
+        for (AfonUser user : userProvider.getUsers()) {
             sessions.add(new GuacamoleConfig.Session(user.email(), jupyterPassword, VNC_PORT));
         }
     }
@@ -255,7 +256,7 @@ public abstract class JupyterHubConfig {
         // logged into JupyterHub and spawned it.
         Map<String, String>        emailToVncHost = new LinkedHashMap<>();
         List<ITerraformDependable> guacamoleDeps  = new ArrayList<>(eksDependOn);
-        for (AfonUserProvider.AfonUser user : userProvider.getUsers()) {
+        for (AfonUser user : userProvider.getUsers()) {
             emailToVncHost.put(user.email(), vncServiceName(user.slug()));
             List<ServiceSpecPort> userPorts = List.of(ServiceSpecPort.builder()
                                                         .name("vnc")
@@ -521,7 +522,7 @@ public abstract class JupyterHubConfig {
             SINGLEUSER_IMAGE, SINGLEUSER_PORT,
             HUB_BASE_URL, GUACAMOLE_USER,
             issuer, jupyterDomain(),
-            pythonSetOf(userProvider.getUsers().stream().map(AfonUserProvider.AfonUser::email).toList()),
+            pythonSetOf(userProvider.getUsers().stream().map(AfonUser::email).toList()),
             pythonSlugMap(),
             URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8));
     }
