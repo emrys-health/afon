@@ -3,7 +3,7 @@ package health.emrys.afon.polaris.config;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.security.SecurityUtils;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -45,7 +45,7 @@ public class AfonPolarisClient {
     }
 
     AfonPolarisClient(String hostname, Properties properties) {
-        this(format("%s://%s", ConfigUtils.protocolFor(hostname), hostname),
+        this(format("%s://%s", SecurityUtils.protocolFor(hostname), hostname),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
     }

@@ -11,7 +11,7 @@ import static health.emrys.afon.config.AfonProperties.GCP_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperties.GCP_SERVICE_ACCOUNT;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP;
 import static health.emrys.afon.config.AfonProperties.SupportedCloudsEnum.GCP_EXTERNAL;
-import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
+import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum.GCS;
 
 public class ExternalGcpCloudConfigForPolaris extends ExternalCloudConfigForPolaris {

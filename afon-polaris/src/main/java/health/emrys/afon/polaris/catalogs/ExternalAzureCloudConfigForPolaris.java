@@ -9,7 +9,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
-import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
+import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 
 /**
  * This helps to create a catalog called SupportedCloudsEnum.AZURE_EXTERNAL_BUCKET

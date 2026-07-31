@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.ConfigUtils.protocolFor;
+import static health.emrys.afon.security.SecurityUtils.protocolFor;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.tokenEndpoint;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;

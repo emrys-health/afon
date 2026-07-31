@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.ConfigUtils.protocolFor;
+import static health.emrys.afon.security.SecurityUtils.protocolFor;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -64,11 +64,11 @@ public class KeyCloakAdmin {
     }
 
     /**
-     * Ensures the Polaris realm, client and user all exist. Idempotent: anything that already exists
-     * is left untouched.
+     * Ensures the Polaris realm, client and user all exist.
+     * Idempotent: anything that already exists is left untouched.
      */
-    public void registerPolarisUser(String user, String userPassword) {
-        registerPolarisUser(AfonUserProvider.createUser(user, userPassword));
+    public void registerPolarisUser(String username, String password) {
+        registerPolarisUser(AfonUserProvider.createUser(username, password));
     }
 
     /**

@@ -6,7 +6,7 @@ import org.jspecify.annotations.NonNull;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.CatalogUtils.OAUTH_SCOPE;
+import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static java.lang.String.format;
 
 public class TrinoServerConfiguration {
