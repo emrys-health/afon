@@ -14,7 +14,7 @@ usage (){
   echo "          build :  executes the mvn build"
   echo "          docs  :  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
   echo "          exec  :  executes the jvm classes from ops (see the docs for details)"
-  echo "          setup :  sets up the "
+  echo "          setup :  sets up the local env for the given os."
   echo "          tofu-*:  executes the tofu commands.  One of apply|destroy"
   echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging-level:  the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
@@ -118,10 +118,10 @@ exec_tofu(){
 setup_env(){
   case $SETUP_OS in
     linux)
-      sudo apt install git openjdk-17-jdk maven docker tofu kubectl kubefwd awscli azure-cli google-cloud-cli
+      sudo apt install git openjdk-17-jdk maven docker tofu kubectl awscli azure-cli google-cloud-cli
       ;;
     macos)
-      brew install git openjdk@17 maven docker opentofu kubernetes-cli kubefwd awscli azure-cli gcloud-cli
+      brew install git openjdk@17 maven docker opentofu kubernetes-cli awscli azure-cli gcloud-cli hubble
       ;;
     *)
       echo "Setup not supported for $SETUP_OS"
