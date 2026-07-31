@@ -3,6 +3,7 @@ package health.emrys.afon.security.keycloak;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
@@ -76,7 +77,7 @@ public class KeyCloakAdmin {
      * A verified email is required for logins that go through oauth2-proxy, which rejects id_tokens
      * whose email is unverified. Pass {@code null}/blank to leave the email unset.
      */
-    public void registerPolarisUser(AfonUserProvider.AfonUser user) {
+    public void registerPolarisUser(AfonUser user) {
         try {
             logger.info("Running as {}/{}", adminUser, adminPassword);
             String adminToken = adminToken();
@@ -418,7 +419,7 @@ public class KeyCloakAdmin {
 
     public void createUser(String adminToken,
                            String realm,
-                           AfonUserProvider.AfonUser user
+                           AfonUser user
     ) throws IOException {
         Map<String, Object> userObject = new HashMap<>();
         userObject.put("username", user.username());

@@ -11,7 +11,7 @@ public class AfonUsersTest {
     @Test
     public void testLoadAllUsers() {
         AfonUserProvider provider = new FileUserProvider();
-        List<AfonUserProvider.AfonUser> users = provider.getUsers();
+        List<AfonUser> users = provider.getUsers();
         assertThat(users).hasSizeGreaterThan(0);
     }
 
