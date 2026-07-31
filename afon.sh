@@ -1,6 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage (){
+  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h]"
+  echo "          [--logging-level|-l <logging>]"
+  echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
+  echo "          [--docs-dir|-d <dir>]"
+  echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
+  echo "          [--exec-script <script-name>]"
+  echo "actions:  build|docs|exec|setup"
+  echo "          build: executes the mvn build"
+  echo "          docs:  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
+  echo "          exec:  executes the jvm classes from ops (see the docs for details)"
+  echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
+  echo "logging-level:  the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
+  echo "build-args:     the build args.  eg '-DskipTests'."
+  echo "build-goals:    the build goals.  Defaults to 'clean install'."
+  echo "build-profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
+  echo "docs-dir:       the output dir for the docs."
+  echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
+  echo "exec-package:   the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
+  echo "exec-class:     the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
+  echo "exec-args:      the jvm exec args (must be quoted if more than one arg)"
+  echo "exec-envs:      the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
+  echo "setup-os:       the os to setup.  One of linux|macos"
+  echo "mvn-quiet:      the flag to hush the mvn output"
+}
+
 check_acceptance(){
   SCENARIOS_FILE="afon-acceptance/target/surefire-reports/scenarios.txt"
   if [ -f "$SCENARIOS_FILE" ]; then
@@ -32,9 +58,17 @@ exec_mvn() {
 }
 
 exec_jvm(){
+    if [ -z "$EXEC_PACKAGE" ] ; then
+      EXEC_PACKAGE="health.emrys.afon"
+    fi
   if [ -z "$EXEC_CLASS" ] ; then
     echo "Action exec requires option --exec-class"
     usage; exit 1
+  fi
+  if [ -n "$EXEC_PACKAGE" ] ; then
+    if [[ "$EXEC_CLASS" != "$EXEC_PACKAGE"* ]]; then
+      EXEC_CLASS="$EXEC_PACKAGE.$EXEC_CLASS"
+    fi
   fi
   MVN_GOALS="exec:exec -Pexec -Dexec.mainClass=$EXEC_CLASS"
   if [ -n "$EXEC_ARGS" ] ; then
@@ -83,28 +117,6 @@ version(){
   mvn help:evaluate -Dexpression=project.version -q -DforceStdout
 }
 
-usage (){
-  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h]"
-  echo "          [--logging-level|-l <logging>]"
-  echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
-  echo "          [--docs-dir|-d <dir>]"
-  echo "          [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
-  echo "          [--exec-script <script-name>]"
-  echo "actions:  build|docs|exec|setup"
-  echo "          build: executes the mvn build"
-  echo "          docs:  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
-  echo "          exec:  executes the jvm classes from ops (see the docs for details)"
-  echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
-  echo "logging-level:  the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
-  echo "build-args:     the build args.  eg '-DskipTests'."
-  echo "build-goals:    the build goals.  Defaults to 'clean install'."
-  echo "build-profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
-  echo "docs-dir:       the output dir for the docs."
-  echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
-  echo "setup-os:       the os to setup.  One of linux|macos"
-  echo "mvn-quiet:      the flag to hush the mvn output"
-}
-
 ACTION=
 BUILD_ARGS=
 BUILD_GOALS=
@@ -116,6 +128,7 @@ DOCS_DIR=
 EXEC_CLASS=
 EXEC_ARGS=
 EXEC_ENVS=
+EXEC_PACKAGE=
 EXEC_SCRIPT=
 EXEC_TYPE=
 MVN_PROFILES=
@@ -148,6 +161,8 @@ while [[ $# -gt 0 ]]; do
       EXEC_ARGS="$2"; shift 2 ;;
     --exec-envs)
       EXEC_ENVS="$2"; shift 2 ;;
+    --exec-package)
+      EXEC_PACKAGE="$2"; shift 2 ;;
     --exec-script)
       EXEC_SCRIPT="$2"; shift 2 ;;
     --exec-type|-t)
