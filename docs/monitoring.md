@@ -5,7 +5,7 @@ To install the monitoring components on AWS:
 - Generate config files and executes tofu:
 
 ```shell
-./afon.sh -a exec --exec-class health.emrys.afon.cdk.aws.PrometheusClusterDeployment
+./afon.sh -a exec --exec-class cdk.aws.PrometheusClusterDeployment
 ```
 
 The tofu/terraform executions can be done directly via:
