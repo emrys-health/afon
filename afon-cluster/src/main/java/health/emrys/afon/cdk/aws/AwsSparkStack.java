@@ -29,15 +29,15 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
  * But now we're more production like (static domain names; persisted Polaris metadata etc)
  * this could be feasibly moved into its parent class.
  */
-public class SparkClusterDeployment extends AwsWholeStack {
+public class AwsSparkStack extends AwsJupyterStack {
 
-    static final Logger logger                 = org.slf4j.LoggerFactory.getLogger(SparkClusterDeployment.class);
+    static final Logger logger                 = org.slf4j.LoggerFactory.getLogger(AwsSparkStack.class);
     static final String NO_SPARK_LB_FINALIZERS = "kubectl patch service spark-master-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
     protected final String awsPolarisDomainName;
 
-    public SparkClusterDeployment(@NonNull Construct scope,
-                                  @NonNull AfonCloud id,
-                                  Properties properties) {
+    public AwsSparkStack(@NonNull Construct scope,
+                         @NonNull AfonCloud id,
+                         Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
@@ -102,22 +102,14 @@ public class SparkClusterDeployment extends AwsWholeStack {
 
     public static void main(String[] args) {
         try {
-            createSparkDeploymentTerraformFile();
+            logger.info("Creating AWS Spark stack");
+            final App app = new App();
+            new AwsSparkStack(app, AWS, new AfonPropertiesLoader().getProperties());
+            app.synth();
         } catch (RuntimeException e) {
-            logAndThrow(e);
+            logger.error(e.toString());
+            throw new RuntimeException(e);
         }
-    }
-
-    public static void logAndThrow(RuntimeException e) {
-        logger.error(e.toString());
-        throw new RuntimeException(e);
-    }
-
-    private static void createSparkDeploymentTerraformFile() {
-        logger.info("Creating JSON for a Spark cluster");
-        final App app = new App();
-        new SparkClusterDeployment(app, AWS, new AfonPropertiesLoader().getProperties());
-        app.synth();
     }
 
 }

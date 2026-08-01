@@ -28,11 +28,6 @@ public class AzureReader {
         return Pattern.compile(regex);
     }
 
-    public static void main(String[] args) {
-        AzureReader app = new AzureReader();
-        app.list("my_project_folder*metadata.json");
-    }
-
     public AzureReader() {
         Properties properties = new AfonPropertiesLoader().getProperties();
         containerName    = AfonProperties.AZURE_BUCKET.getValueFrom(properties);
@@ -56,4 +51,11 @@ public class AzureReader {
         }
         return result;
     }
+
+    public static void main(String[] args) {
+        AzureReader app = new AzureReader();
+        app.list("my_project_folder*metadata.json");
+    }
+
+
 }

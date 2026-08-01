@@ -9,7 +9,7 @@ public class AwsComponentNames {
     private final String prefix;
 
     public AwsComponentNames(Properties properties) {
-        prefix          = CLUSTER_NAME.getValueFrom(properties);
+        prefix = CLUSTER_NAME.getValueFrom(properties);
     }
 
     public String getClusterRoleName() {

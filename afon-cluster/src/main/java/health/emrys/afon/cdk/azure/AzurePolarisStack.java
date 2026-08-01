@@ -10,7 +10,7 @@ import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import health.emrys.afon.cdk.PolarisConfig;
-import health.emrys.afon.cdk.TFUtils;
+import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jspecify.annotations.NonNull;
@@ -22,11 +22,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 
-import static health.emrys.afon.cdk.TFUtils.POLARIS_PROVISIONERS;
+import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
 import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
-public class AzureKubernetesPolaris extends AzureKubernetesStack {
+public class AzurePolarisStack extends AzureKubernetesStack {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AzureKubernetesStack.class);
 
@@ -38,21 +38,21 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
     protected final      Release certManager;
     private final        Service internalService;
 
-    public AzureKubernetesPolaris(Construct scope, String id,
-                                  Properties properties) {
+    public AzurePolarisStack(Construct scope, String id,
+                             Properties properties) {
         super(scope, id, properties);
         resourceGroup = AfonProperties.AZURE_RESOURCE_GROUP.getValueFrom(properties);
 
         PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
-        var util = new TFUtils(
+        var helper = new CdkHelper(
             this, azurePolarisDomainName, TLS_SECRET_NAME,
             POLARIS_PORT, POLARIS_INTERNAL, POLARIS_INGRESS_NAME);
         HelmProvider               helm        = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
         nginxRelease    = configureNginx(helm, dependables);
-        certManager     = util.installCertManager(this, helm, dependables);
+        certManager     = helper.installCertManager(this, helm, dependables);
         internalService = polarisConfig.deployPolaris(cloudProvider.getDependables());
-        IngressV1 ingress = util.createIngress(
+        IngressV1 ingress = helper.createIngress(
             List.of(
                 nginxRelease, certManager, internalService),
             Optional.of(POLARIS_PROVISIONERS));
@@ -65,7 +65,7 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
             "controller.service.annotations.service\\.beta\\" +
             ".kubernetes\\.io/azure-load-balancer-health-probe" +
             "-request-path", "/healthz");
-        nginxRelease = TFUtils.installNginxIngress(this, helm, dependables, annotations);
+        nginxRelease = CdkHelper.installNginxIngress(this, helm, dependables, annotations);
         return nginxRelease;
     }
 
@@ -95,7 +95,7 @@ public class AzureKubernetesPolaris extends AzureKubernetesStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AzureKubernetesPolaris(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
+        new AzurePolarisStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
         app.synth();
     }
 }

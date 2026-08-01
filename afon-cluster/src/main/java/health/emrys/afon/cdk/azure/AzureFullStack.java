@@ -23,11 +23,11 @@ import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
 import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
-public class AzureWholeStack extends AzureKubernetesPolaris {
+public class AzureFullStack extends AzurePolarisStack {
 
     private final String TLS_SECRET_NAME = "jupyter-secret";
 
-    public AzureWholeStack(Construct scope, String id, Properties properties) {
+    public AzureFullStack(Construct scope, String id, Properties properties) {
         super(scope, id, properties);
 
         // The Azure CNI (Cilium) data plane is not necessarily ready the moment the
@@ -58,14 +58,14 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
         sparkDeployer.deploy(this, AZURE, sparkDependsOn);
 
         String jupyterDomainName = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
-        var util = new TFUtils(
+        var helper = new CdkHelper(
             this, jupyterDomainName, TLS_SECRET_NAME,
             PROXY_PORT, PROXY_SVC_NAME, JUPYTER_INGRESS);
         JupyterHubConfig jupyter = new JupyterHubConfig(this, properties) {
 
             @Override
             protected void configureHttpsAndDNS() {
-                IngressV1 ingress = util.createIngress(
+                IngressV1 ingress = helper.createIngress(
                     List.of(
                         nginxRelease, certManager),
                     Optional.empty());
@@ -77,7 +77,7 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
             @Override
             protected JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps) {
                 return new JupyterMfaConfig(
-                    AzureWholeStack.this,
+                    AzureFullStack.this,
                     proxyDeps,
                     JupyterHubConfig.MFA_UPSTREAMS,
                     jupyterDomainName,
@@ -107,7 +107,7 @@ public class AzureWholeStack extends AzureKubernetesPolaris {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AzureWholeStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
+        new AzureFullStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
         app.synth();
     }
 

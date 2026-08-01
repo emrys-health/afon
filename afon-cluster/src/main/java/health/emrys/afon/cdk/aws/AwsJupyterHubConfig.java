@@ -18,18 +18,18 @@ import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
 /**
  * AWS wiring for {@link JupyterHubConfig}: terminates HTTPS at an ALB and routes to the oauth2-proxy
  * MFA gate, which in turn forwards to JupyterHub's public proxy. Mirrors
- * {@link JupyterAwsConfig} but for the multi-user JupyterHub deployment.
+ * {@link AwsJupyterConfig} but for the multi-user JupyterHub deployment.
  */
-public class JupyterHubAwsConfig extends JupyterHubConfig {
-    private final AwsConstruct   cloudProvider;
+public class AwsJupyterHubConfig extends JupyterHubConfig {
+    private final AwsCloudProvider cloudProvider;
     private final String         jupyterDomain;
     private final String         jupyterDnsZoneId;
     private final String         jupyterCertArn;
     private final TerraformStack stack;
     private final Route53Record  keycloakAliasRecord;
 
-    public JupyterHubAwsConfig(TerraformStack stack,
-                               AwsConstruct cloudProvider,
+    public AwsJupyterHubConfig(TerraformStack stack,
+                               AwsCloudProvider cloudProvider,
                                Properties properties,
                                Route53Record keycloakAliasRecord) {
         super(stack, properties);

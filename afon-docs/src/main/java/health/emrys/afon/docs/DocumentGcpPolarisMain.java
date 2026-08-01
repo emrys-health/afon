@@ -1,6 +1,6 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.cdk.gcp.GcpConstruct;
+import health.emrys.afon.cdk.gcp.GcpCloudProvider;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.DeployGcpPolarisMain;
 import health.emrys.afon.ops.steps.Step;
@@ -78,7 +78,7 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
             gcloud container clusters delete %s --region=europe-west2
             ```
             """,
-             GcpConstruct.nukeGcp(),
+             GcpCloudProvider.nukeGcp(),
              CLUSTER_NAME.getValueFrom(properties)
         );
     }

@@ -13,15 +13,15 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
 
-public class JupyterAwsConfig extends JupyterConfig {
-    private final AwsConstruct   cloudProvider;
+public class AwsJupyterConfig extends JupyterConfig {
+    private final AwsCloudProvider cloudProvider;
     private final String         jupyterDomain;
     private final String         jupyterDnsZoneId;
     private final String         jupyterCertArn;
     private final TerraformStack stack;
 
-    public JupyterAwsConfig(TerraformStack stack,
-                            AwsConstruct cloudProvider,
+    public AwsJupyterConfig(TerraformStack stack,
+                            AwsCloudProvider cloudProvider,
                             Properties properties) {
         super(stack, properties);
         this.cloudProvider    = cloudProvider;

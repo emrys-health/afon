@@ -17,7 +17,7 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
         ArrayList<Step> steps = new ArrayList<>();
         steps.addAll(List.of(
                 stepOperations.deleteAwsStack(),
-                stepOperations.deployAwsFullCluster(),
+                stepOperations.deployAwsFullStack(),
                 stepOperations.waitForAwsPolaris(),
                 stepOperations.initializeAllCatalogsInAws(),
                 stepOperations.checkAwsSparkConnectorTalkingToAws()

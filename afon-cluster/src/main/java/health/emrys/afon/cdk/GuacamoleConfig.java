@@ -11,7 +11,6 @@ import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplat
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpec;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerPort;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainer;
@@ -34,9 +33,6 @@ import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecInit
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecVolume;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecVolumeConfigMap;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecVolumeEmptyDir;
-import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import software.constructs.Construct;
 
@@ -45,9 +41,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import static health.emrys.afon.cdk.TFUtils.clusterIpService;
-import static health.emrys.afon.cdk.DeploymentUtils.withAppKubernetesIoName;
-import static health.emrys.afon.cdk.TFUtils.envVar;
+import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
+import static health.emrys.afon.cdk.CdkUtils.withAppKubernetesIoName;
+import static health.emrys.afon.cdk.CdkHelper.envVar;
 
 /**
  * Deploys Apache Guacamole as a clientless remote desktop gateway so that the GUI of the
@@ -240,7 +236,7 @@ public class GuacamoleConfig {
 
         Deployment.Builder.create(scope, "guacamoleDeployment")
                 .dependsOn(deps)
-                // See DeploymentUtils.deploy: don't burn the 15-minute EKS token window waiting for
+                // See CdkUtils.deploy: don't burn the 15-minute EKS token window waiting for
                 // pod readiness on an app workload nothing downstream depends on. Trade-off: a broken
                 // rollout won't fail the apply — surface it via monitoring/kubectl.
                 .waitForRollout(false)
@@ -348,7 +344,7 @@ public class GuacamoleConfig {
 
         Deployment.Builder.create(scope, "guacamoleDeployment")
                 .dependsOn(deployDeps)
-                // See DeploymentUtils.deploy: don't burn the 15-minute EKS token window waiting for
+                // See CdkUtils.deploy: don't burn the 15-minute EKS token window waiting for
                 // pod readiness on an app workload nothing downstream depends on. Trade-off: a broken
                 // rollout won't fail the apply — surface it via monitoring/kubectl.
                 .waitForRollout(false)

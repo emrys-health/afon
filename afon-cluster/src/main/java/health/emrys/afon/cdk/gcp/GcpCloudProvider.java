@@ -22,7 +22,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import health.emrys.afon.cdk.AbstractConstruct;
+import health.emrys.afon.cdk.AbstractCloudProvider;
 import health.emrys.afon.config.AfonProperties;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
@@ -47,7 +47,7 @@ import static java.lang.String.format;
  * If you need to destroy by hand, run:
  * gcloud container clusters delete $CLUSTER_NAME --region=$REGION --project afon-core
  */
-public class GcpConstruct extends AbstractConstruct {
+public class GcpCloudProvider extends AbstractCloudProvider {
 
     /**
      * Generate with:
@@ -59,7 +59,7 @@ public class GcpConstruct extends AbstractConstruct {
     private       KubernetesProvider k8sProvider;
     private       HelmProvider       helmProvider;
 
-    GcpConstruct(final Construct scope, final String id, String projectID, Properties properties) {
+    GcpCloudProvider(final Construct scope, final String id, String projectID, Properties properties) {
         super(scope, id);
         String clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
         String vpcName     = "gke-private-vpc-" + clusterName;
@@ -181,7 +181,7 @@ public class GcpConstruct extends AbstractConstruct {
     }
 
     // -------------------------------------------------------------------------
-    // AbstractConstruct implementation
+    // AbstractCloudProvider implementation
     // -------------------------------------------------------------------------
 
     @Override
@@ -253,7 +253,7 @@ public class GcpConstruct extends AbstractConstruct {
     }
 
     // -------------------------------------------------------------------------
-    // Ingress controller + TLS (mirroring AzureConstruct)
+    // Ingress controller + TLS (mirroring AzureCloudProvider)
     // -------------------------------------------------------------------------
 
     synchronized HelmProvider configureHelm() {

@@ -43,7 +43,7 @@ You may need to run them multiple times for the VPC to disappear from your cloud
 To actually run all the steps in each deployment above, run:
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployFullStackAwsMain
+./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain
 ./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain
 ./afon.sh -a exec --exec-class ops.DeployGcpPolarisMain
 ./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain

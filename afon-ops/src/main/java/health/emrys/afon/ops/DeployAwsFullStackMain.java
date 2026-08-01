@@ -4,13 +4,13 @@ import health.emrys.afon.ops.steps.*;
 
 import java.util.List;
 
-public class DeployFullStackAwsMain implements StepsProvider {
+public class DeployAwsFullStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
             stepOperations.deleteAwsStack(),
-            stepOperations.deployAwsFullCluster(),
+            stepOperations.deployAwsFullStack(),
             stepOperations.waitForAwsPolaris(),
             stepOperations.initializeAllCatalogsInAws(),
             stepOperations.checkAwsSparkConnectorTalkingToAws()
@@ -18,7 +18,7 @@ public class DeployFullStackAwsMain implements StepsProvider {
     }
 
     public static void main(String[] args) {
-        new StepRunner().runUsing(new DeployFullStackAwsMain(), args);
+        new StepRunner().runUsing(new DeployAwsFullStackMain(), args);
     }
 
 }

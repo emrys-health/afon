@@ -31,7 +31,7 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.AbstractConstruct;
+import health.emrys.afon.cdk.AbstractCloudProvider;
 import health.emrys.afon.config.AfonProperties;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
@@ -42,7 +42,7 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.*;
 import static java.lang.String.format;
 
-public class AzureConstruct extends AbstractConstruct {
+public class AzureCloudProvider extends AbstractCloudProvider {
 
     private static final String             KUBERNETES_VERSION = "1.36.2";
     /** Well-known AKS AAD server application ID; kubelogin requests a token for this audience. */
@@ -61,9 +61,9 @@ public class AzureConstruct extends AbstractConstruct {
     private              KubernetesProvider k8sProvider;
     private              HelmProvider       helmProvider;
 
-    public AzureConstruct(@NonNull Construct scope,
-                          @NonNull String id,
-                          Properties properties) {
+    public AzureCloudProvider(@NonNull Construct scope,
+                              @NonNull String id,
+                              Properties properties) {
         super(scope, id);
         clusterName    = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
         resourceGroup  = AZURE_RESOURCE_GROUP.getValueFrom(properties) + "_" + CLUSTER_NAME.getValueFrom(properties);
@@ -393,7 +393,7 @@ public class AzureConstruct extends AbstractConstruct {
     }
 
     // -------------------------------------------------------------------------
-    // AbstractConstruct implementation
+    // AbstractCloudProvider implementation
     // -------------------------------------------------------------------------
 
     /**

@@ -10,15 +10,15 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
 import health.emrys.afon.security.keycloak.KeyCloakConfig;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.cdk.TFUtils.clusterIpService;
+import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static java.lang.String.format;
@@ -122,8 +122,15 @@ public class PolarisConfig extends Construct {
     static @NonNull String toExports(Map<String, String> properties) {
         return properties
             .entrySet().stream().map(x ->
-                                         format("export %s=%s", AppUtils.toEnvironmentVariable(x.getKey()), x.getValue())
+                                         format("export %s=%s", toEnvironmentVariable(x.getKey()), x.getValue())
             ).collect(Collectors.joining("\n"));
+    }
+
+    public static String toEnvironmentVariable(String propertyName) {
+        return propertyName
+            .replace('.', '_')
+            .replace('-', '_')
+            .toUpperCase(Locale.ROOT);
     }
 
     public Service deployPolaris(List<ITerraformDependable> eksDependOn) {
@@ -175,7 +182,7 @@ public class PolarisConfig extends Construct {
             .readinessProbe(readinessProbe)
             .build();
         polarisLabels = Map.of("app", "polaris");
-        var polarisDeployment = DeploymentUtils.deploy(
+        var polarisDeployment = CdkUtils.deploy(
             this,
             eksDependOn,
             polarisLabels,

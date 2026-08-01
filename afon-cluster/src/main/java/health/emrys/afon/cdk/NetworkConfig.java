@@ -10,11 +10,11 @@ import java.util.Map;
 /**
  * Cloud independent config for the K8s network.
  */
-public class NetworkConfiguration {
+public class NetworkConfig {
 
     private final TerraformStack tfStack;
 
-    public NetworkConfiguration(TerraformStack tfStack) {
+    public NetworkConfig(TerraformStack tfStack) {
         this.tfStack = tfStack;
     }
 
