@@ -4,12 +4,12 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
-public abstract class AbstractConstruct extends Construct implements CloudProvider {
+public abstract class AbstractCloudProvider extends Construct implements CloudProvider {
 
     private final @NonNull String             id;
     private                KubernetesProvider kubernetesProvider;
 
-    public AbstractConstruct(@NonNull Construct scope, @NonNull String id) {
+    public AbstractCloudProvider(@NonNull Construct scope, @NonNull String id) {
         super(scope, id);
         this.id = id;
     }

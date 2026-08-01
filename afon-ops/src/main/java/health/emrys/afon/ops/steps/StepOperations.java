@@ -1,13 +1,13 @@
 package health.emrys.afon.ops.steps;
 
 import com.azure.storage.blob.models.BlobItem;
-import health.emrys.afon.cdk.aws.AwsWholeStack;
-import health.emrys.afon.cdk.aws.PrometheusClusterDeployment;
-import health.emrys.afon.cdk.aws.SparkClusterDeployment;
-import health.emrys.afon.cdk.azure.AzureKubernetesPolaris;
+import health.emrys.afon.cdk.aws.AwsPolarisStack;
+import health.emrys.afon.cdk.aws.AwsFullStack;
+import health.emrys.afon.cdk.aws.AwsSparkStack;
+import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.azure.AzureReader;
-import health.emrys.afon.cdk.azure.AzureWholeStack;
-import health.emrys.afon.cdk.gcp.GcpKubernetesPolaris;
+import health.emrys.afon.cdk.azure.AzureFullStack;
+import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.OnboardAllUsersMain;
@@ -105,43 +105,44 @@ public class StepOperations {
         return new Step(
             "aws_polaris",
             "deploy Polaris in AWS",
-            () -> actions.startStack(AwsWholeStack.class, AWS));
+            () -> actions.startStack(AwsPolarisStack.class, AWS));
     }
 
-    public Step deployAwsFullCluster() {
+    public Step deployAwsFullStack() {
         return new Step(
-            "aws_spark",
-            "deploy Spark in AWS",
-            () -> actions.startStack(PrometheusClusterDeployment.class, AWS));
+            "aws_full",
+            "deploy full stack in AWS",
+            () -> actions.startStack(AwsFullStack.class, AWS));
     }
 
     public Step deployAwsSpark() {
         return new Step(
             "aws_spark",
             "deploy Spark in AWS",
-            () -> actions.startStack(SparkClusterDeployment.class, AWS));
+            () -> actions.startStack(AwsSparkStack.class, AWS));
     }
 
-    public Step deployGcpPolaris() {
+    public Step deployAzureFullStack() {
         return new Step(
-            "gcp_polaris",
-            "deploy Polaris in GCP",
-            () -> actions.startStack(GcpKubernetesPolaris.class, GCP));
-    }
-
-    public Step deployAzureWholeStack() {
-        return new Step(
-            "az_sre",
-            "deploy SRE in Azure",
-            () -> actions.startStack(AzureWholeStack.class, AZURE));
+            "az_full",
+            "deploy full stack in Azure",
+            () -> actions.startStack(AzureFullStack.class, AZURE));
     }
 
     public Step deployAzurePolaris() {
         return new Step(
             "az_polaris",
             "deploy Polaris in Azure",
-            () -> actions.startStack(AzureKubernetesPolaris.class, AZURE));
+            () -> actions.startStack(AzurePolarisStack.class, AZURE));
     }
+
+    public Step deployGcpPolaris() {
+        return new Step(
+                "gcp_polaris",
+                "deploy Polaris in GCP",
+                () -> actions.startStack(GcpPolarisStack.class, GCP));
+    }
+
 
     public Step purgeForeignCatalogFromAzure() {
         return purgeForeignCatalogFrom(azurePolarisDomainName, AZURE);

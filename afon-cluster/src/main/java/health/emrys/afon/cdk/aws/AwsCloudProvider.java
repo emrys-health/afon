@@ -46,7 +46,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.cdk.AbstractConstruct;
+import health.emrys.afon.cdk.AbstractCloudProvider;
 import health.emrys.afon.config.AfonProperties;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -56,22 +56,21 @@ import software.constructs.Construct;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.cdk.KeyCloakDeploymentConfig.KEYCLOAK_HTTPS_INGRESS;
 import static health.emrys.afon.cdk.KeyCloakDeploymentConfig.KEYCLOAK_INGRESS;
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
-import static health.emrys.afon.cdk.TFUtils.finalizeIngress;
-import static health.emrys.afon.cdk.aws.AwsWholeStack.NO_INSTALLATION_FINALIZERS;
+import static health.emrys.afon.cdk.CdkHelper.finalizeIngress;
+import static health.emrys.afon.cdk.aws.AwsJupyterStack.NO_INSTALLATION_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.JupyterConfig.NO_JUPYTER_FINALIZERS;
-import static health.emrys.afon.cdk.TFUtils.NO_POLARIS_FINALIZERS;
+import static health.emrys.afon.cdk.CdkHelper.NO_POLARIS_FINALIZERS;
 import static health.emrys.afon.config.AfonProperties.AWS_ACCOUNT_ID;
 import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
 
-public class AwsConstruct extends AbstractConstruct {
+public class AwsCloudProvider extends AbstractCloudProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(AwsConstruct.class);
+    private static final Logger log = LoggerFactory.getLogger(AwsCloudProvider.class);
 
     private final String                     clusterPolicyArn;
     final static  String                     NO_JUPYTER_LB = """
@@ -93,7 +92,7 @@ public class AwsConstruct extends AbstractConstruct {
     final         Resource newKubeConfig;
     private       Release  lbRelease;
 
-    AwsConstruct(final Construct scope, final String id, Properties properties) {
+    AwsCloudProvider(final Construct scope, final String id, Properties properties) {
         super(scope, id);
         awsNuke        = new AwsNuke(properties);
         componentNames = new AwsComponentNames(properties);
@@ -457,7 +456,7 @@ public class AwsConstruct extends AbstractConstruct {
                 // The matching ServiceMonitor toggles (prometheus.serviceMonitor.enabled,
                 // operator.prometheus.serviceMonitor.enabled) are intentionally LEFT OFF:
                 // they need monitoring.coreos.com CRDs which kube-prometheus-stack
-                // installs in a later stack (PrometheusClusterDeployment). The ServiceMonitor
+                // installs in a later stack (AwsFullStack). The ServiceMonitor
                 // for Cilium is therefore created on the Prometheus side once those CRDs
                 // exist.
                 createValue("prometheus.enabled", "true"),

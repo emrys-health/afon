@@ -14,20 +14,14 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
 class AzureKubernetesStack extends TerraformStack implements AfonCloudStack {
 
-    protected final     AzureConstruct      cloudProvider;
+    protected final AzureCloudProvider cloudProvider;
     protected final     String              azurePolarisDomainName;
 
     public AzureKubernetesStack(final Construct scope, final String id,
                                 Properties properties) {
         super(scope, id);
-        cloudProvider = new AzureConstruct(this, id, properties);
+        cloudProvider = new AzureCloudProvider(this, id, properties);
         this.azurePolarisDomainName = AfonProperties.AZURE_DOMAIN_NAME.getValueFrom(properties);
-    }
-
-    public static void main(String[] args) {
-        final App app = new App();
-        new AzureKubernetesStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
-        app.synth();
     }
 
     @Override
@@ -39,4 +33,11 @@ class AzureKubernetesStack extends TerraformStack implements AfonCloudStack {
     public String getPolarisDomainName() {
         return azurePolarisDomainName;
     }
+
+    public static void main(String[] args) {
+        final App app = new App();
+        new AzureKubernetesStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
+        app.synth();
+    }
+
 }

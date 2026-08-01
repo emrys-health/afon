@@ -15,7 +15,7 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
 
 class GcpKubernetesStack extends TerraformStack implements AfonCloudStack {
 
-    protected final     GcpConstruct        cloudProvider;
+    protected final GcpCloudProvider cloudProvider;
     protected final     String              gcpDomainName;
     private final       Properties          properties;
 
@@ -24,7 +24,7 @@ class GcpKubernetesStack extends TerraformStack implements AfonCloudStack {
         this.gcpDomainName = GCP_DOMAIN_NAME.getValueFrom(properties);
         this.properties    = properties;
         NullProvider.Builder.create(this, "null").build();
-        cloudProvider = new GcpConstruct(this, id, "afon-core", properties);
+        cloudProvider = new GcpCloudProvider(this, id, "afon-core", properties);
     }
 
     public static void main(String[] args) {

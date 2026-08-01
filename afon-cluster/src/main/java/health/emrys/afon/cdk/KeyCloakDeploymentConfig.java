@@ -14,7 +14,7 @@ import software.constructs.Construct;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.cdk.TFUtils.*;
+import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_IMAGE;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
@@ -113,7 +113,7 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
         List<ITerraformDependable> dependants = new ArrayList(cloudProvider.getDependables());
         dependants.add(kcSecrets);
         Map<String, String> labels = Map.of("app", APP_NAME);
-        Deployment app = DeploymentUtils.deploy(
+        Deployment app = CdkUtils.deploy(
             this,
             dependants,
             labels,

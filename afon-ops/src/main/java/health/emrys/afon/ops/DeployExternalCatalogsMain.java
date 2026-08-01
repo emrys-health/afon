@@ -21,7 +21,7 @@ public class DeployExternalCatalogsMain implements StepsProvider {
         List<Step> stackSteps = new ArrayList<>();
         stackSteps.addAll(List.of(
                 stepOperations.deleteAwsStack(),
-                stepOperations.deployAwsFullCluster(),
+                stepOperations.deployAwsFullStack(),
                 stepOperations.waitForAwsPolaris(),
                 stepOperations.initializeAllCatalogsInAws(),
                 stepOperations.checkAwsSparkConnectorTalkingToAws()

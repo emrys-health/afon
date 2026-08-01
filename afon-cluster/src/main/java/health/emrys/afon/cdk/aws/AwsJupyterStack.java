@@ -12,7 +12,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.JupyterHubConfig;
-import health.emrys.afon.cdk.NetworkConfiguration;
+import health.emrys.afon.cdk.NetworkConfig;
 import health.emrys.afon.cdk.SparkConfig;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.config.AfonPropertiesLoader;
@@ -46,9 +46,9 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
  * </UL>
  * when you run the output
  */
-public class AwsWholeStack extends AwsKubernetesPolaris {
+public class AwsJupyterStack extends AwsPolarisStack {
 
-    static final Logger logger                     = org.slf4j.LoggerFactory.getLogger(AwsWholeStack.class);
+    static final Logger logger                     = org.slf4j.LoggerFactory.getLogger(AwsJupyterStack.class);
     public static final String NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p " +
                                                      "'{\"metadata\":{\"finalizers\":[]}}' --type=merge";
 
@@ -61,24 +61,24 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
     protected final HelmProvider  helmProvider;
     private         String        DELETE_CRDS;
 
-    public AwsWholeStack(final Construct scope,
-                         final AfonCloud id,
-                         final Properties properties) {
+    public AwsJupyterStack(final Construct scope,
+                           final AfonCloud id,
+                           final Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
-        JupyterHubConfig jupyter = new JupyterHubAwsConfig(
+        JupyterHubConfig jupyter = new AwsJupyterHubConfig(
             this,
             cloudProvider,
             properties,
             getKeyCloakConfig().getAliasRecord());
-        NetworkConfiguration network = new NetworkConfiguration(this);
+        NetworkConfig network = new NetworkConfig(this);
         // Every Service the hub deploy creates (guacamole-web, the per-user VNC services,
         // jupyterhub-proxy-public) fires the AWS LB Controller's mutating webhook
         // (mservice.elbv2.k8s.aws), which intercepts all Service creations — not just
         // type: LoadBalancer. Depend on the controller's Helm release — installed atomically,
         // so Terraform waits for its pods to be Ready — otherwise the webhook Service can still
         // have zero endpoints and the apply fails with "no endpoints available for service
-        // aws-load-balancer-webhook-service". Same reasoning as SparkClusterDeployment's LB Service.
+        // aws-load-balancer-webhook-service". Same reasoning as AwsSparkStack's LB Service.
         List<ITerraformDependable> jupyterDependables = new ArrayList<>(dependables);
         jupyterDependables.add(cloudProvider.getLbRelease());
         network.networkPolicies(jupyter.deployJupyterHub(jupyterDependables), SPARK_CONNECTOR_NAME);
@@ -170,7 +170,7 @@ public class AwsWholeStack extends AwsKubernetesPolaris {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsWholeStack(app, AWS, new AfonPropertiesLoader().getProperties());
+        new AwsJupyterStack(app, AWS, new AfonPropertiesLoader().getProperties());
         app.synth();
         logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu " +
                     "-apply");

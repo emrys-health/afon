@@ -16,14 +16,14 @@ import java.util.Properties;
  * This is experimental only. It creates the bare bones of an EKS environment
  * just to see if it works.
  */
-public class AwsPlainKubernetes extends TerraformStack {
-    protected AwsPlainKubernetes(final Construct scope,
-                                 final String id,
-                                 final Properties properties) {
+public class AwsHelmStack extends TerraformStack {
+    protected AwsHelmStack(final Construct scope,
+                           final String id,
+                           final Properties properties) {
         super(scope, id);
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
-        AwsConstruct cloudProvider = new AwsConstruct(this, id.toString(), properties);
+        AwsCloudProvider cloudProvider = new AwsCloudProvider(this, id.toString(), properties);
         this.addOverride(
             "terraform.required_providers.helm", Map.of(
                 "source", "hashicorp/helm",
@@ -42,7 +42,7 @@ public class AwsPlainKubernetes extends TerraformStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsPlainKubernetes(app, "ops", new AfonPropertiesLoader().getProperties());
+        new AwsHelmStack(app, "ops", new AfonPropertiesLoader().getProperties());
         app.synth();
     }
 }

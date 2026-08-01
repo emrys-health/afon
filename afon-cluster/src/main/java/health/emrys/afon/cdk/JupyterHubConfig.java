@@ -30,9 +30,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
-import static health.emrys.afon.cdk.DeploymentUtils.withAppKubernetesIoName;
-import static health.emrys.afon.cdk.TFUtils.clusterIpService;
-import static health.emrys.afon.cdk.TFUtils.envFromSecret;
+import static health.emrys.afon.cdk.CdkUtils.withAppKubernetesIoName;
+import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
+import static health.emrys.afon.cdk.CdkHelper.envFromSecret;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -337,7 +337,7 @@ public abstract class JupyterHubConfig {
                                                                 .build())
             .build();
 
-        // Built directly (rather than via DeploymentUtils.deploy) so the pod runs under the `hub`
+        // Built directly (rather than via CdkUtils.deploy) so the pod runs under the `hub`
         // ServiceAccount that grants KubeSpawner its pod-management permissions.
         Deployment.Builder
             .create(stack, "jupyterhubHubDeployment")
@@ -406,7 +406,7 @@ public abstract class JupyterHubConfig {
                                                        .build()))
             .build();
 
-        DeploymentUtils.deploy(stack, dependsOn, PROXY_LABELS, List.of(proxyContainer), List.of(), "jupyterhub-proxy");
+        CdkUtils.deploy(stack, dependsOn, PROXY_LABELS, List.of(proxyContainer), List.of(), "jupyterhub-proxy");
 
         List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
                                                              .name("api")

@@ -25,7 +25,7 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
 import static java.lang.String.format;
 
-public class TFUtils {
+public class CdkHelper {
 
     public static final String                     NO_POLARIS_FINALIZERS
         = finalizeIngress(POLARIS_INGRESS_NAME);
@@ -138,7 +138,7 @@ public class TFUtils {
     private final Construct construct;
     private final String    ingressName;
 
-    public TFUtils(
+    public CdkHelper(
         Construct construct,
         String domainName,
         String tlsSecretName,

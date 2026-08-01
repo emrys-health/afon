@@ -22,22 +22,22 @@ import java.util.Properties;
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 
-public class AwsKubernetesPolaris extends TerraformStack implements AfonCloudStack {
+public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsKubernetesPolaris.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsPolarisStack.class);
 
     protected final PolarisConfig polarisConfig;
-    protected final AwsConstruct  cloudProvider;
+    protected final AwsCloudProvider cloudProvider;
 
     private AwsKeyCloakDeploymentConfig keyCloakConfig;
 
-    public AwsKubernetesPolaris(@NonNull Construct scope,
-                                AfonCloud id,
-                                Properties properties) {
+    public AwsPolarisStack(@NonNull Construct scope,
+                           AfonCloud id,
+                           Properties properties) {
         super(scope, id.toString());
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
-        cloudProvider = new AwsConstruct(this, id.toString(), properties);
+        cloudProvider = new AwsCloudProvider(this, id.toString(), properties);
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
             protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
                 return null; // no longer using an external service
@@ -73,13 +73,6 @@ public class AwsKubernetesPolaris extends TerraformStack implements AfonCloudSta
         return keyCloakConfig;
     }
 
-    public static void main(String[] args) {
-        final App app = new App();
-        new AwsKubernetesPolaris(app, AWS, new AfonPropertiesLoader().getProperties());
-        app.synth();
-        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu-apply");
-    }
-
     @Override
     public AfonCloud getId() {
         return AWS;
@@ -89,4 +82,12 @@ public class AwsKubernetesPolaris extends TerraformStack implements AfonCloudSta
     public String getPolarisDomainName() {
         return cloudProvider.getPolarisDomainName();
     }
+
+    public static void main(String[] args) {
+        final App app = new App();
+        new AwsPolarisStack(app, AWS, new AfonPropertiesLoader().getProperties());
+        app.synth();
+        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu-apply");
+    }
+
 }

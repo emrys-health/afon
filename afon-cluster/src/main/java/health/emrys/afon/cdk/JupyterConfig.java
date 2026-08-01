@@ -16,8 +16,8 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.TFUtils.finalizeIngress;
-import static health.emrys.afon.cdk.TFUtils.envVar;
+import static health.emrys.afon.cdk.CdkHelper.finalizeIngress;
+import static health.emrys.afon.cdk.CdkHelper.envVar;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_SERVICE_NAME;
 
 public abstract class JupyterConfig {
@@ -75,7 +75,7 @@ public abstract class JupyterConfig {
                          "" + sessions.size())
                         )
                 ).build();
-        DeploymentUtils.deploy(
+        CdkUtils.deploy(
             stack,
             eksDependOn,
             jupyterLabels,

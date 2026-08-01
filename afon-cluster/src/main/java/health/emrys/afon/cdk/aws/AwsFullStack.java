@@ -17,13 +17,13 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 
-public class PrometheusClusterDeployment extends TrinoClusterDeployment {
+public class AwsFullStack extends AwsTrinoStack {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(PrometheusClusterDeployment.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsFullStack.class);
 
-    public PrometheusClusterDeployment(@NonNull Construct scope,
-                                       @NonNull AfonCloud id,
-                                       Properties properties) {
+    public AwsFullStack(@NonNull Construct scope,
+                        @NonNull AfonCloud id,
+                        Properties properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
         dependablesAndLoadBalancers.addAll(loadBalancers);
@@ -149,7 +149,7 @@ public class PrometheusClusterDeployment extends TrinoClusterDeployment {
      * Installs the current {@code grafana/loki} chart (single-binary mode,
      * ships Loki 3.x) configured to push chunks and the index to S3. The
      * bucket, region, and IAM credentials are read from the
-     * {@link Properties} passed to the {@link PrometheusClusterDeployment}
+     * {@link Properties} passed to the {@link AwsFullStack}
      * constructor (keys {@code AWS_S3_BUCKET_NAME}, {@code AWS_REGION},
      * {@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY}).
      *
@@ -335,13 +335,14 @@ public class PrometheusClusterDeployment extends TrinoClusterDeployment {
     }
 
     public static void main(String[] args) {
-        logger.info("Creating JSON for Prometheus");
+        logger.info("Creating full stack");
         final App app = new App();
         try {
-            new PrometheusClusterDeployment(app, AWS, new AfonPropertiesLoader().getProperties());
+            new AwsFullStack(app, AWS, new AfonPropertiesLoader().getProperties());
             app.synth();
         } catch (RuntimeException e) {
-            logAndThrow(e);
+            logger.error(e.toString());
+            throw new RuntimeException(e);
         }
     }
 }

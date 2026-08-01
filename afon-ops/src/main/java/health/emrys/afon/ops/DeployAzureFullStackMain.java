@@ -9,13 +9,13 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
-public class DeployFullStackAzureMain implements StepsProvider {
+public class DeployAzureFullStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
             stepOperations.deleteStack(AZURE),
-            stepOperations.deployAzureWholeStack(),
+            stepOperations.deployAzureFullStack(),
             stepOperations.waitForAzurePolaris(),
             stepOperations.initializeAllCatalogsInAzure(),
             stepOperations.checkSparkConnectorTalkingToAzure()
@@ -23,6 +23,6 @@ public class DeployFullStackAzureMain implements StepsProvider {
     }
 
     public static void main(String[] args) {
-        new StepRunner().runUsing(new DeployFullStackAzureMain(), args);
+        new StepRunner().runUsing(new DeployAzureFullStackMain(), args);
     }
 }

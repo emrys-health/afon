@@ -11,7 +11,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
 
-public class AwsKeyCloakDeploymentConfig extends KeyCloakDeploymentConfig<AwsConstruct> {
+public class AwsKeyCloakDeploymentConfig extends KeyCloakDeploymentConfig<AwsCloudProvider> {
     private final String dnsZone;
     private final String certArn;
     private final String hostname;
@@ -21,7 +21,7 @@ public class AwsKeyCloakDeploymentConfig extends KeyCloakDeploymentConfig<AwsCon
     public AwsKeyCloakDeploymentConfig(
         @NonNull Construct scope,
         @NonNull Properties properties,
-        @NonNull AwsConstruct cloudProvider) {
+        @NonNull AwsCloudProvider cloudProvider) {
         super(scope, properties, cloudProvider);
         dnsZone  = AfonProperties.AWS_KEYCLOAK_DNS_ZONE.getValueFrom(properties);
         certArn  = AfonProperties.AWS_KEYCLOAK_CERT_ARN.getValueFrom(properties);

@@ -3,16 +3,15 @@ package health.emrys.afon.cdk.aws;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.cdk.TFUtils.NO_POLARIS_FINALIZERS;
-import static health.emrys.afon.cdk.aws.AwsConstruct.NO_JUPYTER_LB;
+import static health.emrys.afon.cdk.CdkHelper.NO_POLARIS_FINALIZERS;
+import static health.emrys.afon.cdk.aws.AwsCloudProvider.NO_JUPYTER_LB;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.JupyterConfig.NO_JUPYTER_FINALIZERS;
-import static health.emrys.afon.cdk.aws.SparkClusterDeployment.NO_SPARK_LB_FINALIZERS;
+import static health.emrys.afon.cdk.aws.AwsSparkStack.NO_SPARK_LB_FINALIZERS;
 import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
 import static java.lang.String.format;
 
