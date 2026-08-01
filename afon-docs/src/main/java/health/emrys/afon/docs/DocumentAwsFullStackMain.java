@@ -1,7 +1,7 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.SparkWorkloads;
-import health.emrys.afon.cdk.aws.AwsNuke;
+import health.emrys.afon.cdk.aws.AwsCleanupHelper;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.steps.Step;
@@ -14,12 +14,12 @@ import java.util.List;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-public class DocumentFullStackAwsMain extends AbstractDocumentMetadata {
+public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
 
-    private static final Logger log = getLogger(DocumentFullStackAwsMain.class);
+    private static final Logger log = getLogger(DocumentAwsFullStackMain.class);
 
     public static void main(String[] args) throws IOException {
-        new Documenter(new DocumentFullStackAwsMain()).writeDocumentation();
+        new Documenter(new DocumentAwsFullStackMain()).writeDocumentation();
     }
 
     @Override
@@ -29,7 +29,7 @@ public class DocumentFullStackAwsMain extends AbstractDocumentMetadata {
 
     @Override
     public String getFilename() {
-        return "full_stack_aws.md";
+        return "aws_full_stack.md";
     }
 
     @Override
@@ -44,7 +44,6 @@ public class DocumentFullStackAwsMain extends AbstractDocumentMetadata {
     }
 
     public String getFurtherNotes() {
-        var    nuke              = new AwsNuke();
         String polarisDomainName =
             AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(new AfonPropertiesLoader().getProperties());
         return String.format(
@@ -68,6 +67,6 @@ public class DocumentFullStackAwsMain extends AbstractDocumentMetadata {
             ```
             """,
             SparkWorkloads.startConnectCommand(polarisDomainName),
-            nuke.cleanUpHint());
+            new AwsCleanupHelper().cleanupCommands());
     }
 }

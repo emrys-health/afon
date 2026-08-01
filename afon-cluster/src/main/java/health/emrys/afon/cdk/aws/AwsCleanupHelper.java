@@ -1,54 +1,24 @@
 package health.emrys.afon.cdk.aws;
 
-import com.hashicorp.cdktf.LocalExecProvisioner;
+import health.emrys.afon.cdk.AbstractCleanupHelper;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import org.jspecify.annotations.NonNull;
 
-import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.cdk.CdkHelper.NO_POLARIS_FINALIZERS;
-import static health.emrys.afon.cdk.aws.AwsCloudProvider.NO_JUPYTER_LB;
-import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.JupyterConfig.NO_JUPYTER_FINALIZERS;
-import static health.emrys.afon.cdk.aws.AwsSparkStack.NO_SPARK_LB_FINALIZERS;
-import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
+import static health.emrys.afon.cdk.CdkHelper.*;
 import static java.lang.String.format;
 
-public class AwsNuke {
+public class AwsCleanupHelper extends AbstractCleanupHelper {
 
-    /**
-     * Note that EKS depends on the subnets.
-     * Once the EKS is nuked with "eksctl delete cluster", you can delete the subnets with:
-     * aws ec2 delete-subnet --subnet-id subnet-XXX
-     * then delete the whole VPC
-     */
-    public static void main(String[] args) {
-        var app = new AwsNuke();
-        System.out.println("\u001B[31m" + app.cleanUpHint() + "\u001B[0m");
-    }
-
-    private String clusterName;
     private AwsComponentNames componentNames;
 
-    public AwsNuke() {
-        this(new AfonPropertiesLoader().getProperties()); // TODO get some of the values from here
+    public AwsCleanupHelper() {
+        this(new AfonPropertiesLoader().getProperties());
     }
 
-    AwsNuke(Properties properties) {
-        clusterName = CLUSTER_NAME.getValueFrom(properties);
+    AwsCleanupHelper(Properties properties) {
         componentNames = new AwsComponentNames(properties);
-    }
-
-    @NonNull String cleanSecurityGroupsCommand(String vpcId) {
-        String region = "eu-west-2"; // TODO make configuratble
-        return format(
-            """
-            echo "Destroying security-groups"
-            for SG_ID in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=%s --region %s --query 'SecurityGroups[*].[GroupId]' --output text --no-cli-pager); do { 
-              echo $SG_ID ;  
-              aws ec2 delete-security-group --group-id $SG_ID || true 
-            } done""", vpcId, region);
     }
 
     /**
@@ -62,7 +32,7 @@ public class AwsNuke {
      * loud (echoes the resolved VPC and a stderr warning if it cannot be resolved) so a future
      * failure is visible in the tofu output rather than silently no-ops into a 20 min hang.
      */
-    @NonNull String cleanELBs() {
+    @NonNull String deleteLoadBalancersCommand() {
         return format(
             """
             VPCS=$(%s)
@@ -74,7 +44,7 @@ public class AwsNuke {
             # returns multiple ids; iterate (rather than 'export VPC=$(...)', which yields a multi-value
             # string that matches no single VpcId and silently no-ops the whole cleanup).
             for VPC in $VPCS ; do
-              echo "cleanELBs: removing load-balancer-controller resources in $VPC"
+              echo "cleanupELBs: removing load-balancer-controller resources in $VPC"
               LBS=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text)
               for LB in $LBS ; do
                 echo "Deleting load balancer $LB"
@@ -105,28 +75,43 @@ public class AwsNuke {
               done
             done
             """,
-            getVPCsCommand(), componentNames.getVpcId());
+            listVPCsCommand(), componentNames.getVpcId());
     }
 
-    @NonNull String getVPCCommand() {
-        return format("export VPC=$(%s)", getVPCsCommand());
+    public @NonNull String deleteSecurityGroupsCommand() {
+        String command = String.format(
+                """
+                        echo "Destroying security-groups"
+                        for SG_ID in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=%s --region %s --query 'SecurityGroups[*].[GroupId]' --output text --no-cli-pager); do { 
+                          echo $SG_ID ;  
+                          aws ec2 delete-security-group --group-id $SG_ID || true 
+                        } done""", "$VPC", componentNames.getRegion());
+        return format(
+                """
+                export VPC=$(%s)
+                %s
+                """,
+                listVPCsCommand(),
+                command);
     }
 
-    @NonNull String getVPCsCommand() {
+    private @NonNull String deleteClusterCommand() {
+        return format("eksctl delete cluster --name %s --region %s", componentNames.getCluster(), componentNames.getRegion());
+    }
+
+    private @NonNull String listVPCsCommand() {
+        return format(
+                """
+                aws ec2 describe-vpcs --query "Vpcs[?Tags[?Key=='Name' && Value=='%s']].VpcId"   --output text""",
+                componentNames.getVpcId());
+    }
+
+    public @NonNull String cleanupCommands() {
         return format(
             """
-            aws ec2 describe-vpcs --query "Vpcs[?Tags[?Key=='Name' && Value=='%s']].VpcId"   --output text""",
-            componentNames.getVpcId());
-    }
+            # Note that EKS depends on the subnets.
+            # Once the EKS cluster is deleted, you can delete the subnets.
 
-    @NonNull String cleanEksCommand() {
-        return format("eksctl delete cluster --name %s --region eu-west-2", clusterName);
-    }
-
-    public @NonNull String cleanUpHint() {
-        return format(
-            """
-            
             unalias aws
             
             for VPC_ID in $(%s) ; do {
@@ -208,31 +193,27 @@ public class AwsNuke {
             
             aws iam delete-policy --policy-arn arn:aws:iam::123456789012:policy/%s
             
-            aws --region eu-west-2 secretsmanager  delete-secret --secret-id %s --force-delete-without-recovery
+            aws --region %s secretsmanager  delete-secret --secret-id %s --force-delete-without-recovery
             
             """,
-            getVPCsCommand(),
+            listVPCsCommand(),
             NO_POLARIS_FINALIZERS,
             NO_JUPYTER_FINALIZERS,
-            NO_JUPYTER_LB,
+            NO_JUPYTER_LB_FINALIZERS,
             NO_SPARK_LB_FINALIZERS,
-            cleanEksCommand(),
+            deleteClusterCommand(),
             componentNames.getClusterRoleName(),
             componentNames.getNodeGroupRoleName(),
             componentNames.getLoadBalancerRoleName(),
             componentNames.getAccessPolicyName(),
+            componentNames.getRegion(),
             componentNames.getSecret()
                      );
     }
 
-    public @NonNull List<LocalExecProvisioner> destroySGsAndVPC() {
-        return uponDestroyRun(format(
-            """
-            %s
-            %s
-            """,
-            getVPCCommand(),
-            cleanSecurityGroupsCommand("$VPC")));
+    public static void main(String[] args) {
+        outputCleanupCommands(args, new AwsCleanupHelper().cleanupCommands());
     }
+
 
 }

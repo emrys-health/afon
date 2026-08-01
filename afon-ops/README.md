@@ -33,7 +33,7 @@ NOTE: Only AWS has the full stack.
 Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.
 
 NOTE: If you really foul things up, you'll leave the environment in an unstable state.
-Consult the `*Nuke.java` files to destroy your environment totally.
+Consult the `{Aws,Azure}CleanupHelper` classes to destroy your environment totally.
 They will output shell scripts that you can run.
 You may need to run them multiple times for the VPC to disappear from your cloud.
 
@@ -220,11 +220,11 @@ Thereafter, you can run tofu apply or destroy commands via
 In all cloud providers, deleting the Polaris deployment is fine.
 However, destroying the whole stack in AWS is problematic.
 It appears that there are lingering AWS infrastructure components.
-Run `health.emrys.afon.cdk.aws.AwsNuke` to print out helpful command lines.
+Run `health.emrys.afon.cdk.aws.AwsCleanupHelper` to print out helpful command lines.
 In particular, the output of this script should blatt everything:
 
 ```shell
-./afon.sh -a exec --exec-class cdk.aws.AwsNuke
+./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper
 ```
 
 This is a shell script. 

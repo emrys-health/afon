@@ -420,13 +420,13 @@ cd cdktf.out/stacks/aws
 tofu destroy --auto-approve
 ```
 
-**Nuke scripts (when Terraform state is lost or things are stuck):**
+**Cleanup scripts (when Terraform state is lost or things are stuck):**
 
 ```shell
 # AWS
-./afon.sh -a exec --exec-class cdk.aws.AwsNuke
+./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper
 # Azure
-./afon.sh -a exec --exec-class cdk.azure.AzureNuke
+./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper
 ```
 
 These output shell scripts that destroy everything. You may need to run them multiple times for VPCs to disappear.
@@ -950,12 +950,16 @@ tofu destroy --auto-approve
 
 **When Terraform state is corrupted or resources are stuck:**
 
+Generate the cleanup scripts by executing the cleanup helpers:
 ```shell
-# Generate nuke scripts
-./afon.sh -a exec --exec-class cdk.aws.AwsNuke 
-# Run the output script (may need multiple passes for VPCs to disappear)
-./afon.sh -a exec --exec-class cdk.azure.AzureNuke
+# Generate cleanup scripts
+./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args "aws-cleanup.sh"
+./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper --exec-args "azure-cleanup.sh"
+./afon.sh -a exec --exec-class cdk.gcp.GcpCleanupHelper --exec-args "gcp-cleanup.sh"
 ```
+If the cleanup script file is not specified, the cleanup commands will be printed to console. 
+
+NOTE: you may need to run the AWS scripts two or more times for VPCs to disappear.
 
 **When Azure Terraform import is needed:**
 
@@ -974,7 +978,7 @@ az group delete --name afon_resource_group_aks --yes --no-wait
 
 **When AWS VPCs won't delete:**
 
-The `AwsNuke` output script patches Kubernetes finalizers, deletes load balancers, internet gateways, VPC endpoints, NAT gateways, network interfaces, subnets, route tables, security groups, and network ACLs in sequence. Run it twice if needed.
+The `AwsCleanupHelper` output script patches Kubernetes finalizers, deletes load balancers, internet gateways, VPC endpoints, NAT gateways, network interfaces, subnets, route tables, security groups, and network ACLs in sequence. Run it twice if needed.
 
 ### GitOps considerations
 

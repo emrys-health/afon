@@ -56,14 +56,10 @@ import software.constructs.Construct;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.cdk.KeyCloakDeploymentConfig.KEYCLOAK_INGRESS;
-import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
-import static health.emrys.afon.cdk.CdkHelper.finalizeIngress;
-import static health.emrys.afon.cdk.aws.AwsJupyterStack.NO_INSTALLATION_FINALIZERS;
+import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.JupyterConfig.NO_JUPYTER_FINALIZERS;
-import static health.emrys.afon.cdk.CdkHelper.NO_POLARIS_FINALIZERS;
+import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonProperties.AWS_ACCOUNT_ID;
 import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
@@ -72,29 +68,26 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     private static final Logger log = LoggerFactory.getLogger(AwsCloudProvider.class);
 
-    private final String                     clusterPolicyArn;
-    final static  String                     NO_JUPYTER_LB = """
-                                                             kubectl patch service jupyter-web -p \
-                                                             '{"metadata":{"finalizers":null}}'  --type=merge""";
-    final         DataAwsEksClusterAuth      eksAuthData;
+    private final AwsCleanupHelper           cleanupHelper;
     private final AwsComponentNames          componentNames;
-    private final EksCluster                 cluster;
-    private final List<ITerraformDependable> eksDependOn;
-    private final List<String>               subnetIds;
     private final String                     polarisDomainName;
     private final String                     accountId;
     private final String                     region;
     private final String                     clusterName;
-    private final AwsNuke                    awsNuke;
+    private final String                     clusterPolicyArn;
     private final String                     polarisCertArn;
-    final         Vpc                        vpc;
+    private final EksCluster                 cluster;
+    private final List<ITerraformDependable> eksDependOn;
+    private final List<String>               subnetIds;
+    final         DataAwsEksClusterAuth      eksAuthData;
     final         IamRole                    loadBalancerRole;
-    final         Resource newKubeConfig;
-    private       Release  lbRelease;
+    final         Resource                   newKubeConfig;
+    final         Release                    lbRelease;
+    final         Vpc                        vpc;
 
     AwsCloudProvider(final Construct scope, final String id, Properties properties) {
         super(scope, id);
-        awsNuke        = new AwsNuke(properties);
+        cleanupHelper = new AwsCleanupHelper(properties);
         componentNames = new AwsComponentNames(properties);
         clusterName    = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
         polarisCertArn = AfonProperties.AWS_POLARIS_CERT_ARN.getValueFrom(properties);
@@ -127,7 +120,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .cidrBlock("10.0.0.0/16")
             .enableDnsSupport(true)
             .enableDnsHostnames(true)
-            .provisioners(awsNuke.destroySGsAndVPC())
+            .provisioners(uponDestroyRun(cleanupHelper.deleteSecurityGroupsCommand()))
             .tags(Map.of("Name", componentNames.getVpcId())).build();
 
         final InternetGateway igw = InternetGateway.Builder
@@ -143,7 +136,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .availabilityZone(region + "a")
             .mapPublicIpOnLaunch(true)
             .dependsOn(List.of(igw))
-            .provisioners(uponDestroyRun(awsNuke.cleanELBs()))
+            .provisioners(uponDestroyRun(cleanupHelper.deleteLoadBalancersCommand()))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .tags(Map.of("Name", "cdktf-eks-public-1-" + clusterName)).build();
 
@@ -789,10 +782,10 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                           .build())
             .provisioners(uponDestroyRun(
                 NO_INSTALLATION_FINALIZERS,
-                NO_JUPYTER_LB,
+                NO_JUPYTER_LB_FINALIZERS,
                 NO_POLARIS_FINALIZERS,
                 NO_JUPYTER_FINALIZERS,
-                finalizeIngress(KEYCLOAK_INGRESS)))
+                NO_KEYCLOAK_FINALIZERS))
             .build();
         return serviceAccountName;
     }
