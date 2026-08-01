@@ -16,12 +16,10 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.CdkHelper.finalizeIngress;
 import static health.emrys.afon.cdk.CdkHelper.envVar;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_SERVICE_NAME;
 
 public abstract class JupyterConfig {
-    public static final  String          NO_JUPYTER_FINALIZERS = finalizeIngress("jupyter-ingress");
     /**
      * One in-pod X session per entry. Each session pairs a Guacamole login (used to
      * authenticate against the Guacamole web UI) with the VNC port serving that
@@ -91,7 +89,7 @@ public abstract class JupyterConfig {
                                      .namespace("default")
                                      .build())
             .dependsOn(eksDependOn)
-            .provisioners(uponDestroyRun(NO_JUPYTER_FINALIZERS))
+            .provisioners(uponDestroyRun(CdkHelper.NO_JUPYTER_FINALIZERS))
             .spec(ServiceSpec.builder()
                              .selector(jupyterLabels)
                              .type("ClusterIP")

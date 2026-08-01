@@ -1,6 +1,6 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.cdk.azure.AzureNuke;
+import health.emrys.afon.cdk.azure.AzureCleanupHelper;
 import health.emrys.afon.ops.DeployExternalCatalogsMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
@@ -42,7 +42,7 @@ public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
     public String getFurtherNotes() {
         return String.format("""
             # Problems destroying the stack?
-            If the domain name points at a Kubernetes service that's not longer there, run:
+            Run:
             ```shell
             %s
             ```
@@ -74,6 +74,6 @@ public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
             
             If all else fails, destroy the Kubernetes cluster directly in the 
             [Azure console](https://portal.azure.com/#view/Microsoft_Azure_KubernetesFleet/KubernetesHub.MenuView/~/clusters)
-            """, new AzureNuke().cleanUpHint());
+            """, new AzureCleanupHelper().cleanupCommands());
     }
 }

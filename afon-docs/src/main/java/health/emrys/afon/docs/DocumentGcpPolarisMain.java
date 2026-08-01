@@ -1,11 +1,10 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.cdk.gcp.GcpCloudProvider;
+import health.emrys.afon.cdk.gcp.GcpCleanupHelper;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.DeployGcpPolarisMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
-
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -66,20 +65,22 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
             ```tofu
             gcloud compute instance-groups managed delete gke-spark-cluster-default-pool-XXX --zone europe-west2-a --project afon-core --quiet
             ```
-            
-            If in a pickle, nuke everything with:
-            ```shell
-            %s
-            ```
-            
-            Nuke the cluset with:
+
+            Cleanup the cluster with:
             ```
             gcloud container clusters list
             gcloud container clusters delete %s --region=europe-west2
             ```
+            
+            # Problems destroying the stack?
+            
+            Run:
+            ```shell
+            %s
+            ```
             """,
-             GcpCloudProvider.nukeGcp(),
-             CLUSTER_NAME.getValueFrom(properties)
+            new GcpCleanupHelper().cleanupCommands(),
+            CLUSTER_NAME.getValueFrom(properties)
         );
     }
 

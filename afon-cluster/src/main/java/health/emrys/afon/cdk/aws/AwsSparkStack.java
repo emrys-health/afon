@@ -19,9 +19,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.cdk.CdkHelper.NO_SPARK_LB_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_NAME;
+import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 
 /**
@@ -32,7 +33,6 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 public class AwsSparkStack extends AwsJupyterStack {
 
     static final Logger logger                 = org.slf4j.LoggerFactory.getLogger(AwsSparkStack.class);
-    static final String NO_SPARK_LB_FINALIZERS = "kubectl patch service spark-master-lb -p '{\"metadata\":{\"finalizers\":null}}'  --type=merge";
     protected final String awsPolarisDomainName;
 
     public AwsSparkStack(@NonNull Construct scope,

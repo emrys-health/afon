@@ -49,8 +49,6 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 public class AwsJupyterStack extends AwsPolarisStack {
 
     static final Logger logger                     = org.slf4j.LoggerFactory.getLogger(AwsJupyterStack.class);
-    public static final String NO_INSTALLATION_FINALIZERS = "kubectl patch installation default -p " +
-                                                     "'{\"metadata\":{\"finalizers\":[]}}' --type=merge";
 
     /**
      * Password the Jupyter VNC server is configured with. Kept in-cluster only — the

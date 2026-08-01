@@ -22,18 +22,31 @@ import java.util.Map;
 import java.util.Optional;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.KeyCloakDeploymentConfig.KEYCLOAK_INGRESS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
 import static java.lang.String.format;
 
 public class CdkHelper {
 
-    public static final String                     NO_POLARIS_FINALIZERS
-        = finalizeIngress(POLARIS_INGRESS_NAME);
+    public static final String NO_POLARIS_FINALIZERS = finalizeIngress(POLARIS_INGRESS_NAME);
     public static final List<LocalExecProvisioner> POLARIS_PROVISIONERS
-        = uponDestroyRun(NO_POLARIS_FINALIZERS);
+            = uponDestroyRun(NO_POLARIS_FINALIZERS);
+    public static final String NO_KEYCLOAK_FINALIZERS = finalizeIngress(KEYCLOAK_INGRESS);
+    public static final String NO_JUPYTER_FINALIZERS = finalizeIngress("jupyter-ingress");
+    public static final String NO_JUPYTER_LB_FINALIZERS = finalizeService("jupyter-web");
+    public static final String NO_SPARK_LB_FINALIZERS = finalizeService("spark-master-lb");
+    public static final String NO_INSTALLATION_FINALIZERS = finalizeInstallation("default");
 
     public static String finalizeIngress(String service) {
         return format("kubectl patch ingress %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
+    }
+
+    private static String finalizeInstallation(String service) {
+        return format("kubectl patch installation %s  -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
+    }
+
+    public static String finalizeService(String service) {
+        return format("kubectl patch service %s -p '{\"metadata\":{\"finalizers\":null}}' --type=merge", service);
     }
 
     public static DeploymentSpecTemplateSpecContainerEnv envVar(String name, String value) {

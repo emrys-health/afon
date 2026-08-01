@@ -1,6 +1,6 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.cdk.azure.AzureNuke;
+import health.emrys.afon.cdk.azure.AzureCleanupHelper;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import org.slf4j.Logger;
@@ -43,13 +43,13 @@ public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
     @Override
     public String getFurtherNotes() {
         return String.format("""
-            # Problems running `tofu destroy`?
+            # Problems destroying the stack?
             
-            If the domain name points at a Kubernetes service that's not longer there, run:
+            Run:
             ```shell
             %s
             ```
-            """, new AzureNuke().cleanUpHint());
+            """, new AzureCleanupHelper().cleanupCommands());
     }
 
 }
