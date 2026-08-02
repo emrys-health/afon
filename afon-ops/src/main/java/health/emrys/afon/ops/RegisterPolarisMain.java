@@ -81,6 +81,7 @@ public class RegisterPolarisMain {
     }
 
     public static void main(String[] args) {
+        args = ArgsUtils.splitFirstBySpace(args); // when args are passed as a single space-separated arg
         final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
         try (ClusterState state = new ClusterState()) {
             RegisterTableConfig conf        = new RegisterTableConfig(args);

@@ -75,6 +75,7 @@ public class RegisterLocalPolarisMain {
     }
 
     public static void main(String[] args) {
+        args = ArgsUtils.splitFirstBySpace(args); // when args are passed as a single space-separated arg
         AfonPolarisClientFactory clientFactory  = AfonPolarisClientFactory.clientFactory();
         RegisterPolarisMain.RegisterTableConfig conf           = new RegisterPolarisMain.RegisterTableConfig(args);
         Properties               afonProperties = new AfonPropertiesLoader().getProperties();
