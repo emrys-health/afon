@@ -5,7 +5,6 @@ import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hashicorp.cdktf.TerraformStack;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
@@ -71,7 +70,7 @@ public class StepActions {
         }
     }
 
-    void startStack(Class<? extends TerraformStack> stackClass, AfonCloud id) throws Exception {
+    void startStack(Class stackClass, AfonCloud id) throws Exception {
         executeMainOf(stackClass, new String[]{});
         startManagedStack(id);
     }
