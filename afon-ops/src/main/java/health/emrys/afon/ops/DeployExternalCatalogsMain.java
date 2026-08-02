@@ -1,10 +1,16 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.ops.steps.*;
+import health.emrys.afon.ops.steps.Step;
+import health.emrys.afon.ops.steps.StepOperations;
+import health.emrys.afon.ops.steps.StepRunner;
+import health.emrys.afon.ops.steps.StepsProvider;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
 /**
  * This sets the cloud environments up just as they were for the TDA ops of 23/3/26.
@@ -20,20 +26,19 @@ public class DeployExternalCatalogsMain implements StepsProvider {
     public static final List<Step> steps(StepOperations stepOperations) {
         List<Step> stackSteps = new ArrayList<>();
         stackSteps.addAll(List.of(
-                stepOperations.deleteAwsStack(),
-                stepOperations.deployAwsFullStack(),
-                stepOperations.waitForAwsPolaris(),
-                stepOperations.initializeAllCatalogsInAws(),
-                stepOperations.checkAwsSparkConnectorTalkingToAws()
+                stepOperations.deleteStack(AWS),
+                stepOperations.deployFullStackIn(AWS),
+                stepOperations.waitForPolarisIn(AWS),
+                stepOperations.initializeAllCatalogsIn(AWS),
+                stepOperations.checkAwsSparkWritingTo(AWS)
         ));
         stackSteps.addAll(List.of(
-            stepOperations.deleteAzureStack(),
-            stepOperations.deployAzurePolaris(),
-            stepOperations.waitForAzurePolaris(),
-            stepOperations.purgeForeignCatalogFromAzure(),
-            stepOperations.createAzureCatalogInAzure(),
-//            stepOperations.createExternalAzureCatalogInAzure(), // not sure this is necessary and it fails because of the line above
-            stepOperations.checkLocalSparkTalksToAzurePolarisViaAwsPolaris()
+            stepOperations.deleteStack(AZURE),
+            stepOperations.deployPolarisIn(AZURE),
+            stepOperations.waitForPolarisIn(AZURE),
+            stepOperations.purgeForeignCatalogFrom(AZURE),
+            stepOperations.createForeignCatalogIn(AZURE),
+            stepOperations.checkSparkWritingViaAwsPolarisToPolarisIn(AZURE)
                 ));
         return stackSteps;
     }

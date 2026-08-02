@@ -15,10 +15,10 @@ public class DeployAzureFullStackMain implements StepsProvider {
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
             stepOperations.deleteStack(AZURE),
-            stepOperations.deployAzureFullStack(),
-            stepOperations.waitForAzurePolaris(),
-            stepOperations.initializeAllCatalogsInAzure(),
-            stepOperations.checkSparkConnectorTalkingToAzure()
+            stepOperations.deployFullStackIn(AZURE),
+            stepOperations.waitForPolarisIn(AZURE),
+            stepOperations.initializeAllCatalogsIn(AZURE),
+            stepOperations.checkSparkWritingToPolarisIn(AZURE)
                       );
     }
 

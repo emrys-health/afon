@@ -15,9 +15,9 @@ public class DeployAzurePolarisMain implements StepsProvider {
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
             stepOperations.deleteStack(AZURE),
-            stepOperations.deployAzurePolaris(),
-            stepOperations.waitForAzurePolaris(),
-            stepOperations.initializeAllCatalogsInAzure()
+            stepOperations.deployPolarisIn(AZURE),
+            stepOperations.waitForPolarisIn(AZURE),
+            stepOperations.initializeAllCatalogsIn(AZURE)
                       );
     }
 

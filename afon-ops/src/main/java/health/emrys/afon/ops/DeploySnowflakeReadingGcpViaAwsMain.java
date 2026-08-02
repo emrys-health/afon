@@ -8,19 +8,22 @@ import health.emrys.afon.ops.steps.StepsProvider;
 import java.util.ArrayList;
 import java.util.List;
 
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
+
 public class DeploySnowflakeReadingGcpViaAwsMain implements StepsProvider {
 
     public static List<Step> steps(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(List.of(
-                stepOperations.deleteAwsStack(),
-                stepOperations.deployAwsFullStack(),
-                stepOperations.waitForAwsPolaris(),
-                stepOperations.initializeAllCatalogsInAws(),
-                stepOperations.checkAwsSparkConnectorTalkingToAws()
+                stepOperations.deleteStack(AWS),
+                stepOperations.deployFullStackIn(AWS),
+                stepOperations.waitForPolarisIn(AWS),
+                stepOperations.initializeAllCatalogsIn(AWS),
+                stepOperations.checkAwsSparkWritingTo(AWS)
         ));
-        steps.add(stepOperations.checkAwsSparkConnectorReadingGcp());
-        steps.add(stepOperations.snowflakeReadsGcpViaPolaris());
+        steps.add(stepOperations.checkAwsSparkWritingTo(GCP));
+        steps.add(stepOperations.snowflakeReadingViaAwsPolaris(GCP));
         return steps;
     }
 
