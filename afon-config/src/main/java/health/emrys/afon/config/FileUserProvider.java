@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -53,11 +55,16 @@ public class FileUserProvider implements AfonUserProvider {
         String dir = configDir();
         String pathname = dir + "/" + file;
         logger.info("Loading {} users from {}", file, dir);
+        Path path = Path.of(pathname);
+        if (!Files.exists(path) ){
+            logger.warn("File {} not found", pathname);
+            throw new RuntimeException("File not found: "+pathname);
+        }
         Scanner scanner = null;
         try {
             scanner = new Scanner(new File(pathname));
         } catch (FileNotFoundException e) {
-            logger.warn("Failed to load users from {}", file);
+            logger.error("Failed to load users from {}", file);
             throw new RuntimeException(e);
         }
         List<AfonUser> list = new ArrayList<>();

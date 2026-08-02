@@ -21,7 +21,7 @@ public class AfonUsersTest {
             AfonUserProvider provider = new FileUserProvider(List.of("missing.csv"));
             provider.getUsers();
         } catch (Exception e) {
-            assertThat(e.getMessage()).endsWith("missing.csv (No such file or directory)");
+            assertThat(e.getMessage()).contains("missing.csv");
         }
     }
 
