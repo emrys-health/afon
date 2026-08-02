@@ -59,6 +59,7 @@
         <module>afon-snowflake</module>
         <module>afon-trino</module>
         <module>afon-cluster</module>
+        <module>afon-cdk</module>
         <module>afon-ops</module>
         <module>afon-docs</module>
     </modules>
