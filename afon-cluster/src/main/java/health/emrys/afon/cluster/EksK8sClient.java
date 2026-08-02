@@ -16,13 +16,13 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 
-public class EksInfoClient extends K8sClient {
+public class EksK8sClient extends K8sClient {
 
-    public EksInfoClient() {
+    public EksK8sClient() {
         this(new AfonPropertiesLoader().getProperties());
     }
 
-    public EksInfoClient(Properties properties){
+    public EksK8sClient(Properties properties){
         super(properties);
         Region region = Region.of(AWS_REGION.getValueFrom(properties));
         AWSCredentials awsCredentials = new BasicAWSCredentials(
@@ -49,7 +49,7 @@ public class EksInfoClient extends K8sClient {
     }
 
     public static void main(String[] args) {
-        EksInfoClient app = new EksInfoClient();
+        EksK8sClient app = new EksK8sClient();
         app.smokeTest();
     }
 
