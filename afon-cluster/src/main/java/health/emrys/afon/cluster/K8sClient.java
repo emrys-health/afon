@@ -20,14 +20,25 @@ import software.amazon.awssdk.services.eks.model.DescribeClusterResponse;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
 import static java.lang.String.format;
 
 
 public class K8sClient {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(K8sClient.class);
+    private final String clusterName;
+
+    public K8sClient(Properties properties) {
+        this.clusterName = CLUSTER_NAME.getValueFrom(properties);
+    }
+
+    public String getClusterName() {
+        return clusterName;
+    }
 
     public String getIngressExpectingOnlyOneFor(String serviceName) throws ApiException, IncorrectConfigException {
         Optional<List<String>> optionalIngress = getIngressFor(serviceName);
@@ -38,8 +49,7 @@ public class K8sClient {
         if (polarisIngress.size() != 1) {
             throw new IncorrectConfigException(format("Was expecting 1 service address but got {}", polarisIngress.toString()));
         }
-        String polarisHost = polarisIngress.get(0);
-        return polarisHost;
+        return polarisIngress.get(0);
     }
 
     public Optional<List<String>> getIngressFor(String serviceName) throws ApiException {
@@ -53,7 +63,9 @@ public class K8sClient {
         return Optional.empty();
     }
 
-    public String getServiceExpectingOnlyOneFor(String serviceName) throws ApiException, IncorrectConfigException {
+    public String getUniqueService(String serviceName) throws ApiException, IncorrectConfigException {
+        logger.info(format("Querying cluster %s for service name %s", clusterName, serviceName));
+
         Optional<List<String>> optionalIngress = getServiceFor(serviceName);
         if (!optionalIngress.isPresent()) {
             throw new IncorrectConfigException(format("No service called '%s'", serviceName));
@@ -62,8 +74,7 @@ public class K8sClient {
         if (polarisIngress.size() != 1) {
             throw new IncorrectConfigException(format("Was expecting 1 service address but got %s", polarisIngress.toString()));
         }
-        String polarisHost = polarisIngress.get(0);
-        return polarisHost;
+        return polarisIngress.get(0);
     }
 
     public Optional<List<String>> getServiceFor(String serviceName) throws ApiException {
@@ -139,7 +150,7 @@ public class K8sClient {
                 }
             }
         } catch (ApiException e) {
-            logger.error("could not talk to cluster ", e);
+            logger.error("Failed to connect to cluster {}", clusterName, e);
         }
     }
 }

@@ -12,8 +12,7 @@ import static health.emrys.afon.config.AfonProperties.*;
  * <pre>
  mvn -DPOLARIS_ENDPOINT=emryspolarisazure.click -Dexec.mainClass=health.emrys.afon.cluster.EndpointPolarisConfiguration exec:java -Dexec.args="AZURE_EXTERNAL POLARIS_ID:POLARIS_SECRET"
  * </pre>
- * although you will need to point your K8s current environment at the cloud and run
- * PolarisCredentialGrabber to get the POLARIS_ID and POLARIS_SECRET.
+ * although you will need to point your K8s current environment at the cloud.
  */
 public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration implements AutoCloseable {
 
