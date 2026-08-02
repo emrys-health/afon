@@ -13,6 +13,7 @@ public class ConfigurePolarisMain {
 
     public static void main(String[] args) {
         try {
+            args = ArgsUtils.splitFirstBySpace(args); // when args are passed as a single space-separated arg
             PolarisConfigClient client = new PolarisConfigClient();
             if (args.length == 0) {
                 logger.info("Running smoke test");

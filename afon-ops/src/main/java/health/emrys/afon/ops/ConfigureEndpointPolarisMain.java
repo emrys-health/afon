@@ -9,6 +9,7 @@ public class ConfigureEndpointPolarisMain {
     private static final Logger logger = LoggerFactory.getLogger(ConfigureEndpointPolarisMain.class);
 
     public static void main(String[] args) {
+        args = ArgsUtils.splitFirstBySpace(args); // when args are passed as a single space-separated arg
         try {
             try (EndpointPolarisConfiguration configuration = new EndpointPolarisConfiguration()) {
                 configuration.configure(args);
