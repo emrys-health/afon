@@ -51,7 +51,7 @@ public class OnboardAllUsersMain {
     public static void main(String[] args) {
         Properties properties = new AfonPropertiesLoader().getProperties();
         properties.put(POLARIS_ENDPOINT.getName(), args[0]);
-        OnboardAllUsersMain app           = new OnboardAllUsersMain(new FileUserProvider(), properties);
+        OnboardAllUsersMain app         = new OnboardAllUsersMain(new FileUserProvider(), properties);
         String            catalog       = args[1];
         String            jupyterDomain = args[2];
         try {

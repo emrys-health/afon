@@ -16,8 +16,8 @@ Then, login to `emrysjupyter.click` and follow the OAuth link to fire up your po
 You should see it with status `ContainerCreating` when you run `kubectl get pods`.
 It may take a minute or two if the container image is not cached.
 
-User names and passwords can be found in `Onboarding.java`.
-`DeployFullStackAwsMain.java` should have configured these users for AWS but if you need them for other Catalogs, look at `UserOnboarderMain.java`.
+User names and passwords can be found in `config/users.csv`.
+`DeployAwsFullStackMain.java` should have configured these users for AWS but if you need them for other Catalogs, look at `OnboardAllUsersMain.java`.
 
 Let's assume you want to put a notebook on, say, the `phil` pod. In the `notebooks` sub directory, run:
 ```shell
