@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.List;
 
+import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
@@ -35,11 +36,11 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
     @Override
     public List<Step> steps(StepOperations stepOperations) {
         return List.of(
-            stepOperations.deleteAwsStack(),
-            stepOperations.deployAwsFullStack(),
-            stepOperations.waitForAwsPolaris(),
-            stepOperations.initializeAllCatalogsInAws(),
-            stepOperations.checkAwsSparkConnectorTalkingToAws()
+            stepOperations.deleteStack(AWS),
+                stepOperations.deployFullStackIn(AfonProperties.AfonCloud.AWS),
+            stepOperations.waitForPolarisIn(AWS),
+            stepOperations.initializeAllCatalogsIn(AWS),
+            stepOperations.checkAwsSparkWritingTo(AWS)
                       );
     }
 

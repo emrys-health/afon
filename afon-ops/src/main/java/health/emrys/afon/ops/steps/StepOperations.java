@@ -1,17 +1,16 @@
 package health.emrys.afon.ops.steps;
 
 import com.azure.storage.blob.models.BlobItem;
-import health.emrys.afon.cdk.aws.AwsPolarisStack;
 import health.emrys.afon.cdk.aws.AwsFullStack;
-import health.emrys.afon.cdk.aws.AwsSparkStack;
+import health.emrys.afon.cdk.aws.AwsPolarisStack;
+import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.azure.AzureReader;
-import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
-import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.OnboardAllUsersMain;
 import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
+import health.emrys.afon.ops.RegisterLocalPolarisMain;
 import health.emrys.afon.ops.spark.SparkChecker;
 import health.emrys.afon.ops.spark.SparkTestReader;
 import health.emrys.afon.ops.spark.SparkTestWriter;
@@ -37,14 +36,12 @@ public class StepOperations {
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
 
     private static final Properties NO_ENV_VARIABLES   = new Properties();
-    public static final  String     POLARIS_TABLE_NAME = "sf_table";
     public static final  String     SNOWFLAKE_OUT_DIR  = "my_project_folder";
 
     private final StepActions actions;
 
     private final String awsPolarisDomainName;
-    private final String awsAccountId;
-    private final String region;
+    private final String awsRegion;
     private final String azurePolarisDomainName;
     private final String clusterName;
     private final String gcpPolarisDomainName;
@@ -54,13 +51,12 @@ public class StepOperations {
     public StepOperations(StepActions actions) {
         Properties properties = appProperties();
         this.actions                = actions;
+        this.clusterName            = CLUSTER_NAME.getValueFrom(properties);
+        this.awsRegion              = AWS_REGION.getValueFrom(properties);
         this.awsPolarisDomainName   = AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
-        this.awsAccountId           = AWS_ACCOUNT_ID.getValueFrom(properties);
-        this.region                 = AWS_REGION.getValueFrom(properties);
         this.azurePolarisDomainName = AZURE_DOMAIN_NAME.getValueFrom(properties);
         this.gcpPolarisDomainName   = GCP_DOMAIN_NAME.getValueFrom(properties);
-        this.clusterName            = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
-        this.awsJupyterDomain       = AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties);
+        this.awsJupyterDomain       = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
         this.azureJupyterDomain     = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
     }
 
@@ -68,167 +64,146 @@ public class StepOperations {
         return new AfonPropertiesLoader().getProperties();
     }
 
-    public Step deleteAwsStack() {
-        return new Step(
-            "clean_aws",
-            "clean the local AWS directory (if it exists)",
-            () -> {
-                try {
-                    actions.deleteStack(AWS);
-                } catch (Exception ex) {
-                    logger.error(
-                        format(
-                            """
-                            You may need to run:
-                            
-                            aws eks update-kubeconfig --region %s --name %s
-                            """, region, clusterName), ex);
-                }
-            });
-    }
-
-    public Step deleteAzureStack() {
-        return deleteStack(AZURE);
-    }
-
     @NonNull
-    public Step deleteStack(AfonCloud id) {
+    public Step deleteStack(final AfonCloud id) {
         return new Step(
                 "clean_" + id,
                 format("clean the local %s directory (if it exists)", id),
                 () -> {
-                    actions.deleteStack(id);
+                    try {
+                        actions.deleteStack(id);
+                    } catch ( Exception e ){
+                        if ( id == AWS ){
+                            logger.error(format(
+                                    """
+                                    You may need to run:
+                                    
+                                    aws eks update-kubeconfig --region %s --name %s
+                                    """, awsRegion, clusterName), e);
+
+                        }
+
+                    }
                 });
     }
 
-    public Step deployAwsPolaris() {
-        return new Step(
-            "aws_polaris",
-            "deploy Polaris in AWS",
-            () -> actions.startStack(AwsPolarisStack.class, AWS));
+    public Step deployFullStackIn(AfonCloud id){
+        switch ( id ){
+            case AWS:
+                return new Step(
+                        "aws_full",
+                        "deploy full stack in AWS",
+                        () -> actions.startStack(AwsFullStack.class, AWS));
+            case AZURE:
+                return new Step(
+                    "az_full",
+                    "deploy full stack in Azure",
+                    () -> actions.startStack(AzureFullStack.class, AZURE));
+            case GCP:
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
     }
 
-    public Step deployAwsFullStack() {
-        return new Step(
-            "aws_full",
-            "deploy full stack in AWS",
-            () -> actions.startStack(AwsFullStack.class, AWS));
+    public Step deployPolarisIn(AfonCloud id){
+        switch ( id ){
+            case AWS:
+                return new Step(
+                        "aws_polaris",
+                        "deploy Polaris in AWS",
+                        () -> actions.startStack(AwsPolarisStack.class, AWS));
+            case AZURE:
+                return new Step(
+                    "az_polaris",
+                    "deploy Polaris in Azure",
+                    () -> actions.startStack(AzurePolarisStack.class, AZURE));
+            case GCP:
+                return new Step(
+                        "gcp_polaris",
+                        "deploy Polaris in GCP",
+                        () -> actions.startStack(GcpPolarisStack.class, GCP));
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
     }
 
-    public Step deployAwsSpark() {
-        return new Step(
-            "aws_spark",
-            "deploy Spark in AWS",
-            () -> actions.startStack(AwsSparkStack.class, AWS));
+    public Step purgeForeignCatalogFrom(AfonCloud id){
+        switch ( id ){
+            case AZURE:
+                return purgeForeignCatalogFrom(AZURE, azurePolarisDomainName);
+            case AWS, GCP:
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
     }
 
-    public Step deployAzureFullStack() {
-        return new Step(
-            "az_full",
-            "deploy full stack in Azure",
-            () -> actions.startStack(AzureFullStack.class, AZURE));
-    }
-
-    public Step deployAzurePolaris() {
-        return new Step(
-            "az_polaris",
-            "deploy Polaris in Azure",
-            () -> actions.startStack(AzurePolarisStack.class, AZURE));
-    }
-
-    public Step deployGcpPolaris() {
-        return new Step(
-                "gcp_polaris",
-                "deploy Polaris in GCP",
-                () -> actions.startStack(GcpPolarisStack.class, GCP));
-    }
-
-
-    public Step purgeForeignCatalogFromAzure() {
-        return purgeForeignCatalogFrom(azurePolarisDomainName, AZURE);
-    }
-
-    public @NonNull Step purgeForeignCatalogFrom(String domainName,
-                                                 AfonCloud catalog
+    private @NonNull Step purgeForeignCatalogFrom(AfonCloud catalog, String domainName
     ) {
-        return purgeEverythingFor(domainName, catalog, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
+        return purgePolarisFor(catalog, domainName, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
     }
 
-    public @NonNull Step purgeEverythingFor(String domainName,
-                                            AfonCloud catalog,
-                                            String namespace,
-                                            String tableName
+    private @NonNull Step purgePolarisFor(AfonCloud catalog, String domainName,
+                                          String namespace,
+                                          String tableName
     ) {
         return new Step(
-            format("%s_purge_%s", machineNameFrom(domainName), catalog.toString()),
-            format("remove all persisted references to %s in Polaris at `%s`", namespace, domainName),
+            format("%s_purge_%s", catalog.toString(), machineNameFor(domainName)),
+            format("remove all persisted references to namespace `%s` in Polaris in domain `%s`", namespace, domainName),
             () -> actions.executeMainOf(
                 PurgeAndPopulatePolarisMain.class,
                 new String[]{domainName, catalog.name(), namespace, tableName},
                 NO_ENV_VARIABLES));
     }
 
-    private static @NonNull String machineNameFrom(String domainName) {
-        String name = domainName;
-        if (domainName.contains(".")) {
-            name = domainName.substring(0, domainName.indexOf("."));
-        }
-        return name;
-    }
-
-    public Step createAzureCatalogInAzure() {
-        return createAzureCatalogWithExternalBucketIn(azurePolarisDomainName);
-    }
-
-    public @NonNull Step createAzureCatalogWithExternalBucketIn(String domainName) {
-        return new Step(
-            "foreign_catalog_in_" + machineNameFrom(domainName),
-            format("Create a catalog in the Polaris at `%s`", domainName),
-            () -> {
-                // swap the buckets
+    public Step createForeignCatalogIn(AfonCloud id){
+        switch ( id ){
+            case AZURE:
                 Properties properties = new Properties();
                 properties.setProperty(
-                    AZURE_BUCKET.getName(),
-                    AZURE_EXTERNAL_BUCKET.getValueFrom(appProperties()));
-                actions.createSingleCatalogsFor(domainName, AZURE, properties);
-            });
+                        AZURE_BUCKET.getName(),
+                        AZURE_EXTERNAL_BUCKET.getValueFrom(appProperties()));
+                return createForeignCatalogIn(AZURE, azurePolarisDomainName, properties);
+            case AWS, GCP:
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
     }
 
-    public Step createExternalAzureCatalogInAzure() {
-        return createExternalAzureCatalogIn(azurePolarisDomainName);
-    }
-
-    public @NonNull Step createAzureCatalogIn(String domainName) {
+    private @NonNull Step createCatalogIn(AfonCloud catalog, String domainName) {
         return new Step(
-            "azure_in_" + machineNameFrom(domainName),
-            format("configure a catalog called `%s` in the Polaris at `%s`", AZURE, domainName),
-            () -> actions.createSingleCatalogsFor(domainName, AZURE));
+                format("%s_catalog_in_%s", catalog.toString(), machineNameFor(domainName)),
+                format("configure a catalog called `%s` in the Polaris in domain `%s`", catalog, domainName),
+                () -> actions.createSingleCatalogsFor(domainName, catalog));
     }
 
-    public @NonNull Step createExternalAzureCatalogIn(String domainName) {
+    private @NonNull Step createForeignCatalogIn(AfonCloud catalog, String domainName, Properties properties) {
         return new Step(
-            "external_azure_in_" + machineNameFrom(domainName),
-            format("configure a catalog called `%s` in the Polaris at `%s`", AZURE_EXTERNAL, domainName),
-            () -> actions.createSingleCatalogsFor(domainName, AZURE_EXTERNAL));
+                format("%s_foreign_catalog_in_%s", catalog.toString(), machineNameFor(domainName)),
+                format("Create a foreign catalog called `%s` in the Polaris in domain `%s`", catalog, domainName),
+                () -> {
+                    // swap the buckets
+                    actions.createSingleCatalogsFor(domainName, catalog, properties);
+                });
     }
 
-    public Step initializeAllCatalogsInAzure() {
-        return initializeAllCatalogsIn(azurePolarisDomainName);
-    }
-
-    public Step initializeAllCatalogsInAws() {
-        return initializeAllCatalogsIn(awsPolarisDomainName);
-    }
-
-    public Step initializeAllCatalogsInGcp() {
-        return initializeAllCatalogsIn(gcpPolarisDomainName);
+    public Step initializeAllCatalogsIn(AfonCloud id){
+        switch ( id ){
+            case AWS:
+                return initializeAllCatalogsIn(awsPolarisDomainName);
+            case AZURE:
+                return initializeAllCatalogsIn(azurePolarisDomainName);
+            case GCP:
+                return initializeAllCatalogsIn(gcpPolarisDomainName);
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
     }
 
     @NonNull
-    public Step initializeAllCatalogsIn(String domainName) {
+    private Step initializeAllCatalogsIn(String domainName) {
         return new Step(
-            "all_catalogs_in_" + machineNameFrom(domainName),
-            "configure all the the catalogs in Polaris at " + domainName,
+                format("all_catalogs_in_%s", machineNameFor(domainName)),
+                format("initialize all the catalogs in Polaris in domain `%s`", domainName),
             () -> {
                 try {
                     actions.executeMainOf(
@@ -244,104 +219,106 @@ public class StepOperations {
                                   
                                   can be because the certificates are not yet ready, it seems.
                                   If this is the case, try re-running this step.
-                                  I've seen second attempts work without any other intervention.
                                   """, e);
                     throw e;
                 }
             });
     }
 
-    public Step waitForAwsPolaris() {
-        return actions.waitFor(awsPolarisDomainName);
+    public Step waitForPolarisIn(AfonCloud id){
+        switch ( id ){
+            case AWS:
+                return waitForPolarisIn(awsPolarisDomainName);
+            case AZURE:
+                return waitForPolarisIn(azurePolarisDomainName);
+            case GCP:
+                return waitForPolarisIn(gcpPolarisDomainName);
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
     }
 
-    public Step waitForAzurePolaris() {
-        return actions.waitFor(azurePolarisDomainName);
+    private Step waitForPolarisIn(String domainName) {
+        return actions.waitFor(domainName);
     }
 
-    public Step waitForGcpPolaris() {
-        return actions.waitFor(gcpPolarisDomainName);
+    public Step checkAwsSparkWritingTo(AfonCloud id){
+        switch ( id ){
+            case AWS:
+                return awsSparkWritingTo(AWS, EXTERNAL_NAMESPACE);
+            case AZURE:
+                return awsSparkWritingTo(AZURE, EXTERNAL_NAMESPACE);
+            case GCP:
+                return awsSparkWritingTo(GCP, EXTERNAL_NAMESPACE);
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
     }
 
-    public Step checkLocalSparkTalksToAzurePolarisViaAwsPolaris() {
-        return awsSparkWriteTestUsing(
-            AZURE_EXTERNAL,
-            format(
-                "run Spark locally such that it talks to %s which defers to %s",
-                awsPolarisDomainName,
-                AZURE_DOMAIN_NAME),
-            EXTERNAL_NAMESPACE);
-    }
-
-    public Step checkAwsSparkConnectorReadingGcp() {
-        return awsSparkTestUsing(GCP, EXTERNAL_NAMESPACE);
-    }
-
-    public Step checkAwsSparkConnectorReadingAzure() {
-        return awsSparkTestUsing(AZURE, EXTERNAL_NAMESPACE);
-    }
-
-    public Step checkAwsSparkConnectorTalkingToAws() {
-        return awsSparkTestUsing(AWS, EXTERNAL_NAMESPACE);
-    }
-
-    public Step checkSparkConnectorTalkingToAzure() {
+    private Step awsSparkWritingTo(AfonCloud warehouse, String namespace) {
         return sparkTestUsing(
-            AZURE,
-            format("local Spark call that uses %s", azurePolarisDomainName),
-            EXTERNAL_NAMESPACE,
-            SparkTestWriter.class,
-            azurePolarisDomainName,
-            azureJupyterDomain);
-    }
-
-    public @NonNull Step awsSparkTestUsing(AfonCloud warehouse,
-                                           String namespace
-    ) {
-        return awsSparkWriteTestUsing(
-            warehouse,
-            format(
-                "run Spark locally such that it talks to the AWS Polaris, writes a table to %s",
-                warehouse),
-            namespace);
-    }
-
-    private Step awsSparkWriteTestUsing(AfonCloud warehouse,
-                                        String description,
-                                        String namespace
-    ) {
-        return sparkTestUsing(warehouse, description, namespace, SparkTestWriter.class, awsPolarisDomainName, awsJupyterDomain);
-    }
-
-    public Step awsSparkReadTestUsing(AfonCloud warehouse,
-                                      String namespace
-    ) {
-        return sparkTestUsing(
-            warehouse,
-            format(
-                "read via Spark table `%s.%s.%s` by calling `%s`",
                 warehouse,
+                format("local Spark call that talks to AWS Polaris, writing a table to %s in namespace %s", warehouse, namespace),
                 namespace,
-                SparkChecker.TABLE,
-                awsPolarisDomainName
-            ),
-            namespace,
-            SparkTestReader.class,
-            awsPolarisDomainName,
-            awsJupyterDomain);
+                SparkTestWriter.class,
+                awsPolarisDomainName,
+                awsJupyterDomain);
+    }
+
+    public @NonNull Step checkSparkWritingViaAwsPolarisToPolarisIn(AfonCloud id) {
+        switch ( id ){
+            case AZURE:
+                return sparkTestUsing(
+                        AZURE_EXTERNAL,
+                        format("local Spark call that uses %s which defers to %s", awsPolarisDomainName, azurePolarisDomainName),
+                        EXTERNAL_NAMESPACE,
+                        SparkTestWriter.class,
+                        awsPolarisDomainName,
+                        awsJupyterDomain);
+            case AWS, GCP:
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
+    }
+
+    public @NonNull Step checkSparkWritingToPolarisIn(AfonCloud id) {
+        switch ( id ){
+            case AZURE:
+                return sparkTestUsing(
+                        AZURE,
+                        format("local Spark call that uses %s", azurePolarisDomainName),
+                        EXTERNAL_NAMESPACE,
+                        SparkTestWriter.class,
+                        azurePolarisDomainName,
+                        azureJupyterDomain);
+            case AWS, GCP:
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
+    }
+
+    public @NonNull Step checkAwsSparkReadingUsing(AfonCloud id) {
+        return sparkTestUsing(
+                id,format("read via Spark table `%s.%s.%s` by calling `%s`",
+                        id,ACCEPTANCE_TEST_NAMESPACE,SparkChecker.TABLE,
+                        awsPolarisDomainName),
+                ACCEPTANCE_TEST_NAMESPACE,
+                SparkTestReader.class,
+                awsPolarisDomainName,
+                awsJupyterDomain);
     }
 
     private @NonNull Step sparkTestUsing(AfonCloud warehouse,
                                          String description,
                                          String namespace,
-                                         Class<? extends SparkChecker> clazz,
+                                         Class<? extends SparkChecker> sparkChecker,
                                          String domainName,
                                          String jupyterDomainName
     ) {
         return new Step(
             format(
                 "%s_spark_talks_to_%s",
-                machineNameFrom(domainName),
+                machineNameFor(domainName),
                 warehouse.toString()),
             description,
             () -> {
@@ -358,25 +335,13 @@ public class StepOperations {
                     domainName,
                     namespace);
                 actions.executeMainOf(
-                    clazz,
+                    sparkChecker,
                     args.toArray(new String[0]),
                     NO_ENV_VARIABLES);
             });
     }
 
-    public Step snowflakeReadsGcpViaPolaris() {
-        return snowflakeReadViaPolaris(GCP);
-    }
-
-    public Step snowflakeReadsAzureViaPolaris() {
-        return snowflakeReadViaPolaris(AZURE);
-    }
-
-    public Step snowflakeReadsAwsViaPolaris() {
-        return snowflakeReadViaPolaris(AWS);
-    }
-
-    private @NonNull Step snowflakeReadViaPolaris(AfonCloud warehouse) {
+    public @NonNull Step snowflakeReadingViaAwsPolaris(AfonCloud warehouse) {
         return new Step(
             "snowflake_reads_" + warehouse.toString(),
             format("Call Snowflake that uses AWS Polaris to get the credentials to read from %s storage", warehouse.name()),
@@ -433,7 +398,17 @@ public class StepOperations {
         );
     }
 
-    public Step snowflakeWritesToAzure() {
+    public @NonNull Step snowflakeWritesTo(AfonCloud id){
+        switch ( id ){
+            case AZURE:
+                return snowflakeWritesToAzure();
+            case AWS, GCP:
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
+    }
+
+    private Step snowflakeWritesToAzure() {
         Properties        properties = appProperties();
         String            bucket     = AZURE_BUCKET.getValueFrom(properties);
         String            account    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
@@ -499,23 +474,34 @@ public class StepOperations {
         );
     }
 
-    public Step registerMostRecentSnowflakeAzureTableInAws(Class<?> registerTableMainClass) {
-        String glob = format(
-            "%s/%s*metadata.json",
-            ACCEPTANCE_TEST_NAMESPACE,
-            SNOWFLAKE_OUT_DIR);
-        String json = firstFile(glob, true); // firstFileInLatestDirectoryMatching(glob);
-        return registerTableInAws(json, AZURE, SparkChecker.TABLE, registerTableMainClass);
+    public Step purgeFromAwsPolarisAndRecreateFor(AfonCloud id){
+        switch ( id ){
+            case AZURE:
+                return purgePolarisFor(AZURE, awsPolarisDomainName, ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE)
+                    .andThen(createCatalogIn(AZURE, awsPolarisDomainName));
+            case AWS, GCP:
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
     }
 
-    public @NonNull Step purgeAzureFromAwsPolarisAndRecreate() {
-        String tableName = SparkChecker.TABLE;
-        return purgeEverythingFor(awsPolarisDomainName, AZURE, ACCEPTANCE_TEST_NAMESPACE, tableName)
-            .andThen(createAzureCatalogIn(awsPolarisDomainName));
+    public @NonNull Step registerMostRecentSnowflakeTableInAws(AfonCloud id){
+        switch ( id ){
+            case AZURE:
+                String glob = format(
+                        "%s/%s*metadata.json",
+                        ACCEPTANCE_TEST_NAMESPACE,
+                        SNOWFLAKE_OUT_DIR);
+                String json = azureFirstFile(glob, true); // firstFileInLatestDirectoryMatching(glob);
+                return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterLocalPolarisMain.class);
+            case AWS, GCP:
+            default:
+                throw new RuntimeException("Unsupported id "+id);
+        }
     }
 
-    private static @NonNull String firstFile(String glob,
-                                             boolean descendingOrder
+    private static @NonNull String azureFirstFile(String glob,
+                                                  boolean descendingOrder
     ) {
         logger.info("Querying Azure for {}", glob);
         AzureReader lister    = new AzureReader();
@@ -540,9 +526,8 @@ public class StepOperations {
             latest.getName());
     }
 
-    public Step registerTableInAws(String jsonMetadataFQN,
-                                   AfonCloud warehouse,
-                                   String tableName, Class<?> registerTableMainClass
+    private Step registerTableInAwsPolaris(AfonCloud warehouse, String jsonMetadataFQN,
+                                           String tableName, Class<?> registerTableMainClass
     ) {
         return new Step(
             format("%s_table_in_aws_polaris", warehouse.toString()),
@@ -556,4 +541,13 @@ public class StepOperations {
             }
         );
     }
+
+    private static @NonNull String machineNameFor(String domainName) {
+        String name = domainName;
+        if (domainName.contains(".")) {
+            name = domainName.substring(0, domainName.indexOf("."));
+        }
+        return name;
+    }
+
 }
