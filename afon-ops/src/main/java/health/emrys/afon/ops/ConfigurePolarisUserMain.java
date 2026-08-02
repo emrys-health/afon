@@ -62,7 +62,7 @@ public class ConfigurePolarisUserMain {
     }
 
     public void configureAll(String warehouse,
-                             AfonUserProvider onboarding
+                             AfonUserProvider userProvider
     ) throws IncorrectConfigException, IOException {
         // A previous run may have left this principal role — and hence its catalog-role association —
         // in place, which would make the create/associate below fail. Delete it first so both start
@@ -73,7 +73,7 @@ public class ConfigurePolarisUserMain {
         if (PolarisConfigurer.isFailure(permissions.createPrincipalRoles(principalRoleName))) {
             logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
         }
-        for (AfonUser user : onboarding.getUsers()) {
+        for (AfonUser user : userProvider.getUsers()) {
             configureUser(user.username(), warehouse);
         }
     }

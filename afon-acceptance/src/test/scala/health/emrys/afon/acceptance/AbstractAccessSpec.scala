@@ -135,7 +135,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     val properties    = AcceptanceTestConfig.instance.getProperties
     val User          = new AfonUser(UserName, UserPassword, "email@test.com", "slug", "first", "second")
 
-    val onboardingConfig = new AfonUserProvider() {
+    val userProvider = new AfonUserProvider() {
       override def getUsers: util.List[AfonUser] = util.List.of(User)
     }
     "agree on the token" in {
@@ -144,7 +144,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       assert(ContainerHelper.instance.startPolaris(properties) != null)
 
       When(s"we onboard a user '$User' for catalog ${config.warehouseName()}' in Polaris")
-      val onboarding = new OnboardAllUsersMain(onboardingConfig, properties)
+      val onboarding = new OnboardAllUsersMain(userProvider, properties)
       onboarding.onboardAll(config.warehouseName())
       And("in KeyCloak")
       onboarding.configureKeyCloak("NotUsed.com")
