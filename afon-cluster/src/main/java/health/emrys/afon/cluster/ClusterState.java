@@ -24,13 +24,7 @@ public class ClusterState implements AutoCloseable {
         V1Pod  polarisPod = k8sClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME);
         String podName    = polarisPod.getMetadata().getName();
         logger.info("Pod Name: {}", podName);
-        String tokenFromSysProp = System.getProperty(ACCESS_TOKEN_SYS_PROP);
-        if (tokenFromSysProp == null) {
-            logger.info("Access Token not set as the system property " + ACCESS_TOKEN_SYS_PROP);
-            accessToken = new PolarisCredentialGrabber().getCredentials(k8sClient.getLogsOf(podName));
-        } else {
-            accessToken = tokenFromSysProp;
-        }
+        accessToken = System.getProperty(ACCESS_TOKEN_SYS_PROP);
         polarisHost = k8sClient.getIngressExpectingOnlyOneFor(POLARIS_INGRESS_NAME);
         logger.info("Polaris is available to the outside world at: {}", polarisHost);
     }
