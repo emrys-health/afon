@@ -435,6 +435,11 @@ tofu destroy --auto-approve
 
 These output shell scripts that destroy everything. You may need to run them multiple times for VPCs to disappear.
 
+To check the VPC has been destroyed: 
+```shell
+aws ec2 describe-vpcs --query "Vpcs[?Tags[?Key=='Name' && Value=='cdktf-eks-vpc-spark-cluster']].VpcId"   --output text
+```
+
 **Cloud-specific destroy scripts:**
 
 ```shell
