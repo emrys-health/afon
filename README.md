@@ -88,9 +88,9 @@ Required sensitive properties:
 | `POLARIS_DB_PASSWORD` | Your external Postgres password |
 | `POLARIS_DB_HOST` | Your external Postgres host |
 
-NOTE:  When you run the tests, you use the credentials in env-aws.properties
-When you run tofu apply|destroy, you use the credentials in ~/.aws/credentials.
-TODO:  Have mechanism to keep them in sync.
+NOTE:  When you run the tests, you use the Polaris service account credentials in `env-aws.properties`. 
+When you run tofu apply|destroy, you use the user admin credentials in ~/.aws/credentials.
+TODO:  Rename `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `env-aws.properties` to `AWS_POLARIS_*`
 
 #### Users 
 
