@@ -12,12 +12,13 @@ We currently have the following monitoring tools:
 
 ### Install cloud tools via tofu:
 
-To install all the cloud tools, generate terraform deployment plan and execute via tofu:
-
+To install all the cloud tools, assume AWS full stack has been deployed. 
+If not, deploy using command:
 ```shell
-./afon.sh -a exec --exec-class cdk.aws.PrometheusClusterDeployment
-./afon.sh -a tofu-apply
+./afon.sh -a exec --exec-class cdk.aws.DeployAwsFullStack
 ```
+
+### Set up kube port-forwarding 
 
 Set up cloud port-forward for the tools you want to access:
 ```shell
@@ -35,16 +36,16 @@ docker run -d --name grafana -p 3000:3000 grafana/grafana
 ```
 Open the Grafana UI at `http://localhost:3000` and login with credentials `admin`/`admin`.
 
-#### Local config persistence
+#### Save local Grafana config
 You can run your dockerized Grafana persisting the config each time with:
 ```shell
-docker run -d --name grafana -p 3000:3000 -v $YOUR_LOCAL_CONFIG_DIRECTORY/grafana:/var/lib/grafana grafana/grafana
+docker run -d --name grafana -p 3000:3000 -v $LOCAL_GRAFANA_CONFIG_DIR:/var/lib/grafana grafana/grafana
 ```
-To grab all the metadata files first time around, run:
+To save all the metadata files the first time:
 ```shell
-docker cp YOUR_CONTAINER_ID:/var/lib/grafana $YOUR_LOCAL_CONFIG_DIRECTORY
+docker cp YOUR_CONTAINER_ID:/var/lib/grafana $LOCAL_GRAFANA_CONFIG_DIR
 ```
-**Note** you may need to execute `sudo chown -R 472:472 YOUR_LOCAL_CONFIG_DIRECTORY` to give Grafana permissions.
+**Note** you may need to execute `sudo chown -R 472:472 $LOCAL_GRAFANA_CONFIG_DIR` to give Grafana permissions.
 User/group 472 is the Grafana user.
 
 ![image](pics/grafana.png)
@@ -53,8 +54,8 @@ User/group 472 is the Grafana user.
 
 In Grafana UI, add a Loki Data Source pointing to`http://localhost:3100`.
 
-NOTE: Add a `HTTP headers` value with a header name of `X-Scope-OrgID`
-and a `CLUSTER_NAME` value from `config/afon.properties`.
+NOTE: In `HTTP headers` add a single entry with:
+- Header name `X-Scope-OrgID` and as value the cluster name (`CLUSTER_NAME` from `config/afon.properties`).
 
 ![image](pics/grafana_multitenancy.png)
 
@@ -63,12 +64,14 @@ You may need to refresh your browser.
 
 Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in `afon-aws.properties`.
 
+NOTE: On macos, if getting connection refused when adding the data source, use http://host.docker.internal:3100 in place of http://localhost:3100
+
 ### Prometheus
 
 In Grafana UI, add a Prometheus Data Source pointing to `http://localhost:9090` 
 One should see nearly 2000 metrics.
 
-NOTE:  If getting connection refused when adding the data source, use http://host.docker.internal:9090 in place of http://localhost:9090 (see https://github.com/grafana/grafana/issues/46434).  
+NOTE:  On macos, if getting connection refused when adding the data source, use http://host.docker.internal:9090 in place of http://localhost:9090 (see https://github.com/grafana/grafana/issues/46434).  
 
 ### Hubble
 
