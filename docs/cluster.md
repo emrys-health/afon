@@ -1,47 +1,61 @@
-This file documents *what* the infrastructure is and *why* we chose it.
-See the [REAMDME](./README.md) file for *how* to create the infrastructure.
-
-**NOTE: that this document is partially deprecated as we now use Cilium as our CNI not Calico.**
-TODO: update me!
+This file documents *what* the cluster is and *why* we chose it.
+See the [REAMDME](./../README.md) file for *how* to create the cluster.
 
 # Pods
 
 A healthy Emrys K8s cluster **on AWS** should look something like this:
 ```shell
-$ kubectl get pods -A
-NAMESPACE         NAME                                                  READY   STATUS    RESTARTS   AGE
-calico-system     calico-apiserver-78cd78c756-b5tcb                     1/1     Running   0          22h
-calico-system     calico-apiserver-78cd78c756-fbzmj                     1/1     Running   0          22h
-calico-system     calico-kube-controllers-644d797b6b-bdn9m              1/1     Running   0          22h
-calico-system     calico-node-5vsjd                                     1/1     Running   0          22h
-calico-system     calico-node-7wmzj                                     1/1     Running   0          22h
-calico-system     calico-node-8hl2h                                     1/1     Running   0          22h
-calico-system     calico-typha-6cd6677d6d-5k9bx                         1/1     Running   0          22h
-calico-system     calico-typha-6cd6677d6d-mvsxt                         1/1     Running   0          22h
-calico-system     goldmane-859fd45798-dkxxb                             1/1     Running   0          22h
-calico-system     whisker-5d544968fb-24g9x                              2/2     Running   0          22h
-default           emrys-master-0                                        1/1     Running   0          22h
-default           emrys-worker-0                                        1/1     Running   0          22h
-default           emrys-worker-1                                        1/1     Running   0          22h
-default           jupyter-deployment-7985d67bcf-55tvv                   1/1     Running   0          22h
-default           polaris-deployment-6999d5b5b4-j2t66                   1/1     Running   0          22h
-default           spark-connector-0-driver                              1/1     Running   0          6h2m
-default           spark-kubernetes-operator-7cdb84d876-psktf            1/1     Running   0          22h
-kube-system       aws-load-balancer-controller-chart-6c67847cf7-gmftt   1/1     Running   0          22h
-kube-system       aws-load-balancer-controller-chart-6c67847cf7-zhk9t   1/1     Running   0          22h
-kube-system       aws-node-4cr6m                                        2/2     Running   0          22h
-kube-system       aws-node-6mrch                                        2/2     Running   0          22h
-kube-system       aws-node-x62zr                                        2/2     Running   0          22h
-kube-system       coredns-6574fbb8f6-4tgwl                              1/1     Running   0          22h
-kube-system       coredns-6574fbb8f6-bspng                              1/1     Running   0          22h
-kube-system       csi-secrets-store-secrets-store-csi-driver-fq5sd      3/3     Running   0          22h
-kube-system       csi-secrets-store-secrets-store-csi-driver-rmncl      3/3     Running   0          22h
-kube-system       csi-secrets-store-secrets-store-csi-driver-whhsh      3/3     Running   0          22h
-kube-system       kube-proxy-cdm9v                                      1/1     Running   0          22h
-kube-system       kube-proxy-jxgng                                      1/1     Running   0          22h
-kube-system       kube-proxy-l5mgf                                      1/1     Running   0          22h
-tigera-operator   tigera-operator-656c6bc5bd-tdpj8                      1/1     Running   0          22h
+kubectl get pods -A
+NAMESPACE     NAME                                                       READY   STATUS      RESTARTS        AGE
+default       alertmanager-kube-prometheus-stack-alertmanager-0          2/2     Running     0               2d22h
+default       emrys-master-0                                             1/1     Running     0               2d22h
+default       emrys-worker-0                                             1/1     Running     0               2d22h
+default       emrys-worker-1                                             1/1     Running     0               2d22h
+default       guacamole-db-init-xv559                                    0/1     Completed   0               2d22h
+default       guacamole-deployment-847bfbc549-vmktx                      2/2     Running     0               2d22h
+default       hub-deployment-6777cd5cd6-wjtvl                            1/1     Running     0               2d22h
+default       jupyterhub-proxy-deployment-8cfd699f6-f2wm9                1/1     Running     0               2d22h
+default       keycloak-deployment-7c6f6665bb-gkxtn                       1/1     Running     0               2d14h
+default       kube-prometheus-stack-grafana-6d75dbdd5c-vwzlq             3/3     Running     0               2d22h
+default       kube-prometheus-stack-kube-state-metrics-65458c595-bw9z5   1/1     Running     0               2d22h
+default       kube-prometheus-stack-operator-5d85bd8b4-bzdbw             1/1     Running     0               2d22h
+default       kube-prometheus-stack-prometheus-node-exporter-27n94       1/1     Running     0               2d22h
+default       kube-prometheus-stack-prometheus-node-exporter-6srn2       1/1     Running     0               2d22h
+default       kube-prometheus-stack-prometheus-node-exporter-ljv8h       1/1     Running     0               2d22h
+default       loki-0                                                     2/2     Running     0               2d22h
+default       oauth2-proxy-deployment-7cc6555dcc-4nmzh                   1/1     Running     0               2d22h
+default       polaris-deployment-7775b67b59-z9pgg                        1/1     Running     0               2d22h
+default       prometheus-kube-prometheus-stack-prometheus-0              2/2     Running     0               2d22h
+default       promtail-8fj5c                                             1/1     Running     0               2d22h
+default       promtail-gjb7j                                             1/1     Running     0               2d22h
+default       promtail-zwj9v                                             1/1     Running     0               2d22h
+default       spark-connector-0-driver                                   1/1     Running     0               2d22h
+default       spark-kubernetes-operator-6fc558c7bb-4c7mc                 1/1     Running     0               2d22h
+default       trino-coordinator-86d75b5dd4-9h6jf                         1/1     Running     0               2d22h
+default       trino-worker-75749bc7bb-7vf7l                              1/1     Running     0               2d22h
+default       trino-worker-75749bc7bb-8rrw5                              1/1     Running     0               2d22h
+kube-system   aws-load-balancer-controller-chart-5df9d9fd86-pdtjs        1/1     Running     0               2d22h
+kube-system   aws-load-balancer-controller-chart-5df9d9fd86-zhz7p        1/1     Running     0               2d22h
+kube-system   cilium-envoy-gbpsd                                         1/1     Running     0               2d22h
+kube-system   cilium-envoy-k5dcc                                         1/1     Running     0               2d22h
+kube-system   cilium-envoy-xl4d7                                         1/1     Running     0               2d22h
+kube-system   cilium-hcqxr                                               1/1     Running     1 (2d22h ago)   2d22h
+kube-system   cilium-operator-85b66c9cb4-5pvzs                           1/1     Running     0               2d22h
+kube-system   cilium-operator-85b66c9cb4-7xnwc                           1/1     Running     0               2d22h
+kube-system   cilium-w9tln                                               1/1     Running     1 (2d22h ago)   2d22h
+kube-system   cilium-wdsx9                                               1/1     Running     0               2d22h
+kube-system   coredns-85b99dc87-9tkls                                    1/1     Running     0               2d22h
+kube-system   coredns-85b99dc87-mqjwf                                    1/1     Running     0               2d22h
+kube-system   csi-secrets-store-secrets-store-csi-driver-dctq2           3/3     Running     0               2d22h
+kube-system   csi-secrets-store-secrets-store-csi-driver-jzjt5           3/3     Running     0               2d22h
+kube-system   csi-secrets-store-secrets-store-csi-driver-stb8t           3/3     Running     0               2d22h
+kube-system   hubble-relay-587fd6785-t2d87                               1/1     Running     0               2d22h
+kube-system   hubble-ui-f799d8b94-t8qpx                                  2/2     Running     0               2d22h
+kube-system   metrics-server-8699ccc578-5xtjw                            1/1     Running     0               2d22h
 ```
+
+In general, a pod with `operator` in its name is an "SRE in a pod".
+They automate deployment and self-heal the cluster.
 
 ## The `default` namespace
 
@@ -52,28 +66,34 @@ The `spark-kubernetes-operator-*` pod manages the Spark cluster by (for example)
 It also manages the `spark-connector-0-driver` pod. 
 This is the proxy between the pod running Jupyter and the Spark cluster.
 The sensitive credentials used to talk to Polaris live here and are inaccessible to the average Jupyter user.
+
 You can see those credentials with:
 ```shell
-kubectl get sparkapplications spark-connector -o yaml
+kubectl get sparkapplications spark-connector -o yaml | grep token
 ...
-    spark.sql.catalog.gcp.token: eyJhbGci...
+    spark.sql.catalog.aws.oauth2-server-uri: https://emrysoauth.click/realms/polaris/protocol/openid-connect/token
 ...
 ```
 
-The `jupyter-deployment-*` pod hosts the Jupyter notebook. 
-We've slightly modified the Docker image [see](../scripts/docker/jupyter/Dockerfile) so it uses Spark v4 libraries.
+The `hub-deployment-*` pod hosts the Jupyter Hub. 
+We've slightly modified the Docker image (scripts/docker/jupyter/Dockerfile) so it uses Spark v4 libraries.
 
 The `polaris-deployment-*` pod hosts our Polaris instance. 
+
 The interesting thing about this pod is that it mounts the credentials to talk to the clouds as a filesystem.
 ```shell
-$ kubectl exec -it spark-kubernetes-operator-7cdb84d876-psktf -- bash
-spark@spark-kubernetes-operator-7cdb84d876-psktf:~/operator$ df -h
+kubectl exec -it spark-kubernetes-operator-6fc558c7bb-4c7mc -- bash 
+spark@spark-kubernetes-operator-6fc558c7bb-4c7mc:~/operator$ df -h
 Filesystem      Size  Used Avail Use% Mounted on
-overlay          20G   13G  7.6G  63% /
+overlay          50G  9.1G   41G  19% /
+tmpfs            64M     0   64M   0% /dev
+/dev/nvme0n1p1   50G  9.1G   41G  19% /etc/hosts
+shm              64M     0   64M   0% /dev/shm
 tmpfs           2.0G   12K  2.0G   1% /run/secrets/kubernetes.io/serviceaccount
-...
+tmpfs           7.7G     0  7.7G   0% /proc/acpi
+tmpfs           7.7G     0  7.7G   0% /sys/firmware
 ```
-Note tha `/run/secrets/kubernetes.io/serviceaccount` mount point. How this is managed is below.
+Note the `/run/secrets/kubernetes.io/serviceaccount` mount point. 
 
 ## The `kube-system` namespace
 
@@ -81,7 +101,9 @@ The Polaris secrets are stored in AWS and can be seen with:
 ```shell
 aws secretsmanager list-secrets
 ```
-They're the ones called `cdktf-app-config-secret`, a name that comes from the code that creates the [Terrform plan](./src/main/java/health/emrys/afon/cdk/AwsConstruct.java).
+
+They're the ones called `cdktf-app-config-secret-spark-cluster`, a name that comes from the code that creates the 
+Terrform plan (AwsCloudProvider.java).
 The bridge between AWS and Kubernetes are the `csi-secrets-store-secrets-store-csi-driver-*` pods.
 
 The `aws-load-balancer-controller-chart-*` pods are the bridge between the Kubernetes cluster and the greater internet.
@@ -94,23 +116,36 @@ These IP addresses are valid outside the K8s cluster but only within the AWS VPC
 
 The `coredns-*` and `kube-proxy-*` pods are standard in K8s and manage the domain name and traffic routing **within** the cluster.
 
-## The `tigera-operator` and `calico-system`
+### Networking
 
-The `tigera-operator-*` pod manages Calico, the network controller for traffic within the K8s cluster. 
-It's thanks to Calico that we can limit network traffic out of the cluster and stop exfiltration. 
-The network constraint code currently lives [here](./src/main/java/health/emrys/afon/cdk/AwsWholeStack.java)
+The `cilium-*` pods manage Cilium, the network controller for traffic within the K8s cluster.
+Cilium (`cilium-`UUID) only deals with L3/L4 traffic (IP/TCP etc).
+Cilium Envoy (`cilium-envoy-*`) deals with higher level traffic (including HTTP).
+It allows network policies to be set at this level.
 
-# Security
+It's thanks to Cilium that we can limit network traffic out of the cluster and stop exfiltration.
+The network constraint code currently lives in AwsFullStack.java
 
-Raw tokens are passed between Polaris and clients calling it.
-Therefore, communication must be encrypted.
-Note that in an HTTPS handshake, the client must call a hard-coded list of Certificate Authorities to check the domain
-belongs to who is says it does. 
-For this, we need obviously need a registered domain not just an IP address of a domain name Kubernetes has assigned.
+### Logging & Monitoring
 
-To make AWS aware of it, we need to annotate the Kubernetes Ingress with details that the ALB (AWS Load Balancer) pods
-pick up and use to manipulate the AWS infra outside of our Kubernetes.
-Go to the [Route 53](https://us-east-1.console.aws.amazon.com/route53/v2/hostedzones?region=eu-west-2#) page in the Amazon 
-console to claim and manage the actual domain.
+Currently (4/6/26) we favour an external Grafana and tunneling into the K8s cluster.
+But Grafana (`kube-prometheus-stack-grafana-*`) is deployed as part of the Prometheus Helm chart.
+So is the Alert Manager (`alertmanager-kube-prometheus-stack-alertmanager-0`).
+It too is currently unused.
 
+The Hubble UI (`hubble-ui-*`) shows connections that are in Cilium's (finite) memory.
+Therefore, this GUI represents connection in a limited window in time not all connections ever made by the pods.
+The window of time depends on traffic volumes, available memory etc.
+
+Hubble relay (`hubble-relay-*`) collects the data from all the nodes and serves it.
+
+### Security
+
+Raw tokens are passed between Polaris and clients calling it. Therefore, communication must be encrypted.
+In an HTTPS handshake, the client must call a hard-coded list of Certificate Authorities to check the domain
+belongs to who is says it does. For this, we need a registered domain, not just an IP address of a domain name Kubernetes has assigned.
+
+To make AWS aware of it, we need to annotate the Kubernetes Ingress with details that the ALB (AWS Load Balancer) pods pick up and use to manipulate the AWS infra outside of our Kubernetes.
+
+Go to the [Route 53](https://us-east-1.console.aws.amazon.com/route53/v2/hostedzones?region=eu-west-2#) page in the Amazon console to claim and manage the actual domain.
 
