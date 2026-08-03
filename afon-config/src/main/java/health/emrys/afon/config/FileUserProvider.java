@@ -8,6 +8,7 @@ import java.io.FileNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
@@ -69,12 +70,18 @@ public class FileUserProvider implements AfonUserProvider {
         }
         List<AfonUser> list = new ArrayList<>();
         while (scanner.hasNextLine()) {
-            String[] fields = scanner.nextLine().split(",");
-            if ( fields.length > 1 ) {
-                try {
-                    list.add(AfonUserProvider.createUser(fields));
-                } catch (RuntimeException e) {
-                    logger.warn("Failed to create user", e);
+            String line = scanner.nextLine();
+            // skip comment lines starting with #
+            if (!line.trim().startsWith("#")) {
+                // split line and trim fields
+                String[] fields = Arrays.stream(line.split(","))
+                        .map(String::trim).toArray(String[]::new);
+                if (fields.length > 1) {
+                    try {
+                        list.add(AfonUserProvider.createUser(fields));
+                    } catch (RuntimeException e) {
+                        logger.warn("Failed to create user", e);
+                    }
                 }
             }
         }

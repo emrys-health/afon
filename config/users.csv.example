@@ -1,1 +1,2 @@
-username,password,email,slug,firstName,lastName
+# Add one user per line using the fields:
+#username,password,email,slug,firstName,lastName
