@@ -119,9 +119,14 @@ setup_env(){
   case $SETUP_OS in
     linux)
       sudo apt install git openjdk-17-jdk maven docker tofu kubectl awscli azure-cli google-cloud-cli
+      # install eksctl hubble via tarball?
       ;;
     macos)
-      brew install git openjdk@17 maven docker opentofu kubernetes-cli awscli azure-cli gcloud-cli hubble
+      brew install git openjdk@17 maven docker opentofu kubernetes-cli awscli azure-cli gcloud-cli
+      brew install eksctl hubble
+      ;;
+    docker)
+
       ;;
     *)
       echo "Setup not supported for $SETUP_OS"
