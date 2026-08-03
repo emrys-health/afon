@@ -3,6 +3,14 @@
 config/env*.properties
 config/users.csv
 logs/
+*-cleanup.sh
+
+# Terraform/tofu
+
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+cdktf.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -133,10 +141,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-*.tfstate
-*.tfstate.backup
-.terraform.lock.hcl
-cdktf.out
 .idea
 iam_policy.json
 
