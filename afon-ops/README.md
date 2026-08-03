@@ -6,9 +6,9 @@ We assume that if you running Afon, you have an AWS, Azure and/or GCP cloud.
 We also assume that the roles and permissions to create a K8s cluster have been set up.
 These include running:
 ```shell
-../scripts/aws/create.sh    # for AWS
-../scripts/azure/create.sh  # for Azure
-../scripts/gcp/create.sh    # for Google
+./afon.sh -a exec -t script --exec-script create.sh -c aws 
+./afon.sh -a exec -t script --exec-script create.sh -c azure 
+./afon.sh -a exec -t script --exec-script create.sh -c gcp
 ```
 
 ### External Database
@@ -33,7 +33,12 @@ NOTE: Only AWS has the full stack.
 Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.
 
 NOTE: If you really foul things up, you'll leave the environment in an unstable state.
-Consult the `{Aws,Azure}CleanupHelper` classes to destroy your environment totally.
+Use the `{Aws,Azure,Gcp}CleanupHelper` classes to destroy your environment totally.
+```shell
+./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args aws-cleanup.sh
+./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper --exec-args azure-cleanup.sh
+./afon.sh -a exec --exec-class cdk.gcp.GcpCleanupHelper --exec-args gcp-cleanup.sh
+```
 They will output shell scripts that you can run.
 You may need to run them multiple times for the VPC to disappear from your cloud.
 
@@ -92,7 +97,7 @@ For instance, domain names need to propagate.
 You should see the Polaris ingress before Terraform has completed with something like:
 
 ```shell
-$ kubectl get ingress
+kubectl get ingress
 ```
 You should see something like:
 ```shell
@@ -183,7 +188,7 @@ az network dns zone create  --resource-group afon_resource_group  --name emryspo
 For some suggests as to what to execute, running this:
 
 ```shell
-mvn exec:exec -Pexec -Dexec.mainClass=health.emrys.afon.ops.GeneratePySparkContextMain
+./afon.sh -a exec --exec-class ops.GeneratePySparkContextMain
 ```
 
 will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
@@ -205,9 +210,9 @@ and register tables with something like:
 
 # What the Java code does
 
-The Java code creates the config to create the cloud environment and delegates it to tofu to execute it.
+The Java code generates the Terraform plan to manage the cloud environment and delegates it to tofu to execute it.
 
-After the Java is run, the tofu plan is in `afon-ops/cdktf.out/stacks/{aws,azure,gcp}`.
+After the Java is run, the plan is in `afon-ops/cdktf.out/stacks/{aws,azure,gcp}`.
 Thereafter, you can run tofu apply or destroy commands via 
 ```shell
 ./afon.sh -a tofu-{apply,destroy}
@@ -220,14 +225,12 @@ Thereafter, you can run tofu apply or destroy commands via
 In all cloud providers, deleting the Polaris deployment is fine.
 However, destroying the whole stack in AWS is problematic.
 It appears that there are lingering AWS infrastructure components.
-Run `health.emrys.afon.cdk.aws.AwsCleanupHelper` to print out helpful command lines.
-In particular, the output of this script should blatt everything:
+Run `AwsCleanupHelper` to generate the cleanup commands as a shell script.
 
 ```shell
-./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper
+./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args aws-cleanup.sh
 ```
 
-This is a shell script. 
 The advantage of this is that you can use it if your accidentally delete your Terraform state.
 
 And if all else fails. go to the [AWS VPCs](https://eu-west-2.console.aws.amazon.com/vpcconsole/home?region=eu-west-2#vpcs:)

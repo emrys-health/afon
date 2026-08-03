@@ -19,7 +19,7 @@ It may take a minute or two if the container image is not cached.
 User names and passwords can be found in `config/users.csv`.
 `DeployAwsFullStackMain.java` should have configured these users for AWS but if you need them for other Catalogs, look at `OnboardAllUsersMain.java`.
 
-Let's assume you want to put a notebook on, say, the `phil` pod. In the `notebooks` sub directory, run:
+Let's assume you want to put a notebook on, say, the `phil` pod. In the `notebooks` subdirectory, run:
 ```shell
 POD=$(kubectl get pods | grep phil | awk '{print $1}') # swap 'phil' for 'will' if you want his pod
 kubectl cp ./CrossCloudJoinExample.ipynb $POD:/home/jovyan/CrossCloudJoinExample.ipynb
