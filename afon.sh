@@ -9,13 +9,13 @@ usage (){
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
   echo "          [--setup-os <os>]"
-  echo "          [--tofu-apply] [--tofu-destroy]"
+  echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args]"
   echo "actions:  build|docs|exec|setup|tofu-{apply|destroy}"
   echo "          build :  executes the mvn build"
   echo "          docs  :  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
   echo "          exec  :  executes the jvm classes from ops (see the docs for details)"
   echo "          setup :  sets up the local env for the given os."
-  echo "          tofu-*:  executes the tofu commands.  One of apply|destroy"
+  echo "          tofu-*:  executes the tofu commands.  One of apply|destroy|state"
   echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging-level:  the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "build-args:     the build args.  eg '-DskipTests'."
@@ -28,6 +28,7 @@ usage (){
   echo "exec-args:      the jvm exec args (must be quoted if more than one arg)"
   echo "exec-envs:      the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
   echo "setup-os:       the os to setup.  One of linux|macos"
+  echo "tofu-args:      the tofu args."
   echo "mvn-quiet:      the flag to hush the mvn output"
 }
 
@@ -110,7 +111,10 @@ exec_tofu(){
      usage; exit 0
   fi
   TOFU_ACTION=${ACTION#tofu-}
-  TOFU_CMD="tofu -chdir=$TOFU_DIR $TOFU_ACTION -auto-approve"
+  if [ "$TOFU_ACTION" != "state" ] ; then
+    TOFU_ARGS="$TOFU_ARGS -auto-approve"
+  fi
+  TOFU_CMD="tofu -chdir=$TOFU_DIR $TOFU_ACTION $TOFU_ARGS"
   echo "Executing $TOFU_CMD"
   $TOFU_CMD
 }
@@ -158,6 +162,7 @@ MVN_ARGS=
 MVN_ENVS=
 MVN_QUIET=
 SETUP_OS=
+TOFU_ARGS=
 VERSION=
 
 while [[ $# -gt 0 ]]; do
@@ -192,6 +197,8 @@ while [[ $# -gt 0 ]]; do
       LOGGING="$2"; shift 2 ;;
     --setup-os)
       SETUP_OS="$2"; shift 2 ;;
+    --tofu-args)
+      TOFU_ARGS="$2"; shift 2 ;;
     --mvn-quiet)
       MVN_QUIET=true; shift ;;
     --help|-h)
