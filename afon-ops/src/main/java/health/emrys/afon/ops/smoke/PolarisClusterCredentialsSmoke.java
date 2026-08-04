@@ -20,7 +20,7 @@ public class PolarisClusterCredentialsSmoke {
         logger.info("Access token for {}: {}", cloud, credentials.getAccessToken());
     }
 
-    public void main(String[] args) {
+    public static void main(String[] args) {
         var app = new PolarisClusterCredentialsSmoke();
         app.createCredentials(AWS);
         app.createCredentials(AZURE);
