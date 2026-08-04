@@ -384,7 +384,7 @@ The deployment is automated via:
 Install monitoring components on AWS:
 
 ```shell
-./afon.sh -a exec --exec-class cdk.aws.PrometheusClusterDeployment
+./afon.sh -a exec --exec-class ops.DeployAwsFullStack
 ./afon.sh -a tofu-apply -c aws
 ```
 
@@ -895,7 +895,7 @@ SNOWFLAKE_PRIVATE_KEY=YOUR_SNOWFLAKE_PRIVATE_KEY
 1. **Install monitoring stack:**
 
 ```shell
-./afon.sh -a exec --exec-class cdk.aws.PrometheusClusterDeployment
+./afon.sh -a exec --exec-class ops.DeployAwsFullStack
 ./afon.sh -a tofu-apply -c aws
 
 ```
@@ -953,9 +953,15 @@ az storage blob list --account-name yourstorageaccount --container-name yourstor
 **Normal teardown:**
 
 ```shell
-cd cdktf.out/stacks/aws
-tofu destroy --auto-approve
+./afon.sh -a tofu-destroy
 ```
+If tofu-destroy hangs on an instance of a managed type, rm manage type from tofu state and re-run destroy:
+
+```shell
+./afon.sh -a tofu-state --tofu-args "rm helm_release.prometheusRelease"
+```
+
+By default, assumes we are targeting `aws` cloud.   A different cloud can be set via the `-c {aws,azure,gcp}` option.
 
 **When Terraform state is corrupted or resources are stuck:**
 
