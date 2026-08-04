@@ -3,6 +3,7 @@ package health.emrys.afon.acceptance
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
+import health.emrys.afon.acceptance.permissions.TestUsers
 import health.emrys.afon.cluster.ClusterUtils
 import health.emrys.afon.config.{AfonPropertiesLoader, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.OnboardAllUsersMain
@@ -130,14 +131,9 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   }
 
   "Polaris and KeyCloak" should {
-    val UserName      = "userX"
-    val UserPassword  = "password"
-    val properties    = AcceptanceTestConfig.instance.getProperties
-    val User          = new AfonUser(UserName, UserPassword, "email@test.com", "slug", "first", "second")
-
-    val userProvider = new AfonUserProvider() {
-      override def getUsers: util.List[AfonUser] = util.List.of(User)
-    }
+    val properties  = AcceptanceTestConfig.instance.getProperties
+    val testUsers   = new TestUsers()
+    import testUsers._
     "agree on the token" in {
       Given("A KeyCloak and Polaris instance")
       assert(ContainerHelper.instance.startKeyCloak(properties) != null)
