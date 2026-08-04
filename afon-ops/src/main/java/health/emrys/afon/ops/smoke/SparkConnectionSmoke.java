@@ -1,4 +1,4 @@
-package health.emrys.afon.spark.connect;
+package health.emrys.afon.ops.smoke;
 
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -10,9 +10,9 @@ import org.slf4j.LoggerFactory;
  * and create some port tunelling with:
  * <pre>kubectl port-forward pod/spark-connector-0-driver 15002:15002</pre>
  */
-public class SmokeTestSparkConnect {
+public class SparkConnectionSmoke {
 
-    private static final Logger log = LoggerFactory.getLogger(SmokeTestSparkConnect.class);
+    private static final Logger logger = LoggerFactory.getLogger(SparkConnectionSmoke.class);
 
     /**
      * Note that the `;token=...` string just must match with PreSharedKeyAuthenticationInterceptor
@@ -32,7 +32,7 @@ public class SmokeTestSparkConnect {
                 .remote("sc://localhost:15002/;token=deadbeef")
                 .getOrCreate();
         String tableName = "aws.acceptancetests.AwsAccessSpec"; // aws_trino.acceptancetests.AwsAccessSpec
-        log.info("Reading table {}", tableName);
+        logger.info("Reading table {}", tableName);
         spark.read().table(tableName).show();
     }
 

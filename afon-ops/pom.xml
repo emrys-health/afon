@@ -23,6 +23,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>afon-spark-connect</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>ch.vorburger.exec</groupId>
             <artifactId>exec</artifactId>
             <version>3.3.2</version>

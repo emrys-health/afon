@@ -28,7 +28,7 @@ openssl rsa -in private_key.p8 -pubout -out public_key.pub
 
 and it's the contents of that `public_key.pub` file that you put in `RSA_PUBLIC_KEY`. 
 The same public key is then to be used in the client code.
-See [SmokeTest.java](./src/main/java/health/emrys/afon/snowflake/SmokeTest.java) as an example.
+See [SnowflakeConnectionSmoke.java](../afon-ops/src/main/java/health/emrys/afon/ops/smoke/SnowflakeConnectionSmoke.java) as an example.
 
 You then need to give the SA access to a table. 
 In this example, we let it talk to `aws_acceptance_Test`
