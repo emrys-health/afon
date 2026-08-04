@@ -140,7 +140,7 @@ public class StepActions {
      * @param metadataLocation eg gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325-b437-20900bbcf2a3.metadata.json
      * @param polarisDomainNAme eg emryspolaris.click
      * @param tableName eg AwsAccessSpec
-     * @param registerTableMainClass eg RegisterLocalPolarisMain.class
+     * @param registerTableMainClass eg RegisterPolarisTableMain.class
      * @throws Exception
      */
     public void registerTable(AfonCloud storageCloud,

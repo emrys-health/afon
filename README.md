@@ -385,7 +385,6 @@ Install monitoring components on AWS:
 
 ```shell
 ./afon.sh -a exec --exec-class ops.DeployAwsFullStack
-./afon.sh -a tofu-apply -c aws
 ```
 
 This installs Prometheus, Loki, Grafana, and Hubble.
@@ -896,8 +895,6 @@ SNOWFLAKE_PRIVATE_KEY=YOUR_SNOWFLAKE_PRIVATE_KEY
 
 ```shell
 ./afon.sh -a exec --exec-class ops.DeployAwsFullStack
-./afon.sh -a tofu-apply -c aws
-
 ```
 
 2. **Run Grafana locally:**
@@ -955,8 +952,8 @@ az storage blob list --account-name yourstorageaccount --container-name yourstor
 ```shell
 ./afon.sh -a tofu-destroy
 ```
-If tofu-destroy hangs on an instance of a managed type, rm manage type from tofu state and re-run destroy:
 
+If tofu-destroy hangs on an instance of a managed type, rm manage type from tofu state and re-run destroy:
 ```shell
 ./afon.sh -a tofu-state --tofu-args "rm helm_release.prometheusRelease"
 ```

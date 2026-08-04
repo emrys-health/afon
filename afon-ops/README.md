@@ -205,7 +205,7 @@ So, create the warehouses with:
 and register tables with something like:
 
 ```shell
-./afon.sh -a exec --exec-class ops.RegisterPolarisMain --exec-args="AWS acceptancetests AwsAccessSpec251117511401 s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json" 
+./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click will s3cr3t"
 ```
 
 # What the Java code does
