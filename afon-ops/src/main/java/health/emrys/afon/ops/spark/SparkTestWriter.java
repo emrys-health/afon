@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.spark;
 
+import health.emrys.afon.ops.ArgsUtils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -21,6 +22,7 @@ public class SparkTestWriter extends SparkChecker {
     private static final Logger logger = getLogger(SparkTestWriter.class);
 
     public static void main(String[] args) {
+        args = ArgsUtils.splitFirstBySpace(args);
         parseAndExecute(args, new SparkTestWriter());
     }
 

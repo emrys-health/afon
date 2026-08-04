@@ -1,11 +1,11 @@
 package health.emrys.afon.ops.spark;
 
+import health.emrys.afon.ops.ArgsUtils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 
-import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class SparkTestReader extends SparkChecker {
@@ -13,6 +13,7 @@ public class SparkTestReader extends SparkChecker {
     private static final Logger logger = getLogger(SparkTestWriter.class);
 
     public static void main(String[] args) {
+        args = ArgsUtils.splitFirstBySpace(args);
         parseAndExecute(args, new SparkTestReader());
     }
 
