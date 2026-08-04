@@ -10,7 +10,7 @@ import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.OnboardAllUsersMain;
 import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
-import health.emrys.afon.ops.RegisterLocalPolarisMain;
+import health.emrys.afon.ops.RegisterPolarisTableMain;
 import health.emrys.afon.ops.spark.SparkChecker;
 import health.emrys.afon.ops.spark.SparkTestReader;
 import health.emrys.afon.ops.spark.SparkTestWriter;
@@ -499,7 +499,7 @@ public class StepOperations {
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
                 String json = azureFirstFile(glob, true); // firstFileInLatestDirectoryMatching(glob);
-                return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterLocalPolarisMain.class);
+                return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterPolarisTableMain.class);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);

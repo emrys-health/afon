@@ -10,6 +10,7 @@ import java.io.IOException;
 import static health.emrys.afon.cluster.Defaults.POLARIS_POD_NAME;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
 
+@Deprecated
 public class ClusterState implements AutoCloseable {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterState.class);
