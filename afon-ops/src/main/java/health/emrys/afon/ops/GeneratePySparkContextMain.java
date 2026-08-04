@@ -43,8 +43,8 @@ public class GeneratePySparkContextMain {
             if (args.length > 0) {
                 polarisCloud = AfonProperties.AfonCloud.valueOf(args[0]);
             }
-            ClusterCredentials emrysCloud = createClusterCredentials(polarisCloud);
-            var                app        = new GeneratePySparkContextMain(emrysCloud);
+            ClusterCredentials cloud = createClusterCredentials(polarisCloud);
+            var                app        = new GeneratePySparkContextMain(cloud);
             app.generatePySparkCode();
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -53,10 +53,10 @@ public class GeneratePySparkContextMain {
 
     private final SparkWarehouseConfig polarisConfig;
 
-    public GeneratePySparkContextMain(ClusterCredentials emrysCloud) {
-        polarisId     = emrysCloud.getPolarisId();
-        polarisSecret = emrysCloud.getPolarisSecret();
-        polarisHost   = emrysCloud.getPolarisHost();
+    public GeneratePySparkContextMain(ClusterCredentials cloud) {
+        polarisId     = cloud.getPolarisId();
+        polarisSecret = cloud.getPolarisSecret();
+        polarisHost   = cloud.getPolarisHost();
         polarisConfig = SparkWarehouseConfigFactory.getFactory().getConfig(
             polarisId,
             polarisSecret,
