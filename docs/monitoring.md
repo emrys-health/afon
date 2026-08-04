@@ -70,6 +70,11 @@ Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in `afon-aw
 
 NOTE: On macos, use http://host.docker.internal:3100 in place of http://localhost:3100, if getting connection refused when adding the data source.
 
+NOTE: Loki logs are stored in the cloud, eg
+```shell
+aws s3 ls s3://emrys-afon-bucket/spark-cluster
+```
+
 ### Prometheus
 
 In Grafana UI, add a Prometheus Data Source pointing to `http://localhost:9090` 
