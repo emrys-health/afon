@@ -23,14 +23,12 @@ az network dns zone create  --resource-group $AZURE_RESOURCE_GROUP  --name $YOUR
 This will print out some JSON that contains nameservers, for example:
 ```json
 {
-  ...
   "nameServers": [
     "ns1-02.azure-dns.com.",
     "ns2-02.azure-dns.net.",
     "ns3-02.azure-dns.org.",
     "ns4-02.azure-dns.info."
-  ],
-  ...
+  ]
 }
 ```
 Make a note of these.
@@ -55,12 +53,12 @@ Again, make a note.
 
 ### AWS
 
-For AWS, you do need to let the infra code know about your domain.
+For AWS, you do need to let the afon code know about your domain.
 Get the Zone ID for your domain by running something like:
 ```shell
-aws route53 list-hosted-zones-by-name --dns-name emrysjupyter2.click
+aws route53 list-hosted-zones-by-name
 ```
-And then update the `AWS_XXX_DNS_ZONE` values in `afon.properties` accordingly.
+And then update the `AWS_XXX_DNS_ZONE` values in `afon-aws.properties` accordingly.
 
 Note the `AWS_ZONE_ID` is for the ELB and the `AWS_XXX_DNS_ZONE` are for the DNS. 
 Although they are lexically similar (thank AWS for that) they are unrelated concepts.
