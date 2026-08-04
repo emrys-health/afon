@@ -13,19 +13,23 @@ We currently have the following monitoring tools:
 ### Install cloud tools via tofu:
 
 To install all the cloud tools, assume AWS full stack has been deployed. 
-If not, deploy using command:
+If not, deploy using:
 ```shell
-./afon.sh -a exec --exec-class cdk.aws.DeployAwsFullStack
+./afon.sh -a exec --exec-class ops.DeployAwsFullStack
 ```
 
 ### Set up kube port-forwarding 
 
 Set up cloud port-forward for the tools you want to access:
 ```shell
-kubectl port-forward svc/loki 3100:3100 # loki
-kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 # prometheus
-kubectl port-forward svc/hubble-ui -n kube-system 12000:80   # hubble-ui
-kubectl port-forward svc/hubble-relay -n kube-system 4245:80 # hubble-cli
+# loki
+kubectl port-forward svc/loki 3100:3100 
+# prometheus
+kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 
+# hubble-ui
+kubectl port-forward svc/hubble-ui -n kube-system 12000:80
+# hubble-cli   
+kubectl port-forward svc/hubble-relay -n kube-system 4245:80 
 ```
 
 ### Grafana 
@@ -64,14 +68,14 @@ You may need to refresh your browser.
 
 Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in `afon-aws.properties`.
 
-NOTE: On macos, if getting connection refused when adding the data source, use http://host.docker.internal:3100 in place of http://localhost:3100
+NOTE: On macos, use http://host.docker.internal:3100 in place of http://localhost:3100, if getting connection refused when adding the data source.
 
 ### Prometheus
 
 In Grafana UI, add a Prometheus Data Source pointing to `http://localhost:9090` 
 One should see nearly 2000 metrics.
 
-NOTE:  On macos, if getting connection refused when adding the data source, use http://host.docker.internal:9090 in place of http://localhost:9090 (see https://github.com/grafana/grafana/issues/46434).  
+NOTE:  On macos, use http://host.docker.internal:9090 in place of http://localhost:9090, if getting connection refused when adding the data source (see https://github.com/grafana/grafana/issues/46434).  
 
 ### Hubble
 
