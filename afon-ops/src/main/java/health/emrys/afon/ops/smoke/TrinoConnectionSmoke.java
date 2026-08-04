@@ -1,4 +1,6 @@
-package health.emrys.afon.trino;
+package health.emrys.afon.ops.smoke;
+
+import org.slf4j.Logger;
 
 import java.sql.*;
 import java.util.Properties;
@@ -15,7 +17,37 @@ import java.util.Properties;
 </pre>
  *
  */
-public class SmokeTest {
+public class TrinoConnectionSmoke {
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(TrinoConnectionSmoke.class);
+
+    private final String url;
+
+    public TrinoConnectionSmoke(String url) {
+        this.url = url;
+    }
+
+    public String query(String query) throws SQLException {
+        // 2. Set up connection properties (User is required by Trino)
+        Properties properties = new Properties();
+        properties.setProperty("user", "arbitrary");
+        // If your cluster requires SSL or Password authentication:
+        // properties.setProperty("password", "your_password");
+        // properties.setProperty("SSL", "true");
+
+        logger.info("Connecting to Trino");
+
+        // 4. Execute the query using try-with-resources
+        try (Connection connection = DriverManager.getConnection(url, properties);
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery(query)) {
+
+            // 5. Iterate through the results
+            if (resultSet.next()) {
+                return resultSet.getString(1);
+            }
+        }
+        return "empty, like my life";
+    }
 
     /**
      * @param args
@@ -38,40 +70,11 @@ public class SmokeTest {
             } else {
                 sql = sql + "aws.namespaceph.test_table";
             }
-            String result = new SmokeTest(url).readTable(sql);
+            String result = new TrinoConnectionSmoke(url).query(sql);
             System.out.println(result);
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
-    }
-
-    private final String url;
-
-    public SmokeTest(String url) {
-        this.url = url;
-    }
-
-    public String readTable(String sqlQuery) throws SQLException {
-        // 2. Set up connection properties (User is required by Trino)
-        Properties properties = new Properties();
-        properties.setProperty("user", "arbitrary");
-        // If your cluster requires SSL or Password authentication:
-        // properties.setProperty("password", "your_password");
-        // properties.setProperty("SSL", "true");
-
-        System.out.println("Connecting to Trino...");
-
-        // 4. Execute the query using try-with-resources
-        try (Connection connection = DriverManager.getConnection(url, properties);
-            Statement statement = connection.createStatement();
-            ResultSet resultSet = statement.executeQuery(sqlQuery)) {
-
-            // 5. Iterate through the results
-            if (resultSet.next()) {
-                return resultSet.getString(1);
-            }
-        }
-        return "empty, like my life";
     }
 }

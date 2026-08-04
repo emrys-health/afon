@@ -6,13 +6,13 @@ import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.cluster.ClusterUtils
 import health.emrys.afon.config.{AfonPropertiesLoader, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.OnboardAllUsersMain
+import health.emrys.afon.ops.smoke.TrinoConnectionSmoke
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import health.emrys.afon.polaris.config.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
 import health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.{KeyCloakAdmin, KeyCloakConfig}
-import health.emrys.afon.trino.SmokeTest
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
@@ -177,10 +177,10 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val trinoHttp = trinoConfigProperties().get("discovery.uri").toString
       val url = s"jdbc:trino://${trinoHttp.substring(trinoHttp.indexOf("//") + 2)}/"
       When(s"we connect to $url")
-      val smokeTest = new SmokeTest(url)
+      val smokeTest = new TrinoConnectionSmoke(url)
       val sql = s"SELECT COUNT(*) FROM $tableName"
       And(s"execute SQL: ${formatSQL(sql)}")
-      val result = smokeTest.readTable(sql)
+      val result = smokeTest.query(sql)
       Then(s"the result is $result")
       assert(Integer.parseInt(result) == NUM_ROWS)
     }
