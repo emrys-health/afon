@@ -15,23 +15,23 @@ See [build](./docs/build.md)
 
 ### Configure properties and users
 
-See [configuration.md](./docs/configuration.md).
+See [configuration](./docs/configuration.md).
 
 ### Cloud infrastructure
 
-See [cloud.md](./docs/cloud.md).
+See [cloud](./docs/cloud.md).
 
 ### DNS Configuration
 
-See [dns_config.md](./docs/dns_config.md).
+See [dns_config](./docs/dns_config.md).
 
 ### Deploy the stacks
 
-See [stacks.md](./docs/stacks.md).
+See [stacks](./docs/stacks.md).
 
 ### Deploy the catalogs
 
-See [catalogs.md](./docs/catalogs.md).
+See [catalogs](./docs/catalogs.md).
 
 ### Access Polaris and Jupyter
 
