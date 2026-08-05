@@ -35,16 +35,11 @@ See [catalogs](./docs/catalogs.md).
 
 ### Access Polaris and Jupyter
 
-Once deployed, log in via your domain name:
+For development purposes, we've registered domains `emryspolaris.click` and `emrysjupyter.click`.
 
-```
-https://emryspolaris.click
-```
-
-You can also access Jupyter at:
-```
-https://emrysjupyter.click/guacamole
-```
+Once stack is deployed, we can access Polaris and Jupyter via the URLs:
+- `https://emryspolaris.click`
+- `https://emrysjupyter.click/guacamole`
 
 ---
 ## How it works
