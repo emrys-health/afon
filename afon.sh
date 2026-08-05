@@ -8,7 +8,7 @@ usage (){
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
-  echo "          [--setup-os <os>]"
+  echo "          [--setup-os <os>] [--setup-output <file>] [--setup-show]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args]"
   echo "actions:  build|docs|exec|setup|tofu-{apply|destroy}"
   echo "          build :  executes the mvn build"
@@ -27,7 +27,9 @@ usage (){
   echo "exec-class:     the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
   echo "exec-args:      the jvm exec args (must be quoted if more than one arg)"
   echo "exec-envs:      the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
-  echo "setup-os:       the os to setup.  One of linux|macos"
+  echo "setup-os:       the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
+  echo "setup-output:   the output file where to write the setup.  Defaults to 'versions.md'"
+  echo "setup-show:     the flag to show the current setup."
   echo "tofu-args:      the tofu args."
   echo "mvn-quiet:      the flag to hush the mvn output"
 }
@@ -121,21 +123,39 @@ exec_tofu(){
 
 setup_env(){
   case $SETUP_OS in
-    linux)
+    linux|GNU/Linux)
       sudo apt install git openjdk-17-jdk maven docker tofu kubectl awscli azure-cli google-cloud-cli
       # install eksctl hubble via tarball?
       ;;
-    macos)
+    macos|arm64)
       brew install git openjdk@17 maven docker opentofu kubernetes-cli awscli azure-cli gcloud-cli
       brew install eksctl hubble
-      ;;
-    docker)
-
       ;;
     *)
       echo "Setup not supported for $SETUP_OS"
       ;;
   esac
+}
+
+setup_output(){
+  echo "## Tools setup" > $SETUP_OUTPUT
+  echo "### os" >> $SETUP_OUTPUT
+  echo "$(uname -a)" >> $SETUP_OUTPUT
+  echo "### kubectl" >> $SETUP_OUTPUT
+  kubectl version >> $SETUP_OUTPUT
+  echo "### tofu" >> $SETUP_OUTPUT
+  tofu --version >> $SETUP_OUTPUT
+  echo "### java" >> $SETUP_OUTPUT
+  java --version >> $SETUP_OUTPUT
+  echo "### mvn" >> $SETUP_OUTPUT
+  mvn --version >> $SETUP_OUTPUT
+  echo "### aws" >> $SETUP_OUTPUT
+  aws --version >> $SETUP_OUTPUT
+  echo "### az" >> $SETUP_OUTPUT
+  az --version >> $SETUP_OUTPUT
+  echo "### gcloud" >> $SETUP_OUTPUT
+  gcloud --version >> $SETUP_OUTPUT
+  echo "Setup output written to $SETUP_OUTPUT"
 }
 
 version(){
@@ -162,6 +182,8 @@ MVN_ARGS=
 MVN_ENVS=
 MVN_QUIET=
 SETUP_OS=
+SETUP_OUTPUT=
+SETUP_SHOW=
 TOFU_ARGS=
 VERSION=
 
@@ -197,6 +219,10 @@ while [[ $# -gt 0 ]]; do
       LOGGING="$2"; shift 2 ;;
     --setup-os)
       SETUP_OS="$2"; shift 2 ;;
+    --setup-outout)
+      SETUP_OUTPUT="$2"; shift 2 ;;
+    --setup-show)
+      SETUP_SHOW=true; shift ;;
     --tofu-args)
       TOFU_ARGS="$2"; shift 2 ;;
     --mvn-quiet)
@@ -253,7 +279,7 @@ case $ACTION in
   docs)
     VERSION=$(version)
     if [ -z "$DOCS_DIR" ]; then
-      DOCS_DIR=afon-docs/target/docs
+      DOCS_DIR="afon-docs/target/docs"
     fi
     mkdir -p $DOCS_DIR
     ARTIFACT="health.emrys:afon-docs:$VERSION:zip:docs"
@@ -276,7 +302,17 @@ case $ACTION in
     fi
     ;;
   setup)
-    setup_env
+    if [ -z "$SETUP_OS" ]; then
+      SETUP_OS=$(uname -a| awk '{print $NF}')
+    fi
+    if [ -z "$SETUP_SHOW" ]; then
+      # only perform setup if show flag is not set
+      setup_env
+    fi
+    if [ -z "$SETUP_OUTPUT" ]; then
+      SETUP_OUTPUT="versions.md"
+    fi
+    setup_output
     ;;
   tofu-*)
     if [ -z "$CLOUD" ]; then
