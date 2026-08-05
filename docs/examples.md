@@ -60,8 +60,7 @@ df_joined.show()
 **Write:**
 
 ```shell
-./afon.sh -a exec --exec-class ops.spark.SparkTestWriter \ 
-  --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
+./afon.sh -a exec --exec-class ops.spark.SparkTestWriter --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
 This creates a namespace, creates an Iceberg table, and writes three rows ("apple", "banana", "cherry").
@@ -69,8 +68,7 @@ This creates a namespace, creates an Iceberg table, and writes three rows ("appl
 **Read:**
 
 ```shell
-./afon.sh -a exec --exec-class ops.spark.SparkTestReader \ 
-  --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
+./afon.sh -a exec --exec-class ops.spark.SparkTestReader --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
 ```
 
 ### Create sample patient data

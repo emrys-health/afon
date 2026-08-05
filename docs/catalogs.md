@@ -14,8 +14,7 @@ It takes approximately 45 minutes.
 When a new Polaris instance starts, it has no catalogs. You can configure all catalogs at once:
 
 ```shell
-./afon.sh -a exec --exec-class ops.PurgeAndPopulatePolarisMain \
-  --exec-args "emryspolaris.click"
+./afon.sh -a exec --exec-class ops.PurgeAndPopulatePolarisMain --exec-args "emryspolaris.click"
 ```
 
 This creates catalogs for AWS, GCP, Azure, and their external/forbidden variants in a single call.
@@ -23,8 +22,7 @@ This creates catalogs for AWS, GCP, Azure, and their external/forbidden variants
 To configure a single catalog on a specific endpoint:
 
 ```shell
-./afon.sh -a exec --exec-class ops.ConfigureEndpointPolarisMain \
-  --exec-args "AZURE" --exec-envs "POLARIS_ENDPOINT=emryspolarisazure.click"
+./afon.sh -a exec --exec-class ops.ConfigureEndpointPolarisMain --exec-args "AZURE" --exec-envs "POLARIS_ENDPOINT=emryspolarisazure.click"
 ```
 
 ### Cross-cloud querying
