@@ -14,7 +14,6 @@ public class ConfigureAllPolarisUsersMain {
     private static final Logger logger = LoggerFactory.getLogger(ConfigureAllPolarisUsersMain.class);
 
     public static void main(String[] args) {
-        args = ArgsUtils.splitFirstBySpace(args); // when args are passed as a single space-separated arg
         Properties properties = new AfonPropertiesLoader().getProperties();
         if (args.length > 0) {
             properties.put(POLARIS_ENDPOINT.getName(), args[0]);

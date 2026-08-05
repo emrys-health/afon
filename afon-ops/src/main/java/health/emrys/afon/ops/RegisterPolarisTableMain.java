@@ -79,7 +79,6 @@ public class RegisterPolarisTableMain {
     }
 
     public static void main(String[] args) {
-        args = ArgsUtils.splitFirstBySpace(args); // when args are passed as a single space-separated arg
         AfonPolarisClientFactory clientFactory  = AfonPolarisClientFactory.clientFactory();
         if (args.length < 4) {
             throw new IllegalArgumentException(format("""
