@@ -56,19 +56,15 @@ mvn_envs(){
 }
 
 exec_mvn() {
-  if [ -n "$MVN_ARGS" ] ; then
-    echo "Executing $MVN_CMD \"$MVN_ARGS\" $MVN_ENVS $MVN_GOALS"
-    $MVN_CMD "$MVN_ARGS" $MVN_ENVS $MVN_GOALS
-  else
-    echo "Executing $MVN_CMD $MVN_ENVS $MVN_GOALS"
-    $MVN_CMD $MVN_ENVS $MVN_GOALS
-  fi
+  MVN="$MVN_CMD $MVN_ENVS $MVN_ARGS $MVN_GOALS"
+  echo "Executing: $MVN"
+  eval "$MVN"
 }
 
 exec_jvm(){
-    if [ -z "$EXEC_PACKAGE" ] ; then
-      EXEC_PACKAGE="health.emrys.afon"
-    fi
+  if [ -z "$EXEC_PACKAGE" ] ; then
+    EXEC_PACKAGE="health.emrys.afon"
+  fi
   if [ -z "$EXEC_CLASS" ] ; then
     echo "Action exec requires option --exec-class"
     usage; exit 1
@@ -78,9 +74,10 @@ exec_jvm(){
       EXEC_CLASS="$EXEC_PACKAGE.$EXEC_CLASS"
     fi
   fi
-  MVN_GOALS="exec:exec -Pexec -Dexec.mainClass=$EXEC_CLASS"
+  MVN_GOALS="-Pexec exec:exec"
+  MVN_ARGS="-Dexec.mainClass=$EXEC_CLASS"
   if [ -n "$EXEC_ARGS" ] ; then
-    MVN_ARGS="-Dexec.args=\"$EXEC_ARGS\""
+    MVN_ARGS="$MVN_ARGS -Dexec.args=\"$EXEC_ARGS\""
   fi
   if [ -n "$EXEC_ENVS" ] ; then
     EXEC_ENVS="${EXEC_ENVS/ / -D}"
@@ -120,8 +117,8 @@ exec_tofu(){
     TOFU_ARGS="$TOFU_ARGS -auto-approve"
   fi
   TOFU_CMD="tofu -chdir=$TOFU_DIR $TOFU_ACTION $TOFU_ARGS"
-  echo "Executing $TOFU_CMD"
-  $TOFU_CMD
+  echo "Executing: $TOFU_CMD"
+  eval "$TOFU_CMD"
 }
 
 setup_env(){
@@ -323,7 +320,7 @@ case $ACTION in
   tofu-*)
     if [ -z "$TOFU_CLOUD" ]; then
       TOFU_CLOUD="aws"
-      echo "Defaulting to tofu cloud $TOFU_CLOUD"
+      echo "Defaulting to tofu cloud: $TOFU_CLOUD"
     fi
     exec_tofu
     ;;
