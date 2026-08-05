@@ -43,7 +43,6 @@ public class DeleteCatalogsMain {
     }
 
     public static void main(String[] args) {
-        args = ArgsUtils.splitFirstBySpace(args); // when args are passed as a single space-separated arg
         DeleteCatalogsMain app = new DeleteCatalogsMain();
         if (args.length == 0) {
             app.deleteAll();

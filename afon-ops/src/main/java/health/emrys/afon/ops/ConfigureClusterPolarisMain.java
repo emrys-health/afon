@@ -9,7 +9,6 @@ public class ConfigureClusterPolarisMain {
     private static final Logger logger = LoggerFactory.getLogger(ConfigureClusterPolarisMain.class);
 
     public static void main(String[] args) {
-        args = ArgsUtils.splitFirstBySpace(args); // when args are passed as a single space-separated arg
         try {
             try (ClusterPolarisConfiguration configuration = new ClusterPolarisConfiguration()) {
                 configuration.configure(args);
