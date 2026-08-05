@@ -13,6 +13,9 @@
       <unpack>false</unpack>
       <scope>runtime</scope>
       <outputDirectory>/lib</outputDirectory>
+      <includes>
+        <include>${project.groupId}:afon-*</include>
+      </includes>
     </dependencySet>
   </dependencySets>
   <fileSets>
@@ -24,17 +27,6 @@
       </includes>
     </fileSet>
     <fileSet>
-      <directory>src/lib</directory>
-      <outputDirectory>/lib</outputDirectory>
-    </fileSet>
-    <fileSet>
-      <directory>..</directory>
-      <outputDirectory>/lib</outputDirectory>
-      <includes>
-        <include>settings.xml</include>
-      </includes>
-    </fileSet>
-    <fileSet>
       <directory>.</directory>
       <outputDirectory>/lib</outputDirectory>
       <includes>
@@ -42,7 +34,15 @@
       </includes>
     </fileSet>
     <fileSet>
-      <directory>../docs</directory>
+      <directory>src/scripts</directory>
+      <outputDirectory>/lib</outputDirectory>
+      <includes>
+        <include>mvn-install.sh</include>
+      </includes>
+      <fileMode>0755</fileMode>
+    </fileSet>
+    <fileSet>
+      <directory>target/docs/ops</directory>
       <outputDirectory>/docs</outputDirectory>
     </fileSet>
   </fileSets>
