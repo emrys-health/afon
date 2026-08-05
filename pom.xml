@@ -77,7 +77,7 @@
         <profile>
             <id>distribution</id>
             <activation>
-                <activeByDefault>false</activeByDefault>
+                <activeByDefault>true</activeByDefault>
             </activation>
             <modules>
                 <module>afon-distribution</module>
