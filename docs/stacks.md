@@ -159,3 +159,27 @@ Before adopting a GitOps workflow where Terraform state is checked into Git:
 4. **State locking** — ensure concurrent runs are prevented via state locking
 
 This is noted as a future improvement in the project.
+
+## Summary of deployment commands
+
+```shell
+# Full AWS stack (Polaris + Spark + Jupyter)
+./afon.sh -a exec --exec-class ops.DeployFullStackAwsMain 
+
+# Azure Polaris (standalone)
+./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain
+
+# GCP Polaris (standalone)
+./afon.sh -a exec --exec-class ops.DeployGcpPolarisMain 
+
+# Cross-cloud external catalogs (AWS + Azure federation)
+./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain 
+
+# Snowflake reading cross-cloud data
+./afon.sh -a exec --exec-class ops.DeploySnowflakeReadingGcpViaAwsMain 
+./afon.sh -a exec --exec-class ops.DeploySnowflakeReadingAzureViaAwsMain 
+
+# Snowflake writing to Azure
+./afon.sh -a exec --exec-class ops.DeploySnowflakeWritingAzureViaAwsMain 
+```
+
