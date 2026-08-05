@@ -1,4 +1,44 @@
-# Talking to Snowflake
+# Connect Snowflake to cross-cloud data via Polaris
+
+Afon can configure Snowflake to read Iceberg tables from any cloud via Polaris as a catalog integration.
+
+The following commands deploy the AWS full stack, write test data to the target cloud, then create a Snowflake catalog integration and iceberg table that reads through Polaris.
+
+## Read AWS data via AWS Polaris:**
+
+```shell
+./afon.sh -a exec --exec-class ops.DeploySnowflakeReadingAwsViaAwsMain  
+```
+
+## Read GCP data via AWS Polaris
+
+```shell
+./afon.sh -a exec --exec-class ops.DeploySnowflakeReadingGcpViaAwsMain  
+```
+
+## Read Azure data via AWS Polaris:**
+
+```shell
+./afon.sh -a exec --exec-class ops.DeploySnowflakeReadingAzureViaAwsMain  
+```
+
+## Write data from Snowflake to Azure blob storage
+
+In summary:
+
+1. Create a storage integration in Snowflake pointing at Azure
+2. Create an external volume with Azure storage details
+3. Click the consent URL output by `DESCRIBE EXTERNAL VOLUME` to grant Snowflake access
+4. Assign the Storage Blob Data Contributor role to the Snowflake app in Azure
+5. Create an Iceberg table and insert data
+
+The deployment is automated via:
+
+```shell
+./afon.sh -a exec --exec-class ops.DeploySnowflakeWritingAzureViaAwsMain  
+```
+
+### Connecting to Snowflake
 
 ### Via a service account
 
@@ -18,7 +58,7 @@ Yadda, yadda, yadda
 -----END PUBLIC KEY-----
 ';
 ```
-      
+
 Generate the key using:
 
 ```shell
@@ -26,11 +66,11 @@ openssl genrsa 2048 | openssl pkcs8 -topk8 -v2 des3 -inform PEM -out private_key
 openssl rsa -in private_key.p8 -pubout -out public_key.pub
 ```
 
-and it's the contents of that `public_key.pub` file that you put in `RSA_PUBLIC_KEY`. 
+and it's the contents of that `public_key.pub` file that you put in `RSA_PUBLIC_KEY`.
 The same public key is then to be used in the client code.
 See [SnowflakeConnectionSmoke.java](../afon-ops/src/main/java/health/emrys/afon/ops/smoke/SnowflakeConnectionSmoke.java) as an example.
 
-You then need to give the SA access to a table. 
+You then need to give the SA access to a table.
 In this example, we let it talk to `aws_acceptance_Test`
 
 ```sql      
@@ -40,7 +80,7 @@ GRANT SELECT ON TABLE SNOWFLAKE_LEARNING_DB.PUBLIC.aws_acceptance_Test TO USER E
 GRANT ROLE ACCOUNTADMIN TO USER ETL_SERVICE_USER;
 ```
 
-# Writing from Snowflake to Azure
+### Writing from Snowflake to Azure
 
 In Snowflake, run:
 
@@ -67,7 +107,7 @@ CREATE EXTERNAL VOLUME my_external_volume
 
 DESCRIBE EXTERNAL VOLUME my_external_volume; 
 ```
-This last command will print a "consent" URL. 
+This last command will print a "consent" URL.
 Click it adn login to the cloud you want to talk to.
 It adds a principle to our cloud.
 This is an application you can see [here](https://portal.azure.com/#view/Microsoft_AAD_IAM/StartboardApplicationsMenuBlade/~/Overview)

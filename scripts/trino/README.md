@@ -11,7 +11,7 @@ docker exec -it $(docker ps | grep trino | awk '{print $1}') trino --server http
 ```
 Run `select version();` and check that it's `481`.
 
-Then, if you created the environment with `DeployFullStackAwsMain`, a test table is created and you can see it with:
+Then, if you deployed a full stack, a test table is created and you can see it with:
 
 ```sql
 SELECT * FROM aws.namespaceph.test_table
