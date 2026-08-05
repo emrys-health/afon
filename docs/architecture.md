@@ -81,7 +81,7 @@ Executables are composed of reusable steps:
 
 Each `Deploy*Main` class composes steps from `StepOperations`. 
 
-For example, `DeployExternalCatalogsMain` reuses all steps from `DeployFullStackAwsMain` and then adds Azure-specific steps.
+For example, `DeployExternalCatalogsMain` reuses all steps from `DeployAwsFullStackMain` and then adds Azure-specific steps.
 
 The corresponding `Document*Main` classes generate markdown documentation describing each step — this keeps documentation in lock-step with the actual deployment code.
 

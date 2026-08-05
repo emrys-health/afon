@@ -37,7 +37,7 @@ Azure and GCP just host Polaris at the moment. There's no particular reason for 
 The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployFullStackAwsMain
+./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain
 ```
 Steps executed:
 
@@ -76,8 +76,7 @@ Steps: `clean_aws` → `aws_spark` → `waitFor_emryspolaris` → `all_catalogs_
 If a deployment fails partway through, you can resume from a specific step, e.g.:
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain \ 
-  --exec-args "az_polaris"
+./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain --exec-args "az_polaris"
 ```
 
 ### The afon-cdk module
@@ -164,7 +163,7 @@ This is noted as a future improvement in the project.
 
 ```shell
 # Full AWS stack (Polaris + Spark + Jupyter)
-./afon.sh -a exec --exec-class ops.DeployFullStackAwsMain 
+./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain 
 
 # Azure Polaris (standalone)
 ./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain
