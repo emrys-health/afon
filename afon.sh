@@ -9,7 +9,7 @@ usage (){
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
   echo "          [--setup-os <os>] [--setup-output <file>] [--setup-show]"
-  echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args]"
+  echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  build|docs|exec|setup|tofu-{apply|destroy}"
   echo "          build :  executes the mvn build"
   echo "          docs  :  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
@@ -29,8 +29,9 @@ usage (){
   echo "exec-envs:      the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
   echo "setup-os:       the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:   the output file where to write the setup.  Defaults to 'versions.md'"
-  echo "setup-show:     the flag to show the current setup."
+  echo "setup-show:     the flag to show the current setup, without executing the setup commands."
   echo "tofu-args:      the tofu args."
+  echo "tofu-cloud:     the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
   echo "mvn-quiet:      the flag to hush the mvn output"
 }
 
@@ -107,11 +108,13 @@ exec_script(){
 }
 
 exec_tofu(){
-  TOFU_DIR="afon-ops/cdktf.out/stacks/$CLOUD"
+  echo "tofu targetting cloud $TOFU_CLOUD"
+  TOFU_DIR="afon-ops/cdktf.out/stacks/$TOFU_CLOUD"
   if [ ! -d "$TOFU_DIR" ] ; then
      echo "Dir $TOFU_DIR not found.  Execute deploy or configure actions first."
      usage; exit 0
   fi
+  echo "Using tofu dir $TOFU_DIR"
   TOFU_ACTION=${ACTION#tofu-}
   if [ "$TOFU_ACTION" != "state" ] ; then
     TOFU_ARGS="$TOFU_ARGS -auto-approve"
@@ -185,6 +188,7 @@ SETUP_OS=
 SETUP_OUTPUT=
 SETUP_SHOW=
 TOFU_ARGS=
+TOFU_CLOUD=
 VERSION=
 
 while [[ $# -gt 0 ]]; do
@@ -225,6 +229,8 @@ while [[ $# -gt 0 ]]; do
       SETUP_SHOW=true; shift ;;
     --tofu-args)
       TOFU_ARGS="$2"; shift 2 ;;
+    --tofu-cloud)
+      TOFU_CLOUD="$2"; shift 2 ;;
     --mvn-quiet)
       MVN_QUIET=true; shift ;;
     --help|-h)
@@ -315,9 +321,9 @@ case $ACTION in
     setup_output
     ;;
   tofu-*)
-    if [ -z "$CLOUD" ]; then
-      CLOUD="aws"
-      echo "Defaulting to cloud $CLOUD"
+    if [ -z "$TOFU_CLOUD" ]; then
+      TOFU_CLOUD="aws"
+      echo "Defaulting to tofu cloud $TOFU_CLOUD"
     fi
     exec_tofu
     ;;

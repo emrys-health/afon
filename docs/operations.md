@@ -1,70 +1,46 @@
-# Assumptions
+# Operations
 
-### Cloud permissions
+## Technical requirements 
 
-We assume that if you running Afon, you have an AWS, Azure and/or GCP cloud.
-We also assume that the roles and permissions to create a K8s cluster have been set up.
-These include running:
-```shell
-./afon.sh -a exec -t script --exec-script create.sh -c aws 
-./afon.sh -a exec -t script --exec-script create.sh -c azure 
-./afon.sh -a exec -t script --exec-script create.sh -c gcp
-```
+To use Afon, you'll to satisfy the following technical requirements.
 
-### External Database
+### Cloud provider
 
-We also assume that you have a Database to store the Polaris metadata.
-Credentials to access that live in [env.properties](../config/env.properties)
+A cloud provider is required. The supported providers are: AWS, Azure and GCP.
 
-### OAuth Provider
-
-Finally, if you want to use Jupyter/Guacamole, you need to get past the Oauth2 security that we delegate to Google.
-So, you'll need a Google account login.
-
-If you want to set up OAuth via Google, then register your domain [here](https://console.cloud.google.com/auth/clients?project=afon-core).
-Doing so will generate the client ID and secret you then put in `env.properties`.
-(The cookie secret you generate yourself using something like `openssl rand -hex 16`).
-
-# Deployment
-
-Run everything from the top-level dir.
-
-NOTE: Only AWS has the full stack. 
-Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.
-
-NOTE: If you really foul things up, you'll leave the environment in an unstable state.
-Use the `{Aws,Azure,Gcp}CleanupHelper` classes to destroy your environment totally.
-```shell
-./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args aws-cleanup.sh
-./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper --exec-args azure-cleanup.sh
-./afon.sh -a exec --exec-class cdk.gcp.GcpCleanupHelper --exec-args gcp-cleanup.sh
-```
-They will output shell scripts that you can run.
-You may need to run them multiple times for the VPC to disappear from your cloud.
-
-
-### Automated deployment
-
-To actually run all the steps in each deployment above, run:
+We assume that the roles and permissions to create a kubernetes cluster have been set up.
+For the chosen cloud provider, run the corresponding script:
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain
-./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain
-./afon.sh -a exec --exec-class ops.DeployGcpPolarisMain
-./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain
+./afon.sh -a exec -t script --exec-script create.sh -c <cloud> 
 ```
+where valid cloud values are `{aws|azure|gcp}`.
 
-Note that the credentials in your `config/env*.properties` are used by the deployed Polaris instance.
+### Polaris Database
 
-### Deploying the environment
+An external database is required to store the Polaris metadata.
 
-To deploy the environment, run:
+Credentials to access the database are specified in [env.properties](../config/env.properties.example)
 
+### OAuth2 Security Provider
+
+Finally, if you want to use Jupyter/Guacamole, an OAuth2 security provider is required.
+
+Afon uses Google Cloud as provider, so you'll need a Google account to register your domain in
+[Google Auth](https://console.cloud.google.com/auth/clients?project=afon-core).
+
+Doing so will generate the OAUTH2 client id and secret that can be set in your [env.properties](../config/env.properties.example). 
+
+The OAUTH2 cookie secret can be generated using command: 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain
+openssl rand -hex 16
 ```
 
-This will create an AWS and Azure K8s cluster both running a Polaris, populate it and run against them a simple Spark test locally.
+## Deploying the stack
+
+Ensure the stack is deployed using the [deployment](stacks.md) documentation.
+
+## Using the stack
 
 # Viewing the SRE
 
@@ -208,33 +184,8 @@ and register tables with something like:
 ./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click will s3cr3t"
 ```
 
-# What the Java code does
-
-The Java code generates the Terraform plan to manage the cloud environment and delegates it to tofu to execute it.
-
-After the Java is run, the plan is in `afon-ops/cdktf.out/stacks/{aws,azure,gcp}`.
-Thereafter, you can run tofu apply or destroy commands via 
-```shell
-./afon.sh -a tofu-{apply,destroy}
-```
 
 # Future improvements
-
-### Tearing down the AWS environment
-
-In all cloud providers, deleting the Polaris deployment is fine.
-However, destroying the whole stack in AWS is problematic.
-It appears that there are lingering AWS infrastructure components.
-Run `AwsCleanupHelper` to generate the cleanup commands as a shell script.
-
-```shell
-./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args aws-cleanup.sh
-```
-
-The advantage of this is that you can use it if your accidentally delete your Terraform state.
-
-And if all else fails. go to the [AWS VPCs](https://eu-west-2.console.aws.amazon.com/vpcconsole/home?region=eu-west-2#vpcs:)
-and delete everything you created by hand.
 
 ### Be GitOps aligned
 
