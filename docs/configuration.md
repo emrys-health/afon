@@ -8,19 +8,24 @@ The configuration properties are cloud-specific but will include some properties
 
 All cloud-specific configuration files will include the cloud reference in their names, e.g. `afon-aws.properties` and `env-aws.properties`.
 
+The config dir is assumed to be a child dir of the AfonHome dir, which by default points to $HOME/.afon. 
+The AfonHome can be overridden by the `--home <afon-home>` option of `afon.sh`.
+The default config dir is then `$HOME/.afon/config`.
+
+To initialise the config files execute:
+
+```shell
+./afon.sh -a exec -t script --exec-script config/initialise.sh
+```
+This generates empty config files from templates in the config dir.  
+
+**NOTE**: Once initialised, the config values need to be completed. 
+
 Afon uses two types configuration properties in the config dir:
 
 ### Non-sensitive properties 
 
 The `afon` properties contain non-sensitive configuration (bucket names, domain names, regions, Polaris credentials). 
-
-Copy the examples and fill in your cloud-specific values:
-
-```shell
-cd config
-cp afon.properties.example afon.properties  
-cp afon-<cloud>.properties.example afon-<cloud>.properties
-```
 
 Required non-sensitive properties:
 
@@ -47,14 +52,6 @@ Cloud-specific:
 ### Sentitive properties
 
 The `env` properties contain sensitive configuration and should be committed to source control.
-
-Copy from `env.properties.example` and `env-<cloud>.properties.example` and fill in:
-
-```shell
-cd config
-cp env.properties.example env.properties
-cp env-<cloud>.properties.example env-<cloud>.properties
-```
 
 Required sensitive properties:
 
