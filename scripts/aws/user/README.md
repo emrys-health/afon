@@ -26,7 +26,7 @@ $ aws iam create-access-key --user-name saemrys
     }
 }
 ```
-where I've redacted sensitive values that should become `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in your `env.properties`. 
+where I've redacted sensitive values that should become `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in your `secret.properties`. 
 
 First, let's get all the properties into our shell:
 

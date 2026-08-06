@@ -20,7 +20,7 @@ where valid cloud values are `{aws|azure|gcp}`.
 
 An external database is required to store the Polaris metadata.
 
-Credentials to access the database are specified in [env.properties](../config/env.properties.example)
+Credentials to access the database are specified in [secret.properties](../config/secret.properties.example)
 
 ### OAuth2 Security Provider
 
@@ -29,7 +29,7 @@ Finally, if you want to use Jupyter/Guacamole, an OAuth2 security provider is re
 Afon uses Google Cloud as provider, so you'll need a Google account to register your domain in
 [Google Auth](https://console.cloud.google.com/auth/clients?project=afon-core).
 
-Doing so will generate the OAUTH2 client id and secret that can be set in your [env.properties](../config/env.properties.example). 
+Doing so will generate the OAUTH2 client id and secret that can be set in your [secret.properties](../config/secret.properties.example). 
 
 The OAUTH2 cookie secret can be generated using command: 
 ```shell

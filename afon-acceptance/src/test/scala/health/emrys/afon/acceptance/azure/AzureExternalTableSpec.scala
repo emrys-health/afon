@@ -16,7 +16,7 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 /**
  * This is work in progress.
- * You'll need to generate a Databricks token for this test to run successfully and put it in your env.properties
+ * You'll need to generate a Databricks token for this test to run successfully and put it in your secret.properties
  *
  * Test Databricks is actually ready to receive calls with:
  * curl -X GET   https://adb-7405611337270626.6.azuredatabricks.net/api/2.1/unity-catalog/iceberg-rest/v1/catalogs/phdbx/namespaces/default   -H "Authorization: Bearer $DATABRICKS_TOKEN"

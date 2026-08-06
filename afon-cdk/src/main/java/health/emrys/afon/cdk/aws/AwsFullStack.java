@@ -222,7 +222,7 @@ public class AwsFullStack extends AwsTrinoStack {
               commonConfig:
                 replication_factor: 1
               # All long-term data (chunks, index, ruler rules) is shipped to
-              # S3. Credentials come from afon.properties / env.properties via
+              # S3. Credentials come from afon.properties / secret.properties via
               # AfonProperties — the rendered values land in the local tofu
               # state and cdktf.out (both gitignored), not in git history.
               storage:

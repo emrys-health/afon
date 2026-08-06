@@ -15,7 +15,7 @@ pNY8dkf3zfYVtc0SmudbG2acqe+5MdqrJ03w7YqdpHXJc+gz54DUSPbUHjN4YtPR
 mtqGAePLd973QjkoP22CCVOAC24t43DgvJOLO7nqlU8wh3/HFxtE0TEgLPD/n6VV
 kQIDAQAB
 -----END PUBLIC KEY-----
-'; -- Note that this is the Public key that matches SNOWFLAKE_PRIVATE_KEY in your env.properties
+'; -- Note that this is the Public key that matches SNOWFLAKE_PRIVATE_KEY in your secret.properties
 
 GRANT USAGE ON WAREHOUSE COMPUTE_WH TO USER ETL_SERVICE_USER;
 GRANT USAGE ON DATABASE SNOWFLAKE_LEARNING_DB TO USER ETL_SERVICE_USER;
