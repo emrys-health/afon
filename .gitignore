@@ -1,7 +1,5 @@
 # Afon
 
-config/env*.properties
-config/users.csv
 logs/
 *-cleanup.sh
 
