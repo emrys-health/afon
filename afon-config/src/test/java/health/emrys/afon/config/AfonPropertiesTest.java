@@ -40,7 +40,7 @@ public class AfonPropertiesTest {
         checkAllExpectedInPropertiesFile(properties);
         checkOnlyExpectedInPropertiesFile(properties);
         checkExpectedValuesNotEmpty(properties);
-        assertThat(loader.getConfidentialProperties()).hasSizeGreaterThan(0);
+        assertThat(loader.getSecretProperties()).hasSizeGreaterThan(0);
     }
 
     @Test

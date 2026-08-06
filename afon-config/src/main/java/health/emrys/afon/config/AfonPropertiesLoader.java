@@ -54,7 +54,7 @@ public class AfonPropertiesLoader {
 
     private final List<String> types;
     private final Properties  properties;
-    private final Set<String> confidentialKeys = new HashSet<>();
+    private final Set<String> secretKeys = new HashSet<>();
 
     public AfonPropertiesLoader() {
         this(ALL_TYPES);
@@ -85,7 +85,7 @@ public class AfonPropertiesLoader {
             Properties props = loadPropertiesFromFile(dir, file);
             properties.putAll(props);
             if (file.startsWith("secret")) {
-                confidentialKeys.addAll(props.keySet().stream().map(x -> x.toString()).toList());
+                secretKeys.addAll(props.keySet().stream().map(x -> x.toString()).toList());
             }
         }
         for (String property : AfonProperties.getAllNames()) {
@@ -116,10 +116,10 @@ public class AfonPropertiesLoader {
         return files;
     }
 
-    public Properties getConfidentialProperties() {
-        Properties copy = new Properties();
-        confidentialKeys.stream().forEach(prop -> copy.put(prop, properties.getProperty(prop)));
-        return copy;
+    public Properties getSecretProperties() {
+        Properties secret = new Properties();
+        secretKeys.stream().forEach(prop -> secret.put(prop, properties.getProperty(prop)));
+        return secret;
     }
 
     public Properties getProperties() {
