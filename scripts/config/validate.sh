@@ -12,6 +12,7 @@ for TEMPLATE in $(ls $CWD/templates/config/*) ; do {
   fi
   echo "Validating config file $FILE_NAME"
   for KEY in $(grep '=' $TEMPLATE | grep -v ^\# | grep -e ^[A-Z] | perl -pe s/=.*//g) ; do {
-    grep ^$KEY= $CONFIG_FILE > /dev/null || echo "no $KEY in $CONFIG_FILE" ;
+    grep ^$KEY= $CONFIG_FILE > /dev/null || echo "no key $KEY" ;
+    grep -E '^[^=]+=[^[:space:]]+' $CONFIG_FILE > /dev/null || echo "no value for key $KEY"
   } done
 } done
