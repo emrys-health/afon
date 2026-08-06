@@ -20,9 +20,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  * Cloud-specific secrets live alongside it in
  * {@code env-<cloud>.properties} (e.g. {@code env-aws.properties}).
  *
- * The properties files are loaded from the config dir located in ${afon.home}/config.
- * The system property ${afon.home} by default points to the root of the project
- * and can be overridden.
+ * The properties files are loaded from the ConfigUtils.configDir().
  */
 public class AfonPropertiesLoader {
 
@@ -72,25 +70,13 @@ public class AfonPropertiesLoader {
     }
 
     private void loadProperties(String type) {
-        String configDir = configDir();
+        String configDir = ConfigUtils.configDir();
 
         try {
             loadPropertiesFromDir(type, configDir);
         } catch (IOException e) {
             logger.warn("Failed to load {} properties files in {}", type, configDir);
-            String altDir = "config";
-            try {
-                // ...or in the IDE?
-                loadPropertiesFromDir(type, altDir);
-            } catch (IOException ex) {
-                logger.warn("Failed to load {} properties files in {}", type, altDir);
-                throw new RuntimeException(ex); // urgh, the properties file not found
-            }
         }
-    }
-
-    private @NonNull String configDir() {
-        return System.getProperty("afon.home", "..") + "/config";
     }
 
     private void loadPropertiesFromDir(String type, String dir) throws IOException {

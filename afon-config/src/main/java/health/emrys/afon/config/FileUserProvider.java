@@ -1,6 +1,5 @@
 package health.emrys.afon.config;
 
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.File;
@@ -23,9 +22,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  *
  * The first two fields are mandatory.
  *
- * The csv files are loaded from the config dir located in ${afon.home}/config.
- * The system property ${afon.home} by default points to the root of the project
- * and can be overridden.
+ * The csv files are loaded from the ConfigUtils.configDir().
  */
 public class FileUserProvider implements AfonUserProvider {
 
@@ -53,7 +50,7 @@ public class FileUserProvider implements AfonUserProvider {
     }
 
     private void loadUsers(String file) {
-        String dir = configDir();
+        String dir = ConfigUtils.configDir();
         String pathname = dir + "/" + file;
         logger.info("Loading {} users from {}", file, dir);
         Path path = Path.of(pathname);
@@ -95,10 +92,6 @@ public class FileUserProvider implements AfonUserProvider {
             loadUsers();
         }
         return users;
-    }
-
-    private @NonNull String configDir() {
-        return System.getProperty("afon.home", "..") + "/config";
     }
 
     @Override

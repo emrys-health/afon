@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage (){
-  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h]"
+  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h] [--home <afon-home>]"
   echo "          [--logging-level|-l <logging>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
   echo "          [--docs-dir|-d <dir>]"
@@ -33,6 +33,8 @@ usage (){
   echo "tofu-args:      the tofu args."
   echo "tofu-cloud:     the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
   echo "mvn-quiet:      the flag to hush the mvn output"
+  echo "help:           the help flag.  Prints usage."
+  echo "home:           the afon home dir.  Defaults to $HOME/.afon."
 }
 
 check_acceptance(){
@@ -46,7 +48,7 @@ check_acceptance(){
 }
 
 mvn_envs(){
-  MVN_ENVS="-Dafon.home=$CWD"
+  MVN_ENVS="-Dafon.home=$AFON_HOME"
   if [ -n "$CLOUD" ] ; then
     MVN_ENVS="$MVN_ENVS -Dafon.cloud=$CLOUD"
   fi
@@ -96,12 +98,13 @@ exec_script(){
     echo "Action exec requires option --exec-script"
     usage; exit 1
   fi
-  if [ -z "$CLOUD" ] ; then
-    echo "Script requires option --cloud"
-    usage; exit 1
+  cd $CWD/scripts
+  if [ -n "$CLOUD" ] ; then
+    set -a && source $AFON_HOME/config/afon.properties && source $AFON_HOME/config/afon-$CLOUD.properties && set +a
+    source $CLOUD/$EXEC_SCRIPT
+  else
+    source $EXEC_SCRIPT
   fi
-  set -a && source $CWD/config/afon.properties && source $CWD/config/afon-$CLOUD.properties && set +a
-  $CWD/scripts/$CLOUD/$EXEC_SCRIPT
 }
 
 exec_tofu(){
@@ -162,6 +165,7 @@ version(){
   mvn help:evaluate -Dexpression=project.version -q -DforceStdout
 }
 
+AFON_HOME=
 ACTION=
 BUILD_ARGS=
 BUILD_GOALS=
@@ -232,11 +236,18 @@ while [[ $# -gt 0 ]]; do
       MVN_QUIET=true; shift ;;
     --help|-h)
       usage; exit 0 ;;
+    --home)
+      AFON_HOME="$2"; shift 2 ;;
     *)
       echo "Unknown option: $1" >&2;
       usage; exit 1 ;;
   esac
 done
+
+if [ -z "$AFON_HOME" ] ; then
+  AFON_HOME="$HOME/.afon"
+  echo "AFON_HOME not specified. Defaulting to $AFON_HOME"
+fi
 
 if [ "$ACTION" == "" ] ; then
   ACTION="build"

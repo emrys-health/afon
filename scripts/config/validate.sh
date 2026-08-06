@@ -1,6 +1,10 @@
-CONFIG_DIR=~/.afon/dev/config
+CONFIG_DIR="$AFON_HOME/config"
+if [ ! -d $CONFIG_DIR ]; then
+  echo "Missing config dir $CONFIG_DIR"
+  exit;
+fi
 # shellcheck disable=SC2045
-for TEMPLATE in $(ls ../../templates/config/*) ; do {
+for TEMPLATE in $(ls $CWD/templates/config/*) ; do {
   FILE_NAME=$(basename $TEMPLATE)
   export CONFIG_FILE=$CONFIG_DIR/$FILE_NAME
   if [ -z $CONFIG_FILE ]; then
