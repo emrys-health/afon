@@ -2,10 +2,11 @@
 
 ## Config dir
 
-All the configuration will be read from the config dir, a dir named `config` in the Afon home dir, 
+All configuration is read from the config dir, assumed to be a child dir named `config` in the Afon home dir, 
 which by default points to `$HOME/.afon`.  The default config dir is then `$HOME/.afon/config`.
 
-The Afon home can be overridden by the `--home <afon-home>` option of `afon.sh`.
+The Afon home can be overridden by the `--home <afon-home>` option of `afon.sh`.   
+In your IDE, you can override via the `-Dafon.home=<afon-home>` system property.
 
 For example, if you need to support multiple envs, say a `dev` and a `stg` env, you can specify different Afon home dirs:
 ```shell
@@ -49,11 +50,11 @@ The `afon` properties contain non-sensitive configuration (bucket names, domain 
 
 Required non-sensitive properties:
 
-| Property | Example | Description |
-|---|---|---|
+| Property | Example | Description                     |
+|---|---|---------------------------------|
 | `CLUSTER_NAME` | `spark-cluster-wb2` | Name for your Kubernetes cluster |
-| `POLARIS_ID` | `root` | Polaris client ID |
-| `POLARIS_SECRET` | `s3cr3t` | Polaris client secret |
+| `POLARIS_ENDPOINT` | `localhost:8181` | URL of Polaris endpoint         |
+
 
 Cloud-specific:
 
@@ -71,17 +72,19 @@ Cloud-specific:
 
 ### Sentitive properties
 
-The `secret` properties contain sensitive configuration and should be committed to source control.
+The `secret` properties contain sensitive configuration, such as credentials and secrets.
 
 Required sensitive properties:
 
-| Property | How to obtain |
-|---|---|
-| `OAUTH2_CLIENT_ID` | Google Cloud Auth console |
-| `OAUTH2_CLIENT_SECRET` | Google Cloud Auth console |
-| `OAUTH2_COOKIE_SECRET` | `openssl rand -hex 16` |
-| `POLARIS_DB_PASSWORD` | Your external Postgres password |
-| `POLARIS_DB_HOST` | Your external Postgres host |
+| Property | How to obtain                    |
+|---|----------------------------------|
+| `OAUTH2_CLIENT_ID` | Google Cloud Auth console        |
+| `OAUTH2_CLIENT_SECRET` | Google Cloud Auth console        |
+| `OAUTH2_COOKIE_SECRET` | `openssl rand -hex 16`           |
+| `POLARIS_DB_PASSWORD` | Your external Postgres password  |
+| `POLARIS_DB_HOST` | Your external Postgres host      |
+| `POLARIS_ID` | Polaris client ID                |
+| `POLARIS_SECRET` | Polaris client secret            |
 
 Cloud-specific:
 
@@ -98,95 +101,22 @@ Cloud-specific:
 When running in CLI (e.g. tofu apply|destroy), you use the user admin credentials in ~/.aws/credentials.
 **TODO:**  Rename `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `secret-aws.properties` to `AWS_POLARIS_*`
 
-### Properties templates
+### Properties & users templates
 
 **`afon.properties`** (non-sensitive):
 
-```properties
-### Global
-CLUSTER_NAME=your-production-cluster
-POLARIS_ID=root
-POLARIS_SECRET=CHANGE_ME_TO_A_STRONG_SECRET
-POLARIS_ENDPOINT=your-polaris-domain.click
-USER_POLARIS_ID=root
-USER_POLARIS_SECRET=CHANGE_ME_TO_A_STRONG_SECRET
-JUPYTER_VNC_PASSWORD=CHANGE_ME
-OIDC_ISSUER_URL=https://accounts.google.com
-OIDC_EMAIL_DOMAIN=yourdomain.com
-
-### AWS
-AWS_S3_EXTERNAL_BUCKET_NAME=your-org-afon-external
-AWS_S3_BUCKET_NAME=your-org-afon-primary
-AWS_S3_BUCKET_NAME_FORBIDDEN=your-org-afon-forbidden
-AWS_S3_ROLE_ARN=arn:aws:iam::YOUR_ACCOUNT_ID:role/S3ReadWriteRole
-AWS_REGION=eu-west-2
-AWS_POLARIS_DOMAIN_NAME=your-polaris.yourdomain.com
-AWS_JUPYTER_DOMAIN=your-jupyter.yourdomain.com
-AWS_ACCOUNT_ID=YOUR_ACCOUNT_ID
-AWS_ZONE_ID=YOUR_ZONE_ID
-AWS_POLARIS_DNS_ZONE=YOUR_DNS_ZONE_ID
-AWS_JUPYTER_DNS_ZONE=YOUR_JUPYTER_DNS_ZONE_ID
-AWS_JUPYTER_CERT_ARN=arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
-AWS_POLARIS_CERT_ARN=arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
-
-### Azure
-AZURE_EXTERNAL_BUCKET=yourstorage-external
-AZURE_BUCKET_FORBIDDEN=yourstorage-forbidden
-AZURE_BUCKET=yourstorage
-AZURE_STORAGE_ACCOUNT=yourstorageaccount
-AZURE_SUBSCRIPTION=YOUR_SUBSCRIPTION_ID
-AZURE_REGION=uksouth
-AZURE_RESOURCE_GROUP=your_resource_group
-AZURE_DOMAIN_NAME=your-polaris-azure.yourdomain.com
-AZURE_JUPYTER_DOMAIN_NAME=your-jupyter-azure.yourdomain.com
-
-### GCP
-GCP_BUCKET_NAME=your_org_afon
-GCP_BUCKET_NAME_FORBIDDEN=your_org_afon_forbidden
-GCP_EXTERNAL_BUCKET_NAME=your_org_afon_external
-GCP_SERVICE_ACCOUNT=your-sa@your-project.iam.gserviceaccount.com
-GCP_DOMAIN_NAME=your-polaris-gcp.yourdomain.com
-
-### Snowflake
-SNOWFLAKE_JDBC_URL=jdbc:snowflake://YOUR_ACCOUNT.snowflakecomputing.com/
-```
+- [afon.properties](../templates/config/afon.properties)
+- [afon-aws.properties](../templates/config/afon-aws.properties)
+- [afon-azure.properties](../templates/config/afon-azure.properties)
+- [afon-gcp.properties](../templates/config/afon-gcp.properties)
 
 **`secret.properties`** (sensitive):
 
-```properties
-# AWS
-AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY
-AWS_SECRET_ACCESS_KEY=YOUR_SECRET_KEY
+- [secret.properties](../templates/config/secret.properties)
+- [secret-aws.properties](../templates/config/secret-aws.properties)
+- [secret-azure.properties](../templates/config/secret-azure.properties)
+- [secret-gcp.properties](../templates/config/secret-gcp.properties)
 
-# Azure
-AZURE_CLIENT_ID=YOUR_CLIENT_ID
-AZURE_TENANT_ID=YOUR_TENANT_ID
-AZURE_CLIENT_SECRET=YOUR_CLIENT_SECRET
-DATABRICKS_TOKEN=YOUR_DATABRICKS_TOKEN
+**`users.csv`** (list of users, one per line):
 
-# GCP
-GOOGLE_APPLICATION_CREDENTIALS=CONTENTS_OF_APPLICATION_DEFAULT_CREDENTIALS_JSON_WITH_NEWLINES_REMOVED
-
-# OAuth2 (for Jupyter/Guacamole)
-OAUTH2_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-OAUTH2_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-OAUTH2_COOKIE_SECRET=GENERATED_WITH_OPENSSL_RAND_HEX_16
-
-# External Postgres for Polaris metadata
-POLARIS_DB_PASSWORD=YOUR_STRONG_DB_PASSWORD
-POLARIS_DB_HOST=YOUR_POSTGRES_HOST
-
-# Snowflake
-SNOWFLAKE_PRIVATE_KEY=YOUR_SNOWFLAKE_PRIVATE_KEY
-```
-
-#### Users
-
-- **`users.csv`** — list of users, one per line. Copy the example and fill in your values:
-
-```shell
-cd config
-cp users.csv.example users.csv
-```
-
-
+- [user.csv](../templates/config/users.csv)
