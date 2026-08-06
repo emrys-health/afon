@@ -27,6 +27,12 @@ This generates empty config files from templates in the config dir.
 
 **NOTE**: Once initialised, the config values need to be completed.
 
+Once completed, you can validate the config files by running: 
+```shell
+./afon.sh -a exec -t script --exec-script config/validate.sh
+```
+The validation checks that all the template properties have a corresponding non-empty property in the config dir.
+
 ## Properties
 
 The properties configuration is currently file-based.
