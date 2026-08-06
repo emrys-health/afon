@@ -16,9 +16,9 @@ import static org.slf4j.LoggerFactory.getLogger;
  * Cloud-specific properties live alongside it in
  * {@code afon-<cloud>.properties} (e.g. {@code afon-aws.properties}).
  *
- * Sensitive secrets live in {@code env.properties}
+ * Sensitive secrets live in {@code secret.properties}
  * Cloud-specific secrets live alongside it in
- * {@code env-<cloud>.properties} (e.g. {@code env-aws.properties}).
+ * {@code secret-<cloud>.properties} (e.g. {@code secret-aws.properties}).
  *
  * The properties files are loaded from the ConfigUtils.configDir().
  */
@@ -28,7 +28,7 @@ public class AfonPropertiesLoader {
 
     /**
      * System property selecting properties for a given {@code afon-<cloud>.properties} and
-     * {@code env-<cloud>.properties} to load; when unset, every cloud's files are loaded together,
+     * {@code secret-<cloud>.properties} to load; when unset, every cloud's files are loaded together,
      * since some deployments (e.g. cross-cloud federation) need more than one cloud's properties at the same time.
      */
     public static final String CLOUD_SYSTEM_PROPERTY = "afon.cloud";
@@ -36,7 +36,7 @@ public class AfonPropertiesLoader {
     /**
      * Property types
      */
-    private static final List<String> ALL_TYPES = List.of("afon", "env");
+    private static final List<String> ALL_TYPES = List.of("afon", "secret");
 
     /**
      * Cloud types
@@ -84,7 +84,7 @@ public class AfonPropertiesLoader {
         for (String file : propertyFiles(type)) {
             Properties props = loadPropertiesFromFile(dir, file);
             properties.putAll(props);
-            if (file.startsWith("env")) {
+            if (file.startsWith("secret")) {
                 confidentialKeys.addAll(props.keySet().stream().map(x -> x.toString()).toList());
             }
         }
@@ -97,7 +97,7 @@ public class AfonPropertiesLoader {
     }
 
     /**
-     * Lists the {@code afon.properties} and {@code env.properties} and its cloud-specific file(s).
+     * Lists the {@code afon.properties} and {@code secret.properties} and its cloud-specific file(s).
      * {@link AfonPropertiesLoader#CLOUD_SYSTEM_PROPERTY} selects a single cloud; otherwise every cloud's file
      * is listed, since some deployments (e.g. cross-cloud federation) need more than one cloud's
      * properties in the same run.

@@ -71,7 +71,7 @@ Cloud-specific:
 
 ### Sentitive properties
 
-The `env` properties contain sensitive configuration and should be committed to source control.
+The `secret` properties contain sensitive configuration and should be committed to source control.
 
 Required sensitive properties:
 
@@ -94,9 +94,9 @@ Cloud-specific:
 | `AZURE_CLIENT_SECRET` | Same as above |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Contents of `~/.config/gcloud/application_default_credentials.json` with newlines removed |
 
-**NOTE:**  When running in the JVM, you use the Polaris service account credentials in `env-aws.properties`.
+**NOTE:**  When running in the JVM, you use the Polaris service account credentials in `secret-aws.properties`.
 When running in CLI (e.g. tofu apply|destroy), you use the user admin credentials in ~/.aws/credentials.
-**TODO:**  Rename `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `env-aws.properties` to `AWS_POLARIS_*`
+**TODO:**  Rename `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `secret-aws.properties` to `AWS_POLARIS_*`
 
 ### Properties templates
 
@@ -151,7 +151,7 @@ GCP_DOMAIN_NAME=your-polaris-gcp.yourdomain.com
 SNOWFLAKE_JDBC_URL=jdbc:snowflake://YOUR_ACCOUNT.snowflakecomputing.com/
 ```
 
-**`env.properties`** (sensitive — never commit):
+**`secret.properties`** (sensitive):
 
 ```properties
 # AWS
