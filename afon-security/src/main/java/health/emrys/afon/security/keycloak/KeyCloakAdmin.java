@@ -544,17 +544,17 @@ public class KeyCloakAdmin {
         Properties    properties = new AfonPropertiesLoader().getProperties();
         KeyCloakAdmin admin      = new KeyCloakAdmin(properties);
         if (args.length == 3) {
-            String userID   = args[0];
-            String password = args[1];
-            String email    = args[2];
-            logger.info("user ID = {}, password = {}, email = {}", userID, password, email);
+            String id = args[0];
+            String secret = args[1];
+            String email = args[2];
+            logger.info("Registering user id = {}, secret = {}, email = {}", id, secret, email);
             admin.registerPolarisUser(AfonUserProvider.createUser(
-                userID,
-                password,
+                id,
+                secret,
                 email
             ));
         } else {
-            logger.info("Using default user from afon.properties");
+            logger.info("Registering user from properties");
             admin.registerPolarisUser(AfonUserProvider.createUser(
                 AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
                 AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),

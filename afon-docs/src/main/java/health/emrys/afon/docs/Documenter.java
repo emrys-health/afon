@@ -95,8 +95,8 @@ public class Documenter {
     }
 
     private static String redact(String documentation) {
-        Properties confidential   = new AfonPropertiesLoader().getConfidentialProperties();
-        for (String redact : confidential
+        Properties secretProperties   = new AfonPropertiesLoader().getSecretProperties();
+        for (String redact : secretProperties
                 .values()
                 .stream()
                 .map(x -> x.toString())
