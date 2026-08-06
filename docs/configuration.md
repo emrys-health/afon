@@ -1,25 +1,39 @@
 # Configuration
 
+## Config dir
+
+All the configuration will be read from the config dir, a dir named `config` in the Afon home dir, 
+which by default points to `$HOME/.afon`.  The default config dir is then `$HOME/.afon/config`.
+
+The Afon home can be overridden by the `--home <afon-home>` option of `afon.sh`.
+
+For example, if you need to support multiple envs, say a `dev` and a `stg` env, you can specify different Afon home dirs:
+```shell
+./afon.sh --home ~/.afon/envs/dev # config for dev will be in ~/.afon/envs/dev/config
+./afon.sh --home ~/.afon/envs/stg # config for stg will be in ~/.afon/envs/stg/config
+```
+Equally, you could leave Afon home as the default and use symlinks to point to different configurations
+```shell
+ls -s ~/.afon/envs/dev/config ~/.afon/config # config symlink for dev 
+ls -s ~/.afon/envs/stg/config ~/.afon/config # config symlink for stg 
+```
+
+Whichever Afon home you decide to use, you can initialise the config files by running:
+
+```shell
+./afon.sh -a exec -t script --exec-script config/initialise.sh
+```
+This generates empty config files from templates in the config dir.
+
+**NOTE**: Once initialised, the config values need to be completed.
+
 ## Properties
 
 The properties configuration is currently file-based.
 
 The configuration properties are cloud-specific but will include some properties that are common to all cloud providers.  
 
-All cloud-specific configuration files will include the cloud reference in their names, e.g. `afon-aws.properties` and `env-aws.properties`.
-
-The config dir is assumed to be a child dir of the AfonHome dir, which by default points to $HOME/.afon. 
-The AfonHome can be overridden by the `--home <afon-home>` option of `afon.sh`.
-The default config dir is then `$HOME/.afon/config`.
-
-To initialise the config files execute:
-
-```shell
-./afon.sh -a exec -t script --exec-script config/initialise.sh
-```
-This generates empty config files from templates in the config dir.  
-
-**NOTE**: Once initialised, the config values need to be completed. 
+All cloud-specific configuration files will include the cloud reference in their names, e.g. `afon-aws.properties`.
 
 Afon uses two types configuration properties in the config dir:
 
