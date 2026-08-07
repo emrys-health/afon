@@ -29,7 +29,7 @@ For AWS, get the Zone ID for your domain by running:
 ```shell
 aws route53 list-hosted-zones-by-name
 ```
-And then update the `AWS_XXX_DNS_ZONE` values in `config/afon-aws.properties` accordingly.
+And then update the `AWS_XXX_DNS_ZONE` values in [configuration](configuration.md) accordingly.
 
 Note the `AWS_ZONE_ID` is for the ELB and the `AWS_XXX_DNS_ZONE` are for the DNS.
 Although they are lexically similar (thank AWS for that) they are unrelated concepts.
