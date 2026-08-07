@@ -305,10 +305,10 @@ public class StepActions {
         return original;
     }
 
-    public Step waitFor(String domain) {
+    public Step waitOnDNS(String domain) {
         return new Step(
-                stepNameWaitingFor(domain),
-                "wait for internet DNS servers to recognise " + domain,
+                stepNameWaitOn(domain),
+                "wait on DNS for domain " + domain,
                 () -> {
                     boolean stopResolving = false;
                     long    start         = System.currentTimeMillis();
@@ -316,7 +316,7 @@ public class StepActions {
                     logger.info("Checking DNS for {}", domain);
                     while (!stopResolving) {
                         long elapsed = System.currentTimeMillis() - start;
-                        logger.info("Waiting on DNS for {}, time elapsed {}s (until timeout {}s)", domain, elapsed/1000, timeout/1000);
+                        logger.info("Waiting on DNS for domain {}: time elapsed {}s (until timeout of {}s)", domain, elapsed/1000, timeout/1000);
                         if (!(elapsed < timeout)) break;
                         try {
                             InetAddress[] addresses = InetAddress.getAllByName(domain);
@@ -331,13 +331,13 @@ public class StepActions {
                 });
     }
 
-    static @NonNull String stepNameWaitingFor(String domain) {
-        return "waitFor_" + domain.substring(0, domain.indexOf('.'));
+    @NonNull String stepNameWaitOn(String domain) {
+        return "wait_on_" + domain.substring(0, domain.indexOf('.'));
     }
 
     private boolean isWaitingInterrupted(int timeout) {
         int pauseMs = 15_000;
-        logger.debug("Waiting {}s. Maximum = {}s", pauseMs / 1000, timeout / 1000);
+        logger.debug("Waiting {}s until timeout of {}s", pauseMs / 1000, timeout / 1000);
         try {
             Thread.sleep(pauseMs);
         } catch (InterruptedException e) {
