@@ -1,6 +1,4 @@
-# Note: you must source a properties file before running this script
-# For example:
-# set -a && source afon.properties && source afon-azure.properties && set +a
+source $CWD/scripts/config/afon-source.sh azure
 
 APP_ID=$(az ad app list --display-name AfonMultiTenantApp --query "[].appId" -o tsv)
 echo APP_ID=$APP_ID

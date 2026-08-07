@@ -99,12 +99,7 @@ exec_script(){
     usage; exit 1
   fi
   cd $CWD/scripts
-  if [ -n "$CLOUD" ] ; then
-    set -a && source $AFON_HOME/config/afon.properties && source $AFON_HOME/config/afon-$CLOUD.properties && set +a
-    source $CLOUD/$EXEC_SCRIPT
-  else
-    source $EXEC_SCRIPT
-  fi
+  source $EXEC_SCRIPT
 }
 
 exec_tofu(){

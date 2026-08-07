@@ -12,7 +12,7 @@ We assume that the roles and permissions to create a kubernetes cluster have bee
 For the chosen cloud provider, run the corresponding script:
 
 ```shell
-./afon.sh -a exec -t script --exec-script create.sh -c <cloud> 
+./afon.sh -a exec -t script --exec-script <cloud>/create.sh
 ```
 where valid cloud values are `{aws|azure|gcp}`.
 
