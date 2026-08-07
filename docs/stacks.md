@@ -4,7 +4,7 @@
 
 ## Setup
 
-See [setup.md](setup.md).
+See [setup](setup.md).
 
 ## Command API
 
@@ -162,7 +162,7 @@ This is noted as a future improvement in the project.
 ## Summary of deployment commands
 
 ```shell
-# Full AWS stack (Polaris + Spark + Jupyter)
+# AWS full stack (Polaris + Spark + Jupyter)
 ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain 
 
 # Azure Polaris (standalone)

@@ -55,7 +55,7 @@ In Grafana UI, add a Loki Data Source pointing to `http://localhost:3100`.
 
 **NOTE:** In the `HTTP headers` section, a single entry needs to added with:
 - `Header` name: `X-Scope-OrgID`
-- The cluster name value (`CLUSTER_NAME` from `config/afon.properties`).
+- The cluster name value (`CLUSTER_NAME` from [configuration](configuration.md)).
 
 ![image](images/grafana_multitenancy.png)
 
@@ -64,7 +64,7 @@ In Grafana UI, add a Loki Data Source pointing to `http://localhost:3100`.
 Once the data source is configured, logs will be available in the Grafana GUI (`Drilldown -> Logs`).
 You may need to refresh your browser.
 
-Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in `afon-aws.properties`.
+Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in the [configuration](configuration.md).
 Loki logs are stored in the cloud, eg
 ```shell
 aws s3 ls s3://emrys-afon-bucket/spark-cluster
