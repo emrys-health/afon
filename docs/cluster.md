@@ -5,7 +5,7 @@ We focus on *what* the cluster is and *why* we chose it.
 # Deployment
 
 We assume cluster is set up and the stack has been deployed to the cluster.
-See the [stacks](./stacks.md) on how to deploy the stack.
+See the [stacks](stacks.md) on how to deploy the stack.
 
 # Pods
 
