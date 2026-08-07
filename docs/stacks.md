@@ -4,7 +4,7 @@
 
 ## Setup
 
-See [setup.md](./setup.md).
+See [setup.md](setup.md).
 
 ## Command API
 
@@ -27,7 +27,7 @@ To deploy a stack, we use the ops.Deploy*Main classes, e.g.:
 ./afon.sh -a exec --exec-class ops.DeployGcpPolarisMain
 ```
 
-The credentials in the cloud-specific env properties in [config dir](../config/) are used by the deployed Polaris instance.
+The credentials in the cloud-specific env properties in [config dir](configuration.md) are used by the deployed Polaris instance.
 
 **NOTE:** Currently, only AWS has the full stack.
 Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.

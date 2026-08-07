@@ -12,7 +12,7 @@ git clone https://github.com/emrys-health/afon-core.git
 
 ## Build
 
-We assume [setup](./setup.md) has been done. 
+We assume [setup](setup.md) has been done. 
 
 To build all components, running acceptance tests:
 ```shell
@@ -32,7 +32,7 @@ cd afon-core
 ./afon.sh -a build -p -acceptance
 ```
 
-See [acceptance tests](./acceptance_tests.md) for more details.
+See [acceptance tests](acceptance_tests.md) for more details.
 
 ### Generated docs
 

@@ -11,7 +11,7 @@ We currently have the following monitoring tools:
 - hubble-cli: running locally to query hubble
 
 To set up monitoring tools, we assume AWS full stack has been deployed. 
-See [stacks](./stacks.md) for details on deployment of the full stack.
+See [stacks](stacks.md) for details on deployment of the full stack.
 
 ### Set up kube port-forwarding 
 
