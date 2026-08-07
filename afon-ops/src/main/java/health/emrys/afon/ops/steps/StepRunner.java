@@ -29,16 +29,16 @@ public class StepRunner {
      * @param steps
      */
     public void runSteps(List<Step> steps) {
-        logger.info("\u001B[32mSteps to run: {}\u001B[0m", join(steps));
-        try {
+        logger.info("Steps to run: {}", join(steps));
             for (Step step : steps) {
-                logger.info("\u001B[32mRunning step {}\u001B[0m", step.getName());
-                step.getFunction().run();
+                logger.info("Running step {}", step.getName());
+                try {
+                    step.getFunction().run();
+                } catch (Exception e) {
+                    logger.error("Failed running step "+step.getName(), e);
+                    throw new RuntimeException(e);
+                }
             }
-        } catch (Exception e) {
-            logger.error("Failed running steps", e);
-            throw new RuntimeException(e);
-        }
     }
 
     /**
