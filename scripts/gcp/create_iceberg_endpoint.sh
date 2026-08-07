@@ -1,3 +1,5 @@
+source $CWD/scripts/config/afon-source.sh gcp
+
 gcloud services enable \
     bigquery.googleapis.com \
     bigqueryconnection.googleapis.com \

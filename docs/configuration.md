@@ -22,7 +22,7 @@ ls -s ~/.afon/envs/stg/config ~/.afon/config # config symlink for stg
 Whichever Afon home you decide to use, you can initialise the config files by running:
 
 ```shell
-./afon.sh -a exec -t script --exec-script config/initialise.sh
+./afon.sh -a exec -t script --exec-script config/init.sh
 ```
 This generates empty config files from templates in the config dir.
 
