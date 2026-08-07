@@ -1,6 +1,6 @@
 It appears that AWS does not have service accounts so create a user with limited privileges to be an approximation.
 
-Create the user - we;ll call it `saemrys`:
+Create the user - we'll call it `saemrys`:
 ```shell
 $ aws iam create-user --user-name saemrys
 {
@@ -31,7 +31,7 @@ where I've redacted sensitive values that should become `AWS_ACCESS_KEY_ID` and 
 First, let's get all the properties into our shell:
 
 ```shell
-set -a && source afon.properties && set +a
+./afon.sh -a exec -t --exec-script config/afon-source.sh aws
 ```
 
 Then create a role:
