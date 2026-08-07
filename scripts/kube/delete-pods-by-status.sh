@@ -2,7 +2,7 @@
 # Delete pods matching a given status (phase or reason) on the current kubectl context/cluster.
 #
 # Usage:
-#   ./kube-delete-pods-by-status.sh <status> [namespace]
+#   ./delete-pods-by-status.sh <status> [namespace]
 #
 #   <status>    Pod phase or reason to match, e.g. Failed, Evicted, Error,
 #               Completed, Pending, CrashLoopBackOff, Unknown, ImagePullBackOff.
@@ -14,9 +14,9 @@
 #   CONTEXT=... kubectl context to use (defaults to current context).
 #
 # Examples:
-#   ./kube-delete-pods-by-status.sh Evicted
-#   ./kube-delete-pods-by-status.sh Failed kube-system
-#   DRY_RUN=1 ./kube-delete-pods-by-status.sh CrashLoopBackOff all
+#   ./delete-pods-by-status.sh Evicted
+#   ./delete-pods-by-status.sh Failed kube-system
+#   DRY_RUN=1 ./delete-pods-by-status.sh CrashLoopBackOff all
 
 set -euo pipefail
 
