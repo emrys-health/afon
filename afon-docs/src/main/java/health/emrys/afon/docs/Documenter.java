@@ -94,21 +94,27 @@ public class Documenter {
         }
     }
 
-    private static String redact(String documentation) {
+    private String redact(String documentation) {
         Properties secretProperties   = new AfonPropertiesLoader().getSecretProperties();
         for (String redact : secretProperties
                 .values()
                 .stream()
                 .map(x -> x.toString())
-                .filter(x -> !x.equals("emrys")) // this is innocent, although we should change OAUTH2_CLIENT_ID
                 .toList()) {
             String  original = documentation;
-            documentation = documentation.replace(redact, "REDACTED");
+            if ( redactWord(redact) ) {
+                // words too generic
+                documentation = documentation.replace(redact, "REDACTED");
+            }
             if (!original.equals(documentation)) {
                 log.info("Redacted {}", redact);
             }
         }
         return documentation;
+    }
+
+    private boolean redactWord(String redact) {
+        return !redact.matches("afon|emrys|will");
     }
 
     private void writeSteps(OutputStream fos) {

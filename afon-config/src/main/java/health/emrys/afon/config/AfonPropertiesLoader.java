@@ -117,19 +117,24 @@ public class AfonPropertiesLoader {
     }
 
     public Properties getSecretProperties() {
+        loadPropertiesLazily();
         Properties secret = new Properties();
         secretKeys.stream().forEach(prop -> secret.put(prop, properties.getProperty(prop)));
         return secret;
     }
 
     public Properties getProperties() {
+        loadPropertiesLazily();
+        Properties copy = new Properties();
+        copy.putAll(properties);
+        return copy;
+    }
+
+    private void loadPropertiesLazily() {
         if ( properties.isEmpty() ){
             // lazy loading and only once
             loadProperties();
         }
-        Properties copy = new Properties();
-        copy.putAll(properties);
-        return copy;
     }
 
     public Properties getProperties(String overrideFile) throws IOException {
