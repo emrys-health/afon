@@ -1,11 +1,21 @@
-This file documents *what* the cluster is and *why* we chose it.
-See the [REAMDME](./../README.md) file for *how* to create the cluster.
+# Kubernetes Cluster
+
+We focus on *what* the cluster is and *why* we chose it.
+
+# Deployment
+
+We assume cluster is set up and the stack has been deployed to the cluster.
+See the [stacks](./stacks.md) on how to deploy the stack.
 
 # Pods
 
-A healthy Emrys K8s cluster **on AWS** should look something like this:
+To list the pods in the cluster:
 ```shell
 kubectl get pods -A
+```
+
+A healthy cluster (on AWS) will look something like:
+```shell
 NAMESPACE     NAME                                                       READY   STATUS      RESTARTS        AGE
 default       alertmanager-kube-prometheus-stack-alertmanager-0          2/2     Running     0               2d22h
 default       emrys-master-0                                             1/1     Running     0               2d22h
@@ -59,11 +69,13 @@ They automate deployment and self-heal the cluster.
 
 ## The `default` namespace
 
-The pods `emrys-*` are just Spark master/worker nodes.
+### The Spark pods
+
+The pods `emrys-*` are the Spark master/worker nodes.
 
 The `spark-kubernetes-operator-*` pod manages the Spark cluster by (for example) spinning up worker and driver pods.
 
-It also manages the `spark-connector-0-driver` pod. 
+It also manages the `spark-connector-0-driver` pod.
 This is the proxy between the pod running Jupyter and the Spark cluster.
 The sensitive credentials used to talk to Polaris live here and are inaccessible to the average Jupyter user.
 
@@ -75,8 +87,20 @@ kubectl get sparkapplications spark-connector -o yaml | grep token
 ...
 ```
 
+### The Jupyter pods 
+
 The `hub-deployment-*` pod hosts the Jupyter Hub. 
 We've slightly modified the Docker image (scripts/docker/jupyter/Dockerfile) so it uses Spark v4 libraries.
+
+When the user logs into the Jupyter, using the `AWS_JUPYTER_DOMAIN`, a new *personal* pod is spun up with the 
+username used to log in in the pod name.   
+
+You can find the pod name by running
+```shell
+kubectl get pods | grep <username> | awk '{print $1}'
+```
+
+### The Polaris pods
 
 The `polaris-deployment-*` pod hosts our Polaris instance. 
 
@@ -97,7 +121,7 @@ Note the `/run/secrets/kubernetes.io/serviceaccount` mount point.
 
 ## The `kube-system` namespace
 
-The Polaris secrets are stored in AWS and can be seen with:
+The Polaris secrets are stored in AWS and can be listed by running:
 ```shell
 aws secretsmanager list-secrets
 ```
@@ -126,9 +150,9 @@ It allows network policies to be set at this level.
 It's thanks to Cilium that we can limit network traffic out of the cluster and stop exfiltration.
 The network constraint code currently lives in AwsFullStack.java
 
-### Logging & Monitoring
+## Logging & Monitoring
 
-Currently (4/6/26) we favour an external Grafana and tunneling into the K8s cluster.
+Currently, we use an external Grafana and tunneling into the cluster.
 But Grafana (`kube-prometheus-stack-grafana-*`) is deployed as part of the Prometheus Helm chart.
 So is the Alert Manager (`alertmanager-kube-prometheus-stack-alertmanager-0`).
 It too is currently unused.
@@ -139,7 +163,7 @@ The window of time depends on traffic volumes, available memory etc.
 
 Hubble relay (`hubble-relay-*`) collects the data from all the nodes and serves it.
 
-### Security
+## Security
 
 Raw tokens are passed between Polaris and clients calling it. Therefore, communication must be encrypted.
 In an HTTPS handshake, the client must call a hard-coded list of Certificate Authorities to check the domain
