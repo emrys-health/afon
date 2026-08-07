@@ -40,20 +40,21 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                         """
                         
                         The steps to run are:
-                        1. %s
+                        - %s
                         
-                        If the job fails on a given step, you can add this switch to the mvn command above:
+                        If the job fails on a given step, you don't need to rerun the full list of steps. 
+                        Instead, you can specify to the exec command the step from which to restart:
                         
-                        `--exec-args "STEP_FROM_LIST_ABOVE"`
-                        
-                        and the steps will continue starting at that one.
+                        `--exec-args "<one-of-the-steps-from-list-above>"`
+
+                        This will continue the execution starting at the chosen step.                       
                         
                         For example:
                         ```shell
                         ./afon.sh -a exec --exec-class "%s" --exec-args "%s"
                         ```
                         """,
-                        String.join(("\n1. "), stepArray),
+                        String.join(("\n- "), stepArray),
                         clazz.getCanonicalName(),
                         stepArray[stepArray.length - 1]
                     );
@@ -71,7 +72,7 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
             
             To generate the documentation, run:
             ```shell
-            # builds docs
+            # builds docs without acceptance tests
             ./afon.sh -a build -p -acceptance
             ```
             The generated docs can be found in `afon-docs/target/docs`.  To export them to an external dir:

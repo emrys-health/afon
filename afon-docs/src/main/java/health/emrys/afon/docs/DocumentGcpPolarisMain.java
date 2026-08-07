@@ -1,6 +1,5 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.cdk.gcp.GcpCleanupHelper;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.DeployGcpPolarisMain;
 import health.emrys.afon.ops.steps.Step;
@@ -74,12 +73,11 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
             
             # Problems destroying the stack?
             
-            Run:
+            Generate and run cleanup script:
             ```shell
-            %s
+            ./afon.sh -a exec --exec-class cdk.gcp.GcpCleanupHelper --exec-args gcp-cleanup.sh
             ```
             """,
-            new GcpCleanupHelper().cleanupCommands(),
             CLUSTER_NAME.getValueFrom(properties)
         );
     }

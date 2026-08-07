@@ -1,6 +1,5 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.cdk.azure.AzureCleanupHelper;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import org.slf4j.Logger;
@@ -45,11 +44,11 @@ public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
         return String.format("""
             # Problems destroying the stack?
             
-            Run:
+            Generate and run cleanup script:
             ```shell
-            %s
+            ./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper --exec-args azure-cleanup.sh
             ```
-            """, new AzureCleanupHelper().cleanupCommands());
+            """);
     }
 
 }
