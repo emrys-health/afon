@@ -1,12 +1,10 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.SparkWorkloads;
-import health.emrys.afon.cdk.aws.AwsCleanupHelper;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
-
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -52,7 +50,7 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
             # Problems starting Spark Connect
             
             There appears to be a race condition so that Spark Connect is killed as soon as it starts
-            (see [this ticket](https://github.com/emrys-health/afon-core/issues/65). 
+            (see issue [#65](https://github.com/emrys-health/afon-core/issues/65)). 
             If this happens, run:
             
             ```
@@ -62,12 +60,11 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
             
             # Problems destroying the stack?
             
-            Run this *twice*:
+           Generate and run cleanup script (more than once if required):
             ```shell
-            %s
+           ./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args aws-cleanup.sh
             ```
             """,
-            SparkWorkloads.startConnectCommand(polarisDomainName),
-            new AwsCleanupHelper().cleanupCommands());
+            SparkWorkloads.startConnectCommand(polarisDomainName));
     }
 }
