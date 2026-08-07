@@ -43,7 +43,7 @@ Steps executed:
 
 1. `clean_aws` — destroy any existing AWS stack
 2. `aws_spark` — deploy Polaris + Spark to AWS via CDKTF + OpenTofu
-3. `waitFor_emryspolaris` — wait for DNS to propagate
+3. `wait_on_emryspolaris` — wait for DNS to propagate
 4. `all_catalogs_in_emryspolaris` — configure all catalogs in Polaris
 5. `aws_spark_talks_to_aws` — smoke test: Spark writes and reads via Polaris
 
@@ -52,14 +52,14 @@ Steps executed:
 ```shell
 ./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain  
 ```
-Steps: `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
+Steps: `clean_azure` → `az_polaris` → `wait_on_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
 
 ### Deploy only Polaris to GCP
 
 ```shell
 ./afon.sh -a exec --exec-class ops.DeployGcpPolarisMain  
 ```
-Steps: `clean_gcp` → `gcp_polaris` → `waitFor_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
+Steps: `clean_gcp` → `gcp_polaris` → `wait_on_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
 
 ### Deploy cross-cloud external catalogs (AWS + Azure)
 
@@ -69,7 +69,7 @@ To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate 
 ./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain  
 ```
 
-Steps: `clean_aws` → `aws_spark` → `waitFor_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `az_polaris` → `waitFor_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
+Steps: `clean_aws` → `aws_spark` → `wait_on_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `az_polaris` → `wait_on_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
 
 ### Resume a failed stack deployment from a specific step
 

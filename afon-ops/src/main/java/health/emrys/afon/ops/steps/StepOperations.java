@@ -207,45 +207,47 @@ public class StepOperations {
             () -> {
                 try {
                     actions.executeMainOf(
-                        PurgeAndPopulatePolarisMain.class,
+                            PurgeAndPopulatePolarisMain.class,
                         new String[]{domainName},
                         NO_ENV_VARIABLES);
                 } catch (Exception e) {
-                    logger.error("""
-                                     An error like:
-                                     
-                                     PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException:
-                                     unable to find valid certification path to requested target
-                                     
-                                     can be because the certificates are not yet ready, it seems.
-                                     If this is the case, try re-running this step.
-                                     """, e);
+                    logger.error(
+                         """
+                         Failed to initialize all the catalogs in Polaris.
+                         It may be because the certificates are not yet ready. 
+                         The hint is an error message such as:
+                         
+                         PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException:
+                         unable to find valid certification path to requested target
+                         
+                         If this is the case, try re-running this step.                         
+                         """, e);
                     throw e;
                 }
             });
     }
 
     public Step waitForPolarisIn(AfonCloud id) {
-        Step waitForPolaris  = polarisWait(id);
-        Step waitForKeyCloak = actions.waitFor(KC_HOSTNAME.getValueFrom(appProperties()));
+        Step waitForPolaris  = waitForPolaris(id);
+        Step waitForKeyCloak = waitForKeyCloak();
         return waitForPolaris.andThen(waitForKeyCloak);
     }
 
-    private Step polarisWait(AfonCloud id) {
+    private Step waitForPolaris(AfonCloud id) {
         switch (id) {
             case AWS:
-                return waitForPolarisIn(awsPolarisDomainName);
+                return actions.waitOnDNS(awsPolarisDomainName);
             case AZURE:
-                return waitForPolarisIn(azurePolarisDomainName);
+                return actions.waitOnDNS(azurePolarisDomainName);
             case GCP:
-                return waitForPolarisIn(gcpPolarisDomainName);
+                return actions.waitOnDNS(gcpPolarisDomainName);
             default:
                 throw new RuntimeException("Unsupported id " + id);
         }
     }
 
-    private Step waitForPolarisIn(String domainName) {
-        return actions.waitFor(domainName);
+    private Step waitForKeyCloak() {
+        return actions.waitOnDNS(KC_HOSTNAME.getValueFrom(appProperties()));
     }
 
     public Step checkAwsSparkWritingTo(AfonCloud id) {

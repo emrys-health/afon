@@ -78,10 +78,10 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public Step waitFor(String domain) {
-        return new Step(stepNameWaitingFor(domain), "Wait for DNS servers", () -> {
+    public Step waitOnDNS(String domain) {
+        return new Step(stepNameWaitOn(domain), "Wait on DNS", () -> {
             out.println(format("""
-                                   Wait for DNS servers to recognise %s. On a Unix system, running:
+                                   Wait on DNS for domain %s. On a Unix system, running:
                                    ```shell
                                    dig A %s +short
                                    ```
