@@ -59,7 +59,6 @@ This will print out some JSON that contains nameservers, for example:
 Make a note of these.
 
 If a Kubernetes service is gone but DNS record remains, run the Azure DNS cleanup command:
-
 ```shell
 az network dns record-set a delete \
   --resource-group afon_resource_group \
@@ -68,10 +67,10 @@ az network dns record-set a delete \
   --yes
 ```
 
-
 ### GCP
 
 Create a DNS zone through the GUI.  Note you might need admin rights to do this.
+
 Once it's created, you can run:
 ```shell
 $ gcloud dns managed-zones describe $YOUR_ZONE_NAME --project=$YOUR_PROJECT
@@ -94,7 +93,7 @@ For AWS, you can use [AWS Route 53](https://us-east-1.console.aws.amazon.com/rou
 Click the domain you've bought and in the top right corner, you'll see a section called `Name servers`.
 Click the `Actions` button and choose `Edit name servers`.
 
-![image](pics/aws_nameservers.png)
+![image](images/aws_nameservers.png)
 
 Now add the list of nameservers your cloud provider gave you. 
 They should propagate within about 10 minutes.
@@ -104,7 +103,6 @@ They should propagate within about 10 minutes.
 ```shell
 dig A <domain> +short
 ```
-
 
 ## Consequences
 
