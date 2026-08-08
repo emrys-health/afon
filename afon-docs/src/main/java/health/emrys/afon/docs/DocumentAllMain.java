@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class DocumentAllMain {
-    private static final Logger log = getLogger(DocumentAllMain.class);
+    private static final Logger logger = getLogger(DocumentAllMain.class);
     public static void main(String[] args) {
         try (ScanResult scanResult = new ClassGraph()
             .enableClassInfo()
@@ -15,19 +15,23 @@ public class DocumentAllMain {
             .scan()) {
 
             scanResult.getAllClasses()
-                      .filter(info ->
-                                  info.getSimpleName().startsWith("Document")
-                                      && info.getSimpleName().endsWith("Main")
-                                      && !info.getSimpleName().equals(DocumentAllMain.class.getSimpleName()))
-                      .forEach(info -> {
-                          try {
-                              Class<?> documentClass = info.loadClass();
-                              log.info("Running {}", documentClass.getSimpleName());
-                              documentClass.getMethod("main", String[].class).invoke(null, (Object) args);
-                          } catch (Exception e) {
-                              log.error("Cannot run " + info, e);
-                          }
-                      });
+              .filter(info ->
+              info.getSimpleName().startsWith("Document")
+                  && info.getSimpleName().endsWith("Main")
+                  && !info.getSimpleName().equals(DocumentAllMain.class.getSimpleName())
+                      // DocumentSnowflakeWritingAzureViaAwsMain seems to require online access
+                      // TODO investigate why
+                  && !info.getSimpleName().equals(DocumentSnowflakeWritingAzureViaAwsMain.class.getSimpleName())
+              )
+              .forEach(info -> {
+                  try {
+                      Class<?> documentClass = info.loadClass();
+                      logger.info("Running {}", documentClass.getSimpleName());
+                      documentClass.getMethod("main", String[].class).invoke(null, (Object) args);
+                  } catch (Exception e) {
+                      logger.error("Failed to run " + info.getName(), e);
+                  }
+              });
         }
     }
 }

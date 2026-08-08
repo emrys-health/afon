@@ -4,29 +4,13 @@ import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.DeployGcpPolarisMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
-import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
-import static org.slf4j.LoggerFactory.getLogger;
 
 public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
-
-    private static final Logger log = getLogger(DocumentGcpPolarisMain.class);
-
-    public static void main(String[] args) throws IOException {
-        new Documenter(new DocumentGcpPolarisMain()).writeDocumentation();
-    }
-
-    @Override
-    public String getSupplementaryIntro() {
-        return """
-            Creates a GCP environment with a Polaris instance populated with the test catalogs
-            """;
-    }
 
     @Override
     public String getFilename() {
@@ -34,8 +18,10 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
     }
 
     @Override
-    public List<Step> steps(StepOperations stepOperations) {
-        return DeployGcpPolarisMain.steps(stepOperations);
+    public String getSupplementaryIntro() {
+        return """
+            Creates a GCP environment with a Polaris instance populated with the test catalogs
+            """;
     }
 
     @Override
@@ -82,4 +68,12 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
         );
     }
 
+    @Override
+    public List<Step> steps(StepOperations stepOperations) {
+        return new DeployGcpPolarisMain().stepsUsing(stepOperations);
+    }
+
+    public static void main(String[] args) {
+        new Documenter(new DocumentGcpPolarisMain()).writeDocumentation();
+    }
 }

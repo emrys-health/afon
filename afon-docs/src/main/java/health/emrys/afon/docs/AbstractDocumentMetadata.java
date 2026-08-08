@@ -4,100 +4,108 @@ import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepDocumentation;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepsProvider;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.OutputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
 import static java.lang.String.format;
+import static java.lang.String.join;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public abstract class AbstractDocumentMetadata implements DocumentMetadata {
 
-    private static final Logger log = getLogger(AbstractDocumentMetadata.class);
+    private static final Logger logger = getLogger(AbstractDocumentMetadata.class);
 
     public String getDescription() {
-        String afonExec        = "";
-        String stepInstructions = "";
-        try {
-            Class<?> clazz = getDeployHomologue();
-            afonExec = String.format(
+        Class<?> deployClass = deployClass(this.getClass().getName());
+        return format(
+                """
+                # Introduction
+                
+                To generate the documentation, run:
+                ```shell
+                # builds docs without acceptance tests
+                ./afon.sh -a build -p -acceptance
+                ```
+                The generated docs can be found in `afon-docs/target/docs`.  To export them to an external dir:
+                ```shell
+                # retrieves docs and copies them to a specified docs dir, eg:
+                ./afon.sh -a docs --docs-dir ~/.afon/docs
+                ``
+                %s
+                %s
+                %s
+                """,
+                    afonExec(deployClass),
+                    stepsBeingRun(deployClass),
+                getSupplementaryIntro());
+    }
+
+    private static @NonNull String afonExec(Class<?> deployClass) {
+        return format(
                 """
                 
                 To execute, run:
                 ```shell
                ./afon.sh %s 
                 ```
-                """, StepDocumentation.afonArgumentsToRun(clazz, null, "exec"));
-            Object o = clazz.getConstructor(new Class[]{}).newInstance(new Object[]{});
-            if (o instanceof StepsProvider) {
-                StepOperations dummyOps  = new StepOperations(new StepDocumentation(OutputStream.nullOutputStream()));
-                List<Step>     steps     = ((StepsProvider) o).stepsUsing(dummyOps);
-                String[]       stepArray = steps.stream().map(x -> x.getName()).toArray(String[]::new);
-                if (stepArray.length > 0) {
-                    stepInstructions = format(
-                        """
-                        
-                        The steps to run are:
-                        - %s
-                        
-                        If the job fails on a given step, you don't need to rerun the full list of steps. 
-                        Instead, you can specify to the exec command the step from which to restart:
-                        
-                        `--exec-args "<one-of-the-steps-from-list-above>"`
+                """, StepDocumentation.afonArgumentsToRun(deployClass, null, "exec"));
+    }
 
-                        This will continue the execution starting at the chosen step.                       
-                        
-                        For example:
-                        ```shell
-                        ./afon.sh -a exec --exec-class "%s" --exec-args "%s"
-                        ```
-                        """,
-                        String.join(("\n- "), stepArray),
-                        clazz.getCanonicalName(),
-                        stepArray[stepArray.length - 1]
-                    );
-                }
-            }
-        } catch (ClassNotFoundException e) {
-            log.warn("Cannot find the class for " + this.getClass().getSimpleName(), e);
-        } catch (NoSuchMethodException | InvocationTargetException | InstantiationException |
-                 IllegalAccessException e) {
-            log.warn("Could not find the steps for the class", e);
+    private static String stepsBeingRun(Class<?> deployClass) {
+        StepsProvider provider = stepProvider(deployClass);
+        List<Step> steps = provider.stepsUsing(new StepOperations(new StepDocumentation(OutputStream.nullOutputStream())));
+        if (steps.size() == 0){
+            return format("The steps provider %s has no steps.", deployClass.getName());
         }
-        return String.format(
-            """
-            # Introduction
-            
-            To generate the documentation, run:
-            ```shell
-            # builds docs without acceptance tests
-            ./afon.sh -a build -p -acceptance
-            ```
-            The generated docs can be found in `afon-docs/target/docs`.  To export them to an external dir:
-            ```shell
-            # retrieves docs and copies them to a specified docs dir, eg:
-            ./afon.sh -a docs --docs-dir ~/.afon/docs
-            ```
-            
-            %s
-            %s
-            %s
-            """,
-            afonExec,
-            stepInstructions,
-            getSupplementaryIntro());
+        String[] stepNames = steps.stream().map(x -> x.getName()).toArray(String[]::new);
+        return format(
+                """
+                The steps being run are:
+                - %s
+                
+                If the job fails on a given step, you don't need to rerun the full list of steps. 
+                Instead, you can specify to the exec command the step from which to restart:
+                
+                `--exec-args "<one-of-the-steps-from-list-above>"`
+                
+                This will continue the execution starting at the chosen step.                       
+                
+                For example:
+                ```shell
+                ./afon.sh -a exec --exec-class "%s" --exec-args "%s"
+                ```
+                """,
+                join(("\n- "), stepNames),
+                deployClass.getCanonicalName(),
+                stepNames[stepNames.length - 1]
+        );
+
     }
 
-    public Class<?> getDeployHomologue() throws ClassNotFoundException {
-        String name = this.getClass().getName();
-        return Class.forName(name.replace("docs.Document", "ops.Deploy"));
+    private static @NonNull StepsProvider stepProvider(Class<?> deployClass) {
+        try {
+            return (StepsProvider)deployClass.getConstructor(new Class[]{}).newInstance(new Object[]{});
+        } catch (Exception e) {
+            throw new RuntimeException("Not a StepsProvider: " + deployClass.getName(), e);
+        }
     }
 
-    abstract public String getSupplementaryIntro();
+    private Class<?> deployClass(String documentClassName) {
+        try {
+            return Class.forName(documentClassName.replace("docs.Document", "ops.Deploy"));
+        } catch (ClassNotFoundException e) {
+            logger.warn("Document class not found: " + this.getClass().getSimpleName(), e);
+            throw new RuntimeException("Document class not found: "+documentClassName, e);
+        }
+    }
 
     public String getFurtherNotes() {
         return "";
     }
+
+    protected abstract String getSupplementaryIntro();
+
 }

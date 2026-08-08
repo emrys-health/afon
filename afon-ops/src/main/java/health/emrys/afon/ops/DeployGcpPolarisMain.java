@@ -11,12 +11,13 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
 
 public class DeployGcpPolarisMain implements StepsProvider {
 
-    public static List<Step> steps(StepOperations ops) {
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            ops.deleteStack(GCP),
-            ops.deployPolarisIn(GCP),
-            ops.waitForPolarisIn(GCP),
-            ops.initializeAllCatalogsIn(GCP)
+            stepOperations.deleteStack(GCP),
+            stepOperations.deployPolarisIn(GCP),
+            stepOperations.waitForPolarisIn(GCP),
+            stepOperations.initializeAllCatalogsIn(GCP)
                       );
     }
 
@@ -24,8 +25,4 @@ public class DeployGcpPolarisMain implements StepsProvider {
         new StepRunner().runUsing(new DeployGcpPolarisMain(), args);
     }
 
-    @Override
-    public List<Step> stepsUsing(StepOperations stepOperations) {
-        return steps(stepOperations);
-    }
 }

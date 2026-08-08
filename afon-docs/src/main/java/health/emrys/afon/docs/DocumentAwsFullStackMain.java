@@ -3,28 +3,13 @@ package health.emrys.afon.docs;
 import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.ops.DeployAwsFullStackMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
-import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
-import static org.slf4j.LoggerFactory.getLogger;
-
 public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
-
-    private static final Logger log = getLogger(DocumentAwsFullStackMain.class);
-
-    public static void main(String[] args) throws IOException {
-        new Documenter(new DocumentAwsFullStackMain()).writeDocumentation();
-    }
-
-    @Override
-    public String getSupplementaryIntro() {
-        return "This brings the full stack (Jupyter, Polaris, Spark etc) up on AWS.";
-    }
 
     @Override
     public String getFilename() {
@@ -32,14 +17,8 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
     }
 
     @Override
-    public List<Step> steps(StepOperations stepOperations) {
-        return List.of(
-            stepOperations.deleteStack(AWS),
-                stepOperations.deployFullStackIn(AfonProperties.AfonCloud.AWS),
-            stepOperations.waitForPolarisIn(AWS),
-            stepOperations.initializeAllCatalogsIn(AWS),
-            stepOperations.checkAwsSparkWritingTo(AWS)
-                      );
+    public String getSupplementaryIntro() {
+        return "This brings the full stack (Jupyter, Polaris, Spark etc) up on AWS.";
     }
 
     public String getFurtherNotes() {
@@ -67,4 +46,15 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
             """,
             SparkWorkloads.startConnectCommand(polarisDomainName));
     }
+
+
+    @Override
+    public List<Step> steps(StepOperations stepOperations) {
+        return new DeployAwsFullStackMain().stepsUsing(stepOperations);
+    }
+
+    public static void main(String[] args) {
+        new Documenter(new DocumentAwsFullStackMain()).writeDocumentation();
+    }
+
 }

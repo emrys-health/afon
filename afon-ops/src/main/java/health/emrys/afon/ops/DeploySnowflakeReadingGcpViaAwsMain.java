@@ -13,7 +13,8 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
 
 public class DeploySnowflakeReadingGcpViaAwsMain implements StepsProvider {
 
-    public static List<Step> steps(StepOperations stepOperations) {
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(List.of(
                 stepOperations.deleteStack(AWS),
@@ -25,11 +26,6 @@ public class DeploySnowflakeReadingGcpViaAwsMain implements StepsProvider {
         steps.add(stepOperations.checkAwsSparkWritingTo(GCP));
         steps.add(stepOperations.snowflakeReadingViaAwsPolaris(GCP));
         return steps;
-    }
-
-    @Override
-    public List<Step> stepsUsing(StepOperations stepOperations) {
-        return steps(stepOperations);
     }
 
     public static void main(String[] args) {

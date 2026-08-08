@@ -13,8 +13,9 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
 public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
 
-    public static List<Step> steps(StepOperations stepOperations) {
-        ArrayList<Step> steps = new ArrayList<>();
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
+        List<Step> steps = new ArrayList<>();
         steps.addAll(List.of(
                 stepOperations.deleteStack(AWS),
                 stepOperations.deployFullStackIn(AWS),
@@ -31,12 +32,7 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
                     );
         return steps;
     }
-
-    @Override
-    public List<Step> stepsUsing(StepOperations stepOperations) {
-        return steps(stepOperations);
-    }
-
+    
     public static void main(String[] args) {
         new StepRunner().runUsing(new DeploySnowflakeWritingAzureViaAwsMain(), args);
     }
