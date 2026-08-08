@@ -52,7 +52,7 @@ Steps executed:
 ```shell
 ./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain  
 ```
-Steps: `clean_azure` → `az_polaris` → `wait_on_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
+Steps: `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
 
 ### Deploy only Polaris to GCP
 
@@ -69,14 +69,14 @@ To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate 
 ./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain  
 ```
 
-Steps: `clean_aws` → `aws_spark` → `wait_on_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `az_polaris` → `wait_on_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
+Steps: `clean_aws` → `aws_spark` → `wait_on_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
 
 ### Resume a failed stack deployment from a specific step
 
 If a deployment fails partway through, you can resume from a specific step, e.g.:
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain --exec-args "az_polaris"
+./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain --exec-args "azure_polaris"
 ```
 
 ### The afon-cdk module
