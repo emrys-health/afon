@@ -75,7 +75,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       import scala.jdk.CollectionConverters._
       val conf = SparkHelper.sparkWarehouse.sparkConfigs(cloudProvider).asScala.map {
         case(k, v) =>
-          val value = if (k.toLowerCase.contains("token") || k.toLowerCase.contains("oauth")) "REDACTED" else v
+          val value = if (k.toLowerCase.contains("token") || k.toLowerCase.contains("oauth")) String.format("<%s>", k.toLowerCase)  else v
           String.format("%-50s%50s", k, value)
       }.mkString("\n")
       Given(s"Spark is configured with:\n\n$conf")
