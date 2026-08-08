@@ -114,7 +114,7 @@ public class StepOperations {
                     () -> actions.startStack(AwsPolarisStack.class, AWS));
             case AZURE:
                 return new Step(
-                    "az_polaris",
+                    "azure_polaris",
                     "deploy Polaris in Azure",
                     () -> actions.startStack(AzurePolarisStack.class, AZURE));
             case GCP:
