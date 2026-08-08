@@ -1,11 +1,9 @@
 package health.emrys.afon.ops.steps;
 
-import com.azure.storage.blob.models.BlobItem;
 import health.emrys.afon.cdk.aws.AwsFullStack;
 import health.emrys.afon.cdk.aws.AwsPolarisStack;
 import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
-import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.ops.OnboardAllUsersMain;
@@ -19,8 +17,6 @@ import org.slf4j.Logger;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 
@@ -29,7 +25,6 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.*;
 import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
-import static java.util.Comparator.comparing;
 
 public class StepOperations {
 
@@ -359,7 +354,7 @@ public class StepOperations {
                 actions.runSnowflakeSql(new String[]{
                     "USE DATABASE SNOWFLAKE_LEARNING_DB",
 
-                    "DROP  ICEBERG TABLE my_gcp_table_id",
+                    "DROP ICEBERG TABLE my_gcp_table_id",
 
                     "DROP CATALOG INTEGRATION iceberg_gcp_id",
 
@@ -500,38 +495,12 @@ public class StepOperations {
                     "%s/%s*metadata.json",
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
-                String json = azureFirstFile(glob, true); // firstFileInLatestDirectoryMatching(glob);
+                String json = actions.azureFirstFile(glob, true); // firstFileInLatestDirectoryMatching(glob);
                 return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterPolarisTableMain.class);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);
         }
-    }
-
-    private static @NonNull String azureFirstFile(String glob,
-                                                  boolean descendingOrder
-    ) {
-        logger.info("Querying Azure for {}", glob);
-        AzureReader          lister    = new AzureReader();
-        List<BlobItem>       list      = new ArrayList<>(lister.list(glob));
-        Comparator<BlobItem> comparing = comparing((BlobItem o) -> o.getProperties().getCreationTime());
-        if (descendingOrder) {
-            comparing = comparing.reversed();
-        }
-        BlobItem latest = list
-            .stream()
-            .sorted(comparing)
-            .findFirst()
-            .get();
-        logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
-        Properties properties = appProperties();
-        String     bucket     = AZURE_BUCKET.getValueFrom(properties);
-        String     account    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
-        return format(
-            "abfss://%s@%s.dfs.core.windows.net/%s",
-            bucket,
-            account,
-            latest.getName());
     }
 
     private Step registerTableInAwsPolaris(AfonCloud warehouse, String jsonMetadataFQN,

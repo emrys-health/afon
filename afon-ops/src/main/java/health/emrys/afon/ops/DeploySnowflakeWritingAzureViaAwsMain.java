@@ -32,7 +32,7 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
                     );
         return steps;
     }
-    
+
     public static void main(String[] args) {
         new StepRunner().runUsing(new DeploySnowflakeWritingAzureViaAwsMain(), args);
     }
