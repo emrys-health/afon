@@ -19,9 +19,6 @@ public class DocumentAllMain {
               info.getSimpleName().startsWith("Document")
                   && info.getSimpleName().endsWith("Main")
                   && !info.getSimpleName().equals(DocumentAllMain.class.getSimpleName())
-                      // DocumentSnowflakeWritingAzureViaAwsMain seems to require online access
-                      // TODO investigate why
-                  && !info.getSimpleName().equals(DocumentSnowflakeWritingAzureViaAwsMain.class.getSimpleName())
               )
               .forEach(info -> {
                   try {

@@ -10,7 +10,7 @@ public class DocumentSnowflakeWritingAzureViaAwsMain extends AbstractDocumentMet
 
     @Override
     public String getFilename() {
-        return "snowflake_to_azure.md";
+        return "snowflake_writes_to_azure.md";
     }
 
     @Override

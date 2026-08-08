@@ -3,10 +3,13 @@ package health.emrys.afon.ops.steps;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
+import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonPropertiesLoader;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -25,13 +28,12 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
+import static java.lang.String.format;
+import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class StepActions {
@@ -266,6 +268,30 @@ public class StepActions {
         executeMainOf(EndpointPolarisConfiguration.class,
                       new String[] {catalog.name()},
                       properties);
+    }
+
+    @NonNull String azureFirstFile(String glob, boolean descendingOrder) {
+        logger.info("Querying Azure for {}", glob);
+        AzureReader lister    = new AzureReader();
+        List<BlobItem>       list      = new ArrayList<>(lister.list(glob));
+        Comparator<BlobItem> comparing = comparing((BlobItem o) -> o.getProperties().getCreationTime());
+        if (descendingOrder) {
+            comparing = comparing.reversed();
+        }
+        BlobItem latest = list
+                .stream()
+                .sorted(comparing)
+                .findFirst()
+                .get();
+        logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
+        Properties properties = new AfonPropertiesLoader().getProperties();
+        String     bucket     = AZURE_BUCKET.getValueFrom(properties);
+        String     account    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
+        return format(
+                "abfss://%s@%s.dfs.core.windows.net/%s",
+                bucket,
+                account,
+                latest.getName());
     }
 
     void deletePath(Path path) {
