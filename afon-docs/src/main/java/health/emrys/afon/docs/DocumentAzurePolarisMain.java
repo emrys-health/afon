@@ -1,28 +1,12 @@
 package health.emrys.afon.docs;
 
+import health.emrys.afon.ops.DeployAzurePolarisMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
-import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
-import static org.slf4j.LoggerFactory.getLogger;
-
 public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
-
-    private static final Logger log = getLogger(DocumentAzurePolarisMain.class);
-
-    public static void main(String[] args) throws IOException {
-        new Documenter(new DocumentAzurePolarisMain()).writeDocumentation();
-    }
-
-    @Override
-    public String getSupplementaryIntro() {
-        return """
-            """;
-    }
 
     @Override
     public String getFilename() {
@@ -30,13 +14,8 @@ public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
     }
 
     @Override
-    public List<Step> steps(StepOperations stepOperations) {
-        return List.of(
-            stepOperations.deleteStack(AZURE),
-            stepOperations.deployPolarisIn(AZURE),
-            stepOperations.waitForPolarisIn(AZURE),
-            stepOperations.initializeAllCatalogsIn(AZURE)
-                      );
+    protected String getSupplementaryIntro() {
+        return "";
     }
 
     @Override
@@ -49,6 +28,15 @@ public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
             ./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper --exec-args azure-cleanup.sh
             ```
             """);
+    }
+
+    @Override
+    public List<Step> steps(StepOperations stepOperations) {
+        return new DeployAzurePolarisMain().stepsUsing(stepOperations);
+    }
+
+    public static void main(String[] args) {
+        new Documenter(new DocumentAzurePolarisMain()).writeDocumentation();
     }
 
 }

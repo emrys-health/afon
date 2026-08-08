@@ -2,7 +2,7 @@ package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonProperties.AfonCloud;
 
-public class DocumentSnowflakeUtils {
+public class SnowflakeDocumentUtils {
 
     public static String getSupplementaryIntro(AfonCloud warehouse) {
         return String.format("""

@@ -13,7 +13,8 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
 
 public class DeploySnowflakeReadingAzureViaAwsMain implements StepsProvider {
 
-    public static List<Step> steps(StepOperations stepOperations) {
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(List.of(
                 stepOperations.deleteStack(AWS),
@@ -25,11 +26,6 @@ public class DeploySnowflakeReadingAzureViaAwsMain implements StepsProvider {
         steps.add(stepOperations.checkAwsSparkWritingTo(AZURE));
         steps.add(stepOperations.snowflakeReadingViaAwsPolaris(AZURE));
         return steps;
-    }
-
-    @Override
-    public List<Step> stepsUsing(StepOperations stepOperations) {
-        return steps(stepOperations);
     }
 
     public static void main(String[] args) {

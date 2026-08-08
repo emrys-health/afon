@@ -1,20 +1,15 @@
 package health.emrys.afon.docs;
 
-import java.io.IOException;
-import java.util.List;
-
 import health.emrys.afon.ops.DeploySnowflakeReadingAwsViaAwsMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
+import java.io.IOException;
+import java.util.List;
+
 import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 
 public class DocumentSnowflakeReadingAwsViaAwsMain extends AbstractDocumentMetadata {
-
-    @Override
-    public String getSupplementaryIntro() {
-        return DocumentSnowflakeUtils.getSupplementaryIntro(AWS);
-    }
 
     @Override
     public String getFilename() {
@@ -22,8 +17,13 @@ public class DocumentSnowflakeReadingAwsViaAwsMain extends AbstractDocumentMetad
     }
 
     @Override
+    public String getSupplementaryIntro() {
+        return SnowflakeDocumentUtils.getSupplementaryIntro(AWS);
+    }
+
+    @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return DeploySnowflakeReadingAwsViaAwsMain.steps(stepOperations);
+        return new DeploySnowflakeReadingAwsViaAwsMain().stepsUsing(stepOperations);
     }
 
     public static void main(String[] args) throws IOException {

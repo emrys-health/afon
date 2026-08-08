@@ -12,7 +12,8 @@ import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
 
 public class DeploySnowflakeReadingAwsViaAwsMain implements StepsProvider {
 
-    public static List<Step> steps(StepOperations stepOperations) {
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(List.of(
                 stepOperations.deleteStack(AWS),
@@ -23,11 +24,6 @@ public class DeploySnowflakeReadingAwsViaAwsMain implements StepsProvider {
         ));
         steps.add(stepOperations.snowflakeReadingViaAwsPolaris(AWS));
         return steps;
-    }
-
-    @Override
-    public List<Step> stepsUsing(StepOperations stepOperations) {
-        return steps(stepOperations);
     }
 
     public static void main(String[] args) {
