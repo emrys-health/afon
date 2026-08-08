@@ -1,18 +1,21 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.ops.steps.Step;
-import health.emrys.afon.ops.steps.StepOperations;
 import org.junit.Test;
-
-import java.util.List;
 
 import static org.junit.Assert.assertTrue;
 
 public class DocumenterTest {
 
     @Test
-    public void testDocumentDirectoryAlreadyExists() {
-        assertTrue(Documenter.documentationPath().toFile().exists());
+    public void isDocsDirCreated() {
+        Documenter documenter = new Documenter(new DocumentAwsFullStackMain());
+        assertTrue(documenter.docsDir().exists());
+    }
+
+    @Test
+    public void canRedactSecrets() {
+        Documenter documenter = new Documenter(new DocumentAwsFullStackMain());
+        documenter.writeDocumentation();
     }
 
 }
