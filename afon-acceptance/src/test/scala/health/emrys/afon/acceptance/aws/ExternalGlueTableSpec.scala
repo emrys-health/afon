@@ -4,7 +4,7 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.tags.{Aws, External}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant, CatalogRoles}
 import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
-import health.emrys.afon.config.AfonPropertiesLoader
+import health.emrys.afon.config.FilePropertyProvider
 import health.emrys.afon.polaris.catalogs.GlueCloudConfigForPolaris
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.spark.sql.SparkSession
@@ -22,7 +22,7 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
   val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
 
   "An external table" should {
-    val properties        = new AfonPropertiesLoader().getProperties
+    val properties        = new FilePropertyProvider().getProperties
     val glueCatalogName   = GLUE_CATALOG_NAME.getValueFrom(properties)
     val externalBucket    = AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)
     val config            = new GlueCloudConfigForPolaris(properties)

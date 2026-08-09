@@ -1,7 +1,7 @@
 package health.emrys.afon.spark.connect;
 
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.apache.spark.sql.SparkSession;
@@ -49,7 +49,7 @@ public class KeyCloakSparkConnect {
     }
 
     public KeyCloakSparkConnect() {
-        properties = new AfonPropertiesLoader().getProperties();
+        properties = new FilePropertyProvider().getProperties();
     }
 
     public void talkToSparkConnect() {

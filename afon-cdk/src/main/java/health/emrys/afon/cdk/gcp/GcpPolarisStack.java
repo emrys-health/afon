@@ -12,7 +12,7 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.cdk.CdkHelper;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -77,7 +77,7 @@ public class GcpPolarisStack extends GcpKubernetesStack {
 
     public static void main(String[] args) {
         final App  app        = new App();
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         new GcpPolarisStack(app, GCP.toString(), properties);
         app.synth();
     }

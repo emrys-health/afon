@@ -1,6 +1,5 @@
 package health.emrys.afon.config;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -12,42 +11,38 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class AfonPropertiesTest {
-    @BeforeAll
-    public static void initializeConstants() throws ClassNotFoundException {
-        Class.forName(AfonProperties.class.getName());
-    }
 
     @Test
-    public void testLoadPropertiesWhenFilesAreMissing(){
-        AfonPropertiesLoader loader = new AfonPropertiesLoader(List.of("missing"));
+    public void cannotGetPropertiesWhenFilesAreMissing(){
+        AfonPropertyProvider provider = new FilePropertyProvider(List.of("missing"));
         try {
-            loader.getProperties();
+            provider.getProperties();
         } catch ( RuntimeException e ){
             assertThat(e.getMessage()).endsWith("missing.properties (No such file or directory)");
         }
     }
 
     @Test
-    public void testRetrieveAllPropertyNames() {
+    public void canRetrieveAllPropertyNames() {
         assertThat(AfonProperties.getAllNames()).hasSizeGreaterThan(0);
     }
 
     @Test
-    public void testLoadAllProperties() throws IOException {
-        AfonPropertiesLoader loader = new AfonPropertiesLoader();
-        Properties properties = loader.getProperties();
+    public void canGetAllProperties() throws IOException {
+        AfonPropertyProvider provider = new FilePropertyProvider();
+        Properties properties = provider.getProperties();
         assertThat(properties).hasSizeGreaterThan(0);
         checkAllExpectedInPropertiesFile(properties);
         checkOnlyExpectedInPropertiesFile(properties);
         checkExpectedValuesNotEmpty(properties);
-        assertThat(loader.getSecretProperties()).hasSizeGreaterThan(0);
+        assertThat(provider.getSecretProperties()).hasSizeGreaterThan(0);
     }
 
     @Test
-    public void testLoadAWSPropertiesOnly() throws IOException {
-        System.setProperty(AfonPropertiesLoader.CLOUD_SYSTEM_PROPERTY, "aws");
+    public void canGetPropertiesOnlyForAWS() throws IOException {
+        System.setProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY, "aws");
         try {
-            Properties properties = new AfonPropertiesLoader().getProperties();
+            Properties properties = new FilePropertyProvider().getProperties();
             assertThat(properties.getProperty(AfonProperties.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -61,15 +56,15 @@ public class AfonPropertiesTest {
                     .as("gcp properties are not loaded")
                     .isNull();
         } finally {
-            System.clearProperty(AfonPropertiesLoader.CLOUD_SYSTEM_PROPERTY);
+            System.clearProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY);
         }
     }
 
     @Test
-    public void testLoadAzurePropertiesOnly() throws IOException {
-        System.setProperty(AfonPropertiesLoader.CLOUD_SYSTEM_PROPERTY, "azure");
+    public void canGetPropertiesOnlyForAzure() throws IOException {
+        System.setProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY, "azure");
         try {
-            Properties properties = new AfonPropertiesLoader().getProperties();
+            Properties properties = new FilePropertyProvider().getProperties();
             assertThat(properties.getProperty(AfonProperties.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -83,15 +78,15 @@ public class AfonPropertiesTest {
                     .as("gcp properties are not loaded")
                     .isNull();
         } finally {
-            System.clearProperty(AfonPropertiesLoader.CLOUD_SYSTEM_PROPERTY);
+            System.clearProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY);
         }
     }
 
     @Test
-    public void testLoadGcpPropertiesOnly() throws IOException {
-        System.setProperty(AfonPropertiesLoader.CLOUD_SYSTEM_PROPERTY, "gcp");
+    public void canGetPropertiesOnlyForGCP() throws IOException {
+        System.setProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY, "gcp");
         try {
-            Properties properties = new AfonPropertiesLoader().getProperties();
+            Properties properties = new FilePropertyProvider().getProperties();
             assertThat(properties.getProperty(AfonProperties.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -105,7 +100,7 @@ public class AfonPropertiesTest {
                     .as("aws properties are not loaded")
                     .isNull();
         } finally {
-            System.clearProperty(AfonPropertiesLoader.CLOUD_SYSTEM_PROPERTY);
+            System.clearProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY);
         }
     }
 

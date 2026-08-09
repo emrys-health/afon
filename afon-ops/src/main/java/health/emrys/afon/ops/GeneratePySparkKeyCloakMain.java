@@ -1,7 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -33,7 +33,7 @@ public class GeneratePySparkKeyCloakMain {
 
     GeneratePySparkKeyCloakMain(String polarisHost) {
         log.info("Using {} as the Polaris host");
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         properties.setProperty(POLARIS_ENDPOINT.getName(), polarisHost);
         SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
         config = configFactory.getConfig(properties);

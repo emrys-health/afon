@@ -1,7 +1,7 @@
 package health.emrys.afon.cdk.aws;
 
 import health.emrys.afon.cdk.AbstractCleanupHelper;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Properties;
@@ -14,7 +14,7 @@ public class AwsCleanupHelper extends AbstractCleanupHelper {
     private AwsComponentNames componentNames;
 
     public AwsCleanupHelper() {
-        this(new AfonPropertiesLoader().getProperties());
+        this(new FilePropertyProvider().getProperties());
     }
 
     AwsCleanupHelper(Properties properties) {

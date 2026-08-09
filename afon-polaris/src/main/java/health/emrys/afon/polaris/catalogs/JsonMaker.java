@@ -3,7 +3,7 @@ package health.emrys.afon.polaris.catalogs;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,8 +22,7 @@ public class JsonMaker {
     }
 
     private void smokeTestOutput() throws Exception {
-        AfonPropertiesLoader  loader = new AfonPropertiesLoader();
-        CloudConfigForPolaris config = new AwsCloudConfigForPolaris(loader.getProperties());
+        CloudConfigForPolaris config = new AwsCloudConfigForPolaris(new FilePropertyProvider().getProperties());
         System.out.println(config.catalogConfig());
     }
 

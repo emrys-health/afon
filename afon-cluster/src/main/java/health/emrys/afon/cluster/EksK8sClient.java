@@ -3,7 +3,7 @@ package health.emrys.afon.cluster;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.STSSessionCredentialsProvider;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import io.kubernetes.client.util.credentials.Authentication;
 import io.kubernetes.client.util.credentials.EKSAuthentication;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
@@ -19,7 +19,7 @@ import static health.emrys.afon.config.AfonProperties.*;
 public class EksK8sClient extends K8sClient {
 
     public EksK8sClient() {
-        this(new AfonPropertiesLoader().getProperties());
+        this(new FilePropertyProvider().getProperties());
     }
 
     public EksK8sClient(Properties properties){

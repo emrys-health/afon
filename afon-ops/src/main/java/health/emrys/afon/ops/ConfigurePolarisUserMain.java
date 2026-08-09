@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
@@ -156,7 +156,7 @@ public class ConfigurePolarisUserMain {
         if (args.length > 2){
             principalName = args[2];
         }
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         if (principalName == null) {
             principalName = USER_POLARIS_ID.getValueFrom(properties);
         }

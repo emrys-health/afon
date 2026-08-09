@@ -59,7 +59,7 @@ In the deployed environment, Spark runs as a Spark Connect server in Kubernetes.
 
 ## Properties management
 
-Runtime properties are loaded via the `AfonPropertiesLoader` from the config dir.   
+Runtime properties are loaded via the `FilePropertyProvider` from the config dir.   
 
 The config dir is defined relative to the `afon.home` system property.  If this is not set, it will default to the top-level dir of the afon-core project. 
 

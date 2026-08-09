@@ -6,7 +6,7 @@ import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.Map;
@@ -42,7 +42,7 @@ public class AwsHelmStack extends TerraformStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsHelmStack(app, "ops", new AfonPropertiesLoader().getProperties());
+        new AwsHelmStack(app, "ops", new FilePropertyProvider().getProperties());
         app.synth();
     }
 }

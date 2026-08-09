@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
@@ -35,7 +35,7 @@ public class PurgeAndPopulatePolarisMain {
     public PurgeAndPopulatePolarisMain(String domainName) {
         AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
         this.domainName  = domainName;
-        this.client      = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
+        this.client      = clientFactory.getPolarisClient(domainName, new FilePropertyProvider().getProperties());
         this.accessToken = client.getAccessToken();
         logger.debug("For {}/{}:\nPOLARIS_TOKEN={}", client.getClientId(), client.getClientSecret(), accessToken);
     }

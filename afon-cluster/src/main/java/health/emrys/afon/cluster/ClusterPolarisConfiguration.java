@@ -1,7 +1,7 @@
 package health.emrys.afon.cluster;
 
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.PolarisConfigClient;
@@ -28,7 +28,7 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
     private final ClusterState         state;
 
     public ClusterPolarisConfiguration() throws IncorrectConfigException, IOException, ApiException {
-        super(new AfonPropertiesLoader().getProperties());
+        super(new FilePropertyProvider().getProperties());
         state           = new ClusterState();
         polarisClient   = new PolarisConfigClient();
         String endpoint = format("%s:443", state.getPolarisHost());

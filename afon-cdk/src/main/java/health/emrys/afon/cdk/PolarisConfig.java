@@ -6,7 +6,7 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
 import health.emrys.afon.security.keycloak.KeyCloakConfig;
 import org.jspecify.annotations.NonNull;
@@ -20,7 +20,8 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.polaris.PolarisConstants.*;
+import static health.emrys.afon.polaris.PolarisConstants.POLARIS_IMAGE_NAME;
+import static health.emrys.afon.polaris.PolarisConstants.getPolarisProperties;
 import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
@@ -59,9 +60,7 @@ public class PolarisConfig extends Construct {
     }
 
     private static Properties appProperties() {
-        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
-        Properties           properties = loader.getProperties();
-        return properties;
+        return new FilePropertyProvider().getProperties();
     }
 
     static String getProviderCredentials(

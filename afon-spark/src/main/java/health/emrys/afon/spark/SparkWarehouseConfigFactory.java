@@ -1,6 +1,6 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Properties;
@@ -14,7 +14,7 @@ public class SparkWarehouseConfigFactory {
     }
 
     private static @NonNull Properties propertiesWith(String clientId, String clientSecret, String host) {
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         properties.put(POLARIS_ENDPOINT.getName(), host);
         return propertiesWith(clientId, clientSecret, properties);
     }

@@ -1,7 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +16,7 @@ public class PurgePolarisMain {
             String domainName = args[0];
             try {
                 AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
-                var client = clientFactory.getPolarisClient(domainName, new AfonPropertiesLoader().getProperties());
+                var client = clientFactory.getPolarisClient(domainName, new FilePropertyProvider().getProperties());
                 String accessToken = client.getAccessToken();
                 for (AfonCloud warehouse : AfonCloud.values()) {
                     client.delete(catalogsURI(warehouse.toString()), accessToken);

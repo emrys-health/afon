@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -284,7 +284,7 @@ public class StepActions {
                 .findFirst()
                 .get();
         logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         String     bucket     = AZURE_BUCKET.getValueFrom(properties);
         String     account    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
         return format(

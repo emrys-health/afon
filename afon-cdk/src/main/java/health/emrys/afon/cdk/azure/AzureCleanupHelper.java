@@ -2,7 +2,7 @@ package health.emrys.afon.cdk.azure;
 
 import health.emrys.afon.cdk.AbstractCleanupHelper;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Properties;
@@ -17,7 +17,7 @@ public class AzureCleanupHelper extends AbstractCleanupHelper {
     private final String subscription;
 
     public AzureCleanupHelper() {
-        this(new AfonPropertiesLoader().getProperties());
+        this(new FilePropertyProvider().getProperties());
     }
 
     public AzureCleanupHelper(Properties props) {

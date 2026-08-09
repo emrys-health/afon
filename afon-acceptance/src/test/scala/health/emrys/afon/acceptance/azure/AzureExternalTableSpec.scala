@@ -5,7 +5,7 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{Azure, External}
 import health.emrys.afon.config.AfonProperties.{AZURE_BUCKET, DATABRICKS_TOKEN}
-import health.emrys.afon.config.AfonPropertiesLoader
+import health.emrys.afon.config.FilePropertyProvider
 import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, JsonMaker}
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
@@ -31,7 +31,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
   val FEDERATED_CATALOG_NAME = "phdbx"
 
   "An external table" should {
-    val properties        = new AfonPropertiesLoader().getProperties
+    val properties        = new FilePropertyProvider().getProperties
     properties.setProperty(AZURE_BUCKET.getName, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
     val config            = new AzureCloudConfigForPolaris(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))

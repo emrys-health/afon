@@ -1,7 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.FileUserProvider;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.security.keycloak.KeyCloakAdmin;
 import health.emrys.afon.config.AfonUser;
@@ -49,7 +49,7 @@ public class OnboardAllUsersMain {
     }
 
     public static void main(String[] args) {
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         properties.put(POLARIS_ENDPOINT.getName(), args[0]);
         OnboardAllUsersMain app         = new OnboardAllUsersMain(new FileUserProvider(), properties);
         String            catalog       = args[1];

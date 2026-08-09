@@ -1,6 +1,6 @@
 package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.jspecify.annotations.NonNull;
@@ -30,7 +30,7 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
     private static final Logger       log    = getLogger(KeyCloakPolarisClient.class);
 
     public static void main(String[] args) {
-        KeyCloakPolarisClient app = new KeyCloakPolarisClient(new AfonPropertiesLoader().getProperties());
+        KeyCloakPolarisClient app = new KeyCloakPolarisClient(new FilePropertyProvider().getProperties());
         log.info("access token: {}", app.getAccessToken());
     }
 

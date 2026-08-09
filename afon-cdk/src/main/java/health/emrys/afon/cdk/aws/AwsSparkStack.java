@@ -8,7 +8,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -104,7 +104,7 @@ public class AwsSparkStack extends AwsJupyterStack {
         try {
             logger.info("Creating AWS Spark stack");
             final App app = new App();
-            new AwsSparkStack(app, AWS, new AfonPropertiesLoader().getProperties());
+            new AwsSparkStack(app, AWS, new FilePropertyProvider().getProperties());
             app.synth();
         } catch (RuntimeException e) {
             logger.error(e.toString());

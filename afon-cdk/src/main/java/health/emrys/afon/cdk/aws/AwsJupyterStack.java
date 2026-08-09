@@ -15,7 +15,7 @@ import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.NetworkConfig;
 import health.emrys.afon.cdk.SparkConfig;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -168,7 +168,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsJupyterStack(app, AWS, new AfonPropertiesLoader().getProperties());
+        new AwsJupyterStack(app, AWS, new FilePropertyProvider().getProperties());
         app.synth();
         logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu " +
                     "-apply");

@@ -1,7 +1,7 @@
 package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
@@ -68,8 +68,7 @@ public class PolarisConfigClient {
     }
 
     public void smokeTest() throws Exception {
-        AfonPropertiesLoader loader = new AfonPropertiesLoader();
-        Properties properties = loader.getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         CloudConfigForPolaris config = new AwsCloudConfigForPolaris(properties) {
             @Override
             public String getBucketUri() {

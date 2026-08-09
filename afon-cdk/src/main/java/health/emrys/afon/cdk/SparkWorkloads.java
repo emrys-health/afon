@@ -5,7 +5,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -205,7 +205,7 @@ public class SparkWorkloads {
         var                         toReturn     = new HashMap<String, String>();
         SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         SparkWarehouseConfig sparkWarehouseConfig = sparkFactory.getConfig(
             USER_POLARIS_ID.getValueFrom(properties),
             USER_POLARIS_SECRET.getValueFrom(properties),

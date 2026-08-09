@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.cluster.ClusterUtils
-import health.emrys.afon.config.{AfonPropertiesLoader, AfonUser, AfonUserProvider}
+import health.emrys.afon.config.{FilePropertyProvider, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.OnboardAllUsersMain
 import health.emrys.afon.ops.smoke.TrinoConnectionSmoke
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
@@ -162,7 +162,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   }
 
   "Trino" should {
-    val properties          = new AfonPropertiesLoader().getProperties
+    val properties          = new FilePropertyProvider().getProperties
     "vend credentials" in {
       Given(s"a catalog called ${config.warehouseName()} in Polaris")
 

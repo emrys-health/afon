@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.FileUserProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +14,7 @@ public class ConfigureAllPolarisUsersMain {
     private static final Logger logger = LoggerFactory.getLogger(ConfigureAllPolarisUsersMain.class);
 
     public static void main(String[] args) {
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         if (args.length > 0) {
             properties.put(POLARIS_ENDPOINT.getName(), args[0]);
         }

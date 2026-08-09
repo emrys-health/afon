@@ -1,6 +1,6 @@
 package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 
 import java.util.Properties;
 
@@ -30,7 +30,7 @@ public class AfonPolarisClientFactory {
     }
 
     public AfonPolarisClient getPolarisClient(String endpoint, String clientId, String clientSecret) {
-        Properties props = new AfonPropertiesLoader().getProperties();
+        Properties props = new FilePropertyProvider().getProperties();
         props.setProperty(POLARIS_ENDPOINT.getName(), endpoint);
         props.setProperty(POLARIS_ID.getName(), clientId);
         props.setProperty(POLARIS_SECRET.getName(), clientSecret);
@@ -38,7 +38,7 @@ public class AfonPolarisClientFactory {
     }
 
     public AfonPolarisClient getPolarisClient(String endpoint, String clientId, String clientSecret, String kcHost) {
-        Properties props = new AfonPropertiesLoader().getProperties();
+        Properties props = new FilePropertyProvider().getProperties();
         props.setProperty(POLARIS_ENDPOINT.getName(), endpoint);
         props.setProperty(POLARIS_ID.getName(), clientId);
         props.setProperty(POLARIS_SECRET.getName(), clientSecret);
