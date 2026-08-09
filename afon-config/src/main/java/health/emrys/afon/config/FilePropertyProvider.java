@@ -41,15 +41,6 @@ public class FilePropertyProvider implements AfonPropertyProvider {
      */
     private static final List<String> ALL_CLOUDS = List.of("aws", "azure", "gcp");
 
-    static {
-        try {
-            logger.debug("Initializing properties");
-            Class.forName(AfonProperties.class.getName());
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     private final List<String> types;
     private final Properties  properties;
     private final Set<String> secretKeys = new HashSet<>();
