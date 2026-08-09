@@ -5,6 +5,7 @@ usage (){
   echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h] [--home <afon-home>]"
   echo "          [--logging-level|-l <logging>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
+  echo "          [--config-source <zip>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
@@ -12,8 +13,8 @@ usage (){
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  build|docs|exec|setup|tofu-{apply|destroy}"
   echo "          build       :  executes the mvn build"
-  echo "          config-*    :  "
-  echo "          docs-export :  retrieves the docs that have been generated in the build and unpacks them to <docs-dir>."
+  echo "          config-*    :  executes the config commands.  One of import|init|validate"
+  echo "          docs-export :  export the docs (both generated and static) to <docs-dir>."
   echo "          exec        :  executes the jvm classes from ops (see the docs for details)"
   echo "          setup       :  sets up the local env for the given os."
   echo "          tofu-*      :  executes the tofu commands.  One of apply|destroy|state"
@@ -22,6 +23,7 @@ usage (){
   echo "build-args:     the build args.  eg '-DskipTests'."
   echo "build-goals:    the build goals.  Defaults to 'clean install'."
   echo "build-profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
+  echo "config-source:  the config source to import as a zip file."
   echo "docs-dir:       the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
   echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
   echo "exec-package:   the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
@@ -56,6 +58,51 @@ mvn_envs(){
   if [ -n "$LOGGING" ] ; then
     MVN_ENVS="$MVN_ENVS -Dafon.logging=$LOGGING"
   fi
+}
+
+exec_config(){
+  CONFIG_DIR="$AFON_HOME/config"
+  echo "Using config dir $CONFIG_DIR"
+  CONFIG_ACTION=${ACTION#config-}
+  case $CONFIG_ACTION in
+    import)
+        if [ -z "$CONFIG_SOURCE" ] ; then
+          echo "Action $ACTION requires option --config-source"
+          usage; exit 1
+        fi
+        if [ -d $CONFIG_DIR ] ; then
+          echo "$CONFIG_DIR already exists.  Remove and retry."
+          exit;
+        fi
+        if [ -f $CONFIG_SOURCE ] ; then
+          mkdir -p $CONFIG_DIR
+          unzip -jqu $CONFIG_SOURCE -d $CONFIG_DIR
+          echo "Imported $CONFIG_SOURCE to $CONFIG_DIR."
+        fi
+      ;;
+    init)
+        if [ -d $CONFIG_DIR ] ; then
+          echo "$CONFIG_DIR already exists.  Remove and retry."
+          exit;
+        fi
+        EXEC_TYPE="script"
+        EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
+        exec_script
+      ;;
+    validate)
+        EXEC_TYPE="script"
+        EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
+        exec_script
+      ;;
+  esac
+}
+
+exec_docs(){
+  mkdir -p $DOCS_DIR
+  ARTIFACT="health.emrys:afon-docs:$VERSION:zip:docs"
+  mvn -q dependency:copy -Dartifact=$ARTIFACT -DoutputDirectory=$AFON_HOME
+  unzip -qu $AFON_HOME/afon-docs-$VERSION-docs.zip -d $DOCS_DIR
+  echo "Exported docs to $DOCS_DIR"
 }
 
 exec_mvn() {
@@ -169,6 +216,7 @@ BUILD_PROFILES=
 CLOUD=
 LOGGING=
 DRY_RUN=false
+CONFIG_SOURCE=
 DOCS_DIR=
 EXEC_CLASS=
 EXEC_ARGS=
@@ -202,6 +250,8 @@ while [[ $# -gt 0 ]]; do
       CLOUD="$2"; shift 2 ;;
     --dry-run)
       DRY_RUN=true; shift ;;
+    --config-source)
+      CONFIG_SOURCE="$2"; shift 2 ;;
     --docs-dir|-d)
       DOCS_DIR="$2"; shift 2 ;;
     --exec-class)
@@ -285,17 +335,16 @@ case $ACTION in
     exec_mvn
     check_acceptance
     ;;
+  config-*)
+    exec_config
+    ;;
   docs-export)
     VERSION=$(version)
     if [ -z "$DOCS_DIR" ]; then
       DOCS_DIR="$AFON_HOME/docs"
       echo "Docs dir not specified.  Defaulting to '$DOCS_DIR'."
     fi
-    mkdir -p $DOCS_DIR
-    ARTIFACT="health.emrys:afon-docs:$VERSION:zip:docs"
-    mvn -q dependency:copy -Dartifact=$ARTIFACT -DoutputDirectory=$AFON_HOME
-    unzip -qu $AFON_HOME/afon-docs-$VERSION-docs.zip -d $DOCS_DIR
-    echo "Exported docs to $DOCS_DIR"
+    exec_docs
     ;;
   exec)
     if [ -n "$EXEC_TYPE" ] ; then
