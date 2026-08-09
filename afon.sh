@@ -11,11 +11,12 @@ usage (){
   echo "          [--setup-os <os>] [--setup-output <file>] [--setup-show]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  build|docs|exec|setup|tofu-{apply|destroy}"
-  echo "          build :  executes the mvn build"
-  echo "          docs  :  retrieves the docs that have been generated in the build and unpacks them to <docs-dir>."
-  echo "          exec  :  executes the jvm classes from ops (see the docs for details)"
-  echo "          setup :  sets up the local env for the given os."
-  echo "          tofu-*:  executes the tofu commands.  One of apply|destroy|state"
+  echo "          build       :  executes the mvn build"
+  echo "          config-*    :  "
+  echo "          docs-export :  retrieves the docs that have been generated in the build and unpacks them to <docs-dir>."
+  echo "          exec        :  executes the jvm classes from ops (see the docs for details)"
+  echo "          setup       :  sets up the local env for the given os."
+  echo "          tofu-*      :  executes the tofu commands.  One of apply|destroy|state"
   echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging-level:  the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "build-args:     the build args.  eg '-DskipTests'."
@@ -284,7 +285,7 @@ case $ACTION in
     exec_mvn
     check_acceptance
     ;;
-  docs)
+  docs-export)
     VERSION=$(version)
     if [ -z "$DOCS_DIR" ]; then
       DOCS_DIR="$AFON_HOME/docs"
