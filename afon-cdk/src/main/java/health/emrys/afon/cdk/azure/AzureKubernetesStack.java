@@ -4,13 +4,13 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
 import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.AZURE;
 
 class AzureKubernetesStack extends TerraformStack implements AfonCloudStack {
 

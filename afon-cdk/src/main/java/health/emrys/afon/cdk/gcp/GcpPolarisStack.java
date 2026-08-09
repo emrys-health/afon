@@ -21,7 +21,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
+import static health.emrys.afon.config.AfonCloud.GCP;
 
 public class GcpPolarisStack extends GcpKubernetesStack {
 

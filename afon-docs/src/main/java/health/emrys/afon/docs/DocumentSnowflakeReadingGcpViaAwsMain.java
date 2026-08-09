@@ -7,7 +7,7 @@ import health.emrys.afon.ops.steps.StepOperations;
 import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
+import static health.emrys.afon.config.AfonCloud.GCP;
 
 public class DocumentSnowflakeReadingGcpViaAwsMain extends AbstractDocumentMetadata {
 

@@ -1,7 +1,7 @@
 package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 

@@ -9,8 +9,8 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.GCP_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperties.GCP_SERVICE_ACCOUNT;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP_EXTERNAL;
+import static health.emrys.afon.config.AfonCloud.GCP;
+import static health.emrys.afon.config.AfonCloud.GCP_EXTERNAL;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum.GCS;
 

@@ -1,5 +1,6 @@
 package health.emrys.afon.trino;
 
+import health.emrys.afon.config.AfonCloud;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Properties;

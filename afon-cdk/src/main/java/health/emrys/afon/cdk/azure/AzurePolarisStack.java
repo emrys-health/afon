@@ -24,7 +24,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.AZURE;
 
 public class AzurePolarisStack extends AzureKubernetesStack {
 

@@ -1,7 +1,6 @@
 package health.emrys.afon.cluster;
 
-import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.polaris.catalogs.*;
 import health.emrys.afon.polaris.config.PolarisConfigClient;
 import org.apache.hc.core5.http.HttpResponse;
@@ -19,13 +18,13 @@ public abstract class AbstractPolarisConfiguration {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractPolarisConfiguration.class);
 
-    protected static final Map<AfonProperties.AfonCloud, Function<Properties, CloudConfigForPolaris>>
+    protected static final Map<AfonCloud, Function<Properties, CloudConfigForPolaris>>
                                       CLOUD_TO_PROVIDER = Map.of(
-        AfonProperties.AfonCloud.AWS, AwsCloudConfigForPolaris::new,
+        AfonCloud.AWS, AwsCloudConfigForPolaris::new,
         AfonCloud.AZURE, AzureCloudConfigForPolaris::new,
         AfonCloud.GCP, GoogleCloudConfigForPolaris::new,
-        AfonProperties.AfonCloud.AZURE_EXTERNAL, ExternalAzureCloudConfigForPolaris::new,
-        AfonProperties.AfonCloud.GCP_EXTERNAL, ExternalGcpCloudConfigForPolaris::new
+        AfonCloud.AZURE_EXTERNAL, ExternalAzureCloudConfigForPolaris::new,
+        AfonCloud.GCP_EXTERNAL, ExternalGcpCloudConfigForPolaris::new
                                                                 );
     protected final          Properties properties;
     private final PolarisConfigClient polarisClient;

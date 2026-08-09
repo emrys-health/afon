@@ -2,7 +2,7 @@ package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import health.emrys.afon.cdk.TrinoWorkloads;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonCloud;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Properties;
 
 public class AwsTrinoStack extends AwsSparkStack {
-    public AwsTrinoStack(@NonNull Construct scope, AfonProperties.@NonNull AfonCloud id, Properties properties) {
+    public AwsTrinoStack(@NonNull Construct scope, @NonNull AfonCloud id, Properties properties) {
         super(scope, id, properties);
         // Trino only needs the cluster reachable (not the Spark operator), so it depends on the
         // EKS dependables rather than eksDependOn.

@@ -1,6 +1,6 @@
 package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -195,7 +195,7 @@ public class PolarisConfigurer {
 
             @Override
             public String warehouseName() {
-                return AfonProperties.AfonCloud.AWS_TRINO.toString();
+                return AfonCloud.AWS_TRINO.toString();
             }
         };
         logger.info("Configuring {}", config.warehouseName());

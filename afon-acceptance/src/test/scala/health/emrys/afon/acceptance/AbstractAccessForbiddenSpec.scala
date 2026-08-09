@@ -1,7 +1,7 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.SparkHelper.spark
-import health.emrys.afon.config.AfonProperties.AfonCloud
+import health.emrys.afon.config.AfonCloud
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.config.PolarisConfigurer.getCreateCatalogURI
 import org.scalatest.GivenWhenThen
