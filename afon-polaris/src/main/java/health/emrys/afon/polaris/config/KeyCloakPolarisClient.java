@@ -13,10 +13,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.KC_HOSTNAME;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.tokenEndpoint;
-import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -24,6 +23,16 @@ import static org.slf4j.LoggerFactory.getLogger;
  * provider. In that mode Polaris no longer implements its own token endpoint
  * ({@code /api/catalog/v1/oauth/tokens} returns HTTP 501), so the access token is obtained directly
  * from KeyCloak. The inherited catalog/management calls then present it to Polaris as a bearer token.
+ *
+ * Get the token with:
+ * <pre>
+ curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token -H "Content-Type: application/x-www-form-urlencoded" -d grant_type=client_credentials -d client_id=<polaris_id> -d client_secret=<polaris_secret></client_secret>
+ * </pre>
+ *
+ * Validate with:
+ * <pre>
+ curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token/introspect -H "Content-Type: application/x-www-form-urlencoded" -d token=$POLARIS_TOKEN  -d client_id=<polaris_id> -d client_secret=<polaris_secret> | jq
+ * </pre>
  */
 public class KeyCloakPolarisClient extends AfonPolarisClient {
 
@@ -60,18 +69,6 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
-    /**
-     * Get the token with:
-     * <pre>
-curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token -H "Content-Type: application/x-www-form-urlencoded" -d grant_type=client_credentials -d client_id=root -d client_secret=s3cr3t
-     * </pre>
-     *
-     * Validate with:
-     *
-     * <pre>
-curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token/introspect -H "Content-Type: application/x-www-form-urlencoded" -d token=$POLARIS_TOKEN  -d client_id=root -d client_secret=s3cr3t | jq
-     * </pre>
-     */
     @Override
     public String callAccessToken() throws IOException {
         Map<String, String> form = new LinkedHashMap<>();

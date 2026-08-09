@@ -54,7 +54,7 @@ To check table status:
 ```shell
 TOKEN=$(curl -X POST "https://emryspolaris.click/api/catalog/v1/oauth/tokens" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=root&client_secret=***REMOVED***" \
+  -d "grant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret>&scope=PRINCIPAL_ROLE:ALL" \
   | jq -r '.access_token')
 
 curl -X GET "https://emryspolaris.click/api/catalog/v1/aws/namespaces/acceptancetests/tables/YOUR_TABLE" \

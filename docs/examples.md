@@ -60,7 +60,7 @@ df_joined.show()
 **Write:**
 
 ```shell
-./afon.sh -a exec --exec-class ops.spark.SparkTestWriter --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
+./afon.sh -a exec --exec-class ops.spark.SparkTestWriter --exec-args "azure_external <polaris_id> <polaris_secret> emryspolaris.click namespaceph"
 ```
 
 This creates a namespace, creates an Iceberg table, and writes three rows ("apple", "banana", "cherry").
@@ -68,7 +68,7 @@ This creates a namespace, creates an Iceberg table, and writes three rows ("appl
 **Read:**
 
 ```shell
-./afon.sh -a exec --exec-class ops.spark.SparkTestReader --exec-args "azure_external root s3cr3t emryspolaris.click namespaceph"
+./afon.sh -a exec --exec-class ops.spark.SparkTestReader --exec-args "azure_external <polaris_id> <polaris_secret> emryspolaris.click namespaceph"
 ```
 
 ### Create sample patient data
@@ -96,8 +96,8 @@ CREATE OR REPLACE CATALOG INTEGRATION iceberg_gcp_id
   )
   REST_AUTHENTICATION = (
     TYPE = OAUTH
-    OAUTH_CLIENT_ID = 'root'
-    OAUTH_CLIENT_SECRET = 's3cr3t'
+    OAUTH_CLIENT_ID = '<polaris_id>'
+    OAUTH_CLIENT_SECRET = '<polaris_secret>'
     OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
   )
   ENABLED = TRUE;

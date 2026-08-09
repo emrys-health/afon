@@ -57,7 +57,7 @@ That is, Guacamole runs in its own Kubernetes pod and streams the X11 data from 
 You can examine the status of a table using the `curl` command aimed at your Polaris endpoint.
 For example, for Emrys's AWS Polaris:
 ```shell
-TOKEN=$(curl -X POST "https://emryspolaris.click/api/catalog/v1/oauth/tokens" -H "Content-Type: application/x-www-form-urlencoded" -d "grant_type=client_credentials&client_id=root&client_secret=***REMOVED***" | jq -r '.access_token')
+TOKEN=$(curl -X POST "https://emryspolaris.click/api/catalog/v1/oauth/tokens" -H "Content-Type: application/x-www-form-urlencoded" -d "grant_type=client_credentials&client_id=<polaris_id>&client_secret=<polaris_secret>&scope=PRINCIPAL_ROLE:ALL" | jq -r '.access_token')
 curl -X GET "https://emryspolaris.click/api/catalog/v1/aws/namespaces/acceptancetests/tables/AwsAccessSpec251117511401" -H "Authorization: Bearer ${ACCESS_TOKEN}"  | jq
 ```
 Note how this uses credentials and domain names you can find in the [configuration](configuration.md).
@@ -163,5 +163,5 @@ So, create the warehouses with:
 and register tables with something like:
 
 ```shell
-./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click will s3cr3t"
+./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click <user_polaris_id> <user_polaris_secret>"
 ```
