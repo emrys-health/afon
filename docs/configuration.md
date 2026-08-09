@@ -22,17 +22,26 @@ ls -s ~/.afon/envs/stg/config ~/.afon/config # config symlink for stg
 Whichever Afon home you decide to use, you can initialise the config files by running:
 
 ```shell
-./afon.sh -a exec -t script --exec-script config/init.sh
+./afon.sh -a config-init
 ```
-This generates empty config files from templates in the config dir.
+This generates empty config files from templates in the config dir.  
 
-**NOTE**: Once initialised, the config values need to be completed.
+**NOTE**: The config-init command assumes that the config dir does not exist and is created in the process. 
+Once initialised, the config values need to be completed.
 
 Once completed, you can validate the config files by running: 
 ```shell
-./afon.sh -a exec -t script --exec-script config/validate.sh
+./afon.sh -a config-validate
 ```
 The validation checks that all the template properties have a corresponding non-empty property in the config dir.
+
+You can also import the config files as a zip: 
+```shell
+./afon.sh -a config-import --config-source <path-to-config-zip>
+```
+This can be useful when sharing a pre-defined configuration.
+
+**NOTE**: The config-import command assumes that the config dir does not exist and is created in the process.
 
 ## Properties
 
