@@ -40,10 +40,10 @@ The docs related to the operations (in module `afon-ops`) are generated and kept
 
 They can be found in `afon-docs/target/docs`.
 
-To export them to a different docs dir:
+To export all the docs (including the static) to an external dir:
 
 ```shell
-./afon.sh -a docs --docs-dir ~/.afon/docs
+./afon.sh -a docs-export --docs-dir ~/.afon/docs
 ```
 
 

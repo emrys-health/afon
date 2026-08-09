@@ -29,10 +29,10 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                 # builds docs without acceptance tests
                 ./afon.sh -a build -p -acceptance
                 ```
-                The generated docs can be found in `afon-docs/target/docs`.  To export them to an external dir:
+                The generated docs can be found in `afon-docs/target/docs`.  To export all the docs (including the static) to an external dir:
                 ```shell
-                # retrieves docs and copies them to a specified docs dir, eg:
-                ./afon.sh -a docs --docs-dir ~/.afon/docs
+                # export docs to a specified docs dir, eg:
+                ./afon.sh -a docs-export --docs-dir ~/.afon/docs
                 ``
                 %s
                 %s
