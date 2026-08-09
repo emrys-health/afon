@@ -12,7 +12,7 @@ usage (){
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  build|docs|exec|setup|tofu-{apply|destroy}"
   echo "          build :  executes the mvn build"
-  echo "          docs  :  retrieves the docs that have been generated in the build and unpacks them to afon-docs/target/ops"
+  echo "          docs  :  retrieves the docs that have been generated in the build and unpacks them to <docs-dir>."
   echo "          exec  :  executes the jvm classes from ops (see the docs for details)"
   echo "          setup :  sets up the local env for the given os."
   echo "          tofu-*:  executes the tofu commands.  One of apply|destroy|state"
@@ -21,7 +21,7 @@ usage (){
   echo "build-args:     the build args.  eg '-DskipTests'."
   echo "build-goals:    the build goals.  Defaults to 'clean install'."
   echo "build-profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
-  echo "docs-dir:       the output dir for the docs."
+  echo "docs-dir:       the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
   echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
   echo "exec-package:   the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
   echo "exec-class:     the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
@@ -269,7 +269,6 @@ if [ -n "$MVN_QUIET" ] ; then
   MVN_CMD="$MVN_CMD -q"
 fi
 MVN_CMD="$MVN_CMD -s $CWD/settings.xml $MVN_PROFILES"
-
 case $ACTION in
 
   build)
@@ -288,13 +287,14 @@ case $ACTION in
   docs)
     VERSION=$(version)
     if [ -z "$DOCS_DIR" ]; then
-      DOCS_DIR="afon-docs/target/docs"
+      DOCS_DIR="$AFON_HOME/docs"
+      echo "Docs dir not specified.  Defaulting to '$DOCS_DIR'."
     fi
     mkdir -p $DOCS_DIR
     ARTIFACT="health.emrys:afon-docs:$VERSION:zip:docs"
-    mvn -q dependency:copy -Dartifact=$ARTIFACT -DoutputDirectory=$DOCS_DIR
-    unzip -qu $DOCS_DIR/afon-docs-$VERSION-docs.zip -d $DOCS_DIR
-    echo "Copied $ARTIFACT to $DOCS_DIR"
+    mvn -q dependency:copy -Dartifact=$ARTIFACT -DoutputDirectory=$AFON_HOME
+    unzip -qu $AFON_HOME/afon-docs-$VERSION-docs.zip -d $DOCS_DIR
+    echo "Exported docs to $DOCS_DIR"
     ;;
   exec)
     if [ -n "$EXEC_TYPE" ] ; then
