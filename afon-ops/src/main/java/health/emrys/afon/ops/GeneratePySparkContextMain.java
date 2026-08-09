@@ -2,7 +2,7 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -153,7 +153,7 @@ public class GeneratePySparkContextMain {
     private String snowflakeSql(AfonCloud cloud, String catalog_table) {
         String     catalog    = "iceberg_" + cloud.name();
         String     table      = format("my_%s_table", cloud.name());
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         return format(
             """
             CREATE OR REPLACE CATALOG INTEGRATION %s

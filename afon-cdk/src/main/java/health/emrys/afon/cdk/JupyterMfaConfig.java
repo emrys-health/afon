@@ -1,19 +1,14 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFrom;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainerEnv;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
@@ -21,7 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperties.OIDC_EMAIL_DOMAIN;
+import static health.emrys.afon.config.AfonProperties.OIDC_ISSUER_URL;
 import static java.lang.String.format;
 
 /**
@@ -65,8 +61,7 @@ public class JupyterMfaConfig {
                      String clientId,
                      String clientSecret,
                      String cookieSecret) {
-        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
-        Properties           properties = loader.getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
 
         Secret oauthSecret = Secret.Builder
             .create(scope, "oauth2ProxySecret")

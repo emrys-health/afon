@@ -1,6 +1,6 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.PolarisConstants;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
 import org.junit.jupiter.api.Test;
@@ -15,8 +15,7 @@ class PolarisConfigTest {
 
     @Test
     public void testConfigScript() {
-        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
-        Properties           properties = loader.getProperties();
+        Properties           properties = new FilePropertyProvider().getProperties();
         String               script     = PolarisConfig.getProviderCredentials(properties, "test");
         PolarisConstants.getPolarisProperties()
             .forEach(x -> {

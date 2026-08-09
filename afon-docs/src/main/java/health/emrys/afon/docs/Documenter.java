@@ -1,6 +1,6 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepDocumentation;
 import health.emrys.afon.ops.steps.StepOperations;
@@ -88,7 +88,7 @@ public class Documenter {
     }
 
     private String redactSecrets(String document) {
-        Properties secretProperties   = new AfonPropertiesLoader().getSecretProperties();
+        Properties secretProperties   = new FilePropertyProvider().getSecretProperties();
         for (String key : secretProperties.stringPropertyNames()){
             String  original = document;
             String value = secretProperties.getProperty(key);

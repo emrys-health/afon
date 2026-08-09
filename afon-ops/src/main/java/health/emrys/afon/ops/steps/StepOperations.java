@@ -5,7 +5,7 @@ import health.emrys.afon.cdk.aws.AwsPolarisStack;
 import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.OnboardAllUsersMain;
 import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
@@ -56,7 +56,7 @@ public class StepOperations {
     }
 
     private static Properties appProperties() {
-        return new AfonPropertiesLoader().getProperties();
+        return new FilePropertyProvider().getProperties();
     }
 
     @NonNull

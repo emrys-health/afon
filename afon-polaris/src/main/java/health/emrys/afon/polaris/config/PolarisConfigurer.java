@@ -1,7 +1,7 @@
 package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
@@ -18,8 +18,8 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.AWS_S3_BUCKET_NAME_TRINO;
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.polaris.config.PolarisConfigClient.addPolarisCredentialsTo;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
+import static health.emrys.afon.polaris.config.PolarisConfigClient.addPolarisCredentialsTo;
 import static java.lang.String.format;
 
 public class PolarisConfigurer {
@@ -186,8 +186,7 @@ public class PolarisConfigurer {
     }
 
     private void smokeTest() throws Exception {
-        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
-        Properties            properties = loader.getProperties();
+        Properties  properties = new FilePropertyProvider().getProperties();
         CloudConfigForPolaris config     = new AwsCloudConfigForPolaris(properties) {
             @Override
             public String getBucketUri() {

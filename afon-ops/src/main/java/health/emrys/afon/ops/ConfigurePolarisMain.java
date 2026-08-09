@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisConfigClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,12 +19,12 @@ public class ConfigurePolarisMain {
                 logger.info("Running smoke test");
                 client.smokeTest();
             } else {
-                AfonPropertiesLoader loader = new AfonPropertiesLoader();
+                AfonPropertyProvider provider = new FilePropertyProvider();
                 Properties properties;
                 if (args.length == 1) {
-                    properties = loader.getProperties();
+                    properties = provider.getProperties();
                 } else {
-                    properties = loader.getProperties(args[1]);
+                    properties = provider.getProperties(args[1]);
                 }
                 client.createAllCatalogs(properties, args[0]);
             }

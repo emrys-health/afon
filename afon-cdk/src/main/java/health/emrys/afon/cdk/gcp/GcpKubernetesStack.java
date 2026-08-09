@@ -5,7 +5,7 @@ import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.Properties;
@@ -29,7 +29,7 @@ class GcpKubernetesStack extends TerraformStack implements AfonCloudStack {
 
     public static void main(String[] args) {
         final App  app        = new App();
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         new GcpKubernetesStack(app, GCP.toString(), properties);
         app.synth();
     }

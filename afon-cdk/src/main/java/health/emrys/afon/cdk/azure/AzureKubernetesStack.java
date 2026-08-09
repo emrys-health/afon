@@ -5,7 +5,7 @@ import com.hashicorp.cdktf.TerraformStack;
 import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.Properties;
@@ -36,7 +36,7 @@ class AzureKubernetesStack extends TerraformStack implements AfonCloudStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AzureKubernetesStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
+        new AzureKubernetesStack(app, AZURE.toString(), new FilePropertyProvider().getProperties());
         app.synth();
     }
 

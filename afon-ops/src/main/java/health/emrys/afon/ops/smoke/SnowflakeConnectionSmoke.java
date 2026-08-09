@@ -1,6 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.slf4j.Logger;
 
@@ -32,7 +32,7 @@ public class SnowflakeConnectionSmoke {
 
     public static void main(String[] args) throws Exception {
         SnowflakeConnectionSmoke app = new SnowflakeConnectionSmoke();
-        app.selectFrom("my_gcp_table_id", new AfonPropertiesLoader().getProperties());
+        app.selectFrom("my_gcp_table_id", new FilePropertyProvider().getProperties());
     }
 
 

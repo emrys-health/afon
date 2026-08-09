@@ -2,7 +2,7 @@ package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.DeployAwsFullStackMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
@@ -23,7 +23,7 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
 
     public String getFurtherNotes() {
         String polarisDomainName =
-            AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(new AfonPropertiesLoader().getProperties());
+            AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(new FilePropertyProvider().getProperties());
         return String.format(
             """
             # Problems starting Spark Connect

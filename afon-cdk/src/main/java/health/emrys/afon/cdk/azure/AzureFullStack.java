@@ -7,7 +7,7 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import health.emrys.afon.cdk.*;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
@@ -107,7 +107,7 @@ public class AzureFullStack extends AzurePolarisStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AzureFullStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
+        new AzureFullStack(app, AZURE.toString(), new FilePropertyProvider().getProperties());
         app.synth();
     }
 

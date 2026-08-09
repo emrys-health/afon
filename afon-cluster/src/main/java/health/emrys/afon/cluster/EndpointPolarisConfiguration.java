@@ -1,6 +1,6 @@
 package health.emrys.afon.cluster;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 
 import java.util.Properties;
 
@@ -19,11 +19,11 @@ public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration i
     private final String credentials;
 
     public EndpointPolarisConfiguration() {
-        this(new AfonPropertiesLoader().getProperties());
+        this(new FilePropertyProvider().getProperties());
     }
 
     public EndpointPolarisConfiguration(String host) {
-        this(new AfonPropertiesLoader().getProperties());
+        this(new FilePropertyProvider().getProperties());
         properties.put(POLARIS_ENDPOINT.getName(), host);
     }
 

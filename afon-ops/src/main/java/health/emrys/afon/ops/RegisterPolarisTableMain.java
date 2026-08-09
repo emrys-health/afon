@@ -1,7 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import health.emrys.afon.polaris.config.RegisterTableConfig;
@@ -93,7 +93,7 @@ public class RegisterPolarisTableMain {
         String metadata = args[3];
 
         RegisterTableConfig tableConfig = new RegisterTableConfig(catalog, namespace, table, metadata);
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         if (args.length > 4) {
             properties.put(POLARIS_ENDPOINT.getName(), args[4]);
         }

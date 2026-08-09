@@ -4,7 +4,7 @@ import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobContainerClientBuilder;
 import com.azure.storage.blob.models.BlobItem;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.slf4j.Logger;
 
 import java.util.HashSet;
@@ -29,7 +29,7 @@ public class AzureReader {
     }
 
     public AzureReader() {
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         containerName    = AfonProperties.AZURE_BUCKET.getValueFrom(properties);
         connectionString = AfonProperties.AZURE_CONNECTION_STRING.getValueFrom(properties);
     }

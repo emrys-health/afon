@@ -6,7 +6,7 @@ import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import health.emrys.afon.config.AfonProperties;
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -338,7 +338,7 @@ public class AwsFullStack extends AwsTrinoStack {
         logger.info("Creating full stack");
         final App app = new App();
         try {
-            new AwsFullStack(app, AWS, new AfonPropertiesLoader().getProperties());
+            new AwsFullStack(app, AWS, new FilePropertyProvider().getProperties());
             app.synth();
         } catch (RuntimeException e) {
             logger.error(e.toString());

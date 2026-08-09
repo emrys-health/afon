@@ -1,6 +1,6 @@
 package health.emrys.afon.acceptance;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
@@ -18,8 +18,7 @@ public class AcceptanceTestConfig {
     public static final AcceptanceTestConfig instance;
 
     static {
-        AfonPropertiesLoader loader = new AfonPropertiesLoader();
-        instance = new AcceptanceTestConfig(loader.getProperties());
+        instance = new AcceptanceTestConfig(new FilePropertyProvider().getProperties());
     }
 
     private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();

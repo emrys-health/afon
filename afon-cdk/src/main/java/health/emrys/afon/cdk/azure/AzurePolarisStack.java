@@ -12,7 +12,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -95,7 +95,7 @@ public class AzurePolarisStack extends AzureKubernetesStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AzurePolarisStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
+        new AzurePolarisStack(app, AZURE.toString(), new FilePropertyProvider().getProperties());
         app.synth();
     }
 }

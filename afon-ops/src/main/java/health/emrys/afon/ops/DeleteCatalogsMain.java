@@ -1,7 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import org.slf4j.Logger;
@@ -20,7 +20,7 @@ public class DeleteCatalogsMain {
 
     DeleteCatalogsMain() {
         client      = clientFactory.getPolarisClient(
-            new AfonPropertiesLoader().getProperties(),
+            new FilePropertyProvider().getProperties(),
             "https");
         accessToken = client.getAccessToken();
     }

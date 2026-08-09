@@ -1,10 +1,7 @@
 package health.emrys.afon.security.keycloak;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.*;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -541,7 +538,7 @@ public class KeyCloakAdmin {
      * already-running KeyCloak.
      */
     public static void main(String[] args) {
-        Properties    properties = new AfonPropertiesLoader().getProperties();
+        Properties    properties = new FilePropertyProvider().getProperties();
         KeyCloakAdmin admin      = new KeyCloakAdmin(properties);
         if (args.length == 3) {
             String id = args[0];

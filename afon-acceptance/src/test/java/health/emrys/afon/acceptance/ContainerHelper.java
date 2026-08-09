@@ -1,6 +1,6 @@
 package health.emrys.afon.acceptance;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.security.keycloak.KeyCloakAdmin;
 import health.emrys.afon.security.keycloak.KeyCloakConfig;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -58,7 +58,7 @@ public class ContainerHelper {
      * For testing.
      */
     public static void main(String[] args) {
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         // KeyCloak must be up (and the Polaris realm provisioned) before Polaris starts, as Polaris
         // resolves its OIDC configuration from KeyCloak.
         instance.startKeyCloak(properties);

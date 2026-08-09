@@ -1,6 +1,6 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.DeployGcpPolarisMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
@@ -26,7 +26,7 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
 
     @Override
     public String getFurtherNotes() {
-        Properties properties = new AfonPropertiesLoader().getProperties();
+        Properties properties = new FilePropertyProvider().getProperties();
         return String.format("""
             # Problems running `tofu destroy`?
             If you see:
