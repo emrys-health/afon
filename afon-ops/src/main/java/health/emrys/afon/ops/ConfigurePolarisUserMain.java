@@ -47,7 +47,7 @@ public class ConfigurePolarisUserMain {
     public ConfigurePolarisUserMain(Properties properties) {
         AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(
             POLARIS_ENDPOINT.getValueFrom(properties),
-            properties); // For service-account-root/s3cr3t: POLARIS_TOKEN=null
+            properties);
         accessToken       = client.getAccessToken();
         configurer        = new PolarisConfigurer(client);
         permissions       = new PermissionsConfigurer(client);
