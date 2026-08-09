@@ -4,14 +4,14 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AfonCloudStack;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.GCP_DOMAIN_NAME;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
+import static health.emrys.afon.config.AfonCloud.GCP;
 
 class GcpKubernetesStack extends TerraformStack implements AfonCloudStack {
 

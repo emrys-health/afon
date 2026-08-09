@@ -2,7 +2,7 @@ package health.emrys.afon.ops.spark;
 
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.cluster.PolarisClusterCredentials;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;

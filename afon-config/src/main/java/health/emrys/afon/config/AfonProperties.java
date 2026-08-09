@@ -101,28 +101,6 @@ public class AfonProperties {
     public static final AfonProperty SNOWFLAKE_JDBC_URL    = new AfonProperty("SNOWFLAKE_JDBC_URL");
     public static final AfonProperty SNOWFLAKE_PRIVATE_KEY = new AfonProperty("SNOWFLAKE_PRIVATE_KEY");
 
-    public enum AfonCloud {
-        AWS("aws"),
-        AWS_FORBIDDEN("aws_forbidden"),
-        AWS_TRINO("aws_trino"),
-        AZURE("azure"),
-        AZURE_EXTERNAL("azure_external"),
-        AZURE_FORBIDDEN("azure_forbidden"),
-        GCP("gcp"),
-        GCP_EXTERNAL("gcp_external"),
-        GCP_FORBIDDEN("gcp_forbidden");
-
-        private String value;
-
-        AfonCloud(String value) {
-            this.value = value;
-        }
-
-        public String toString() {
-            return String.valueOf(value);
-        }
-    }
-
     public static Set<String> getAllNames(){
         Set<String> names = new HashSet<>();
         for (Field field : AfonProperties.class.getDeclaredFields()) {

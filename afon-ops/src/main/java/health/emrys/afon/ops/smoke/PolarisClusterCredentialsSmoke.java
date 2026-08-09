@@ -2,10 +2,10 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.cluster.PolarisClusterCredentials;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import org.slf4j.Logger;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.*;
+import static health.emrys.afon.config.AfonCloud.*;
 
 public class PolarisClusterCredentialsSmoke {
 

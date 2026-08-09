@@ -1,6 +1,6 @@
 package health.emrys.afon.spark.connect;
 
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -56,7 +56,7 @@ public class KeyCloakSparkConnect {
         String warehouse = "test_warehouse";
         SparkSession spark = sparkWithWarehouseCalled(
             warehouse,
-            AfonProperties.AfonCloud.AWS.toString()
+            AfonCloud.AWS.toString()
         );
         String tableName = warehouse + ".acceptancetests.AwsAccessSpec"; // aws_trino.acceptancetests.AwsAccessSpec
         log.info("Reading table {}", tableName);

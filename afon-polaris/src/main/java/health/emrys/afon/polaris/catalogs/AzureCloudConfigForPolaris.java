@@ -7,7 +7,7 @@ import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 
 public class AzureCloudConfigForPolaris extends CloudConfigForPolaris {

@@ -1,8 +1,7 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.SparkHelper.namespace
-import health.emrys.afon.config.AfonProperties
-import health.emrys.afon.config.AfonProperties.AfonCloud
+import health.emrys.afon.config.AfonCloud
 import uk.co.odinconsultants.documentation_utils.Datum
 
 import java.sql.{Date, Timestamp}

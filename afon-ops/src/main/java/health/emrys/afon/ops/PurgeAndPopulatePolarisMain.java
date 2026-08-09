@@ -3,8 +3,7 @@ package health.emrys.afon.ops;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
-import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.AfonPolarisClient;
@@ -21,7 +20,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static health.emrys.afon.cluster.ClusterUtils.isFailure;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.*;
+import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -130,7 +129,7 @@ public class PurgeAndPopulatePolarisMain {
             if (args.length == 1) {
                 app.createAllCatalogs();
             } else if (args.length == 4) {
-                app.cleanTable(AfonProperties.AfonCloud.valueOf(args[1]), args[2], args[3]);
+                app.cleanTable(AfonCloud.valueOf(args[1]), args[2], args[3]);
             }
         } catch (Exception e) {
             logger.error("Failed to purge and populate polaris for host {}", host, e);

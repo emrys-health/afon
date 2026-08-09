@@ -1,5 +1,6 @@
 package health.emrys.afon.acceptance;
 
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;

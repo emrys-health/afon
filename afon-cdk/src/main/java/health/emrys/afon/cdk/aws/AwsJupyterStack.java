@@ -14,7 +14,7 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.NetworkConfig;
 import health.emrys.afon.cdk.SparkConfig;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -28,7 +28,7 @@ import java.util.Properties;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonCloud.AWS;
 
 /***
  * Creates the markup to create the full stack in AWS.

@@ -3,7 +3,7 @@ package health.emrys.afon.acceptance.azure
 import health.emrys.afon.acceptance.SparkHelper.spark
 import health.emrys.afon.acceptance.{AbstractAccessSpec, AcceptanceTestConfig}
 import health.emrys.afon.acceptance.tags.{Access, Azure}
-import health.emrys.afon.config.AfonProperties.AfonCloud
+import health.emrys.afon.config.AfonCloud
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 
 @Azure

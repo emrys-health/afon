@@ -9,7 +9,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.cdk.PolarisConfig;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonCloud.AWS;
 
 public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
 

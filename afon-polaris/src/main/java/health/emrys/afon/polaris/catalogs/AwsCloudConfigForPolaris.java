@@ -1,5 +1,6 @@
 package health.emrys.afon.polaris.catalogs;
 
+import health.emrys.afon.config.AfonCloud;
 import org.apache.polaris.core.admin.model.Catalog;
 import org.apache.polaris.core.admin.model.CreateCatalogRequest;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;

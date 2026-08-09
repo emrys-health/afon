@@ -7,7 +7,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.cdk.SparkWorkloads;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -23,7 +23,7 @@ import static health.emrys.afon.cdk.CdkHelper.NO_SPARK_LB_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_NAME;
 import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DOMAIN_NAME;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonCloud.AWS;
 
 /**
  * This was initially run as a step after its superclass so it could be configured with domain names etc.

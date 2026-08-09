@@ -1,6 +1,6 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 
 public class SnowflakeDocumentUtils {
 

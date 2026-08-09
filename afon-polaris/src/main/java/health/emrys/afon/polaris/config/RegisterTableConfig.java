@@ -1,6 +1,6 @@
 package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonCloud;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
 
@@ -12,12 +12,12 @@ public class RegisterTableConfig {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(RegisterTableConfig.class);
 
-    private final AfonProperties.AfonCloud catalog;
+    private final AfonCloud catalog;
     private final String namespace;
     private final String table;
     private final String metadata;
 
-    public RegisterTableConfig(AfonProperties.AfonCloud catalog, String namespace, String table, String metadata) {
+    public RegisterTableConfig(AfonCloud catalog, String namespace, String table, String metadata) {
         this.catalog = catalog;
         this.namespace = namespace;
         this.table = table;
@@ -59,7 +59,7 @@ public class RegisterTableConfig {
         return namespace;
     }
 
-    public AfonProperties.AfonCloud getCatalog() {
+    public AfonCloud getCatalog() {
         return catalog;
     }
 }

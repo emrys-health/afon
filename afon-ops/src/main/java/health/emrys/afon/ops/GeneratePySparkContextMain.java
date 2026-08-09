@@ -1,7 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -16,8 +15,8 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
+import static health.emrys.afon.config.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.cluster.PolarisClusterCredentials.createClusterCredentials;
 import static java.lang.String.format;
 
@@ -41,7 +40,7 @@ public class GeneratePySparkContextMain {
         try {
             AfonCloud polarisCloud = AfonCloud.AWS;
             if (args.length > 0) {
-                polarisCloud = AfonProperties.AfonCloud.valueOf(args[0]);
+                polarisCloud = AfonCloud.valueOf(args[0]);
             }
             ClusterCredentials cloud = createClusterCredentials(polarisCloud);
             var                app        = new GeneratePySparkContextMain(cloud);

@@ -5,6 +5,7 @@ import health.emrys.afon.cdk.aws.AwsPolarisStack;
 import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.OnboardAllUsersMain;
 import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
@@ -21,7 +22,7 @@ import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.*;
+import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;

@@ -1,7 +1,7 @@
 package health.emrys.afon.cluster;
 
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 

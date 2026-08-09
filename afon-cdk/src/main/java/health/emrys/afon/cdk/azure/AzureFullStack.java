@@ -21,7 +21,7 @@ import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_PORT;
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_SVC_NAME;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.AZURE;
 
 public class AzureFullStack extends AzurePolarisStack {
 

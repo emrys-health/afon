@@ -5,7 +5,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import health.emrys.afon.cluster.Defaults;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;

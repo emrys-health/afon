@@ -1,5 +1,6 @@
 package health.emrys.afon.acceptance;
 
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.security.keycloak.KeyCloakAdmin;
 import health.emrys.afon.security.keycloak.KeyCloakConfig;
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.*;
+import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.*;

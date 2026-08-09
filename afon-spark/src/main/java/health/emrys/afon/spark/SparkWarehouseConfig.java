@@ -1,6 +1,6 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.SQLConf$;
 import org.apache.spark.sql.internal.StaticSQLConf$;

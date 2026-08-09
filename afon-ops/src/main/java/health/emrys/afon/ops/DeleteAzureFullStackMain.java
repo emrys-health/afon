@@ -7,7 +7,7 @@ import health.emrys.afon.ops.steps.StepsProvider;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.AZURE;
 
 public class DeleteAzureFullStackMain implements StepsProvider {
 

@@ -7,7 +7,7 @@ import health.emrys.afon.ops.steps.StepsProvider;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonCloud.AWS;
 
 public class DeployAwsFullStackMain implements StepsProvider {
 
