@@ -1,0 +1,13 @@
+---
+# Grow the root partition and filesystem onto whatever space the underlying
+# volume now has. This is the follow-up to enlarging the EBS volume in AWS:
+# resize the volume, then re-run this playbook.
+grow_root_filesystem: true
+
+# Reclaim the apt cache, which is worth a few hundred MB on a long-lived runner.
+reclaim_apt_cache: true
+
+# Remove dangling images, stopped containers and unused networks. Testcontainers
+# cleans up after itself via ryuk, but a killed job can leak. Tagged images are
+# kept, so the next run does not re-pull them.
+prune_docker: false

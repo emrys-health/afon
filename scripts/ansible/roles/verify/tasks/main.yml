@@ -8,6 +8,7 @@
   loop: "{{ verify_commands + (verify_cloud_commands if install_cloud_tools | bool else []) }}"
   register: afon_verify
   changed_when: false
+  check_mode: false
 
 - name: Report the installed versions
   ansible.builtin.debug:
@@ -29,3 +30,41 @@
     fail_msg: >-
       The maven build requires JDK {{ java_major_version }}, found:
       {{ (afon_java_check.stderr ~ afon_java_check.stdout) | trim }}
+
+# df rather than the mount facts, which do not list every filesystem.
+- name: Measure the free disk on {{ verify_disk_path }}
+  ansible.builtin.command: df -B1 --output=avail,size {{ verify_disk_path }}
+  register: afon_df
+  changed_when: false
+  check_mode: false
+
+- name: Record the disk sizes in GB
+  vars:
+    afon_df_fields: "{{ afon_df.stdout_lines | last | split }}"
+  ansible.builtin.set_fact:
+    afon_free_disk_gb: "{{ (afon_df_fields[0] | int / 1073741824) | round(1) }}"
+    afon_total_disk_gb: "{{ (afon_df_fields[1] | int / 1073741824) | round(1) }}"
+
+- name: Report the runner resources
+  ansible.builtin.debug:
+    msg: >-
+      {{ ansible_facts['processor_vcpus'] }} vcpus,
+      {{ ansible_facts['memtotal_mb'] }}MB memory,
+      {{ ansible_facts['swaptotal_mb'] }}MB swap,
+      {{ afon_free_disk_gb }}GB free of {{ afon_total_disk_gb }}GB on {{ verify_disk_path }}
+
+- name: Assert the runner is big enough for the acceptance tests
+  when: verify_resources | bool
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['memtotal_mb'] | int >= verify_min_memory_mb | int
+      - afon_free_disk_gb | float >= verify_min_free_disk_gb | int
+    fail_msg: >-
+      This runner is too small for the acceptance tests: it has
+      {{ ansible_facts['memtotal_mb'] }}MB memory (need {{ verify_min_memory_mb }}MB) and
+      {{ afon_free_disk_gb }}GB free on {{ verify_disk_path }} (need {{ verify_min_free_disk_gb }}GB).
+      The specs run a local[4] Spark driver plus the KeyCloak, Polaris, Trino and Spark Connect
+      containers. Resize the instance and its volume, then re-run this playbook — the disk role
+      grows the filesystem onto the enlarged volume.
+    success_msg: >-
+      {{ ansible_facts['memtotal_mb'] }}MB memory and {{ afon_free_disk_gb }}GB free disk.

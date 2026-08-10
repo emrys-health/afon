@@ -4,7 +4,7 @@
 #
 #   ansible-playbook runner-setup.yml
 #   ansible-playbook runner-setup.yml --check --diff        # dry run
-#   ansible-playbook runner-setup.yml --tags verify         # just report versions
+#   ansible-playbook runner-setup.yml --tags verify         # versions + resource check
 #   ansible-playbook runner-setup.yml -e install_cloud_tools=true
 #
 # This playbook does not install or register the runner itself — see
@@ -29,11 +29,16 @@
       register: afon_runner_id
       changed_when: false
       failed_when: afon_runner_id.rc != 0
+      check_mode: false
       tags: [always]
 
   roles:
     - role: base_tools
       tags: [base]
+    - role: disk
+      tags: [disk]
+    - role: swap
+      tags: [swap]
     - role: java
       tags: [java]
     - role: maven

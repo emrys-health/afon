@@ -6,9 +6,8 @@
 verify_commands:
   - java -version
   - mvn -version
-# docker verify fails
-#  - docker version
-#  - docker info
+  - docker version
+  - docker info
   - git --version
   - base64 --version
   - unzip -v
@@ -22,3 +21,19 @@ verify_cloud_commands:
   - gcloud --version
   - kubectl version --client
   - tofu --version
+
+# Having the tools installed is not enough — the specs run a local[4] Spark
+# driver alongside the KeyCloak, Polaris, Trino and Spark Connect containers, so
+# the runner is checked for the memory and disk to hold them. Undersized, the
+# build dies in javac with 'OutOfMemoryError: Java heap space' long before any
+# spec runs. Pass -e verify_resources=false to report without failing.
+verify_resources: true
+
+# ~8GB of RAM. The default max heap is a quarter of that, which is what javac
+# and the forked test JVM get unless MAVEN_OPTS says otherwise.
+verify_min_memory_mb: 7500
+
+# The container images (spark, trino, polaris, keycloak) are several GB, on top
+# of ~/.m2 and the runner workspace.
+verify_min_free_disk_gb: 25
+verify_disk_path: /

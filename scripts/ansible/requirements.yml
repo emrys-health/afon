@@ -1,0 +1,6 @@
+---
+# Ships with the `ansible` package; install explicitly with
+#   ansible-galaxy collection install -r requirements.yml
+# if you only have ansible-core.
+collections:
+  - name: ansible.posix

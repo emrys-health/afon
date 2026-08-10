@@ -49,6 +49,11 @@ Polaris and Trino via Testcontainers. Java 17 is provisioned by `actions/setup-j
 [scripts/github/runner.sh](../scripts/github/runner.sh) for installing and registering the runner
 itself.
 
+The runner also has to be big enough to hold the workload: the specs run a `local[4]` Spark driver
+alongside the four containers, which needs 8GB of memory (16GB comfortably) and 30GB of disk. Below
+that the build dies in javac with `OutOfMemoryError: Java heap space` before any spec runs, since the
+default max heap is a quarter of the machine's RAM.
+
 The tools the workflow needs — docker, maven, a JDK 17, and the shell tools used by `afon.sh`
 (git, curl, unzip, perl, jq) — are installed by the ansible playbook in
 [scripts/ansible](../scripts/ansible/README.md):
@@ -57,7 +62,7 @@ The tools the workflow needs — docker, maven, a JDK 17, and the shell tools us
 cd scripts/ansible && ansible-playbook runner-setup.yml
 ```
 
-To report what a runner currently has installed, without changing it:
+To report what a runner currently has installed and whether it is big enough, without changing it:
 
 ```shell
 cd scripts/ansible && ansible-playbook runner-setup.yml --tags verify
