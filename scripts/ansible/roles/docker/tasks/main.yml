@@ -36,6 +36,12 @@
     append: true
   register: afon_docker_group
 
+# Our own ssh session was opened before the group was added, so it still carries
+# the old group set — without this, the docker checks in the verify role fail
+# with a permission denied on the socket.
+- name: Reconnect so this play picks up the docker group
+  ansible.builtin.meta: reset_connection
+
 - name: Find the installed actions runner services
   ansible.builtin.shell:
     cmd: set -o pipefail && systemctl list-units --type=service --all --plain --no-legend 'actions.runner.*' | awk '{print $1}'

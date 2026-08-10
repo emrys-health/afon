@@ -37,6 +37,10 @@ concurrency:
 env:
   # Keep config inside the workspace rather than the runner's home, so it is scoped to this run.
   AFON_HOME: ${{ github.workspace }}/.afon
+  # Without this the JVM takes a quarter of the runner's RAM as its max heap, which is not
+  # enough for javac to open the spark jars. Set explicitly so the build does not silently
+  # depend on the instance size.
+  MAVEN_OPTS: -Xmx3g
 
 jobs:
   acceptance:
@@ -63,6 +67,10 @@ jobs:
           java -version
           mvn -version
           docker version
+          # Reported up front: the specs run a local[4] Spark driver alongside four
+          # containers, and a runner short of memory or disk fails deep in the build.
+          free -h
+          df -h /
 
       - name: Write afon config from secrets
         env:

@@ -1,0 +1,14 @@
+---
+# EC2 instances ship with no swap. Swap is not a substitute for memory — the
+# specs need the real thing — but it stops a peak in javac or the forked test
+# JVM taking the whole box down.
+configure_swap: true
+swap_file: /swapfile
+swap_size_gb: 4
+
+# Skipped rather than filling the disk, if the swap file would not leave this
+# much room behind for the build.
+swap_min_free_disk_gb: 20
+
+# Favour keeping the JVM heaps resident.
+swap_swappiness: 10

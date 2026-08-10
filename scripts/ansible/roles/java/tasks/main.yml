@@ -41,6 +41,7 @@
     executable: /bin/bash
   register: afon_javac_home
   changed_when: false
+  check_mode: false
 
 # With temurin, point at its install dir rather than at whatever javac currently
 # resolves to — a host may also carry the distro OpenJDK.
@@ -55,6 +56,7 @@
   register: afon_javac_alternatives
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Make the {{ java_distribution }} JDK the default java and javac
   ansible.builtin.command: update-alternatives --set {{ item }} {{ afon_java_home }}/bin/{{ item }}
