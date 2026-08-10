@@ -33,7 +33,9 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
                 ```shell
                 # export docs to a specified docs dir, eg:
                 ./afon.sh -a docs-export --docs-dir ~/.afon/docs
-                ``
+                ```
+                # Deployment
+                
                 %s
                 %s
                 %s

@@ -26,7 +26,9 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
             AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(new FilePropertyProvider().getProperties());
         return String.format(
             """
-            # Problems starting Spark Connect
+            # Troubleshooting
+            
+            ### Problems starting Spark Connect
             
             There appears to be a race condition so that Spark Connect is killed as soon as it starts
             (see issue [#65](https://github.com/emrys-health/afon-core/issues/65)). 
@@ -37,7 +39,7 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
             %s
             ```
             
-            # Problems destroying the stack?
+            ### Problems destroying the stack?
             
            Generate and run cleanup script (more than once if required):
             ```shell

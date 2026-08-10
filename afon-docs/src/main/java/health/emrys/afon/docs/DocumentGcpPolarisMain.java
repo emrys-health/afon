@@ -28,11 +28,12 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
     public String getFurtherNotes() {
         Properties properties = new FilePropertyProvider().getProperties();
         return String.format("""
-            # Problems running `tofu destroy`?
+            # Troubleshooting
+
+            ### Problems running `tofu destroy`?
             If you see:
             ```
             │ Error: Error creating Network: googleapi: Error 409: The resource 'projects/afon-core/global/networks/gke-private-vpc' already exists, alreadyExists
-            │\s
             │   with google_compute_network.XXX,
             ```
             then import it with:
@@ -57,7 +58,7 @@ public class DocumentGcpPolarisMain extends AbstractDocumentMetadata {
             gcloud container clusters delete %s --region=europe-west2
             ```
             
-            # Problems destroying the stack?
+            ### Problems destroying the stack?
             
             Generate and run cleanup script:
             ```shell
