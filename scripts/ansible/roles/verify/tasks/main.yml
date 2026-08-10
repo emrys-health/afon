@@ -1,0 +1,31 @@
+---
+# Run as the runner user, not root: `docker info` in particular only proves
+# anything if it is the user the workflow runs as that can reach the daemon.
+- name: Verify the tooling as {{ github_runner_user }}
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_commands + (verify_cloud_commands if install_cloud_tools | bool else []) }}"
+  register: afon_verify
+  changed_when: false
+
+- name: Report the installed versions
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.item }} -> {{ (((item.stdout | default('')) ~ (item.stderr | default('')))
+      | trim).splitlines() | first | default('ok', true) }}
+  loop: "{{ afon_verify.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Assert the JDK is version {{ java_major_version }}
+  vars:
+    afon_java_checks: "{{ afon_verify.results | selectattr('item', 'equalto', 'java -version') | list }}"
+    afon_java_check: "{{ afon_java_checks | first | default({'stdout': '', 'stderr': ''}) }}"
+  when: afon_java_checks | length > 0
+  ansible.builtin.assert:
+    that: >-
+      ('version "' ~ java_major_version) in (afon_java_check.stderr ~ afon_java_check.stdout)
+    fail_msg: >-
+      The maven build requires JDK {{ java_major_version }}, found:
+      {{ (afon_java_check.stderr ~ afon_java_check.stdout) | trim }}

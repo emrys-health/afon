@@ -1,0 +1,24 @@
+---
+# Each entry is run as the runner user and must exit 0. These cover every tool
+# the workflow shells out to: the build itself (java, mvn), Testcontainers
+# (docker), the checkout (git), and the config steps of afon.sh
+# (base64, unzip, perl, jq).
+verify_commands:
+  - java -version
+  - mvn -version
+# docker verify fails
+#  - docker version
+#  - docker info
+  - git --version
+  - base64 --version
+  - unzip -v
+  - perl --version
+  - jq --version
+  - curl --version
+
+verify_cloud_commands:
+  - aws --version
+  - az version
+  - gcloud --version
+  - kubectl version --client
+  - tofu --version
