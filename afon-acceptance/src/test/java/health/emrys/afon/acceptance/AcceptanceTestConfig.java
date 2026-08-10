@@ -13,6 +13,7 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
+import static java.lang.String.format;
 
 public class AcceptanceTestConfig {
 
@@ -167,5 +168,14 @@ public class AcceptanceTestConfig {
         Properties props = new Properties();
         props.putAll(properties);
         return props;
+    }
+
+    public String redactSecrets(String document) {
+        Properties secretProperties   = new FilePropertyProvider().getSecretProperties();
+        for (String key : secretProperties.stringPropertyNames()){
+            String value = secretProperties.getProperty(key);
+            document = document.replace(value, format("<%s>", key.toLowerCase()));
+        }
+        return document;
     }
 }
