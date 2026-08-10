@@ -1,0 +1,10 @@
+---
+# 'openjdk' installs the distro JDK, 'temurin' adds the Adoptium apt repo.
+java_distribution: openjdk
+
+# JDK 17 is enforced by the maven build (maven.compiler.source/target in pom.xml).
+java_major_version: 17
+
+adoptium_key_url: https://packages.adoptium.net/artifactory/api/gpg/key/public
+adoptium_keyring: /etc/apt/keyrings/adoptium.asc
+adoptium_repo_url: https://packages.adoptium.net/artifactory/deb

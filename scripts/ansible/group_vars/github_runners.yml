@@ -1,0 +1,26 @@
+---
+# Site-level settings for the self-hosted Linux runners.
+# Everything else lives in the role defaults (roles/*/defaults/main.yml).
+
+# The user the GitHub Actions runner service runs as. It is added to the docker
+# group, so that Testcontainers can talk to the daemon from the workflow.
+github_runner_user: ubuntu
+
+# Java 17 flavour: 'openjdk' (distro packages) or 'temurin' (Adoptium apt repo).
+# The workflow provisions its own Temurin 17 via actions/setup-java, so this is
+# the JDK used when running the build by hand on the runner.
+java_distribution: openjdk
+
+# Maven is installed from the Apache archive rather than apt, as the distro
+# package lags behind what the build needs.
+maven_version: "3.9.9"
+
+# The acceptance tests reach the clouds through the SDKs, not the CLIs, so the
+# cloud tooling is off by default. Turn it on for a runner that also runs the
+# ops/tofu actions of afon.sh.
+install_cloud_tools: false
+
+# Architecture names, as used by apt (amd64/arm64) and by the tarball
+# downloads (x86_64/aarch64). Derived from the host facts.
+apt_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}"
+tarball_arch: "{{ ansible_facts['architecture'] }}"

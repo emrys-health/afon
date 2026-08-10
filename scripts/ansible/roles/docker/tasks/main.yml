@@ -1,0 +1,56 @@
+---
+# The acceptance specs start KeyCloak, Polaris, Trino and Spark Connect through
+# Testcontainers, so the runner user needs a docker daemon it can talk to.
+- name: Fetch the docker signing key
+  ansible.builtin.get_url:
+    url: "{{ docker_key_url }}"
+    dest: "{{ docker_keyring }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Add the docker apt repo
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch={{ apt_arch }} signed-by={{ docker_keyring }}]
+      {{ docker_repo_url }} {{ ansible_facts['distribution_release'] }} stable
+    filename: docker
+    state: present
+    update_cache: true
+
+- name: Install the docker engine
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+
+- name: Enable and start the docker daemon
+  ansible.builtin.systemd_service:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Add {{ github_runner_user }} to the docker group
+  ansible.builtin.user:
+    name: "{{ github_runner_user }}"
+    groups: docker
+    append: true
+  register: afon_docker_group
+
+- name: Find the installed actions runner services
+  ansible.builtin.shell:
+    cmd: set -o pipefail && systemctl list-units --type=service --all --plain --no-legend 'actions.runner.*' | awk '{print $1}'
+    executable: /bin/bash
+  register: afon_runner_services
+  changed_when: false
+  check_mode: false
+
+# Without this the runner keeps the group memberships it had at boot, and
+# docker calls from the workflow fail with a permission denied on the socket.
+- name: Restart the actions runner services to pick up the docker group
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ afon_runner_services.stdout_lines | select | list }}"
+  when:
+    - restart_runner_service | bool
+    - afon_docker_group is changed

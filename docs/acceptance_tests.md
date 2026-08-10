@@ -49,6 +49,20 @@ Polaris and Trino via Testcontainers. Java 17 is provisioned by `actions/setup-j
 [scripts/github/runner.sh](../scripts/github/runner.sh) for installing and registering the runner
 itself.
 
+The tools the workflow needs — docker, maven, a JDK 17, and the shell tools used by `afon.sh`
+(git, curl, unzip, perl, jq) — are installed by the ansible playbook in
+[scripts/ansible](../scripts/ansible/README.md):
+
+```shell
+cd scripts/ansible && ansible-playbook runner-setup.yml
+```
+
+To report what a runner currently has installed, without changing it:
+
+```shell
+cd scripts/ansible && ansible-playbook runner-setup.yml --tags verify
+```
+
 ### Config secrets
 
 The workflow reconstructs `$AFON_HOME/config` from repository secrets — one base64-encoded secret per
