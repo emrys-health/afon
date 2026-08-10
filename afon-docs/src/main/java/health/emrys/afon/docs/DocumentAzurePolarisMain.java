@@ -21,7 +21,9 @@ public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
     @Override
     public String getFurtherNotes() {
         return String.format("""
-            # Problems destroying the stack?
+            # Troubleshooting
+
+            ### Problems destroying the stack?
             
             Generate and run cleanup script:
             ```shell
