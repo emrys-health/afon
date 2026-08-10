@@ -78,7 +78,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
           val value = if (k.toLowerCase.contains("token") || k.toLowerCase.contains("oauth")) String.format("<%s>", k.toLowerCase) else v
           String.format("%-50s%50s", k, value)
       }.mkString("\n")
-      conf = AcceptanceTestConfig.instance.redactSecrets(conf)
+      conf = AcceptanceTestConfig.instance.redactSecrets(conf, "sparkConfig")
       Given(s"Spark is configured with:\n\n$conf")
       val sql = s"CREATE NAMESPACE IF NOT EXISTS $FULL_NAMESPACE"
       When(s"we create a namespace with SQL '$sql'")

@@ -2,6 +2,7 @@ package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.Redacter;
 import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
@@ -13,7 +14,6 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
-import static java.lang.String.format;
 
 public class AcceptanceTestConfig {
 
@@ -170,12 +170,7 @@ public class AcceptanceTestConfig {
         return props;
     }
 
-    public String redactSecrets(String document) {
-        Properties secretProperties   = new FilePropertyProvider().getSecretProperties();
-        for (String key : secretProperties.stringPropertyNames()){
-            String value = secretProperties.getProperty(key);
-            document = document.replace(value, format("<%s>", key.toLowerCase()));
-        }
-        return document;
+    public String redactSecrets(String content, String source) {
+        return Redacter.redactSecrets(content, source);
     }
 }
