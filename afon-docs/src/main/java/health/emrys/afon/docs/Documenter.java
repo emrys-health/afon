@@ -1,6 +1,6 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.Redacter;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepDocumentation;
 import health.emrys.afon.ops.steps.StepOperations;
@@ -15,7 +15,6 @@ import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Properties;
 
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -84,29 +83,10 @@ public class Documenter {
         writeSteps(os);
         appendTo(os, documentMetadata.getFurtherNotes());
         String document = os.toString();
-        return redactSecrets(document);
+        return Redacter.redactSecrets(document, documentMetadata.getFilename());
     }
 
-    private String redactSecrets(String document) {
-        Properties secretProperties   = new FilePropertyProvider().getSecretProperties();
-        for (String key : secretProperties.stringPropertyNames()){
-            String  original = document;
-            String value = secretProperties.getProperty(key);
-            if ( redactable(value) ) {
-                document = document.replace(value, format("<%s>", key.toLowerCase()));
-            }
-            if (!original.equals(document)) {
-                logger.info("Redacted in {} property value {} of key {}", documentMetadata.getFilename(), value, key);
-            }
-        }
-        return document;
-    }
-
-    private boolean redactable(String value) {
-        return !value.matches("afon|emrys|will");
-    }
-
-    private void writeSteps(OutputStream fos) {
+     private void writeSteps(OutputStream fos) {
         List<Step> steps = documentMetadata.steps(new StepOperations(new StepDocumentation(fos)));
         new StepRunner().runSteps(steps.stream().map(x -> decorating(x, fos)).toList());
     }
