@@ -2,6 +2,8 @@
 
 logs/
 *-cleanup.sh
+# afon home materialised in the workspace by the acceptance test workflow
+.afon/
 
 # Terraform/tofu
 
