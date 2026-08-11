@@ -12,12 +12,13 @@ usage (){
   echo "          [--setup-os <os>] [--setup-output <file>] [--setup-show]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  build|docs|exec|setup|tofu-{apply|destroy}"
-  echo "          build       :  executes the mvn build"
-  echo "          config-*    :  executes the config commands.  One of import|init|validate"
-  echo "          docs-export :  export the docs (both generated and static) to <docs-dir>."
-  echo "          exec        :  executes the jvm classes from ops (see the docs for details)"
-  echo "          setup       :  sets up the local env for the given os."
-  echo "          tofu-*      :  executes the tofu commands.  One of apply|destroy|state"
+  echo "          build       : executes the mvn build"
+  echo "          config-*    : executes the config commands.  One of import|init|validate"
+  echo "          deploy-*    : executes the deploy commands.  One of aws-full|{azure,gcp}-polaris"
+  echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
+  echo "          exec        : executes the jvm classes from ops (see the docs for details)"
+  echo "          setup       : sets up the local env for the given os."
+  echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state"
   echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging-level:  the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "build-args:     the build args.  eg '-DskipTests'."
@@ -95,6 +96,23 @@ exec_config(){
         exec_script
       ;;
   esac
+}
+
+exec_deploy(){
+  DEPLOY_ACTION=${ACTION#deploy-}
+  EXEC_TYPE="ops"
+  case $DEPLOY_ACTION in
+    aws-full)
+      EXEC_CLASS="ops.DeployAwsFullStackMain"
+      ;;
+    azure-polaris)
+      EXEC_CLASS="ops.DeployAzurePolarisMain"
+      ;;
+    gcp-polaris)
+      EXEC_CLASS="ops.DeployGcpPolarisMain"
+      ;;
+  esac
+  exec_jvm
 }
 
 exec_docs(){
@@ -337,6 +355,9 @@ case $ACTION in
     ;;
   config-*)
     exec_config
+    ;;
+  deploy-*)
+    exec_deploy
     ;;
   docs-export)
     VERSION=$(version)
