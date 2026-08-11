@@ -20,19 +20,18 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_IMAGE;
 import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
 
 /**
- * These environment variable, although inappropriate for Docker, get the app to start:
- * docker run  -it -p 127.0.0.1:8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
- * -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
- * -e KC_DB_URL=jdbc:postgresql://polaris-db.crsocia0o0bd.eu-west-2.rds.amazonaws.com:5432/keycloak \
- * -e KC_DB_USERNAME=postgres \
- * -e KC_DB_PASSWORD=3mry5af0n \
- * -e KC_DB=postgres \
- * -e KC_PROXY=edge \
- * -e KC_HOSTNAME=localhost \
- * -e KC_HOSTNAME_STRICT=true \
- * -e KC_HOSTNAME_STRICT_BACKCHANNEL=false \
- * -e KC_HTTP_ENABLED=true \
- * quay.io/keycloak/keycloak:26.6.3 start
+ * Abstract based class for KeyCloak deployment configurations.
+ *
+ * Requires properties:
+ *
+ * KC_HOSTNAME
+ * KC_PROTOCOL
+ * KC_BOOTSTRAP_ADMIN_USERNAME
+ * KC_BOOTSTRAP_ADMIN_PASSWORD
+ * KC_DB
+ * KC_DB_URL
+ * KC_DB_USERNAME
+ * KC_DB_PASSWORD
  */
 public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends Construct {
     public static final String          KEYCLOAK_INGRESS       = "keycloak-ingress";
