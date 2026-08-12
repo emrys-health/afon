@@ -34,6 +34,11 @@ verify_resources: true
 verify_min_memory_mb: 7500
 
 # The container images (spark, trino, polaris, keycloak) are several GB, on top
-# of ~/.m2 and the runner workspace.
-verify_min_free_disk_gb: 25
-verify_disk_path: /
+# of ~/.m2 and the runner workspace. With the lvm role moving those onto
+# their own filesystem, check that one too and relax the root, e.g.
+#   verify_disk_checks:
+#     - {path: /, min_free_gb: 5}
+#     - {path: /data, min_free_gb: 40}
+verify_disk_checks:
+  - path: /
+    min_free_gb: 25

@@ -1,0 +1,69 @@
+---
+# Bind mounts rather than symlinks, so the paths the runner and maven are
+# configured with stay real directories.
+- name: Check whether {{ afon_bind.dest }} is already bound
+  ansible.builtin.command: mountpoint -q {{ afon_bind.dest }}
+  register: afon_bind_mounted
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Bind {{ afon_bind.dest }} onto {{ afon_bind.src }}
+  when: afon_bind_mounted.rc != 0
+  vars:
+    afon_bind_owner: "{{ afon_bind.owner | default(github_runner_user) }}"
+  block:
+    - name: Create {{ afon_bind.src }}
+      ansible.builtin.file:
+        path: "{{ afon_bind.src }}"
+        state: directory
+        owner: "{{ afon_bind_owner }}"
+        group: "{{ afon_bind_owner }}"
+        mode: "0755"
+
+    - name: Look at the existing {{ afon_bind.dest }}
+      ansible.builtin.stat:
+        path: "{{ afon_bind.dest }}"
+      register: afon_bind_dest
+
+    # Copied first, and the original only moved aside once rsync has succeeded —
+    # a failure here fails the play rather than losing the directory.
+    - name: Copy the existing content of {{ afon_bind.dest }} across
+      ansible.builtin.command: >-
+        rsync --archive --hard-links --acls --xattrs --numeric-ids
+        {{ afon_bind.dest }}/ {{ afon_bind.src }}/
+      when: afon_bind_dest.stat.isdir | default(false)
+      register: afon_bind_rsync
+      changed_when: afon_bind_rsync.rc == 0
+
+    - name: Keep the original {{ afon_bind.dest }} aside
+      ansible.builtin.command: mv {{ afon_bind.dest }} {{ afon_bind.dest }}.pre-bind
+      when:
+        - afon_bind_dest.stat.isdir | default(false)
+        - lvm_keep_moved_data | bool
+      register: afon_bind_kept
+      changed_when: afon_bind_kept.rc == 0
+
+    - name: Remove the original {{ afon_bind.dest }}
+      ansible.builtin.file:
+        path: "{{ afon_bind.dest }}"
+        state: absent
+      when:
+        - afon_bind_dest.stat.isdir | default(false)
+        - not lvm_keep_moved_data | bool
+
+    - name: Recreate {{ afon_bind.dest }} as the mount point
+      ansible.builtin.file:
+        path: "{{ afon_bind.dest }}"
+        state: directory
+        owner: "{{ afon_bind_owner }}"
+        group: "{{ afon_bind_owner }}"
+        mode: "0755"
+
+    - name: Mount {{ afon_bind.dest }}
+      ansible.posix.mount:
+        path: "{{ afon_bind.dest }}"
+        src: "{{ afon_bind.src }}"
+        fstype: none
+        opts: bind,nofail
+        state: mounted

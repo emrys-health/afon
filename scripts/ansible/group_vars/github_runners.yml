@@ -5,6 +5,7 @@
 # The user the GitHub Actions runner service runs as. It is added to the docker
 # group, so that Testcontainers can talk to the daemon from the workflow.
 github_runner_user: ubuntu
+github_runner_home: /home/ubuntu
 
 # Java 17 flavour: 'openjdk' (distro packages) or 'temurin' (Adoptium apt repo).
 # The workflow provisions its own Temurin 17 via actions/setup-java, so this is
@@ -19,6 +20,13 @@ maven_version: "3.9.9"
 # cloud tooling is off by default. Turn it on for a runner that also runs the
 # ops/tofu actions of afon.sh.
 install_cloud_tools: false
+
+# Extra volumes attached to the runner, pooled into one LVM group and carved up
+# by the lvm role (see its defaults for the volumes and their sizes). Left
+# empty, the role leaves the runner's storage alone.
+lvm_devices: []
+# lvm_devices:
+#   - /dev/xvdf
 
 # Architecture names, as used by apt (amd64/arm64) and by the tarball
 # downloads (x86_64/aarch64). Derived from the host facts.

@@ -4,3 +4,4 @@
 # if you only have ansible-core.
 collections:
   - name: ansible.posix
+  - name: community.general

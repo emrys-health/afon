@@ -37,6 +37,8 @@
       tags: [base]
     - role: disk
       tags: [disk]
+    - role: lvm
+      tags: [lvm]
     - role: swap
       tags: [swap]
     - role: java
