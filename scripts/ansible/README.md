@@ -14,6 +14,7 @@ It provisions the tools only — installing and registering the runner itself st
 |---------------|-------------------------------------------------------------------------------|-------------------------------------------------------------------------|
 | `base_tools`  | git, curl, wget, unzip, zip, tar, jq, perl, rsync, coreutils, ca-certificates | `actions/checkout`, the config steps of `afon.sh`, `scripts/config/validate.sh` |
 | `disk`        | grows the root partition and filesystem onto the volume, reclaims the apt cache | The container images, `~/.m2` and the workspace need tens of GB          |
+| `lvm`         | lays out extra volumes as LVM at the sizes you declare — **off until you name a device** | Puts the images, `~/.m2` and the workspace on their own filesystem instead of the cramped root |
 | `swap`        | a 4G swap file (EC2 ships with none)                                          | Stops a peak in javac or the test JVM taking the box down                |
 | `java`        | JDK 17 (`openjdk` by default, `temurin` optionally)                           | JDK 17 is enforced by the maven build                                    |
 | `maven`       | Maven from the Apache archive, linked as `/usr/local/bin/mvn`                 | `./afon.sh -a build -p acceptance`                                       |
@@ -41,6 +42,58 @@ The `verify` role checks this and fails with the shortfall, rather than leaving 
 mid-build. After enlarging the EBS volume in the AWS console, re-run the playbook — the `disk` role
 grows the partition and filesystem onto the new space.
 
+## Declaring the storage layout
+
+The stock Ubuntu cloud image gives the runner a small root filesystem and a 1 GB `/boot` it never
+uses, which is no place for several GB of container images. Rather than repartitioning a live root
+disk — which cannot be done while it is mounted — attach one or more extra EBS volumes and declare
+what you want built on them. The `lvm` role pools them into one LVM volume group and carves it
+into the volumes you name:
+
+```yaml
+lvm_devices:                  # empty by default, so the role does nothing until you name one
+  - /dev/xvdf
+lvm_group: afon-vg
+lvm_volumes:
+  - name: data
+    size: 100%VG                  # or '60g', '50%VG' — lvcreate syntax
+    mount: /data
+    fstype: ext4
+```
+
+LVM rather than plain partitions so the sizes stay yours to change: raise a `size` and the next run
+grows the volume *and* its filesystem, online. Lowering one is ignored rather than shrinking a
+filesystem out from under its data, and attaching another volume and adding it to `lvm_devices`
+extends the group.
+
+Use `100%VG` — meaning the whole group — not `100%FREE`, which targets only the extents free at that
+moment and strands the rest of the group once the volume exists. Several volumes means giving them
+explicit sizes.
+
+The role then moves the space-hungry directories onto the new filesystem:
+
+| Directory                        | How                                            |
+|----------------------------------|------------------------------------------------|
+| `/var/lib/docker`                | `data-root` in `/etc/docker/daemon.json`, which is what the daemon supports; anything already pulled is copied across |
+| `~/.m2`                          | bind mount from `/data/m2`                     |
+| `actions-runner/_work`           | bind mount from `/data/runner-work`            |
+
+Existing content is copied first and the original kept as `<dir>.pre-bind` — delete those once you
+are happy, or set `lvm_keep_moved_data=false`.
+
+**A declared device must be a whole, unused disk.** The role asserts this and refuses anything
+carrying a partition table, a filesystem or a mount, so pointing it at the wrong device stops the
+play rather than destroying data. Devices already in the volume group are recognised, so re-runs are
+no-ops.
+
+With the layout in place, tell `verify` where the room now has to be:
+
+```yaml
+verify_disk_checks:
+  - {path: /, min_free_gb: 5}
+  - {path: /data, min_free_gb: 40}
+```
+
 ## Usage
 
 Requires `ansible` on your machine (`brew install ansible`) and SSH access to the runner host with
@@ -65,8 +118,8 @@ Report the versions currently installed, without changing anything:
 cd scripts/ansible && ansible-playbook runner-setup.yml --tags verify
 ```
 
-Install a single part of the setup with `--tags base|disk|swap|java|maven|docker|cloud|verify`, for
-example:
+Install a single part of the setup with
+`--tags base|disk|lvm|swap|java|maven|docker|cloud|verify`, for example:
 
 ```bash
 cd scripts/ansible && ansible-playbook runner-setup.yml --tags docker,verify

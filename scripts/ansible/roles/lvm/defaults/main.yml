@@ -1,0 +1,55 @@
+---
+# Declares the storage layout for the runner: extra block devices are pooled
+# into one LVM volume group, and carved into the logical volumes below. LVM
+# rather than plain partitions so a volume can be grown later by raising its
+# size here and re-running — no repartitioning, no downtime.
+#
+# The role does nothing at all while lvm_devices is empty, so a runner that
+# has no extra volumes attached is left alone.
+#
+# The devices must be whole, unused disks (an attached EBS volume, e.g.
+# /dev/xvdf or /dev/nvme1n1) — NOT the root disk, and not a device holding a
+# filesystem you care about. The role refuses to touch a device that already
+# carries a filesystem or partition table it did not create.
+lvm_devices: []
+lvm_group: afon-vg
+
+# Device types lsblk may report for a declared device. EBS volumes are 'disk';
+# 'loop' is here so the role can be exercised against loopback devices.
+lvm_device_types:
+  - disk
+
+# Sizes are lvcreate syntax: '40g', '20%VG', '100%VG'. Raising a size grows the
+# volume and its filesystem on the next run; lowering one is ignored rather than
+# shrinking a filesystem out from under its data.
+#
+# '100%VG' means the whole group, so a single volume keeps taking all of it as
+# devices are added. Do not use '100%FREE' — it targets only the extents free at
+# the time, which strands the rest of the group when the volume already exists.
+# Declaring several volumes means giving them explicit sizes.
+lvm_volumes:
+  - name: data
+    size: 100%VG
+    mount: /data
+    fstype: ext4
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_user }}"
+    mode: "0755"
+
+# Docker's data root — where the KeyCloak, Polaris, Trino and Spark images land.
+# Moved by configuration rather than a bind mount, which is what the daemon
+# supports properly. Set to an empty string to leave docker where it is.
+lvm_docker_root: /data/docker
+
+# Directories moved onto the new filesystem and bind mounted back into place, so
+# that the paths the runner and maven expect keep working.
+lvm_binds:
+  - src: /data/m2
+    dest: "{{ github_runner_home }}/.m2"
+  - src: /data/runner-work
+    dest: "{{ github_runner_home }}/actions-runner/_work"
+
+# Existing content is copied to the new location before the bind mount hides it.
+# The original is renamed to '<dir>.pre-bind' rather than deleted — remove those
+# by hand once you are happy, or set this to false to delete them outright.
+lvm_keep_moved_data: true

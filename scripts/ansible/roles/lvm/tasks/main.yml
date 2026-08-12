@@ -1,0 +1,133 @@
+---
+- name: Report that no extra storage is declared
+  ansible.builtin.debug:
+    msg: >-
+      No lvm_devices declared, leaving the runner's storage alone. Attach an
+      EBS volume and list it in lvm_devices to lay out {{ lvm_group }}.
+  when: lvm_devices | length == 0
+
+- name: Lay out the declared storage
+  when: lvm_devices | length > 0
+  block:
+    - name: Install the LVM tools
+      ansible.builtin.apt:
+        name: lvm2
+        state: present
+
+    - name: List the devices already in {{ lvm_group }}
+      ansible.builtin.command: pvs --noheadings --options pv_name --select vg_name={{ lvm_group }}
+      register: afon_pvs
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    # A physical volume belonging to no group holds no data — one is left behind
+    # by an interrupted run — so it can be adopted into the group rather than
+    # needing a pvremove by hand.
+    - name: List the physical volumes in no volume group
+      ansible.builtin.command: pvs --noheadings --options pv_name --select vg_name=""
+      register: afon_orphan_pvs
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Record the physical volumes already in place
+      ansible.builtin.set_fact:
+        afon_existing_pvs: "{{ afon_pvs.stdout_lines | map('trim') | list }}"
+        afon_free_pvs: "{{ afon_orphan_pvs.stdout_lines | map('trim') | list }}"
+
+    - name: Inspect the devices not yet a physical volume
+      ansible.builtin.command: lsblk --noheadings --output NAME,TYPE,FSTYPE,MOUNTPOINT {{ item }}
+      loop: "{{ lvm_devices | difference(afon_existing_pvs) | difference(afon_free_pvs) }}"
+      register: afon_device_check
+      changed_when: false
+      check_mode: false
+
+    # A device carrying partitions, a filesystem or a mount is either the wrong
+    # device or one holding data, and is never overwritten here. Devices already
+    # a physical volume are skipped above, so re-runs stay quiet.
+    - name: Assert the new devices are whole unused disks
+      vars:
+        afon_device_rows: "{{ item.stdout_lines | map('split') | list }}"
+      ansible.builtin.assert:
+        that:
+          - afon_device_rows | length == 1
+          - afon_device_rows[0] | length == 2
+          - afon_device_rows[0][1] in lvm_device_types
+        fail_msg: >-
+          {{ item.item }} is not an empty disk — lsblk reports
+          '{{ item.stdout_lines | map('trim') | join('; ') }}'. lvm_devices must name whole,
+          unused block devices (an attached EBS volume), never the root disk and never a device
+          holding a filesystem or partitions.
+      loop: "{{ afon_device_check.results | selectattr('stdout_lines', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    # The union of the declared devices and those already in the group, so that
+    # dropping a device from lvm_devices leaves the group alone instead of
+    # reducing it out from under the volumes. Removing a device is a deliberate
+    # operation, done by hand with pvmove and vgreduce.
+    - name: Pool the devices into the {{ lvm_group }} volume group
+      community.general.lvg:
+        vg: "{{ lvm_group }}"
+        pvs: "{{ (lvm_devices + afon_existing_pvs) | unique }}"
+        state: present
+
+    - name: Create the logical volumes
+      community.general.lvol:
+        vg: "{{ lvm_group }}"
+        lv: "{{ item.name }}"
+        size: "{{ item.size }}"
+        state: present
+        # Grow on a raised size, but never shrink a filesystem out from under
+        # its data if a size is lowered.
+        resizefs: true
+        shrink: false
+      loop: "{{ lvm_volumes }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.size }})"
+
+    - name: Make the filesystems
+      community.general.filesystem:
+        dev: "/dev/{{ lvm_group }}/{{ item.name }}"
+        fstype: "{{ item.fstype | default('ext4') }}"
+        resizefs: true
+      loop: "{{ lvm_volumes }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # The /dev/<vg>/<lv> path is stable across reboots and device reordering,
+    # unlike the /dev/xvdX name of the underlying volume. nofail so that a
+    # missing volume leaves the runner bootable rather than dropping to a shell.
+    - name: Mount the volumes
+      ansible.posix.mount:
+        path: "{{ item.mount }}"
+        src: "/dev/{{ lvm_group }}/{{ item.name }}"
+        fstype: "{{ item.fstype | default('ext4') }}"
+        opts: defaults,nofail
+        state: mounted
+      loop: "{{ lvm_volumes }}"
+      loop_control:
+        label: "{{ item.mount }}"
+
+    - name: Own the mount points
+      ansible.builtin.file:
+        path: "{{ item.mount }}"
+        state: directory
+        owner: "{{ item.owner | default(omit) }}"
+        group: "{{ item.group | default(omit) }}"
+        mode: "{{ item.mode | default(omit) }}"
+      loop: "{{ lvm_volumes }}"
+      loop_control:
+        label: "{{ item.mount }}"
+
+    - name: Move the docker data root onto the new storage
+      ansible.builtin.include_tasks: docker_root.yml
+      when: lvm_docker_root | length > 0
+
+    - name: Bind the runner directories onto the new storage
+      ansible.builtin.include_tasks: bind.yml
+      loop: "{{ lvm_binds }}"
+      loop_control:
+        loop_var: afon_bind
+        label: "{{ afon_bind.dest }} -> {{ afon_bind.src }}"
