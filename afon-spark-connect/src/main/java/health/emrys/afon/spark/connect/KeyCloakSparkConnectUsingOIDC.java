@@ -1,6 +1,6 @@
 package health.emrys.afon.spark.connect;
 
-import health.emrys.afon.security.keycloak.KeyCloakAdmin;
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,12 +27,11 @@ public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
 
     }
 
-    private final String kcAdminToken;
+    private final String keyCloakToken;
 
     public KeyCloakSparkConnectUsingOIDC(String polarisHost) throws IOException {
         super(polarisHost);
-        KeyCloakAdmin kcAdmin = new KeyCloakAdmin(properties);
-        kcAdminToken = kcAdmin.userToken(getSparkUser(), getSparkPassword());
+        keyCloakToken = new KeyCloakProvider(properties).userToken(getSparkUser(), getSparkPassword());
     }
 
     protected Map<String, String> getWarehouseConfig(String warehouseName,
@@ -45,7 +44,7 @@ public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
             .filter(x -> !x.getValue().contains(getSparkUser() + ":" + getSparkPassword()))
             .forEach(x -> warehouseConfig.put(x.getKey(), x.getValue()));
 
-        warehouseConfig.put(String.format("spark.sql.catalog.%s.token", warehouseName), kcAdminToken);
+        warehouseConfig.put(String.format("spark.sql.catalog.%s.token", warehouseName), keyCloakToken);
         return warehouseConfig;
     }
 }
