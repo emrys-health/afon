@@ -36,6 +36,24 @@ public class KeyCloakProvider {
 
     private static final Logger logger = getLogger(KeyCloakProvider.class);
 
+    /**
+     * oauth2-proxy's callback path (see JupyterMfaConfig's --redirect-url).
+     */
+    public static final String OAUTH2_PROXY_CALLBACK = "/oauth2/callback";
+    /**
+     * JupyterHub's OAuthenticator callback path (HUB_BASE_URL + "hub/oauth_callback"). The hub now
+     * owns the domain root (base_url "/"), so this is "/hub/oauth_callback" rather than under /jupyter/.
+     */
+    public static final String JUPYTERHUB_CALLBACK   = "/hub/oauth_callback";
+
+    /** 10 hours: how long an issued access token stays valid, so an interactive session lasts a working day. */
+    private static final int ACCESS_TOKEN_LIFESPAN_SECONDS = 10 * 60 * 60;
+    /**
+     * The SSO session bounds cap a token's lifespan, so they must exceed {@link #ACCESS_TOKEN_LIFESPAN_SECONDS}
+     * or a freshly-minted token would be clipped short. Given headroom above the 10h token life.
+     */
+    private static final int SSO_SESSION_LIFESPAN_SECONDS  = 12 * 60 * 60;
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final String baseUrl;
@@ -62,17 +80,39 @@ public class KeyCloakProvider {
     }
 
     /**
-     * Ensures the Polaris realm, client and user all exist.
-     * Idempotent: anything that already exists is left untouched.
+     * Registers the Polaris user with username and password provided, leaving
+     * the email unset.
      */
     public void registerPolarisUser(String username, String password) {
         registerPolarisUser(AfonUserProvider.createUser(username, password));
     }
 
     /**
-     * As {@link #registerPolarisUser(String, String)} but also sets the user's (verified) email.
+     * Registers the Polaris user with the configured properties:
+     * {@link AfonProperties#USER_POLARIS_ID},
+     * {@link AfonProperties#USER_POLARIS_SECRET},
+     * {@link AfonProperties#USER_POLARIS_EMAIL}.
+     *
+     * Registers the browser for the {@link AfonProperties#AWS_JUPYTER_DOMAIN}.
+     *
+     * Provisions the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
+     * "sign in" on the OAuth splash yields KeyCloak's "Client not found".
+     */
+    public void registerPolarisUserAndBrowserClient(Properties properties) {
+        registerPolarisUser(AfonUserProvider.createUser(
+                AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
+                AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
+                AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, "")));
+        registerBrowserClient(properties, AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties));
+    }
+
+    /**
+     * Registers a Polaris user, also setting the user's (verified) email.
      * A verified email is required for logins that go through oauth2-proxy, which rejects id_tokens
      * whose email is unverified. Pass {@code null}/blank to leave the email unset.
+     *
+     * Ensures the Polaris realm, client and user all exist.
+     * Idempotent: anything that already exists is left untouched.
      */
     public void registerPolarisUser(AfonUser user) {
         try {
@@ -152,14 +192,6 @@ public class KeyCloakProvider {
                 });
         }
     }
-
-    /** 10 hours: how long an issued access token stays valid, so an interactive session lasts a working day. */
-    private static final int ACCESS_TOKEN_LIFESPAN_SECONDS = 10 * 60 * 60;
-    /**
-     * The SSO session bounds cap a token's lifespan, so they must exceed {@link #ACCESS_TOKEN_LIFESPAN_SECONDS}
-     * or a freshly-minted token would be clipped short. Given headroom above the 10h token life.
-     */
-    private static final int SSO_SESSION_LIFESPAN_SECONDS  = 12 * 60 * 60;
 
     /**
      * Creates the realm if absent and, either way, converges its token lifespans. Polaris validates
@@ -291,6 +323,21 @@ public class KeyCloakProvider {
 
     private boolean isFailure(HttpResponse response) {
         return response == null || response.getCode() / 100 != 2;
+    }
+
+    /**
+     * Registers the browser-flow client for the Jupyter domain using the OAuth2 client configured in properties.
+     *
+     * @param properties
+     * @param jupyterDomain
+     */
+    public void registerBrowserClient(Properties properties, String jupyterDomain) {
+        registerBrowserClient(
+                AfonProperties.OAUTH2_CLIENT_ID.getValueFrom(properties),
+                AfonProperties.OAUTH2_CLIENT_SECRET.getValueFrom(properties),
+                List.of(
+                        "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
+                        "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
     }
 
     /**
@@ -524,54 +571,22 @@ public class KeyCloakProvider {
     }
 
     /**
-     * oauth2-proxy's callback path (see JupyterMfaConfig's --redirect-url).
-     */
-    public static final String OAUTH2_PROXY_CALLBACK = "/oauth2/callback";
-    /**
-     * JupyterHub's OAuthenticator callback path (HUB_BASE_URL + "hub/oauth_callback"). The hub now
-     * owns the domain root (base_url "/"), so this is "/hub/oauth_callback" rather than under /jupyter/.
-     */
-    public static final String JUPYTERHUB_CALLBACK   = "/hub/oauth_callback";
-
-    /**
      * Allows the realm/client/user to be provisioned independently of the containers, e.g. against an
      * already-running KeyCloak.
      */
     public static void main(String[] args) {
         Properties properties = new FilePropertyProvider().getProperties();
         KeyCloakProvider keyCloakProvider = new KeyCloakProvider(properties);
-        if (args.length == 3) {
-            String id = args[0];
-            String secret = args[1];
-            String email = args[2];
-            logger.info("Registering user id = {}, secret = {}, email = {}", id, secret, email);
-            keyCloakProvider.registerPolarisUser(AfonUserProvider.createUser(
-                id,
-                secret,
-                email
-            ));
+        if (args.length == 1) {
+            String username = args[0];
+            AfonUser user = new FileUserProvider().getUser(username);
+            logger.info("Registering user {} from UserProvider", username);
+            keyCloakProvider.registerPolarisUser(user);
         } else {
             logger.info("Registering user from properties");
-            keyCloakProvider.registerPolarisUser(AfonUserProvider.createUser(
-                AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
-                AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
-                AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, ""))
-            );
-
-            // Provision the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
-            // "sign in" on the OAuth splash yields KeyCloak's "Client not found".
-            String jupyterDomain = AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties);
-            keyCloakProvider.registerBrowser(properties, jupyterDomain);
+            keyCloakProvider.registerPolarisUserAndBrowserClient(properties);
         }
     }
 
-    public void registerBrowser(Properties properties, String jupyterDomain) {
-        registerBrowserClient(
-            AfonProperties.OAUTH2_CLIENT_ID.getValueFrom(properties),
-            AfonProperties.OAUTH2_CLIENT_SECRET.getValueFrom(properties),
-            List.of(
-                "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
-                "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
-    }
 
 }

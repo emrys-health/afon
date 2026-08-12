@@ -138,6 +138,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
     val userProvider = new AfonUserProvider() {
       override def getUsers: util.List[AfonUser] = util.List.of(User)
+      override def getUser(UserName: String): AfonUser = User;
     }
     "agree on the token" in {
       Given("A KeyCloak and Polaris instance")

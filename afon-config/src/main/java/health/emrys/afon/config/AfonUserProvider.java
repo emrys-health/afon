@@ -37,4 +37,5 @@ public interface AfonUserProvider {
 
     List<AfonUser> getUsers();
 
+    AfonUser getUser(String username);
 }

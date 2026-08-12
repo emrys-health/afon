@@ -95,6 +95,16 @@ public class FileUserProvider implements AfonUserProvider {
     }
 
     @Override
+    public AfonUser getUser(String username) {
+        for (AfonUser user : getUsers()) {
+            if (user.username().equals(username)) {
+                return user;
+            }
+        }
+        throw new RuntimeException("No user found with username: " + username);
+    }
+
+    @Override
     public String toString() {
         return getUsers().stream().map(x -> x.username()).collect(Collectors.joining("\n"));
     }
