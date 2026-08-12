@@ -11,8 +11,8 @@ import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import health.emrys.afon.polaris.config.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
-import health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM
-import health.emrys.afon.security.keycloak.{KeyCloakAdmin, KeyCloakConfig}
+import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
+import health.emrys.afon.security.keycloak.KeyCloakProvider
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
@@ -151,8 +151,8 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       onboarding.configureKeyCloak("NotUsed.com")
 
       Then(s"we can get a token from KeyCloak for user '$UserName' in Realm '$KEYCLOAK_REALM'")
-      val kcAdmin = new KeyCloakAdmin("localhost", UserName, UserPassword)
-      assert(kcAdmin.getToken(KEYCLOAK_REALM) != null)
+      val keyCloakProvider = new KeyCloakProvider("localhost", UserName, UserPassword)
+      assert(keyCloakProvider.getToken(KEYCLOAK_REALM) != null)
 
       val uriGet = tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
       val polarisClient = AcceptanceTestConfig.instance.polarisClientFor(UserName, UserPassword)

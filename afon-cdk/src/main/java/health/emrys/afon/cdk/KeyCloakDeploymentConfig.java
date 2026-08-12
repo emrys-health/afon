@@ -16,8 +16,8 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_IMAGE;
-import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_IMAGE;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
 
 /**
  * Abstract based class for KeyCloak deployment configurations.

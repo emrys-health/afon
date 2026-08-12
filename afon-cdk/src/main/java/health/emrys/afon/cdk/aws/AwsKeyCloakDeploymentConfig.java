@@ -9,7 +9,7 @@ import software.constructs.Construct;
 
 import java.util.Properties;
 
-import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_PORT;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
 
 public class AwsKeyCloakDeploymentConfig extends KeyCloakDeploymentConfig<AwsCloudProvider> {
     private final String dnsZone;

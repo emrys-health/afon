@@ -22,7 +22,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
-import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -32,9 +32,9 @@ import static org.slf4j.LoggerFactory.getLogger;
  *
  * Note in KeyCloak parlance, client is an app and user is a human
  */
-public class KeyCloakAdmin {
+public class KeyCloakProvider {
 
-    private static final Logger logger = getLogger(KeyCloakAdmin.class);
+    private static final Logger logger = getLogger(KeyCloakProvider.class);
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -42,20 +42,20 @@ public class KeyCloakAdmin {
     private final String adminUser;
     private final String adminPassword;
 
-    public KeyCloakAdmin(Properties properties) {
+    public KeyCloakProvider(Properties properties) {
         this(properties, KC_HOSTNAME.getValueFrom(properties));
     }
 
-    public KeyCloakAdmin(Properties properties, String kcHostname) {
-        this(KeyCloakConfig.urlFor(kcHostname, protocolFor(kcHostname)),
+    public KeyCloakProvider(Properties properties, String kcHostname) {
+        this(KeyCloakConfigurer.urlFor(kcHostname, protocolFor(kcHostname)),
              KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
              KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
     }
 
-    public KeyCloakAdmin(String kcHostname,
-                         String adminUser,
-                         String adminPassword) {
-        this.baseUrl       = KeyCloakConfig.urlFor(kcHostname, protocolFor(kcHostname));
+    public KeyCloakProvider(String kcHostname,
+                            String adminUser,
+                            String adminPassword) {
+        this.baseUrl       = KeyCloakConfigurer.urlFor(kcHostname, protocolFor(kcHostname));
         this.adminUser     = adminUser;
         this.adminPassword = adminPassword;
         logger.info("KeyCloak Admin URL: {}. user = {}", this.baseUrl, this.adminUser);
@@ -538,21 +538,21 @@ public class KeyCloakAdmin {
      * already-running KeyCloak.
      */
     public static void main(String[] args) {
-        Properties    properties = new FilePropertyProvider().getProperties();
-        KeyCloakAdmin admin      = new KeyCloakAdmin(properties);
+        Properties properties = new FilePropertyProvider().getProperties();
+        KeyCloakProvider keyCloakProvider = new KeyCloakProvider(properties);
         if (args.length == 3) {
             String id = args[0];
             String secret = args[1];
             String email = args[2];
             logger.info("Registering user id = {}, secret = {}, email = {}", id, secret, email);
-            admin.registerPolarisUser(AfonUserProvider.createUser(
+            keyCloakProvider.registerPolarisUser(AfonUserProvider.createUser(
                 id,
                 secret,
                 email
             ));
         } else {
             logger.info("Registering user from properties");
-            admin.registerPolarisUser(AfonUserProvider.createUser(
+            keyCloakProvider.registerPolarisUser(AfonUserProvider.createUser(
                 AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
                 AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
                 AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, ""))
@@ -561,7 +561,7 @@ public class KeyCloakAdmin {
             // Provision the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
             // "sign in" on the OAuth splash yields KeyCloak's "Client not found".
             String jupyterDomain = AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties);
-            admin.registerBrowser(properties, jupyterDomain);
+            keyCloakProvider.registerBrowser(properties, jupyterDomain);
         }
     }
 

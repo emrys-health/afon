@@ -3,7 +3,7 @@ package health.emrys.afon.ops;
 import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.security.keycloak.KeyCloakAdmin;
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import org.slf4j.Logger;
@@ -14,7 +14,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.security.keycloak.KeyCloakConfig.KEYCLOAK_REALM;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 
 public class OnboardAllUsersMain {
 
@@ -22,12 +22,12 @@ public class OnboardAllUsersMain {
 
     private final AfonUserProvider userProvider;
     private final Properties       properties;
-    private final KeyCloakAdmin    kcAdmin;
+    private final KeyCloakProvider keyCloakProvider;
 
     public OnboardAllUsersMain(AfonUserProvider userProvider, Properties properties) {
         this.userProvider = userProvider;
         this.properties = properties;
-        this.kcAdmin = new KeyCloakAdmin(properties);
+        this.keyCloakProvider = new KeyCloakProvider(properties);
     }
 
     public void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
@@ -39,12 +39,12 @@ public class OnboardAllUsersMain {
 
     public void configureKeyCloak(String jupyterDomain) throws IOException {
         logger.info("CONFIGURING KEYCLOAK");
-        kcAdmin.registerBrowser(properties, jupyterDomain);
-        String adminToken = kcAdmin.adminToken();
-        kcAdmin.createRealm(adminToken, KEYCLOAK_REALM);
+        keyCloakProvider.registerBrowser(properties, jupyterDomain);
+        String adminToken = keyCloakProvider.adminToken();
+        keyCloakProvider.createRealm(adminToken, KEYCLOAK_REALM);
         for (AfonUser user : userProvider.getUsers()) {
-            kcAdmin.createUser(adminToken, KEYCLOAK_REALM, user);
-            kcAdmin.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
+            keyCloakProvider.createUser(adminToken, KEYCLOAK_REALM, user);
+            keyCloakProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
         }
     }
 

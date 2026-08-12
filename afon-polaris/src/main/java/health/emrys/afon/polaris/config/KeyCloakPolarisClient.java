@@ -15,7 +15,7 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperties.KC_HOSTNAME;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
-import static health.emrys.afon.security.keycloak.KeyCloakConfig.tokenEndpoint;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.tokenEndpoint;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**

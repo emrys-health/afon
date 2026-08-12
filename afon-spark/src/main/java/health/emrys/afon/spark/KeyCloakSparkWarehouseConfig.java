@@ -1,6 +1,6 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.security.keycloak.KeyCloakConfig;
+import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import org.jspecify.annotations.NonNull;
 
 import java.util.HashMap;
@@ -28,7 +28,7 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
 
     private static String kcUriFor(Properties properties) {
         String kcHost = KC_HOSTNAME.getValueFrom(properties);
-        return KeyCloakConfig.tokenEndpoint(kcHost, protocolFor(kcHost));
+        return KeyCloakConfigurer.tokenEndpoint(kcHost, protocolFor(kcHost));
     }
 
     private final String oauth2ServerUri;

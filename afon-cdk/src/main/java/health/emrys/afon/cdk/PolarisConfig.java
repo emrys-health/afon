@@ -8,7 +8,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
-import health.emrys.afon.security.keycloak.KeyCloakConfig;
+import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -112,7 +112,7 @@ public class PolarisConfig extends Construct {
     private static @NonNull String kcExports(Properties properties) {
         String kcHost = KC_HOSTNAME.getValueFrom(properties);
         Map<String, String> kcProperties = KeyCloakHelper.polarisOidcEnv(
-            KeyCloakConfig.internalRealmUrl(kcHost, "https"),
+            KeyCloakConfigurer.internalRealmUrl(kcHost, "https"),
             KC_DB_USERNAME.getValueFrom(properties),
             KC_DB_PASSWORD.getValueFrom(properties));
         return toExports(kcProperties);

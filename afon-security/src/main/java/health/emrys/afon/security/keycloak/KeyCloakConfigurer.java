@@ -11,9 +11,9 @@ import static health.emrys.afon.config.AfonProperties.KC_BOOTSTRAP_ADMIN_PASSWOR
 import static health.emrys.afon.config.AfonProperties.KC_BOOTSTRAP_ADMIN_USERNAME;
 import static java.lang.String.format;
 
-public class KeyCloakConfig {
+public class KeyCloakConfigurer {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(KeyCloakConfig.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(KeyCloakConfigurer.class);
 
     public static final int    KEYCLOAK_PORT  = 8080;
     public static final String KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak:26.6.3";
@@ -64,11 +64,11 @@ public class KeyCloakConfig {
 
     private final Properties properties;
 
-    public KeyCloakConfig(Properties properties) {
+    public KeyCloakConfigurer(Properties properties) {
         this.properties = properties;
     }
 
-    public Map<String, String> configUsing() {
+    public Map<String, String> config() {
         Map<String, String> config = new HashMap<>();
         config.put(KC_BOOTSTRAP_ADMIN_USERNAME.getName(), KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties));
         config.put(KC_BOOTSTRAP_ADMIN_PASSWORD.getName(), KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));

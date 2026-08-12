@@ -2,8 +2,8 @@ package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.security.keycloak.KeyCloakAdmin;
-import health.emrys.afon.security.keycloak.KeyCloakConfig;
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
+import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
@@ -32,7 +32,7 @@ import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
-import static health.emrys.afon.security.keycloak.KeyCloakConfig.*;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.*;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
@@ -96,26 +96,25 @@ public class ContainerHelper {
                                 .forPort(KEYCLOAK_PORT)
                                 .forStatusCode(200)
                                 .withStartupTimeout(Duration.ofMinutes(3)));
-            KeyCloakConfig kcConfig = new KeyCloakConfig(properties);
-            kcConfig.configUsing().entrySet().forEach(entry ->
+            new KeyCloakConfigurer(properties).config().entrySet().forEach(entry ->
                                                           keyCloak.withEnv(entry.getKey(), entry.getValue())
             );
-            // Fixed binding so the host-side KeyCloakAdmin can reach it at localhost:8080.
+            // Fixed binding so the host-side KeyCloakProvider can reach it at localhost:8080.
             keyCloak.setPortBindings(List.of(KEYCLOAK_PORT + ":" + KEYCLOAK_PORT));
             logger.info("Starting KeyCloak docker container. This usually takes about 20s, longer if " +
                             "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
-            KeyCloakAdmin keyCloakAdmin = new KeyCloakAdmin(properties, KEYCLOAK_HOSTNAME);
-            keyCloakAdmin
+            KeyCloakProvider keyCloakProvider = new KeyCloakProvider(properties, KEYCLOAK_HOSTNAME);
+            keyCloakProvider
                 .registerPolarisUser(
                     KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
                     KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
-            keyCloakAdmin
+            keyCloakProvider
                 .registerPolarisUser(
                     USER_POLARIS_ID.getValueFrom(properties),
                     USER_POLARIS_SECRET.getValueFrom(properties));
-            keyCloakAdmin
+            keyCloakProvider
                 .registerPolarisUser(
                     POLARIS_ID.getValueFrom(properties),
                     POLARIS_SECRET.getValueFrom(properties));
