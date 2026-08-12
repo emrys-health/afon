@@ -180,7 +180,10 @@ exec_tofu(){
      usage; exit 0
   fi
   echo "Using tofu dir $TOFU_DIR"
-  TOFU_ACTION=${ACTION#tofu-}
+  if [ -z "$TOFU_ACTION" ]; then
+    # it may have already been set by caller
+    TOFU_ACTION=${ACTION#tofu-}
+  fi
   if [ "$TOFU_ACTION" != "state" ] ; then
     TOFU_ARGS="$TOFU_ARGS -auto-approve"
   fi
@@ -417,7 +420,18 @@ case $ACTION in
       TOFU_CLOUD="aws"
       echo "Defaulting to tofu cloud: $TOFU_CLOUD"
     fi
-    exec_tofu
+    if [ "$ACTION" == "tofu-destroy" ]; then
+      # workaround until we sort out the issue of the hanging process
+      # https://github.com/emrys-health/afon-core/issues/84
+      TOFU_ACTION="state"
+      TOFU_ARGS="rm helm_release.prometheusRelease"
+      exec_tofu
+      TOFU_ACTION="destroy"
+      TOFU_ARGS=
+      exec_tofu
+    else
+      exec_tofu
+    fi
     ;;
   *)
     echo "Unknown action $ACTION"
