@@ -6,16 +6,16 @@ usage (){
   echo "          [--logging-level|-l <logging>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
   echo "          [--config-source <zip>]"
-  echo "          [--deploy-stack <stack>] [--deploy-args <args>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
   echo "          [--setup-os <os>] [--setup-output <file>] [--setup-show]"
+  echo "          [--stack-deploy] [--stack-type <type>] [--stack-args <args>] [--stack-status]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  build|config-*|deploy|docs|exec|setup|tofu-*"
   echo "          build       : executes the mvn build"
   echo "          config-*    : executes the config commands.  One of import|init|validate"
-  echo "          deploy      : executes the deploy commands, based on the <cloud> option and the <deploy-stack>."
+  echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|status"
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
   echo "          exec        : executes the jvm classes from ops (see the docs for details)"
   echo "          setup       : sets up the local env for the given os."
@@ -26,8 +26,6 @@ usage (){
   echo "build-goals:    the build goals.  Defaults to 'clean install'."
   echo "build-profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
   echo "config-source:  the config source to import as a zip file."
-  echo "deploy-stack:   the deploy stack.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'full'."
-  echo "deploy-args:    the deploy args."
   echo "docs-dir:       the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
   echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
   echo "exec-package:   the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
@@ -37,6 +35,8 @@ usage (){
   echo "setup-os:       the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:   the output file where to write the setup.  Defaults to 'versions.md'"
   echo "setup-show:     the flag to show the current setup, without executing the setup commands."
+  echo "stack-type:     the stack type.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'full'."
+  echo "stack-args:     the stack command args."
   echo "tofu-args:      the tofu args."
   echo "tofu-cloud:     the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
   echo "mvn-quiet:      the flag to hush the mvn output"
@@ -101,26 +101,6 @@ exec_config(){
   esac
 }
 
-capitaliseFirst(){
-  echo "$1" | awk '{print toupper(substr($0,1,1)) substr($0,2)}'
-}
-
-exec_deploy(){
-  EXEC_TYPE="ops"
-  EXEC_ARGS="$DEPLOY_ARGS"
-  CLOUD_CF=$(capitaliseFirst $CLOUD)
-  case $DEPLOY_STACK in
-    full)
-      EXEC_CLASS="ops.Deploy${CLOUD_CF}FullStackMain"
-      ;;
-    polaris)
-      EXEC_CLASS="ops.Deploy${CLOUD_CF}PolarisMain"
-      ;;
-  esac
-  echo "Deploy using $EXEC_CLASS"
-  exec_jvm
-}
-
 exec_docs(){
   mkdir -p $DOCS_DIR
   ARTIFACT="health.emrys:afon-docs:$VERSION:zip:docs"
@@ -172,6 +152,45 @@ exec_script(){
   fi
   cd $CWD/scripts
   source $EXEC_SCRIPT
+}
+
+capitaliseFirst(){
+  echo "$1" | awk '{print toupper(substr($0,1,1)) substr($0,2)}'
+}
+
+exec_stack(){
+  EXEC_TYPE="ops"
+  EXEC_ARGS="$STACK_ARGS"
+  STACK_ACTION=${ACTION#stack-}
+  if [ "$STACK_ACTION" == "deploy" ]; then
+    if [ -z "$STACK_TYPE" ]; then
+      STACK_TYPE="full"
+      echo "Stack type not specified.  Defaulting to '$STACK_TYPE'."
+    fi
+    CLOUD_CF=$(capitaliseFirst $CLOUD)
+    case $STACK_TYPE in
+      full)
+        EXEC_CLASS="ops.Deploy${CLOUD_CF}FullStackMain"
+        ;;
+      polaris)
+        EXEC_CLASS="ops.Deploy${CLOUD_CF}PolarisMain"
+        ;;
+    esac
+    echo "Deploy using $EXEC_CLASS"
+    exec_jvm
+  fi
+  if [ "$STACK_ACTION" == "status" ]; then
+    EXEC_TYPE="script"
+    case $CLOUD in
+      aws)
+        EXEC_SCRIPT="aws/vpcs.sh"
+        ;;
+      *)
+        echo "Stack status for $CLOUD not yet supported"
+        ;;
+    esac
+    exec_script
+  fi
 }
 
 exec_tofu(){
@@ -244,8 +263,6 @@ CLOUD=
 LOGGING=
 DRY_RUN=false
 CONFIG_SOURCE=
-DEPLOY_STACK=
-DEPLOY_ARGS=
 DOCS_DIR=
 EXEC_CLASS=
 EXEC_ARGS=
@@ -261,6 +278,8 @@ MVN_QUIET=
 SETUP_OS=
 SETUP_OUTPUT=
 SETUP_SHOW=
+STACK_TYPE=
+STACK_ARGS=
 TOFU_ACTION=
 TOFU_ARGS=
 TOFU_CLOUD=
@@ -282,10 +301,6 @@ while [[ $# -gt 0 ]]; do
       DRY_RUN=true; shift ;;
     --config-source)
       CONFIG_SOURCE="$2"; shift 2 ;;
-    --deploy-stack)
-      DEPLOY_STACK="$2"; shift 2 ;;
-    --deploy-args)
-      DEPLOY_ARGS="$2"; shift 2 ;;
     --docs-dir|-d)
       DOCS_DIR="$2"; shift 2 ;;
     --exec-class)
@@ -308,6 +323,10 @@ while [[ $# -gt 0 ]]; do
       SETUP_OUTPUT="$2"; shift 2 ;;
     --setup-show)
       SETUP_SHOW=true; shift ;;
+    --stack-type)
+      STACK_TYPE="$2"; shift 2 ;;
+    --stack-args)
+      STACK_ARGS="$2"; shift 2 ;;
     --tofu-args)
       TOFU_ARGS="$2"; shift 2 ;;
     --tofu-cloud)
@@ -372,17 +391,6 @@ case $ACTION in
   config-*)
     exec_config
     ;;
-  deploy)
-    if [ -z "$CLOUD" ]; then
-      CLOUD="aws"
-      echo "Cloud not specified.  Defaulting to '$CLOUD'."
-    fi
-    if [ -z "$DEPLOY_STACK" ]; then
-      DEPLOY_STACK="full"
-      echo "Deploy stack not specified.  Defaulting to '$DEPLOY_STACK'."
-    fi
-    exec_deploy
-    ;;
   docs-export)
     VERSION=$(version)
     if [ -z "$DOCS_DIR" ]; then
@@ -417,6 +425,13 @@ case $ACTION in
       SETUP_OUTPUT="versions.md"
     fi
     setup_output
+    ;;
+  stack-*)
+    if [ -z "$CLOUD" ]; then
+      CLOUD="aws"
+      echo "Cloud not specified.  Defaulting to '$CLOUD'."
+    fi
+    exec_stack
     ;;
   tofu-*)
     if [ -z "$TOFU_CLOUD" ]; then
