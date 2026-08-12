@@ -31,15 +31,15 @@ public class OnboardAllUsersMain {
     }
 
     public void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
-        logger.info("CONFIGURING POLARIS");
+        logger.info("Configuring Polaris");
         ConfigurePolarisUserMain polarisConfiguration = new ConfigurePolarisUserMain(properties);
         polarisConfiguration.configurePrivilegesFor(warehouse);
         polarisConfiguration.configureAll(warehouse, userProvider);
     }
 
     public void configureKeyCloak(String jupyterDomain) throws IOException {
-        logger.info("CONFIGURING KEYCLOAK");
-        keyCloakProvider.registerBrowser(properties, jupyterDomain);
+        logger.info("Configuring KeyCloak");
+        keyCloakProvider.registerBrowserClient(properties, jupyterDomain);
         String adminToken = keyCloakProvider.adminToken();
         keyCloakProvider.createRealm(adminToken, KEYCLOAK_REALM);
         for (AfonUser user : userProvider.getUsers()) {
