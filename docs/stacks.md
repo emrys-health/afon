@@ -123,7 +123,7 @@ You may need to run them multiple times for the VPC to disappear from your cloud
 To check the AWS VPC has been destroyed:
 
 ```shell
-aws ec2 describe-vpcs --query "Vpcs[?Tags[?Key=='Name' && Value=='cdktf-eks-vpc-spark-cluster']].VpcId"   --output text
+./afon.sh -a stack-status
 ```
 
 And if all else fails, login to the [AWS VPC Console](https://eu-west-2.console.aws.amazon.com/vpcconsole/home?region=eu-west-2#vpcs:)
