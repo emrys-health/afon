@@ -33,7 +33,7 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PO
  * KC_DB_USERNAME
  * KC_DB_PASSWORD
  */
-public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends Construct {
+public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct {
     public static final String          KEYCLOAK_INGRESS       = "keycloak-ingress";
     public static final String          KEYCLOAK_HTTPS_INGRESS = "keycloak-https-ingress";
     public static final String          APP_NAME               = "keycloak";
@@ -47,7 +47,7 @@ public abstract class KeyCloakDeploymentConfig<T extends CloudProvider> extends 
     private final       String          SECRET_NAME            = "kcsecrets";
     protected final     T               cloudProvider;
 
-    public KeyCloakDeploymentConfig(
+    public KeyCloakConfig(
         @NonNull Construct scope,
         @NonNull Properties properties,
         @NonNull T cloudProvider) {
