@@ -27,10 +27,10 @@ import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
- * Provisions, via the KeyCloak admin REST API, the realm, client and user/password that Polaris
+ * Provisions, via the KeyCloak admin REST API, the realm, client and username/password that Polaris
  * trusts. After registration, a client can obtain a token from KeyCloak.
  *
- * Note in KeyCloak parlance, client is an app and user is a human
+ * Note: In KeyCloak parlance, client is an app and user is a human
  */
 public class KeyCloakProvider {
 
@@ -54,29 +54,32 @@ public class KeyCloakProvider {
      */
     private static final int SSO_SESSION_LIFESPAN_SECONDS  = 12 * 60 * 60;
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper();
 
     private final String baseUrl;
     private final String adminUser;
     private final String adminPassword;
 
+    /**
+     * Create a provider using the configured properties:
+     * {@link AfonProperties#KC_HOSTNAME},
+     * {@link AfonProperties#KC_BOOTSTRAP_ADMIN_USERNAME},
+     * {@link AfonProperties#KC_BOOTSTRAP_ADMIN_PASSWORD}
+     * @param properties
+     */
     public KeyCloakProvider(Properties properties) {
-        this(properties, KC_HOSTNAME.getValueFrom(properties));
+        this(KC_HOSTNAME.getValueFrom(properties),
+                KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
+                KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
     }
 
-    public KeyCloakProvider(Properties properties, String kcHostname) {
-        this(KeyCloakConfigurer.urlFor(kcHostname, protocolFor(kcHostname)),
-             KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
-             KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
-    }
-
-    public KeyCloakProvider(String kcHostname,
+    public KeyCloakProvider(String hostname,
                             String adminUser,
                             String adminPassword) {
-        this.baseUrl       = KeyCloakConfigurer.urlFor(kcHostname, protocolFor(kcHostname));
+        this.baseUrl       = KeyCloakConfigurer.urlFor(hostname, protocolFor(hostname));
         this.adminUser     = adminUser;
         this.adminPassword = adminPassword;
-        logger.info("KeyCloak Admin URL: {}. user = {}", this.baseUrl, this.adminUser);
+        logger.info("Using KeyCloak URL: {}, admin: {}", this.baseUrl, this.adminUser);
     }
 
     /**
@@ -116,13 +119,12 @@ public class KeyCloakProvider {
      */
     public void registerPolarisUser(AfonUser user) {
         try {
-            logger.info("Running as {}/{}", adminUser, adminPassword);
             String adminToken = adminToken();
             createRealm(adminToken, KEYCLOAK_REALM);
             createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
             createUser(adminToken, KEYCLOAK_REALM, user);
             logger.info(
-                "KeyCloak realm '{}' provisioned with client/user '{}' (email '{}')",
+                "KeyCloak realm '{}' provisioned with client user '{}' (email '{}')",
                 KEYCLOAK_REALM, user.username(), user.email());
         } catch (IOException e) {
             throw new RuntimeException("Failed to provision KeyCloak for Polaris", e);
@@ -152,7 +154,7 @@ public class KeyCloakProvider {
                 if (response.getCode() != HttpStatus.SC_OK) {
                     throw new IOException("Could not obtain token for user " + username + ": HTTP " + response.getCode());
                 }
-                Map<?, ?> json = MAPPER.readValue(response.getEntity().getContent(), Map.class);
+                Map<?, ?> json = mapper.readValue(response.getEntity().getContent(), Map.class);
                 return (String) json.get("access_token");
             });
         }
@@ -160,14 +162,23 @@ public class KeyCloakProvider {
 
 
     /**
-     * Authenticates against the master realm as the bootstrap admin and returns an access token for
-     * the admin REST API.
-     * NOTE: this is the 'master' realm so only the admin user can call this.
+     * Authenticates against the 'master' realm as the bootstrap admin.
+     *
+     * Note: This is the 'master' realm so only the admin user can call this.
+     * @return An access token for the admin REST API.
+     * @throws IOException
      */
     public String adminToken() throws IOException {
         return getToken("master");
     }
 
+    /**
+     * Authenticates against the given realm, eg 'polaris'.
+     *
+     * @param realm the realm to authenticate against.
+     * @return An access token
+     * @throws IOException
+     */
     public String getToken(String realm) throws IOException {
         String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, realm);
         String body = form(Map.of(
@@ -187,7 +198,7 @@ public class KeyCloakProvider {
                     if (response.getCode() != HttpStatus.SC_OK) {
                         throw new IOException("Could not obtain KeyCloak admin token: HTTP " + response.getCode());
                     }
-                    Map<?, ?> json = MAPPER.readValue(response.getEntity().getContent(), Map.class);
+                    Map<?, ?> json = mapper.readValue(response.getEntity().getContent(), Map.class);
                     return (String) json.get("access_token");
                 });
         }
@@ -204,7 +215,7 @@ public class KeyCloakProvider {
      * these lifespans rather than left stale.
      */
     public void createRealm(String adminToken, String realm) throws IOException {
-        String json = MAPPER.writeValueAsString(Map.of(
+        String json = mapper.writeValueAsString(Map.of(
             "realm", realm,
             "enabled", true,
             "accessTokenLifespan", ACCESS_TOKEN_LIFESPAN_SECONDS,
@@ -233,7 +244,7 @@ public class KeyCloakProvider {
         String clientId,
         String clientSecret
     ) throws IOException {
-        String json = MAPPER.writeValueAsString(Map.of(
+        String json = mapper.writeValueAsString(Map.of(
             "clientId", clientId,
             "secret", clientSecret,
             "enabled", true,
@@ -317,7 +328,7 @@ public class KeyCloakProvider {
             return;
         }
         String uri  = format("%s/admin/realms/%s/clients/%s/protocol-mappers/models", baseUrl, realm, uuid);
-        String json = MAPPER.writeValueAsString(mapper);
+        String json = this.mapper.writeValueAsString(mapper);
         postJson(adminToken, uri, json, "protocol mapper " + mapper.get("name") + " on " + clientId);
     }
 
@@ -378,7 +389,7 @@ public class KeyCloakProvider {
                                     String clientSecret,
                                     List<String> redirectUris
     ) throws IOException {
-        String json = MAPPER.writeValueAsString(Map.ofEntries(
+        String json = mapper.writeValueAsString(Map.ofEntries(
             Map.entry("clientId", clientId),
             Map.entry("secret", clientSecret),
             Map.entry("enabled", true),
@@ -438,7 +449,7 @@ public class KeyCloakProvider {
                 if (response.getCode() != HttpStatus.SC_OK) {
                     return null;
                 }
-                List<?> found = MAPPER.readValue(response.getEntity().getContent(), List.class);
+                List<?> found = mapper.readValue(response.getEntity().getContent(), List.class);
                 if (found.isEmpty()) {
                     return null;
                 }
@@ -486,7 +497,7 @@ public class KeyCloakProvider {
                 "value", user.password(),
                 "temporary", false
             )));
-        String json = MAPPER.writeValueAsString(userObject);
+        String json = mapper.writeValueAsString(userObject);
         int    code = postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + user.username()).getCode();
         // A 409 on POST /users is ambiguous: it means the username already exists (genuinely
         // idempotent - fine) OR that some other unique field collides, typically a duplicate email
@@ -516,7 +527,7 @@ public class KeyCloakProvider {
                     if (response.getCode() != HttpStatus.SC_OK) {
                         return false;
                     }
-                    List<?> users = MAPPER.readValue(response.getEntity().getContent(), List.class);
+                    List<?> users = mapper.readValue(response.getEntity().getContent(), List.class);
                     return !users.isEmpty();
                 });
         }
@@ -583,7 +594,7 @@ public class KeyCloakProvider {
             logger.info("Registering user {} from UserProvider", username);
             keyCloakProvider.registerPolarisUser(user);
         } else {
-            logger.info("Registering user from properties");
+            logger.info("Registering user and client from properties");
             keyCloakProvider.registerPolarisUserAndBrowserClient(properties);
         }
     }
