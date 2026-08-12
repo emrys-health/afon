@@ -4,6 +4,7 @@ set -euo pipefail
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h] [--home <afon-home>]"
   echo "          [--logging-level|-l <logging>]"
+  echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
   echo "          [--config-source <zip>]"
   echo "          [--docs-dir|-d <dir>]"
@@ -12,7 +13,8 @@ usage (){
   echo "          [--setup-os <os>] [--setup-output <file>] [--setup-show]"
   echo "          [--stack-deploy] [--stack-type <type>] [--stack-args <args>] [--stack-status]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
-  echo "actions:  build|config-*|deploy|docs|exec|setup|tofu-*"
+  echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
+  echo "          ansible:    : executes the ansible playbook"
   echo "          build       : executes the mvn build"
   echo "          config-*    : executes the config commands.  One of import|init|validate"
   echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|status"
@@ -20,28 +22,30 @@ usage (){
   echo "          exec        : executes the jvm classes from ops (see the docs for details)"
   echo "          setup       : sets up the local env for the given os."
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state"
-  echo "cloud:          the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
-  echo "logging-level:  the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
-  echo "build-args:     the build args.  eg '-DskipTests'."
-  echo "build-goals:    the build goals.  Defaults to 'clean install'."
-  echo "build-profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
-  echo "config-source:  the config source to import as a zip file."
-  echo "docs-dir:       the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
-  echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
-  echo "exec-package:   the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
-  echo "exec-class:     the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
-  echo "exec-args:      the jvm exec args (must be quoted if more than one arg)"
-  echo "exec-envs:      the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
-  echo "setup-os:       the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
-  echo "setup-output:   the output file where to write the setup.  Defaults to 'versions.md'"
-  echo "setup-show:     the flag to show the current setup, without executing the setup commands."
-  echo "stack-type:     the stack type.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'full'."
-  echo "stack-args:     the stack command args."
-  echo "tofu-args:      the tofu args."
-  echo "tofu-cloud:     the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
-  echo "mvn-quiet:      the flag to hush the mvn output"
-  echo "help:           the help flag.  Prints usage."
-  echo "home:           the afon home dir.  Defaults to $HOME/.afon."
+  echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
+  echo "logging-level:    the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
+  echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
+  echo "ansible-args:     the ansible args.  eg '--tags verify'."
+  echo "build-args:       the build args.  eg '-DskipTests'."
+  echo "build-goals:      the build goals.  Defaults to 'clean install'."
+  echo "build-profiles:   the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
+  echo "config-source:    the config source to import as a zip file."
+  echo "docs-dir:         the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
+  echo "exec-types:       the exec types.  One of ops|samples|script.  Defaults to 'ops'."
+  echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
+  echo "exec-class:       the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
+  echo "exec-args:        the jvm exec args (must be quoted if more than one arg)"
+  echo "exec-envs:        the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
+  echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
+  echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
+  echo "setup-show:       the flag to show the current setup, without executing the setup commands."
+  echo "stack-type:       the stack type.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'full'."
+  echo "stack-args:       the stack command args."
+  echo "tofu-args:        the tofu args."
+  echo "tofu-cloud:       the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
+  echo "mvn-quiet:        the flag to hush the mvn output"
+  echo "help:             the help flag.  Prints usage."
+  echo "home:             the afon home dir.  Defaults to $HOME/.afon."
 }
 
 check_acceptance(){
@@ -62,6 +66,15 @@ mvn_envs(){
   if [ -n "$LOGGING" ] ; then
     MVN_ENVS="$MVN_ENVS -Dafon.logging=$LOGGING"
   fi
+}
+
+exec_ansible(){
+  cd $CWD/scripts/ansible
+  if [ -z "$ANSIBLE_PLAYBOOK" ]; then
+    ANSIBLE_PLAYBOOK="runner-setup.yml"
+  fi
+  echo "Executing ansible playbook $ANSIBLE_PLAYBOOK"
+  ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS
 }
 
 exec_config(){
@@ -256,6 +269,8 @@ version(){
 
 AFON_HOME=
 ACTION=
+ANSIBLE_PLAYBOOK=
+ANSIBLE_ARGS=
 BUILD_ARGS=
 BUILD_GOALS=
 BUILD_PROFILES=
@@ -289,6 +304,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --action|-a)
       ACTION="$2"; shift 2 ;;
+    --ansible-playbook)
+      ANSIBLE_PLAYBOOK="$2"; shift 2 ;;
+    --ansible-args)
+      ANSIBLE_ARGS="$2"; shift 2 ;;
     --build-args)
       BUILD_ARGS="$2"; shift 2 ;;
     --build-goals|-g)
@@ -375,6 +394,9 @@ fi
 MVN_CMD="$MVN_CMD -s $CWD/settings.xml $MVN_PROFILES"
 case $ACTION in
 
+  ansible)
+    exec_ansible
+    ;;
   build)
     if [ -n "$BUILD_GOALS" ] ; then
       MVN_GOALS="$BUILD_GOALS"
