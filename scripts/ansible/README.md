@@ -12,7 +12,7 @@ It provisions the tools only — installing and registering the runner itself st
 
 | Role          | Tools                                                                         | Why                                                                     |
 |---------------|-------------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `base_tools`  | git, curl, wget, unzip, zip, tar, jq, perl, rsync, coreutils, ca-certificates | `actions/checkout`, the config steps of `afon.sh`, `scripts/config/validate.sh` |
+| `shell_tools`  | git, curl, wget, unzip, zip, tar, jq, perl, rsync, coreutils, ca-certificates | `actions/checkout`, the config steps of `afon.sh`, `scripts/config/validate.sh` |
 | `disk`        | grows the root partition and filesystem onto the volume, reclaims the apt cache | The container images, `~/.m2` and the workspace need tens of GB          |
 | `lvm`         | lays out extra volumes as LVM at the sizes you declare — **off until you name a device** | Puts the images, `~/.m2` and the workspace on their own filesystem instead of the cramped root |
 | `swap`        | a 4G swap file (EC2 ships with none)                                          | Stops a peak in javac or the test JVM taking the box down                |
@@ -119,7 +119,7 @@ cd scripts/ansible && ansible-playbook runner-setup.yml --tags verify
 ```
 
 Install a single part of the setup with
-`--tags base|disk|lvm|swap|java|maven|docker|cloud|verify`, for example:
+`--tags shell|disk|lvm|swap|java|maven|docker|cloud|verify`, for example:
 
 ```bash
 cd scripts/ansible && ansible-playbook runner-setup.yml --tags docker,verify

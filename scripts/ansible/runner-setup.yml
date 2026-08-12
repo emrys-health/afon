@@ -33,8 +33,8 @@
       tags: [always]
 
   roles:
-    - role: base_tools
-      tags: [base]
+    - role: shell_tools
+      tags: [shell]
     - role: disk
       tags: [disk]
     - role: lvm

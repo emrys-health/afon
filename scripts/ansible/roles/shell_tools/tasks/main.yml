@@ -6,7 +6,7 @@
 
 - name: Install the base command-line tools
   ansible.builtin.apt:
-    name: "{{ base_tools_packages }}"
+    name: "{{ shell_tools_packages }}"
     state: present
 
 - name: Create the apt keyrings dir used by the docker/cloud repos
