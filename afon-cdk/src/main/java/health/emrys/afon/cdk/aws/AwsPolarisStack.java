@@ -29,7 +29,7 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
     protected final PolarisConfig polarisConfig;
     protected final AwsCloudProvider cloudProvider;
 
-    private AwsKeyCloakDeploymentConfig keyCloakConfig;
+    private AwsKeyCloakConfig keyCloakConfig;
 
     public AwsPolarisStack(@NonNull Construct scope,
                            AfonCloud id,
@@ -61,15 +61,15 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
                       .port(List.of(polarisConfig.POLARIS_PORTS))
                       .build())
             .build();
-        keyCloakConfig = new AwsKeyCloakDeploymentConfig(this, properties, cloudProvider);
+        keyCloakConfig = new AwsKeyCloakConfig(this, properties, cloudProvider);
         keyCloakConfig.configureHttpsAndDNS();
     }
 
     /**
      * Keycloak's AWS wiring, exposed so subclasses can depend on its DNS record (see
-     * {@link AwsKeyCloakDeploymentConfig#getAliasRecord()}).
+     * {@link AwsKeyCloakConfig#getAliasRecord()}).
      */
-    protected AwsKeyCloakDeploymentConfig getKeyCloakConfig() {
+    protected AwsKeyCloakConfig getKeyCloakConfig() {
         return keyCloakConfig;
     }
 

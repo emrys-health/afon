@@ -30,25 +30,9 @@ import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
 
-/***
- * Creates the markup to create the full stack in AWS.
- * Note: it does not create anything other than JSON files!
- * You need to run tofu on those files for the infra to be provisioned.
- * Don't forget to
- * <UL>
- *     <LI>
- *          set environment variables, something like <pre>KUBE_CONFIG_PATH=$HOME/.kube/config</pre>
- *     </LI>
- *      <LI>
- *          <pre>unalias aws</pre> if you're using the Dockerized version and put the actual binary in your
- *          <pre>PATH</pre>
- *      </LI>
- * </UL>
- * when you run the output
- */
 public class AwsJupyterStack extends AwsPolarisStack {
 
-    static final Logger logger                     = org.slf4j.LoggerFactory.getLogger(AwsJupyterStack.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsJupyterStack.class);
 
     /**
      * Password the Jupyter VNC server is configured with. Kept in-cluster only — the

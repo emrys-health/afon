@@ -2,7 +2,7 @@ package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
-import health.emrys.afon.cdk.KeyCloakDeploymentConfig;
+import health.emrys.afon.cdk.KeyCloakConfig;
 import health.emrys.afon.config.AfonProperties;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
@@ -11,14 +11,14 @@ import java.util.Properties;
 
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
 
-public class AwsKeyCloakDeploymentConfig extends KeyCloakDeploymentConfig<AwsCloudProvider> {
+public class AwsKeyCloakConfig extends KeyCloakConfig<AwsCloudProvider> {
     private final String dnsZone;
     private final String certArn;
     private final String hostname;
 
     private Route53Record aliasRecord;
 
-    public AwsKeyCloakDeploymentConfig(
+    public AwsKeyCloakConfig(
         @NonNull Construct scope,
         @NonNull Properties properties,
         @NonNull AwsCloudProvider cloudProvider) {
