@@ -15,6 +15,7 @@ public class KeyCloakConfigurer {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(KeyCloakConfigurer.class);
 
+    public static final String HTTP = "http";
     public static final int    KEYCLOAK_PORT  = 8080;
     public static final String KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak:26.6.3";
 
@@ -36,19 +37,19 @@ public class KeyCloakConfigurer {
 
     public static @NonNull String urlFor(String host, String protocol) {
         String url;
-        if (host.toLowerCase().startsWith("http")) {
+        if (host.toLowerCase().startsWith(HTTP)) {
             url = host;
-        } else if ("HTTP".equalsIgnoreCase(protocol.toUpperCase())) {
+        } else if (HTTP.equalsIgnoreCase(protocol.toLowerCase())) {
             url = format(
-                "%s://%s:%d",
-                protocol,
-                host,
-                KEYCLOAK_PORT);
+                    "%s://%s:%d",
+                    protocol,
+                    host,
+                    KEYCLOAK_PORT);
         } else {
             url = format(
-                "%s://%s",
-                protocol,
-                host);
+                    "%s://%s",
+                    protocol,
+                    host);
         }
         return url;
     }
