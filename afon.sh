@@ -12,7 +12,7 @@ usage (){
   echo "          [--exec-script <script-name>]"
   echo "          [--setup-os <os>] [--setup-output <file>] [--setup-show]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
-  echo "actions:  build|docs|exec|setup|tofu-{apply|destroy}"
+  echo "actions:  build|config-*|deploy|docs|exec|setup|tofu-*"
   echo "          build       : executes the mvn build"
   echo "          config-*    : executes the config commands.  One of import|init|validate"
   echo "          deploy      : executes the deploy commands, based on the <cloud> option and the <deploy-stack>."
@@ -26,7 +26,7 @@ usage (){
   echo "build-goals:    the build goals.  Defaults to 'clean install'."
   echo "build-profiles: the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
   echo "config-source:  the config source to import as a zip file."
-  echo "deploy-stack:   the deploy stack.  One of full|polaris.  Defaults to 'full'."
+  echo "deploy-stack:   the deploy stack.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'full'."
   echo "deploy-args:    the deploy args."
   echo "docs-dir:       the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
   echo "exec-types:     the exec types.  One of ops|samples|script.  Defaults to 'ops'."
@@ -108,14 +108,16 @@ capitaliseFirst(){
 exec_deploy(){
   EXEC_TYPE="ops"
   EXEC_ARGS="$DEPLOY_ARGS"
+  CLOUD_CF=$(capitaliseFirst $CLOUD)
   case $DEPLOY_STACK in
     full)
-      EXEC_CLASS="ops.Deploy$(capitaliseFirst $CLOUD)FullStackMain"
+      EXEC_CLASS="ops.Deploy${CLOUD_CF}FullStackMain"
       ;;
     polaris)
-      EXEC_CLASS="ops.Deploy$(capitaliseFirst $CLOUD)PolarisMain"
+      EXEC_CLASS="ops.Deploy${CLOUD_CF}PolarisMain"
       ;;
   esac
+  echo "Deploy using $EXEC_CLASS"
   exec_jvm
 }
 
