@@ -47,15 +47,27 @@ lvm_data_mount: /data
 # supports properly. Set to an empty string to leave docker where it is.
 lvm_docker_root: "{{ lvm_data_mount }}/docker"
 
+# The containerd store. Docker uses the containerd image store here (Storage
+# Driver: overlayfs), so this is where the images actually are — moving
+# lvm_docker_root alone leaves them on the root filesystem. Set to an empty
+# string to leave containerd where it is.
+lvm_containerd_root: "{{ lvm_data_mount }}/containerd"
+
 # Directories moved onto the new filesystem and bind mounted back into place, so
 # that the paths the runner and maven expect keep working.
+#
 lvm_binds:
   - src: "{{ lvm_data_mount }}/m2"
     dest: "{{ github_runner_home }}/.m2"
-  - src: "{{ lvm_data_mount }}/runner-work"
-    dest: "{{ github_runner_home }}/actions-runner/_work"
+  - src: "{{ lvm_data_mount }}/actions-runner"
+    dest: "{{ github_runner_home }}/actions-runner"
+
+# The runner service runs out of the directory being moved, so it is stopped for
+# the move and started again afterwards. It cannot be left running: the move
+# would pull its working directory out from under it mid-job.
+lvm_stop_runner: true
 
 # Existing content is copied to the new location before the bind mount hides it.
 # The original is renamed to '<dir>.pre-bind' rather than deleted — remove those
 # by hand once you are happy, or set this to false to delete them outright.
-lvm_keep_moved_data: true
+lvm_keep_moved_data: false

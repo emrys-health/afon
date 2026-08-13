@@ -53,7 +53,7 @@ into the volumes you name:
 
 ```yaml
 lvm_devices:                  # empty by default, so the role does nothing until you name one
-  - /dev/xvdf
+  - /dev/xvdd
 lvm_group: afon-vg
 lvm_volumes:
   - name: data
@@ -78,9 +78,13 @@ nothing is mounted there the relocations are skipped rather than binding onto th
 
 | Directory                        | How                                            |
 |----------------------------------|------------------------------------------------|
-| `/var/lib/docker`                | `data-root` in `/etc/docker/daemon.json`, which is what the daemon supports; anything already pulled is copied across |
+| `/var/lib/docker`                | `data-root` in `/etc/docker/daemon.json`, which is what the daemon supports |
+| `/var/lib/containerd`            | `root` in `/etc/containerd/config.toml`.  Docker uses the containerd image store, so this — not the docker data root — is where the images actually are |
 | `~/.m2`                          | bind mount from `/data/m2`                     |
-| `actions-runner/_work`           | bind mount from `/data/runner-work`            |
+| `actions-runner`                 | bind mount from `/data/actions-runner`, covering `_work`, `_diag` and the ~700MB of runner binaries |
+
+Anything already pulled or checked out is copied across first, and the runner service is stopped for
+the move — its own working directory is what is being relocated.
 
 Existing content is copied first and the original kept as `<dir>.pre-bind` — delete those once you
 are happy, or set `lvm_keep_moved_data=false`.
