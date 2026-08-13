@@ -40,5 +40,5 @@ verify_min_memory_mb: 7500
 #     - {path: /, min_free_gb: 5}
 #     - {path: /data, min_free_gb: 40}
 verify_disk_checks:
-  - path: /
+  - path: /data
     min_free_gb: 25
