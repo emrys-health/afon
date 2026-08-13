@@ -102,7 +102,7 @@ jobs:
             chmod 600 "$CONFIG_DIR/$file"
             echo "Wrote $file ($(wc -c < "$CONFIG_DIR/$file") bytes)"
           }
-
+          echo "Writing config to $CONFIG_DIR"
           write_config afon.properties        "$AFON_PROPERTIES"
           write_config afon-aws.properties    "$AFON_AWS_PROPERTIES"
           write_config afon-azure.properties  "$AFON_AZURE_PROPERTIES"
