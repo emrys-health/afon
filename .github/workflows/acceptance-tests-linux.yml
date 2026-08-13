@@ -140,4 +140,4 @@ jobs:
 
       - name: Remove afon config
         if: always()
-        run: echo rm -rf "$AFON_HOME"
+        run: echo rm -rf "$AFON_HOME/config"
