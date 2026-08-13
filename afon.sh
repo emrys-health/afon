@@ -408,6 +408,8 @@ done
 if [ -z "$AFON_HOME" ]; then
   AFON_HOME="$HOME/.afon"
   echo "AFON_HOME not specified. Defaulting to $AFON_HOME"
+else
+  echo "Using AFON_HOME=$AFON_HOME"
 fi
 
 if [ "$ACTION" == "" ]; then
