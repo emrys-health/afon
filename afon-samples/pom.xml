@@ -79,7 +79,7 @@
                         <artifactId>exec-maven-plugin</artifactId>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
+                            <commandlineArgs>@jvm-args.txt ${afon.exec} -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
                         </configuration>
                     </plugin>
                 </plugins>
