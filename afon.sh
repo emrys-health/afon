@@ -16,7 +16,7 @@ usage (){
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
   echo "          ansible:    : executes the ansible playbook"
   echo "          build       : executes the mvn build"
-  echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch"
+  echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch|status"
   echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|status"
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
   echo "          exec        : executes the jvm classes from ops (see the docs for details)"
@@ -61,10 +61,10 @@ check_acceptance(){
 
 mvn_envs(){
   MVN_ENVS="-Dafon.home=$AFON_HOME"
-  if [ -n "$CLOUD" ] ; then
+  if [ -n "$CLOUD" ]; then
     MVN_ENVS="$MVN_ENVS -Dafon.cloud=$CLOUD"
   fi
-  if [ -n "$LOGGING" ] ; then
+  if [ -n "$LOGGING" ]; then
     MVN_ENVS="$MVN_ENVS -Dafon.logging=$LOGGING"
   fi
 }
@@ -84,15 +84,15 @@ exec_config(){
   CONFIG_ACTION=${ACTION#config-}
   case $CONFIG_ACTION in
     import)
-        if [ -z "$CONFIG_ZIP" ] ; then
+        if [ -z "$CONFIG_ZIP" ]; then
           echo "Action $ACTION requires option --config-zip"
           usage; exit 1
         fi
-        if [ -d $CONFIG_DIR ] ; then
+        if [ -d $CONFIG_DIR ]; then
           echo "$CONFIG_DIR already exists.  Remove and retry."
           exit;
         fi
-        if [ -f $CONFIG_ZIP ] ; then
+        if [ -f $CONFIG_ZIP ]; then
           mkdir -p $CONFIG_DIR
           unzip -jqu $CONFIG_ZIP -d $CONFIG_DIR
           echo "Imported $CONFIG_ZIP to $CONFIG_DIR."
@@ -101,44 +101,55 @@ exec_config(){
         fi
       ;;
     export)
-        if [ -z "$CONFIG_ZIP" ] ; then
-          echo "Action $ACTION requires option --config-zip"
-          usage; exit 1
-        fi
-        if [ -d $CONFIG_DIR ] ; then
-          zip -jr $CONFIG_ZIP $CONFIG_DIR
-          echo "Exported $CONFIG_DIR to $CONFIG_ZIP."
-        else
-          echo "Dir $CONFIG_DIR not found."
-        fi
-      ;;
+      if [ -z "$CONFIG_ZIP" ]; then
+        echo "Action $ACTION requires option --config-zip"
+        usage; exit 1
+      fi
+      if [ -d $CONFIG_DIR ]; then
+        zip -jr $CONFIG_ZIP $CONFIG_DIR
+        echo "Exported $CONFIG_DIR to $CONFIG_ZIP."
+      else
+        echo "Dir $CONFIG_DIR not found."
+      fi
+    ;;
     init)
-        if [ -d $CONFIG_DIR ] ; then
-          echo "$CONFIG_DIR already exists.  Remove and retry."
-          exit;
-        fi
-        EXEC_TYPE="script"
-        EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
-        exec_script
-      ;;
+      if [ -d $CONFIG_DIR ]; then
+        echo "$CONFIG_DIR already exists.  Remove and retry."
+        exit;
+      fi
+      EXEC_TYPE="script"
+      EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
+      exec_script
+    ;;
     validate)
-        EXEC_TYPE="script"
-        EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
-        exec_script
-      ;;
+      EXEC_TYPE="script"
+      EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
+      exec_script
+    ;;
     switch)
-        if [ -z "$CONFIG_ENV" ] ; then
-          echo "Action $ACTION requires option --config-env"
-          usage; exit 1
+      if [ -z "$CONFIG_ENV" ]; then
+        echo "Action $ACTION requires option --config-env"
+        usage; exit 1
+      fi
+      if [ -L "$CONFIG_DIR" ]; then
+        rm $CONFIG_DIR
+      elif [ -d "$CONFIG_DIR" ]; then
+        echo "$CONFIG_DIR is not a symlink.  Remove manually."
+        exit;
+      fi
+      CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
+      ln -s $CONFIG_ENV_DIR $CONFIG_DIR
+    ;;
+    status)
+      if [ -d $CONFIG_DIR ]; then
+        if [ -f "$CONFIG_DIR/afon.md" ]; then
+          cat $CONFIG_DIR/afon.md
         fi
-        if [ -L "$CONFIG_DIR" ]; then
-          rm $CONFIG_DIR
-        elif [ -d "$CONFIG_DIR" ]; then
-          echo "$CONFIG_DIR is not a symlink.  Remove manually."
-          exit;
-        fi
-        CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
-        ln -s $CONFIG_ENV_DIR $CONFIG_DIR
+        ls -lt $CONFIG_DIR
+        ls -lt $CONFIG_DIR/*
+      else
+        echo "$CONFIG_DIR not found."
+      fi
       ;;
   esac
 }
@@ -158,28 +169,28 @@ exec_mvn() {
 }
 
 exec_jvm(){
-  if [ -z "$EXEC_PACKAGE" ] ; then
+  if [ -z "$EXEC_PACKAGE" ]; then
     EXEC_PACKAGE="health.emrys.afon"
   fi
-  if [ -z "$EXEC_CLASS" ] ; then
+  if [ -z "$EXEC_CLASS" ]; then
     echo "Action exec requires option --exec-class"
     usage; exit 1
   fi
-  if [ -n "$EXEC_PACKAGE" ] ; then
+  if [ -n "$EXEC_PACKAGE" ]; then
     if [[ "$EXEC_CLASS" != "$EXEC_PACKAGE"* ]]; then
       EXEC_CLASS="$EXEC_PACKAGE.$EXEC_CLASS"
     fi
   fi
   MVN_GOALS="-Pexec exec:exec"
   MVN_ARGS="-Dexec.mainClass=$EXEC_CLASS"
-  if [ -n "$EXEC_ARGS" ] ; then
+  if [ -n "$EXEC_ARGS" ]; then
     MVN_ARGS="$MVN_ARGS -Dexec.args=\"$EXEC_ARGS\""
   fi
-  if [ -n "$EXEC_ENVS" ] ; then
+  if [ -n "$EXEC_ENVS" ]; then
     EXEC_ENVS="${EXEC_ENVS/ / -D}"
     MVN_ENVS="$MVN_ENVS -D$EXEC_ENVS"
   fi
-  if [ -z "$EXEC_TYPE" ] ; then
+  if [ -z "$EXEC_TYPE" ]; then
     echo "Action exec requires option --exec-type"
     usage; exit 1
   fi
@@ -188,7 +199,7 @@ exec_jvm(){
 }
 
 exec_script(){
-  if [ -z "$EXEC_SCRIPT" ] ; then
+  if [ -z "$EXEC_SCRIPT" ]; then
     echo "Action exec requires option --exec-script"
     usage; exit 1
   fi
@@ -238,7 +249,7 @@ exec_stack(){
 exec_tofu(){
   echo "tofu targetting cloud $TOFU_CLOUD"
   TOFU_DIR="afon-ops/cdktf.out/stacks/$TOFU_CLOUD"
-  if [ ! -d "$TOFU_DIR" ] ; then
+  if [ ! -d "$TOFU_DIR" ]; then
      echo "Dir $TOFU_DIR not found.  Execute deploy or configure actions first."
      usage; exit 0
   fi
@@ -247,7 +258,7 @@ exec_tofu(){
     # it may have already been set by caller
     TOFU_ACTION=${ACTION#tofu-}
   fi
-  if [ "$TOFU_ACTION" != "state" ] ; then
+  if [ "$TOFU_ACTION" != "state" ]; then
     TOFU_ARGS="$TOFU_ARGS -auto-approve"
   fi
   TOFU_CMD="tofu -chdir=$TOFU_DIR $TOFU_ACTION $TOFU_ARGS"
@@ -394,24 +405,24 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [ -z "$AFON_HOME" ] ; then
+if [ -z "$AFON_HOME" ]; then
   AFON_HOME="$HOME/.afon"
   echo "AFON_HOME not specified. Defaulting to $AFON_HOME"
 fi
 
-if [ "$ACTION" == "" ] ; then
+if [ "$ACTION" == "" ]; then
   ACTION="build"
   echo "Action not specified. Defaulting to $ACTION"
 fi
 
-if [ -n "$BUILD_PROFILES" ] ; then
+if [ -n "$BUILD_PROFILES" ]; then
   echo "Using build profiles $BUILD_PROFILES"
   MVN_PROFILES="-P$BUILD_PROFILES"
 fi
 
-if [ -n "$CLOUD" ] ; then
+if [ -n "$CLOUD" ]; then
   echo "Using cloud $CLOUD"
-    if [ -n "$MVN_PROFILES" ] ; then
+    if [ -n "$MVN_PROFILES" ]; then
       MVN_PROFILES="$MVN_PROFILES,$CLOUD"
     else
       MVN_PROFILES="-P$CLOUD"
@@ -420,7 +431,7 @@ fi
 
 CWD=`pwd`
 MVN_CMD="mvn"
-if [ -n "$MVN_QUIET" ] ; then
+if [ -n "$MVN_QUIET" ]; then
   MVN_CMD="$MVN_CMD -q"
 fi
 MVN_CMD="$MVN_CMD -s $CWD/settings.xml $MVN_PROFILES"
@@ -430,12 +441,12 @@ case $ACTION in
     exec_ansible
     ;;
   build)
-    if [ -n "$BUILD_GOALS" ] ; then
+    if [ -n "$BUILD_GOALS" ]; then
       MVN_GOALS="$BUILD_GOALS"
     else
       MVN_GOALS="clean install"
     fi
-    if [ -n "$BUILD_ARGS" ] ; then
+    if [ -n "$BUILD_ARGS" ]; then
       MVN_ARGS="$BUILD_ARGS"
     fi
     mvn_envs
@@ -454,13 +465,13 @@ case $ACTION in
     exec_docs
     ;;
   exec)
-    if [ -n "$EXEC_TYPE" ] ; then
+    if [ -n "$EXEC_TYPE" ]; then
       echo "Using exec type '$EXEC_TYPE'"
     else
       echo "Exec type not specified.  Defaulting to 'ops'."
       EXEC_TYPE="ops"
     fi
-    if [ "$EXEC_TYPE" == "script" ] ; then
+    if [ "$EXEC_TYPE" == "script" ]; then
       exec_script
     else
       mvn_envs

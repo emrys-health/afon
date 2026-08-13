@@ -42,6 +42,13 @@ This will create or move the symlink `<afon-home>/config` pointing to `<afon-hom
 Create config env dirs `<afon-home>/config-<env>` and ensure there is no config dir.   
 The config-switch action will remove any existing symlink.
 
+To show the status of the current config, you can use the `config-status` action:
+```shell
+./afon.sh -a config-status
+```
+If found, it will output the content of the file `afon.md` in the config dir, which can be used to 
+provide information to the user of the configuration.  It will also list the files in the config dir.
+
 ## Properties
 
 The properties configuration is currently file-based.
