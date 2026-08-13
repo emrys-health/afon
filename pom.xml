@@ -135,6 +135,21 @@
                 <artifactId>jspecify</artifactId>
                 <version>1.0.0</version>
             </dependency>
+            <!-- Logging uses logback over sfl4j from afon-logging.
+                 Logback 1.5 binds through the slf4j 2.x provider mechanism.
+                 Fixing the dependencies in dependencyManagement ensures that
+                 it will resolve over dependencies pulling in versions of slf4j-api 1.x.
+            -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>1.5.38</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>2.0.18</version>
+            </dependency>
             <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
