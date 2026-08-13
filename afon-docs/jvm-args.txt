@@ -1,9 +1,0 @@
---add-exports=java.base/sun.util.calendar=ALL-UNNAMED
---add-exports java.base/sun.nio.ch=ALL-UNNAMED
---add-exports=java.base/sun.net.util=ALL-UNNAMED
---add-exports=java.management/sun.management=ALL-UNNAMED
---add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED
---add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED
---add-modules=jdk.incubator.vector
---add-opens=java.base/java.nio=ALL-UNNAMED
---enable-preview
