@@ -35,9 +35,9 @@ Once completed, you can validate the config files by running:
 ```
 The validation checks that all the template properties have a corresponding non-empty property in the config dir.
 
-You can also import the config files as a zip: 
+You can also import or export the config files as a zip: 
 ```shell
-./afon.sh -a config-import --config-source <path-to-config-zip>
+./afon.sh -a config-{import|export} --config-zip <path-to-config-zip>
 ```
 This can be useful when sharing a pre-defined configuration.
 
