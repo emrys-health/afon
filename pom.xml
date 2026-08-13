@@ -291,19 +291,26 @@
                     </executions>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.4</version>
+                    <configuration>
+                        <!-- Pass the afon properties to the forked JVM -->
+                        <argLine>${afon.jvm} ${afon.exec}</argLine>
+                    </configuration>
+                </plugin>
+                <plugin>
                     <groupId>org.scalatest</groupId>
                     <artifactId>scalatest-maven-plugin</artifactId>
                     <version>2.2.0</version>
-                    <!-- Note config is repeated in surefire config -->
                     <configuration>
+                        <!-- Reuse the surefire plugin default reportsDirectory -->
                         <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
                         <junitxml>.</junitxml>
                         <stderr/>
                         <filereports>W scenarios.txt</filereports>
                         <forkMode>once</forkMode>
-                        <!-- The specs run in a forked JVM, which inherits nothing from the mvn
-                             command line, so the ${afon.exec} properties are handed over explicitly.
-                        -->
+                        <!-- Pass the afon properties to the forked JVM -->
                         <argLine>${afon.jvm} ${afon.exec}</argLine>
                     </configuration>
                     <executions>
