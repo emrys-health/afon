@@ -3,7 +3,7 @@ set -euo pipefail
 VOLUME=
 VOLUME="${1:-}"
 if [ -z "$VOLUME" ]; then
-  echo "Mount EBS volume"
+  echo "Mount a volume as /data"
   echo "Usage: $0 <volume>"
   echo "  e.g. $0 /dev/xvdd"
   echo "Check available volumes using command:"
@@ -16,14 +16,16 @@ if [ -z "$VOLUME" ]; then
   └─xvda15 202:15   0  106M  0 part /boot/efi
   xvdd     202:48   0   60G  0 disk "
   echo "To configure automatic mount on boot, add to the /etc/fstab file an entry in the format:"
-  echo "/dev/xvdd /mnt/ebs_volume ext4 defaults,nofail 0 0"
+  echo "UUID=<UUID> /data ext4 defaults,nofail 0 2"
+  echo "where the UUID is found vai the command:"
+  echo "sudo blkid /dev/xvdd"
   exit
 fi
 
-# create a filesystem on the attached EBS volume
+# create a filesystem on the attached volume
 sudo mkfs -t ext4 $VOLUME
 #	create a mount directory
-sudo mkdir /mnt/ebs_volume
-# mount the EBS volume
-sudo mount $VOLUME /mnt/ebs_volume
+sudo mkdir /data
+# mount the volume
+sudo mount $VOLUME /data
 
