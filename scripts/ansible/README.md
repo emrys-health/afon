@@ -4,9 +4,9 @@ Ansible playbook that installs the command-line tools required by the
 [Acceptance tests (Linux)](../../.github/workflows/acceptance-tests-linux.yml) workflow on a
 self-hosted Linux runner.
 
-It provisions the tools only — installing and registering the runner itself stays with
-[runner.sh](../github/runner.sh), and the config files come from the repository secrets pushed by
-[secrets.sh](../github/secrets.sh).
+The runner itself is installed by the `github` role, which drives
+[runner.sh](../github/runner.sh) rather than restating what it does. The config files come from the
+repository secrets pushed by [secrets.sh](../github/secrets.sh).
 
 ## What it installs
 
@@ -20,6 +20,7 @@ It provisions the tools only — installing and registering the runner itself st
 | `maven`       | Maven from the Apache archive, linked as `/usr/local/bin/mvn`                 | `./afon.sh -a build -p acceptance`                                       |
 | `docker`      | docker engine + buildx/compose plugins, runner user in the `docker` group     | The specs start KeyCloak, Polaris, Trino and Spark Connect via Testcontainers |
 | `cloud_tools` | aws, az, gcloud, kubectl, tofu — **off by default**                           | Only needed if the runner also drives the ops/tofu actions of `afon.sh`  |
+| `github`      | installs and registers the actions runner via `runner.sh` — **off by default** | Registering acts on the repo on GitHub, not just on this host            |
 | `verify`      | runs each tool as the runner user, asserts the JDK version and the runner size | Same checks as the workflow's *Verify runner tooling* step               |
 
 The workflow also provisions its own Temurin 17 through `actions/setup-java`; the JDK installed here
@@ -122,7 +123,7 @@ cd scripts/ansible && ansible-playbook runner-setup.yml --tags verify
 ```
 
 Install a single part of the setup with
-`--tags shell|disk|lvm|swap|java|maven|docker|cloud|verify`, for example:
+`--tags shell|disk|lvm|swap|java|maven|docker|cloud|github|verify`, for example:
 
 ```bash
 cd scripts/ansible && ansible-playbook runner-setup.yml --tags docker,verify
@@ -133,6 +134,34 @@ Include the cloud CLIs:
 ```bash
 cd scripts/ansible && ansible-playbook runner-setup.yml -e install_cloud_tools=true
 ```
+
+## Installing the runner
+
+The `github` role downloads, unpacks, registers and services the runner by driving the `install`,
+`configure` and `service` actions of [runner.sh](../github/runner.sh), passing the version, install
+dir, repo and registration token to it as environment variables. The script stays the one definition
+of how a runner is installed, for running by hand as much as from here.
+
+Registering creates a runner against the repo on GitHub, so it never happens as a side effect of a
+routine run — ask for it:
+
+```bash
+cd scripts/ansible && ansible-playbook runner-setup.yml --tags github -e github_install_runner=true
+```
+
+Registration tokens expire after an hour, so the role mints one per run with `gh` on your machine —
+the same tool [secrets.sh](../github/secrets.sh) needs, and no GitHub credential ever reaches the
+runner. To use one from
+[the runners page](https://github.com/emrys-health/afon-core/settings/actions/runners/new) instead,
+pass `-e github_runner_token=...`.
+
+The runner reports as `github_runner_name`, defaulting to the inventory host's short name — set it to
+match if you are re-registering a host that GitHub already knows under another name, or you will end
+up with two registrations. It applies the `self-hosted`, `Linux` and `X64` labels the workflow selects
+on by itself; `github_runner_labels` adds to those.
+
+Both steps are guarded: an installed runner is not re-downloaded, and a registered one is not
+re-registered.
 
 ## Settings
 

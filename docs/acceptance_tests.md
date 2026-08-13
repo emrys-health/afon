@@ -45,9 +45,9 @@ only one run executes at a time.
 ### Runner requirements
 
 The runner must have a Docker daemon reachable by the runner user, since the specs start KeyCloak,
-Polaris and Trino via Testcontainers. Java 17 is provisioned by `actions/setup-java`. See
-[scripts/github/runner.sh](../scripts/github/runner.sh) for installing and registering the runner
-itself.
+Polaris and Trino via Testcontainers. Java 17 is provisioned by `actions/setup-java`. The runner
+itself is installed and registered by [scripts/github/runner.sh](../scripts/github/runner.sh), either
+by hand or through the `github` role of the ansible playbook below.
 
 The runner also has to be big enough to hold the workload: the specs run a `local[4]` Spark driver
 alongside the four containers, which needs 8GB of memory (16GB comfortably) and 30GB of disk. Below
