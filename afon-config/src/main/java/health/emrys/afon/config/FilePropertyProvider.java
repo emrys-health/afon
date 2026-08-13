@@ -114,7 +114,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
     private @NonNull Properties loadPropertiesFromFile(String filename) throws IOException {
         try {
             Properties properties = loadPropertiesFromStream(new FileInputStream(filename));
-            logger.info("Loaded {} items from {}", properties.size(), filename);
+            logger.debug("Loaded {} items from {}", properties.size(), filename);
             return properties;
         } catch ( IOException e ){
             logger.warn("Failed to load properties from {}", filename);
