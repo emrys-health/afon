@@ -38,7 +38,10 @@
                         </goals>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>@jvm-args.txt -classpath %classpath health.emrys.afon.docs.DocumentAllMain</commandlineArgs>
+                            <!-- exec:exec launches a new java process, which inherits nothing
+                                 from the mvn command line, so afon properties are passed explicitly.
+                              -->
+                            <commandlineArgs>@jvm-args.txt -Dafon.home=${afon.home} -Dafon.logging=${afon.logging} -classpath %classpath health.emrys.afon.docs.DocumentAllMain</commandlineArgs>
                         </configuration>
                     </execution>
                 </executions>

@@ -26,7 +26,7 @@ public class DocumentAllMain {
                       logger.info("Running {}", documentClass.getSimpleName());
                       documentClass.getMethod("main", String[].class).invoke(null, (Object) args);
                   } catch (Exception e) {
-                      logger.error("Failed to run " + info.getName(), e);
+                      logger.error("Failed to run {}: {}", info.getName(), e.getMessage());
                   }
               });
         }
