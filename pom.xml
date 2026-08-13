@@ -34,6 +34,7 @@
         <!-- afon system properties -->
         <afon.home>${env.HOME}/.afon</afon.home>
         <afon.logging>INFO</afon.logging>
+        <afon.exec>-Dafon.home=${afon.home} -Dafon.logging=${afon.logging}</afon.exec>
         <!-- compilation and encoding -->
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
