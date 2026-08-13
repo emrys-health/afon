@@ -8,17 +8,6 @@ which by default points to `$HOME/.afon`.  The default config dir is then `$HOME
 The Afon home can be overridden by the `--home <afon-home>` option of `afon.sh`.   
 In your IDE, you can override via the `-Dafon.home=<afon-home>` system property.
 
-For example, if you need to support multiple envs, say a `dev` and a `stg` env, you can specify different Afon home dirs:
-```shell
-./afon.sh --home ~/.afon/envs/dev # config for dev will be in ~/.afon/envs/dev/config
-./afon.sh --home ~/.afon/envs/stg # config for stg will be in ~/.afon/envs/stg/config
-```
-Equally, you could leave Afon home as the default and use symlinks to point to different configurations
-```shell
-ls -s ~/.afon/envs/dev/config ~/.afon/config # config symlink for dev 
-ls -s ~/.afon/envs/stg/config ~/.afon/config # config symlink for stg 
-```
-
 Whichever Afon home you decide to use, you can initialise the config files by running:
 
 ```shell
@@ -42,6 +31,16 @@ You can also import or export the config files as a zip:
 This can be useful when sharing a pre-defined configuration.
 
 **NOTE**: The config-import command assumes that the config dir does not exist and is created in the process.
+
+To support multiple config envs, say a `dev` and a `stg` env, you can use the `config-switch` action:
+```shell
+./afon.sh -a config-switch --config-env {dev|stg} # config symlink for <env> 
+```
+This will create or move the symlink `<afon-home>/config` pointing to `<afon-home>/config-<env>`.  
+
+**NOTE**: If you're using multiple config envs, the config dir must be a symlink and not a dir.  
+Create config env dirs `<afon-home>/config-<env>` and ensure there is no config dir.   
+The config-switch action will remove any existing symlink.
 
 ## Properties
 
