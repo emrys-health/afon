@@ -251,6 +251,12 @@
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
                     <version>3.6.3</version>
+                    <configuration>
+                        <environmentVariables>
+                            <afon.home>${afon.home}</afon.home>
+                            <afon.logging>${afon.logging}</afon.logging>
+                        </environmentVariables>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <!-- see http://davidb.github.io/scala-maven-plugin -->
