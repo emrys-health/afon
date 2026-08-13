@@ -151,9 +151,58 @@
       ansible.builtin.include_tasks: docker_root.yml
       when: lvm_docker_root | length > 0
 
+    - name: Move the containerd store onto {{ lvm_data_mount }}
+      ansible.builtin.include_tasks: containerd_root.yml
+      when: lvm_containerd_root | length > 0
+
+    - name: Find the runner services
+      ansible.builtin.shell:
+        cmd: set -o pipefail && systemctl list-units --type=service --all --plain --no-legend 'actions.runner.*' | awk '{print $1}'
+        executable: /bin/bash
+      register: afon_lvm_runner_services
+      changed_when: false
+      check_mode: false
+
+    # Nothing is bounced once everything is in place: a run with the binds
+    # already mounted would otherwise interrupt whatever job is in flight.
+    - name: Check which runner directories are already bound
+      ansible.builtin.command: mountpoint -q {{ item.dest }}
+      loop: "{{ lvm_binds }}"
+      register: afon_bind_state
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      loop_control:
+        label: "{{ item.dest }}"
+
+    - name: Record whether any directory still has to move
+      ansible.builtin.set_fact:
+        afon_binds_pending: "{{ afon_bind_state.results | rejectattr('rc', 'equalto', 0) | list | length > 0 }}"
+
+    # The runner is stopped for the move, not merely restarted afterwards: its
+    # working directory is what is being moved, and a job running through the
+    # rsync would see the directory replaced underneath it.
+    - name: Stop the runner services while their directories move
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+      loop: "{{ afon_lvm_runner_services.stdout_lines | select | list }}"
+      when:
+        - lvm_stop_runner | bool
+        - afon_binds_pending | bool
+
     - name: Bind the runner directories onto {{ lvm_data_mount }}
       ansible.builtin.include_tasks: bind.yml
       loop: "{{ lvm_binds }}"
       loop_control:
         loop_var: afon_bind
         label: "{{ afon_bind.dest }} -> {{ afon_bind.src }}"
+
+    - name: Run the runner services again
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: started
+      loop: "{{ afon_lvm_runner_services.stdout_lines | select | list }}"
+      when:
+        - lvm_stop_runner | bool
+        - afon_binds_pending | bool
