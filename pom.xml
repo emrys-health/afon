@@ -34,7 +34,8 @@
         <!-- afon system properties -->
         <afon.home>${env.HOME}/.afon</afon.home>
         <afon.logging>INFO</afon.logging>
-        <afon.exec>-Dafon.home=${afon.home} -Dafon.logging=${afon.logging}</afon.exec>
+        <afon.exec>-Dafon.home=${afon.home} -Dafon.logging=${afon.logging} -Dslf4j.provider=ch.qos.logback.classic.spi.LogbackServiceProvider</afon.exec>
+        <afon.jvm>--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-modules=jdk.incubator.vector --add-opens=java.base/java.nio=ALL-UNNAMED --enable-preview</afon.jvm>
         <!-- compilation and encoding -->
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -301,17 +302,9 @@
                         <filereports>W scenarios.txt</filereports>
                         <forkMode>once</forkMode>
                         <!-- The specs run in a forked JVM, which inherits nothing from the mvn
-                             command line, so the afon properties are handed over explicitly.
+                             command line, so the ${afon.exec} properties are handed over explicitly.
                         -->
-                        <!-- afon.cloud is deliberately NOT passed on.  It filters which
-                             secret-<cloud>.properties FilePropertyProvider loads, while
-                             ContainerHelper.startPolaris needs GOOGLE_APPLICATION_CREDENTIALS
-                             from secret-gcp.properties whatever cloud is under test. -->
-                        <systemProperties>
-                            <afon.home>${afon.home}</afon.home>
-                            <afon.logging>${afon.logging}</afon.logging>
-                        </systemProperties>
-                        <argLine>--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-modules=jdk.incubator.vector --add-opens=java.base/java.nio=ALL-UNNAMED --enable-preview</argLine>
+                        <argLine>${afon.jvm} ${afon.exec}</argLine>
                     </configuration>
                     <executions>
                         <execution>
