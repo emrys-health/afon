@@ -4,22 +4,34 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 import uk.co.odinconsultants.documentation_utils.Datum
 
+import health.emrys.afon.config.AfonProperties.GOOGLE_APPLICATION_CREDENTIALS
+import health.emrys.afon.config.ConfigUtils
+
+import java.nio.file.{Files, Paths}
 import java.sql.{Date, Timestamp}
 import java.time.LocalDateTime
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
+import java.util.Properties
+import scala.util.Using
 
 /**
- * Works if a file like:
- * /home/henryp/.config/gcloud/application_default_credentials.json
- * exists or you point GOOGLE_APPLICATION_CREDENTIALS at it
+ * Takes its credentials from GOOGLE_APPLICATION_CREDENTIALS in
+ * $AFON_HOME/config/secret-gcp.properties, as the specs do.
  */
 object GcpRest {
 
   def main(args: Array[String]): Unit = {
-    System.setProperty("GOOGLE_APPLICATION_CREDENTIALS",
-    """{ "type": "service_account", "project_id": "fjords-450014", "private_key_id": "***REMOVED***", "private_key": "-----BEGIN PRIVATE KEY-----REMOVED-----END PRIVATE KEY-----\n", "client_email": "my-vendable-sa@fjords-450014.iam.gserviceaccount.com", "client_id": "103905077815523834346", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token", "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs", "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/my-vendable-sa%40fjords-450014.iam.gserviceaccount.com", "universe_domain": "googleapis.com", "quota_project_id": "fjords-450014" }""");
-    println(s"Using GOOGLE_APPLICATION_CREDENTIALS = ${System.getenv("GOOGLE_APPLICATION_CREDENTIALS")}")
+    // Only the GCP secrets are read: this entry point needs nothing from the other clouds.
+    // GoogleAuthManager takes the credentials as the property value itself, not as a path to them.
+    val gcpSecrets = Paths.get(ConfigUtils.configDir, "secret-gcp.properties")
+    val properties = new Properties()
+    Using.resource(Files.newInputStream(gcpSecrets))(in => properties.load(in))
+    System.setProperty(
+      GOOGLE_APPLICATION_CREDENTIALS.getName,
+      GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties))
+    println(s"Using GOOGLE_APPLICATION_CREDENTIALS from $gcpSecrets")
+
     val catalog_name = "CATALOG_NAME"
     val spark = SparkSession.builder.config(new SparkConf().setMaster("local[2]").setAppName("Tests")
         .set(f"spark.sql.catalog.$catalog_name", "org.apache.iceberg.spark.SparkCatalog")
