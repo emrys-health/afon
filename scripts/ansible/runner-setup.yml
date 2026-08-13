@@ -6,9 +6,11 @@
 #   ansible-playbook runner-setup.yml --check --diff        # dry run
 #   ansible-playbook runner-setup.yml --tags verify         # versions + resource check
 #   ansible-playbook runner-setup.yml -e install_cloud_tools=true
+#   ansible-playbook runner-setup.yml --tags github -e github_install_runner=true
 #
-# This playbook does not install or register the runner itself — see
-# scripts/github/runner.sh for that.
+# The runner itself is installed by the github role, which drives
+# scripts/github/runner.sh. That is off by default, as registering a runner acts on
+# the repo on GitHub rather than only on this host.
 - name: Set up acceptance test tooling on the GitHub runner
   hosts: github_runners
   become: true
@@ -50,5 +52,7 @@
     - role: cloud_tools
       when: install_cloud_tools | bool
       tags: [cloud]
+    - role: github
+      tags: [github]
     - role: verify
       tags: [verify]
