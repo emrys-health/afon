@@ -133,7 +133,7 @@ jobs:
 
       - name: Upload acceptance test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: afon-acceptance-reports-${{ github.run_id }}
           path: |
