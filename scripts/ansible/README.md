@@ -70,7 +70,10 @@ Use `100%VG` — meaning the whole group — not `100%FREE`, which targets only 
 moment and strands the rest of the group once the volume exists. Several volumes means giving them
 explicit sizes.
 
-The role then moves the space-hungry directories onto the new filesystem:
+The role then moves the space-hungry directories onto that filesystem. This part does not depend on
+LVM at all — it happens whenever `lvm_data_mount` (`/data`) is a mounted filesystem, so a volume you
+formatted and mounted by hand is used exactly as it stands, and `lvm_devices` can stay empty. When
+nothing is mounted there the relocations are skipped rather than binding onto the root filesystem:
 
 | Directory                        | How                                            |
 |----------------------------------|------------------------------------------------|

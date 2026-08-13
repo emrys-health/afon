@@ -36,17 +36,23 @@ lvm_volumes:
     group: "{{ github_runner_user }}"
     mode: "0755"
 
+# Where the runner's storage lives. The relocations below happen whenever this
+# is a mounted filesystem — whether the volumes above built it, or a volume was
+# formatted and mounted here by hand. It is never relocated onto a plain
+# directory on the root filesystem, which would defeat the point.
+lvm_data_mount: /data
+
 # Docker's data root — where the KeyCloak, Polaris, Trino and Spark images land.
 # Moved by configuration rather than a bind mount, which is what the daemon
 # supports properly. Set to an empty string to leave docker where it is.
-lvm_docker_root: /data/docker
+lvm_docker_root: "{{ lvm_data_mount }}/docker"
 
 # Directories moved onto the new filesystem and bind mounted back into place, so
 # that the paths the runner and maven expect keep working.
 lvm_binds:
-  - src: /data/m2
+  - src: "{{ lvm_data_mount }}/m2"
     dest: "{{ github_runner_home }}/.m2"
-  - src: /data/runner-work
+  - src: "{{ lvm_data_mount }}/runner-work"
     dest: "{{ github_runner_home }}/actions-runner/_work"
 
 # Existing content is copied to the new location before the bind mount hides it.

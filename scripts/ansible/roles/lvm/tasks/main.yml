@@ -1,9 +1,10 @@
 ---
-- name: Report that no extra storage is declared
+- name: Report that no volume group is declared
   ansible.builtin.debug:
     msg: >-
-      No lvm_devices declared, leaving the runner's storage alone. Attach an
-      EBS volume and list it in lvm_devices to lay out {{ lvm_group }}.
+      No lvm_devices declared, so no volume group is built. Attach an EBS volume and list it
+      in lvm_devices to lay out {{ lvm_group }}. The runner directories are still moved onto
+      {{ lvm_data_mount }} below if something is already mounted there.
   when: lvm_devices | length == 0
 
 - name: Lay out the declared storage
@@ -58,7 +59,9 @@
           {{ item.item }} is not an empty disk — lsblk reports
           '{{ item.stdout_lines | map('trim') | join('; ') }}'. lvm_devices must name whole,
           unused block devices (an attached EBS volume), never the root disk and never a device
-          holding a filesystem or partitions.
+          holding a filesystem or partitions. A volume already formatted and mounted at
+          {{ lvm_data_mount }} needs no entry here at all — leave lvm_devices empty and the
+          runner directories are moved onto it as it stands.
       loop: "{{ afon_device_check.results | selectattr('stdout_lines', 'defined') | list }}"
       loop_control:
         label: "{{ item.item }}"
@@ -121,11 +124,34 @@
       loop_control:
         label: "{{ item.mount }}"
 
-    - name: Move the docker data root onto the new storage
+# The relocations are deliberately outside the block above: what matters is that
+# {{ lvm_data_mount }} is a filesystem of its own, not whether this role is the
+# thing that built it. A volume formatted and mounted by hand is moved onto just
+# the same, and a runner without one is left alone rather than having the
+# directories bound onto its root filesystem.
+- name: Check whether {{ lvm_data_mount }} is a mounted filesystem
+  ansible.builtin.command: mountpoint -q {{ lvm_data_mount }}
+  register: afon_data_mounted
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Report that there is nowhere to move the runner directories
+  ansible.builtin.debug:
+    msg: >-
+      {{ lvm_data_mount }} is not a mounted filesystem, so the docker data root and
+      {{ lvm_binds | map(attribute='dest') | join(', ') }} are left where they are. Declare
+      lvm_devices to build it, or mount a volume there yourself.
+  when: afon_data_mounted.rc != 0
+
+- name: Move the runner storage onto {{ lvm_data_mount }}
+  when: afon_data_mounted.rc == 0
+  block:
+    - name: Move the docker data root onto {{ lvm_data_mount }}
       ansible.builtin.include_tasks: docker_root.yml
       when: lvm_docker_root | length > 0
 
-    - name: Bind the runner directories onto the new storage
+    - name: Bind the runner directories onto {{ lvm_data_mount }}
       ansible.builtin.include_tasks: bind.yml
       loop: "{{ lvm_binds }}"
       loop_control:
