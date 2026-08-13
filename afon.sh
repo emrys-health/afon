@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h] [--home <afon-home>]"
-  echo "          [--logging-level|-l <logging>]"
+  echo "          [--logging-level|-l <logging>] [--logging-console <console>]"
   echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
   echo "          [--config-zip <zip>] [--config-env <env>]"
@@ -24,6 +24,7 @@ usage (){
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state"
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging-level:    the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
+  echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
   echo "build-args:       the build args.  eg '-DskipTests'."
@@ -66,6 +67,9 @@ mvn_envs(){
   fi
   if [ -n "$LOGGING" ]; then
     MVN_ENVS="$MVN_ENVS -Dafon.logging=$LOGGING"
+  fi
+  if [ -n "$LOGGING_CONSOLE" ]; then
+    MVN_ENVS="$MVN_ENVS -Dafon.logging.console=$LOGGING_CONSOLE"
   fi
 }
 
@@ -316,6 +320,7 @@ BUILD_GOALS=
 BUILD_PROFILES=
 CLOUD=
 LOGGING=
+LOGGING_CONSOLE=
 DRY_RUN=false
 CONFIG_ENV=
 CONFIG_ZIP=
@@ -379,6 +384,8 @@ while [[ $# -gt 0 ]]; do
       EXEC_TYPE="$2"; shift 2 ;;
     --logging|-l)
       LOGGING="$2"; shift 2 ;;
+    --logging-console)
+      LOGGING_CONSOLE="$2"; shift 2 ;;
     --setup-os)
       SETUP_OS="$2"; shift 2 ;;
     --setup-outout)
