@@ -6,7 +6,7 @@ usage (){
   echo "          [--logging-level|-l <logging>]"
   echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
-  echo "          [--config-source <zip>]"
+  echo "          [--config-zip <zip>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
@@ -16,7 +16,7 @@ usage (){
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
   echo "          ansible:    : executes the ansible playbook"
   echo "          build       : executes the mvn build"
-  echo "          config-*    : executes the config commands.  One of import|init|validate"
+  echo "          config-*    : executes the config commands.  One of import|export|init|validate"
   echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|status"
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
   echo "          exec        : executes the jvm classes from ops (see the docs for details)"
@@ -29,7 +29,7 @@ usage (){
   echo "build-args:       the build args.  eg '-DskipTests'."
   echo "build-goals:      the build goals.  Defaults to 'clean install'."
   echo "build-profiles:   the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
-  echo "config-source:    the config source to import as a zip file."
+  echo "config-zip:       the config zip path to import/export as a zip file."
   echo "docs-dir:         the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
   echo "exec-types:       the exec types.  One of ops|samples|script.  Defaults to 'ops'."
   echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
@@ -83,18 +83,32 @@ exec_config(){
   CONFIG_ACTION=${ACTION#config-}
   case $CONFIG_ACTION in
     import)
-        if [ -z "$CONFIG_SOURCE" ] ; then
-          echo "Action $ACTION requires option --config-source"
+        if [ -z "$CONFIG_ZIP" ] ; then
+          echo "Action $ACTION requires option --config-zip"
           usage; exit 1
         fi
         if [ -d $CONFIG_DIR ] ; then
           echo "$CONFIG_DIR already exists.  Remove and retry."
           exit;
         fi
-        if [ -f $CONFIG_SOURCE ] ; then
+        if [ -f $CONFIG_ZIP ] ; then
           mkdir -p $CONFIG_DIR
-          unzip -jqu $CONFIG_SOURCE -d $CONFIG_DIR
-          echo "Imported $CONFIG_SOURCE to $CONFIG_DIR."
+          unzip -jqu $CONFIG_ZIP -d $CONFIG_DIR
+          echo "Imported $CONFIG_ZIP to $CONFIG_DIR."
+        else
+          echo "File $CONFIG_ZIP not found."
+        fi
+      ;;
+    export)
+        if [ -z "$CONFIG_ZIP" ] ; then
+          echo "Action $ACTION requires option --config-zip"
+          usage; exit 1
+        fi
+        if [ -d $CONFIG_DIR ] ; then
+          zip -jr $CONFIG_ZIP $CONFIG_DIR
+          echo "Exported $CONFIG_DIR to $CONFIG_ZIP."
+        else
+          echo "Dir $CONFIG_DIR not found."
         fi
       ;;
     init)
@@ -277,7 +291,7 @@ BUILD_PROFILES=
 CLOUD=
 LOGGING=
 DRY_RUN=false
-CONFIG_SOURCE=
+CONFIG_ZIP=
 DOCS_DIR=
 EXEC_CLASS=
 EXEC_ARGS=
@@ -318,8 +332,8 @@ while [[ $# -gt 0 ]]; do
       CLOUD="$2"; shift 2 ;;
     --dry-run)
       DRY_RUN=true; shift ;;
-    --config-source)
-      CONFIG_SOURCE="$2"; shift 2 ;;
+    --config-zip)
+      CONFIG_ZIP="$2"; shift 2 ;;
     --docs-dir|-d)
       DOCS_DIR="$2"; shift 2 ;;
     --exec-class)
