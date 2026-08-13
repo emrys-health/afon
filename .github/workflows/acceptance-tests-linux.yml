@@ -1,4 +1,4 @@
-name: Acceptance tests (Linux)
+name: Acceptance Tests (Linux)
 
 # Runs the acceptance tests (default tags: Access, External, Forbidden) on the self-hosted Linux runner.
 #
@@ -126,7 +126,7 @@ jobs:
           if [ "$CLOUD" != "all" ]; then
             CLOUD_ARG="--cloud $CLOUD"
           fi
-          ./afon.sh -a build -p acceptance --home "$AFON_HOME" --build-args "-B -ntp" $CLOUD_ARG
+          ./afon.sh -a build -p acceptance --home "$AFON_HOME" --build-args "-ntp" $CLOUD_ARG
 
       - name: Upload acceptance test reports
         if: always()
