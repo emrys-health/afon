@@ -6,7 +6,7 @@ usage (){
   echo "          [--logging-level|-l <logging>]"
   echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
-  echo "          [--config-zip <zip>]"
+  echo "          [--config-zip <zip>] [--config-env <env>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
@@ -16,7 +16,7 @@ usage (){
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
   echo "          ansible:    : executes the ansible playbook"
   echo "          build       : executes the mvn build"
-  echo "          config-*    : executes the config commands.  One of import|export|init|validate"
+  echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch"
   echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|status"
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
   echo "          exec        : executes the jvm classes from ops (see the docs for details)"
@@ -30,6 +30,7 @@ usage (){
   echo "build-goals:      the build goals.  Defaults to 'clean install'."
   echo "build-profiles:   the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
   echo "config-zip:       the config zip path to import/export as a zip file."
+  echo "config-env:       the config env name.  Assumes config dir '$AFON_HOME/config-<env>' to symlink to '$AFON_HOME/config'."
   echo "docs-dir:         the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
   echo "exec-types:       the exec types.  One of ops|samples|script.  Defaults to 'ops'."
   echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
@@ -124,6 +125,20 @@ exec_config(){
         EXEC_TYPE="script"
         EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
         exec_script
+      ;;
+    switch)
+        if [ -z "$CONFIG_ENV" ] ; then
+          echo "Action $ACTION requires option --config-env"
+          usage; exit 1
+        fi
+        if [ -L "$CONFIG_DIR" ]; then
+          rm $CONFIG_DIR
+        elif [ -d "$CONFIG_DIR" ]; then
+          echo "$CONFIG_DIR is not a symlink.  Remove manually."
+          exit;
+        fi
+        CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
+        ln -s $CONFIG_ENV_DIR $CONFIG_DIR
       ;;
   esac
 }
@@ -291,6 +306,7 @@ BUILD_PROFILES=
 CLOUD=
 LOGGING=
 DRY_RUN=false
+CONFIG_ENV=
 CONFIG_ZIP=
 DOCS_DIR=
 EXEC_CLASS=
@@ -332,6 +348,8 @@ while [[ $# -gt 0 ]]; do
       CLOUD="$2"; shift 2 ;;
     --dry-run)
       DRY_RUN=true; shift ;;
+    --config-env)
+      CONFIG_ENV="$2"; shift 2 ;;
     --config-zip)
       CONFIG_ZIP="$2"; shift 2 ;;
     --docs-dir|-d)
