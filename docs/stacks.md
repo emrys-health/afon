@@ -81,7 +81,7 @@ If a deployment fails partway through, you can resume from a specific step, e.g.
 
 ### Deploy or delete the AWS stack from GitHub
 
-The [Stack AWS (Linux)](../.github/workflows/stack-aws-linux.yml) workflow runs `afon.sh`'s
+The [Stack AWS (Linux)](../.github/workflows/aws-stack-linux.yml) workflow runs `afon.sh`'s
 `stack-deploy` or `stack-delete` for AWS on the self-hosted Linux runner — ie
 `ops.DeployAwsFullStackMain` or `ops.DeleteAwsFullStackMain`.
 

@@ -1,13 +1,12 @@
-name: Stack AWS (Linux)
+name: AWS Stack (Linux)
 
 # Runs afon.sh's stack-deploy or stack-delete for AWS from the self-hosted Linux runner, ie
 # ops.DeployAwsFullStackMain or ops.DeleteAwsFullStackMain — the same entry points as docs/stacks.md.
 #
-# deploy is a re-deployment, not an upgrade: its first step (clean_aws) runs `tofu destroy` against
-# the stack that is currently up, and the run then recreates it. delete just tears the stack down
-# and leaves it down — a later deploy is what brings it back. Either way there is a window of an
-# hour or more where Polaris and Jupyter are unavailable. Hence, workflow_dispatch only and never on
-# push, but could be on a schedule. 
+# deploy run first delete against the stack that is currently up, and the run then recreates it.
+# delete just tears down the stack and leaves it down — a later deploy is what brings it back.
+# Either way there is a window of about hour or more where Polaris and Jupyter are unavailable.
+# Hence, workflow_dispatch only and never on push, but could be on a schedule.
 #
 # The runner needs, beyond what the acceptance tests need (see acceptance-tests-linux.yml):
 #   - the aws cli, tofu and kubectl on PATH  (scripts/ansible, `-e install_cloud_tools=true`)
@@ -30,8 +29,12 @@ on:
         type: choice
         options: [deploy, delete]
         required: true
+      rebuild:
+        description: "Rebuild components"
+        type: boolean
+        required: true
       from_step:
-        description: "deploy only: resume from this step, eg aws_spark (blank runs every step, starting with the teardown). Ignored by delete."
+        description: "deploy only: resume from this step, eg all_catalogs_in_emryspolaris (blank runs every step, starting with the teardown). Ignored by delete."
         type: string
         default: ""
 
@@ -180,6 +183,7 @@ jobs:
           fi
 
       - name: Build components without acceptance tests
+        if: ${{ inputs.rebuild == true }}
         run: |
           set -euo pipefail
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.

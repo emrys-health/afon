@@ -47,7 +47,7 @@ public class StepActions {
             tofuDestroy(stackDir);
             deletePath(stackDir);
         } else {
-            logger.warn("Directory {} does not exist so starting afresh", stackDir);
+            logger.info("Directory {} does not exist so starting afresh", stackDir);
         }
         deleteTerraformStateFiles(id);
         return stackDir;
