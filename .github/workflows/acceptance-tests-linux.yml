@@ -89,7 +89,7 @@ jobs:
           rm -rf "$CONFIG_DIR"
           mkdir -p "$CONFIG_DIR"
           chmod 700 "$CONFIG_DIR"
-          echo "Writing config to $CONFIG_DIR"
+          echo "Using config dir $CONFIG_DIR"
 
           # Secret values are base64 so that multi-line properties (SNOWFLAKE_PRIVATE_KEY,
           # GOOGLE_APPLICATION_CREDENTIALS) survive the round trip byte for byte.
@@ -143,4 +143,8 @@ jobs:
 
       - name: Remove afon config
         if: always()
-        run: echo rm -rf "$AFON_HOME/config"
+        run: | 
+          set -euo pipefail
+          CONFIG_DIR="$AFON_HOME/config"
+          rm -rf "$CONFIG_DIR"
+          echo "Removed config dir $CONFIG_DIR"
