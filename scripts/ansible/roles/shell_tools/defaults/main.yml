@@ -18,6 +18,8 @@ shell_tools_packages:
   - jq
   - libicu-dev
   - lsb-release
+  - nodejs
+  - npm
   - perl
   - rsync
   - tar
