@@ -77,7 +77,7 @@ public class StepActions {
         startManagedStack(id);
     }
 
-    private void startManagedStack(AfonCloud id) throws ManagedProcessException {
+    private void startManagedStack(AfonCloud id) throws ManagedProcessException, IOException {
         // The kubernetes/helm providers are configured from the managed cluster's endpoint and
         // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
         // (plugin-framework) providers, those must be known at plan time, otherwise apply fails
@@ -100,7 +100,8 @@ public class StepActions {
         tofuApply(stackDir, bootstrapTargets);
     }
 
-    private void tofuApply(Path tofuDir, List<String> bootstrapTargets) throws ManagedProcessException {
+    private void tofuApply(Path tofuDir, List<String> bootstrapTargets) throws ManagedProcessException, IOException {
+        ensureKubeConfigExists();
         run("tofu", tofuDir, "init");
         if (!bootstrapTargets.isEmpty()) {
             List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
@@ -109,6 +110,24 @@ public class StepActions {
             run("tofu", tofuDir, phaseOne.toArray(new String[0]));
         }
         run("tofu", tofuDir, OutputStream.nullOutputStream(), "apply", "--auto-approve", "-parallelism=5");
+    }
+
+    /**
+     * The kubernetes/helm providers' {@code config_path} must exist before tofu can even plan the
+     * second, full apply above — but the resource that writes real content there only runs inside
+     * that same apply, once the cluster it depends on exists; {@code -target} on the cluster alone
+     * does not pull in that resource, since it is a dependent, not a dependency. On a workstation
+     * this is invisible because {@code ~/.kube/config} already exists from prior manual use —
+     * stale content is fine, since it gets overwritten once the updater resource runs.
+     * A machine that has never run either (a fresh CI runner) has no such file, and the
+     * providers fail outright with "no such file or directory". An empty file is enough.
+     */
+    private void ensureKubeConfigExists() throws IOException {
+        Path kubeConfig = Path.of(System.getProperty("user.home"), ".kube", "config");
+        if (!Files.exists(kubeConfig)) {
+            Files.createDirectories(kubeConfig.getParent());
+            Files.createFile(kubeConfig);
+        }
     }
 
     private void tofuDestroy(Path tofuDir) {

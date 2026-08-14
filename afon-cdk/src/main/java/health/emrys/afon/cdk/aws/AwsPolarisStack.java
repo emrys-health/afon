@@ -12,7 +12,6 @@ import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
-import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -23,8 +22,6 @@ import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonCloud.AWS;
 
 public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
-
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsPolarisStack.class);
 
     protected final PolarisConfig polarisConfig;
     protected final AwsCloudProvider cloudProvider;
@@ -87,7 +84,6 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
         final App app = new App();
         new AwsPolarisStack(app, AWS, new FilePropertyProvider().getProperties());
         app.synth();
-        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu-apply");
     }
 
 }

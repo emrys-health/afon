@@ -165,20 +165,6 @@ jobs:
           mkdir -p "$HOME/.kube"
           echo "KUBE_CONFIG_PATH=$HOME/.kube/config" >> "$GITHUB_ENV"
 
-          # The k8s/helm providers' config_path must exist before the second (full) tofu apply,
-          # but the resource that writes real content there (AwsCloudProvider's
-          # "kubeconfigUpdater" local-exec) only runs inside that same apply, once the cluster it
-          # depends on exists — the cluster bootstrap target in StepActions only creates the raw cluster,
-          # since target does not pull in a resource's dependents. On a workstation this is
-          # invisible because ~/.kube/config already exists from prior manual use and gets
-          # overwritten with real content once the updater runs; a fresh runner has no such file
-          # and the provider fails outright with "no such file or directory". An empty file is
-          # enough — client-go treats it as an empty kubeconfig — and it is replaced with the real
-          # one moments later in the same apply.
-          if [ ! -f "$HOME/.kube/config" ]; then
-            touch "$HOME/.kube/config"
-          fi
-
           # Where the tofu state is kept between runs — outside the workspace the checkout cleans.
           # Held as shell vars first: a write to $GITHUB_ENV only takes effect in later steps, so
           # reading AFON_STATE_DIR back via $GITHUB_ENV in this same step would be unbound.
