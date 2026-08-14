@@ -5,7 +5,47 @@
   become: true
   become_user: "{{ github_runner_user }}"
   ansible.builtin.command: "{{ item }}"
-  loop: "{{ verify_commands + (verify_cloud_commands if install_cloud_tools | bool else []) }}"
+  loop: "{{ verify_commands }}"
+  register: afon_verify
+  changed_when: false
+  check_mode: false
+
+- name: Verify the cloud tooling as {{ github_runner_user }}
+  when: install_cloud_tools | bool
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_cloud_commands }}"
+  register: afon_verify
+  changed_when: false
+  check_mode: false
+
+- name: Verify the aws tooling as {{ github_runner_user }}
+  when: install_awscli | bool
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_aws_commands }}"
+  register: afon_verify
+  changed_when: false
+  check_mode: false
+
+- name: Verify the azure tooling as {{ github_runner_user }}
+  when: install_azurecli | bool
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_azure_commands }}"
+  register: afon_verify
+  changed_when: false
+  check_mode: false
+
+- name: Verify the gcloud tooling as {{ github_runner_user }}
+  when: install_gcloud | bool
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_gcloud_commands }}"
   register: afon_verify
   changed_when: false
   check_mode: false
