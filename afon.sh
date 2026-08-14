@@ -17,7 +17,7 @@ usage (){
   echo "          ansible:    : executes the ansible playbook"
   echo "          build       : executes the mvn build"
   echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch|status"
-  echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|status"
+  echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|delete|status"
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
   echo "          exec        : executes the jvm classes from ops (see the docs for details)"
   echo "          setup       : sets up the local env for the given os."
@@ -220,35 +220,44 @@ exec_stack(){
   EXEC_TYPE="ops"
   EXEC_ARGS="$STACK_ARGS"
   STACK_ACTION=${ACTION#stack-}
-  if [ "$STACK_ACTION" == "deploy" ]; then
-    if [ -z "$STACK_TYPE" ]; then
-      STACK_TYPE="full"
-      echo "Stack type not specified.  Defaulting to '$STACK_TYPE'."
-    fi
-    CLOUD_CF=$(capitaliseFirst $CLOUD)
-    case $STACK_TYPE in
-      full)
-        EXEC_CLASS="ops.Deploy${CLOUD_CF}FullStackMain"
-        ;;
-      polaris)
-        EXEC_CLASS="ops.Deploy${CLOUD_CF}PolarisMain"
-        ;;
-    esac
-    echo "Deploy using $EXEC_CLASS"
-    exec_jvm
-  fi
-  if [ "$STACK_ACTION" == "status" ]; then
-    EXEC_TYPE="script"
-    case $CLOUD in
-      aws)
-        EXEC_SCRIPT="aws/vpcs.sh"
-        ;;
-      *)
-        echo "Stack status for $CLOUD not yet supported"
-        ;;
-    esac
-    exec_script
-  fi
+  case $STACK_ACTION in
+    deploy|delete)
+      if [ -z "$STACK_TYPE" ]; then
+        STACK_TYPE="full"
+        echo "Stack type not specified.  Defaulting to '$STACK_TYPE'."
+      fi
+      ACTION_CF=$(capitaliseFirst $STACK_ACTION)
+      CLOUD_CF=$(capitaliseFirst $CLOUD)
+      case $STACK_TYPE in
+        full)
+          EXEC_CLASS="ops.${ACTION_CF}${CLOUD_CF}FullStackMain"
+          ;;
+        polaris)
+          EXEC_CLASS="ops.${ACTION_CF}${CLOUD_CF}PolarisMain"
+          ;;
+        *)
+          echo "Stack type not supported: $STACK_TYPE"
+          usage; exit 0
+      esac
+      echo "$ACTION_CF using $EXEC_CLASS"
+      exec_jvm
+      ;;
+    status)
+      EXEC_TYPE="script"
+      case $CLOUD in
+        aws)
+          EXEC_SCRIPT="aws/vpcs.sh"
+          ;;
+        *)
+          echo "Stack status for $CLOUD not yet supported"
+          ;;
+      esac
+      exec_script
+      ;;
+    *)
+      echo "Stack action not supported: $STACK_ACTION"
+      usage; exit 0
+  esac
 }
 
 exec_tofu(){
