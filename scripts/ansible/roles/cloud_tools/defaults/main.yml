@@ -3,7 +3,8 @@
 # Not needed by the acceptance tests themselves — they use the cloud SDKs — but
 # required if the runner also drives the ops/tofu actions.
 install_awscli: true
-install_azurecli: true
+# azurecli fails on runner - excluding until issue sorted
+install_azurecli: false
 install_gcloud: true
 install_kubectl: true
 install_opentofu: true

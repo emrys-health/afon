@@ -4,7 +4,7 @@
     update_cache: true
     cache_valid_time: "{{ apt_cache_valid_time }}"
 
-- name: Install the base command-line tools
+- name: Install the shell command-line tools
   ansible.builtin.apt:
     name: "{{ shell_tools_packages }}"
     state: present
