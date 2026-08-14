@@ -104,8 +104,8 @@ Pre-requisites, on top of what the acceptance workflow needs:
   A run that starts without that state will deploy as if AWS were empty, so if you tear the stack
   down by hand, keep the two in step.
 
-**NOTE**: the `$AFON_STATE_DIR` points to `$HOME/.afon/state` and lives outside the GitHub workspace,
-which is wiped out at each checkout.   On the runner, the `$AFON_HOME` points to the workspace and not to `$HOME/.afon`.   Should this naming convention cause confusion, we can revisit and rename.
+**NOTE**: the `$AFON_STATE_DIR` points to `/data/afon/state` and lives outside the GitHub workspace,
+which is wiped out at each checkout.   On the runner, the `$AFON_HOME` points to the workspace.   
 
 The region comes from `AWS_REGION` in `afon-aws.properties`, and the deploy log is uploaded as the
 `afon-deploy-aws-logs-<run id>` artifact.

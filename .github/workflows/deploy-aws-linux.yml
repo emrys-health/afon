@@ -13,7 +13,7 @@ name: Deploy AWS Stack (Linux)
 #   - AWS *admin* credentials, which are NOT the Polaris service account credentials held in
 #     secret-aws.properties. Set them as the AWS_DEPLOY_* secrets below, or leave those unset and
 #     let the runner's own credentials (EC2 instance profile, or ~/.aws/credentials) be used.
-#   - $AFON_STATE_DIR to keep the tofu state between runs.  Points to $HOME/.afon/state on the runner
+#   - $AFON_STATE_DIR to keep the tofu state between runs and points /data/afon/state on the runner
 #     and is different from $AFON_HOME which lives in the GitHub workspace.
 #     See the "Save/Restore the tofu state" steps.
 #
@@ -166,7 +166,8 @@ jobs:
           echo "KUBE_CONFIG_PATH=$HOME/.kube/config" >> "$GITHUB_ENV"
 
           # Where the tofu state is kept between runs — outside the workspace the checkout cleans.
-          echo "AFON_STATE_DIR=/data/afon/state/${{ github.repository }}/aws" >> "$GITHUB_ENV"
+          echo "AFON_STATE_DIR=/data/afon/state" >> "$GITHUB_ENV"
+          echo "AWS_STATE_DIR=$AFON_STATE_DIR/${{ github.repository }}/aws" >> "$GITHUB_ENV"
 
       - name: Check the AWS credentials
         run: |
@@ -187,20 +188,20 @@ jobs:
       - name: Restore the tofu state
         run: |
           set -euo pipefail
-          mkdir -p "$AFON_STATE_DIR"
+          mkdir -p "$AWS_STATE_DIR"
           # cdktf synthesises into afon-ops/cdktf.out/stacks/aws and keeps the state next to it in
           # afon-ops/terraform.aws.tfstate. Both are gitignored, and actions/checkout runs
           # `git clean -ffdx`, so they do not survive a checkout and are kept on the runner instead.
           # Without them the teardown at the head of the deploy finds nothing to destroy and the
           # rebuild then collides with the resources still running in AWS.
-          if compgen -G "$AFON_STATE_DIR/terraform.aws.tfstate*" > /dev/null; then
-            cp -v "$AFON_STATE_DIR"/terraform.aws.tfstate* afon-ops/
+          if compgen -G "$AWS_STATE_DIR/terraform.aws.tfstate*" > /dev/null; then
+            cp -v "$AWS_STATE_DIR"/terraform.aws.tfstate* afon-ops/
           else
-            echo "::warning::No saved tofu state in $AFON_STATE_DIR — this run will deploy as if AWS were empty. If a stack is in fact up, destroy it first (./afon.sh -a tofu-destroy) or restore its tfstate."
+            echo "::warning::No saved tofu state in $AWS_STATE_DIR — this run will deploy as if AWS were empty. If a stack is in fact up, destroy it first (./afon.sh -a tofu-destroy) or restore its tfstate."
           fi
-          if [ -d "$AFON_STATE_DIR/cdktf.out" ]; then
+          if [ -d "$AWS_STATE_DIR/cdktf.out" ]; then
             rm -rf afon-ops/cdktf.out
-            cp -R "$AFON_STATE_DIR/cdktf.out" afon-ops/cdktf.out
+            cp -R "$AWS_STATE_DIR/cdktf.out" afon-ops/cdktf.out
             echo "Restored cdktf.out"
           fi
 
@@ -219,17 +220,17 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          mkdir -p "$AFON_STATE_DIR"
+          mkdir -p "$AWS_STATE_DIR"
           if compgen -G "afon-ops/terraform.aws.tfstate*" > /dev/null; then
-            cp -v afon-ops/terraform.aws.tfstate* "$AFON_STATE_DIR/"
+            cp -v afon-ops/terraform.aws.tfstate* "$AWS_STATE_DIR/"
           else
             # Expected only when the teardown destroyed the stack and the rebuild then failed
             # before writing new state.
             echo "::warning::No tofu state in afon-ops to save"
           fi
-          rm -rf "$AFON_STATE_DIR/cdktf.out"
+          rm -rf "$AWS_STATE_DIR/cdktf.out"
           if [ -d afon-ops/cdktf.out ]; then
-            cp -R afon-ops/cdktf.out "$AFON_STATE_DIR/cdktf.out"
+            cp -R afon-ops/cdktf.out "$AWS_STATE_DIR/cdktf.out"
           fi
 
       - name: Report the cluster status
