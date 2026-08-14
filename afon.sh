@@ -429,15 +429,6 @@ if [ -n "$BUILD_PROFILES" ]; then
   MVN_PROFILES="-P$BUILD_PROFILES"
 fi
 
-if [ -n "$CLOUD" ]; then
-  echo "Using cloud $CLOUD"
-    if [ -n "$MVN_PROFILES" ]; then
-      MVN_PROFILES="$MVN_PROFILES,$CLOUD"
-    else
-      MVN_PROFILES="-P$CLOUD"
-    fi
-fi
-
 CWD=`pwd`
 MVN_CMD="mvn"
 if [ -n "$MVN_QUIET" ]; then
@@ -457,6 +448,14 @@ case $ACTION in
     fi
     if [ -n "$BUILD_ARGS" ]; then
       MVN_ARGS="$BUILD_ARGS"
+    fi
+    if [ -n "$CLOUD" ]; then
+      echo "Using cloud $CLOUD"
+        if [ -n "$MVN_PROFILES" ]; then
+          MVN_PROFILES="$MVN_PROFILES,$CLOUD"
+        else
+          MVN_PROFILES="-P$CLOUD"
+        fi
     fi
     mvn_envs
     exec_mvn
