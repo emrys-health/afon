@@ -60,19 +60,6 @@ check_acceptance(){
   fi
 }
 
-mvn_envs(){
-  MVN_ENVS="-Dafon.home=$AFON_HOME"
-  if [ -n "$CLOUD" ]; then
-    MVN_ENVS="$MVN_ENVS -Dafon.cloud=$CLOUD"
-  fi
-  if [ -n "$LOGGING" ]; then
-    MVN_ENVS="$MVN_ENVS -Dafon.logging=$LOGGING"
-  fi
-  if [ -n "$LOGGING_CONSOLE" ]; then
-    MVN_ENVS="$MVN_ENVS -Dafon.logging.console=$LOGGING_CONSOLE"
-  fi
-}
-
 exec_ansible(){
   cd $CWD/scripts/ansible
   if [ -z "$ANSIBLE_PLAYBOOK" ]; then
@@ -166,6 +153,19 @@ exec_docs(){
   echo "Exported docs to $DOCS_DIR"
 }
 
+mvn_envs(){
+  MVN_ENVS="-Dafon.home=$AFON_HOME"
+  if [ -n "$CLOUD" ]; then
+    MVN_ENVS="$MVN_ENVS -Dafon.cloud=$CLOUD"
+  fi
+  if [ -n "$LOGGING" ]; then
+    MVN_ENVS="$MVN_ENVS -Dafon.logging=$LOGGING"
+  fi
+  if [ -n "$LOGGING_CONSOLE" ]; then
+    MVN_ENVS="$MVN_ENVS -Dafon.logging.console=$LOGGING_CONSOLE"
+  fi
+}
+
 exec_mvn() {
   MVN="$MVN_CMD $MVN_ENVS $MVN_ARGS $MVN_GOALS"
   echo "Executing: $MVN"
@@ -190,6 +190,7 @@ exec_jvm(){
   if [ -n "$EXEC_ARGS" ]; then
     MVN_ARGS="$MVN_ARGS -Dexec.args=\"$EXEC_ARGS\""
   fi
+  mvn_envs
   if [ -n "$EXEC_ENVS" ]; then
     EXEC_ENVS="${EXEC_ENVS/ / -D}"
     MVN_ENVS="$MVN_ENVS -D$EXEC_ENVS"
@@ -482,7 +483,6 @@ case $ACTION in
     if [ "$EXEC_TYPE" == "script" ]; then
       exec_script
     else
-      mvn_envs
       exec_jvm
     fi
     ;;
