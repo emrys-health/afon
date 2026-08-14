@@ -16,11 +16,18 @@ verify_commands:
   - curl --version
 
 verify_cloud_commands:
-  - aws --version
-  - az version
-  - gcloud --version
   - kubectl version --client
   - tofu --version
+
+verify_aws_commands:
+  - aws --version
+
+verify_azure_commands:
+  - az version
+
+verify_gcloud_commands:
+  - gcloud --version
+
 
 # Having the tools installed is not enough — the specs run a local[4] Spark
 # driver alongside the KeyCloak, Polaris, Trino and Spark Connect containers, so
