@@ -79,13 +79,21 @@ If a deployment fails partway through, you can resume from a specific step, e.g.
 ./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain --exec-args "azure_polaris"
 ```
 
-### Deploy the AWS stack from GitHub
+### Deploy or delete the AWS stack from GitHub
 
-The [Deploy AWS Stack (Linux)](../.github/workflows/deploy-aws-linux.yml) workflow runs
-`ops.DeployAwsFullStackMain` on the self-hosted Linux runner.
-Run it from the Actions tab: it is `workflow_dispatch` only, takes the step to resume from
-(blank runs the lot) and requires `deploy` typed into the confirm input, because the first step
-tears the running stack down before rebuilding it.
+The [Stack AWS (Linux)](../.github/workflows/stack-aws-linux.yml) workflow runs `afon.sh`'s
+`stack-deploy` or `stack-delete` for AWS on the self-hosted Linux runner — ie
+`ops.DeployAwsFullStackMain` or `ops.DeleteAwsFullStackMain`.
+
+Run it from the Actions tab: it is `workflow_dispatch` only, with an `action` dropdown
+(`deploy`/`delete`), a `from_step` to resume from (deploy only — blank runs every step, starting
+with the teardown; ignored by delete, which has a single step) and a `confirm` input that must
+match the chosen action. `deploy` tears the running stack down before rebuilding it; `delete` tears
+it down and leaves it down — a later `deploy` run is what brings it back.
+
+Both actions run on the *same* self-hosted runner (see the `runs-on` note in the workflow), because
+both need the tofu state described below — `delete` just as much as `deploy`, since that state is
+the only record of what there is to tear down.
 
 Pre-requisites, on top of what the acceptance workflow needs:
 
@@ -100,15 +108,16 @@ Pre-requisites, on top of what the acceptance workflow needs:
   has, from an EC2 instance profile or its `~/.aws/credentials`.
 - **Tofu state**: kept on the runner in `$AFON_STATE_DIR/<owner>/<repo>/aws`, since
   `afon-ops/cdktf.out` and `afon-ops/terraform.aws.tfstate` are gitignored and so are wiped by
-  `actions/checkout`. The workflow copies them in before deployment and back out afterwards.
-  A run that starts without that state will deploy as if AWS were empty, so if you tear the stack
-  down by hand, keep the two in step.
+  `actions/checkout`. The workflow copies them in before running and back out afterwards. A
+  `deploy` that starts without that state deploys as if AWS were empty (and collides with whatever
+  is actually still running); a `delete` that starts without it has nothing to destroy and leaves
+  the running stack untouched. If you ever tear the stack down by hand, keep the two in step.
 
 **NOTE**: the `$AFON_STATE_DIR` points to `/data/afon/state` and lives outside the GitHub workspace,
 which is wiped out at each checkout.   On the runner, the `$AFON_HOME` points to the workspace.   
 
-The region comes from `AWS_REGION` in `afon-aws.properties`, and the deploy log is uploaded as the
-`afon-deploy-aws-logs-<run id>` artifact.
+The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log is uploaded as the
+`afon-stack-aws-logs-<run id>` artifact.
 
 ### The afon-cdk module
 

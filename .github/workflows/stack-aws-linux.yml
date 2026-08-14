@@ -1,12 +1,13 @@
-name: Deploy AWS Stack (Linux)
+name: Stack AWS (Linux)
 
-# Deploys the AWS full stack from the self-hosted Linux runner,
-# by running ops.DeployAwsFullStackMain — the same entry point as docs/stacks.md.
+# Runs afon.sh's stack-deploy or stack-delete for AWS from the self-hosted Linux runner, ie
+# ops.DeployAwsFullStackMain or ops.DeleteAwsFullStackMain — the same entry points as docs/stacks.md.
 #
-# This is a re-deployment, not an upgrade: the first step (clean_aws) runs `tofu destroy` against the
-# stack that is currently up, and the run then recreates it. There is a window of an hour or more
-# where Polaris and Jupyter are down. Hence, workflow_dispatch only and never on push, but could be on a schedule.
-# Currently, requires a typed confirmation but could be replaced by a drop-down.
+# deploy is a re-deployment, not an upgrade: its first step (clean_aws) runs `tofu destroy` against
+# the stack that is currently up, and the run then recreates it. delete just tears the stack down
+# and leaves it down — a later deploy is what brings it back. Either way there is a window of an
+# hour or more where Polaris and Jupyter are unavailable. Hence, workflow_dispatch only and never on
+# push, but could be on a schedule. 
 #
 # The runner needs, beyond what the acceptance tests need (see acceptance-tests-linux.yml):
 #   - the aws cli, tofu and kubectl on PATH  (scripts/ansible, `-e install_cloud_tools=true`)
@@ -15,29 +16,32 @@ name: Deploy AWS Stack (Linux)
 #     let the runner's own credentials (EC2 instance profile, or ~/.aws/credentials) be used.
 #   - $AFON_STATE_DIR to keep the tofu state between runs and points /data/afon/state on the runner
 #     and is different from $AFON_HOME which lives in the GitHub workspace.
-#     See the "Save/Restore the tofu state" steps.
+#     See the "Save/Restore the tofu state" steps. delete needs this every bit as much as deploy —
+#     it is the only record of what tofu destroy has to tear down — which is why this job always
+#     runs on the same runner rather than whichever self-hosted Linux runner happens to be free.
 #
 # The $AFON_HOME/config files are reconstructed from the same base64 repository secrets the
 # acceptance workflow uses; `scripts/github/secrets.sh push` publishes them.
 on:
   workflow_dispatch:
     inputs:
+      action:
+        description: "Stack action to run"
+        type: choice
+        options: [deploy, delete]
+        required: true
       from_step:
-        description: "Resume from this step, eg aws_spark (blank runs every step, starting with the teardown)"
+        description: "deploy only: resume from this step, eg aws_spark (blank runs every step, starting with the teardown). Ignored by delete."
         type: string
         default: ""
-      confirm:
-        description: "Type 'deploy' to confirm — the run tears down the running AWS stack before rebuilding it"
-        type: string
-        required: true
 
 permissions:
   contents: read
 
-# One deploy at a time, and never cancel one in flight: a half-applied plan leaves both AWS and the
-# local tfstate in a state the next run has to untangle by hand.
+# One stack action at a time, and never cancel one in flight: a half-applied plan leaves both AWS
+# and the local tfstate in a state the next run has to untangle by hand.
 concurrency:
-  group: deploy-aws-linux
+  group: stack-aws-linux
   cancel-in-progress: false
 
 env:
@@ -49,7 +53,7 @@ env:
   MAVEN_OPTS: -Xmx3g
 
 jobs:
-  deploy:
+  stack:
     # NOTE: in case of multiple Linux runner, we need to narrow the labels to one runner.
     # The tofu state is kept on the runner, so the job must run on the same runner.
     runs-on: [self-hosted, Linux, X64]
@@ -59,12 +63,6 @@ jobs:
         shell: bash
 
     steps:
-      - name: Confirm the deploy
-        if: inputs.confirm != 'deploy'
-        run: |
-          echo "::error::Set the confirm input to 'deploy'. This workflow destroys the running AWS stack before rebuilding it."
-          exit 1
-
       - name: Checkout
         uses: actions/checkout@v7
 
@@ -196,8 +194,9 @@ jobs:
           # cdktf synthesises into afon-ops/cdktf.out/stacks/aws and keeps the state next to it in
           # afon-ops/terraform.aws.tfstate. Both are gitignored, and actions/checkout runs
           # `git clean -ffdx`, so they do not survive a checkout and are kept on the runner instead.
-          # Without them the teardown at the head of the deploy finds nothing to destroy and the
-          # rebuild then collides with the resources still running in AWS.
+          # Without them, deploy's teardown finds nothing to destroy and the rebuild then collides
+          # with the resources still running in AWS; delete finds nothing to destroy at all and
+          # leaves the running stack untouched.
           if compgen -G "$AWS_STATE_DIR/terraform.aws.tfstate*" > /dev/null; then
             cp -v "$AWS_STATE_DIR"/terraform.aws.tfstate* afon-ops/
           else
@@ -209,19 +208,29 @@ jobs:
             echo "Restored cdktf.out"
           fi
 
-      - name: Deploy the AWS full stack
+      - name: Run the AWS stack action
         env:
+          ACTION: ${{ inputs.action }}
           # Blank runs every step; a step name (eg aws_spark) resumes from there, per docs/stacks.md.
+          # Only meaningful for deploy — DeleteAwsFullStackMain has a single step (clean_aws).
           FROM_STEP: ${{ inputs.from_step }}
         run: |
           set -euo pipefail
-          if [ -n "$FROM_STEP" ]; then
-            echo "Deploy resumes from step $FROM_STEP"
+          # Using --logging-console INFO because a run this long is unreadable in the Actions log otherwise.
+          if [ "$ACTION" == "delete" ]; then
+            if [ -n "$FROM_STEP" ]; then
+              echo "::warning::from_step is ignored by delete"
+            fi
+            ./afon.sh -a stack-delete --cloud aws --stack-type full \
+              --home "$AFON_HOME" --logging-console INFO
+          else
+            if [ -n "$FROM_STEP" ]; then
+              echo "Deploy resumes from step $FROM_STEP"
+            fi
+            ./afon.sh -a stack-deploy --cloud aws --stack-type full \
+              --home "$AFON_HOME" --logging-console INFO \
+              --stack-args "$FROM_STEP"
           fi
-          # Using --logging-console INFO because deploy this long is unreadable in the Actions log otherwise.
-          ./afon.sh -a stack-deploy --cloud aws --stack-type full \
-            --home "$AFON_HOME" --logging-console INFO \
-            --stack-args "$FROM_STEP"
 
       - name: Save the tofu state
         if: always()
@@ -247,14 +256,14 @@ jobs:
           ./afon.sh -a stack-status --cloud aws --home "$AFON_HOME"
           kubectl get pods -A
 
-      - name: Upload deploy logs
+      - name: Upload stack logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          # afon-core.log is the full deploy log (logback writes it under $AFON_HOME/logs). It
+          # afon-core.log is the full run log (logback writes it under $AFON_HOME/logs). It
           # carries configuration values, so the artifact is as sensitive as the config itself —
           # it is visible to anyone with read access to this repo.
-          name: afon-deploy-aws-logs-${{ github.run_id }}
+          name: afon-stack-aws-logs-${{ github.run_id }}
           path: |
             ${{ github.workspace }}/.afon/logs/**
           if-no-files-found: ignore
