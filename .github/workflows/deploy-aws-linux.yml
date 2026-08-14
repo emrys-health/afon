@@ -176,6 +176,14 @@ jobs:
             exit 1
           fi
 
+      - name: Build components without acceptance tests
+        run: |
+          set -euo pipefail
+          # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
+          # The Actions log renders the escape codes, so the output reads as it does in a shell.
+          ./afon.sh -a build -p -acceptance --home "$AFON_HOME" \
+            --build-args "-B -ntp -Dstyle.color=always"
+
       - name: Restore the tofu state
         run: |
           set -euo pipefail
