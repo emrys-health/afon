@@ -78,7 +78,7 @@ exec_ansible(){
   if [ -z "$ANSIBLE_PLAYBOOK" ]; then
     ANSIBLE_PLAYBOOK="runner-setup.yml"
   fi
-  echo "Executing ansible playbook $ANSIBLE_PLAYBOOK"
+  echo "Executing: ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS"
   ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS
 }
 
