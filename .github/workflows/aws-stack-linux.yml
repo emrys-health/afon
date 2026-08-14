@@ -29,10 +29,6 @@ on:
         type: choice
         options: [deploy, delete]
         required: true
-      rebuild:
-        description: "Rebuild components"
-        type: boolean
-        required: true
       from_step:
         description: "deploy only: resume from this step, eg all_catalogs_in_emryspolaris (blank runs every step, starting with the teardown). Ignored by delete."
         type: string
@@ -183,7 +179,6 @@ jobs:
           fi
 
       - name: Build components without acceptance tests
-        if: ${{ inputs.rebuild == true }}
         run: |
           set -euo pipefail
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
