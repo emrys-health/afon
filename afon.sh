@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h] [--home <afon-home>]"
-  echo "          [--logging-level|-l <logging>] [--logging-console <console>]"
+  echo "          [--logging|-l <logging>] [--logging-console <console>]"
   echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
   echo "          [--config-zip <zip>] [--config-env <env>]"
@@ -23,7 +23,7 @@ usage (){
   echo "          setup       : sets up the local env for the given os."
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state"
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
-  echo "logging-level:    the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
+  echo "logging:          the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
