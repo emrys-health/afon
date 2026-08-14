@@ -166,7 +166,7 @@ jobs:
           echo "KUBE_CONFIG_PATH=$HOME/.kube/config" >> "$GITHUB_ENV"
 
           # Where the tofu state is kept between runs — outside the workspace the checkout cleans.
-          echo "AFON_STATE_DIR=$HOME/.afon/state/${{ github.repository }}/aws" >> "$GITHUB_ENV"
+          echo "AFON_STATE_DIR=/data/afon/state/${{ github.repository }}/aws" >> "$GITHUB_ENV"
 
       - name: Check the AWS credentials
         run: |
