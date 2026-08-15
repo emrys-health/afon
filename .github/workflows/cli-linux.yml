@@ -1,0 +1,158 @@
+name: CLI (Linux)
+
+# Runs CLI deploy or delete from the self-hosted Linux runner.
+#
+# workflow_dispatch only and never on push, but could be on a schedule.
+#
+# The runner needs:
+#   - $AFON_CLI_DIR to deploy to and delete from the afon-cli artifacts.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "CLI action to run"
+        type: choice
+        options: [deploy, delete]
+        required: true
+
+permissions:
+  contents: read
+
+# One cli action at a time, and never cancel one in flight.
+concurrency:
+  group: cli-linux
+  cancel-in-progress: false
+
+env:
+  # Keep config inside the workspace rather than the runner's home, so it is scoped to this run.
+  AFON_HOME: ${{ github.workspace }}/.afon
+  # Without this the JVM takes a quarter of the runner's RAM as its max heap, which is not
+  # enough for javac to open the spark jars. Set explicitly so the build does not silently
+  # depend on the instance size.
+  MAVEN_OPTS: -Xmx3g
+
+jobs:
+  stack:
+    # NOTE: in case of multiple Linux runner, we need to narrow the labels to one runner.
+    # The tofu state is kept on the runner, so the job must run on the same runner.
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Verify runner tooling
+        run: |
+          set -euo pipefail
+          java -version
+          mvn -version
+          free -h
+          df -h /
+
+      - name: Write afon config from secrets
+        env:
+          AFON_PROPERTIES: ${{ secrets.AFON_PROPERTIES }}
+          AFON_AWS_PROPERTIES: ${{ secrets.AFON_AWS_PROPERTIES }}
+          AFON_AZURE_PROPERTIES: ${{ secrets.AFON_AZURE_PROPERTIES }}
+          AFON_GCP_PROPERTIES: ${{ secrets.AFON_GCP_PROPERTIES }}
+          SECRET_PROPERTIES: ${{ secrets.SECRET_PROPERTIES }}
+          SECRET_AWS_PROPERTIES: ${{ secrets.SECRET_AWS_PROPERTIES }}
+          SECRET_AZURE_PROPERTIES: ${{ secrets.SECRET_AZURE_PROPERTIES }}
+          SECRET_GCP_PROPERTIES: ${{ secrets.SECRET_GCP_PROPERTIES }}
+          USERS_CSV: ${{ secrets.USERS_CSV }}
+        run: |
+          set -euo pipefail
+          CONFIG_DIR="$AFON_HOME/config"
+          rm -rf "$CONFIG_DIR"
+          mkdir -p "$CONFIG_DIR"
+          chmod 700 "$CONFIG_DIR"
+          echo "Writing config to $CONFIG_DIR"
+
+          # Secret values are base64 so that multi-line properties (SNOWFLAKE_PRIVATE_KEY,
+          # GOOGLE_APPLICATION_CREDENTIALS) survive the round trip byte for byte.
+          write_config() {
+            local file="$1" encoded="$2"
+            if [ -z "$encoded" ]; then
+              echo "::error::Missing repository secret for config file $file"
+              return 1
+            fi
+            printf '%s' "$encoded" | base64 -d > "$CONFIG_DIR/$file"
+            chmod 600 "$CONFIG_DIR/$file"
+            echo "Wrote $file ($(wc -c < "$CONFIG_DIR/$file") bytes)"
+          }
+          write_config afon.properties         "$AFON_PROPERTIES"
+          write_config afon-aws.properties     "$AFON_AWS_PROPERTIES"
+          write_config afon-azure.properties   "$AFON_AZURE_PROPERTIES"
+          write_config afon-gcp.properties     "$AFON_GCP_PROPERTIES"
+          write_config secret.properties       "$SECRET_PROPERTIES"
+          write_config secret-aws.properties   "$SECRET_AWS_PROPERTIES"
+          write_config secret-azure.properties "$SECRET_AZURE_PROPERTIES"
+          write_config secret-gcp.properties   "$SECRET_GCP_PROPERTIES"
+          write_config users.csv               "$USERS_CSV"
+
+      - name: Validate afon config
+        run: ./afon.sh -a config-validate --home "$AFON_HOME"
+
+      - name: Configure the deploy environment
+        env:
+          AFON_CLI_DIR: "/data/afon/cli"
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$AFON_CLI_DIR"
+
+      - name: Build cli
+        ACTION: ${{ inputs.action }}
+        run: |
+          set -euo pipefail
+          # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
+          # The Actions log renders the escape codes, so the output reads as it does in a shell.
+          if [ "$ACTION" == "deploy" ]; then
+            ./afon.sh -a build -g "clean package" -p cli --home "$AFON_HOME" \
+              --build-args "-Dafon.cli.dir=$AFON_CLI_DIR -B -ntp -Dstyle.color=always"
+          else 
+             rm $AFON_CLI_DIR/afon-cli.jar
+             rm $AFON_CLI_DIR/afon-cli.sh
+          fi
+          
+      - name: Report the cli status
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ "$ACTION" == "deploy" ]; then
+            eval $AFON_CLI_DIR/afon-cli.sh  
+          else
+            if [ -f "$AFON_CLI_DIR/afon-cli.jar" ] || [ -f "$AFON_CLI_DIR/afon-cli.sh" ] ; then
+              echo "The cli artifacts have not been deleted from $AFON_CLI_DIR"
+            else 
+              echo "The cli artifacts have been deleted from $AFON_CLI_DIR"
+            fi
+          fi
+
+      - name: Upload stack logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          # afon-core.log is the full run log (logback writes it under $AFON_HOME/logs). It
+          # carries configuration values, so the artifact is as sensitive as the config itself —
+          # it is visible to anyone with read access to this repo.
+          name: cli-logs-${{ github.run_id }}
+          path: |
+            ${{ github.workspace }}/.afon/logs/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Remove afon config
+        if: always()
+        run: rm -rf "$AFON_HOME/config"
