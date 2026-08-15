@@ -33,7 +33,7 @@ env:
   AFON_CLI_DIR: /data/afon/cli
 
 jobs:
-  stack:
+  cli:
     # NOTE: in case of multiple Linux runner, we need to narrow the labels to one runner.
     # The tofu state is kept on the runner, so the job must run on the same runner.
     runs-on: [self-hosted, Linux, X64]
