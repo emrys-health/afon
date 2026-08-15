@@ -30,6 +30,7 @@ env:
   # enough for javac to open the spark jars. Set explicitly so the build does not silently
   # depend on the instance size.
   MAVEN_OPTS: -Xmx3g
+  AFON_CLI_DIR: /data/afon/cli
 
 jobs:
   stack:
@@ -105,15 +106,14 @@ jobs:
         run: ./afon.sh -a config-validate --home "$AFON_HOME"
 
       - name: Configure the deploy environment
-        env:
-          AFON_CLI_DIR: "/data/afon/cli"
         run: |
           set -euo pipefail
 
           mkdir -p "$AFON_CLI_DIR"
 
       - name: Build cli
-        ACTION: ${{ inputs.action }}
+        env:
+          ACTION: ${{ inputs.action }}
         run: |
           set -euo pipefail
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
@@ -129,6 +129,8 @@ jobs:
       - name: Report the cli status
         if: always()
         continue-on-error: true
+        env:
+          ACTION: ${{ inputs.action }}
         run: |
           if [ "$ACTION" == "deploy" ]; then
             eval $AFON_CLI_DIR/afon-cli.sh  
