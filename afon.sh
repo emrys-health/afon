@@ -6,6 +6,7 @@ usage (){
   echo "          [--logging|-l <logging>] [--logging-console <console>]"
   echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
+  echo "          [--cli-command|-cli-cmd <command>] [--cli-args <args>] [--cli-dir <dir>]"
   echo "          [--config-zip <zip>] [--config-env <env>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
@@ -14,14 +15,15 @@ usage (){
   echo "          [--stack-deploy] [--stack-type <type>] [--stack-args <args>] [--stack-status]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
-  echo "          ansible:    : executes the ansible playbook"
-  echo "          build       : executes the mvn build"
-  echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch|status"
-  echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|delete|status"
+  echo "          ansible:    : executes the ansible playbook."
+  echo "          build       : executes the mvn build."
+  echo "          cli         : executes the cli commands."
+  echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch|status."
+  echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|delete|status."
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
-  echo "          exec        : executes the jvm classes from ops (see the docs for details)"
+  echo "          exec        : executes the jvm classes from ops (see the docs for details)."
   echo "          setup       : sets up the local env for the given os."
-  echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state"
+  echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state."
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging:          the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
@@ -30,6 +32,9 @@ usage (){
   echo "build-args:       the build args.  eg '-DskipTests'."
   echo "build-goals:      the build goals.  Defaults to 'clean install'."
   echo "build-profiles:   the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
+  echo "cli-command:      the cli command."
+  echo "cli-args:         the cli args."
+  echo "cli-dir:          the cli dir.  Defaulting to env `$AFON_CLI_DIR` if set, else to `$AFON_HOME/cli`."
   echo "config-zip:       the config zip path to import/export as a zip file."
   echo "config-env:       the config env name.  Assumes config dir '$AFON_HOME/config-<env>' to symlink to '$AFON_HOME/config'."
   echo "docs-dir:         the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
@@ -67,6 +72,34 @@ exec_ansible(){
   fi
   echo "Executing: ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS"
   ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS
+}
+
+exec_cli(){
+  if [ -z "$CLI_DIR" ]; then
+    AFON_CLI_DIR=${AFON_CLI_DIR:-""}
+    if [ -n "$AFON_CLI_DIR" ]; then
+      echo "Using cli dir $AFON_CLI_DIR"
+      CLI_DIR="$AFON_CLI_DIR"
+    else
+      echo "Using cli dir $AFON_HOME/cli"
+      CLI_DIR="$AFON_HOME/cli"
+    fi
+  fi
+  if [ ! -d "$CLI_DIR" ]; then
+    echo "The cli dir is not found: $CLI_DIR"
+    usage; exit;
+  fi
+  CLI_JAR="$CLI_DIR/afon-cli.jar"
+  CLI_SH="$CLI_DIR/afon-cli.sh"
+  if [ ! -f "$CLI_JAR" ] || [ ! -f "$CLI_SH" ]; then
+    echo "The cli artifacts are not found in $CLI_DIR"
+    echo "Build cli artifacts:"
+    echo "./afon.sh -p cli --build-args -Dafon.cli.dir=$CLI_DIR"
+    usage; exit;
+  fi
+  CLI="$CLI_SH $CLI_COMMAND $CLI_ARGS"
+  echo "Executing: $CLI"
+  eval "$CLI"
 }
 
 exec_config(){
@@ -261,7 +294,7 @@ exec_stack(){
 }
 
 exec_tofu(){
-  echo "tofu targetting cloud $TOFU_CLOUD"
+  echo "tofu targetting cloud '$TOFU_CLOUD'"
   TOFU_DIR="afon-ops/cdktf.out/stacks/$TOFU_CLOUD"
   if [ ! -d "$TOFU_DIR" ]; then
      echo "Dir $TOFU_DIR not found.  Execute deploy or configure actions first."
@@ -328,6 +361,9 @@ ANSIBLE_ARGS=
 BUILD_ARGS=
 BUILD_GOALS=
 BUILD_PROFILES=
+CLI_ARGS=
+CLI_COMMAND=
+CLI_DIR=
 CLOUD=
 LOGGING=
 LOGGING_CONSOLE=
@@ -374,6 +410,12 @@ while [[ $# -gt 0 ]]; do
       CLOUD="$2"; shift 2 ;;
     --dry-run)
       DRY_RUN=true; shift ;;
+    --cli-args)
+      CLI_ARGS="$2"; shift 2 ;;
+    --cli-command|--cli-cmd)
+      CLI_COMMAND="$2"; shift 2 ;;
+    --cli-dir)
+      CLI_DIR="$2"; shift 2 ;;
     --config-env)
       CONFIG_ENV="$2"; shift 2 ;;
     --config-zip)
@@ -460,7 +502,7 @@ case $ACTION in
       MVN_ARGS="$BUILD_ARGS"
     fi
     if [ -n "$CLOUD" ]; then
-      echo "Using cloud $CLOUD"
+      echo "Using cloud '$CLOUD'"
         if [ -n "$MVN_PROFILES" ]; then
           MVN_PROFILES="$MVN_PROFILES,$CLOUD"
         else
@@ -470,6 +512,9 @@ case $ACTION in
     mvn_envs
     exec_mvn
     check_acceptance
+    ;;
+  cli)
+    exec_cli
     ;;
   config-*)
     exec_config
