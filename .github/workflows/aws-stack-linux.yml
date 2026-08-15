@@ -29,6 +29,10 @@ on:
         type: choice
         options: [deploy, delete]
         required: true
+      build_cli:
+        description: "Build cli"
+        type: boolean
+        required: false
       from_step:
         description: "deploy only: resume from this step, eg all_catalogs_in_emryspolaris (blank runs every step, starting with the teardown). Ignored by delete."
         type: string
@@ -177,6 +181,15 @@ jobs:
             echo "::error::No usable AWS credentials. Set the AWS_DEPLOY_ACCESS_KEY_ID and AWS_DEPLOY_SECRET_ACCESS_KEY secrets, or give the runner an instance profile."
             exit 1
           fi
+
+      - name: Build cli
+        if: ${{ inputs.build_cli == true }}
+        run: |
+          set -euo pipefail
+          # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
+          # The Actions log renders the escape codes, so the output reads as it does in a shell.
+          ./afon.sh -a build -g "clean package" -p cli --home "$AFON_HOME" \
+            --build-args "-Dafon.cli.dir=/data/afon/cli -B -ntp -Dstyle.color=always"
 
       - name: Build components without acceptance tests
         run: |
