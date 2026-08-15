@@ -1,0 +1,71 @@
+package health.emrys.afon.cli;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.annotation.Bean;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+
+/**
+ * Single executable entry point bundling all afon-ops commands. Dispatches
+ * {@code java -jar afon-cli.jar <command> [args...]} to the matching afon-ops
+ * {@code *Main} class, forwarding the remaining args to it unchanged.
+ */
+@SpringBootApplication
+public class AfonCliApplication {
+
+    private static final Logger logger = LoggerFactory.getLogger(AfonCliApplication.class);
+
+    public static void main(String[] args) {
+        new SpringApplicationBuilder(AfonCliApplication.class)
+            .web(WebApplicationType.NONE)
+            .run(args);
+    }
+
+    @Bean
+    CommandLineRunner dispatch(OpsCommands opsCommands) {
+        return args -> {
+            if (args.length == 0 || isHelp(args[0])) {
+                printUsage(opsCommands);
+                return;
+            }
+            Class<?> target = opsCommands.resolve(args[0]);
+            if (target == null) {
+                System.err.println("Unknown command: " + args[0]);
+                printUsage(opsCommands);
+                System.exit(1);
+                return;
+            }
+            invoke(target, Arrays.copyOfRange(args, 1, args.length));
+        };
+    }
+
+    private static boolean isHelp(String arg) {
+        return "help".equalsIgnoreCase(arg) || "--help".equals(arg) || "-h".equals(arg);
+    }
+
+    private static void printUsage(OpsCommands opsCommands) {
+        System.out.println("Usage: afon-cli <command> [args...]");
+        System.out.println("Commands:");
+        opsCommands.names().forEach(name -> System.out.println("  " + name));
+    }
+
+    private static void invoke(Class<?> target, String[] args) {
+        try {
+            Method main = target.getMethod("main", String[].class);
+            main.invoke(null, (Object) args);
+        } catch (InvocationTargetException e) {
+            logger.error("Command {} failed", target.getSimpleName(), e.getCause());
+            throw new RuntimeException(e.getCause());
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+}
