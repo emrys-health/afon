@@ -13,7 +13,7 @@ if [ "$AFON_CLI_DIR" == "$SCRIPT_DIR" ] && [[ "$SCRIPT_DIR" == *"afon-cli/src/ma
 fi
 JAR=""
 if [ -z "$JAR" ]; then
-    JAR="$(ls $AFON_CLI_DIR/afon-cli-*.jar 2>/dev/null | grep -v '\.original$' | head -1 || true)"
+    JAR="$(ls $AFON_CLI_DIR/afon-cli*.jar 2>/dev/null | grep -v '\.original$' | head -1 || true)"
 fi
 if [ -z "$JAR" ]; then
     echo "The afon-cli jar not found in the $AFON_CLI_DIR." >&2
