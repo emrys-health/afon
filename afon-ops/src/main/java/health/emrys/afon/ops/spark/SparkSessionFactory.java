@@ -3,42 +3,34 @@ package health.emrys.afon.ops.spark;
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.cluster.PolarisClusterCredentials;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
-import io.kubernetes.client.openapi.ApiException;
 import org.apache.spark.SparkContext;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 
 import java.io.IOException;
-
-import static health.emrys.afon.spark.SparkWarehouseConfig.SUPPORTED_CLOUD_NAMES;
-import static org.slf4j.LoggerFactory.getLogger;
+import java.util.Arrays;
 
 public class SparkSessionFactory {
 
-    private static final Logger logger = getLogger(SparkSessionFactory.class);
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(SparkSessionFactory.class);
 
-    public static SparkSession localSparkClusterPolaris(AfonCloud polarisCloud) throws IncorrectConfigException, IOException, ApiException {
-        return localSparkClusterPolaris(SUPPORTED_CLOUD_NAMES, polarisCloud);
-    }
+    private static final  String[] WAREHOUSE_NAMES =
+            Arrays.stream(AfonCloud.values()).map(x -> x.toString()).toArray(String[]::new);
 
-    public static SparkSession localSparkClusterPolaris(String[] warehouseNames,
-                                                        AfonCloud polarisCloud)
-    throws IOException {
-        ClusterCredentials credentials = PolarisClusterCredentials.createClusterCredentials(polarisCloud);
+    public static SparkSession localSparkClusterPolaris(AfonCloud polarisCloud) throws IOException {
+        ClusterCredentials credentials = new PolarisClusterCredentials(polarisCloud);
         return new SparkSessionFactory(
             credentials.getPolarisId(),
             credentials.getPolarisSecret(),
             credentials.getPolarisHost(),
-            "https",
-            warehouseNames
+            "https", WAREHOUSE_NAMES
         ).createSparkSession();
     }
 
     private final SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
-    private final String                      polarisId;
+    private final String polarisId;
     private final String polarisSecret;
     private final String polarisHost;
     private final String protocol;

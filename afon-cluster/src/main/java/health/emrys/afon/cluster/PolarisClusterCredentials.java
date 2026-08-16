@@ -9,12 +9,20 @@ import java.util.Properties;
 
 public class PolarisClusterCredentials implements ClusterCredentials {
 
-    public static ClusterCredentials createClusterCredentials(AfonCloud cloud) {
-        return new PolarisClusterCredentials(polarisDomainName(cloud));
+    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+    private final Properties properties;
+    private final String accessToken;
+
+    public PolarisClusterCredentials(AfonCloud cloud) {
+        this(cloud, new FilePropertyProvider().getProperties());
     }
 
-    private static String polarisDomainName(AfonCloud cloud) {
-        Properties properties = new FilePropertyProvider().getProperties();
+    public PolarisClusterCredentials(AfonCloud cloud, Properties properties) {
+        this.properties = properties;
+        accessToken = clientFactory.getPolarisClient(polarisDomainName(cloud), properties).getAccessToken();
+    }
+
+    private String polarisDomainName(AfonCloud cloud) {
         switch ( cloud ) {
             case AWS:
                 return AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
@@ -25,16 +33,6 @@ public class PolarisClusterCredentials implements ClusterCredentials {
             default:
                 throw new RuntimeException("Unsupported cloud "+cloud);
         }
-
-    }
-
-    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
-    private final Properties properties;
-    private final String accessToken;
-
-    public PolarisClusterCredentials(String domain) {
-        properties = new FilePropertyProvider().getProperties();
-        accessToken = clientFactory.getPolarisClient(domain, properties).getAccessToken();
     }
 
     @Override
