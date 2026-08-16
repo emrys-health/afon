@@ -16,7 +16,7 @@ public class PolarisClusterCredentialsSmoke {
 
     public void createCredentials(AfonCloud cloud) {
         logger.info("Creating cluster credentials for "+ cloud);
-        ClusterCredentials credentials = PolarisClusterCredentials.createClusterCredentials(cloud);
+        ClusterCredentials credentials = new PolarisClusterCredentials(cloud);
         logger.info("Access token for {}: {}", cloud, credentials.getAccessToken());
     }
 

@@ -1,8 +1,8 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.cluster.ClusterCredentials;
+import health.emrys.afon.cluster.PolarisClusterCredentials;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -11,13 +11,9 @@ import org.slf4j.Logger;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
 import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonCloud.GCP;
-import static health.emrys.afon.cluster.PolarisClusterCredentials.createClusterCredentials;
 import static java.lang.String.format;
 
 /**
@@ -25,7 +21,7 @@ import static java.lang.String.format;
  * <p>
  * If you're messing around the Spark artifact, you might need to presign with:
  * copy it to S3 with:
- * docker run --rm -it  -v ~/.aws:/root/.aws -v /home/henryp/Code/Emrys/afon-core/afon-iceberg/target/:/tmp/target  amazon/aws-cli s3 cp /tmp/target/afon-iceberg-0.1.jar s3://emrys-afon-bucket/afon-iceberg-0.1.jar
+ * docker run --rm -it  -v ~/.aws:/root/.aws -v afon-iceberg/target/:/tmp/target  amazon/aws-cli s3 cp /tmp/target/afon-iceberg-0.1.jar s3://emrys-afon-bucket/afon-iceberg-0.1.jar
  * then
  * aws s3 presign s3://emrys-afon-bucket/afon-iceberg-0.1.jar --expires-in 14400
  */
@@ -36,26 +32,13 @@ public class GeneratePySparkContextMain {
     private final String polarisSecret;
     private final String polarisHost;
 
-    public static final void main(String[] args) {
-        try {
-            AfonCloud polarisCloud = AfonCloud.AWS;
-            if (args.length > 0) {
-                polarisCloud = AfonCloud.valueOf(args[0]);
-            }
-            ClusterCredentials cloud = createClusterCredentials(polarisCloud);
-            var                app        = new GeneratePySparkContextMain(cloud);
-            app.generatePySparkCode();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     private final SparkWarehouseConfig polarisConfig;
 
-    public GeneratePySparkContextMain(ClusterCredentials cloud) {
-        polarisId     = cloud.getPolarisId();
-        polarisSecret = cloud.getPolarisSecret();
-        polarisHost   = cloud.getPolarisHost();
+    public GeneratePySparkContextMain(AfonCloud cloud) {
+        ClusterCredentials credentials = new PolarisClusterCredentials(cloud);
+        polarisId     = credentials.getPolarisId();
+        polarisSecret = credentials.getPolarisSecret();
+        polarisHost   = credentials.getPolarisHost();
         polarisConfig = SparkWarehouseConfigFactory.getFactory().getConfig(
             polarisId,
             polarisSecret,
@@ -63,7 +46,7 @@ public class GeneratePySparkContextMain {
         );
     }
 
-    private void generatePySparkCode() {
+    public void generatePySparkCode() {
         String tableName = tableName();
         System.out.println("\u001B[32m");
         System.out.println("""
@@ -133,7 +116,7 @@ public class GeneratePySparkContextMain {
                 OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
               )
               ENABLED = TRUE;
-            """, polarisHost, polarisId, polarisSecret));
+            """, polarisHost,  polarisId, polarisSecret));
         System.out.println(format("""
                                   CREATE OR REPLACE ICEBERG TABLE my_iceberg_table
                                     CATALOG = 'polaris_aws'
@@ -152,7 +135,6 @@ public class GeneratePySparkContextMain {
     private String snowflakeSql(AfonCloud cloud, String catalog_table) {
         String     catalog    = "iceberg_" + cloud.name();
         String     table      = format("my_%s_table", cloud.name());
-        Properties properties = new FilePropertyProvider().getProperties();
         return format(
             """
             CREATE OR REPLACE CATALOG INTEGRATION %s
@@ -181,11 +163,11 @@ public class GeneratePySparkContextMain {
             
             select * from %s;
             """, catalog, polarisHost, cloud,
-            POLARIS_ID.getValueFrom(properties), POLARIS_SECRET.getValueFrom(properties),
+            polarisId, polarisSecret,
             table, catalog, catalog_table, table);
     }
 
-    private static @NonNull String azureSmokeTest(String tableName) {
+    private @NonNull String azureSmokeTest(String tableName) {
         return format(
             """
             #
@@ -205,7 +187,7 @@ public class GeneratePySparkContextMain {
             """, tableName, tableName);
     }
 
-    static @NonNull String awsSmokeTest(String tableName) {
+    private @NonNull String awsSmokeTest(String tableName) {
         return format(
             """
             #
@@ -226,7 +208,7 @@ public class GeneratePySparkContextMain {
             """, tableName, tableName, tableName);
     }
 
-    private static @NonNull String gcpSmokeTest(String tableName) {
+    private @NonNull String gcpSmokeTest(String tableName) {
         return format(
             """
             #
@@ -245,16 +227,26 @@ public class GeneratePySparkContextMain {
             """, tableName, tableName);
     }
 
-    private static void addDependencies(StringBuffer szb, String[] dependencies, String groupId, String version) {
+    private void addDependencies(StringBuffer szb, String[] dependencies, String groupId, String version) {
         for (String artifactId : dependencies) {
             szb.append(format("%s:%s:%s,", groupId, artifactId, version));
         }
     }
 
-    private static final String tableName() {
+    private String tableName() {
         LocalDateTime     now       = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMddmmHHss");
         String            formatted = now.format(formatter);
         return "smoketesttable" + formatted;
     }
+
+    public static final void main(String[] args) {
+        AfonCloud polarisCloud = AfonCloud.AWS;
+        if (args.length > 0) {
+            polarisCloud = AfonCloud.valueOf(args[0]);
+        }
+        new GeneratePySparkContextMain(polarisCloud).generatePySparkCode();
+    }
+
+
 }

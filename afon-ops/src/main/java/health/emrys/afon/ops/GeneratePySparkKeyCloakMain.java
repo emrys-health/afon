@@ -17,17 +17,11 @@ import static health.emrys.afon.config.AfonCloud.AWS;
 import static java.lang.String.format;
 
 /**
- * Write some PySpark code that can be run in the cloud assuming you're using KeyClaok as te IdP.
+ * Write some PySpark code that can be run in the cloud assuming you're using KeyClaok.
  */
 public class GeneratePySparkKeyCloakMain {
 
     static final Logger log = org.slf4j.LoggerFactory.getLogger(GeneratePySparkKeyCloakMain.class);
-
-    public static void main(String[] args) {
-        String               polarisHost = args[0];
-        GeneratePySparkKeyCloakMain app         = new GeneratePySparkKeyCloakMain(polarisHost);
-        app.generateAndSavePySparkCode();
-    }
 
     private final SparkWarehouseConfig config;
 
@@ -39,13 +33,13 @@ public class GeneratePySparkKeyCloakMain {
         config = configFactory.getConfig(properties);
     }
 
-    private void generateAndSavePySparkCode() {
+    public void generateAndSavePySparkCode() {
         String pySparkCode = pySparkTestCode();
-        log.info("Config:\n\n{}", pySparkCode);
+        log.info("pySpark:\n\n{}", pySparkCode);
         save(pySparkCode);
     }
 
-    private static void save(String pySparkCode) {
+    private void save(String pySparkCode) {
         String filename = System.getProperty("java.io.tmpdir") + File.separator + "test.py";
         try {
             try (FileOutputStream fos = new FileOutputStream(filename);
@@ -96,7 +90,7 @@ public class GeneratePySparkKeyCloakMain {
         return python.toString();
     }
 
-    private static @NonNull String toSparkName(AfonCloud cloud) {
+    private @NonNull String toSparkName(AfonCloud cloud) {
         return "test_" + cloud;
     }
 
@@ -110,5 +104,13 @@ public class GeneratePySparkKeyCloakMain {
             df_read.show()
             """, toSparkName(AWS), tableName);
     }
+
+    public static void main(String[] args) {
+        if (args.length > 0) {
+            String polarisHost = args[0];
+            new GeneratePySparkKeyCloakMain(polarisHost).generateAndSavePySparkCode();
+        }
+    }
+
 
 }
