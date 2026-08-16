@@ -4,12 +4,14 @@ import health.emrys.afon.ops.DeploySnowflakeReadingAwsViaAwsMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
-import java.io.IOException;
 import java.util.List;
+import java.util.Properties;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
 
-public class DocumentSnowflakeReadingAwsViaAwsMain extends AbstractDocumentMetadata {
+public class DeploySnowflakeReadingAwsViaAwsDocument extends AbstractDocument {
+
+    public DeploySnowflakeReadingAwsViaAwsDocument(Properties properties) {super(properties);}
 
     @Override
     public String getFilename() {
@@ -26,7 +28,4 @@ public class DocumentSnowflakeReadingAwsViaAwsMain extends AbstractDocumentMetad
         return new DeploySnowflakeReadingAwsViaAwsMain().stepsUsing(stepOperations);
     }
 
-    public static void main(String[] args) throws IOException {
-        new Documenter(new DocumentSnowflakeReadingAwsViaAwsMain()).writeDocumentation();
-    }
 }

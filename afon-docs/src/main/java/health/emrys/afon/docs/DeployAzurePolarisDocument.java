@@ -5,8 +5,13 @@ import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
+import java.util.Properties;
 
-public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
+public class DeployAzurePolarisDocument extends AbstractDocument {
+
+    public DeployAzurePolarisDocument(Properties properties) {
+        super(properties);
+    }
 
     @Override
     public String getFilename() {
@@ -35,10 +40,6 @@ public class DocumentAzurePolarisMain extends AbstractDocumentMetadata {
     @Override
     public List<Step> steps(StepOperations stepOperations) {
         return new DeployAzurePolarisMain().stepsUsing(stepOperations);
-    }
-
-    public static void main(String[] args) {
-        new Documenter(new DocumentAzurePolarisMain()).writeDocumentation();
     }
 
 }

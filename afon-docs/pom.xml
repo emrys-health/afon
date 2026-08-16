@@ -38,7 +38,8 @@
                         </goals>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>${afon.jvm} ${afon.exec} -classpath %classpath health.emrys.afon.docs.DocumentAllMain</commandlineArgs>
+                            <commandlineArgs>${afon.jvm} ${afon.exec} -classpath %classpath
+                                health.emrys.afon.docs.GenerateAllDocumentsMain</commandlineArgs>
                         </configuration>
                     </execution>
                 </executions>
