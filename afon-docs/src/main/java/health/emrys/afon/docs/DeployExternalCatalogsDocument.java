@@ -6,8 +6,13 @@ import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
+import java.util.Properties;
 
-public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
+public class DeployExternalCatalogsDocument extends AbstractDocument {
+
+    public DeployExternalCatalogsDocument(Properties properties) {
+        super(properties);
+    }
 
     @Override
     public String getSupplementaryIntro() {
@@ -60,17 +65,12 @@ public class DocumentExternalCatalogsMain extends AbstractDocumentMetadata {
             
             If all else fails, destroy the Kubernetes cluster directly in the 
             [Azure console](https://portal.azure.com/#view/Microsoft_Azure_KubernetesFleet/KubernetesHub.MenuView/~/clusters)
-            """, new AzureCleanupHelper().cleanupCommands());
+            """, new AzureCleanupHelper(properties).cleanupCommands());
     }
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
         return new DeployExternalCatalogsMain().stepsUsing(stepOperations);
     }
-
-    public static void main(String[] args) {
-        new Documenter(new DocumentExternalCatalogsMain()).writeDocumentation();
-    }
-
 
 }

@@ -5,8 +5,11 @@ import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
+import java.util.Properties;
 
-public class DocumentSnowflakeWritingAzureViaAwsMain extends AbstractDocumentMetadata {
+public class DeploySnowflakeWritingAzureViaAwsDocument extends AbstractDocument {
+
+    public DeploySnowflakeWritingAzureViaAwsDocument(Properties properties) { super(properties); }
 
     @Override
     public String getFilename() {
@@ -28,7 +31,4 @@ public class DocumentSnowflakeWritingAzureViaAwsMain extends AbstractDocumentMet
         return new DeploySnowflakeWritingAzureViaAwsMain().stepsUsing(stepOperations);
     }
 
-    public static void main(String[] args) {
-        new Documenter(new DocumentSnowflakeWritingAzureViaAwsMain()).writeDocumentation();
-    }
 }

@@ -9,17 +9,23 @@ import org.slf4j.Logger;
 
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Properties;
 
 import static java.lang.String.format;
 import static java.lang.String.join;
 import static org.slf4j.LoggerFactory.getLogger;
 
-public abstract class AbstractDocumentMetadata implements DocumentMetadata {
+public abstract class AbstractDocument implements DocumentMetadata {
 
-    private static final Logger logger = getLogger(AbstractDocumentMetadata.class);
+    private static final Logger logger = getLogger(AbstractDocument.class);
+    protected final Properties properties;
+
+    protected AbstractDocument(Properties properties) {
+        this.properties = properties;
+    }
 
     public String getDescription() {
-        Class<?> deployClass = deployClass(this.getClass().getName());
+        Class<?> deployClass = opsClass(this.getClass().getName());
         return format(
                 """
                 # Introduction
@@ -95,12 +101,13 @@ public abstract class AbstractDocumentMetadata implements DocumentMetadata {
         }
     }
 
-    private Class<?> deployClass(String documentClassName) {
+    private Class<?> opsClass(String documentClassName) {
+        String opsClassName = documentClassName.replace("docs.", "ops.").replace("Document", "Main");
         try {
-            return Class.forName(documentClassName.replace("docs.Document", "ops.Deploy"));
+            return Class.forName(opsClassName);
         } catch (ClassNotFoundException e) {
-            logger.warn("Document class not found: " + this.getClass().getSimpleName(), e);
-            throw new RuntimeException("Document class not found: "+documentClassName, e);
+            logger.warn("Class not found: " + opsClassName, e);
+            throw new RuntimeException("Class not found: "+opsClassName, e);
         }
     }
 

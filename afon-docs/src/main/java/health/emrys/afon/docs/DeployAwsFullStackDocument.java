@@ -2,14 +2,18 @@ package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.DeployAwsFullStackMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
+import java.util.Properties;
 
-public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
+public class DeployAwsFullStackDocument extends AbstractDocument {
+
+    public DeployAwsFullStackDocument(Properties properties) {
+        super(properties);
+    }
 
     @Override
     public String getFilename() {
@@ -23,7 +27,7 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
 
     public String getFurtherNotes() {
         String polarisDomainName =
-            AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(new FilePropertyProvider().getProperties());
+            AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
         return String.format(
             """
             # Troubleshooting
@@ -53,10 +57,6 @@ public class DocumentAwsFullStackMain extends AbstractDocumentMetadata {
     @Override
     public List<Step> steps(StepOperations stepOperations) {
         return new DeployAwsFullStackMain().stepsUsing(stepOperations);
-    }
-
-    public static void main(String[] args) {
-        new Documenter(new DocumentAwsFullStackMain()).writeDocumentation();
     }
 
 }
