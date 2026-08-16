@@ -43,9 +43,21 @@ public class StepOperations {
     private final String gcpPolarisDomainName;
     private final String awsJupyterDomain;
     private final String azureJupyterDomain;
+    private final String azureTenantId;
+    private final String azureStorageAccount;
+    private final String azureBucket;
+    private final String azureExternalBucket;
+    private final String kcHostname;
+    private final String polarisId;
+    private final String polarisSecret;
+    private final String userPolarisId;
+    private final String userPolarisSecret;
 
     public StepOperations(StepActions actions) {
-        Properties properties = appProperties();
+        this(actions, new FilePropertyProvider().getProperties());
+    }
+
+    public StepOperations(StepActions actions, Properties properties) {
         this.actions                = actions;
         this.clusterName            = CLUSTER_NAME.getValueFrom(properties);
         this.awsRegion              = AWS_REGION.getValueFrom(properties);
@@ -54,10 +66,15 @@ public class StepOperations {
         this.gcpPolarisDomainName   = GCP_DOMAIN_NAME.getValueFrom(properties);
         this.awsJupyterDomain       = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
         this.azureJupyterDomain     = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
-    }
-
-    private static Properties appProperties() {
-        return new FilePropertyProvider().getProperties();
+        this.azureTenantId          = AZURE_TENANT_ID.getValueFrom(properties);
+        this.azureStorageAccount    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
+        this.azureBucket            = AZURE_BUCKET.getValueFrom(properties);
+        this.azureExternalBucket    = AZURE_EXTERNAL_BUCKET.getValueFrom(properties);
+        this.kcHostname             = KC_HOSTNAME.getValueFrom(properties);
+        this.polarisId              = POLARIS_ID.getValueFrom(properties);
+        this.polarisSecret          = POLARIS_SECRET.getValueFrom(properties);
+        this.userPolarisId          = USER_POLARIS_ID.getValueFrom(properties);
+        this.userPolarisSecret      = USER_POLARIS_SECRET.getValueFrom(properties);
     }
 
     @NonNull
@@ -157,7 +174,7 @@ public class StepOperations {
                 Properties properties = new Properties();
                 properties.setProperty(
                     AZURE_BUCKET.getName(),
-                    AZURE_EXTERNAL_BUCKET.getValueFrom(appProperties()));
+                    azureExternalBucket);
                 return createForeignCatalogIn(AZURE, azurePolarisDomainName, properties);
             case AWS, GCP:
             default:
@@ -243,7 +260,7 @@ public class StepOperations {
     }
 
     private Step waitForKeyCloak() {
-        return actions.waitOnDNS(KC_HOSTNAME.getValueFrom(appProperties()));
+        return actions.waitOnDNS(kcHostname);
     }
 
     public Step checkAwsSparkWritingTo(AfonCloud id) {
@@ -331,11 +348,10 @@ public class StepOperations {
                     new String[]{domainName, warehouse.toString(), jupyterDomainName},
                     NO_ENV_VARIABLES);
 
-                Properties properties = appProperties();
                 List<String> args = List.of(
                     warehouse.toString(),
-                    USER_POLARIS_ID.getValueFrom(properties),
-                    USER_POLARIS_SECRET.getValueFrom(properties),
+                    userPolarisId,
+                    userPolarisSecret,
                     domainName,
                     namespace);
                 actions.executeMainOf(
@@ -350,7 +366,6 @@ public class StepOperations {
             "snowflake_reads_" + warehouse.toString(),
             format("Call Snowflake that uses AWS Polaris to get the credentials to read from %s storage", warehouse.name()),
             () -> {
-                Properties properties = appProperties();
                 logger.warn("Calling Snowflake. Note that some of these statements can take a long time");
                 actions.runSnowflakeSql(new String[]{
                     "USE DATABASE SNOWFLAKE_LEARNING_DB",
@@ -379,8 +394,8 @@ public class StepOperations {
                             """,
                         awsPolarisDomainName,
                         warehouse.toString(),
-                        POLARIS_ID.getValueFrom(properties),
-                        POLARIS_SECRET.getValueFrom(properties)),
+                        polarisId,
+                        polarisSecret),
 
                     format(
                         """              
@@ -413,10 +428,6 @@ public class StepOperations {
     }
 
     private Step snowflakeWritesToAzure() {
-        Properties        properties = appProperties();
-        String            bucket     = AZURE_BUCKET.getValueFrom(properties);
-        String            account    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
-        String            tenantId   = AZURE_TENANT_ID.getValueFrom(properties);
         LocalDateTime     now        = LocalDateTime.now();
         DateTimeFormatter formatter  = DateTimeFormatter.ofPattern("yy_MM_dd_mm_HH_ss");
         String            formatted  = now.format(formatter);
@@ -433,7 +444,7 @@ public class StepOperations {
                               ENABLED = TRUE
                               STORAGE_ALLOWED_LOCATIONS = ('azure://%s.blob.core.windows.net/%s')
                               AZURE_TENANT_ID='%s';
-                            """, bucket, account, account, bucket, tenantId),
+                            """, azureBucket, azureStorageAccount, azureStorageAccount, azureBucket, azureTenantId),
 
                     """
                     DROP ICEBERG TABLE IF EXISTS my_azure_iceberg_table ;
@@ -450,7 +461,7 @@ public class StepOperations {
                                   AZURE_TENANT_ID='%s'
                                 )
                               );
-                            """, account, bucket, ACCEPTANCE_TEST_NAMESPACE, tenantId),
+                            """, azureStorageAccount, azureBucket, ACCEPTANCE_TEST_NAMESPACE, azureTenantId),
 
                     """
                     USE DATABASE SNOWFLAKE_LEARNING_DB;
@@ -496,7 +507,7 @@ public class StepOperations {
                     "%s/%s*metadata.json",
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
-                String json = actions.azureFirstFile(glob, true); // firstFileInLatestDirectoryMatching(glob);
+                String json = actions.azureFirstFile(glob, true, azureBucket, azureStorageAccount); // firstFileInLatestDirectoryMatching(glob);
                 return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterPolarisTableMain.class);
             case AWS, GCP:
             default:

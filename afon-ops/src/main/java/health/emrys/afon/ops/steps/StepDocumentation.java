@@ -2,7 +2,6 @@ package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
@@ -12,8 +11,6 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.config.AfonProperties.AZURE_BUCKET;
-import static health.emrys.afon.config.AfonProperties.AZURE_STORAGE_ACCOUNT;
 import static java.lang.String.format;
 
 public class StepDocumentation extends StepActions {
@@ -123,15 +120,12 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    String azureFirstFile(String glob, boolean descendingOrder) {
+    String azureFirstFile(String glob, boolean descendingOrder, String azureBucket, String azureStorageAccount) {
         out.println("Get Azure first file:");
-        Properties properties = new FilePropertyProvider().getProperties();
-        String     bucket     = AZURE_BUCKET.getValueFrom(properties);
-        String     account    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
         return format(
                 "abfss://%s@%s.dfs.core.windows.net/%s",
-                bucket,
-                account,
+                azureBucket,
+                azureStorageAccount,
                 "latestName");
     }
 
