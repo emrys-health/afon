@@ -1,6 +1,5 @@
 package health.emrys.afon.config;
 
-import java.io.IOException;
 import java.util.Properties;
 
 /**
@@ -10,8 +9,6 @@ import java.util.Properties;
  */
 public interface AfonPropertyProvider {
     Properties getProperties();
-
-    Properties getProperties(String overrideFile) throws IOException;
 
     Properties getSecretProperties();
 

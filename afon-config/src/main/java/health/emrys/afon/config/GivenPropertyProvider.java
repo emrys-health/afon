@@ -3,20 +3,16 @@ package health.emrys.afon.config;
 import java.util.Properties;
 
 /**
- * An implementation of {@link AfonPropertyProvider} that provides the given already-loaded
- * (and possibly overridden) {@link Properties}
+ * A record implementation of {@link AfonPropertyProvider} that provides the given already-specified
+ * {@link Properties}.
  */
 public record GivenPropertyProvider(Properties properties) implements AfonPropertyProvider {
+
     @Override
     public Properties getProperties() {
         Properties copy = new Properties();
         copy.putAll(properties);
         return copy;
-    }
-
-    @Override
-    public Properties getProperties(String overrideFile) {
-        return getProperties();
     }
 
     @Override
