@@ -1,9 +1,8 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonProperty;
-import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.GivenPropertyProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -83,40 +82,6 @@ public class ContainerHelper {
     private GenericContainer<?> keyCloak;
 
     private ContainerHelper() {
-    }
-
-    /**
-     * An implementation of @link AfonPropertyProvider} that provides the given already-loaded properties
-     * (and possibly test-overridden), so it can be handed to APIs that expect a provider without losing
-     * the overrides applied by {@link AcceptanceTestConfig}.
-     */
-    public record GivenPropertyProvider(Properties properties) implements AfonPropertyProvider {
-        @Override
-        public Properties getProperties() {
-            Properties copy = new Properties();
-            copy.putAll(properties);
-            return copy;
-        }
-
-        @Override
-        public Properties getProperties(String overrideFile) {
-            return getProperties();
-        }
-
-        @Override
-        public Properties getSecretProperties() {
-            return getProperties();
-        }
-
-        @Override
-        public String getValue(AfonProperty property) {
-            return property.getValueFrom(properties);
-        }
-
-        @Override
-        public String getValue(AfonProperty property, String defaultValue) {
-            return property.getValueFrom(properties, defaultValue);
-        }
     }
 
     public synchronized GenericContainer<?> startKeyCloak(Properties properties) {

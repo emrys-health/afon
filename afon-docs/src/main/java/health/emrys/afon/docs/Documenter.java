@@ -1,5 +1,6 @@
 package health.emrys.afon.docs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.Redacter;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepDocumentation;
@@ -15,7 +16,6 @@ import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Properties;
 
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -24,10 +24,10 @@ public class Documenter {
 
     private static final Logger logger = getLogger(Documenter.class);
 
-    private final Properties secretProperties;
+    private final AfonPropertyProvider properties;
 
-    public Documenter(Properties secretProperties) {
-        this.secretProperties = secretProperties;
+    public Documenter(AfonPropertyProvider properties) {
+        this.properties = properties;
     }
 
     public void generateDocuments(List<DocumentMetadata> documents) {
@@ -85,7 +85,7 @@ public class Documenter {
         writeSteps(documentMetadata, os);
         appendTo(os, documentMetadata.getFurtherNotes());
         String document = os.toString();
-        return Redacter.redactSecrets(document, documentMetadata.getFilename(), secretProperties);
+        return Redacter.redactSecrets(document, documentMetadata.getFilename(), properties.getSecretProperties());
     }
 
      private void writeSteps(DocumentMetadata documentMetadata, OutputStream fos) {

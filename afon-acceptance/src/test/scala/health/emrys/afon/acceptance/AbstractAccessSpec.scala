@@ -1,10 +1,10 @@
 package health.emrys.afon.acceptance
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
-import health.emrys.afon.acceptance.ContainerHelper.{GivenPropertyProvider, trinoConfigProperties, trinoLocalConfig}
+import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.cluster.ClusterUtils
-import health.emrys.afon.config.{AfonUser, AfonUserProvider, FilePropertyProvider}
+import health.emrys.afon.config.{AfonUser, AfonUserProvider, FilePropertyProvider, GivenPropertyProvider}
 import health.emrys.afon.ops.OnboardAllUsersMain
 import health.emrys.afon.ops.smoke.TrinoConnectionSmoke
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris

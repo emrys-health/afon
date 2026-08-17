@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.util.Properties;
 
 /**
- * An {@link AfonPropertyProvider} allows the retrieval of properties based on the cloud configuration.
+ * An {@link AfonPropertyProvider} provides access to configured properties.
+ *
+ * Implementations include {@link FilePropertyProvider} and {@link GivenPropertyProvider}.
  */
 public interface AfonPropertyProvider {
     Properties getProperties();
