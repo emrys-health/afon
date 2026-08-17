@@ -13,29 +13,18 @@ public class Redacter {
     public static final String NON_REDACTABLE_WORDS = "afon|emrys|will";
 
     /**
-     * Redacts secrets in the content from a given source, using the {@link FilePropertyProvider#getSecretProperties()}.
+     * Redacts secrets in the content from a given source, using the secret properties provided.
      *
-     * @param content
-     * @param source
+     * @param content the content to redact
+     * @param source the source of the redaction
+     * @param secrets the Properties containing the secrets to redact.
      * @return the redacted content
      */
-    public static String redactSecrets(String content, String source) {
-        return redactSecrets(content, source, new FilePropertyProvider().getSecretProperties());
-    }
-
-    /**
-     * Redacts secrets in the content from a given source, using the properties provided.
-     *
-     * @param content
-     * @param source
-     * @param properties
-     * @return the redacted content
-     */
-    public static String redactSecrets(String content, String source, Properties properties) {
+    public static String redactSecrets(String content, String source, Properties secrets) {
         logger.info("Redacting content from source " + source);
-        for (String key : properties.stringPropertyNames()){
+        for (String key : secrets.stringPropertyNames()){
             String  original = content;
-            String value = properties.getProperty(key);
+            String value = secrets.getProperty(key);
             if ( redactable(value) ) {
                 content = content.replace(value, format("<%s>", key.toLowerCase()));
             }
