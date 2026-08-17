@@ -63,13 +63,6 @@ public class FilePropertyProvider implements AfonPropertyProvider {
     }
 
     @Override
-    public Properties getProperties(String overrideFile) throws IOException {
-        Properties properties = getProperties();
-        properties.putAll(loadPropertiesFromFile(overrideFile));
-        return properties;
-    }
-
-    @Override
     public Properties getSecretProperties() {
         loadPropertiesLazily();
         Properties secret = new Properties();
@@ -144,10 +137,10 @@ public class FilePropertyProvider implements AfonPropertyProvider {
      * Override properties with the value provided via system properties, if any.
      */
     private void overrideWithSystemProperties() {
-        for (String property : AfonProperty.getAllNames()) {
-            if (System.getProperty(property) != null) {
-                logger.debug("Using the system variables to define property '{}'", property);
-                properties.put(property, System.getProperty(property));
+        for (String key : AfonProperty.getAllNames()) {
+            if (System.getProperty(key) != null) {
+                logger.debug("Using the system variable to define property '{}'", key);
+                properties.put(key, System.getProperty(key));
             }
         }
     }
