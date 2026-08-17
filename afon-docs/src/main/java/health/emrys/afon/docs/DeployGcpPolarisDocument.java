@@ -1,17 +1,17 @@
 package health.emrys.afon.docs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.DeployGcpPolarisMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
+import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
 
 public class DeployGcpPolarisDocument extends AbstractDocument {
 
-    public DeployGcpPolarisDocument(Properties properties) {
+    public DeployGcpPolarisDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 
@@ -67,7 +67,7 @@ public class DeployGcpPolarisDocument extends AbstractDocument {
                         ./afon.sh -a exec --exec-class cdk.gcp.GcpCleanupHelper --exec-args gcp-cleanup.sh
                         ```
                         """,
-                CLUSTER_NAME.getValueFrom(properties)
+                properties.getValue(CLUSTER_NAME)
         );
     }
 

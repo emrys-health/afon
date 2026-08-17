@@ -8,6 +8,10 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import static health.emrys.afon.config.AfonProperty.KC_BOOTSTRAP_ADMIN_PASSWORD;
+import static health.emrys.afon.config.AfonProperty.KC_BOOTSTRAP_ADMIN_USERNAME;
+import static health.emrys.afon.config.AfonProperty.KC_HOSTNAME;
+
 public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
 
     private static final Logger log = LoggerFactory.getLogger(KeyCloakSparkConnectUsingOIDC.class);
@@ -31,7 +35,11 @@ public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
 
     public KeyCloakSparkConnectUsingOIDC(String polarisHost) throws IOException {
         super(polarisHost);
-        keyCloakToken = new KeyCloakProvider(properties).userToken(getSparkUser(), getSparkPassword());
+        keyCloakToken = new KeyCloakProvider(
+                KC_HOSTNAME.getValueFrom(properties),
+                KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
+                KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties)
+        ).userToken(getSparkUser(), getSparkPassword());
     }
 
     protected Map<String, String> getWarehouseConfig(String warehouseName,

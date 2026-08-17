@@ -3,11 +3,10 @@ package health.emrys.afon.cdk.aws;
 import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import health.emrys.afon.cdk.KeyCloakConfig;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
-
-import java.util.Properties;
 
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
 
@@ -20,12 +19,12 @@ public class AwsKeyCloakConfig extends KeyCloakConfig<AwsCloudProvider> {
 
     public AwsKeyCloakConfig(
         @NonNull Construct scope,
-        @NonNull Properties properties,
+        @NonNull AfonPropertyProvider properties,
         @NonNull AwsCloudProvider cloudProvider) {
         super(scope, properties, cloudProvider);
-        dnsZone  = AfonProperties.AWS_KEYCLOAK_DNS_ZONE.getValueFrom(properties);
-        certArn  = AfonProperties.AWS_KEYCLOAK_CERT_ARN.getValueFrom(properties);
-        hostname = AfonProperties.KC_HOSTNAME.getValueFrom(properties);
+        dnsZone  = properties.getValue(AfonProperty.AWS_KEYCLOAK_DNS_ZONE);
+        certArn  = properties.getValue(AfonProperty.AWS_KEYCLOAK_CERT_ARN);
+        hostname = properties.getValue(AfonProperty.KC_HOSTNAME);
     }
 
     @Override

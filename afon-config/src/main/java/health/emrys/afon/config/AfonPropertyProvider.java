@@ -12,4 +12,8 @@ public interface AfonPropertyProvider {
     Properties getProperties(String overrideFile) throws IOException;
 
     Properties getSecretProperties();
+
+    String getValue(AfonProperty property);
+
+    String getValue(AfonProperty property, String defaultValue);
 }

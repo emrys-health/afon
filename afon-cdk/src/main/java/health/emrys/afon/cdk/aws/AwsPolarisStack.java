@@ -10,13 +10,13 @@ import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonCloud.AWS;
@@ -30,12 +30,12 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
 
     public AwsPolarisStack(@NonNull Construct scope,
                            AfonCloud id,
-                           Properties properties) {
+                           AfonPropertyProvider properties) {
         super(scope, id.toString());
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
         cloudProvider = new AwsCloudProvider(this, id.toString(), properties);
-        polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
+        polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties) {
             protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
                 return null; // no longer using an external service
             }
@@ -82,7 +82,7 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsPolarisStack(app, AWS, new FilePropertyProvider().getProperties());
+        new AwsPolarisStack(app, AWS, new FilePropertyProvider());
         app.synth();
     }
 

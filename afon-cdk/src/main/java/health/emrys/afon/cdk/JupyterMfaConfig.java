@@ -8,16 +8,15 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.OIDC_EMAIL_DOMAIN;
-import static health.emrys.afon.config.AfonProperties.OIDC_ISSUER_URL;
+import static health.emrys.afon.config.AfonProperty.OIDC_EMAIL_DOMAIN;
+import static health.emrys.afon.config.AfonProperty.OIDC_ISSUER_URL;
 import static java.lang.String.format;
 
 /**
@@ -41,12 +40,13 @@ public class JupyterMfaConfig {
 
     public JupyterMfaConfig(Construct scope,
                      List<ITerraformDependable> dependsOn,
+                     AfonPropertyProvider properties,
                      String jupyterUpstreamUrl,
                      String jupyterDomain,
                      String clientId,
                      String clientSecret,
                      String cookieSecret) {
-        this(scope, dependsOn, List.of(jupyterUpstreamUrl), jupyterDomain, clientId, clientSecret, cookieSecret);
+        this(scope, dependsOn, properties, List.of(jupyterUpstreamUrl), jupyterDomain, clientId, clientSecret, cookieSecret);
     }
 
     /**
@@ -56,13 +56,12 @@ public class JupyterMfaConfig {
      */
     public JupyterMfaConfig(Construct scope,
                      List<ITerraformDependable> dependsOn,
+                     AfonPropertyProvider properties,
                      List<String> upstreamUrls,
                      String jupyterDomain,
                      String clientId,
                      String clientSecret,
                      String cookieSecret) {
-        Properties properties = new FilePropertyProvider().getProperties();
-
         Secret oauthSecret = Secret.Builder
             .create(scope, "oauth2ProxySecret")
             .metadata(SecretMetadata
@@ -77,12 +76,12 @@ public class JupyterMfaConfig {
                         ))
             .build();
 
-        String issuer = OIDC_ISSUER_URL.getValueFrom(properties);
+        String issuer = properties.getValue(OIDC_ISSUER_URL);
 
         List<String> proxyArgs = new ArrayList<>(List.of(
             "--provider=oidc",
             "--oidc-issuer-url=" + issuer,
-            "--email-domain=" + OIDC_EMAIL_DOMAIN.getValueFrom(properties),
+            "--email-domain=" + properties.getValue(OIDC_EMAIL_DOMAIN),
             "--http-address=0.0.0.0:" + PROXY_PORT,
             "--cookie-secure=true",                           // set true when TLS terminates at this proxy
             // Accept id_tokens whose email is unverified: this Keycloak has no SMTP verification flow,

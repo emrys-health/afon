@@ -23,12 +23,12 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import health.emrys.afon.cdk.AbstractCloudProvider;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import software.constructs.Construct;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Properties;
 
 import static health.emrys.afon.cluster.Defaults.GCP_REGION;
 import static java.lang.String.format;
@@ -58,9 +58,9 @@ public class GcpCloudProvider extends AbstractCloudProvider {
     private       KubernetesProvider k8sProvider;
     private       HelmProvider       helmProvider;
 
-    GcpCloudProvider(final Construct scope, final String id, String projectID, Properties properties) {
+    GcpCloudProvider(final Construct scope, final String id, String projectID, AfonPropertyProvider properties) {
         super(scope, id);
-        String clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+        String clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
         String vpcName     = "gke-private-vpc-" + clusterName;
         String subnetName  = "gke-private-subnet-" + clusterName;
 

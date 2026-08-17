@@ -1,7 +1,7 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
-import health.emrys.afon.config.AfonProperties.{USER_POLARIS_ID, USER_POLARIS_SECRET}
+import health.emrys.afon.config.AfonProperty.{USER_POLARIS_ID, USER_POLARIS_SECRET}
 import health.emrys.afon.polaris.PolarisConstants
 import health.emrys.afon.spark.{KeyCloakSparkWarehouseConfig, SparkWarehouseConfigFactory}
 import org.apache.spark.SparkContext

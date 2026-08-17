@@ -1,12 +1,12 @@
 package health.emrys.afon.cdk;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.PolarisConstants;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -15,13 +15,13 @@ class PolarisConfigTest {
 
     @Test
     public void testConfigScript() {
-        Properties           properties = new FilePropertyProvider().getProperties();
+        AfonPropertyProvider properties = new FilePropertyProvider();
         String               script     = PolarisConfig.getProviderCredentials(properties, "test");
         PolarisConstants.getPolarisProperties()
             .forEach(x -> {
                 String propertyName = x.getName();
                 assertTrue(script.contains(propertyName), propertyName);
-                assertTrue(script.contains(x.getValueFrom(properties)), propertyName);
+                assertTrue(script.contains(properties.getValue(x)), propertyName);
             });
     }
 

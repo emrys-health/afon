@@ -4,7 +4,7 @@ import health.emrys.afon.config.FilePropertyProvider;
 
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 
 public class AfonPolarisClientFactory {
 

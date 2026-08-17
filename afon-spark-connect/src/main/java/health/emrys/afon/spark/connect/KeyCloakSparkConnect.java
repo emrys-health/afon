@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 
 /**
  * You may need to register some data in Polaris to run this.

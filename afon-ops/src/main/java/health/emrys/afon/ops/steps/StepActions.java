@@ -29,7 +29,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;

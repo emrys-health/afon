@@ -6,11 +6,11 @@ import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.Map;
-import java.util.Properties;
 
 /**
  * This is experimental only. It creates the bare bones of an EKS environment
@@ -19,7 +19,7 @@ import java.util.Properties;
 public class AwsHelmStack extends TerraformStack {
     protected AwsHelmStack(final Construct scope,
                            final String id,
-                           final Properties properties) {
+                           final AfonPropertyProvider properties) {
         super(scope, id);
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
@@ -42,7 +42,7 @@ public class AwsHelmStack extends TerraformStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsHelmStack(app, "ops", new FilePropertyProvider().getProperties());
+        new AwsHelmStack(app, "ops", new FilePropertyProvider());
         app.synth();
     }
 }

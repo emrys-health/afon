@@ -1,17 +1,17 @@
 package health.emrys.afon.docs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.DeploySnowflakeReadingAwsViaAwsMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
-import java.util.Properties;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
 
 public class DeploySnowflakeReadingAwsViaAwsDocument extends AbstractDocument {
 
-    public DeploySnowflakeReadingAwsViaAwsDocument(Properties properties) {super(properties);}
+    public DeploySnowflakeReadingAwsViaAwsDocument(AfonPropertyProvider properties) {super(properties);}
 
     @Override
     public String getFilename() {

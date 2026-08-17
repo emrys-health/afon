@@ -6,8 +6,8 @@ import org.jspecify.annotations.NonNull;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.config.AfonProperties.AWS_REGION;
+import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.AfonProperty.AWS_REGION;
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 

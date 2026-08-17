@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.cluster.ClusterUtils.isFailure;
 import static java.lang.String.format;
 

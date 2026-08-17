@@ -1,5 +1,6 @@
 package health.emrys.afon.docs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepDocumentation;
 import health.emrys.afon.ops.steps.StepOperations;
@@ -9,7 +10,6 @@ import org.slf4j.Logger;
 
 import java.io.OutputStream;
 import java.util.List;
-import java.util.Properties;
 
 import static java.lang.String.format;
 import static java.lang.String.join;
@@ -18,9 +18,9 @@ import static org.slf4j.LoggerFactory.getLogger;
 public abstract class AbstractDocument implements DocumentMetadata {
 
     private static final Logger logger = getLogger(AbstractDocument.class);
-    protected final Properties properties;
+    protected final AfonPropertyProvider properties;
 
-    protected AbstractDocument(Properties properties) {
+    protected AbstractDocument(AfonPropertyProvider properties) {
         this.properties = properties;
     }
 

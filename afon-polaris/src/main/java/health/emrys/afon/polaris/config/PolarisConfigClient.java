@@ -1,7 +1,7 @@
 package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.HttpResponse;
@@ -13,8 +13,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 
 public class PolarisConfigClient {
 
@@ -73,7 +73,7 @@ public class PolarisConfigClient {
         CloudConfigForPolaris config = new AwsCloudConfigForPolaris(properties) {
             @Override
             public String getBucketUri() {
-                return AwsUtils.bucketToUrl(AfonProperties.AWS_S3_BUCKET_NAME_TRINO.getValueFrom(properties));
+                return AwsUtils.bucketToUrl(AfonProperty.AWS_S3_BUCKET_NAME_TRINO.getValueFrom(properties));
             }
 
             @Override
@@ -87,7 +87,7 @@ public class PolarisConfigClient {
 
     public HttpResponse[] callPolaris(Properties properties, CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
         String protocol = "https";
-        if (AfonProperties.POLARIS_ENDPOINT.getValueFrom(properties).toLowerCase().contains("localhost")) {
+        if (AfonProperty.POLARIS_ENDPOINT.getValueFrom(properties).toLowerCase().contains("localhost")) {
             protocol = "http";
         }
         var client = AfonPolarisClientFactory.clientFactory().getPolarisClient(properties, protocol);

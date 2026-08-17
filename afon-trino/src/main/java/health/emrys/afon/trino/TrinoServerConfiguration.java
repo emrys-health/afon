@@ -1,11 +1,10 @@
 package health.emrys.afon.trino;
 
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 
-import java.util.Properties;
-
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static java.lang.String.format;
 
@@ -17,11 +16,11 @@ public class TrinoServerConfiguration {
     private final String polarisSecret;
 
     public TrinoServerConfiguration(String polarisDomainName,
-                                    Properties properties) {
+                                    AfonPropertyProvider properties) {
         this.polarisDomainName = polarisDomainName;
-        this.awsRegion         = AWS_REGION.getValueFrom(properties);
-        this.polarisClientId   = USER_POLARIS_ID.getValueFrom(properties);
-        this.polarisSecret     = USER_POLARIS_SECRET.getValueFrom(properties);
+        this.awsRegion         = properties.getValue(AWS_REGION);
+        this.polarisClientId   = properties.getValue(USER_POLARIS_ID);
+        this.polarisSecret     = properties.getValue(USER_POLARIS_SECRET);
     }
 
     public String catalogProperties(AfonCloud cloud) {

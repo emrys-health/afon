@@ -6,7 +6,7 @@ import org.apache.polaris.core.admin.model.AuthenticationParameters.Authenticati
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum;
 import org.apache.polaris.core.admin.model.*;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 
 public class GlueCloudConfigForPolaris extends AwsCloudConfigForPolaris {

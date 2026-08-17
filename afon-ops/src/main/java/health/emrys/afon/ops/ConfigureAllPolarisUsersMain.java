@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 
 public class ConfigureAllPolarisUsersMain {
 

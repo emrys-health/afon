@@ -15,6 +15,7 @@ import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.NetworkConfig;
 import health.emrys.afon.cdk.SparkConfig;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
@@ -22,7 +23,6 @@ import software.constructs.Construct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
@@ -42,7 +42,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
 
     public AwsJupyterStack(final Construct scope,
                            final AfonCloud id,
-                           final Properties properties) {
+                           final AfonPropertyProvider properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
         JupyterHubConfig jupyter = new AwsJupyterHubConfig(
@@ -149,7 +149,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
 
     public static void main(String[] args) {
         final App app = new App();
-        new AwsJupyterStack(app, AWS, new FilePropertyProvider().getProperties());
+        new AwsJupyterStack(app, AWS, new FilePropertyProvider());
         app.synth();
     }
 }

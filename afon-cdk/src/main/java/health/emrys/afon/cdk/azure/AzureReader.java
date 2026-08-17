@@ -3,12 +3,12 @@ package health.emrys.afon.cdk.azure;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobContainerClientBuilder;
 import com.azure.storage.blob.models.BlobItem;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.slf4j.Logger;
 
 import java.util.HashSet;
-import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -29,9 +29,9 @@ public class AzureReader {
     }
 
     public AzureReader() {
-        Properties properties = new FilePropertyProvider().getProperties();
-        containerName    = AfonProperties.AZURE_BUCKET.getValueFrom(properties);
-        connectionString = AfonProperties.AZURE_CONNECTION_STRING.getValueFrom(properties);
+        AfonPropertyProvider properties = new FilePropertyProvider();
+        containerName    = properties.getValue(AfonProperty.AZURE_BUCKET);
+        connectionString = properties.getValue(AfonProperty.AZURE_CONNECTION_STRING);
     }
 
     public Set<BlobItem> list(String wildcard) {

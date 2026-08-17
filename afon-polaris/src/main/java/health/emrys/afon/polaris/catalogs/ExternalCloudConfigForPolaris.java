@@ -1,6 +1,6 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
 import org.apache.polaris.core.admin.model.*;
 import org.jspecify.annotations.NonNull;
 
@@ -16,8 +16,8 @@ abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolari
 
     protected ExternalCloudConfigForPolaris(Properties properties) {
         super(new JsonMaker());
-        clientId                = AfonProperties.POLARIS_ID.getValueFrom(properties);
-        secret                  = AfonProperties.POLARIS_SECRET.getValueFrom(properties);
+        clientId                = AfonProperty.POLARIS_ID.getValueFrom(properties);
+        secret                  = AfonProperty.POLARIS_SECRET.getValueFrom(properties);
     }
     @Override
     public String catalogConfig() throws IncorrectConfigException {

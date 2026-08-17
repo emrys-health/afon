@@ -5,7 +5,7 @@ import health.emrys.afon.config.AfonProperty;
 import java.util.HashSet;
 import java.util.Set;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 
 public class PolarisConstants {
     /**

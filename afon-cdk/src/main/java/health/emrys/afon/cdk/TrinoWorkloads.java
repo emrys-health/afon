@@ -6,6 +6,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import health.emrys.afon.cluster.Defaults;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
@@ -13,7 +14,6 @@ import software.constructs.Construct;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 /**
  * Cloud-agnostic deployment of Trino via its official Helm chart — the counterpart to
@@ -43,7 +43,7 @@ public class TrinoWorkloads {
     private final String polarisDomainName;
     private final TrinoServerConfiguration trinoConfig;
 
-    public TrinoWorkloads(Properties properties,
+    public TrinoWorkloads(AfonPropertyProvider properties,
                           String polarisDomainName) {
         trinoConfig            = new TrinoServerConfiguration(polarisDomainName, properties);
         this.polarisDomainName = polarisDomainName;

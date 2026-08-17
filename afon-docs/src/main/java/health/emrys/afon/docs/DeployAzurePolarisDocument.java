@@ -1,15 +1,15 @@
 package health.emrys.afon.docs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.DeployAzurePolarisMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
-import java.util.Properties;
 
 public class DeployAzurePolarisDocument extends AbstractDocument {
 
-    public DeployAzurePolarisDocument(Properties properties) {
+    public DeployAzurePolarisDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 

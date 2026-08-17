@@ -6,6 +6,7 @@ import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.OnboardAllUsersMain;
 import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
@@ -21,7 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
@@ -54,27 +55,27 @@ public class StepOperations {
     private final String userPolarisSecret;
 
     public StepOperations(StepActions actions) {
-        this(actions, new FilePropertyProvider().getProperties());
+        this(actions, new FilePropertyProvider());
     }
 
-    public StepOperations(StepActions actions, Properties properties) {
+    public StepOperations(StepActions actions, AfonPropertyProvider properties) {
         this.actions                = actions;
-        this.clusterName            = CLUSTER_NAME.getValueFrom(properties);
-        this.awsRegion              = AWS_REGION.getValueFrom(properties);
-        this.awsPolarisDomainName   = AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
-        this.azurePolarisDomainName = AZURE_DOMAIN_NAME.getValueFrom(properties);
-        this.gcpPolarisDomainName   = GCP_DOMAIN_NAME.getValueFrom(properties);
-        this.awsJupyterDomain       = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
-        this.azureJupyterDomain     = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
-        this.azureTenantId          = AZURE_TENANT_ID.getValueFrom(properties);
-        this.azureStorageAccount    = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
-        this.azureBucket            = AZURE_BUCKET.getValueFrom(properties);
-        this.azureExternalBucket    = AZURE_EXTERNAL_BUCKET.getValueFrom(properties);
-        this.kcHostname             = KC_HOSTNAME.getValueFrom(properties);
-        this.polarisId              = POLARIS_ID.getValueFrom(properties);
-        this.polarisSecret          = POLARIS_SECRET.getValueFrom(properties);
-        this.userPolarisId          = USER_POLARIS_ID.getValueFrom(properties);
-        this.userPolarisSecret      = USER_POLARIS_SECRET.getValueFrom(properties);
+        this.clusterName            = properties.getValue(CLUSTER_NAME);
+        this.awsRegion              = properties.getValue(AWS_REGION);
+        this.awsPolarisDomainName   = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
+        this.azurePolarisDomainName = properties.getValue(AZURE_DOMAIN_NAME);
+        this.gcpPolarisDomainName   = properties.getValue(GCP_DOMAIN_NAME);
+        this.awsJupyterDomain       = properties.getValue(AWS_JUPYTER_DOMAIN);
+        this.azureJupyterDomain     = properties.getValue(AZURE_JUPYTER_DOMAIN_NAME);
+        this.azureTenantId          = properties.getValue(AZURE_TENANT_ID);
+        this.azureStorageAccount    = properties.getValue(AZURE_STORAGE_ACCOUNT);
+        this.azureBucket            = properties.getValue(AZURE_BUCKET);
+        this.azureExternalBucket    = properties.getValue(AZURE_EXTERNAL_BUCKET);
+        this.kcHostname             = properties.getValue(KC_HOSTNAME);
+        this.polarisId              = properties.getValue(POLARIS_ID);
+        this.polarisSecret          = properties.getValue(POLARIS_SECRET);
+        this.userPolarisId          = properties.getValue(USER_POLARIS_ID);
+        this.userPolarisSecret      = properties.getValue(USER_POLARIS_SECRET);
     }
 
     @NonNull

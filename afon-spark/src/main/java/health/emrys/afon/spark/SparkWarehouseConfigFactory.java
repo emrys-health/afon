@@ -5,7 +5,7 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 
 public class SparkWarehouseConfigFactory {
 
