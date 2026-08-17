@@ -27,6 +27,7 @@ usage (){
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging:          the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
+  echo "                  Also definable via env `AFON_LOGGING_CONSOLE`."
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
   echo "build-args:       the build args.  eg '-DskipTests'."
@@ -469,6 +470,14 @@ if [ -z "$AFON_HOME" ]; then
   echo "AFON_HOME not specified. Defaulting to $AFON_HOME"
 else
   echo "Using AFON_HOME=$AFON_HOME"
+fi
+
+if [ -n "$AFON_LOGGING_CONSOLE" ]; then
+  LOGGING_CONSOLE="$AFON_LOGGING_CONSOLE"
+fi
+
+if [ -n "$LOGGING_CONSOLE" ]; then
+  echo "Using logging console: $LOGGING_CONSOLE"
 fi
 
 if [ "$ACTION" == "" ]; then
