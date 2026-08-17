@@ -113,6 +113,16 @@ public abstract class JupyterHubConfig {
      */
     private static final String GUACAMOLE_USER = "guacamole-user";
 
+    /**
+     * Label KubeSpawner stamps on every notebook pod it spawns (see {@code extra_labels} in
+     * {@link #jupyterhubConfigPy()}). It is the handle the egress {@code NetworkPolicy} selects on:
+     * the pods that need locking down are the per-user notebooks — where user code actually runs —
+     * not the hub/proxy control plane. Those pods do not exist at synth time, so a label the spawner
+     * applies is the only way to write a policy for them up front.
+     */
+    private static final String SINGLEUSER_LABEL_KEY   = "afon-role";
+    private static final String SINGLEUSER_LABEL_VALUE = "jupyter-singleuser";
+
 
     /**
      * Upstreams the oauth2-proxy MFA gate fronts, on a single domain, both behind the same OIDC/MFA
@@ -127,6 +137,11 @@ public abstract class JupyterHubConfig {
 
     private static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
     private static final Map<String, String> PROXY_LABELS = Map.of("app", "jupyterhub-proxy");
+    /**
+     * Selector for the pods KubeSpawner spawns, matching the labels it stamps on them.
+     */
+    private static final Map<String, String> SINGLEUSER_LABELS =
+        Map.of(SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE);
 
     private final   TerraformStack                stack;
     private final   String                        jupyterPassword;
@@ -148,6 +163,10 @@ public abstract class JupyterHubConfig {
         }
     }
 
+    /**
+     * @return the pod selector the egress {@code NetworkPolicy} should be written against — the
+     *         labels on the per-user notebook pods KubeSpawner spawns, not on the hub or proxy.
+     */
     public Map<String, String> deployJupyterHub(List<ITerraformDependable> eksDependOn) {
         // KubeSpawner (running inside the hub pod) needs to create/watch/delete the per-user
         // notebook pods, the events they emit and the secrets/PVCs it mounts into them. Scope the
@@ -298,7 +317,7 @@ public abstract class JupyterHubConfig {
 
         configureHttpsAndDNS();
 
-        return PROXY_LABELS;
+        return SINGLEUSER_LABELS;
     }
 
     private static String vncServiceName(String slug) {
@@ -481,6 +500,9 @@ public abstract class JupyterHubConfig {
                c.KubeSpawner.http_timeout = 120
                # One in-pod VNC session per single-user server (see start-vnc.sh in the image).
                c.KubeSpawner.environment = {'VNC_SESSIONS': '1'}
+               # Stamp every spawned pod so the egress NetworkPolicy (NetworkConfig) selects it. The
+               # per-user guacamole-user label is added on top of this by the auth_state hook below.
+               c.KubeSpawner.extra_labels = {'%14$s': '%15$s'}
                
                # --- OIDC login against the same provider oauth2-proxy uses. JupyterHub is the OAuth
                #     client itself (not DummyAuthenticator) so it can capture each user's token via
@@ -525,7 +547,8 @@ public abstract class JupyterHubConfig {
             issuer, jupyterDomain(),
             pythonSetOf(userProvider.getUsers().stream().map(AfonUser::email).toList()),
             pythonSlugMap(),
-            URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8));
+            URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8),
+            SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE);
     }
 
     /**
