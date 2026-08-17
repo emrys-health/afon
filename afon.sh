@@ -11,7 +11,7 @@ usage (){
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--exec-script <script-name>]"
-  echo "          [--setup-os <os>] [--setup-output <file>] [--setup-show]"
+  echo "          [--setup-os <os>] [--setup-output <file>]"
   echo "          [--stack-deploy] [--stack-type <type>] [--stack-args <args>] [--stack-status]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
@@ -22,7 +22,7 @@ usage (){
   echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|delete|status."
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
   echo "          exec        : executes the jvm classes from ops (see the docs for details)."
-  echo "          setup       : sets up the local env for the given os."
+  echo "          setup-*     : sets up the local env for the given os and <cloud> option.  One of local|show"
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state."
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging:          the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
@@ -46,7 +46,6 @@ usage (){
   echo "exec-envs:        the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
   echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
-  echo "setup-show:       the flag to show the current setup, without executing the setup commands."
   echo "stack-type:       the stack type.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'full'."
   echo "stack-args:       the stack command args."
   echo "tofu-args:        the tofu args."
@@ -314,15 +313,47 @@ exec_tofu(){
   eval "$TOFU_CMD"
 }
 
-setup_env(){
+install_eksct_linux(){
+  curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" && tar -xzf eksctl_Linux_amd64.tar.gz -C /tmp && sudo mv /tmp/eksctl /usr/local/bin && rm eksctl_Linux_amd64.tar.gz
+}
+
+setup_local(){
   case $SETUP_OS in
     linux|GNU/Linux)
-      sudo apt install git openjdk-17-jdk maven docker tofu kubectl awscli azure-cli google-cloud-cli
-      # install eksctl hubble via tarball?
+      sudo apt install git openjdk-17-jdk maven docker tofu kubectl hubble
+      if [ -z "$CLOUD" ]; then
+        sudo apt install awscli
+        install_eksct_linux
+        sudo apt install azure-cli
+        sudo apt install google-cloud-cli
+      fi
+      if [ "$CLOUD" == "aws" ]; then
+        sudo apt install awscli
+        install_eksct_linux
+      fi
+      if [ "$CLOUD" == "azure" ]; then
+        sudo apt install azure-cli
+      fi
+      if [ "$CLOUD" == "gcp" ]; then
+        sudo apt install google-cloud-cli
+      fi
       ;;
     macos|arm64)
-      brew install git openjdk@17 maven docker opentofu kubernetes-cli awscli azure-cli gcloud-cli
-      brew install eksctl hubble
+      brew install git openjdk@17 maven docker opentofu kubernetes-cli hubble
+      if [ -z "$CLOUD" ]; then
+        brew install awscli eksctl
+        brew install azure-cli
+        brew install gcloud-cli
+      fi
+      if [ "$CLOUD" == "aws" ]; then
+        brew install awscli eksctl
+      fi
+      if [ "$CLOUD" == "azure" ]; then
+        brew install azure-cli
+      fi
+      if [ "$CLOUD" == "gcp" ]; then
+        brew install gcloud-cli
+      fi
       ;;
     *)
       echo "Setup not supported for $SETUP_OS"
@@ -335,19 +366,33 @@ setup_output(){
   echo "### os" >> $SETUP_OUTPUT
   echo "$(uname -a)" >> $SETUP_OUTPUT
   echo "### kubectl" >> $SETUP_OUTPUT
-  kubectl version >> $SETUP_OUTPUT
+  echo kubectl version >> $SETUP_OUTPUT
   echo "### tofu" >> $SETUP_OUTPUT
   tofu --version >> $SETUP_OUTPUT
   echo "### java" >> $SETUP_OUTPUT
   java --version >> $SETUP_OUTPUT
   echo "### mvn" >> $SETUP_OUTPUT
   mvn --version >> $SETUP_OUTPUT
-  echo "### aws" >> $SETUP_OUTPUT
-  aws --version >> $SETUP_OUTPUT
-  echo "### az" >> $SETUP_OUTPUT
-  az --version >> $SETUP_OUTPUT
-  echo "### gcloud" >> $SETUP_OUTPUT
-  gcloud --version >> $SETUP_OUTPUT
+  if [ -z "$CLOUD" ]; then
+    echo "### aws" >> $SETUP_OUTPUT
+    aws --version >> $SETUP_OUTPUT
+    echo "### az" >> $SETUP_OUTPUT
+    az --version >> $SETUP_OUTPUT
+    echo "### gcloud" >> $SETUP_OUTPUT
+    gcloud --version >> $SETUP_OUTPUT
+  fi
+  if [ "$CLOUD" == "aws" ]; then
+    echo "### aws" >> $SETUP_OUTPUT
+    aws --version >> $SETUP_OUTPUT
+  fi
+  if [ "$CLOUD" == "azure" ]; then
+    echo "### az" >> $SETUP_OUTPUT
+    az --version >> $SETUP_OUTPUT
+  fi
+  if [ "$CLOUD" == "gcp" ]; then
+    echo "### gcloud" >> $SETUP_OUTPUT
+    gcloud --version >> $SETUP_OUTPUT
+  fi
   echo "Setup output written to $SETUP_OUTPUT"
 }
 
@@ -386,7 +431,6 @@ MVN_ENVS=
 MVN_QUIET=
 SETUP_OS=
 SETUP_OUTPUT=
-SETUP_SHOW=
 STACK_TYPE=
 STACK_ARGS=
 TOFU_ACTION=
@@ -444,8 +488,6 @@ while [[ $# -gt 0 ]]; do
       SETUP_OS="$2"; shift 2 ;;
     --setup-outout)
       SETUP_OUTPUT="$2"; shift 2 ;;
-    --setup-show)
-      SETUP_SHOW=true; shift ;;
     --stack-type)
       STACK_TYPE="$2"; shift 2 ;;
     --stack-args)
@@ -550,18 +592,25 @@ case $ACTION in
       exec_jvm
     fi
     ;;
-  setup)
+  setup-*)
     if [ -z "$SETUP_OS" ]; then
       SETUP_OS=$(uname -a| awk '{print $NF}')
     fi
-    if [ -z "$SETUP_SHOW" ]; then
-      # only perform setup if show flag is not set
-      setup_env
-    fi
-    if [ -z "$SETUP_OUTPUT" ]; then
-      SETUP_OUTPUT="versions.md"
-    fi
-    setup_output
+    SETUP_ACTION=${ACTION#setup-}
+    case $SETUP_ACTION in
+      local)
+        setup_local
+        ;;
+      show)
+        if [ -z "$SETUP_OUTPUT" ]; then
+          SETUP_OUTPUT="$AFON_HOME/versions.md"
+        fi
+        setup_output
+        ;;
+      *)
+        echo "Setup action not supported: $SETUP_ACTION"
+        usage; exit 0
+    esac
     ;;
   stack-*)
     if [ -z "$CLOUD" ]; then
