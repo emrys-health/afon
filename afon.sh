@@ -366,7 +366,7 @@ setup_output(){
   echo "### os" >> $SETUP_OUTPUT
   echo "$(uname -a)" >> $SETUP_OUTPUT
   echo "### kubectl" >> $SETUP_OUTPUT
-  echo kubectl version >> $SETUP_OUTPUT
+  kubectl version --client>> $SETUP_OUTPUT
   echo "### tofu" >> $SETUP_OUTPUT
   tofu --version >> $SETUP_OUTPUT
   echo "### java" >> $SETUP_OUTPUT
