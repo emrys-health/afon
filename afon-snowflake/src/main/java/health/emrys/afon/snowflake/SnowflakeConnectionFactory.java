@@ -1,5 +1,6 @@
 package health.emrys.afon.snowflake;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.slf4j.Logger;
 
@@ -14,8 +15,8 @@ import java.sql.SQLException;
 import java.util.Base64;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.SNOWFLAKE_JDBC_URL;
-import static health.emrys.afon.config.AfonProperties.SNOWFLAKE_PRIVATE_KEY;
+import static health.emrys.afon.config.AfonProperty.SNOWFLAKE_JDBC_URL;
+import static health.emrys.afon.config.AfonProperty.SNOWFLAKE_PRIVATE_KEY;
 
 public class SnowflakeConnectionFactory {
 
@@ -25,9 +26,9 @@ public class SnowflakeConnectionFactory {
     private final String url;
 
     public SnowflakeConnectionFactory() throws NoSuchAlgorithmException, InvalidKeySpecException {
-        Properties afonProperties = new FilePropertyProvider().getProperties();
+        AfonPropertyProvider afonProperties = new FilePropertyProvider();
         privateKey = getSnowflakePrivateKey(afonProperties);
-        url        = SNOWFLAKE_JDBC_URL.getValueFrom(afonProperties);
+        url        = afonProperties.getValue(SNOWFLAKE_JDBC_URL);
         log.info("Attempting to connect to database at {} ...", url);
     }
 
@@ -43,9 +44,9 @@ public class SnowflakeConnectionFactory {
         return DriverManager.getConnection(url, props);
     }
 
-    private PrivateKey getSnowflakePrivateKey(Properties afonProperties) throws NoSuchAlgorithmException,
+    private PrivateKey getSnowflakePrivateKey(AfonPropertyProvider afonProperties) throws NoSuchAlgorithmException,
                                                                                 InvalidKeySpecException {
-        String              keyFileContent = SNOWFLAKE_PRIVATE_KEY.getValueFrom(afonProperties);
+        String              keyFileContent = afonProperties.getValue(SNOWFLAKE_PRIVATE_KEY);
         byte[]              decodedKey     = Base64.getDecoder().decode(keyFileContent);
         PKCS8EncodedKeySpec keySpec        = new PKCS8EncodedKeySpec(decodedKey);
         KeyFactory          kf             = KeyFactory.getInstance("RSA");

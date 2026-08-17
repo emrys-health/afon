@@ -20,8 +20,8 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.config.AfonProperties.USER_POLARIS_ID;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
 import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
 public class ConfigurePolarisUserMain {

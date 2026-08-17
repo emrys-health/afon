@@ -3,7 +3,7 @@ package health.emrys.afon.acceptance.gcp
 import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
-import health.emrys.afon.config.AfonProperties.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
+import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.FilePropertyProvider
 import health.emrys.afon.polaris.catalogs.{GoogleCloudConfigForPolaris, JsonMaker}
 import health.emrys.afon.polaris.config.PolarisConfigurer

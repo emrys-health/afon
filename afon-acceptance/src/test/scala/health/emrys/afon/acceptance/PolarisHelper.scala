@@ -3,13 +3,13 @@ package health.emrys.afon.acceptance
 import health.emrys.afon.acceptance.AbstractAccessSpec.REST_CODE_RESOURCE_CREATED
 import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
 import health.emrys.afon.acceptance.PolarisHelper.{principalName, principalRoleName}
-import health.emrys.afon.config.AfonProperties
+import health.emrys.afon.config.AfonProperty
 import health.emrys.afon.polaris.catalogs.{JsonMaker, PolarisDTOs}
 import health.emrys.afon.polaris.config.{PermissionsConfigurer, PolarisConfigurer}
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials
 
 object PolarisHelper {
-  val principalName     = AfonProperties.USER_POLARIS_ID.getValueFrom(instance.getProperties)
+  val principalName     = AfonProperty.USER_POLARIS_ID.getValueFrom(instance.getProperties)
   val principalRoleName = "myprincipalrole"
   val principal         = (new PolarisHelper).createPrincipal()
 }

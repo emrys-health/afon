@@ -18,9 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 import static java.lang.String.format;
@@ -62,15 +61,15 @@ public class KeyCloakProvider {
 
     /**
      * Create a provider using the configured properties:
-     * {@link AfonProperties#KC_HOSTNAME},
-     * {@link AfonProperties#KC_BOOTSTRAP_ADMIN_USERNAME},
-     * {@link AfonProperties#KC_BOOTSTRAP_ADMIN_PASSWORD}
+     * {@link AfonProperty#KC_HOSTNAME},
+     * {@link AfonProperty#KC_BOOTSTRAP_ADMIN_USERNAME},
+     * {@link AfonProperty#KC_BOOTSTRAP_ADMIN_PASSWORD}
      * @param properties
      */
-    public KeyCloakProvider(Properties properties) {
-        this(KC_HOSTNAME.getValueFrom(properties),
-                KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
-                KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
+    public KeyCloakProvider(AfonPropertyProvider properties) {
+        this(properties.getValue(KC_HOSTNAME),
+                properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME),
+                properties.getValue(KC_BOOTSTRAP_ADMIN_PASSWORD));
     }
 
     public KeyCloakProvider(String hostname,
@@ -92,21 +91,21 @@ public class KeyCloakProvider {
 
     /**
      * Registers the Polaris user with the configured properties:
-     * {@link AfonProperties#USER_POLARIS_ID},
-     * {@link AfonProperties#USER_POLARIS_SECRET},
-     * {@link AfonProperties#USER_POLARIS_EMAIL}.
+     * {@link AfonProperty#USER_POLARIS_ID},
+     * {@link AfonProperty#USER_POLARIS_SECRET},
+     * {@link AfonProperty#USER_POLARIS_EMAIL}.
      *
-     * Registers the browser for the {@link AfonProperties#AWS_JUPYTER_DOMAIN}.
+     * Registers the browser for the {@link AfonProperty#AWS_JUPYTER_DOMAIN}.
      *
      * Provisions the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
      * "sign in" on the OAuth splash yields KeyCloak's "Client not found".
      */
-    public void registerPolarisUserAndBrowserClient(Properties properties) {
+    public void registerPolarisUserAndBrowserClient(AfonPropertyProvider properties) {
         registerPolarisUser(AfonUserProvider.createUser(
-                AfonProperties.USER_POLARIS_ID.getValueFrom(properties),
-                AfonProperties.USER_POLARIS_SECRET.getValueFrom(properties),
-                AfonProperties.USER_POLARIS_EMAIL.getValueFrom(properties, "")));
-        registerBrowserClient(properties, AfonProperties.AWS_JUPYTER_DOMAIN.getValueFrom(properties));
+                properties.getValue(AfonProperty.USER_POLARIS_ID),
+                properties.getValue(AfonProperty.USER_POLARIS_SECRET),
+                properties.getValue(AfonProperty.USER_POLARIS_EMAIL, "")));
+        registerBrowserClient(properties, properties.getValue(AfonProperty.AWS_JUPYTER_DOMAIN));
     }
 
     /**
@@ -342,10 +341,10 @@ public class KeyCloakProvider {
      * @param properties
      * @param jupyterDomain
      */
-    public void registerBrowserClient(Properties properties, String jupyterDomain) {
+    public void registerBrowserClient(AfonPropertyProvider properties, String jupyterDomain) {
         registerBrowserClient(
-                AfonProperties.OAUTH2_CLIENT_ID.getValueFrom(properties),
-                AfonProperties.OAUTH2_CLIENT_SECRET.getValueFrom(properties),
+                properties.getValue(AfonProperty.OAUTH2_CLIENT_ID),
+                properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET),
                 List.of(
                         "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
                         "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
@@ -586,7 +585,7 @@ public class KeyCloakProvider {
      * already-running KeyCloak.
      */
     public static void main(String[] args) {
-        Properties properties = new FilePropertyProvider().getProperties();
+        AfonPropertyProvider properties = new FilePropertyProvider();
         KeyCloakProvider keyCloakProvider = new KeyCloakProvider(properties);
         if (args.length == 1) {
             String username = args[0];

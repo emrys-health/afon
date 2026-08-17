@@ -5,6 +5,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -17,8 +18,8 @@ import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
-import static health.emrys.afon.config.AfonProperties.USER_POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.USER_POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
+import static health.emrys.afon.config.AfonProperty.USER_POLARIS_SECRET;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 
 /**
@@ -205,10 +206,10 @@ public class SparkWorkloads {
         var                         toReturn     = new HashMap<String, String>();
         SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        Properties properties = new FilePropertyProvider().getProperties();
+        AfonPropertyProvider properties = new FilePropertyProvider();
         SparkWarehouseConfig sparkWarehouseConfig = sparkFactory.getConfig(
-            USER_POLARIS_ID.getValueFrom(properties),
-            USER_POLARIS_SECRET.getValueFrom(properties),
+            properties.getValue(USER_POLARIS_ID),
+            properties.getValue(USER_POLARIS_SECRET),
             polarisDomainName,
             "https"
         );

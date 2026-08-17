@@ -1,8 +1,7 @@
 package health.emrys.afon.trino;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
-
-import java.util.Properties;
 
 /**
  * A {@link TrinoServerConfiguration} for a Polaris running in external-auth mode (KeyCloak as the
@@ -22,7 +21,7 @@ public class KeyCloakTrinoServerConfiguration extends TrinoServerConfiguration {
     private final String oauth2ServerUri;
 
     public KeyCloakTrinoServerConfiguration(String polarisDomainName,
-                                            Properties properties,
+                                            AfonPropertyProvider properties,
                                             String oauth2ServerUri) {
         super(polarisDomainName, properties);
         this.oauth2ServerUri = oauth2ServerUri;

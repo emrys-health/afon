@@ -9,7 +9,7 @@ import org.jspecify.annotations.NonNull;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum.GCS;
 
 public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {

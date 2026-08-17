@@ -3,6 +3,7 @@ package health.emrys.afon.cluster;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.STSSessionCredentialsProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import io.kubernetes.client.util.credentials.Authentication;
 import io.kubernetes.client.util.credentials.EKSAuthentication;
@@ -12,22 +13,20 @@ import software.amazon.awssdk.services.eks.EksClient;
 import software.amazon.awssdk.services.eks.model.DescribeClusterRequest;
 import software.amazon.awssdk.services.eks.model.DescribeClusterResponse;
 
-import java.util.Properties;
-
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 
 public class EksK8sClient extends K8sClient {
 
     public EksK8sClient() {
-        this(new FilePropertyProvider().getProperties());
+        this(new FilePropertyProvider());
     }
 
-    public EksK8sClient(Properties properties){
+    public EksK8sClient(AfonPropertyProvider properties){
         super(properties);
-        Region region = Region.of(AWS_REGION.getValueFrom(properties));
+        Region region = Region.of(properties.getValue(AWS_REGION));
         AWSCredentials awsCredentials = new BasicAWSCredentials(
-                AWS_ACCESS_KEY_ID.getValueFrom(properties),
-                AWS_SECRET_ACCESS_KEY.getValueFrom(properties));
+                properties.getValue(AWS_ACCESS_KEY_ID),
+                properties.getValue(AWS_SECRET_ACCESS_KEY));
         registerClient(region, awsCredentials);
     }
 

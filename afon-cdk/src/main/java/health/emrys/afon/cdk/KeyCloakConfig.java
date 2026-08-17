@@ -8,6 +8,7 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -15,7 +16,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.*;
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_IMAGE;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
 
@@ -49,7 +50,7 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
 
     public KeyCloakConfig(
         @NonNull Construct scope,
-        @NonNull Properties properties,
+        @NonNull AfonPropertyProvider properties,
         @NonNull T cloudProvider) {
         super(scope, APP_NAME + "_scope");
         this.cloudProvider = cloudProvider;
@@ -63,7 +64,7 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
 
         Map<String, String> secretsMap = kcProperties.stream().collect(Collectors.toMap(
             AfonProperty::getName,
-            x -> x.getValueFrom(properties)
+            properties::getValue
         ));
 
         Secret kcSecrets = Secret.Builder
@@ -82,13 +83,13 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         // oauth2-proxy, which requires https, rejects the OIDC discovery document. We therefore pin the
         // public scheme here. Configurable (defaulting to https) so the acceptance tests can run KeyCloak
         // over plain http.
-        String protocol = KC_PROTOCOL.getValueFrom(properties, "https");
+        String protocol = properties.getValue(KC_PROTOCOL, "https");
         String hostname = "https".equalsIgnoreCase(protocol)
-                          ? protocol + "://" + KC_HOSTNAME.getValueFrom(properties)
-                          : KC_HOSTNAME.getValueFrom(properties);
+                          ? protocol + "://" + properties.getValue(KC_HOSTNAME)
+                          : properties.getValue(KC_HOSTNAME);
 
         List<DeploymentSpecTemplateSpecContainerEnv> envs = new ArrayList<>();
-        envs.add(envVar(KC_DB.getName(), KC_DB.getValueFrom(properties)));
+        envs.add(envVar(KC_DB.getName(), properties.getValue(KC_DB)));
         // KC 26 proxy v2: trust the AWS load balancer's X-Forwarded-* headers. This replaces the
         // deprecated KC_PROXY=edge (which KC 26 warns about). Without it Keycloak treats the
         // TLS-terminated request as plain http and omits the Secure flag from its AUTH_SESSION_ID /

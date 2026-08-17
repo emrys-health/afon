@@ -5,12 +5,12 @@ import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import health.emrys.afon.cdk.JupyterConfig;
 import health.emrys.afon.cdk.JupyterMfaConfig;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 
 import java.util.List;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
 
 public class AwsJupyterConfig extends JupyterConfig {
@@ -22,12 +22,12 @@ public class AwsJupyterConfig extends JupyterConfig {
 
     public AwsJupyterConfig(TerraformStack stack,
                             AwsCloudProvider cloudProvider,
-                            Properties properties) {
+                            AfonPropertyProvider properties) {
         super(stack, properties);
         this.cloudProvider    = cloudProvider;
-        this.jupyterDomain    = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
-        this.jupyterDnsZoneId = AWS_JUPYTER_DNS_ZONE.getValueFrom(properties);
-        this.jupyterCertArn   = AfonProperties.AWS_JUPYTER_CERT_ARN.getValueFrom(properties);
+        this.jupyterDomain    = properties.getValue(AWS_JUPYTER_DOMAIN);
+        this.jupyterDnsZoneId = properties.getValue(AWS_JUPYTER_DNS_ZONE);
+        this.jupyterCertArn   = properties.getValue(AfonProperty.AWS_JUPYTER_CERT_ARN);
         this.stack            = stack;
     }
 
@@ -57,11 +57,12 @@ public class AwsJupyterConfig extends JupyterConfig {
         return new JupyterMfaConfig(
             this.stack,
             proxyDeps,
+            properties,
             "http://guacamole-web:8080",
             jupyterDomain,
-            OAUTH2_CLIENT_ID.getValueFrom(properties),
-            OAUTH2_CLIENT_SECRET.getValueFrom(properties),
-            OAUTH2_COOKIE_SECRET.getValueFrom(properties));
+            properties.getValue(OAUTH2_CLIENT_ID),
+            properties.getValue(OAUTH2_CLIENT_SECRET),
+            properties.getValue(OAUTH2_COOKIE_SECRET));
     }
 
 

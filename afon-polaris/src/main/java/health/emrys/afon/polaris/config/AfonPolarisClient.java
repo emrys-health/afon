@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static java.lang.String.format;
 
 /**

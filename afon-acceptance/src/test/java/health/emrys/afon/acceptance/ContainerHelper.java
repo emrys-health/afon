@@ -1,6 +1,8 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
@@ -28,7 +30,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
@@ -83,6 +85,40 @@ public class ContainerHelper {
     private ContainerHelper() {
     }
 
+    /**
+     * An implementation of @link AfonPropertyProvider} that provides the given already-loaded properties
+     * (and possibly test-overridden), so it can be handed to APIs that expect a provider without losing
+     * the overrides applied by {@link AcceptanceTestConfig}.
+     */
+    public record GivenPropertyProvider(Properties properties) implements AfonPropertyProvider {
+        @Override
+        public Properties getProperties() {
+            Properties copy = new Properties();
+            copy.putAll(properties);
+            return copy;
+        }
+
+        @Override
+        public Properties getProperties(String overrideFile) {
+            return getProperties();
+        }
+
+        @Override
+        public Properties getSecretProperties() {
+            return getProperties();
+        }
+
+        @Override
+        public String getValue(AfonProperty property) {
+            return property.getValueFrom(properties);
+        }
+
+        @Override
+        public String getValue(AfonProperty property, String defaultValue) {
+            return property.getValueFrom(properties, defaultValue);
+        }
+    }
+
     public synchronized GenericContainer<?> startKeyCloak(Properties properties) {
         if (keyCloak == null) {
             keyCloak = new GenericContainer<>(KEYCLOAK_IMAGE)
@@ -96,7 +132,7 @@ public class ContainerHelper {
                                 .forPort(KEYCLOAK_PORT)
                                 .forStatusCode(200)
                                 .withStartupTimeout(Duration.ofMinutes(3)));
-            new KeyCloakConfigurer(properties).config().entrySet().forEach(entry ->
+            new KeyCloakConfigurer(new GivenPropertyProvider(properties)).config().entrySet().forEach(entry ->
                                                           keyCloak.withEnv(entry.getKey(), entry.getValue())
             );
             // Fixed binding so the host-side KeyCloakProvider can reach it at localhost:8080.
@@ -128,7 +164,7 @@ public class ContainerHelper {
         if (sparkConnect == null) {
             sparkConnect = new GenericContainer<>(SPARK_IMAGE);
             SparkWarehouseConfig config = sparkFactory.getConfig(properties);
-            Stream<String> envs = Arrays.stream(values()).flatMap(
+            Stream<String> envs = Arrays.stream(AfonCloud.values()).flatMap(
                 cloudProvider ->
                     config.sparkConfigs(cloudProvider).entrySet().stream().map(
                         entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
@@ -243,7 +279,7 @@ public class ContainerHelper {
         logger.info("Trino sees Polaris as {} and KeyCloak as {}", polarisDomainName, keyCloakUrl);
         TrinoServerConfiguration trinoConfig = new KeyCloakTrinoServerConfiguration(
             polarisDomainName,
-            properties,
+            new GivenPropertyProvider(properties),
             // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
             keyCloakUrl
         );

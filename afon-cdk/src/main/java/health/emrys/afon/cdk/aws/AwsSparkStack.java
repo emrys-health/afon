@@ -8,6 +8,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -16,13 +17,12 @@ import software.constructs.Construct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.NO_SPARK_LB_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_NAME;
-import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
 
 /**
@@ -37,11 +37,11 @@ public class AwsSparkStack extends AwsJupyterStack {
 
     public AwsSparkStack(@NonNull Construct scope,
                          @NonNull AfonCloud id,
-                         Properties properties) {
+                         AfonPropertyProvider properties) {
         super(scope, id, properties);
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
-        awsPolarisDomainName = AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
+        awsPolarisDomainName = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
         new SparkWorkloads(awsPolarisDomainName).deploy(this, id, eksDependOn);
         Service sparkLB = sparkExternalService(eksDependOn);
         unregisterCRDs(List.of(sparkLB));
@@ -104,7 +104,7 @@ public class AwsSparkStack extends AwsJupyterStack {
         try {
             logger.info("Creating AWS Spark stack");
             final App app = new App();
-            new AwsSparkStack(app, AWS, new FilePropertyProvider().getProperties());
+            new AwsSparkStack(app, AWS, new FilePropertyProvider());
             app.synth();
         } catch (RuntimeException e) {
             logger.error(e.toString());

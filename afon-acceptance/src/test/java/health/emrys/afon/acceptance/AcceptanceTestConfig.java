@@ -11,7 +11,7 @@ import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 

@@ -7,8 +7,8 @@ import org.jspecify.annotations.NonNull;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.GCP_BUCKET_NAME;
-import static health.emrys.afon.config.AfonProperties.GCP_SERVICE_ACCOUNT;
+import static health.emrys.afon.config.AfonProperty.GCP_BUCKET_NAME;
+import static health.emrys.afon.config.AfonProperty.GCP_SERVICE_ACCOUNT;
 import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.config.AfonCloud.GCP_EXTERNAL;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;

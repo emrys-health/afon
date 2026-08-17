@@ -1,14 +1,14 @@
 package health.emrys.afon.security.keycloak;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.KC_BOOTSTRAP_ADMIN_PASSWORD;
-import static health.emrys.afon.config.AfonProperties.KC_BOOTSTRAP_ADMIN_USERNAME;
+import static health.emrys.afon.config.AfonProperty.KC_BOOTSTRAP_ADMIN_PASSWORD;
+import static health.emrys.afon.config.AfonProperty.KC_BOOTSTRAP_ADMIN_USERNAME;
 import static java.lang.String.format;
 
 public class KeyCloakConfigurer {
@@ -63,16 +63,16 @@ public class KeyCloakConfigurer {
         return internalRealmUrl(host, protocol) + "/protocol/openid-connect/token";
     }
 
-    private final Properties properties;
+    private final AfonPropertyProvider properties;
 
-    public KeyCloakConfigurer(Properties properties) {
+    public KeyCloakConfigurer(AfonPropertyProvider properties) {
         this.properties = properties;
     }
 
     public Map<String, String> config() {
         Map<String, String> config = new HashMap<>();
-        config.put(KC_BOOTSTRAP_ADMIN_USERNAME.getName(), KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties));
-        config.put(KC_BOOTSTRAP_ADMIN_PASSWORD.getName(), KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
+        config.put(KC_BOOTSTRAP_ADMIN_USERNAME.getName(), properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME));
+        config.put(KC_BOOTSTRAP_ADMIN_PASSWORD.getName(), properties.getValue(KC_BOOTSTRAP_ADMIN_PASSWORD));
         config.put("KC_HTTP_ENABLED", "true");
         // Run KeyCloak at DEBUG level to aid diagnosing OIDC/token issues.
         config.put("KC_LOG_LEVEL", "DEBUG");

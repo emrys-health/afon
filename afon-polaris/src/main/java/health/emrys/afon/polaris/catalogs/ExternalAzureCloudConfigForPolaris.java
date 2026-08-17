@@ -1,14 +1,14 @@
 package health.emrys.afon.polaris.catalogs;
 
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 
@@ -32,7 +32,7 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
         this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);
         this.multiTenantAppName = AZURE_CLIENT_ID.getValueFrom(properties);
         this.clientId           = AZURE_CLIENT_ID.getValueFrom(properties);
-        this.domainName         = "https://" + AfonProperties.AZURE_DOMAIN_NAME.getValueFrom(properties);
+        this.domainName         = "https://" + AfonProperty.AZURE_DOMAIN_NAME.getValueFrom(properties);
     }
 
     @Override

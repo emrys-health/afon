@@ -4,8 +4,9 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -13,7 +14,6 @@ import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
 
@@ -23,7 +23,7 @@ public class AwsFullStack extends AwsTrinoStack {
 
     public AwsFullStack(@NonNull Construct scope,
                         @NonNull AfonCloud id,
-                        Properties properties) {
+                        AfonPropertyProvider properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
         dependablesAndLoadBalancers.addAll(loadBalancers);
@@ -68,7 +68,7 @@ public class AwsFullStack extends AwsTrinoStack {
         new MonitoredService("hubble-relay",    "k8s-app",                "hubble-relay",    "metrics")
     );
 
-    private void deployPrometheus(List<@NonNull ITerraformDependable> eksDependOn, Properties properties) {
+    private void deployPrometheus(List<@NonNull ITerraformDependable> eksDependOn, AfonPropertyProvider properties) {
         // Configuration Overrides for the Helm Chart
         // We use the ReleaseSet.builder() for the `set` block in Terraform
         final List<ReleaseSet> chartOverrides = List.of(
@@ -149,16 +149,16 @@ public class AwsFullStack extends AwsTrinoStack {
      * Installs the current {@code grafana/loki} chart (single-binary mode,
      * ships Loki 3.x) configured to push chunks and the index to S3. The
      * bucket, region, and IAM credentials are read from the
-     * {@link Properties} passed to the {@link AwsFullStack}
+     * {@link AfonPropertyProvider} passed to the {@link AwsFullStack}
      * constructor (keys {@code AWS_S3_BUCKET_NAME}, {@code AWS_REGION},
      * {@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY}).
      *
      * <p>The companion log shipper is installed by
-     * {@link #deployPromtail(List, Release, Properties)}; logs are queried in the same
+     * {@link #deployPromtail(List, Release, AfonPropertyProvider)}; logs are queried in the same
      * Grafana that kube-prometheus-stack already deploys, wired up by
-     * {@link #grafanaLokiDatasourceValues(Properties)}.
+     * {@link #grafanaLokiDatasourceValues(AfonPropertyProvider)}.
      */
-    private Release deployLoki(List<@NonNull ITerraformDependable> eksDependOn, Properties properties) {
+    private Release deployLoki(List<@NonNull ITerraformDependable> eksDependOn, AfonPropertyProvider properties) {
         return Release.Builder
             .create(this, "lokiRelease")
             .name("loki")
@@ -181,7 +181,7 @@ public class AwsFullStack extends AwsTrinoStack {
      * lines to the {@code default} namespace, so Loki only stores what the
      * user asked for.
      */
-    private void deployPromtail(List<@NonNull ITerraformDependable> eksDependOn, Release loki, Properties properties) {
+    private void deployPromtail(List<@NonNull ITerraformDependable> eksDependOn, Release loki, AfonPropertyProvider properties) {
         List<ITerraformDependable> deps = new ArrayList<>(eksDependOn);
         deps.add(loki);
         Release.Builder
@@ -205,11 +205,11 @@ public class AwsFullStack extends AwsTrinoStack {
      * the read/write/backend replica counts are zeroed because deploymentMode
      * SingleBinary is mutually exclusive with the scalable/microservices modes.
      */
-    static String lokiValues(Properties properties) {
-        String bucket    = AfonProperties.AWS_S3_BUCKET_NAME.getValueFrom(properties);
-        String region    = AfonProperties.AWS_REGION.getValueFrom(properties);
-        String accessKey = AfonProperties.AWS_ACCESS_KEY_ID.getValueFrom(properties);
-        String secretKey = AfonProperties.AWS_SECRET_ACCESS_KEY.getValueFrom(properties);
+    static String lokiValues(AfonPropertyProvider properties) {
+        String bucket    = properties.getValue(AfonProperty.AWS_S3_BUCKET_NAME);
+        String region    = properties.getValue(AfonProperty.AWS_REGION);
+        String accessKey = properties.getValue(AfonProperty.AWS_ACCESS_KEY_ID);
+        String secretKey = properties.getValue(AfonProperty.AWS_SECRET_ACCESS_KEY);
         return String.format("""
             deploymentMode: SingleBinary
             loki:
@@ -223,7 +223,7 @@ public class AwsFullStack extends AwsTrinoStack {
                 replication_factor: 1
               # All long-term data (chunks, index, ruler rules) is shipped to
               # S3. Credentials come from afon.properties / secret.properties via
-              # AfonProperties — the rendered values land in the local tofu
+              # AfonProperty — the rendered values land in the local tofu
               # state and cdktf.out (both gitignored), not in git history.
               storage:
                 type: s3
@@ -291,8 +291,8 @@ public class AwsFullStack extends AwsTrinoStack {
      * {@code kubernetes-pods} scrape job; {@code action: keep} drops every
      * pod whose namespace isn't {@code default}.
      */
-    static String promtailValues(Properties properties) {
-        String clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+    static String promtailValues(AfonPropertyProvider properties) {
+        String clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
         return String.format("""
             config:
               clients:
@@ -313,8 +313,8 @@ public class AwsFullStack extends AwsTrinoStack {
      * kube-prometheus-stack release. {@code access: proxy} routes queries
      * through the Grafana pod, so we don't need to expose Loki externally.
      */
-    static String grafanaLokiDatasourceValues(Properties properties) {
-        String clusterName = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
+    static String grafanaLokiDatasourceValues(AfonPropertyProvider properties) {
+        String clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
         return String.format("""
             grafana:
               additionalDataSources:
@@ -338,7 +338,7 @@ public class AwsFullStack extends AwsTrinoStack {
         logger.info("Creating full stack");
         final App app = new App();
         try {
-            new AwsFullStack(app, AWS, new FilePropertyProvider().getProperties());
+            new AwsFullStack(app, AWS, new FilePropertyProvider());
             app.synth();
         } catch (RuntimeException e) {
             logger.error(e.toString());

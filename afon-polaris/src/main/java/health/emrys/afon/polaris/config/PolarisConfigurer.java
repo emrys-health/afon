@@ -16,8 +16,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.AWS_S3_BUCKET_NAME_TRINO;
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperty.AWS_S3_BUCKET_NAME_TRINO;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 import static health.emrys.afon.polaris.config.PolarisConfigClient.addPolarisCredentialsTo;
 import static java.lang.String.format;

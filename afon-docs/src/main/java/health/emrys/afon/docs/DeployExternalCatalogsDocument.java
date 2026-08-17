@@ -1,16 +1,16 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.azure.AzureCleanupHelper;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.DeployExternalCatalogsMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
-import java.util.Properties;
 
 public class DeployExternalCatalogsDocument extends AbstractDocument {
 
-    public DeployExternalCatalogsDocument(Properties properties) {
+    public DeployExternalCatalogsDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 

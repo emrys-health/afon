@@ -32,14 +32,14 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AbstractCloudProvider;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static java.lang.String.format;
 
 public class AzureCloudProvider extends AbstractCloudProvider {
@@ -63,12 +63,12 @@ public class AzureCloudProvider extends AbstractCloudProvider {
 
     public AzureCloudProvider(@NonNull Construct scope,
                               @NonNull String id,
-                              Properties properties) {
+                              AfonPropertyProvider properties) {
         super(scope, id);
-        clusterName    = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
-        resourceGroup  = AZURE_RESOURCE_GROUP.getValueFrom(properties) + "_" + CLUSTER_NAME.getValueFrom(properties);
-        subscriptionId = AZURE_SUBSCRIPTION.getValueFrom(properties);
-        this.region    = AZURE_REGION.getValueFrom(properties);
+        clusterName    = properties.getValue(AfonProperty.CLUSTER_NAME);
+        resourceGroup  = properties.getValue(AZURE_RESOURCE_GROUP) + "_" + properties.getValue(CLUSTER_NAME);
+        subscriptionId = properties.getValue(AZURE_SUBSCRIPTION);
+        this.region    = properties.getValue(AZURE_REGION);
         configureProviders();
         clientConfig = new DataAzurermClientConfig(this, "current");
         ResourceGroup        resourceGroup = createResourceGroup();

@@ -1,6 +1,7 @@
 package health.emrys.afon.cluster;
 
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
@@ -20,10 +21,9 @@ import software.amazon.awssdk.services.eks.model.DescribeClusterResponse;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
+import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
 import static java.lang.String.format;
 
 
@@ -32,8 +32,8 @@ public class K8sClient {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(K8sClient.class);
     private final String clusterName;
 
-    public K8sClient(Properties properties) {
-        this.clusterName = CLUSTER_NAME.getValueFrom(properties);
+    public K8sClient(AfonPropertyProvider properties) {
+        this.clusterName = properties.getValue(CLUSTER_NAME);
     }
 
     public String getClusterName() {

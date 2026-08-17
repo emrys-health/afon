@@ -1,15 +1,15 @@
 package health.emrys.afon.docs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.DeploySnowflakeWritingAzureViaAwsMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
-import java.util.Properties;
 
 public class DeploySnowflakeWritingAzureViaAwsDocument extends AbstractDocument {
 
-    public DeploySnowflakeWritingAzureViaAwsDocument(Properties properties) { super(properties); }
+    public DeploySnowflakeWritingAzureViaAwsDocument(AfonPropertyProvider properties) { super(properties); }
 
     @Override
     public String getFilename() {
