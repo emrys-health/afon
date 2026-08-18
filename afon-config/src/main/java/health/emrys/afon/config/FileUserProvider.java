@@ -6,10 +6,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.slf4j.LoggerFactory.getLogger;
@@ -92,6 +89,11 @@ public class FileUserProvider implements AfonUserProvider {
             loadUsers();
         }
         return users;
+    }
+
+    @Override
+    public List<String> getUserNames() {
+        return getUsers().stream().map(AfonUser::username).collect(Collectors.toList());
     }
 
     @Override
