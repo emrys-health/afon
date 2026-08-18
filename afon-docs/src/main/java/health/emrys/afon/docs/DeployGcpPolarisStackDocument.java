@@ -1,7 +1,7 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeployGcpPolarisMain;
+import health.emrys.afon.ops.DeployGcpPolarisStackMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
@@ -9,15 +9,15 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
 
-public class DeployGcpPolarisDocument extends AbstractDocument {
+public class DeployGcpPolarisStackDocument extends AbstractDocument {
 
-    public DeployGcpPolarisDocument(AfonPropertyProvider properties) {
+    public DeployGcpPolarisStackDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 
     @Override
     public String getFilename() {
-        return "gcp_polaris.md";
+        return "gcp_polaris_stack.md";
     }
 
     @Override
@@ -73,7 +73,7 @@ public class DeployGcpPolarisDocument extends AbstractDocument {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return new DeployGcpPolarisMain().stepsUsing(stepOperations);
+        return new DeployGcpPolarisStackMain().stepsUsing(stepOperations);
     }
 
 }

@@ -53,7 +53,7 @@ usage (){
   echo "exec-envs:        the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
   echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
-  echo "stack-type:       the stack type.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'full'."
+  echo "stack-type:       the stack type.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'polaris'."
   echo "stack-args:       the stack command args."
   echo "tofu-args:        the tofu args."
   echo "tofu-cloud:       the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
@@ -250,22 +250,13 @@ exec_stack(){
   case $STACK_ACTION in
     deploy|delete)
       if [ -z "$STACK_TYPE" ]; then
-        STACK_TYPE="full"
+        STACK_TYPE="polaris"
         echo "Stack type not specified.  Defaulting to '$STACK_TYPE'."
       fi
       ACTION_CF=$(capitaliseFirst $STACK_ACTION)
       CLOUD_CF=$(capitaliseFirst $CLOUD)
-      case $STACK_TYPE in
-        full)
-          EXEC_CLASS="ops.${ACTION_CF}${CLOUD_CF}FullStackMain"
-          ;;
-        polaris)
-          EXEC_CLASS="ops.${ACTION_CF}${CLOUD_CF}PolarisMain"
-          ;;
-        *)
-          echo "Stack type not supported: $STACK_TYPE"
-          usage; exit 0
-      esac
+      STACK_CF="$(capitaliseFirst $STACK_TYPE)Stack"
+      EXEC_CLASS="ops.${ACTION_CF}${CLOUD_CF}${STACK_CF}Main"
       echo "$ACTION_CF using $EXEC_CLASS"
       exec_jvm
       ;;

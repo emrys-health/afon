@@ -1,26 +1,28 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeployAzurePolarisMain;
+import health.emrys.afon.ops.DeployAwsPolarisStackMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
 
-public class DeployAzurePolarisDocument extends AbstractDocument {
+public class DeployAwsPolarisStackDocument extends AbstractDocument {
 
-    public DeployAzurePolarisDocument(AfonPropertyProvider properties) {
+    public DeployAwsPolarisStackDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 
     @Override
     public String getFilename() {
-        return "azure_polaris.md";
+        return "aws_polaris_stack.md";
     }
 
     @Override
     protected String getSupplementaryIntro() {
-        return "";
+        return """
+                Creates an AWS environment with a Polaris instance populated with the test catalogs
+                """;
     }
 
     @Override
@@ -32,14 +34,14 @@ public class DeployAzurePolarisDocument extends AbstractDocument {
             
             Generate and run cleanup script:
             ```shell
-            ./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper --exec-args azure-cleanup.sh
+            ./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args aws-cleanup.sh
             ```
             """);
     }
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return new DeployAzurePolarisMain().stepsUsing(stepOperations);
+        return new DeployAwsPolarisStackMain().stepsUsing(stepOperations);
     }
 
 }
