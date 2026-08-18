@@ -17,10 +17,10 @@ public class PermissionsConfigurer {
 
     private final PolarisSerialiser serialiser = new PolarisSerialiser(new JsonSerialiser());
 
-    private final AfonPolarisClient client;
+    private final PolarisRestClient client;
     private final String            accessToken;
 
-    public PermissionsConfigurer(AfonPolarisClient client) {
+    public PermissionsConfigurer(PolarisRestClient client) {
         this.client = client;
         accessToken = client.getAccessToken();
     }
@@ -32,7 +32,7 @@ public class PermissionsConfigurer {
         logger.info("Associating {} with catalog role {} in catalog {}", principalRoleName, catalogRoleName, warehouseName);
         String uri  = catalogeRolesURI(principalRoleName, warehouseName);
         String json = serialiser.catalogRoleCreation(catalogRoleName);
-        return client.putJsonCall(uri, json, accessToken);
+        return client.put(uri, json, accessToken);
     }
 
     public HttpResponse createCatalogRoleGrant(
@@ -41,7 +41,7 @@ public class PermissionsConfigurer {
         String catalogRoleName) throws IncorrectConfigException, IOException {
         String uri  = catalogRolesGrantURI(warehouseName, catalogRoleName);
         String json = serialiser.catalogRoleGrant(perm);
-        return client.putJsonCall(uri, json, accessToken);
+        return client.put(uri, json, accessToken);
     }
 
     public HttpResponse createCatalogRole(
@@ -49,7 +49,7 @@ public class PermissionsConfigurer {
         String catalogRoleName) throws IOException, IncorrectConfigException {
         String uri = catalogRolesURI(warehouseName);
         String json = serialiser.catalogRoleCreation(catalogRoleName);
-        return client.postJsonCall(uri, json, accessToken);
+        return client.post(uri, json, accessToken);
     }
 
     public HttpResponse deleteRoleIfExists(String role, String warehouseName) throws IOException {
@@ -75,7 +75,7 @@ public class PermissionsConfigurer {
         logger.info("Creating principal role {}", principalRoleName);
         String uri  = principalRolesURI();
         String json = serialiser.principalRoleCreation(principalRoleName);
-        return client.postJsonCall(uri, json, accessToken);
+        return client.post(uri, json, accessToken);
     }
 
     public HttpResponse associatePrincipalRoles(
@@ -84,6 +84,6 @@ public class PermissionsConfigurer {
         logger.info("Associated user {} with role {}", principalName, principalRoleName);
         String uri  = PolarisConfigurer.principalRolesURI(principalName);
         String json = serialiser.principalRoleCreation(principalRoleName);
-        return client.putJsonCall(uri, json, accessToken);
+        return client.put(uri, json, accessToken);
     }
 }

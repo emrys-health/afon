@@ -2,8 +2,8 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.polaris.config.AfonPolarisClient;
-import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import health.emrys.afon.polaris.config.RegisterTableConfig;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
@@ -29,10 +29,10 @@ public class RegisterPolarisTableMain {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(RegisterPolarisTableMain.class);
 
-    private final AfonPolarisClient   client;
+    private final PolarisRestClient client;
     private final RegisterTableConfig tableConfig;
 
-    RegisterPolarisTableMain(AfonPolarisClient client, RegisterTableConfig tableConfig) {
+    RegisterPolarisTableMain(PolarisRestClient client, RegisterTableConfig tableConfig) {
         this.client = client;
         this.tableConfig = tableConfig;
     }
@@ -79,7 +79,7 @@ public class RegisterPolarisTableMain {
     }
 
     public static void main(String[] args) {
-        AfonPolarisClientFactory clientFactory  = AfonPolarisClientFactory.clientFactory();
+        PolarisRestClientFactory clientFactory  = PolarisRestClientFactory.clientFactory();
         if (args.length < 4) {
             throw new IllegalArgumentException(format("""
                     arguments are: 
@@ -107,7 +107,7 @@ public class RegisterPolarisTableMain {
         String kcHost = KC_HOSTNAME.getValueFrom(properties);
         logger.info("KC host: {}", kcHost);
         properties.put(KC_HOSTNAME.getName(), kcHost);
-        AfonPolarisClient        client = clientFactory.getPolarisClient(properties);
+        PolarisRestClient client = clientFactory.createClient(properties);
         RegisterPolarisTableMain app    = new RegisterPolarisTableMain(client, tableConfig);
         List<String>             errors = app.createTableAndNamespace();
         if (!errors.isEmpty()) {

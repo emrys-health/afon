@@ -3,13 +3,13 @@ package health.emrys.afon.cluster;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
 import java.util.Properties;
 
 public class PolarisClusterCredentials implements ClusterCredentials {
 
-    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+    private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
     private final Properties properties;
     private final String accessToken;
 
@@ -19,7 +19,7 @@ public class PolarisClusterCredentials implements ClusterCredentials {
 
     public PolarisClusterCredentials(AfonCloud cloud, Properties properties) {
         this.properties = properties;
-        accessToken = clientFactory.getPolarisClient(polarisDomainName(cloud), properties).getAccessToken();
+        accessToken = clientFactory.createClient(polarisDomainName(cloud), properties).getAccessToken();
     }
 
     private String polarisDomainName(AfonCloud cloud) {

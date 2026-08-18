@@ -19,7 +19,7 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.tokenEndpoi
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
- * An {@link AfonPolarisClient} for a Polaris configured to use KeyCloak as an external OIDC identity
+ * An {@link PolarisRestClient} for a Polaris configured to use KeyCloak as an external OIDC identity
  * provider. In that mode Polaris no longer implements its own token endpoint
  * ({@code /api/catalog/v1/oauth/tokens} returns HTTP 501), so the access token is obtained directly
  * from KeyCloak. The inherited catalog/management calls then present it to Polaris as a bearer token.
@@ -34,14 +34,9 @@ import static org.slf4j.LoggerFactory.getLogger;
  curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token/introspect -H "Content-Type: application/x-www-form-urlencoded" -d token=$POLARIS_TOKEN  -d client_id=<polaris_id> -d client_secret=<polaris_secret> | jq
  * </pre>
  */
-public class KeyCloakPolarisClient extends AfonPolarisClient {
+public class KeyCloakPolarisRestClient extends PolarisRestClient {
 
-    private static final Logger       log    = getLogger(KeyCloakPolarisClient.class);
-
-    public static void main(String[] args) {
-        KeyCloakPolarisClient app = new KeyCloakPolarisClient(new FilePropertyProvider().getProperties());
-        log.info("access token: {}", app.getAccessToken());
-    }
+    private static final Logger logger = getLogger(KeyCloakPolarisRestClient.class);
 
     private static @NonNull String tokenEndpointFor(Properties properties) {
         String kcHostname = KC_HOSTNAME.getValueFrom(properties);
@@ -54,23 +49,23 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
 
     private final String keyCloakTokenUri;
 
-    KeyCloakPolarisClient(Properties properties) {
+    KeyCloakPolarisRestClient(Properties properties) {
         super(properties, "http");
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
-    KeyCloakPolarisClient(String polarisHost, Properties properties) {
+    KeyCloakPolarisRestClient(String polarisHost, Properties properties) {
         super(polarisHost, properties);
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
-    KeyCloakPolarisClient(Properties properties, String protocol) {
+    KeyCloakPolarisRestClient(Properties properties, String protocol) {
         super(properties, protocol);
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
     @Override
-    public String callAccessToken() throws IOException {
+    public String accessToken() throws IOException {
         Map<String, String> form = new LinkedHashMap<>();
         form.put("grant_type", "client_credentials");
         form.put("client_id", clientId);
@@ -83,7 +78,7 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
                     keyCloakTokenUri,
                     clientId,
                     clientSecret);
-        ClassicHttpResponse response = makeCall(url, post);
+        ClassicHttpResponse response = post(url, post);
         return parseAccessToken(response);
     }
 
@@ -99,4 +94,10 @@ public class KeyCloakPolarisClient extends AfonPolarisClient {
         });
         return sb.toString();
     }
+
+    public static void main(String[] args) {
+        KeyCloakPolarisRestClient app = new KeyCloakPolarisRestClient(new FilePropertyProvider().getProperties());
+        logger.info("access token: {}", app.getAccessToken());
+    }
+
 }

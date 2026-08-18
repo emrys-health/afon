@@ -6,8 +6,8 @@ import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.config.AfonPolarisClient;
-import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.ParseException;
@@ -28,13 +28,13 @@ public class PurgeAndPopulatePolarisMain {
 
     private static final Logger logger = getLogger(PurgeAndPopulatePolarisMain.class);
 
-    private final AfonPolarisClient client;
+    private final PolarisRestClient client;
     private final String            accessToken;
 
     public PurgeAndPopulatePolarisMain(String domainName) {
-        AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+        PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
         this.domainName  = domainName;
-        this.client      = clientFactory.getPolarisClient(domainName, new FilePropertyProvider().getProperties());
+        this.client      = clientFactory.createClient(domainName, new FilePropertyProvider().getProperties());
         this.accessToken = client.getAccessToken();
         logger.debug("For {}/{}:\nPOLARIS_TOKEN={}", client.getClientId(), client.getClientSecret(), accessToken);
     }
@@ -64,7 +64,7 @@ public class PurgeAndPopulatePolarisMain {
     private Iterable<JsonNode> getAll(
         String url,
         String rootNodeName) throws IOException, ParseException {
-        ClassicHttpResponse response    = client.getCall(url, accessToken);
+        ClassicHttpResponse response    = client.get(url, accessToken);
         JsonNode            root        = mapper.readTree(EntityUtils.toString(response.getEntity()));
         JsonNode            identifiers = root.get(rootNodeName);
         if (identifiers == null || !identifiers.isArray()) {

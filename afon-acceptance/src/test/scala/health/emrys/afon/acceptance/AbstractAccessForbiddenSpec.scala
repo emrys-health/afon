@@ -27,10 +27,10 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
       Given(s"an admin has set up the environment with:\n" + readEnvSetup())
       val json = config.catalogConfig
       When(s"we call $uri with payload:\n$json")
-      client.postJsonCall(uri, json, accessToken)
+      client.post(uri, json, accessToken)
       val uriGet = s"/api/catalog/v1/config?warehouse=${config.warehouseName()}"
       Then(s"Polaris acknowledges the catalog when we call $uriGet")
-      val response = client.getCall(uriGet, accessToken)
+      val response = client.get(uriGet, accessToken)
       assert(response.getCode == 200)
     }
 
@@ -49,7 +49,7 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
       spark.sql(sql)
       val uri = s"/api/catalog/v1/${config.warehouseName()}/namespaces/$NAMESPACE"
       And(s"Polaris acknowledges the namespace exists when call '$uri''")
-      val response = client.getCall(uri, accessToken)
+      val response = client.get(uri, accessToken)
       assert(response.getCode == 200)
       val fqn = s"$FULL_NAMESPACE.$tableName"
       When(s"we write $NUM_ROWS rows of data to a table in that namespace called '$fqn'")

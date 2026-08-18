@@ -2,8 +2,8 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.polaris.config.AfonPolarisClient;
-import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -14,12 +14,12 @@ public class DeleteCatalogsMain {
 
     private static final Logger            logger = org.slf4j.LoggerFactory.getLogger(DeleteCatalogsMain.class);
     private final        String            accessToken;
-    private final        AfonPolarisClient client;
+    private final PolarisRestClient client;
 
-    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+    private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
 
     DeleteCatalogsMain() {
-        client      = clientFactory.getPolarisClient(
+        client      = clientFactory.createClient(
             new FilePropertyProvider().getProperties(),
             "https");
         accessToken = client.getAccessToken();

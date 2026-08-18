@@ -34,7 +34,7 @@ Afon's architecture has four layers:
 
 ### Polaris client
 
-`AfonPolarisClient` is the HTTP client for talking to Polaris REST APIs. It handles:
+`PolarisRestClient` is the HTTP client for talking to Polaris REST APIs. It handles:
 
 - **Authentication** — OAuth2 client credentials flow to get an access token (with retry logic for intermittent 503s)
 - **Catalog management** — POST to create catalogs, PUT to update, DELETE to remove
