@@ -135,7 +135,12 @@ public abstract class JupyterHubConfig {
         "http://" + GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT + GUACAMOLE_PATH,
         "http://" + PROXY_PUBLIC_SVC + ":" + PROXY_PUBLIC + HUB_BASE_URL);
 
-    private static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
+    /**
+     * Package-visible: {@link NetworkConfig} selects on these to allow the spawned notebook pods
+     * to reach the hub. A single-user server that cannot reach the hub fails to register and the
+     * spawn times out, so this peer is mandatory, not optional.
+     */
+    static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
     private static final Map<String, String> PROXY_LABELS = Map.of("app", "jupyterhub-proxy");
     /**
      * Selector for the pods KubeSpawner spawns, matching the labels it stamps on them.

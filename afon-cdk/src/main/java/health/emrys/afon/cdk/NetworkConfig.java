@@ -19,41 +19,66 @@ public class NetworkConfig {
     }
 
     public void networkPolicies(Map<String, String> labels, String sparkConnectorName) {
-        List<NetworkPolicySpecEgressTo> clusterPodSelectors = specEgressFor(
-            egressPodSelectorFor(Map.of()));
-        List<NetworkPolicySpecEgressTo> clusterIps = ipBlocksFor("10.96.0.0/12");
-        List<NetworkPolicySpecEgressPorts> clusterPorts = List.of(
-            NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build()
-                                                                 );
-        List<NetworkPolicySpecEgressTo> sparkOperatorPods = List.of(
-            egressPolicyFor(
-                egressToNamespaceFor(Map.of(
-                    "kubernetes.io/metadata.name", "spark-operator")),
-                egressPodSelectorFor(Map.of(
-                    "app.kubernetes.io/name", "spark-operator"))));
-
+        // The only default-namespace peers a notebook pod may reach. An egress `to` entry carrying
+        // just a podSelector is scoped to the policy's own namespace, so this is exactly "these two
+        // pods in default, nothing else": Guacamole (streams the pod's VNC desktop) and the
+        // JupyterHub hub (the single-user server must register with it or the spawn times out).
+        // Everything else in the namespace -- Polaris, Keycloak, Trino, the monitoring stack, other
+        // users' notebooks -- is dropped.
+        // Guacamole is deliberately absent. guacd dials the notebook's VNC port, so the desktop
+        // pixels travel back on a connection Guacamole itself opened; conntrack permits those
+        // replies and the notebook never initiates to Guacamole. Listing it would only have granted
+        // the notebook the ability to dial Guacamole, which nothing requires.
+        List<NetworkPolicySpecEgressTo> allowedNamespacePeers = List.of(
+            podEgressTo(JupyterHubConfig.HUB_LABELS));
+        // Two rules were deleted here after validating every selector in this file against a live
+        // cluster. Both matched zero pods, so removing them is a no-op at runtime, not a loosening:
+        //
+        //   * egress to a "spark-operator" namespace. SparkConfig deploys the operator into default
+        //     and nothing in the stack ever creates a namespace of that name, so the rule was inert.
+        //     It is unnecessary regardless: under Spark Connect the notebook is a thin client that
+        //     speaks to the driver alone, never to the operator.
+        //
+        //   * egress to 10.96.0.0/12:443 -- the upstream-Kubernetes default service CIDR, evidently
+        //     intended to permit calls to the kube API. EKS assigns this cluster 172.20.0.0/16, so
+        //     it matched nothing. Correcting the CIDR would not have helped either: Cilium rewrites
+        //     a ClusterIP to its backend pod address before evaluating policy, so a service-CIDR
+        //     ipBlock is not the mechanism for allowing that traffic. jupyterhub-singleuser never
+        //     calls the kube API, so no rule is needed at all.
+        //
+        // Egress is default-deny across every namespace once this policy selects a pod, so the list
+        // below is the complete set of destinations a spawned notebook may reach.
         List<NetworkPolicySpecEgress> egress = List.of(
             createWebEgressPolicy(),
             createDnsEgressPolicy(),
             NetworkPolicySpecEgress.builder()
-                                   .to(clusterPodSelectors)
+                                   .to(allowedNamespacePeers)
                                    .build(),
-            NetworkPolicySpecEgress.builder()
-                                   .to(clusterIps)
-                                   .ports(clusterPorts)
-                                   .build(),
-            createSparkConnectorEgressPolicy(sparkConnectorName),
-            NetworkPolicySpecEgress.builder()
-                                   .to(sparkOperatorPods)
-                                   .build());
+            createSparkConnectorEgressPolicy(sparkConnectorName));
         networkPolicyFor(labels, egress);
     }
 
+    /**
+     * Egress to the Spark Connect endpoint, restricted to port 15002.
+     *
+     * <p>Selected on the labels the Spark operator stamps on the pods it manages, not on
+     * {@code app.kubernetes.io/name}. The operator derives that one as {@code <app>-driver} --
+     * {@code spark-connector-driver} -- so the previous selector
+     * {@code app.kubernetes.io/name=spark-connector} matched no pods at all and this rule was inert.
+     * That went unnoticed because a blanket "all pods in the namespace" rule was permitting the
+     * traffic instead; once that was narrowed, the mistake became load-bearing.
+     *
+     * <p>{@code spark.operator/spark-app-name} carries the SparkApplication name verbatim, so it
+     * lines up with {@code SPARK_CONNECTOR_NAME} with no suffix convention to drift out of step.
+     * {@code spark-role=driver} narrows it to the single pod serving Connect: executors carry the
+     * same app name but do not listen on 15002.
+     */
     private static @NonNull NetworkPolicySpecEgress createSparkConnectorEgressPolicy(
         String sparkConnectorName) {
         List<NetworkPolicySpecEgressTo> sparkConnectorPods = specEgressFor(
-            egressPodSelectorFor(
-                Map.of("app.kubernetes.io/name", sparkConnectorName)));
+            egressPodSelectorFor(Map.of(
+                "spark.operator/spark-app-name", sparkConnectorName,
+                "spark-role", "driver")));
         List<NetworkPolicySpecEgressPorts> sparkConnectorPorts = List.of(
             NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("15002").build());
         return NetworkPolicySpecEgress
@@ -126,6 +151,17 @@ public class NetworkConfig {
             .builder()
             .name("allow-only-specific-egress")
             .namespace("default")
+            .build();
+    }
+
+    /**
+     * A single egress peer selected by pod labels. With no namespaceSelector alongside it, this
+     * matches only pods in the NetworkPolicy's own namespace.
+     */
+    private static @NonNull NetworkPolicySpecEgressTo podEgressTo(Map<String, String> podLabels) {
+        return NetworkPolicySpecEgressTo
+            .builder()
+            .podSelector(egressPodSelectorFor(podLabels))
             .build();
     }
 
