@@ -4,7 +4,7 @@ import health.emrys.afon.acceptance.AbstractAccessSpec.REST_CODE_RESOURCE_CREATE
 import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
 import health.emrys.afon.acceptance.PolarisHelper.{principalName, principalRoleName}
 import health.emrys.afon.config.AfonProperty
-import health.emrys.afon.polaris.catalogs.{JsonMaker, PolarisDTOs}
+import health.emrys.afon.polaris.catalogs.{JsonSerialiser, PolarisSerialiser}
 import health.emrys.afon.polaris.config.{PermissionsConfigurer, PolarisConfigurer}
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials
 
@@ -15,10 +15,10 @@ object PolarisHelper {
 }
 
 class PolarisHelper {
-  val dtos        = new PolarisDTOs(new JsonMaker())
   val accessToken = instance.getAdminAccessToken()
   val client      = instance.getPolarisAdminClient()
   val permissions = new PermissionsConfigurer(client)
+  val serialiser  = new PolarisSerialiser(new JsonSerialiser())
 
   def createPrincipal(): PrincipalWithCredentials = {
     val configurer = new PolarisConfigurer(client)

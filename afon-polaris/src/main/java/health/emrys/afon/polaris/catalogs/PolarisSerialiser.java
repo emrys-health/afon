@@ -7,12 +7,12 @@ import org.apache.polaris.core.entity.PolarisEntityConstants;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class PolarisDTOs {
+public class PolarisSerialiser {
 
-    private final JsonMaker jsonMaker;
+    private final JsonSerialiser jsonSerialiser;
 
-    public PolarisDTOs(JsonMaker jsonMaker) {
-        this.jsonMaker = jsonMaker;
+    public PolarisSerialiser(JsonSerialiser jsonSerialiser) {
+        this.jsonSerialiser = jsonSerialiser;
     }
 
     public String catalogAdminGrants() throws IncorrectConfigException {
@@ -59,14 +59,14 @@ public class PolarisDTOs {
 
     protected String toJson(Object object) throws IncorrectConfigException {
         try {
-            return jsonMaker.toJson(object);
+            return jsonSerialiser.toJson(object);
         } catch (JsonProcessingException e) {
             throw new IncorrectConfigException(this.toString(), e);
         }
     }
 
     public <T> T fromJson(InputStream is, Class<T> clazz) throws IOException {
-        return jsonMaker.fromJson(is, clazz);
+        return jsonSerialiser.fromJson(is, clazz);
     }
 
 }

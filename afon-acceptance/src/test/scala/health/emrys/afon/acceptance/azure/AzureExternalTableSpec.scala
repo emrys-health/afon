@@ -6,7 +6,7 @@ import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{Azure, External}
 import health.emrys.afon.config.AfonProperty.{AZURE_BUCKET, DATABRICKS_TOKEN}
 import health.emrys.afon.config.FilePropertyProvider
-import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, JsonMaker}
+import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, JsonSerialiser}
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
 import org.apache.polaris.core.admin.model._
@@ -104,6 +104,6 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
         null,
         config.getStorageConfigInfo())
 
-    new JsonMaker().toJson(new CreateCatalogRequest(catalog))
+    new JsonSerialiser().toJson(new CreateCatalogRequest(catalog))
   }
 }

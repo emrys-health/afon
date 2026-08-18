@@ -126,7 +126,7 @@ public class PolarisConfigurer {
                 accessToken),
             client.putJsonCall(
                 getCatalogAdminGrantsURI(warehouseName),
-                config.getDtoMaker().catalogAdminGrants(),
+                config.getSerialiser().catalogAdminGrants(),
                 accessToken),
             };
     }
@@ -135,15 +135,15 @@ public class PolarisConfigurer {
         String accessToken,
         String principalName) throws IncorrectConfigException, IOException {
         String      uri  = principalsURI();
-        PolarisDTOs dtos = new PolarisDTOs(new JsonMaker());
-        String      json = dtos.principalCreation(principalName);
+        PolarisSerialiser serialiser = new PolarisSerialiser(new JsonSerialiser());
+        String      json = serialiser.principalCreation(principalName);
         if (isFailure(deletePrincipalIfPresent(accessToken, principalName))) {
             logger.warn("Could not delete principal {}", principalName);
         }
         logger.info(format("Creating user %s", principalName));
         try (ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
              InputStream is = response.getEntity().getContent()) {
-            return dtos.fromJson(is, PrincipalWithCredentials.class);
+            return serialiser.fromJson(is, PrincipalWithCredentials.class);
         }
     }
 
