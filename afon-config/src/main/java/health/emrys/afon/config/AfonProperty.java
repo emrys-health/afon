@@ -72,6 +72,13 @@ public enum AfonProperty {
     KC_DB_USERNAME("KC_DB_USERNAME"),
     KC_DB_PASSWORD("KC_DB_PASSWORD"),
     KC_DB("KC_DB"),
+    /**
+     * Whether browser logins to the KeyCloak realm must present a TOTP second factor. Optional;
+     * defaults to true. Only interactive logins gain a second factor: the direct-access-grant flow
+     * that Spark, Trino and the acceptance tests use is deliberately relaxed to never ask for one,
+     * since a headless pod has nobody to read an authenticator app.
+     */
+    KC_MFA_ENABLED("KC_MFA_ENABLED"),
 
     // Polaris
     USER_POLARIS_ID("USER_POLARIS_ID"),

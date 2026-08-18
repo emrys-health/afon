@@ -45,6 +45,14 @@ public class KeyCloakProvider {
      */
     public static final String JUPYTERHUB_CALLBACK   = "/hub/oauth_callback";
 
+    /** KeyCloak's own, unmodifiable, flows - the templates this realm's flows are copied from. */
+    private static final String BUILTIN_BROWSER_FLOW      = "browser";
+    private static final String BUILTIN_DIRECT_GRANT_FLOW = "direct grant";
+    /** Alias of the copied browser flow that this realm binds to, with its OTP step forced on. */
+    public static final String BROWSER_MFA_FLOW = "browser-mfa";
+    /** Alias of the copied direct-grant flow that this realm binds to, with its OTP step taken out. */
+    public static final String DIRECT_GRANT_NO_OTP_FLOW = "direct-grant-no-otp";
+
     /** 10 hours: how long an issued access token stays valid, so an interactive session lasts a working day. */
     private static final int ACCESS_TOKEN_LIFESPAN_SECONDS = 10 * 60 * 60;
     /**
@@ -98,7 +106,8 @@ public class KeyCloakProvider {
      * Registers the browser for the {@link AfonProperty#AWS_JUPYTER_DOMAIN}.
      *
      * Provisions the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
-     * "sign in" on the OAuth splash yields KeyCloak's "Client not found".
+     * "sign in" on the OAuth splash yields KeyCloak's "Client not found", and puts that browser flow
+     * behind MFA (see {@link #configureMfa(AfonPropertyProvider)}).
      */
     public void registerPolarisUserAndBrowserClient(AfonPropertyProvider properties) {
         registerPolarisUser(AfonUserProvider.createUser(
@@ -106,6 +115,7 @@ public class KeyCloakProvider {
                 properties.getValue(AfonProperty.USER_POLARIS_SECRET),
                 properties.getValue(AfonProperty.USER_POLARIS_EMAIL, "")));
         registerBrowserClient(properties, properties.getValue(AfonProperty.AWS_JUPYTER_DOMAIN));
+        configureMfa(properties);
     }
 
     /**
@@ -434,6 +444,134 @@ public class KeyCloakProvider {
             logger.warn("Could not update browser client {}", clientId);
         } else {
             logger.info("Updated existing KeyCloak browser client {}", clientId);
+        }
+    }
+
+    /**
+     * Provisions MFA on this realm when {@link AfonProperty#KC_MFA_ENABLED} allows it (the property is
+     * optional and defaults to on).
+     */
+    public void configureMfa(AfonPropertyProvider properties) {
+        if (!Boolean.parseBoolean(properties.getValue(KC_MFA_ENABLED, "true"))) {
+            logger.info("{} is false: leaving KeyCloak logins without MFA", KC_MFA_ENABLED.getName());
+            return;
+        }
+        try {
+            configureMfa(adminToken(), KEYCLOAK_REALM);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to configure MFA on KeyCloak", e);
+        }
+    }
+
+    /**
+     * Makes every browser login to this realm present a TOTP second factor, while leaving headless
+     * logins able to get a token from a username/password alone.
+     *
+     * <p>Both halves are needed, and the second is not optional. Forcing MFA on the browser flow makes
+     * humans enrol an authenticator app - and KeyCloak's built-in direct-grant flow then demands OTP
+     * from exactly those users who have one, so a Spark or Trino job running as a human would start
+     * failing with "Invalid user credentials". The direct grant therefore gets its OTP step taken out:
+     * the second factor guards interactive logins (oauth2-proxy, JupyterHub), and a headless login -
+     * which has nobody to read a phone - is guarded by its confidential client's secret instead.
+     *
+     * <p>KeyCloak refuses to modify its own built-in flows, so each is copied first and the realm
+     * bound to the copy. Idempotent: re-running against a converged realm re-copies nothing (the copy
+     * 409s) and issues no execution updates.
+     */
+    public void configureMfa(String adminToken, String realm) throws IOException {
+        requireOtpForBrowserLogins(adminToken, realm);
+        skipOtpForDirectGrants(adminToken, realm);
+    }
+
+    /** Binds the realm to a browser flow whose OTP step is mandatory rather than opt-in. */
+    private void requireOtpForBrowserLogins(String adminToken, String realm) throws IOException {
+        copyFlow(adminToken, realm, BUILTIN_BROWSER_FLOW, BROWSER_MFA_FLOW);
+        List<Map<String, Object>> changed =
+            KeyCloakMfa.requireOtp(flowExecutions(adminToken, realm, BROWSER_MFA_FLOW));
+        updateFlowExecutions(adminToken, realm, BROWSER_MFA_FLOW, changed);
+        bindFlow(adminToken, realm, "browserFlow", BROWSER_MFA_FLOW);
+        logger.info(
+            "KeyCloak realm '{}' browser flow '{}' requires OTP ({} execution(s) updated)",
+            realm, BROWSER_MFA_FLOW, changed.size());
+    }
+
+    /** Binds the realm to a direct-grant flow with no OTP step, so headless logins keep working. */
+    private void skipOtpForDirectGrants(String adminToken, String realm) throws IOException {
+        copyFlow(adminToken, realm, BUILTIN_DIRECT_GRANT_FLOW, DIRECT_GRANT_NO_OTP_FLOW);
+        List<Map<String, Object>> changed =
+            KeyCloakMfa.skipOtp(flowExecutions(adminToken, realm, DIRECT_GRANT_NO_OTP_FLOW));
+        updateFlowExecutions(adminToken, realm, DIRECT_GRANT_NO_OTP_FLOW, changed);
+        bindFlow(adminToken, realm, "directGrantFlow", DIRECT_GRANT_NO_OTP_FLOW);
+        logger.info(
+            "KeyCloak realm '{}' direct grant flow '{}' skips OTP ({} execution(s) updated)",
+            realm, DIRECT_GRANT_NO_OTP_FLOW, changed.size());
+    }
+
+    /**
+     * Copies one of KeyCloak's built-in flows. A 409 means an earlier deploy already made the copy,
+     * which the caller then converges rather than replaces - deleting and re-copying would leave the
+     * realm bound to a missing flow in between.
+     */
+    private void copyFlow(String adminToken, String realm, String from, String to) throws IOException {
+        String uri = format(
+            "%s/admin/realms/%s/authentication/flows/%s/copy",
+            baseUrl, realm, pathSegment(from));
+        postJson(adminToken, uri, mapper.writeValueAsString(Map.of("newName", to)), "copy of flow " + from);
+    }
+
+    /**
+     * Encodes a value for use as a URL <em>path</em> segment. {@link URLEncoder} targets query
+     * strings, where a space becomes "+"; in a path that is a literal plus, so KeyCloak would 404 on
+     * built-in aliases such as "direct grant".
+     */
+    private static String pathSegment(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    /** A flow's executions, depth-first and each carrying its nesting level, as {@link KeyCloakMfa} expects. */
+    private List<Map<String, Object>> flowExecutions(String adminToken, String realm, String flowAlias)
+        throws IOException {
+        String  uri = format("%s/admin/realms/%s/authentication/flows/%s/executions",
+                             baseUrl, realm, pathSegment(flowAlias));
+        HttpGet get = new HttpGet(uri);
+        get.setHeader("Authorization", "Bearer " + adminToken);
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            return client.execute(get, response -> {
+                if (response.getCode() != HttpStatus.SC_OK) {
+                    throw new IOException(format(
+                        "Could not read executions of KeyCloak flow '%s': HTTP %d", flowAlias, response.getCode()));
+                }
+                return mapper.readValue(response.getEntity().getContent(), List.class);
+            });
+        }
+    }
+
+    /**
+     * Writes changed executions back, in the order given. The admin API keys these on the execution's
+     * own id carried in the body, so each whole representation is PUT to the flow's executions
+     * collection.
+     */
+    private void updateFlowExecutions(String adminToken, String realm, String flowAlias,
+                                      List<Map<String, Object>> executions) throws IOException {
+        String uri = format("%s/admin/realms/%s/authentication/flows/%s/executions",
+                            baseUrl, realm, pathSegment(flowAlias));
+        for (Map<String, Object> execution : executions) {
+            String what = execution.get("displayName") + " -> " + execution.get("requirement");
+            if (isFailure(putJson(adminToken, uri, mapper.writeValueAsString(execution), "execution " + what))) {
+                throw new IOException("Could not set KeyCloak flow execution " + what);
+            }
+        }
+    }
+
+    /**
+     * Points one of the realm's flow bindings at a flow. Done after that flow's executions are set, so
+     * there is no window in which logins run a half-converged flow.
+     */
+    private void bindFlow(String adminToken, String realm, String binding, String flowAlias) throws IOException {
+        String json = mapper.writeValueAsString(Map.of("realm", realm, binding, flowAlias));
+        if (isFailure(putJson(adminToken, format("%s/admin/realms/%s", baseUrl, realm), json, "realm " + realm))) {
+            throw new IOException(format(
+                "Could not bind KeyCloak realm %s %s to flow %s", realm, binding, flowAlias));
         }
     }
 
