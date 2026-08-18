@@ -20,10 +20,10 @@ usage (){
   echo "          build       : executes the mvn build."
   echo "          cli         : executes the cli commands."
   echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch|status."
-  echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|delete|status."
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
   echo "          exec        : executes the jvm classes from ops (see the docs for details)."
   echo "          setup-*     : sets up the local env for the given os and <cloud> option.  One of local|show"
+  echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|delete|status."
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state."
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "mvn-quiet:        the flag to hush the mvn output"
@@ -271,13 +271,16 @@ exec_stack(){
       ;;
     status)
       EXEC_TYPE="script"
-      case $CLOUD in
-        aws)
+      case $STACK_TYPE in
+        full)
           EXEC_SCRIPT="aws/vpcs.sh"
           ;;
-        *)
-          echo "Stack status for $CLOUD not yet supported"
+        polaris)
+          EXEC_SCRIPT="$CLOUD/polaris.sh"
           ;;
+        *)
+          echo "Stack type not supported: $STACK_TYPE"
+          usage; exit 0
       esac
       exec_script
       ;;
