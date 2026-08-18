@@ -23,6 +23,12 @@
             <artifactId>httpclient5-fluent</artifactId>
             <version>${httpclient5-fluent.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-server-spi-private</artifactId>
+            <version>26.7.1</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
 </project>

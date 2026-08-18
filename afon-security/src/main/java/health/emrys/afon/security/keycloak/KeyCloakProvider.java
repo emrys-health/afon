@@ -10,6 +10,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.keycloak.models.utils.DefaultAuthenticationFlows;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -45,9 +46,6 @@ public class KeyCloakProvider {
      */
     public static final String JUPYTERHUB_CALLBACK   = "/hub/oauth_callback";
 
-    /** KeyCloak's own, unmodifiable, flows - the templates this realm's flows are copied from. */
-    private static final String BUILTIN_BROWSER_FLOW      = "browser";
-    private static final String BUILTIN_DIRECT_GRANT_FLOW = "direct grant";
     /** Alias of the copied browser flow that this realm binds to, with its OTP step forced on. */
     public static final String BROWSER_MFA_FLOW = "browser-mfa";
     /** Alias of the copied direct-grant flow that this realm binds to, with its OTP step taken out. */
@@ -485,7 +483,7 @@ public class KeyCloakProvider {
 
     /** Binds the realm to a browser flow whose OTP step is mandatory rather than opt-in. */
     private void requireOtpForBrowserLogins(String adminToken, String realm) throws IOException {
-        copyFlow(adminToken, realm, BUILTIN_BROWSER_FLOW, BROWSER_MFA_FLOW);
+        copyFlow(adminToken, realm, DefaultAuthenticationFlows.BROWSER_FLOW, BROWSER_MFA_FLOW);
         List<Map<String, Object>> changed =
             KeyCloakMfa.requireOtp(flowExecutions(adminToken, realm, BROWSER_MFA_FLOW));
         updateFlowExecutions(adminToken, realm, BROWSER_MFA_FLOW, changed);
@@ -497,7 +495,7 @@ public class KeyCloakProvider {
 
     /** Binds the realm to a direct-grant flow with no OTP step, so headless logins keep working. */
     private void skipOtpForDirectGrants(String adminToken, String realm) throws IOException {
-        copyFlow(adminToken, realm, BUILTIN_DIRECT_GRANT_FLOW, DIRECT_GRANT_NO_OTP_FLOW);
+        copyFlow(adminToken, realm, DefaultAuthenticationFlows.DIRECT_GRANT_FLOW, DIRECT_GRANT_NO_OTP_FLOW);
         List<Map<String, Object>> changed =
             KeyCloakMfa.skipOtp(flowExecutions(adminToken, realm, DIRECT_GRANT_NO_OTP_FLOW));
         updateFlowExecutions(adminToken, realm, DIRECT_GRANT_NO_OTP_FLOW, changed);
