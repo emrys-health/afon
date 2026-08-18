@@ -15,7 +15,7 @@ public class DeployAzurePolarisStackDocument extends AbstractDocument {
 
     @Override
     public String getFilename() {
-        return "azure_polaris_stack.md";
+        return "deploy_azure_polaris_stack.md";
     }
 
     @Override

@@ -17,12 +17,12 @@ public class DeployAwsFullStackDocument extends AbstractDocument {
 
     @Override
     public String getFilename() {
-        return "aws_full_stack.md";
+        return "deploy_aws_full_stack.md";
     }
 
     @Override
     public String getSupplementaryIntro() {
-        return "This brings the full stack (Jupyter, Polaris, Spark etc) up on AWS.";
+        return "Brings up the AWS full stack (Jupyter, Polaris, Spark etc).";
     }
 
     public String getFurtherNotes() {
