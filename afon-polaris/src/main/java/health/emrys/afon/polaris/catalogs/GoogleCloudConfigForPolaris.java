@@ -18,7 +18,6 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
     private final String serviceAccount;
 
     public GoogleCloudConfigForPolaris(Properties properties) {
-        super(new JsonSerialiser());
       this.bucket         = toBucketUri(GCP_BUCKET_NAME.getValueFrom(properties));
       this.serviceAccount = GCP_SERVICE_ACCOUNT.getValueFrom(properties);
     }

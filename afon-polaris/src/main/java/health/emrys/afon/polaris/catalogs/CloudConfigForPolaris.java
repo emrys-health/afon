@@ -13,8 +13,8 @@ public abstract class CloudConfigForPolaris {
 
     private final PolarisSerialiser serialiser;
 
-    protected CloudConfigForPolaris(JsonSerialiser jsonSerialiser) {
-        this.serialiser = new PolarisSerialiser(jsonSerialiser);
+    protected CloudConfigForPolaris() {
+        this.serialiser = new PolarisSerialiser();
     }
 
     public abstract String catalogConfig() throws IncorrectConfigException;

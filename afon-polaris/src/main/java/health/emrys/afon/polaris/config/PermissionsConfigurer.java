@@ -1,7 +1,6 @@
 package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.catalogs.JsonSerialiser;
 import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
@@ -15,7 +14,7 @@ import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 public class PermissionsConfigurer {
     private static final Logger logger = LoggerFactory.getLogger(PermissionsConfigurer.class);
 
-    private final PolarisSerialiser serialiser = new PolarisSerialiser(new JsonSerialiser());
+    private final PolarisSerialiser serialiser = new PolarisSerialiser();
 
     private final PolarisRestClient client;
     private final String            accessToken;

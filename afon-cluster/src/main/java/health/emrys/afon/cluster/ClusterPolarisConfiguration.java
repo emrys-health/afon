@@ -2,15 +2,11 @@ package health.emrys.afon.cluster;
 
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.config.PolarisConfigClient;
 import io.kubernetes.client.openapi.ApiException;
-import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Properties;
 
 import static java.lang.String.format;
@@ -24,13 +20,11 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
-    private final PolarisConfigClient polarisClient;
     private final ClusterState         state;
 
     public ClusterPolarisConfiguration() throws IncorrectConfigException, IOException, ApiException {
         super(new FilePropertyProvider().getProperties());
         state           = new ClusterState();
-        polarisClient   = new PolarisConfigClient();
         String endpoint = format("%s:443", state.getPolarisHost());
         logger.info("Calling Polaris endpoint: {}", endpoint);
         properties.setProperty(AfonProperty.POLARIS_ENDPOINT.getName(), endpoint);
@@ -40,15 +34,6 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
         var props = new Properties();
         props.putAll(properties);
         return props;
-    }
-
-    public List<HttpResponse> initializePolaris() throws IncorrectConfigException, IOException {
-        return polarisClient.createAllCatalogs(properties, getCredentials());
-    }
-
-    public List<HttpResponse> initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
-        polarisClient.createCatalogs(properties, getCredentials(), configs);
-        return null;
     }
 
     protected String getCredentials() {

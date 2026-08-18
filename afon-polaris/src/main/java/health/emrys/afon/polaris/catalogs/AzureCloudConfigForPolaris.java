@@ -18,7 +18,6 @@ public class AzureCloudConfigForPolaris extends CloudConfigForPolaris {
     private final String clientId;
 
     public AzureCloudConfigForPolaris(Properties properties) {
-        super(new JsonSerialiser());
         String bucketName = AZURE_BUCKET.getValueFrom(properties);
         this.bucketUrl          = bucketUrl(bucketName, AZURE_STORAGE_ACCOUNT.getValueFrom(properties));
         this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);

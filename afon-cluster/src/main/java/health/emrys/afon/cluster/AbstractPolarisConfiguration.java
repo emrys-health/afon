@@ -2,7 +2,7 @@ package health.emrys.afon.cluster;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.polaris.catalogs.*;
-import health.emrys.afon.polaris.config.PolarisConfigClient;
+import health.emrys.afon.polaris.config.ConfigurablePolarisClient;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.function.Function;
 
-import static health.emrys.afon.polaris.config.PolarisConfigClient.addPolarisCredentialsTo;
+import static health.emrys.afon.polaris.config.ConfigurablePolarisClient.addPolarisCredentialsTo;
 
 public abstract class AbstractPolarisConfiguration {
 
@@ -26,12 +26,12 @@ public abstract class AbstractPolarisConfiguration {
         AfonCloud.AZURE_EXTERNAL, ExternalAzureCloudConfigForPolaris::new,
         AfonCloud.GCP_EXTERNAL, ExternalGcpCloudConfigForPolaris::new
                                                                 );
-    protected final          Properties properties;
-    private final PolarisConfigClient polarisClient;
+    protected final Properties properties;
+    private final ConfigurablePolarisClient polarisClient;
 
     protected AbstractPolarisConfiguration(Properties properties) {
         this.properties = properties;
-        polarisClient   = new PolarisConfigClient();
+        this.polarisClient = new ConfigurablePolarisClient(properties);
     }
 
     public void configure(String[] args)
@@ -63,21 +63,17 @@ public abstract class AbstractPolarisConfiguration {
         return responses;
     }
 
-    public List<HttpResponse> initialize(AfonCloud cloud) throws IncorrectConfigException, IOException {
-        return initialize(cloud, properties);
-    }
-
     public List<HttpResponse> initialize(AfonCloud cloud, Properties properties) throws IncorrectConfigException, IOException {
         CloudConfigForPolaris cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
         return initializePolaris(new CloudConfigForPolaris[]{cloudConfig});
     }
 
     public List<HttpResponse> initializePolaris() throws IncorrectConfigException, IOException {
-        return checkResponses(polarisClient.createAllCatalogs(properties, getCredentials()));
+        return checkResponses(polarisClient.configureAllCatalogs(getCredentials()));
     }
 
     public List<HttpResponse> initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
-        return checkResponses(polarisClient.createCatalogs(properties, getCredentials(), configs));
+        return checkResponses(polarisClient.configureCatalogs(getCredentials(), configs));
     }
 
     abstract protected String getCredentials();

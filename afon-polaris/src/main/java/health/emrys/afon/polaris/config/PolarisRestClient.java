@@ -3,7 +3,6 @@ package health.emrys.afon.polaris.config;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import health.emrys.afon.security.SecurityUtils;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -21,9 +20,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.*;
 import static java.lang.String.format;
 
 /**
@@ -39,18 +36,6 @@ public class PolarisRestClient {
     private final String endpoint;
     protected final String clientId;
     protected final String clientSecret;
-
-    PolarisRestClient(String hostname, Properties properties) {
-        this(format("%s://%s", SecurityUtils.protocolFor(hostname), hostname),
-             POLARIS_ID.getValueFrom(properties),
-             POLARIS_SECRET.getValueFrom(properties));
-    }
-
-    PolarisRestClient(Properties properties, String protocol) {
-        this(format("%s://%s", protocol, POLARIS_ENDPOINT.getValueFrom(properties)),
-             POLARIS_ID.getValueFrom(properties),
-             POLARIS_SECRET.getValueFrom(properties));
-    }
 
     public PolarisRestClient(String endpoint, String clientId, String clientSecret) {
         this.endpoint     = endpoint;
