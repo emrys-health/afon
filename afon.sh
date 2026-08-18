@@ -2,8 +2,9 @@
 set -euo pipefail
 
 usage (){
-  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run] [--mvn-quiet] [--help|-h] [--home <afon-home>]"
-  echo "          [--logging|-l <logging>] [--logging-console <console>]"
+  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run]"
+  echo "          [--home <afon-home>] [--help|-h]"
+  echo "          [--logging|-l <logging>] [--logging-console <console>] [--mvn-quiet]"
   echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
   echo "          [--cli-command|-cli-cmd <command>] [--cli-args <args>] [--cli-dir <dir>]"
@@ -25,9 +26,14 @@ usage (){
   echo "          setup-*     : sets up the local env for the given os and <cloud> option.  One of local|show"
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state."
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
+  echo "mvn-quiet:        the flag to hush the mvn output"
+  echo "help:             the help flag.  Prints usage."
+  echo "home:             the afon home dir.  Defaults to '$HOME/.afon'."
+  echo "                  Also settable via env variable 'AFON_HOME'."
   echo "logging:          the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
+  echo "                  Also settable via env variable 'AFON_LOGGING'."
   echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
-  echo "                  Also definable via env `AFON_LOGGING_CONSOLE`."
+  echo "                  Also settable via env variable 'AFON_LOGGING_CONSOLE'."
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
   echo "build-args:       the build args.  eg '-DskipTests'."
@@ -35,10 +41,11 @@ usage (){
   echo "build-profiles:   the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
   echo "cli-command:      the cli command."
   echo "cli-args:         the cli args."
-  echo "cli-dir:          the cli dir.  Defaulting to env `$AFON_CLI_DIR` if set, else to `$AFON_HOME/cli`."
+  echo "cli-dir:          the cli dir.  Defaulting to '$AFON_HOME/cli'."
+  echo "                  Also settable via env variable 'AFON_CLI_DIR'."
   echo "config-zip:       the config zip path to import/export as a zip file."
-  echo "config-env:       the config env name.  Assumes config dir '$AFON_HOME/config-<env>' to symlink to '$AFON_HOME/config'."
-  echo "docs-dir:         the output dir for the docs. Defaulting to '$AFON_HOME/docs'."
+  echo "config-env:       the config env name.  Assumes config dir 'AFON_HOME/config-<env>' to symlink to 'AFON_HOME/config'."
+  echo "docs-dir:         the output dir for the docs. Defaulting to 'AFON_HOME/docs'."
   echo "exec-types:       the exec types.  One of ops|samples|script.  Defaults to 'ops'."
   echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
   echo "exec-class:       the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
@@ -50,9 +57,6 @@ usage (){
   echo "stack-args:       the stack command args."
   echo "tofu-args:        the tofu args."
   echo "tofu-cloud:       the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
-  echo "mvn-quiet:        the flag to hush the mvn output"
-  echo "help:             the help flag.  Prints usage."
-  echo "home:             the afon home dir.  Defaults to $HOME/.afon."
 }
 
 check_acceptance(){
@@ -75,19 +79,9 @@ exec_ansible(){
 }
 
 exec_cli(){
-  if [ -z "$CLI_DIR" ]; then
-    AFON_CLI_DIR=${AFON_CLI_DIR:-""}
-    if [ -n "$AFON_CLI_DIR" ]; then
-      echo "Using cli dir $AFON_CLI_DIR"
-      CLI_DIR="$AFON_CLI_DIR"
-    else
-      echo "Using cli dir $AFON_HOME/cli"
-      CLI_DIR="$AFON_HOME/cli"
-    fi
-  fi
   if [ ! -d "$CLI_DIR" ]; then
     echo "The cli dir is not found: $CLI_DIR"
-    usage; exit;
+    usage; exit 0
   fi
   CLI_JAR="$CLI_DIR/afon-cli.jar"
   CLI_SH="$CLI_DIR/afon-cli.sh"
@@ -95,7 +89,7 @@ exec_cli(){
     echo "The cli artifacts are not found in $CLI_DIR"
     echo "Build cli artifacts:"
     echo "./afon.sh -p cli --build-args -Dafon.cli.dir=$CLI_DIR"
-    usage; exit;
+    usage; exit 0
   fi
   CLI="$CLI_SH $CLI_COMMAND $CLI_ARGS"
   echo "Executing: $CLI"
@@ -103,18 +97,18 @@ exec_cli(){
 }
 
 exec_config(){
-  CONFIG_DIR="$AFON_HOME/config"
+  CONFIG_DIR="$HOME_DIR/config"
   echo "Using config dir $CONFIG_DIR"
   CONFIG_ACTION=${ACTION#config-}
   case $CONFIG_ACTION in
     import)
         if [ -z "$CONFIG_ZIP" ]; then
           echo "Action $ACTION requires option --config-zip"
-          usage; exit 1
+          usage; exit 0
         fi
         if [ -d $CONFIG_DIR ]; then
           echo "$CONFIG_DIR already exists.  Remove and retry."
-          exit;
+          exit 0
         fi
         if [ -f $CONFIG_ZIP ]; then
           mkdir -p $CONFIG_DIR
@@ -127,7 +121,7 @@ exec_config(){
     export)
       if [ -z "$CONFIG_ZIP" ]; then
         echo "Action $ACTION requires option --config-zip"
-        usage; exit 1
+        usage; exit 0
       fi
       if [ -d $CONFIG_DIR ]; then
         zip -jr $CONFIG_ZIP $CONFIG_DIR
@@ -139,7 +133,7 @@ exec_config(){
     init)
       if [ -d $CONFIG_DIR ]; then
         echo "$CONFIG_DIR already exists.  Remove and retry."
-        exit;
+        exit 0
       fi
       EXEC_TYPE="script"
       EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
@@ -153,13 +147,13 @@ exec_config(){
     switch)
       if [ -z "$CONFIG_ENV" ]; then
         echo "Action $ACTION requires option --config-env"
-        usage; exit 1
+        usage; exit 0
       fi
       if [ -L "$CONFIG_DIR" ]; then
         rm $CONFIG_DIR
       elif [ -d "$CONFIG_DIR" ]; then
         echo "$CONFIG_DIR is not a symlink.  Remove manually."
-        exit;
+        exit 0
       fi
       CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
       ln -s $CONFIG_ENV_DIR $CONFIG_DIR
@@ -181,13 +175,13 @@ exec_config(){
 exec_docs(){
   mkdir -p $DOCS_DIR
   ARTIFACT="health.emrys:afon-docs:$VERSION:zip:docs"
-  mvn -q dependency:copy -Dartifact=$ARTIFACT -DoutputDirectory=$AFON_HOME
-  unzip -qu $AFON_HOME/afon-docs-$VERSION-docs.zip -d $DOCS_DIR
+  mvn -q dependency:copy -Dartifact=$ARTIFACT -DoutputDirectory=$HOME_DIR
+  unzip -qu $HOME_DIR/afon-docs-$VERSION-docs.zip -d $DOCS_DIR
   echo "Exported docs to $DOCS_DIR"
 }
 
 mvn_envs(){
-  MVN_ENVS="-Dafon.home=$AFON_HOME"
+  MVN_ENVS="-Dafon.home=$HOME_DIR"
   if [ -n "$CLOUD" ]; then
     MVN_ENVS="$MVN_ENVS -Dafon.cloud=$CLOUD"
   fi
@@ -211,7 +205,7 @@ exec_jvm(){
   fi
   if [ -z "$EXEC_CLASS" ]; then
     echo "Action exec requires option --exec-class"
-    usage; exit 1
+    usage; exit 0
   fi
   if [ -n "$EXEC_PACKAGE" ]; then
     if [[ "$EXEC_CLASS" != "$EXEC_PACKAGE"* ]]; then
@@ -230,7 +224,7 @@ exec_jvm(){
   fi
   if [ -z "$EXEC_TYPE" ]; then
     echo "Action exec requires option --exec-type"
-    usage; exit 1
+    usage; exit 0
   fi
   cd $CWD/afon-$EXEC_TYPE
   exec_mvn
@@ -239,7 +233,7 @@ exec_jvm(){
 exec_script(){
   if [ -z "$EXEC_SCRIPT" ]; then
     echo "Action exec requires option --exec-script"
-    usage; exit 1
+    usage; exit 0
   fi
   cd $CWD/scripts
   source $EXEC_SCRIPT
@@ -400,8 +394,6 @@ version(){
   mvn help:evaluate -Dexpression=project.version -q -DforceStdout
 }
 
-AFON_HOME=
-AFON_LOGGING_CONSOLE=
 ACTION=
 ANSIBLE_PLAYBOOK=
 ANSIBLE_ARGS=
@@ -412,9 +404,11 @@ CLI_ARGS=
 CLI_COMMAND=
 CLI_DIR=
 CLOUD=
+DRY_RUN=false
+HELP=
+HOME_DIR=
 LOGGING=
 LOGGING_CONSOLE=
-DRY_RUN=false
 CONFIG_ENV=
 CONFIG_ZIP=
 DOCS_DIR=
@@ -480,10 +474,16 @@ while [[ $# -gt 0 ]]; do
       EXEC_SCRIPT="$2"; shift 2 ;;
     --exec-type|-t)
       EXEC_TYPE="$2"; shift 2 ;;
+    --home)
+      HOME_DIR="$2"; shift 2 ;;
+    --help|-h)
+      HELP=true; shift ;;
     --logging|-l)
       LOGGING="$2"; shift 2 ;;
     --logging-console)
       LOGGING_CONSOLE="$2"; shift 2 ;;
+    --mvn-quiet)
+      MVN_QUIET=true; shift ;;
     --setup-os)
       SETUP_OS="$2"; shift 2 ;;
     --setup-outout)
@@ -496,31 +496,57 @@ while [[ $# -gt 0 ]]; do
       TOFU_ARGS="$2"; shift 2 ;;
     --tofu-cloud)
       TOFU_CLOUD="$2"; shift 2 ;;
-    --mvn-quiet)
-      MVN_QUIET=true; shift ;;
-    --help|-h)
-      usage; exit 0 ;;
-    --home)
-      AFON_HOME="$2"; shift 2 ;;
     *)
       echo "Unknown option: $1" >&2;
-      usage; exit 1 ;;
+      usage; exit 0
+      ;;
   esac
 done
 
-if [ -z "$AFON_HOME" ]; then
-  AFON_HOME="$HOME/.afon"
-  echo "AFON_HOME not specified. Defaulting to $AFON_HOME"
-else
-  echo "Using AFON_HOME=$AFON_HOME"
+AFON_HOME="${AFON_HOME:-}"
+if [ -n "$AFON_HOME" ]; then
+  HOME_DIR="$AFON_HOME"
 fi
 
+if [ -n "$HOME_DIR" ]; then
+  echo "Using home dir=$HOME_DIR"
+else
+  HOME_DIR="$HOME/.afon"
+  echo "Home dir not specified. Defaulting to $HOME_DIR"
+fi
+
+AFON_CLI_DIR=${AFON_CLI_DIR:-}
+if [ -n "$AFON_CLI_DIR" ]; then
+  CLI_DIR="$AFON_CLI_DIR"
+fi
+
+if [ -n "$CLI_DIR" ]; then
+  echo "Using cli dir $CLI_DIR"
+else
+  CLI_DIR="$HOME_DIR/cli"
+  echo "Defaulting to $CLI_DIR"
+fi
+
+AFON_LOGGING="${AFON_LOGGING:-}"
+if [ -n "$AFON_LOGGING" ]; then
+  LOGGING="$AFON_LOGGING"
+fi
+
+if [ -n "$LOGGING" ]; then
+  echo "Using logging level: $LOGGING"
+fi
+
+AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-}"
 if [ -n "$AFON_LOGGING_CONSOLE" ]; then
   LOGGING_CONSOLE="$AFON_LOGGING_CONSOLE"
 fi
 
 if [ -n "$LOGGING_CONSOLE" ]; then
-  echo "Using logging console: $LOGGING_CONSOLE"
+  echo "Using logging console level: $LOGGING_CONSOLE"
+fi
+
+if [ "$HELP" == "true" ]; then
+    usage; exit 0;
 fi
 
 if [ "$ACTION" == "" ]; then
@@ -574,7 +600,7 @@ case $ACTION in
   docs-export)
     VERSION=$(version)
     if [ -z "$DOCS_DIR" ]; then
-      DOCS_DIR="$AFON_HOME/docs"
+      DOCS_DIR="$HOME_DIR/docs"
       echo "Docs dir not specified.  Defaulting to '$DOCS_DIR'."
     fi
     exec_docs
@@ -603,7 +629,7 @@ case $ACTION in
         ;;
       show)
         if [ -z "$SETUP_OUTPUT" ]; then
-          SETUP_OUTPUT="$AFON_HOME/versions.md"
+          SETUP_OUTPUT="$HOME_DIR/versions.md"
         fi
         setup_output
         ;;
