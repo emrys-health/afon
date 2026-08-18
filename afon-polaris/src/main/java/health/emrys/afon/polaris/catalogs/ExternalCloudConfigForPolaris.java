@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.polaris.config.AfonPolarisClient.getTokenUri;
+import static health.emrys.afon.polaris.config.PolarisConfigurer.tokensURI;
 
 abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolaris {
     private final @NonNull String clientId;
@@ -26,7 +26,7 @@ abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolari
             .setAuthenticationType(AuthenticationParameters.AuthenticationTypeEnum.OAUTH)
             .setClientId(clientId)
             .setClientSecret(secret)
-            .setTokenUri(getTokenUri(getEndpoint()))
+            .setTokenUri(tokensURI(getEndpoint()))
             .setScopes(getScopes())
             .build();
 

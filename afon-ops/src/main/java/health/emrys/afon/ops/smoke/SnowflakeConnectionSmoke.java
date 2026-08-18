@@ -12,7 +12,7 @@ import java.util.Properties;
  */
 public class SnowflakeConnectionSmoke {
 
-    private static final Logger log = org.slf4j.LoggerFactory.getLogger(SnowflakeConnectionSmoke.class);
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(SnowflakeConnectionSmoke.class);
 
     public void selectFrom(String table, Properties properties) throws Exception {
         SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory();
@@ -20,14 +20,14 @@ public class SnowflakeConnectionSmoke {
         try (Connection conn = factory.getConnection() ;
             Statement stmt = conn.createStatement()) {
             String sql = "SELECT * from " + table;
-            log.info("Running sql {}", sql);
+            logger.info("Running sql {}", sql);
             ResultSet rs = stmt.executeQuery(sql);
             while (rs.next()) {
                 System.out.println("id: " + rs.getString(1));
             }
         }
 
-        log.info("Finished calling Snowflake");
+        logger.info("Finished calling Snowflake");
     }
 
     public static void main(String[] args) throws Exception {

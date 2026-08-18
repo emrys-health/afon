@@ -94,6 +94,6 @@ public class PolarisConfigClient {
         var configurer = new PolarisConfigurer(client);
         String accessToken = client.getAccessToken();
         logger.info("Access token {}", accessToken);
-        return configurer.configurCatalogFor(config, accessToken);
+        return configurer.configureCatalog(config, accessToken);
     }
 }

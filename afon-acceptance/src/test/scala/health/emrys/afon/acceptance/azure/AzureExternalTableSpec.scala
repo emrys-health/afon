@@ -43,7 +43,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
       Given(f"a Unity catalog called $FEDERATED_CATALOG_NAME already exists")
       val databricksToken = DATABRICKS_TOKEN.getValueFrom(properties)
       val json: String = externalCatalogJson(config, databricksToken)
-      val uri: String  = PolarisConfigurer.getCreateCatalogURI
+      val uri: String  = PolarisConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
       val response = client.postJsonCall(

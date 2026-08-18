@@ -38,7 +38,7 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
     "be registered with Polaris" in {
       Given(s"a catalog called '$FEDERATED_CATALOG_NAME' has already been created in GCP'")
       val json: String = externalCatalogJson(properties)
-      val uri: String  = PolarisConfigurer.getCreateCatalogURI
+      val uri: String  = PolarisConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
       val response = client.postJsonCall(

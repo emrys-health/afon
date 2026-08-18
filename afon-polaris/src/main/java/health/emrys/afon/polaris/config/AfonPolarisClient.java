@@ -40,10 +40,6 @@ public class AfonPolarisClient {
     protected final String clientId;
     protected final String clientSecret;
 
-    public static @NonNull String getTokenUri(String endpoint) {
-        return format("%s/api/catalog/v1/oauth/tokens", endpoint);
-    }
-
     AfonPolarisClient(String hostname, Properties properties) {
         this(format("%s://%s", SecurityUtils.protocolFor(hostname), hostname),
              POLARIS_ID.getValueFrom(properties),
@@ -89,7 +85,7 @@ public class AfonPolarisClient {
     }
 
     public String callAccessToken() throws IOException {
-        String uri = getTokenUri(endpoint);
+        String uri = PolarisConfigurer.tokensURI(endpoint);
         logger.info("Calling " + uri);
         HttpPost post = new HttpPost(uri);
         post.setHeader(CONTENT_TYPE, "application/x-www-form-urlencoded");
