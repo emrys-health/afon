@@ -1,7 +1,7 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.PolarisHelper.principalRoleName
-import health.emrys.afon.polaris.catalogs.{CloudConfigForPolaris, JsonMaker, PolarisDTOs}
+import health.emrys.afon.polaris.catalogs.{CloudConfigForPolaris, JsonSerialiser, PolarisSerialiser}
 import health.emrys.afon.polaris.config.PermissionsConfigurer
 import health.emrys.afon.polaris.config.PolarisConfigurer._
 import org.apache.polaris.core.admin.model.CatalogPrivilege._
@@ -13,7 +13,7 @@ abstract class PolarisFixture extends Function0[Any] {
 
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
   val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
-  val dtos = new PolarisDTOs(new JsonMaker())
+  val serialiser = new PolarisSerialiser(new JsonSerialiser())
 
 }
 
@@ -35,7 +35,7 @@ class CatalogAdminGrant(test: GivenWhenThen,
     if (noisy) Given(s"a Polaris endpoint at ${client.getEndpoint}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
     val uri           = getCatalogAdminGrantsURI(warehouseName)
-    val json          = dtos.catalogAdminGrants
+    val json          = serialiser.catalogAdminGrants
     if (noisy) When(s"we call '$uri' with payload:\n$json")
     val response      = client.putJsonCall(uri, json, accessToken)
     if (noisy) Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")

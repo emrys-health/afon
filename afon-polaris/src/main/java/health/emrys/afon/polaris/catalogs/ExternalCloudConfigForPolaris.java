@@ -15,7 +15,7 @@ abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolari
     private final @NonNull String secret;
 
     protected ExternalCloudConfigForPolaris(Properties properties) {
-        super(new JsonMaker());
+        super(new JsonSerialiser());
         clientId                = AfonProperty.POLARIS_ID.getValueFrom(properties);
         secret                  = AfonProperty.POLARIS_SECRET.getValueFrom(properties);
     }

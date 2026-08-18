@@ -17,7 +17,7 @@ public class AwsCloudConfigForPolaris extends CloudConfigForPolaris {
     private final String region;
 
     protected AwsCloudConfigForPolaris(String roleArn, String bucket, String region) {
-        super(new JsonMaker());
+        super(new JsonSerialiser());
         this.roleArn = roleArn;
         this.bucket  = bucket;
         this.region  = region;

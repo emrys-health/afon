@@ -1,8 +1,8 @@
 package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.catalogs.JsonMaker;
-import health.emrys.afon.polaris.catalogs.PolarisDTOs;
+import health.emrys.afon.polaris.catalogs.JsonSerialiser;
+import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
 import org.slf4j.Logger;
@@ -15,7 +15,7 @@ import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 public class PermissionsConfigurer {
     private static final Logger logger = LoggerFactory.getLogger(PermissionsConfigurer.class);
 
-    private final PolarisDTOs dtos = new PolarisDTOs(new JsonMaker());
+    private final PolarisSerialiser serialiser = new PolarisSerialiser(new JsonSerialiser());
 
     private final AfonPolarisClient client;
     private final String            accessToken;
@@ -31,7 +31,7 @@ public class PermissionsConfigurer {
         String catalogRoleName) throws IOException, IncorrectConfigException {
         logger.info("Associating {} with catalog role {} in catalog {}", principalRoleName, catalogRoleName, warehouseName);
         String uri  = associateRolesURI(principalRoleName, warehouseName);
-        String json = dtos.catalogRoleCreation(catalogRoleName);
+        String json = serialiser.catalogRoleCreation(catalogRoleName);
         return client.putJsonCall(uri, json, accessToken);
     }
 
@@ -40,7 +40,7 @@ public class PermissionsConfigurer {
         CatalogPrivilege perm,
         String catalogRoleName) throws IncorrectConfigException, IOException {
         String uri  = catalogRolesGrantURI(warehouseName, catalogRoleName);
-        String json = dtos.catalogRoleGrant(perm);
+        String json = serialiser.catalogRoleGrant(perm);
         return client.putJsonCall(uri, json, accessToken);
     }
 
@@ -48,7 +48,7 @@ public class PermissionsConfigurer {
         String warehouseName,
         String catalogRoleName) throws IOException, IncorrectConfigException {
         String uri = catalogRolesURI(warehouseName);
-        String json = dtos.catalogRoleCreation(catalogRoleName);
+        String json = serialiser.catalogRoleCreation(catalogRoleName);
         return client.postJsonCall(uri, json, accessToken);
     }
 
@@ -74,7 +74,7 @@ public class PermissionsConfigurer {
     public HttpResponse createPrincipalRoles(String principalRoleName) throws IOException, IncorrectConfigException {
         logger.info("Creating principal role {}", principalRoleName);
         String uri  = principalRolesURI();
-        String json = dtos.principalRoleCreation(principalRoleName);
+        String json = serialiser.principalRoleCreation(principalRoleName);
         return client.postJsonCall(uri, json, accessToken);
     }
 
@@ -83,7 +83,7 @@ public class PermissionsConfigurer {
         String principalRoleName) throws IncorrectConfigException, IOException {
         logger.info("Associated user {} with role {}", principalName, principalRoleName);
         String uri  = getPrincipalToRolesURI(principalName);
-        String json = dtos.principalRoleCreation(principalRoleName);
+        String json = serialiser.principalRoleCreation(principalRoleName);
         return client.putJsonCall(uri, json, accessToken);
     }
 }

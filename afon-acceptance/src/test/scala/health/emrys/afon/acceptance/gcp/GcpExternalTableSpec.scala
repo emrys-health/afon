@@ -5,7 +5,7 @@ import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
 import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.FilePropertyProvider
-import health.emrys.afon.polaris.catalogs.{GoogleCloudConfigForPolaris, JsonMaker}
+import health.emrys.afon.polaris.catalogs.{GoogleCloudConfigForPolaris, JsonSerialiser}
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.iceberg.gcp.auth.GoogleAuthManager
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
@@ -119,6 +119,6 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
         null,
         config.getStorageConfigInfo())
 
-    new JsonMaker().toJson(new CreateCatalogRequest(catalog))
+    new JsonSerialiser().toJson(new CreateCatalogRequest(catalog))
   }
 }

@@ -11,13 +11,10 @@ public abstract class CloudConfigForPolaris {
 
     public static final String METADATA_KEY = "EMRYS_METADATA";
 
-    private final JsonMaker jsonMaker;
+    private final PolarisSerialiser serialiser;
 
-    private final PolarisDTOs dtoMaker;
-
-    protected CloudConfigForPolaris(JsonMaker jsonMaker) {
-        this.jsonMaker = jsonMaker;
-        this.dtoMaker = new PolarisDTOs(jsonMaker);
+    protected CloudConfigForPolaris(JsonSerialiser jsonSerialiser) {
+        this.serialiser = new PolarisSerialiser(jsonSerialiser);
     }
 
     public abstract String catalogConfig() throws IncorrectConfigException;
@@ -25,7 +22,7 @@ public abstract class CloudConfigForPolaris {
     public abstract String warehouseName();
 
     protected String toJson(Object object) throws IncorrectConfigException {
-        return dtoMaker.toJson(object);
+        return serialiser.toJson(object);
     }
 
     protected Catalog createCatalog(String bucket,
@@ -54,7 +51,7 @@ public abstract class CloudConfigForPolaris {
         return properties;
     }
 
-    public PolarisDTOs getDtoMaker() {
-        return dtoMaker;
+    public PolarisSerialiser getSerialiser() {
+        return serialiser;
     }
 }
