@@ -37,7 +37,7 @@ class CatalogAdminGrant(test: GivenWhenThen,
     val uri           = catalogRolesAdminGrantsURI(warehouseName)
     val json          = serialiser.catalogAdminGrants
     if (noisy) When(s"we call '$uri' with payload:\n$json")
-    val response      = client.putJsonCall(uri, json, accessToken)
+    val response      = client.put(uri, json, accessToken)
     if (noisy) Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
     assert(response.getCode == REST_CODE_RESOURCE_CREATED)
   }

@@ -21,7 +21,7 @@ public class PolarisConfigurer {
 
     private static final Logger logger = LoggerFactory.getLogger(PolarisConfigurer.class);
 
-    private final AfonPolarisClient client;
+    private final PolarisRestClient client;
 
     public static String catalogsURI() {
         return "/api/management/v1/catalogs";
@@ -94,7 +94,7 @@ public class PolarisConfigurer {
                 warehouseName, namespace, tableName);
     }
 
-    public PolarisConfigurer(AfonPolarisClient client) {
+    public PolarisConfigurer(PolarisRestClient client) {
         this.client = client;
     }
 
@@ -118,11 +118,11 @@ public class PolarisConfigurer {
         String warehouseName = config.warehouseName();
         client.delete(catalogsURI(warehouseName), accessToken); // this failing is expected if there is no catalog
         HttpResponse[] responses = new HttpResponse[]{
-                client.postJsonCall(
+                client.post(
                         catalogsURI(),
                         config.catalogConfig(),
                         accessToken),
-                client.putJsonCall(
+                client.put(
                         catalogRolesAdminGrantsURI(warehouseName),
                         config.getSerialiser().catalogAdminGrants(),
                         accessToken),
@@ -141,7 +141,7 @@ public class PolarisConfigurer {
             logger.warn("Could not delete principal {}", principalName);
         }
         logger.info(format("Creating user %s", principalName));
-        try (ClassicHttpResponse response = client.postJsonCall(uri, json, accessToken);
+        try (ClassicHttpResponse response = client.post(uri, json, accessToken);
              InputStream is = response.getEntity().getContent()) {
             return serialiser.fromJson(is, PrincipalWithCredentials.class);
         }

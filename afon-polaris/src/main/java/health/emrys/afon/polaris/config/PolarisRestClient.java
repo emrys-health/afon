@@ -31,28 +31,28 @@ import static java.lang.String.format;
  * So, not efficient but it won't leak resources.
  * Since you won't make many calls, this is reasonable,
  */
-public class AfonPolarisClient {
+public class PolarisRestClient {
 
-    static final Logger logger       = org.slf4j.LoggerFactory.getLogger(AfonPolarisClient.class);
+    static final Logger logger       = org.slf4j.LoggerFactory.getLogger(PolarisRestClient.class);
     static final String CONTENT_TYPE = "Content-Type";
 
     private final String endpoint;
     protected final String clientId;
     protected final String clientSecret;
 
-    AfonPolarisClient(String hostname, Properties properties) {
+    PolarisRestClient(String hostname, Properties properties) {
         this(format("%s://%s", SecurityUtils.protocolFor(hostname), hostname),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
     }
 
-    AfonPolarisClient(Properties properties, String protocol) {
+    PolarisRestClient(Properties properties, String protocol) {
         this(format("%s://%s", protocol, POLARIS_ENDPOINT.getValueFrom(properties)),
              POLARIS_ID.getValueFrom(properties),
              POLARIS_SECRET.getValueFrom(properties));
     }
 
-    public AfonPolarisClient(String endpoint, String clientId, String clientSecret) {
+    public PolarisRestClient(String endpoint, String clientId, String clientSecret) {
         this.endpoint     = endpoint;
         this.clientId     = clientId;
         this.clientSecret = clientSecret;
@@ -61,12 +61,12 @@ public class AfonPolarisClient {
     /**
      * Odd. This con sometimes receive a HTTP 503 even though the Polaris server logs HTTP 200.
      */
-    public String getAccessToken() throws RuntimeException {
+    public String getAccessToken() {
         int attempt = 3;
         IOException lastException = null;
         while (attempt > 0) {
             try {
-                return callAccessToken();
+                return accessToken();
             } catch (IOException e) {
                 lastException = e;
                 logger.error(e.toString());
@@ -84,7 +84,7 @@ public class AfonPolarisClient {
         throw new RuntimeException(lastException);
     }
 
-    public String callAccessToken() throws IOException {
+    public String accessToken() throws IOException {
         String uri = PolarisConfigurer.tokensURI(endpoint);
         logger.info("Calling " + uri);
         HttpPost post = new HttpPost(uri);
@@ -92,12 +92,8 @@ public class AfonPolarisClient {
         post.setHeader("Polaris-Realm", "POLARIS");
         logger.info("client id = {}, secret = {}", clientId, clientSecret);
         String body = format("grant_type=client_credentials&client_id=%s&client_secret=%s&scope=PRINCIPAL_ROLE:ALL", clientId, clientSecret);
-        ClassicHttpResponse response = makeCall(body, post);
+        ClassicHttpResponse response = post(body, post);
         return parseAccessToken(response);
-    }
-
-    public String getEndpoint() {
-        return endpoint;
     }
 
     public ClassicHttpResponse delete(String uri, String accessToken) throws IOException {
@@ -112,7 +108,7 @@ public class AfonPolarisClient {
         }
     }
 
-    private static @NonNull String readContent(ClassicHttpResponse response) throws IOException {
+    private @NonNull String readContent(ClassicHttpResponse response) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ByteArrayInputStream  bais = null;
         try {
@@ -128,22 +124,22 @@ public class AfonPolarisClient {
         return "NO CONTENT";
     }
 
-    public ClassicHttpResponse putJsonCall(String uri,
-                                           String json,
-                                           String accessToken) throws IOException {
-        return makeCallWithToken(json, new HttpPut(endpoint + uri), accessToken);
+    public ClassicHttpResponse put(String uri,
+                                   String json,
+                                   String accessToken) throws IOException {
+        return post(json, new HttpPut(endpoint + uri), accessToken);
     }
 
-    public ClassicHttpResponse postJsonCall(String uri,
-                                            String json,
-                                            String accessToken) throws IOException {
+    public ClassicHttpResponse post(String uri,
+                                    String json,
+                                    String accessToken) throws IOException {
         String url = endpoint + uri;
         logger.info("Calling " + url + " with " + json);
-        return makeCallWithToken(json, new HttpPost(url), accessToken);
+        return post(json, new HttpPost(url), accessToken);
     }
 
-    public ClassicHttpResponse getCall(String url,
-                                       String accessToken) throws IOException {
+    public ClassicHttpResponse get(String url,
+                                   String accessToken) throws IOException {
         String  uri     = endpoint + url;
         logger.info("Calling {}", url);
         try (CloseableHttpClient client = HttpClients.createDefault()) {
@@ -155,13 +151,13 @@ public class AfonPolarisClient {
         }
     }
 
-    private ClassicHttpResponse makeCallWithToken(String payload,
-                                                  BasicClassicHttpRequest post,
-                                                  String accessToken) throws IOException {
+    private ClassicHttpResponse post(String payload,
+                                     BasicClassicHttpRequest post,
+                                     String accessToken) throws IOException {
         addAccessTokenToHeaders(post, accessToken);
         post.setHeader("Accept", "application/json");
         post.setHeader(CONTENT_TYPE, "application/json");
-        return makeCall(payload, post);
+        return post(payload, post);
     }
 
     private static void addAccessTokenToHeaders(BasicClassicHttpRequest request, String accessToken) {
@@ -176,8 +172,8 @@ public class AfonPolarisClient {
         return accessTokenFromResponse;
     }
 
-    protected ClassicHttpResponse makeCall(String payload,
-                                         BasicClassicHttpRequest post) throws IOException {
+    protected ClassicHttpResponse post(String payload,
+                                       BasicClassicHttpRequest post) throws IOException {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             post.setEntity(new StringEntity(payload));
             ClassicHttpResponse response = (ClassicHttpResponse) client.execute(post);
@@ -194,4 +190,9 @@ public class AfonPolarisClient {
     public String getClientSecret() {
         return clientSecret;
     }
+
+    public String getEndpoint() {
+        return endpoint;
+    }
+
 }

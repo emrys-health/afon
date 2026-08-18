@@ -46,7 +46,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
       val uri: String  = PolarisConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
-      val response = client.postJsonCall(
+      val response = client.post(
         uri,
         json,
         accessToken)

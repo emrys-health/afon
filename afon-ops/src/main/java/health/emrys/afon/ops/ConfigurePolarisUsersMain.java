@@ -5,8 +5,8 @@ import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.config.AfonPolarisClient;
-import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import health.emrys.afon.polaris.config.PermissionsConfigurer;
 import health.emrys.afon.polaris.config.PolarisConfigurer;
 import org.apache.hc.core5.http.HttpResponse;
@@ -46,7 +46,7 @@ public class ConfigurePolarisUsersMain {
     private final String principalRoleName;
 
     public ConfigurePolarisUsersMain(Properties properties) {
-        AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(
+        PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(
             POLARIS_ENDPOINT.getValueFrom(properties),
             properties);
         accessToken       = client.getAccessToken();

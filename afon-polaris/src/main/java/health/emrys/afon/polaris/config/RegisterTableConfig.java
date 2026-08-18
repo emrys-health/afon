@@ -24,7 +24,7 @@ public class RegisterTableConfig {
         this.metadata = metadata;
     }
 
-    public ClassicHttpResponse createTable(AfonPolarisClient client) throws IOException {
+    public ClassicHttpResponse createTable(PolarisRestClient client) throws IOException {
         String uri = format("/api/catalog/v1/%s/namespaces/%s/register", catalog, namespace);
         String json = format("""
                 {
@@ -33,12 +33,12 @@ public class RegisterTableConfig {
                 }
                 """, table, metadata);
         logger.info(json);
-        ClassicHttpResponse response = client.postJsonCall(uri, json, client.getAccessToken());
+        ClassicHttpResponse response = client.post(uri, json, client.getAccessToken());
         logger.info("response: {}", response.getCode());
         return response;
     }
 
-    public ClassicHttpResponse createNamespace(AfonPolarisClient client) throws IOException {
+    public ClassicHttpResponse createNamespace(PolarisRestClient client) throws IOException {
         String uri = format("/api/catalog/v1/%s/namespaces", catalog);
         String json = format("""
                 {
@@ -46,7 +46,7 @@ public class RegisterTableConfig {
                 }
                 """, namespace);
         logger.info(json);
-        ClassicHttpResponse response = client.postJsonCall(uri, json, client.getAccessToken());
+        ClassicHttpResponse response = client.post(uri, json, client.getAccessToken());
         logger.info("response: {}", response.getCode());
         return response;
     }

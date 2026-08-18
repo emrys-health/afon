@@ -4,8 +4,8 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
-import health.emrys.afon.polaris.config.AfonPolarisClient;
-import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import health.emrys.afon.polaris.config.PolarisConfigurer;
 
 import java.util.Properties;
@@ -17,7 +17,7 @@ public class PolarisConfigurerSmoke {
 
     public void smokeTest() {
         Properties properties = new FilePropertyProvider().getProperties();
-        AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(properties, "http");
+        PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties, "http");
         PolarisConfigurer configurer = new PolarisConfigurer(client);
         CloudConfigForPolaris config     = new AwsCloudConfigForPolaris(properties) {
             @Override

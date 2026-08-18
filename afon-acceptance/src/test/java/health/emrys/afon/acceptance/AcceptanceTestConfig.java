@@ -7,8 +7,8 @@ import health.emrys.afon.config.Redacter;
 import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
-import health.emrys.afon.polaris.config.AfonPolarisClient;
-import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
 import java.util.Properties;
 
@@ -24,9 +24,9 @@ public class AcceptanceTestConfig {
         instance = new AcceptanceTestConfig(new FilePropertyProvider());
     }
 
-    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+    private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
 
-    private final AfonPolarisClient           polarisAdminClient;
+    private final PolarisRestClient polarisAdminClient;
     private final AwsCloudConfigForPolaris    awsCloudConfigForPolaris;
     private final AwsCloudConfigForPolaris    awsForbidden;
     private final AzureCloudConfigForPolaris  azureCloudConfigForPolaris;
@@ -37,7 +37,7 @@ public class AcceptanceTestConfig {
     private final String                      adminClientSecret;
     private final Properties                  properties;
     private final AwsCloudConfigForPolaris    awsTrino;
-    private final AfonPolarisClient           polarisClient;
+    private final PolarisRestClient polarisClient;
     private final AfonPropertyProvider provider;
 
     private AcceptanceTestConfig(AfonPropertyProvider provider) {
@@ -48,7 +48,7 @@ public class AcceptanceTestConfig {
         this.adminClientSecret = provider.getValue(POLARIS_SECRET);
         startContainers(this.properties);
         this.polarisAdminClient       = polarisClientFor(adminClientId, adminClientSecret);
-        this.polarisClient            = clientFactory.getPolarisClient(this.properties);
+        this.polarisClient            = clientFactory.createClient(this.properties);
         this.awsCloudConfigForPolaris = new AwsCloudConfigForPolaris(this.properties);
         this.awsTrino                 = new AwsCloudConfigForPolaris(this.properties) {
             @Override
@@ -99,8 +99,8 @@ public class AcceptanceTestConfig {
         };
     }
 
-    public AfonPolarisClient polarisClientFor(String clientId, String clientSecret) {
-        return clientFactory.getPolarisClient(
+    public PolarisRestClient polarisClientFor(String clientId, String clientSecret) {
+        return clientFactory.createClient(
             POLARIS_ENDPOINT.getValueFrom(this.properties),
             clientId,
             clientSecret,
@@ -114,7 +114,7 @@ public class AcceptanceTestConfig {
         containerHelper.startTrino(properties);
     }
 
-    public AfonPolarisClient getPolarisClient() {
+    public PolarisRestClient getPolarisClient() {
         return polarisClient;
     }
 
@@ -122,7 +122,7 @@ public class AcceptanceTestConfig {
         return polarisClient.getAccessToken();
     }
 
-    public AfonPolarisClient getPolarisAdminClient() {
+    public PolarisRestClient getPolarisAdminClient() {
         return polarisAdminClient;
     }
 

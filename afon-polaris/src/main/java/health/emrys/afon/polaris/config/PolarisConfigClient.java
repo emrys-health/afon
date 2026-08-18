@@ -90,7 +90,7 @@ public class PolarisConfigClient {
         if (AfonProperty.POLARIS_ENDPOINT.getValueFrom(properties).toLowerCase().contains("localhost")) {
             protocol = "http";
         }
-        var client = AfonPolarisClientFactory.clientFactory().getPolarisClient(properties, protocol);
+        var client = PolarisRestClientFactory.clientFactory().createClient(properties, protocol);
         var configurer = new PolarisConfigurer(client);
         String accessToken = client.getAccessToken();
         logger.info("Access token {}", accessToken);

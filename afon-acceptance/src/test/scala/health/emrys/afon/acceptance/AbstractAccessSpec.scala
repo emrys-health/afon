@@ -41,10 +41,10 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       Given(s"a Polaris endpoint at ${client.getEndpoint}")
       val json = config.catalogConfig
       When(s"we call $uri as user '${client.getClientId}' with payload:\n$json")
-      client.postJsonCall(uri, json, accessToken)
+      client.post(uri, json, accessToken)
       val uriGet = s"/api/catalog/v1/config?warehouse=${config.warehouseName()}"
       Then(s"Polaris acknowledges the catalog when we call $uriGet")
-      val response = client.getCall(uriGet, accessToken)
+      val response = client.get(uriGet, accessToken)
       assert(response.getCode == 200)
     }
 
@@ -53,7 +53,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       assert(config.createCatalog().getProperties.containsKey(METADATA_KEY))
       val uriGet = s"${PolarisConfigurer.catalogsURI}/${config.warehouseName()}"
       When(s"we call GET at $uriGet and deserialize the response")
-      val response = client.getCall(uriGet, accessToken)
+      val response = client.get(uriGet, accessToken)
       val entity = new String(response.getEntity.getContent.readAllBytes())
       val OBJECT_MAPPER = new ObjectMapper()
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -85,7 +85,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       spark.sql(sql)
       val uri = namespaceURI(config.warehouseName(), namespace)
       Then(s"Polaris acknowledges the namespace exists when call as user '${client.getClientId}' '$uri")
-      val response = client.getCall(uri, accessToken)
+      val response = client.get(uri, accessToken)
       assert(response.getCode == 200)
     }
     s"be created and populated with $NUM_ROWS rows" in {
@@ -100,7 +100,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       Given(s"we have registered the table in catalog '${config.warehouseName()}', namespace '$namespace'")
       val uriGet = tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
       When(s"we call Polaris at $uriGet")
-      val response = client.getCall(uriGet, accessToken)
+      val response = client.get(uriGet, accessToken)
       Then("Polaris acknowledges the table has been created")
       assert(response.getCode == 200)
       AbstractAccessSpec.tables.add(s"$FULL_NAMESPACE.$tableName")
@@ -159,7 +159,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val uriGet = tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
       val polarisClient = AcceptanceTestConfig.instance.polarisClientFor(UserName, UserPassword)
       And(s"user '$UserName' can see the table when they call Polaris at $uriGet'")
-      val response = polarisClient.getCall(uriGet, polarisClient.getAccessToken())
+      val response = polarisClient.get(uriGet, polarisClient.getAccessToken())
       assert(!ClusterUtils.isFailure(response))
     }
   }
