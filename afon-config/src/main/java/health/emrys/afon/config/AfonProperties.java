@@ -69,6 +69,22 @@ public class AfonProperties {
     public static final AfonProperty KC_DB_PASSWORD              = new AfonProperty("KC_DB_PASSWORD");
     public static final AfonProperty KC_DB                       = new AfonProperty("KC_DB");
 
+    // Pomerium (zero-trust access proxy; see docs/pomerium-zero-trust-plan.md)
+    public static final AfonProperty POMERIUM_AUTHENTICATE_HOSTNAME = new AfonProperty(
+        "POMERIUM_AUTHENTICATE_HOSTNAME");
+    public static final AfonProperty POMERIUM_VERIFY_HOSTNAME       = new AfonProperty("POMERIUM_VERIFY_HOSTNAME");
+    public static final AfonProperty AWS_POMERIUM_CERT_ARN          = new AfonProperty("AWS_POMERIUM_CERT_ARN");
+    public static final AfonProperty AWS_POMERIUM_DNS_ZONE          = new AfonProperty("AWS_POMERIUM_DNS_ZONE");
+    public static final AfonProperty POMERIUM_CLIENT_ID             = new AfonProperty("POMERIUM_CLIENT_ID");
+    public static final AfonProperty POMERIUM_CLIENT_SECRET         = new AfonProperty("POMERIUM_CLIENT_SECRET");
+    public static final AfonProperty POMERIUM_SHARED_SECRET         = new AfonProperty("POMERIUM_SHARED_SECRET");
+    public static final AfonProperty POMERIUM_COOKIE_SECRET         = new AfonProperty("POMERIUM_COOKIE_SECRET");
+    /**
+     * KeyCloak group a user must belong to for the example Pomerium policy to allow access to the
+     * protected verify route. Optional; defaults to "cluster-admins".
+     */
+    public static final AfonProperty POMERIUM_ALLOWED_GROUP         = new AfonProperty("POMERIUM_ALLOWED_GROUP");
+
     // Polaris
     public static final AfonProperty USER_POLARIS_ID     = new AfonProperty("USER_POLARIS_ID");
     public static final AfonProperty USER_POLARIS_SECRET = new AfonProperty("USER_POLARIS_SECRET");

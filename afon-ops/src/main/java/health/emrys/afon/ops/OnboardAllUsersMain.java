@@ -14,6 +14,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperties.POMERIUM_CLIENT_ID;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 
 public class OnboardAllUsersMain {
@@ -45,6 +46,12 @@ public class OnboardAllUsersMain {
         for (AfonUser user : userProvider.getUsers()) {
             keyCloakProvider.createUser(adminToken, KEYCLOAK_REALM, user);
             keyCloakProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
+        }
+        // Optional Pomerium zero-trust demo (docs/pomerium-zero-trust-plan.md): provisions the
+        // Pomerium OIDC client, the groups claim mapper and the demo groups. Skipped unless the
+        // Pomerium properties are configured.
+        if (properties.getProperty(POMERIUM_CLIENT_ID.getName()) != null) {
+            keyCloakProvider.registerPomeriumClient(properties);
         }
     }
 

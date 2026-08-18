@@ -785,7 +785,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 NO_JUPYTER_LB_FINALIZERS,
                 NO_POLARIS_FINALIZERS,
                 NO_JUPYTER_FINALIZERS,
-                NO_KEYCLOAK_FINALIZERS))
+                NO_KEYCLOAK_FINALIZERS,
+                NO_POMERIUM_FINALIZERS))
             .build();
         return serviceAccountName;
     }
@@ -857,10 +858,29 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         final String serviceName,
         final int servicePort,
         final List<String> subnetIds) {
+        return createHttpsIngress(
+            constructId, ingressName, certArn, List.of(hostName), serviceName, servicePort, subnetIds);
+    }
+
+    /**
+     * As {@link #createHttpsIngress(String, String, String, String, String, int, List)} but serving
+     * several hostnames from the one ALB, all routed to the same backend service. Used by Pomerium,
+     * which needs its authenticate host and each route host on the same load balancer. The ACM
+     * certificate must cover every hostname (wildcard or multi-SAN).
+     */
+    public IngressV1 createHttpsIngress(
+        final String constructId,
+        final String ingressName,
+        final String certArn,
+        final List<String> hostNames,
+        final String serviceName,
+        final int servicePort,
+        final List<String> subnetIds) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
         String subnetIdsCSV = subnetIds.stream().collect(Collectors.joining(","));
-        log.info("subnetIDs = {}, certArn = {}, hostname = {}", subnetIdsCSV, certArn, hostName);
+        String hostNamesCSV = String.join(",", hostNames);
+        log.info("subnetIDs = {}, certArn = {}, hostnames = {}", subnetIdsCSV, certArn, hostNamesCSV);
         Map<String, String> albAnnotations = Map.of(
             // 1. Tell the LBC to create an Application Load Balancer (ALB)
             "kubernetes.io/ingress.class", "alb",
@@ -879,7 +899,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
             // 6. Make the ALB internet-facing
             "alb.ingress.kubernetes.io/scheme", "internet-facing",
-            "external-dns.alpha.kubernetes.io/hostname", hostName,
+            "external-dns.alpha.kubernetes.io/hostname", hostNamesCSV,
 
             "alb.ingress.kubernetes.io/subnets", subnetIdsCSV
                                                    );
@@ -904,15 +924,18 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .builder()
             .path(Collections.singletonList(pathRule))
             .build();
-        IngressV1SpecRule ingressRule = IngressV1SpecRule
-            .builder()
-            .host(hostName)
-            .http(servicePortRule)
-            .build();
+        List<IngressV1SpecRule> ingressRules = hostNames
+            .stream()
+            .map(host -> IngressV1SpecRule
+                .builder()
+                .host(host)
+                .http(servicePortRule)
+                .build())
+            .collect(Collectors.toList());
         IngressV1Spec alb = IngressV1Spec
             .builder()
             .ingressClassName("alb")
-            .rule(List.of(ingressRule))
+            .rule(ingressRules)
             .build();
         IngressV1Metadata ingressMetadata = IngressV1Metadata
             .builder()

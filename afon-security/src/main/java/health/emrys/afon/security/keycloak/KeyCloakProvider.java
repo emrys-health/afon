@@ -110,6 +110,135 @@ public class KeyCloakProvider {
     }
 
     /**
+     * Idempotently provisions everything Pomerium needs from KeyCloak (see
+     * docs/pomerium-zero-trust-plan.md):
+     * <ul>
+     *   <li>a confidential browser-flow client ({@link AfonProperties#POMERIUM_CLIENT_ID}) whose
+     *       redirect URI is Pomerium's authenticate callback
+     *       ({@code https://<POMERIUM_AUTHENTICATE_HOSTNAME>/oauth2/callback});</li>
+     *   <li>a group-membership protocol mapper so id_tokens carry a {@code groups} claim, which is
+     *       what the example Pomerium policy ({@code claim/groups}) authorises on;</li>
+     *   <li>the demo groups: {@link AfonProperties#POMERIUM_ALLOWED_GROUP} (default
+     *       {@code cluster-admins}, whose members pass the policy) and {@code analysts} (whose
+     *       members authenticate fine but are denied — demonstrating least privilege);</li>
+     *   <li>membership of the allowed group for the {@link AfonProperties#USER_POLARIS_ID} user, so
+     *       the demo has one user who passes the policy out of the box.</li>
+     * </ul>
+     */
+    public void registerPomeriumClient(Properties properties) {
+        String clientId         = POMERIUM_CLIENT_ID.getValueFrom(properties);
+        String clientSecret     = ***REMOVED***
+        String authenticateHost = POMERIUM_AUTHENTICATE_HOSTNAME.getValueFrom(properties);
+        String allowedGroup     = POMERIUM_ALLOWED_GROUP.getValueFrom(properties, "cluster-admins");
+        try {
+            String adminToken = adminToken();
+            createRealm(adminToken, KEYCLOAK_REALM);
+            createBrowserClient(adminToken, KEYCLOAK_REALM, clientId, clientSecret,
+                                List.of("https://" + authenticateHost + OAUTH2_PROXY_CALLBACK));
+            ensureClientMapper(adminToken, KEYCLOAK_REALM, clientId, groupsClaimMapper());
+            ensureGroup(adminToken, KEYCLOAK_REALM, allowedGroup);
+            ensureGroup(adminToken, KEYCLOAK_REALM, "analysts");
+            addUserToGroup(adminToken, KEYCLOAK_REALM,
+                           USER_POLARIS_ID.getValueFrom(properties), allowedGroup);
+            logger.info(
+                "KeyCloak realm '{}' provisioned with Pomerium client '{}' (authenticate host '{}', "
+                + "allowed group '{}')",
+                KEYCLOAK_REALM, clientId, authenticateHost, allowedGroup);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to provision KeyCloak for Pomerium", e);
+        }
+    }
+
+    /**
+     * A group-membership mapper that stamps the user's groups onto a {@code groups} claim in the
+     * id_token/access token/userinfo. Pomerium's PPL {@code claim/groups} criterion reads this claim;
+     * without the mapper KeyCloak omits groups from tokens entirely and every policy check denies.
+     * {@code full.path=false} yields bare group names ("cluster-admins") rather than paths
+     * ("/cluster-admins"), matching what the policy compares against.
+     */
+    private static Map<String, Object> groupsClaimMapper() {
+        return Map.of(
+            "name", "groups",
+            "protocol", "openid-connect",
+            "protocolMapper", "oidc-group-membership-mapper",
+            "config", Map.of(
+                "claim.name", "groups",
+                "full.path", "false",
+                "id.token.claim", "true",
+                "access.token.claim", "true",
+                "userinfo.token.claim", "true"
+            ));
+    }
+
+    /**
+     * Creates a top-level group if absent; an existing group (409) is left untouched.
+     */
+    public void ensureGroup(String adminToken, String realm, String groupName) throws IOException {
+        String json = mapper.writeValueAsString(Map.of("name", groupName));
+        postJson(adminToken, format("%s/admin/realms/%s/groups", baseUrl, realm), json, "group " + groupName);
+    }
+
+    /**
+     * Adds an existing user to an existing top-level group. Idempotent: KeyCloak's membership PUT
+     * succeeds whether or not the user is already a member.
+     */
+    public void addUserToGroup(String adminToken, String realm, String username, String groupName)
+        throws IOException {
+        String userId  = userId(adminToken, realm, username);
+        String groupId = groupId(adminToken, realm, groupName);
+        if (userId == null || groupId == null) {
+            logger.warn("Cannot add user '{}' to group '{}': user or group not found", username, groupName);
+            return;
+        }
+        String uri = format("%s/admin/realms/%s/users/%s/groups/%s", baseUrl, realm, userId, groupId);
+        if (isFailure(putJson(adminToken, uri, "{}", "group membership " + username + " -> " + groupName))) {
+            logger.warn("Could not add user '{}' to group '{}'", username, groupName);
+        } else {
+            logger.info("User '{}' is a member of group '{}'", username, groupName);
+        }
+    }
+
+    /** The internal UUID of the user with exactly this username, or null when absent. */
+    private String userId(String adminToken, String realm, String username) throws IOException {
+        String uri = format(
+            "%s/admin/realms/%s/users?exact=true&username=%s",
+            baseUrl, realm, URLEncoder.encode(username, StandardCharsets.UTF_8));
+        return firstId(adminToken, uri, found -> true);
+    }
+
+    /** The internal UUID of the top-level group with exactly this name, or null when absent. */
+    private String groupId(String adminToken, String realm, String groupName) throws IOException {
+        String uri = format(
+            "%s/admin/realms/%s/groups?search=%s",
+            baseUrl, realm, URLEncoder.encode(groupName, StandardCharsets.UTF_8));
+        // The search is a substring match, so filter to the exact name.
+        return firstId(adminToken, uri, entry -> groupName.equals(entry.get("name")));
+    }
+
+    /**
+     * GETs a list endpoint and returns the {@code id} of the first entry matching the filter, or null.
+     */
+    private String firstId(String adminToken, String uri,
+                           java.util.function.Predicate<Map<?, ?>> filter) throws IOException {
+        HttpGet get = new HttpGet(uri);
+        get.setHeader("Authorization", "Bearer " + adminToken);
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            return client.execute(get, response -> {
+                if (response.getCode() != HttpStatus.SC_OK) {
+                    return null;
+                }
+                List<?> found = mapper.readValue(response.getEntity().getContent(), List.class);
+                for (Object entry : found) {
+                    if (entry instanceof Map<?, ?> map && filter.test(map)) {
+                        return (String) map.get("id");
+                    }
+                }
+                return null;
+            });
+        }
+    }
+
+    /**
      * Registers a Polaris user, also setting the user's (verified) email.
      * A verified email is required for logins that go through oauth2-proxy, which rejects id_tokens
      * whose email is unverified. Pass {@code null}/blank to leave the email unset.

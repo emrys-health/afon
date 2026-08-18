@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -14,12 +15,14 @@ import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonProperties.POMERIUM_AUTHENTICATE_HOSTNAME;
 
 public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
 
@@ -60,6 +63,14 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
             .build();
         keyCloakConfig = new AwsKeyCloakConfig(this, properties, cloudProvider);
         keyCloakConfig.configureHttpsAndDNS();
+        // Optional Pomerium zero-trust demo (docs/pomerium-zero-trust-plan.md): only deployed when
+        // its properties are configured. Pomerium performs OIDC discovery against KeyCloak at
+        // startup, so it depends on KeyCloak's DNS record existing.
+        if (properties.getProperty(POMERIUM_AUTHENTICATE_HOSTNAME.getName()) != null) {
+            List<ITerraformDependable> pomeriumDeps = new ArrayList<>(cloudProvider.getDependables());
+            pomeriumDeps.add(keyCloakConfig.getAliasRecord());
+            new AwsPomeriumConfig(this, properties, cloudProvider, pomeriumDeps);
+        }
     }
 
     /**

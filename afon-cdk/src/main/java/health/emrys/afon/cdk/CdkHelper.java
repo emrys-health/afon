@@ -32,6 +32,7 @@ public class CdkHelper {
     public static final List<LocalExecProvisioner> POLARIS_PROVISIONERS
             = uponDestroyRun(NO_POLARIS_FINALIZERS);
     public static final String NO_KEYCLOAK_FINALIZERS = finalizeIngress(KEYCLOAK_INGRESS);
+    public static final String NO_POMERIUM_FINALIZERS = finalizeIngress(PomeriumConfig.POMERIUM_INGRESS);
     public static final String NO_JUPYTER_FINALIZERS = finalizeIngress("jupyter-ingress");
     public static final String NO_JUPYTER_LB_FINALIZERS = finalizeService("jupyter-web");
     public static final String NO_SPARK_LB_FINALIZERS = finalizeService("spark-master-lb");
