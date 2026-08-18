@@ -1,13 +1,14 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.AfonPolarisClient;
 import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
 import health.emrys.afon.polaris.config.PermissionsConfigurer;
 import health.emrys.afon.polaris.config.PolarisConfigurer;
-import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.AfonUserProvider;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
@@ -21,15 +22,14 @@ import java.util.Properties;
 import java.util.Set;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
-import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
 import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
-public class ConfigurePolarisUserMain {
+public class ConfigurePolarisUsersMain {
 
     public static final String ROLE_NAME = "emrysrole4";
 
-    private static final Logger                logger            = LoggerFactory.getLogger(ConfigurePolarisUserMain.class);
-    private static final Set<CatalogPrivilege> catalogPrivileges = Set.of(
+    private static final Logger logger = LoggerFactory.getLogger(ConfigurePolarisUsersMain.class);
+    private static final Set<CatalogPrivilege> CATALOG_PRIVILEGES = Set.of(
         TABLE_READ_DATA,
         TABLE_WRITE_DATA,
         NAMESPACE_CREATE,
@@ -41,28 +41,27 @@ public class ConfigurePolarisUserMain {
 
     private final String accessToken;
     private final String adminClientId;
+    private final String endpoint;
     private final String roleName;
     private final String principalRoleName;
 
-    public ConfigurePolarisUserMain(Properties properties) {
+    public ConfigurePolarisUsersMain(Properties properties) {
         AfonPolarisClient client = AfonPolarisClientFactory.clientFactory().getPolarisClient(
             POLARIS_ENDPOINT.getValueFrom(properties),
             properties);
         accessToken       = client.getAccessToken();
+        adminClientId     = client.getClientId();
+        endpoint          = client.getEndpoint();
         configurer        = new PolarisConfigurer(client);
         permissions       = new PermissionsConfigurer(client);
-        adminClientId     = client.getClientId();
         roleName          = ROLE_NAME;
         principalRoleName = roleName + "Principal";
-        logger.debug("For {}/{} when calling {}:\nPOLARIS_TOKEN={}",
-                     client.getClientId(),
-                     client.getClientSecret(),
-                     client.getEndpoint(),
-                     accessToken);
+        logger.debug("Polaris access token {} for user {} when calling endpoint {}",
+                accessToken, adminClientId, endpoint);
     }
 
-    public void configureAll(String warehouse,
-                             AfonUserProvider userProvider
+    public void configureUsers(String catalogName,
+                               AfonUserProvider userProvider
     ) throws IncorrectConfigException, IOException {
         // A previous run may have left this principal role — and hence its catalog-role association —
         // in place, which would make the create/associate below fail. Delete it first so both start
@@ -74,7 +73,12 @@ public class ConfigurePolarisUserMain {
             logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
         }
         for (AfonUser user : userProvider.getUsers()) {
-            configureUser(user.username(), warehouse);
+            // check if catalogName is authorised for user
+            if ( user.isAuthorised(catalogName) ) {
+                configureUser(user.username(), catalogName);
+            } else {
+                logger.warn("Admin {} could not authorise user {}", adminClientId, user.username());
+            }
         }
     }
 
@@ -82,15 +86,9 @@ public class ConfigurePolarisUserMain {
         String principalName,
         String catalogName
     ) throws IncorrectConfigException, IOException {
-        logger.info(
-            "Configuring Polaris user '{}' for catalog '{}'",
-            principalName,
-            catalogName);
+        logger.info("Configuring Polaris user '{}' for catalog '{}'", principalName, catalogName);
         PrincipalWithCredentials principal = configurer.configureUser(accessToken, principalName);
-        logger.info(
-            "Admin '{}' created Polaris User {}",
-            adminClientId,
-            principal);
+        logger.info("Admin '{}' created Polaris user {}", adminClientId, principal);
 
         if (PolarisConfigurer.isFailure(permissions.associateRoles(catalogName, principalRoleName, roleName))) {
             logger.warn(
@@ -105,18 +103,13 @@ public class ConfigurePolarisUserMain {
         return response;
     }
 
-    public List<HttpResponse> configurePrivilegesFor(
-        String catalogName
-    ) throws IOException, IncorrectConfigException {
-        logger.info(
-            "Configuring Polaris  catalog '{}' and role '{}'",
-            catalogName,
-            roleName);
+    public List<HttpResponse> configureCatalog(String catalogName) throws IOException, IncorrectConfigException {
+        logger.info("Configuring Polaris catalog '{}' and role '{}'", catalogName, roleName);
         if (PolarisConfigurer.isFailure(permissions.deleteRoleIfExists(roleName, catalogName))) {
             logger.warn("Admin {} could not delete role {} from catalog", adminClientId, roleName, catalogName);
         }
-        List<HttpResponse> results  = new ArrayList<>();
-        HttpResponse       response = permissions.createCatalogRole(catalogName, roleName);
+        List<HttpResponse> results = new ArrayList<>();
+        HttpResponse response = permissions.createCatalogRole(catalogName, roleName);
         if (PolarisConfigurer.isFailure(response)) {
             logger.error("Admin {} could not create role {} for catalog {}", adminClientId, roleName, catalogName);
             results.add(response);
@@ -129,15 +122,12 @@ public class ConfigurePolarisUserMain {
 
     private List<HttpResponse> addPermissions(String catalogName, String roleName) throws IncorrectConfigException, IOException {
         List<HttpResponse> results = new ArrayList<>();
-        for (CatalogPrivilege privilege : catalogPrivileges) {
+        for (CatalogPrivilege privilege : CATALOG_PRIVILEGES) {
             HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
             if (PolarisConfigurer.isFailure(result)) {
                 logger.error(
-                    "Admin '{}' ould not grant role {} the privilege {} on  catalog {}",
-                    adminClientId,
-                    roleName,
-                    privilege,
-                    catalogName);
+                    "Admin '{}' could not grant role {} the privilege {} on  catalog {}",
+                    adminClientId, roleName, privilege, catalogName);
             }
             results.add(result);
         }
@@ -157,16 +147,13 @@ public class ConfigurePolarisUserMain {
             principalName = args[2];
         }
         Properties properties = new FilePropertyProvider().getProperties();
-        if (principalName == null) {
-            principalName = USER_POLARIS_ID.getValueFrom(properties);
-        }
         if ( endpoint != null ) {
             properties.put(POLARIS_ENDPOINT.getName(), endpoint);
         }
-        ConfigurePolarisUserMain app = new ConfigurePolarisUserMain(properties);
+        ConfigurePolarisUsersMain app = new ConfigurePolarisUsersMain(properties);
         try {
-            app.configurePrivilegesFor(catalogName);
-            app.configureUser(principalName, catalogName);
+            app.configureCatalog(catalogName);
+            app.configureUsers(catalogName, new FileUserProvider());
         } catch (Exception e) {
             logger.error("Error configuring user " + principalName, e);
         }

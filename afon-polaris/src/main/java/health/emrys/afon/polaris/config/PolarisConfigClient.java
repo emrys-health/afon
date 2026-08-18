@@ -24,7 +24,7 @@ public class PolarisConfigClient {
     }
 
     /**
-     * Adds id:secret credentials to properties using keys {@link POLARIS_ID} and {@link POLARIS_SECRET}.
+     * Adds id:secret credentials to properties using keys {@link AfonProperty#POLARIS_ID} and {@link AfonProperty#POLARIS_SECRET}.
      * @param credentials the id:secret String
      * @param properties the Properties to add to
      * @return The updated properties

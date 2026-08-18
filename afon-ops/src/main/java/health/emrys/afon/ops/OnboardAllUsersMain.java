@@ -1,18 +1,13 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FileUserProvider;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
-import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.AfonUserProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Properties;
-import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
@@ -33,11 +28,11 @@ public class OnboardAllUsersMain {
         this.keyCloakProvider = new KeyCloakProvider(provider);
     }
 
-    public void onboardAll(String warehouse) throws IncorrectConfigException, IOException {
+    public void configurePolaris(String warehouse) throws IncorrectConfigException, IOException {
         logger.info("Configuring Polaris");
-        ConfigurePolarisUserMain polarisConfiguration = new ConfigurePolarisUserMain(properties);
-        polarisConfiguration.configurePrivilegesFor(warehouse);
-        polarisConfiguration.configureAll(warehouse, userProvider);
+        ConfigurePolarisUsersMain polarisConfiguration = new ConfigurePolarisUsersMain(properties);
+        polarisConfiguration.configureCatalog(warehouse);
+        polarisConfiguration.configureUsers(warehouse, userProvider);
     }
 
     public void configureKeyCloak(String jupyterDomain) throws IOException {
@@ -60,12 +55,10 @@ public class OnboardAllUsersMain {
         String            jupyterDomain = args[2];
         try {
             app.configureKeyCloak(jupyterDomain);
-            app.onboardAll(catalog); // just for a smoke test
+            app.configurePolaris(catalog); // just for a smoke test
         } catch (Exception e) {
-            logger.error(
-                    "Failed to onboard all users:\n{}\nError = {}",
-                    app.userProvider.getUsers().stream().map(x -> x.username()).collect(Collectors.joining("\n")),
-                    e.getMessage());
+            logger.error("Failed to onboard users {}: {}",
+                    app.userProvider.getUserNames(), e.getMessage(), e);
             throw new RuntimeException(e);
         }
     }

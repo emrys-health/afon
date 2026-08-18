@@ -2,6 +2,8 @@ package health.emrys.afon.config;
 
 import java.util.List;
 
+import static health.emrys.afon.config.AfonUser.UNDEFINED;
+
 public interface AfonUserProvider {
 
 
@@ -10,19 +12,25 @@ public interface AfonUserProvider {
     }
 
     static AfonUser createUser(String username, String password, String email) {
-        return new AfonUser(username, password, email, null, "undefined", "undefined");
+        return createUser(username, password, email, null, UNDEFINED, UNDEFINED);
     }
 
     static AfonUser createUser(String username, String password, String email, String slug) {
-        return new AfonUser(username, password, email, slug, "undefined", "undefined");
+        return createUser(username, password, email, slug, UNDEFINED, UNDEFINED);
     }
 
     static AfonUser createUser(String username, String password, String email, String slug, String firstName, String lastName) {
-        return new AfonUser(username, password, email, slug, firstName, lastName);
+        return createUser(username, password, email, slug, firstName, lastName, UNDEFINED);
+    }
+
+    static AfonUser createUser(String username, String password, String email, String slug, String firstName, String lastName, String catalogs) {
+        return new AfonUser(username, password, email, slug, firstName, lastName, catalogs);
     }
 
     static AfonUser createUser(String... fields) {
-        if ( fields.length == 6){
+        if ( fields.length == 7) {
+            return createUser(fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6]);
+        } else if ( fields.length == 6){
             return createUser(fields[0], fields[1], fields[2], fields[3], fields[4], fields[5]);
         } else if ( fields.length == 4 ){
             return createUser(fields[0], fields[1], fields[2], fields[3]);
@@ -36,6 +44,8 @@ public interface AfonUserProvider {
     }
 
     List<AfonUser> getUsers();
+
+    List<String> getUserNames();
 
     AfonUser getUser(String username);
 }
