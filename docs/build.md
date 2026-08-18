@@ -34,6 +34,21 @@ cd afon-core
 
 See [acceptance tests](acceptance_tests.md) for more details.
 
+### Afon home
+
+The Afon home can be set via the `--home` option or via env variable:
+
+- `AFON_HOME`: the Afon home dir, defaulting to $HOME/.afon.
+
+### Logging 
+
+The script supports two different loggings, one to file and one to console.  
+
+The logging levels can be set via the `--logging` and `--logging-console` options or via env variables:
+
+- `AFON_LOGGING`: the file logging level, defaulting to INFO.
+- `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to OFF.
+
 ### Generated docs
 
 The docs related to the operations (in module `afon-ops`) are generated and kept in sync as part of the build.  
