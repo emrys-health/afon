@@ -16,7 +16,7 @@ import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 /**
  * You may need to register some data in Polaris to run this.
  * If so, try running something like:
- * mvn compile -Dexec.mainClass=health.emrys.afon.core.configuration.LocalPolarisRegisterMain -Dexec.args="AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click" exec:java
+ * mvn compile -Dexec.mainClass=health.emrys.afon.ops.RegisterPolarisTableMain -Dexec.args="AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click" exec:java
  */
 public class KeyCloakSparkConnect {
 
