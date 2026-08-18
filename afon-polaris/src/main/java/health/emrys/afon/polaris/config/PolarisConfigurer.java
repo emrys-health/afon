@@ -2,7 +2,6 @@ package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.catalogs.JsonSerialiser;
 import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
@@ -109,12 +108,6 @@ public class PolarisConfigurer {
     public HttpResponse[] configureCatalog(CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
         String accessToken = client.getAccessToken();
         logger.info("Access token {}", accessToken);
-        return configureCatalog(config, accessToken);
-    }
-
-    public HttpResponse[] configureCatalog(
-            CloudConfigForPolaris config,
-            String accessToken) throws IOException, IncorrectConfigException {
         String warehouseName = config.warehouseName();
         client.delete(catalogsURI(warehouseName), accessToken); // this failing is expected if there is no catalog
         HttpResponse[] responses = new HttpResponse[]{
@@ -135,7 +128,7 @@ public class PolarisConfigurer {
             String accessToken,
             String principalName) throws IncorrectConfigException, IOException {
         String uri = principalsURI();
-        PolarisSerialiser serialiser = new PolarisSerialiser(new JsonSerialiser());
+        PolarisSerialiser serialiser = new PolarisSerialiser();
         String json = serialiser.principalCreation(principalName);
         if (isFailure(deletePrincipalIfPresent(accessToken, principalName))) {
             logger.warn("Could not delete principal {}", principalName);

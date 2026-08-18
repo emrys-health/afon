@@ -13,9 +13,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.KC_HOSTNAME;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.tokenEndpoint;
+import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -26,12 +27,12 @@ import static org.slf4j.LoggerFactory.getLogger;
  *
  * Get the token with:
  * <pre>
- curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token -H "Content-Type: application/x-www-form-urlencoded" -d grant_type=client_credentials -d client_id=<polaris_id> -d client_secret=<polaris_secret></client_secret>
+ curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token -H "Content-Type: application/x-www-form-urlencoded" -d grant_type=client_credentials -d client_id=<polaris_id> -d client_secret=<polaris_secret>
  * </pre>
  *
  * Validate with:
  * <pre>
- curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token/introspect -H "Content-Type: application/x-www-form-urlencoded" -d token=$POLARIS_TOKEN  -d client_id=<polaris_id> -d client_secret=<polaris_secret> | jq
+ curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token/introspect -H "Content-Type: application/x-www-form-urlencoded" -d token=<polaris_token>  -d client_id=<polaris_id> -d client_secret=<polaris_secret> | jq
  * </pre>
  */
 public class KeyCloakPolarisRestClient extends PolarisRestClient {
@@ -50,17 +51,23 @@ public class KeyCloakPolarisRestClient extends PolarisRestClient {
     private final String keyCloakTokenUri;
 
     KeyCloakPolarisRestClient(Properties properties) {
-        super(properties, "http");
+        super(format("%s://%s", "http", POLARIS_ENDPOINT.getValueFrom(properties)),
+                     POLARIS_ID.getValueFrom(properties),
+                     POLARIS_SECRET.getValueFrom(properties));
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
     KeyCloakPolarisRestClient(String polarisHost, Properties properties) {
-        super(polarisHost, properties);
+        super(format("%s://%s", protocolFor(polarisHost), polarisHost),
+                     POLARIS_ID.getValueFrom(properties),
+                     POLARIS_SECRET.getValueFrom(properties));
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
     KeyCloakPolarisRestClient(Properties properties, String protocol) {
-        super(properties, protocol);
+        super(format("%s://%s", protocol, POLARIS_ENDPOINT.getValueFrom(properties)),
+                     POLARIS_ID.getValueFrom(properties),
+                     POLARIS_SECRET.getValueFrom(properties));
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 

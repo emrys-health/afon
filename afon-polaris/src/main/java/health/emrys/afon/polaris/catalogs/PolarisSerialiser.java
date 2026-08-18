@@ -11,6 +11,10 @@ public class PolarisSerialiser {
 
     private final JsonSerialiser jsonSerialiser;
 
+    public PolarisSerialiser(){
+        this(new JsonSerialiser());
+    }
+
     public PolarisSerialiser(JsonSerialiser jsonSerialiser) {
         this.jsonSerialiser = jsonSerialiser;
     }
@@ -57,7 +61,7 @@ public class PolarisSerialiser {
                      );
     }
 
-    protected String toJson(Object object) throws IncorrectConfigException {
+    public String toJson(Object object) throws IncorrectConfigException {
         try {
             return jsonSerialiser.toJson(object);
         } catch (JsonProcessingException e) {
