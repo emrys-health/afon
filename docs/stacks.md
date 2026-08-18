@@ -23,8 +23,8 @@ To deploy a stack, we use the ops.Deploy*Main classes, e.g.:
 
 ```shell
 ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain
-./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain
-./afon.sh -a exec --exec-class ops.DeployGcpPolarisMain
+./afon.sh -a exec --exec-class ops.DeployAzurePolarisStackMain
+./afon.sh -a exec --exec-class ops.DeployGcpPolarisStackMain
 ```
 
 The credentials in the cloud-specific env properties in [config dir](configuration.md) are used by the deployed Polaris instance.
@@ -50,14 +50,14 @@ Steps executed:
 ### Deploy only Polaris to Azure
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain  
+./afon.sh -a exec --exec-class ops.DeployAzurePolarisStackMain  
 ```
 Steps: `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
 
 ### Deploy only Polaris to GCP
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployGcpPolarisMain  
+./afon.sh -a exec --exec-class ops.DeployGcpPolarisStackMain  
 ```
 Steps: `clean_gcp` → `gcp_polaris` → `wait_on_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
 
@@ -206,10 +206,10 @@ This is noted as a future improvement in the project.
 ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain 
 
 # Azure Polaris (standalone)
-./afon.sh -a exec --exec-class ops.DeployAzurePolarisMain
+./afon.sh -a exec --exec-class ops.DeployAzurePolarisStackMain
 
 # GCP Polaris (standalone)
-./afon.sh -a exec --exec-class ops.DeployGcpPolarisMain 
+./afon.sh -a exec --exec-class ops.DeployGcpPolarisStackMain 
 
 # Cross-cloud external catalogs (AWS + Azure federation)
 ./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain 

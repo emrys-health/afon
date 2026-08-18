@@ -7,22 +7,22 @@ import health.emrys.afon.ops.steps.StepsProvider;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCloud.GCP;
+import static health.emrys.afon.config.AfonCloud.AWS;
 
-public class DeployGcpPolarisMain implements StepsProvider {
+public class DeployAwsPolarisStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            stepOperations.deleteStack(GCP),
-            stepOperations.deployPolarisIn(GCP),
-            stepOperations.waitForPolarisIn(GCP),
-            stepOperations.initializeAllCatalogsIn(GCP)
+            stepOperations.deleteStack(AWS),
+            stepOperations.deployPolarisIn(AWS),
+            stepOperations.waitForPolarisIn(AWS),
+            stepOperations.initializeAllCatalogsIn(AWS)
                       );
     }
 
     public static void main(String[] args) {
-        new StepRunner().runUsing(new DeployGcpPolarisMain(), args);
+        new StepRunner().runUsing(new DeployAwsPolarisStackMain(), args);
     }
 
 }
