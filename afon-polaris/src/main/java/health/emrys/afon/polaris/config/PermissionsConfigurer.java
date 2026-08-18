@@ -30,7 +30,7 @@ public class PermissionsConfigurer {
         String principalRoleName,
         String catalogRoleName) throws IOException, IncorrectConfigException {
         logger.info("Associating {} with catalog role {} in catalog {}", principalRoleName, catalogRoleName, warehouseName);
-        String uri  = associateRolesURI(principalRoleName, warehouseName);
+        String uri  = catalogeRolesURI(principalRoleName, warehouseName);
         String json = serialiser.catalogRoleCreation(catalogRoleName);
         return client.putJsonCall(uri, json, accessToken);
     }
@@ -82,7 +82,7 @@ public class PermissionsConfigurer {
         String principalName,
         String principalRoleName) throws IncorrectConfigException, IOException {
         logger.info("Associated user {} with role {}", principalName, principalRoleName);
-        String uri  = getPrincipalToRolesURI(principalName);
+        String uri  = PolarisConfigurer.principalRolesURI(principalName);
         String json = serialiser.principalRoleCreation(principalRoleName);
         return client.putJsonCall(uri, json, accessToken);
     }

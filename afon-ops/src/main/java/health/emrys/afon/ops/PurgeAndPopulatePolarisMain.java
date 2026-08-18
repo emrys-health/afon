@@ -52,7 +52,7 @@ public class PurgeAndPopulatePolarisMain {
         AfonCloud warehouse,
         String namespace) throws IOException, ParseException {
         logger.info("Attempting to delete tables from {}.{}", warehouse, namespace);
-        String url = listTables(warehouse.toString(), namespace);
+        String url = tablesURI(warehouse.toString(), namespace);
         List<HttpResponse> responses = new ArrayList<>();
         for (JsonNode node : getAll(url, "identifiers")) {
             String table = node.get("name").toString();
@@ -92,7 +92,7 @@ public class PurgeAndPopulatePolarisMain {
     private void purgeRecursivelyForAllCatalogs(String domainName) {
         for (AfonCloud warehouse : List.of(AZURE, AWS, GCP)) {
             try {
-                for (JsonNode namespaces : getAll(namespaceURI(warehouse.toString()), "namespaces")) {
+                for (JsonNode namespaces : getAll(namespacesURI(warehouse.toString()), "namespaces")) {
                     if (namespaces.isArray()) {
                         for (JsonNode namespace : namespaces) {
                             String namespaceName = namespace.textValue();

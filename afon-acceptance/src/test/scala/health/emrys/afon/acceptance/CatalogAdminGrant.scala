@@ -34,7 +34,7 @@ class CatalogAdminGrant(test: GivenWhenThen,
   override def apply(): Any = {
     if (noisy) Given(s"a Polaris endpoint at ${client.getEndpoint}")
     val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
-    val uri           = getCatalogAdminGrantsURI(warehouseName)
+    val uri           = catalogRolesAdminGrantsURI(warehouseName)
     val json          = serialiser.catalogAdminGrants
     if (noisy) When(s"we call '$uri' with payload:\n$json")
     val response      = client.putJsonCall(uri, json, accessToken)

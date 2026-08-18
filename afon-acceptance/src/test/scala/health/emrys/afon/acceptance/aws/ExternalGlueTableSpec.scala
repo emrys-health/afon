@@ -38,7 +38,7 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
       )}")
 
       val json: String = config.catalogConfig()
-      val uri: String  = PolarisConfigurer.getCreateCatalogURI
+      val uri: String  = PolarisConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
       val response = client.postJsonCall(

@@ -3,7 +3,7 @@ package health.emrys.afon.acceptance
 import health.emrys.afon.acceptance.SparkHelper.spark
 import health.emrys.afon.config.AfonCloud
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
-import health.emrys.afon.polaris.config.PolarisConfigurer.getCreateCatalogURI
+import health.emrys.afon.polaris.config.PolarisConfigurer.catalogsURI
 import org.scalatest.GivenWhenThen
 import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
@@ -23,7 +23,7 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
 
   "Polaris" should {
     "be able to host a catalog that has a bucket it does not have access to" in {
-      val uri = getCreateCatalogURI
+      val uri = catalogsURI
       Given(s"an admin has set up the environment with:\n" + readEnvSetup())
       val json = config.catalogConfig
       When(s"we call $uri with payload:\n$json")

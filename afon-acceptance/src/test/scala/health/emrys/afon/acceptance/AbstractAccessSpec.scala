@@ -10,7 +10,7 @@ import health.emrys.afon.ops.smoke.TrinoConnectionSmoke
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
 import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
 import health.emrys.afon.polaris.config.PolarisConfigurer
-import health.emrys.afon.polaris.config.PolarisConfigurer.{getCreateCatalogURI, namespaceURI, tableURI}
+import health.emrys.afon.polaris.config.PolarisConfigurer.{catalogsURI, namespaceURI, tableURI}
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.KeyCloakProvider
 import org.apache.polaris.core.admin.model.Catalog
@@ -37,7 +37,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     val client      = AcceptanceTestConfig.instance.getPolarisAdminClient
     val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
     "be told about the catalog" in {
-      val uri = getCreateCatalogURI
+      val uri = catalogsURI
       Given(s"a Polaris endpoint at ${client.getEndpoint}")
       val json = config.catalogConfig
       When(s"we call $uri as user '${client.getClientId}' with payload:\n$json")
@@ -51,7 +51,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     "associate properties with catalog" in {
       Given(s"the catalog has a metadata property '$METADATA_KEY'")
       assert(config.createCatalog().getProperties.containsKey(METADATA_KEY))
-      val uriGet = s"${PolarisConfigurer.getCreateCatalogURI}/${config.warehouseName()}"
+      val uriGet = s"${PolarisConfigurer.catalogsURI}/${config.warehouseName()}"
       When(s"we call GET at $uriGet and deserialize the response")
       val response = client.getCall(uriGet, accessToken)
       val entity = new String(response.getEntity.getContent.readAllBytes())
