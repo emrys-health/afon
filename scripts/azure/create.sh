@@ -110,6 +110,6 @@ if [ -n "$APP_SECRET_RESET" ]; then
   echo "AZURE_CLIENT_SECRET=<password>"
   az ad app credential reset --id $APP_ID
 else
-  echo "- Not resetting app credentials, as APP_RESET env is not set."
+  echo "- Not resetting app credentials, as APP_SECRET_RESET is not set."
 fi
 
