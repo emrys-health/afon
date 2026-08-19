@@ -9,8 +9,8 @@ for FILE in $CONFIG_FILES ; do {
   echo "$FILE"
   TEMPLATE=$AFON_ROOT/templates/config/$FILE
   CONFIG_FILE=$CONFIG_DIR/$FILE
-  if [ -z $CONFIG_FILE ]; then
-     echo "Missing config file $FILE in $CONFIG_DIR"
+  if [ ! -f $CONFIG_FILE ]; then
+     echo "Missing: $FILE"
   fi
   for KEY in $(grep '=' $TEMPLATE | grep -v ^\# | grep -e ^[A-Z] | perl -pe s/=.*//g) ; do {
     grep ^$KEY= $CONFIG_FILE > /dev/null || echo "no key $KEY" ;
