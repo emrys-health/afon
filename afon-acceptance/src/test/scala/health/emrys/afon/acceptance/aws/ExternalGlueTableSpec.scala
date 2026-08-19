@@ -5,7 +5,7 @@ import health.emrys.afon.acceptance.tags.{Aws, External}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant, CatalogRoles}
 import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
 import health.emrys.afon.config.FilePropertyProvider
-import health.emrys.afon.polaris.catalogs.GlueCloudConfigForPolaris
+import health.emrys.afon.polaris.catalogs.GlueAwsPolarisCatalog
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
@@ -25,9 +25,9 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
     val properties        = new FilePropertyProvider().getProperties
     val glueCatalogName   = GLUE_CATALOG_NAME.getValueFrom(properties)
     val externalBucket    = AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)
-    val config            = new GlueCloudConfigForPolaris(properties)
-    val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(config.warehouseName()))
-    val catalogRoles      = new CatalogRoles(this, config, Some(config.warehouseName))
+    val glueCatalog       = new GlueAwsPolarisCatalog(properties)
+    val grantCatalogAdmin = new CatalogAdminGrant(this, glueCatalog, Some(glueCatalog.catalogName()))
+    val catalogRoles      = new CatalogRoles(this, glueCatalog, Some(glueCatalog.catalogName))
     val tableName         = "DatumAccTest2"
     val sparkNamespace    = "ph_glue_iceberg_db"
     val awsRegion         = AWS_REGION.getValueFrom(properties)
@@ -37,7 +37,7 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
         sparkNamespace, tableName, awsRegion, externalBucket
       )}")
 
-      val json: String = config.catalogConfig()
+      val json: String = glueCatalog.catalogConfig()
       val uri: String  = PolarisConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 

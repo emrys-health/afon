@@ -18,13 +18,13 @@ public abstract class AbstractPolarisConfiguration {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractPolarisConfiguration.class);
 
-    protected static final Map<AfonCloud, Function<Properties, CloudConfigForPolaris>>
+    protected static final Map<AfonCloud, Function<Properties, PolarisCatalog>>
                                       CLOUD_TO_PROVIDER = Map.of(
-        AfonCloud.AWS, AwsCloudConfigForPolaris::new,
-        AfonCloud.AZURE, AzureCloudConfigForPolaris::new,
-        AfonCloud.GCP, GoogleCloudConfigForPolaris::new,
-        AfonCloud.AZURE_EXTERNAL, ExternalAzureCloudConfigForPolaris::new,
-        AfonCloud.GCP_EXTERNAL, ExternalGcpCloudConfigForPolaris::new
+        AfonCloud.AWS, AwsPolarisCatalog::new,
+        AfonCloud.AZURE, AzurePolarisCatalog::new,
+        AfonCloud.GCP, GcpPolarisCatalog::new,
+        AfonCloud.AZURE_EXTERNAL, AzureExternalPolarisCatalog::new,
+        AfonCloud.GCP_EXTERNAL, GcpExternalPolarisCatalog::new
                                                                 );
     protected final Properties properties;
     private final ConfigurablePolarisClient polarisClient;
@@ -64,15 +64,15 @@ public abstract class AbstractPolarisConfiguration {
     }
 
     public List<HttpResponse> initialize(AfonCloud cloud, Properties properties) throws IncorrectConfigException, IOException {
-        CloudConfigForPolaris cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
-        return initializePolaris(new CloudConfigForPolaris[]{cloudConfig});
+        PolarisCatalog cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
+        return initializePolaris(new PolarisCatalog[]{cloudConfig});
     }
 
     public List<HttpResponse> initializePolaris() throws IncorrectConfigException, IOException {
         return checkResponses(polarisClient.configureAllCatalogs(getCredentials()));
     }
 
-    public List<HttpResponse> initializePolaris(CloudConfigForPolaris[] configs) throws IncorrectConfigException, IOException {
+    public List<HttpResponse> initializePolaris(PolarisCatalog[] configs) throws IncorrectConfigException, IOException {
         return checkResponses(polarisClient.configureCatalogs(getCredentials(), configs));
     }
 

@@ -11,12 +11,12 @@ import static health.emrys.afon.config.AfonProperty.AWS_REGION;
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 
-public class ExternalAwsCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
+public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
     private final String bucketUrl;
     private final String roleArn;
     private final String region;
 
-    public ExternalAwsCloudConfigForPolaris(Properties properties) {
+    public AwsExternalPolarisCatalog(Properties properties) {
         super(properties);
         this.bucketUrl = bucketToUrl(AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties));
         this.roleArn = AWS_S3_ROLE_ARN.getValueFrom(properties);
@@ -24,32 +24,32 @@ public class ExternalAwsCloudConfigForPolaris extends ExternalCloudConfigForPola
     }
 
     @Override
-    protected String getRemoteCatalogName() {
+    protected String remoteCatalogName() {
         return AWS.toString();
     }
 
     @Override
-    protected List<String> getScopes() {
+    protected List<String> scopes() {
         return List.of();
     }
 
     @Override
-    protected @NonNull String getEndpoint() {
+    protected @NonNull String endpoint() {
         return "https://emryspolaris.click";
     }
 
     @Override
-    protected @NonNull String getBucketUri() {
+    protected @NonNull String bucketUri() {
         return bucketUrl;
     }
 
     @Override
-    protected @NonNull StorageConfigInfo getStorageConfigInfo() {
+    protected @NonNull StorageConfigInfo storageConfigInfo() {
         return AwsUtils.getStorageConfigInfo(roleArn, bucketUrl, region);
     }
 
     @Override
-    public String warehouseName() {
+    public String catalogName() {
         return AWS + "_EXTERNAL";
     }
 }

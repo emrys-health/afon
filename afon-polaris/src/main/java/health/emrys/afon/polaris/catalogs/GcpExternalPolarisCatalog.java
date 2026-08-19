@@ -14,38 +14,38 @@ import static health.emrys.afon.config.AfonCloud.GCP_EXTERNAL;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum.GCS;
 
-public class ExternalGcpCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
+public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
     private final String bucket;
     private final String serviceAccount;
 
-    public ExternalGcpCloudConfigForPolaris(Properties properties) {
+    public GcpExternalPolarisCatalog(Properties properties) {
         super(properties);
         this.bucket         = "gs://" + GCP_BUCKET_NAME.getValueFrom(properties);
         this.serviceAccount = GCP_SERVICE_ACCOUNT.getValueFrom(properties);
     }
 
     @Override
-    protected String getRemoteCatalogName() {
+    protected String remoteCatalogName() {
         return GCP.toString();
     }
 
     @Override
-    protected List<String> getScopes() {
+    protected List<String> scopes() {
         return List.of(OAUTH_SCOPE);
     }
 
     @Override
-    protected @NonNull String getEndpoint() {
+    protected @NonNull String endpoint() {
         return "https://emryspolarisgcp.click";
     }
 
     @Override
-    protected @NonNull String getBucketUri() {
+    protected @NonNull String bucketUri() {
         return bucket;
     }
 
     @Override
-    protected @NonNull StorageConfigInfo getStorageConfigInfo() {
+    protected @NonNull StorageConfigInfo storageConfigInfo() {
         return GcpStorageConfigInfo
             .builder()
             .setGcsServiceAccount(serviceAccount)
@@ -55,7 +55,7 @@ public class ExternalGcpCloudConfigForPolaris extends ExternalCloudConfigForPola
     }
 
     @Override
-    public String warehouseName() {
+    public String catalogName() {
         return GCP_EXTERNAL.toString();
     }
 }

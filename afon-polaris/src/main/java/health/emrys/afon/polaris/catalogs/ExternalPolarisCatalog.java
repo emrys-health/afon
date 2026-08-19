@@ -10,55 +10,61 @@ import java.util.Properties;
 
 import static health.emrys.afon.polaris.config.PolarisConfigurer.tokensURI;
 
-abstract public class ExternalCloudConfigForPolaris extends CloudConfigForPolaris {
+abstract public class ExternalPolarisCatalog extends PolarisCatalog {
     private final @NonNull String clientId;
     private final @NonNull String secret;
 
-    protected ExternalCloudConfigForPolaris(Properties properties) {
+    protected ExternalPolarisCatalog(Properties properties) {
         clientId                = AfonProperty.POLARIS_ID.getValueFrom(properties);
         secret                  = AfonProperty.POLARIS_SECRET.getValueFrom(properties);
     }
+
     @Override
     public String catalogConfig() throws IncorrectConfigException {
-        OAuthClientCredentialsParameters cnxnParams = OAuthClientCredentialsParameters
+        Catalog catalog = createCatalog();
+        return toJson(catalog);
+    }
+
+    protected @NonNull Catalog createCatalog() {
+        OAuthClientCredentialsParameters credentialsParameters = OAuthClientCredentialsParameters
             .builder()
             .setAuthenticationType(AuthenticationParameters.AuthenticationTypeEnum.OAUTH)
             .setClientId(clientId)
             .setClientSecret(secret)
-            .setTokenUri(tokensURI(getEndpoint()))
-            .setScopes(getScopes())
+            .setTokenUri(tokensURI(endpoint()))
+            .setScopes(scopes())
             .build();
 
         CatalogProperties bucketProperties = CatalogProperties
             .builder()
-            .addProperty("warehouse", getRemoteCatalogName()) // corresponds to org.apache.iceberg.CatalogProperties.WAREHOUSE_LOCATION)
-            .setDefaultBaseLocation(getBucketUri())
+            .addProperty("warehouse", remoteCatalogName()) // corresponds to org.apache.iceberg.CatalogProperties.WAREHOUSE_LOCATION)
+            .setDefaultBaseLocation(bucketUri())
             .build();
 
         ConnectionConfigInfo connectionInfo = new ConnectionConfigInfo(
             ConnectionConfigInfo.ConnectionTypeEnum.ICEBERG_REST,
-            getEndpoint() + "/api/catalog/",
-            cnxnParams,
+            endpoint() + "/api/catalog/",
+            credentialsParameters,
             null,
             Map.of());
 
-        ExternalCatalog catalog =
+        Catalog catalog =
             new ExternalCatalog(
                 connectionInfo,
                 Catalog.TypeEnum.EXTERNAL,
-                warehouseName(),
+                catalogName(),
                 bucketProperties,
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 null,
-                getStorageConfigInfo());
-        return toJson(catalog);
+                storageConfigInfo());
+        return catalog;
     }
 
-    protected abstract String getRemoteCatalogName();
+    protected abstract String remoteCatalogName();
 
-    protected abstract List<String> getScopes();
+    protected abstract List<String> scopes();
 
-    protected abstract @NonNull String getEndpoint();
+    protected abstract @NonNull String endpoint();
 
 }

@@ -5,7 +5,7 @@ import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
 import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.FilePropertyProvider
-import health.emrys.afon.polaris.catalogs.{GoogleCloudConfigForPolaris, JsonSerialiser}
+import health.emrys.afon.polaris.catalogs.{GcpPolarisCatalog, JsonSerialiser}
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.iceberg.gcp.auth.GoogleAuthManager
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
@@ -30,7 +30,7 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
   "An external GCP table" should {
 
     val properties        = new FilePropertyProvider().getProperties
-    val config            = new GoogleCloudConfigForPolaris(properties)
+    val config            = new GcpPolarisCatalog(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new health.emrys.afon.acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
     properties.setProperty(GCP_BUCKET_NAME.getName, BUCKET) // bit of a hack - TODO clean me up
@@ -80,7 +80,7 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
   // this gives:
   // Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
   private def externalCatalogJson(properties: Properties): String = {
-    val config = new GoogleCloudConfigForPolaris(properties)
+    val config = new GcpPolarisCatalog(properties)
     val warehouse = f"gs://$BUCKET"
     val bucketProperties = CatalogProperties
       .builder()
@@ -117,7 +117,7 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
         System.currentTimeMillis(),
         System.currentTimeMillis(),
         null,
-        config.getStorageConfigInfo())
+        config.storageConfigInfo())
 
     new JsonSerialiser().toJson(new CreateCatalogRequest(catalog))
   }

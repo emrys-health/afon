@@ -43,7 +43,7 @@ Afon's architecture has four layers:
 
 `PolarisConfigurer` builds on top of the client to provide higher-level operations: creating catalogs with admin grants, configuring principal roles, and creating users.
 
-`CloudConfigForPolaris` is the abstract base for per-cloud configuration. Each cloud has a concrete subclass (e.g. `AwsCloudConfigForPolaris`, `GoogleCloudConfigForPolaris`, `AzureCloudConfigForPolaris`) that knows how to generate the JSON payload for creating a catalog in that cloud, including the correct storage configuration info and bucket URI.
+`PolarisCatalog` is the abstract base for per-cloud catalog configuration. Each cloud has a concrete subclass (e.g. `AwsPolarisCatalog`, `GcpPolarisCatalog`, `AzurePolarisCatalog`) that knows how to generate the JSON payload for creating a catalog in that cloud, including the correct storage configuration info and bucket URI.
 
 ### Spark integration
 

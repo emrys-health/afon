@@ -1,8 +1,6 @@
 package health.emrys.afon.polaris.catalogs;
 
 import health.emrys.afon.config.AfonCloud;
-import org.apache.polaris.core.admin.model.Catalog;
-import org.apache.polaris.core.admin.model.CreateCatalogRequest;
 import org.apache.polaris.core.admin.model.GcpStorageConfigInfo;
 import org.jspecify.annotations.NonNull;
 
@@ -12,12 +10,12 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperty.*;
 import static org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum.GCS;
 
-public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
+public class GcpPolarisCatalog extends PolarisCatalog {
 
     private final String bucket;
     private final String serviceAccount;
 
-    public GoogleCloudConfigForPolaris(Properties properties) {
+    public GcpPolarisCatalog(Properties properties) {
       this.bucket         = toBucketUri(GCP_BUCKET_NAME.getValueFrom(properties));
       this.serviceAccount = GCP_SERVICE_ACCOUNT.getValueFrom(properties);
     }
@@ -26,27 +24,22 @@ public class GoogleCloudConfigForPolaris extends CloudConfigForPolaris {
     return "gs://" + bucketName;
   }
 
-  @Override
-    public String catalogConfig() throws IncorrectConfigException {
-        Catalog catalog = createCatalog(getBucketUri(), getStorageConfigInfo());
-        return toJson(new CreateCatalogRequest(catalog));
-    }
 
-    public GcpStorageConfigInfo getStorageConfigInfo() {
+    public GcpStorageConfigInfo storageConfigInfo() {
         return GcpStorageConfigInfo
             .builder()
             .setGcsServiceAccount(serviceAccount)
             .setStorageType(GCS)
-            .setAllowedLocations(List.of(getBucketUri()))
+            .setAllowedLocations(List.of(bucketUri()))
             .build();
     }
 
     @Override
-    public String warehouseName() {
+    public String catalogName() {
         return AfonCloud.GCP.toString();
     }
 
-    protected String getBucketUri() {
+    protected String bucketUri() {
       return bucket;
     }
 

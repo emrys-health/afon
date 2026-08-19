@@ -2,8 +2,8 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
+import health.emrys.afon.polaris.catalogs.AwsPolarisCatalog;
+import health.emrys.afon.polaris.catalogs.PolarisCatalog;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import health.emrys.afon.polaris.config.PolarisConfigurer;
@@ -19,14 +19,14 @@ public class PolarisConfigurerSmoke {
         Properties properties = new FilePropertyProvider().getProperties();
         PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties, "http");
         PolarisConfigurer configurer = new PolarisConfigurer(client);
-        CloudConfigForPolaris config     = new AwsCloudConfigForPolaris(properties) {
+        PolarisCatalog config     = new AwsPolarisCatalog(properties) {
             @Override
-            public String getBucketUri() {
+            public String bucketUri() {
                 return bucketToUrl(AWS_S3_BUCKET_NAME_TRINO.getValueFrom(properties));
             }
 
             @Override
-            public String warehouseName() {
+            public String catalogName() {
                 return AfonCloud.AWS_TRINO.toString();
             }
         };
