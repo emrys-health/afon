@@ -15,12 +15,12 @@ import java.util.Properties;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 
-public class ConfigurablePolarisClient {
+public class PolarisCatalogClient {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(ConfigurablePolarisClient.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogClient.class);
     private final Properties properties;
 
-    public ConfigurablePolarisClient(Properties properties) {
+    public PolarisCatalogClient(Properties properties) {
         this.properties = properties;
     }
 

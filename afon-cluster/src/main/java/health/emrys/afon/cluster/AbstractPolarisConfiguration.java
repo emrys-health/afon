@@ -2,7 +2,7 @@ package health.emrys.afon.cluster;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.polaris.catalogs.*;
-import health.emrys.afon.polaris.config.ConfigurablePolarisClient;
+import health.emrys.afon.polaris.config.PolarisCatalogClient;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.function.Function;
 
-import static health.emrys.afon.polaris.config.ConfigurablePolarisClient.addPolarisCredentialsTo;
+import static health.emrys.afon.polaris.config.PolarisCatalogClient.addPolarisCredentialsTo;
 
 public abstract class AbstractPolarisConfiguration {
 
@@ -27,11 +27,11 @@ public abstract class AbstractPolarisConfiguration {
         AfonCloud.GCP_EXTERNAL, GcpExternalPolarisCatalog::new
                                                                 );
     protected final Properties properties;
-    private final ConfigurablePolarisClient polarisClient;
+    private final PolarisCatalogClient polarisClient;
 
     protected AbstractPolarisConfiguration(Properties properties) {
         this.properties = properties;
-        this.polarisClient = new ConfigurablePolarisClient(properties);
+        this.polarisClient = new PolarisCatalogClient(properties);
     }
 
     public void configure(String[] args)
