@@ -2,7 +2,7 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.polaris.config.ConfigurablePolarisClient;
+import health.emrys.afon.polaris.config.PolarisCatalogClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,7 +13,7 @@ public class ConfigurePolarisMain {
     public static void main(String[] args) {
         try {
             AfonPropertyProvider provider = new FilePropertyProvider();
-            ConfigurablePolarisClient client = new ConfigurablePolarisClient(provider.getProperties());
+            PolarisCatalogClient client = new PolarisCatalogClient(provider.getProperties());
             if (args.length == 1) { // credentials
                 client.configureAllCatalogs(args[0]);
             }
