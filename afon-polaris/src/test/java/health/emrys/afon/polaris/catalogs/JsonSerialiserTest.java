@@ -1,6 +1,5 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.FilePropertyProvider;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
 import org.junit.jupiter.api.Test;
 
@@ -27,33 +26,4 @@ public class JsonSerialiserTest {
         assertEquals(name, result.getPrincipal().getName());
     }
 
-    @Test
-    public void testOutput() throws Exception {
-        PolarisCatalog catalog = new AwsPolarisCatalog(new FilePropertyProvider().getProperties());
-        String catalogConfig = catalog.catalogConfig();
-        String expectedJson = """
-        {
-          "catalog" : {
-            "type" : "INTERNAL",
-            "name" : "aws",
-            "properties" : {
-              "default-base-location" : "s3://emrys-afon-bucket",
-              "AFON_METADATA" : "Afon catalog for aws"
-            },
-            "createTimestamp" : 1787071750546,
-            "lastUpdateTimestamp" : 1787071750546,
-            "storageConfigInfo" : {
-              "roleArn" : "arn:aws:iam::418295715997:role/S3ReadWriteRoleSA",
-              "allowedKmsKeys" : [ ],
-              "region" : "eu-west-2",
-              "pathStyleAccess" : false,
-              "storageType" : "S3",
-              "allowedLocations" : [ "s3://emrys-afon-bucket" ]
-            }
-          }
-        }""";
-        //System.out.println(catalogConfig);
-        //remove timestamp before comparing
-        //assertThat(catalogConfig).isEqualTo(expectedJson);
-    }
 }

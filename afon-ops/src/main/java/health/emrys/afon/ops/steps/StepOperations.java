@@ -37,45 +37,15 @@ public class StepOperations {
 
     private final StepActions actions;
 
-    private final String awsPolarisDomainName;
-    private final String awsRegion;
-    private final String azurePolarisDomainName;
-    private final String clusterName;
-    private final String gcpPolarisDomainName;
-    private final String awsJupyterDomain;
-    private final String azureJupyterDomain;
-    private final String azureTenantId;
-    private final String azureStorageAccount;
-    private final String azureBucket;
-    private final String azureExternalBucket;
-    private final String kcHostname;
-    private final String polarisId;
-    private final String polarisSecret;
-    private final String userPolarisId;
-    private final String userPolarisSecret;
+    private final AfonPropertyProvider properties;
 
     public StepOperations(StepActions actions) {
         this(actions, new FilePropertyProvider());
     }
 
     public StepOperations(StepActions actions, AfonPropertyProvider properties) {
-        this.actions                = actions;
-        this.clusterName            = properties.getValue(CLUSTER_NAME);
-        this.awsRegion              = properties.getValue(AWS_REGION);
-        this.awsPolarisDomainName   = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
-        this.azurePolarisDomainName = properties.getValue(AZURE_DOMAIN_NAME);
-        this.gcpPolarisDomainName   = properties.getValue(GCP_DOMAIN_NAME);
-        this.awsJupyterDomain       = properties.getValue(AWS_JUPYTER_DOMAIN);
-        this.azureJupyterDomain     = properties.getValue(AZURE_JUPYTER_DOMAIN_NAME);
-        this.azureTenantId          = properties.getValue(AZURE_TENANT_ID);
-        this.azureStorageAccount    = properties.getValue(AZURE_STORAGE_ACCOUNT);
-        this.azureBucket            = properties.getValue(AZURE_BUCKET);
-        this.azureExternalBucket    = properties.getValue(AZURE_EXTERNAL_BUCKET);
-        this.kcHostname             = properties.getValue(KC_HOSTNAME);
-        this.polarisId              = properties.getValue(POLARIS_ID);
-        this.polarisSecret          = properties.getValue(POLARIS_SECRET);
-        this.userPolarisId          = properties.getValue(USER_POLARIS_ID);
-        this.userPolarisSecret      = properties.getValue(USER_POLARIS_SECRET);
+        this.actions = actions;
+        this.properties = properties;
     }
 
     @NonNull
@@ -93,7 +63,7 @@ public class StepOperations {
                                 You may need to run:
                                 
                                 aws eks update-kubeconfig --region %s --name %s
-                                """, awsRegion, clusterName), e);
+                                """, properties.getValue(AWS_REGION), properties.getValue(CLUSTER_NAME)), e);
 
                     }
 
@@ -144,7 +114,7 @@ public class StepOperations {
     public Step purgeForeignCatalogFrom(AfonCloud id) {
         switch (id) {
             case AZURE:
-                return purgeForeignCatalogFrom(AZURE, azurePolarisDomainName);
+                return purgeForeignCatalogFrom(AZURE, properties.getValue(AZURE_DOMAIN_NAME));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);
@@ -175,8 +145,8 @@ public class StepOperations {
                 Properties properties = new Properties();
                 properties.setProperty(
                     AZURE_BUCKET.getName(),
-                    azureExternalBucket);
-                return createForeignCatalogIn(AZURE, azurePolarisDomainName, properties);
+                        this.properties.getValue(AZURE_EXTERNAL_BUCKET));
+                return createForeignCatalogIn(AZURE, this.properties.getValue(AZURE_DOMAIN_NAME), properties);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);
@@ -203,11 +173,11 @@ public class StepOperations {
     public Step initializeAllCatalogsIn(AfonCloud id) {
         switch (id) {
             case AWS:
-                return initializeAllCatalogsIn(awsPolarisDomainName);
+                return initializeAllCatalogsIn(properties.getValue(AWS_POLARIS_DOMAIN_NAME));
             case AZURE:
-                return initializeAllCatalogsIn(azurePolarisDomainName);
+                return initializeAllCatalogsIn(properties.getValue(AZURE_DOMAIN_NAME));
             case GCP:
-                return initializeAllCatalogsIn(gcpPolarisDomainName);
+                return initializeAllCatalogsIn(properties.getValue(GCP_DOMAIN_NAME));
             default:
                 throw new RuntimeException("Unsupported id " + id);
         }
@@ -250,18 +220,18 @@ public class StepOperations {
     private Step waitForPolaris(AfonCloud id) {
         switch (id) {
             case AWS:
-                return actions.waitOnDNS(awsPolarisDomainName);
+                return actions.waitOnDNS(properties.getValue(AWS_POLARIS_DOMAIN_NAME));
             case AZURE:
-                return actions.waitOnDNS(azurePolarisDomainName);
+                return actions.waitOnDNS(properties.getValue(AZURE_DOMAIN_NAME));
             case GCP:
-                return actions.waitOnDNS(gcpPolarisDomainName);
+                return actions.waitOnDNS(properties.getValue(GCP_DOMAIN_NAME));
             default:
                 throw new RuntimeException("Unsupported id " + id);
         }
     }
 
     private Step waitForKeyCloak() {
-        return actions.waitOnDNS(kcHostname);
+        return actions.waitOnDNS(properties.getValue(KC_HOSTNAME));
     }
 
     public Step checkAwsSparkWritingTo(AfonCloud id) {
@@ -283,8 +253,8 @@ public class StepOperations {
             format("local Spark call that talks to AWS Polaris, writing a table to %s in namespace %s", warehouse, namespace),
             namespace,
             SparkTestWriter.class,
-            awsPolarisDomainName,
-            awsJupyterDomain);
+                properties.getValue(AWS_POLARIS_DOMAIN_NAME),
+                properties.getValue(AWS_JUPYTER_DOMAIN));
     }
 
     public @NonNull Step checkSparkWritingViaAwsPolarisToPolarisIn(AfonCloud id) {
@@ -292,11 +262,11 @@ public class StepOperations {
             case AZURE:
                 return sparkTestUsing(
                     AZURE_EXTERNAL,
-                    format("local Spark call that uses %s which defers to %s", awsPolarisDomainName, azurePolarisDomainName),
+                    format("local Spark call that uses %s which defers to %s", properties.getValue(AWS_POLARIS_DOMAIN_NAME), properties.getValue(AZURE_DOMAIN_NAME)),
                     EXTERNAL_NAMESPACE,
                     SparkTestWriter.class,
-                    awsPolarisDomainName,
-                    awsJupyterDomain);
+                        properties.getValue(AWS_POLARIS_DOMAIN_NAME),
+                        properties.getValue(AWS_JUPYTER_DOMAIN));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);
@@ -308,11 +278,11 @@ public class StepOperations {
             case AZURE:
                 return sparkTestUsing(
                     AZURE,
-                    format("local Spark call that uses %s", azurePolarisDomainName),
+                    format("local Spark call that uses %s", properties.getValue(AZURE_DOMAIN_NAME)),
                     EXTERNAL_NAMESPACE,
                     SparkTestWriter.class,
-                    azurePolarisDomainName,
-                    azureJupyterDomain);
+                        properties.getValue(AZURE_DOMAIN_NAME),
+                        properties.getValue(AZURE_JUPYTER_DOMAIN_NAME));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);
@@ -323,11 +293,11 @@ public class StepOperations {
         return sparkTestUsing(
             id, format("read via Spark table `%s.%s.%s` by calling `%s`",
                        id, ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE,
-                       awsPolarisDomainName),
+                        properties.getValue(AWS_POLARIS_DOMAIN_NAME)),
             ACCEPTANCE_TEST_NAMESPACE,
             SparkTestReader.class,
-            awsPolarisDomainName,
-            awsJupyterDomain);
+                properties.getValue(AWS_POLARIS_DOMAIN_NAME),
+                properties.getValue(AWS_JUPYTER_DOMAIN));
     }
 
     private @NonNull Step sparkTestUsing(AfonCloud warehouse,
@@ -351,8 +321,8 @@ public class StepOperations {
 
                 List<String> args = List.of(
                     warehouse.toString(),
-                    userPolarisId,
-                    userPolarisSecret,
+                        properties.getValue(USER_POLARIS_ID),
+                        properties.getValue(USER_POLARIS_SECRET),
                     domainName,
                     namespace);
                 actions.executeMainOf(
@@ -393,10 +363,10 @@ public class StepOperations {
                               )
                               ENABLED = TRUE;
                             """,
-                        awsPolarisDomainName,
+                            properties.getValue(AWS_POLARIS_DOMAIN_NAME),
                         warehouse.toString(),
-                        polarisId,
-                        polarisSecret),
+                            properties.getValue(POLARIS_ID),
+                            properties.getValue(POLARIS_SECRET)),
 
                     format(
                         """              
@@ -445,7 +415,7 @@ public class StepOperations {
                               ENABLED = TRUE
                               STORAGE_ALLOWED_LOCATIONS = ('azure://%s.blob.core.windows.net/%s')
                               AZURE_TENANT_ID='%s';
-                            """, azureBucket, azureStorageAccount, azureStorageAccount, azureBucket, azureTenantId),
+                            """, properties.getValue(AZURE_BUCKET), properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_BUCKET), properties.getValue(AZURE_TENANT_ID)),
 
                     """
                     DROP ICEBERG TABLE IF EXISTS my_azure_iceberg_table ;
@@ -462,7 +432,7 @@ public class StepOperations {
                                   AZURE_TENANT_ID='%s'
                                 )
                               );
-                            """, azureStorageAccount, azureBucket, ACCEPTANCE_TEST_NAMESPACE, azureTenantId),
+                            """, properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_BUCKET), ACCEPTANCE_TEST_NAMESPACE, properties.getValue(AZURE_TENANT_ID)),
 
                     """
                     USE DATABASE SNOWFLAKE_LEARNING_DB;
@@ -493,8 +463,8 @@ public class StepOperations {
     public Step purgeFromAwsPolarisAndRecreateFor(AfonCloud id) {
         switch (id) {
             case AZURE:
-                return purgePolarisFor(AZURE, awsPolarisDomainName, ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE)
-                    .andThen(createCatalogIn(AZURE, awsPolarisDomainName));
+                return purgePolarisFor(AZURE, properties.getValue(AWS_POLARIS_DOMAIN_NAME), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE)
+                    .andThen(createCatalogIn(AZURE, properties.getValue(AWS_POLARIS_DOMAIN_NAME)));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);
@@ -508,7 +478,7 @@ public class StepOperations {
                     "%s/%s*metadata.json",
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
-                String json = actions.azureFirstFile(glob, true, azureBucket, azureStorageAccount); // firstFileInLatestDirectoryMatching(glob);
+                String json = actions.azureFirstFile(glob, true, properties.getValue(AZURE_BUCKET), properties.getValue(AZURE_STORAGE_ACCOUNT)); // firstFileInLatestDirectoryMatching(glob);
                 return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterPolarisTableMain.class);
             case AWS, GCP:
             default:
@@ -526,7 +496,7 @@ public class StepOperations {
                 actions.registerTable(
                     warehouse,
                     jsonMetadataFQN,
-                    awsPolarisDomainName,
+                        properties.getValue(AWS_POLARIS_DOMAIN_NAME),
                     tableName, registerTableMainClass);
             }
         );

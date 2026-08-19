@@ -34,6 +34,19 @@ cd afon-core
 
 See [acceptance tests](acceptance_tests.md) for more details.
 
+### Configuration
+
+The build requires the [configuration](configuration.md) to be setup.
+
+If you want to build with the configuration relative to single cloud:
+
+```shell
+cd afon-core
+./afon.sh -a build -c <cloud> -p -acceptance
+```
+
+**NOTE:** acceptance tests require the configuration for all clouds.
+
 ### Afon home
 
 The Afon home can be set via the `--home` option or via env variable:

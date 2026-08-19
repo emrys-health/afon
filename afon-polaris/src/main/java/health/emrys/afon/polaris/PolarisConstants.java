@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.ConfigConstants.cloudPropertySet;
+import static health.emrys.afon.config.ConfigConstants.cloudPropertyValue;
 
 public class PolarisConstants {
     /**
@@ -36,9 +38,8 @@ public class PolarisConstants {
     public static final Set<AfonProperty> getPolarisProperties(){
         Set<AfonProperty> set = new HashSet<>();
         set.addAll(Set.of(POLARIS_ID, POLARIS_SECRET));
-        String id = System.getProperty("afon.cloud");
-        if ( id != null ){
-            switch ( id ){
+        if ( cloudPropertySet() ){
+            switch ( cloudPropertyValue() ){
                 case "aws":
                     set.addAll(Set.of(AWS_ACCESS_KEY_ID,
                             AWS_SECRET_ACCESS_KEY,

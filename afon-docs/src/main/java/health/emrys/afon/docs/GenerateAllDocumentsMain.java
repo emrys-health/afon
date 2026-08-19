@@ -10,6 +10,8 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
+import static health.emrys.afon.config.ConfigConstants.cloudPropertySet;
+import static health.emrys.afon.config.ConfigConstants.cloudPropertyValue;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class GenerateAllDocumentsMain {
@@ -27,21 +29,42 @@ public class GenerateAllDocumentsMain {
 
     private List<DocumentMetadata> documents() {
         List<DocumentMetadata> documents = new ArrayList<>();
+        String packageName = "health.emrys.afon.docs";
+        logger.info("Scanning classes in package {}", packageName);
         try (ScanResult scanResult = new ClassGraph()
                 .enableClassInfo()
-                .acceptPackages("health.emrys.afon.docs")
+                .acceptPackages(packageName)
                 .scan()) {
 
+            String filter = classNameFilter();
             scanResult.getAllClasses()
                     .filter(info ->
-                            info.getSimpleName().endsWith("Document")
-                                    && !info.isAbstract()
-                    )
+                            !info.isAbstract()
+                                    && info.getSimpleName().endsWith("Document")
+                                    && info.getSimpleName().matches(filter))
                     .forEach(info -> {
+                        logger.info("Found class: {}", info.getSimpleName());
                         documents.add(document(info.loadClass()));
                     });
         }
         return documents;
+    }
+
+    private static @NonNull String classNameFilter() {
+        String filter;
+        if (cloudPropertySet()) {
+            // for a given cloud, only consider the documents with the cloud in the name
+            // but exclude the ViaAws
+            filter = String.format("^(?!.*%s).*%s.*$", "ViaAws", capitalise(cloudPropertyValue()));
+        } else {
+            filter = ".*";
+        }
+        logger.info("Using class name filter: {}", filter);
+        return filter;
+    }
+
+    private static @NonNull String capitalise(String cloud) {
+        return cloud.substring(0, 1).toUpperCase() + cloud.substring(1);
     }
 
     private @NonNull DocumentMetadata document(Class<?> documentClass) {
