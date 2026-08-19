@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.cluster.ClusterUtils
-import health.emrys.afon.config.{AfonUser, AfonUserProvider, FilePropertyProvider, GivenPropertyProvider}
+import health.emrys.afon.config.{AfonUser, AfonUserAcl, AfonUserProvider, FilePropertyProvider, GivenPropertyProvider}
 import health.emrys.afon.ops.OnboardAllUsersMain
 import health.emrys.afon.ops.smoke.TrinoConnectionSmoke
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
@@ -134,12 +134,15 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     val UserName      = "userX"
     val UserPassword  = "password"
     val properties    = AcceptanceTestConfig.instance.getProperties
-    val User          = new AfonUser(UserName, UserPassword, "email@test.com", "slug", "first", "second", "all")
+    val User          = new AfonUser(UserName, UserPassword, "email@test.com", "slug", "first", "second")
+    val UserAcl       = new AfonUserAcl(UserName, "all")
 
     val userProvider = new AfonUserProvider() {
       override def getUsers: util.List[AfonUser] = util.List.of(User)
       override def getUserNames: util.List[String] = util.List.of(User.username())
       override def getUser(UserName: String): AfonUser = User;
+      override def getUserAcls: util.List[AfonUserAcl] = util.List.of(UserAcl)
+      override def isAuthorised(username: String, catalogName: String): Boolean = true
     }
     "agree on the token" in {
       Given("A KeyCloak and Polaris instance")

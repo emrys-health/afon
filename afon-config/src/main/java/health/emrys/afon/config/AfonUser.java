@@ -1,6 +1,5 @@
 package health.emrys.afon.config;
 
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -16,10 +15,8 @@ public record AfonUser(String username,   // for login via KeyCloak
                        String email,      // for user auth across systems via X-Forwarded-Email header stamped by OAuth2-Proxy
                        String slug,       // for user registration in KeyCloak, must be RFC-1123 DNS compliant, therefore cannot use email for the slug
                        String firstName,
-                       String lastName,
-                       String catalogs) {
+                       String lastName){
 
-    public static final String ALL_CATALOGS = "all";
     public static final String UNDEFINED = "undefined";
 
     /**
@@ -60,8 +57,4 @@ public record AfonUser(String username,   // for login via KeyCloak
                 && RFC_1123_PATTERN.matcher(candidate).matches();
     }
 
-    public boolean isAuthorised(String catalogName) {
-         if ( catalogs.equals(ALL_CATALOGS) || catalogs.equals(UNDEFINED) ) return true;
-         return Arrays.asList(catalogs.split(":")).contains(catalogName);
-    }
 }

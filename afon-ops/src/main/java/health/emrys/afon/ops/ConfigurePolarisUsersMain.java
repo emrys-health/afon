@@ -74,7 +74,7 @@ public class ConfigurePolarisUsersMain {
         }
         for (AfonUser user : userProvider.getUsers()) {
             // check if catalogName is authorised for user
-            if ( user.isAuthorised(catalogName) ) {
+            if ( userProvider.isAuthorised(user.username(), catalogName) ) {
                 configureUser(user.username(), catalogName);
             } else {
                 logger.warn("Admin {} could not authorise user {}", adminClientId, user.username());
