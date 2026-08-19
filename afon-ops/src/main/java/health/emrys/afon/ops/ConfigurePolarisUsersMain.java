@@ -30,11 +30,11 @@ public class ConfigurePolarisUsersMain {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigurePolarisUsersMain.class);
     private static final Set<CatalogPrivilege> CATALOG_PRIVILEGES = Set.of(
-        TABLE_READ_DATA,
-        TABLE_WRITE_DATA,
-        NAMESPACE_CREATE,
-        TABLE_CREATE,
-        NAMESPACE_FULL_METADATA);
+            NAMESPACE_CREATE,
+            NAMESPACE_FULL_METADATA,
+            TABLE_CREATE,
+            TABLE_READ_DATA,
+            TABLE_WRITE_DATA);
 
     private final PolarisConfigurer configurer;
     private final PermissionsConfigurer permissions;
