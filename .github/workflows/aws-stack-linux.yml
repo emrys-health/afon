@@ -98,6 +98,7 @@ jobs:
           SECRET_AZURE_PROPERTIES: ${{ secrets.SECRET_AZURE_PROPERTIES }}
           SECRET_GCP_PROPERTIES: ${{ secrets.SECRET_GCP_PROPERTIES }}
           USERS_CSV: ${{ secrets.USERS_CSV }}
+          USERS_ACL_CSV: ${{ secrets.USERS_ACL_CSV }}
         run: |
           set -euo pipefail
           CONFIG_DIR="$AFON_HOME/config"
@@ -127,6 +128,7 @@ jobs:
           write_config secret-azure.properties "$SECRET_AZURE_PROPERTIES"
           write_config secret-gcp.properties   "$SECRET_GCP_PROPERTIES"
           write_config users.csv               "$USERS_CSV"
+          write_config users-acl.csv           "$USERS_ACL_CSV"
 
       - name: Validate afon config
         run: ./afon.sh -a config-validate --home "$AFON_HOME"
