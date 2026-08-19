@@ -12,14 +12,14 @@ class OpsCommandsTest {
 
     @Test
     void resolvesKnownCommandsByKebabCaseName() {
-        assertThat(opsCommands.resolve("configure-polaris")).isEqualTo(health.emrys.afon.ops.ConfigurePolarisMain.class);
+        assertThat(opsCommands.resolve("configure-polaris-catalogs")).isEqualTo(health.emrys.afon.ops.ConfigurePolarisCatalogsMain.class);
         assertThat(opsCommands.resolve("deploy-aws-full-stack")).isEqualTo(health.emrys.afon.ops.DeployAwsFullStackMain.class);
     }
 
     @Test
     void resolvesKnownCommandsByRawClassNameCaseInsensitively() {
-        assertThat(opsCommands.resolve("ConfigurePolarisMain")).isEqualTo(health.emrys.afon.ops.ConfigurePolarisMain.class);
-        assertThat(opsCommands.resolve("configurepolarismain")).isEqualTo(health.emrys.afon.ops.ConfigurePolarisMain.class);
+        assertThat(opsCommands.resolve("ConfigurePolarisCatalogsMain")).isEqualTo(health.emrys.afon.ops.ConfigurePolarisCatalogsMain.class);
+        assertThat(opsCommands.resolve("configurepolariscatalogsmain")).isEqualTo(health.emrys.afon.ops.ConfigurePolarisCatalogsMain.class);
     }
 
     @Test
@@ -30,7 +30,7 @@ class OpsCommandsTest {
     @Test
     void namesListsOnlyKebabCaseFormAndIsSorted() {
         SortedSet<String> names = opsCommands.names();
-        assertThat(names).contains("configure-polaris", "deploy-aws-full-stack", "purge-polaris");
+        assertThat(names).contains("configure-polaris-catalogs", "deploy-aws-full-stack", "purge-polaris");
         assertThat(names).allMatch(name -> name.equals(name.toLowerCase()));
         assertThat(names).isEqualTo(new java.util.TreeSet<>(names));
     }

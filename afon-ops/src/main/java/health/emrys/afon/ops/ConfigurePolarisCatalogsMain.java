@@ -6,9 +6,9 @@ import health.emrys.afon.polaris.config.PolarisCatalogClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ConfigurePolarisMain {
+public class ConfigurePolarisCatalogsMain {
 
-    static final Logger logger = LoggerFactory.getLogger(ConfigurePolarisMain.class);
+    static final Logger logger = LoggerFactory.getLogger(ConfigurePolarisCatalogsMain.class);
 
     public static void main(String[] args) {
         try {
@@ -18,7 +18,7 @@ public class ConfigurePolarisMain {
                 client.configureAllCatalogs(args[0]);
             }
         } catch (Exception e) {
-            logger.error("Error configuring polaris", e);
+            logger.error("Failed configuring polaris catalogs", e);
         }
     }
 
