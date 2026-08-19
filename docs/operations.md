@@ -64,9 +64,6 @@ from any user who has enrolled one - which, with MFA on, is everybody. A batch j
 an authenticator app, so the one-time code is required of interactive logins only; a direct grant is
 protected by its confidential client's secret instead.
 
-Set `KC_MFA_ENABLED=false` in your [configuration](configuration.md) to leave both flows alone. It
-defaults to `true`.
-
 If a user loses their authenticator app, delete their OTP credential in the KeyCloak admin console
 (Users -> the user -> Credentials) and they will be walked through setup again at their next login.
 
