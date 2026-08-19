@@ -1,13 +1,14 @@
 package health.emrys.afon.security.keycloak;
 
 import org.junit.jupiter.api.Test;
+import org.keycloak.authentication.authenticators.browser.OTPFormAuthenticatorFactory;
+import org.keycloak.authentication.authenticators.directgrant.ValidateOTP;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static health.emrys.afon.security.keycloak.KeyCloakMfa.OTP_FORM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,7 +44,7 @@ class KeyCloakMfaTest {
         executions.add(execution(TWO_FA_SUB_FLOW, null, CONDITIONAL, 1, true));
         executions.add(execution(TWO_FA_CONDITION, "conditional-user-configured", REQUIRED, 2, false));
         executions.add(execution(CREDENTIAL_CONDITION, "conditional-credential", REQUIRED, 2, false));
-        executions.add(execution("OTP Form", OTP_FORM, REQUIRED, 2, false));
+        executions.add(execution("OTP Form", OTPFormAuthenticatorFactory.PROVIDER_ID, REQUIRED, 2, false));
         executions.add(execution("WebAuthn Authenticator", "webauthn-authenticator", DISABLED, 2, false));
         executions.add(execution("Recovery Authentication Code Form", "auth-recovery-authn-code-form", DISABLED, 2, false));
         return executions;
@@ -144,7 +145,7 @@ class KeyCloakMfaTest {
         executions.add(execution("Password", "direct-grant-validate-password", REQUIRED, 0, false));
         executions.add(execution(DIRECT_GRANT_OTP_SUB_FLOW, null, CONDITIONAL, 0, true));
         executions.add(execution("Condition - user configured", "conditional-user-configured", REQUIRED, 1, false));
-        executions.add(execution("OTP", KeyCloakMfa.DIRECT_GRANT_OTP, REQUIRED, 1, false));
+        executions.add(execution("OTP", ValidateOTP.PROVIDER_ID, REQUIRED, 1, false));
         return executions;
     }
 
