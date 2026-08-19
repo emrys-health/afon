@@ -1,4 +1,4 @@
-source $CWD/scripts/config/afon-source.sh aws
+source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 aws iam detach-role-policy --role-name S3ReadWriteRole --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
 aws iam delete-role --role-name S3ReadWriteRole
