@@ -25,6 +25,9 @@ class AwsPolarisCatalogNonPermissioned extends AwsPolarisCatalog {
             bucketToUrl(AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS.getValueFrom(properties)),
             AWS_REGION.getValueFrom(properties));
     }
+    public String catalogName() {
+        return "aws_polaris_forbidden";
+    }
 }
 
 public class PolarisCatalogClient {
