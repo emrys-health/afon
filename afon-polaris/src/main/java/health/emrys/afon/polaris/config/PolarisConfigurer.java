@@ -1,6 +1,6 @@
 package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris;
+import health.emrys.afon.polaris.catalogs.PolarisCatalog;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -26,33 +26,33 @@ public class PolarisConfigurer {
         return "/api/management/v1/catalogs";
     }
 
-    public static String catalogsURI(String warehouseName) {
+    public static String catalogsURI(String catalogName) {
         return format(
                 "%s/%s",
                 catalogsURI(),
-                warehouseName);
+                catalogName);
     }
 
-    public static String catalogRolesURI(String warehouseName) {
-        return format("/api/management/v1/catalogs/%s/catalog-roles", warehouseName);
+    public static String catalogRolesURI(String catalogName) {
+        return format("/api/management/v1/catalogs/%s/catalog-roles", catalogName);
     }
 
-    public static String catalogeRolesURI(String roleName, String warehouseName) {
+    public static String catalogeRolesURI(String roleName, String catalogName) {
         return format(
                 "/api/management/v1/principal-roles/%s/catalog-roles/%s",
                 roleName,
-                warehouseName);
+                catalogName);
     }
 
-    public static String catalogRolesGrantURI(String warehouseName, String catalogRole) {
-        return format("/api/management/v1/catalogs/%s/catalog-roles/%s/grants", warehouseName, catalogRole);
+    public static String catalogRolesGrantURI(String catalogName, String catalogRole) {
+        return format("/api/management/v1/catalogs/%s/catalog-roles/%s/grants", catalogName, catalogRole);
     }
 
-    public static String catalogRolesAdminGrantsURI(String warehouseName) {
+    public static String catalogRolesAdminGrantsURI(String catalogName) {
         return format(
                 "%s/%s/catalog-roles/catalog_admin/grants",
                 catalogsURI(),
-                warehouseName);
+                catalogName);
     }
 
     public static String principalsURI() {
@@ -70,27 +70,27 @@ public class PolarisConfigurer {
     }
 
     public static String namespacesURI(
-            String warehouseName) {
-        return format("/api/catalog/v1/%s/namespaces/", warehouseName);
+            String catalogName) {
+        return format("/api/catalog/v1/%s/namespaces/", catalogName);
     }
 
     public static String namespaceURI(
-            String warehouseName,
+            String catalogName,
             String namespace) {
-        return format("%s/%s", namespacesURI(warehouseName), namespace);
+        return format("%s/%s", namespacesURI(catalogName), namespace);
     }
 
-    public static String tablesURI(String warehouseName, String namespace) {
-        return tableURI(warehouseName, namespace, "");
+    public static String tablesURI(String catalogName, String namespace) {
+        return tableURI(catalogName, namespace, "");
     }
 
     public static String tableURI(
-            String warehouseName,
+            String catalogName,
             String namespace,
             String tableName) {
         return format(
                 "/api/catalog/v1/%s/namespaces/%s/tables/%s",
-                warehouseName, namespace, tableName);
+                catalogName, namespace, tableName);
     }
 
     public PolarisConfigurer(PolarisRestClient client) {
@@ -105,19 +105,19 @@ public class PolarisConfigurer {
         return format("%s/api/catalog/v1/oauth/tokens", endpoint);
     }
 
-    public HttpResponse[] configureCatalog(CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
+    public HttpResponse[] configureCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
         String accessToken = client.getAccessToken();
         logger.info("Access token {}", accessToken);
-        String warehouseName = config.warehouseName();
-        client.delete(catalogsURI(warehouseName), accessToken); // this failing is expected if there is no catalog
+        String catalogName = catalog.catalogName();
+        client.delete(catalogsURI(catalogName), accessToken); // this failing is expected if there is no catalog
         HttpResponse[] responses = new HttpResponse[]{
                 client.post(
                         catalogsURI(),
-                        config.catalogConfig(),
+                        catalog.catalogConfig(),
                         accessToken),
                 client.put(
-                        catalogRolesAdminGrantsURI(warehouseName),
-                        config.getSerialiser().catalogAdminGrants(),
+                        catalogRolesAdminGrantsURI(catalogName),
+                        catalog.catalogAdminGrants(),
                         accessToken),
         };
         logIfProblems(responses);

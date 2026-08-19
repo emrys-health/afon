@@ -7,8 +7,8 @@ import health.emrys.afon.cluster.ClusterUtils
 import health.emrys.afon.config.{AfonUser, AfonUserProvider, FilePropertyProvider, GivenPropertyProvider}
 import health.emrys.afon.ops.OnboardAllUsersMain
 import health.emrys.afon.ops.smoke.TrinoConnectionSmoke
-import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
-import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris.METADATA_KEY
+import health.emrys.afon.polaris.catalogs.PolarisCatalog
+import PolarisCatalog.METADATA_KEY
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import health.emrys.afon.polaris.config.PolarisConfigurer.{catalogsURI, namespaceURI, tableURI}
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
@@ -21,7 +21,7 @@ import java.util
 
 abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 
-  def config: CloudConfigForPolaris
+  def config: PolarisCatalog
 
   val GrantCatalogAdmin = new CatalogAdminGrant(this, config)
   val CatalogRoles      = new CatalogRoles(this, config)
@@ -42,7 +42,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val json = config.catalogConfig
       When(s"we call $uri as user '${client.getClientId}' with payload:\n$json")
       client.post(uri, json, accessToken)
-      val uriGet = s"/api/catalog/v1/config?warehouse=${config.warehouseName()}"
+      val uriGet = s"/api/catalog/v1/config?warehouse=${config.catalogName()}"
       Then(s"Polaris acknowledges the catalog when we call $uriGet")
       val response = client.get(uriGet, accessToken)
       assert(response.getCode == 200)
@@ -50,8 +50,8 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
     "associate properties with catalog" in {
       Given(s"the catalog has a metadata property '$METADATA_KEY'")
-      assert(config.createCatalog().getProperties.containsKey(METADATA_KEY))
-      val uriGet = s"${PolarisConfigurer.catalogsURI}/${config.warehouseName()}"
+      assert(config.catalogContainsKey(METADATA_KEY))
+      val uriGet = s"${PolarisConfigurer.catalogsURI}/${config.catalogName()}"
       When(s"we call GET at $uriGet and deserialize the response")
       val response = client.get(uriGet, accessToken)
       val entity = new String(response.getEntity.getContent.readAllBytes())
@@ -83,7 +83,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val sql = s"CREATE NAMESPACE IF NOT EXISTS $FULL_NAMESPACE"
       When(s"we create a namespace with SQL '$sql'")
       spark.sql(sql)
-      val uri = namespaceURI(config.warehouseName(), namespace)
+      val uri = namespaceURI(config.catalogName(), namespace)
       Then(s"Polaris acknowledges the namespace exists when call as user '${client.getClientId}' '$uri")
       val response = client.get(uri, accessToken)
       assert(response.getCode == 200)
@@ -97,8 +97,8 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       assert(output.collect().size == NUM_ROWS)
     }
     "be registered with Polaris" in {
-      Given(s"we have registered the table in catalog '${config.warehouseName()}', namespace '$namespace'")
-      val uriGet = tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
+      Given(s"we have registered the table in catalog '${config.catalogName()}', namespace '$namespace'")
+      val uriGet = tableURI(config.catalogName(), namespace, tableName) + "?snapshots=all"
       When(s"we call Polaris at $uriGet")
       val response = client.get(uriGet, accessToken)
       Then("Polaris acknowledges the table has been created")
@@ -146,9 +146,9 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       assert(ContainerHelper.instance.startKeyCloak(properties) != null)
       assert(ContainerHelper.instance.startPolaris(properties) != null)
 
-      When(s"we onboard a user '$User' for catalog ${config.warehouseName()}' in Polaris")
+      When(s"we onboard a user '$User' for catalog ${config.catalogName()}' in Polaris")
       val onboarding = new OnboardAllUsersMain(userProvider, new GivenPropertyProvider(properties), properties)
-      onboarding.configurePolaris(config.warehouseName())
+      onboarding.configurePolaris(config.catalogName())
       And("in KeyCloak")
       onboarding.configureKeyCloak("NotUsed.com")
 
@@ -156,7 +156,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val keyCloakProvider = new KeyCloakProvider("localhost", UserName, UserPassword)
       assert(keyCloakProvider.getToken(KEYCLOAK_REALM) != null)
 
-      val uriGet = tableURI(config.warehouseName(), namespace, tableName) + "?snapshots=all"
+      val uriGet = tableURI(config.catalogName(), namespace, tableName) + "?snapshots=all"
       val polarisClient = AcceptanceTestConfig.instance.polarisClientFor(UserName, UserPassword)
       And(s"user '$UserName' can see the table when they call Polaris at $uriGet'")
       val response = polarisClient.get(uriGet, polarisClient.getAccessToken())
@@ -167,7 +167,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   "Trino" should {
     val properties          = new FilePropertyProvider().getProperties
     "vend credentials" in {
-      Given(s"a catalog called ${config.warehouseName()} in Polaris")
+      Given(s"a catalog called ${config.catalogName()} in Polaris")
 
       val tableName = tableNameFQN.toLowerCase()
       And(s"a table called $tableName with $NUM_ROWS rows in cloud storage")

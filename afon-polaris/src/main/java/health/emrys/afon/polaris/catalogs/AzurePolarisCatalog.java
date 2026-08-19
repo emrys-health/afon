@@ -1,23 +1,21 @@
 package health.emrys.afon.polaris.catalogs;
 
-import org.apache.polaris.core.admin.model.Catalog;
-import org.apache.polaris.core.admin.model.CreateCatalogRequest;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 
-public class AzureCloudConfigForPolaris extends CloudConfigForPolaris {
+public class AzurePolarisCatalog extends PolarisCatalog {
 
     private final String bucketUrl;
     private final String tenant;
     private final String multiTenantAppName;
     private final String clientId;
 
-    public AzureCloudConfigForPolaris(Properties properties) {
+    public AzurePolarisCatalog(Properties properties) {
         String bucketName = AZURE_BUCKET.getValueFrom(properties);
         this.bucketUrl          = bucketUrl(bucketName, AZURE_STORAGE_ACCOUNT.getValueFrom(properties));
         this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);
@@ -25,26 +23,20 @@ public class AzureCloudConfigForPolaris extends CloudConfigForPolaris {
         this.clientId           = AZURE_CLIENT_ID.getValueFrom(properties);
     }
 
-    protected String getBucketUri() {
+    protected String bucketUri() {
         return bucketUrl;
     }
 
-    @Override
-    public String catalogConfig() throws IncorrectConfigException {
-        Catalog catalog = createCatalog(getBucketUri(), getStorageConfigInfo());
-        return toJson(new CreateCatalogRequest(catalog));
-    }
-
-    public StorageConfigInfo getStorageConfigInfo() {
+    public StorageConfigInfo storageConfigInfo() {
         return AzureUtils.getStorageConfigInfo(
             tenant,
             multiTenantAppName,
-            getBucketUri(),
+            bucketUri(),
             clientId);
     }
 
     @Override
-    public String warehouseName() {
+    public String catalogName() {
         return AZURE.toString();
     }
 }

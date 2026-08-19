@@ -29,8 +29,8 @@ public class JsonSerialiserTest {
 
     @Test
     public void testOutput() throws Exception {
-        CloudConfigForPolaris config = new AwsCloudConfigForPolaris(new FilePropertyProvider().getProperties());
-        String catalogConfig = config.catalogConfig();
+        PolarisCatalog catalog = new AwsPolarisCatalog(new FilePropertyProvider().getProperties());
+        String catalogConfig = catalog.catalogConfig();
         String expectedJson = """
         {
           "catalog" : {
@@ -38,7 +38,7 @@ public class JsonSerialiserTest {
             "name" : "aws",
             "properties" : {
               "default-base-location" : "s3://emrys-afon-bucket",
-              "EMRYS_METADATA" : "Emrys catalog for aws"
+              "AFON_METADATA" : "Afon catalog for aws"
             },
             "createTimestamp" : 1787071750546,
             "lastUpdateTimestamp" : 1787071750546,

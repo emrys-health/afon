@@ -25,31 +25,31 @@ public class ConfigurablePolarisClient {
     }
 
     public List<HttpResponse> configureAllCatalogs(String credentials) throws IncorrectConfigException, IOException {
-        CloudConfigForPolaris[] configs = new CloudConfigForPolaris[]{
-                new AwsCloudConfigForPolaris(properties),
-                new GoogleCloudConfigForPolaris(properties),
-                new AzureCloudConfigForPolaris(properties),
-                new GlueCloudConfigForPolaris(properties),
-                new ExternalAzureCloudConfigForPolaris(properties),
+        PolarisCatalog[] catalogs = new PolarisCatalog[]{
+                new AwsPolarisCatalog(properties),
+                new GcpPolarisCatalog(properties),
+                new AzurePolarisCatalog(properties),
+                new GlueAwsPolarisCatalog(properties),
+                new AzureExternalPolarisCatalog(properties),
         };
-        return configureCatalogs(credentials, configs);
+        return configureCatalogs(credentials, catalogs);
     }
 
-    public List<HttpResponse> configureCatalogs(String credentials, CloudConfigForPolaris[] configs) throws IOException, IncorrectConfigException {
+    public List<HttpResponse> configureCatalogs(String credentials, PolarisCatalog[] catalogs) throws IOException, IncorrectConfigException {
         List<HttpResponse> allResponses = new ArrayList<HttpResponse>();
-        for (CloudConfigForPolaris config : configs) {
-            logger.info("Configuring {}", config.warehouseName());
-            allResponses.addAll(Arrays.asList(configureCatalog(credentials, config)));
+        for (PolarisCatalog catalog : catalogs) {
+            logger.info("Configuring {}", catalog.catalogName());
+            allResponses.addAll(Arrays.asList(configureCatalog(credentials, catalog)));
         }
         return allResponses;
     }
 
-    private HttpResponse[] configureCatalog(String credentials, CloudConfigForPolaris config) throws IOException, IncorrectConfigException {
+    private HttpResponse[] configureCatalog(String credentials, PolarisCatalog catalog) throws IOException, IncorrectConfigException {
         String endpoint = AfonProperty.POLARIS_ENDPOINT.getValueFrom(properties);
         String protocol = SecurityUtils.protocolFor(endpoint);
         var client = PolarisRestClientFactory.clientFactory().createClient(addPolarisCredentialsTo(credentials, properties), protocol);
         var configurer = new PolarisConfigurer(client);
-        return configurer.configureCatalog(config);
+        return configurer.configureCatalog(catalog);
     }
 
     /**

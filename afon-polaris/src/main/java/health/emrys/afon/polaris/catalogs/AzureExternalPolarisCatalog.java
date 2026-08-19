@@ -17,14 +17,14 @@ import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
  * in whichever Polaris is the current that points to a remove catalog called
  * AfonCloud.AZURE in emryspolarisazure.click
  */
-public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPolaris {
+public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
     private final @NonNull String bucketUrl;
     private final @NonNull String tenant;
     private final @NonNull String multiTenantAppName;
     private final @NonNull String clientId;
     private final @NonNull String domainName;
 
-    public ExternalAzureCloudConfigForPolaris(Properties properties) {
+    public AzureExternalPolarisCatalog(Properties properties) {
         super(properties);
         String storageAccount   = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
         String bucketName       = AZURE_EXTERNAL_BUCKET.getValueFrom(properties);
@@ -36,30 +36,30 @@ public class ExternalAzureCloudConfigForPolaris extends ExternalCloudConfigForPo
     }
 
     @Override
-    protected String getRemoteCatalogName() {
+    protected String remoteCatalogName() {
         return AfonCloud.AZURE.toString();
     }
 
     @Override
-    protected List<String> getScopes() {
+    protected List<String> scopes() {
         return List.of(OAUTH_SCOPE);
     }
 
     @Override
-    protected @NonNull String getEndpoint() {
+    protected @NonNull String endpoint() {
         return domainName;
     }
 
     @Override
-    protected @NonNull String getBucketUri() {
+    protected @NonNull String bucketUri() {
         return bucketUrl;
     }
 
-    protected @NonNull StorageConfigInfo getStorageConfigInfo() {
+    protected @NonNull StorageConfigInfo storageConfigInfo() {
         return AzureUtils.getStorageConfigInfo(tenant, multiTenantAppName, bucketUrl, clientId);
     }
 
-    public String warehouseName() {
+    public String catalogName() {
         return AfonCloud.AZURE_EXTERNAL.toString();
     }
 }

@@ -6,7 +6,7 @@ import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{Azure, External}
 import health.emrys.afon.config.AfonProperty.{AZURE_BUCKET, DATABRICKS_TOKEN}
 import health.emrys.afon.config.FilePropertyProvider
-import health.emrys.afon.polaris.catalogs.{AzureCloudConfigForPolaris, JsonSerialiser}
+import health.emrys.afon.polaris.catalogs.{AzurePolarisCatalog, JsonSerialiser}
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
 import org.apache.polaris.core.admin.model._
@@ -33,7 +33,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
   "An external table" should {
     val properties        = new FilePropertyProvider().getProperties
     properties.setProperty(AZURE_BUCKET.getName, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
-    val config            = new AzureCloudConfigForPolaris(properties)
+    val config            = new AzurePolarisCatalog(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
     val tableName         = "diamonds"
@@ -75,7 +75,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
   }
 
 
-  private def externalCatalogJson(config: AzureCloudConfigForPolaris, databricksToken: String): String = {
+  private def externalCatalogJson(config: AzurePolarisCatalog, databricksToken: String): String = {
     val bucketProperties = CatalogProperties
       .builder()
       .setDefaultBaseLocation("abfss://unity-catalog-storage@dbstorageipvnyon4atfem.dfs.core.windows.net/7405611337270626/__unitystorage/catalogs/92a89c86-f5de-4c3c-9fd0-2f0bc68b5888/tables/c8316ca8-4aa3-4b04-8248-fa560bba8463")
@@ -102,7 +102,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
         System.currentTimeMillis(),
         System.currentTimeMillis(),
         null,
-        config.getStorageConfigInfo())
+        config.storageConfigInfo())
 
     new JsonSerialiser().toJson(new CreateCatalogRequest(catalog))
   }

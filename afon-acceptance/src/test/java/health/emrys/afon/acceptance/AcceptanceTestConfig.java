@@ -4,9 +4,9 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.Redacter;
-import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
+import health.emrys.afon.polaris.catalogs.AwsPolarisCatalog;
+import health.emrys.afon.polaris.catalogs.AzurePolarisCatalog;
+import health.emrys.afon.polaris.catalogs.GcpPolarisCatalog;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
@@ -27,16 +27,16 @@ public class AcceptanceTestConfig {
     private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
 
     private final PolarisRestClient polarisAdminClient;
-    private final AwsCloudConfigForPolaris    awsCloudConfigForPolaris;
-    private final AwsCloudConfigForPolaris    awsForbidden;
-    private final AzureCloudConfigForPolaris  azureCloudConfigForPolaris;
-    private final AzureCloudConfigForPolaris  azureForbidden;
-    private final GoogleCloudConfigForPolaris gcpCloudConfigForPolaris;
-    private final GoogleCloudConfigForPolaris gcpForbidden;
+    private final AwsPolarisCatalog awsPolarisCatalog;
+    private final AwsPolarisCatalog awsForbidden;
+    private final AzurePolarisCatalog azurePolarisCatalog;
+    private final AzurePolarisCatalog azureForbidden;
+    private final GcpPolarisCatalog gcpCloudConfigForPolaris;
+    private final GcpPolarisCatalog gcpForbidden;
     private final String                      adminClientId;
     private final String                      adminClientSecret;
     private final Properties                  properties;
-    private final AwsCloudConfigForPolaris    awsTrino;
+    private final AwsPolarisCatalog awsTrino;
     private final PolarisRestClient polarisClient;
     private final AfonPropertyProvider provider;
 
@@ -49,49 +49,49 @@ public class AcceptanceTestConfig {
         startContainers(this.properties);
         this.polarisAdminClient       = polarisClientFor(adminClientId, adminClientSecret);
         this.polarisClient            = clientFactory.createClient(this.properties);
-        this.awsCloudConfigForPolaris = new AwsCloudConfigForPolaris(this.properties);
-        this.awsTrino                 = new AwsCloudConfigForPolaris(this.properties) {
+        this.awsPolarisCatalog = new AwsPolarisCatalog(this.properties);
+        this.awsTrino                 = new AwsPolarisCatalog(this.properties) {
             @Override
-            public String getBucketUri() {
+            public String bucketUri() {
                 return bucketToUrl(provider.getValue(AWS_S3_BUCKET_NAME_TRINO));
             }
 
             @Override
-            public String warehouseName() {
+            public String catalogName() {
                 return AfonCloud.AWS_TRINO.toString();
             }
         };
-        this.awsForbidden               = new AwsCloudConfigForPolaris(this.properties) {
+        this.awsForbidden               = new AwsPolarisCatalog(this.properties) {
             @Override
-            public String getBucketUri() {
+            public String bucketUri() {
                 return bucketToUrl(provider.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN));
             }
 
             @Override
-            public String warehouseName() {
+            public String catalogName() {
                 return AfonCloud.AWS_FORBIDDEN.toString();
             }
         };
-        this.gcpForbidden               = new GoogleCloudConfigForPolaris(this.properties) {
+        this.gcpForbidden               = new GcpPolarisCatalog(this.properties) {
             @Override
-            public String warehouseName() {
+            public String catalogName() {
                 return AfonCloud.GCP_FORBIDDEN.toString();
             }
 
             @Override
-            public String getBucketUri() {
+            public String bucketUri() {
                 return toBucketUri(provider.getValue(GCP_BUCKET_NAME_FORBIDDEN));
             }
         };
-        this.gcpCloudConfigForPolaris   = new GoogleCloudConfigForPolaris(this.properties);
-        this.azureCloudConfigForPolaris = new AzureCloudConfigForPolaris(this.properties);
-        this.azureForbidden             = new AzureCloudConfigForPolaris(this.properties) {
-            public String warehouseName() {
+        this.gcpCloudConfigForPolaris   = new GcpPolarisCatalog(this.properties);
+        this.azurePolarisCatalog = new AzurePolarisCatalog(this.properties);
+        this.azureForbidden             = new AzurePolarisCatalog(this.properties) {
+            public String catalogName() {
                 return AfonCloud.AZURE_FORBIDDEN.toString();
             }
 
             @Override
-            public String getBucketUri() {
+            public String bucketUri() {
                 return bucketUrl(
                         provider.getValue(AZURE_BUCKET_FORBIDDEN),
                         provider.getValue(AZURE_STORAGE_ACCOUNT));
@@ -138,32 +138,32 @@ public class AcceptanceTestConfig {
         return adminClientSecret;
     }
 
-    public AwsCloudConfigForPolaris getAwsCloudConfigForPolaris() {
-        return awsCloudConfigForPolaris;
+    public AwsPolarisCatalog getAwsCloudConfigForPolaris() {
+        return awsPolarisCatalog;
     }
 
-    public GoogleCloudConfigForPolaris getGcpCloudConfigForPolaris() {
+    public GcpPolarisCatalog getGcpCloudConfigForPolaris() {
         return gcpCloudConfigForPolaris;
     }
 
-    public AzureCloudConfigForPolaris getAzureCloudConfigForPolaris() {
-        return azureCloudConfigForPolaris;
+    public AzurePolarisCatalog getAzureCloudConfigForPolaris() {
+        return azurePolarisCatalog;
     }
 
-    public AwsCloudConfigForPolaris getAwsForbidden() {
+    public AwsPolarisCatalog getAwsForbidden() {
         return awsForbidden;
     }
 
-    public GoogleCloudConfigForPolaris getGcpForbidden() {
+    public GcpPolarisCatalog getGcpForbidden() {
         return gcpForbidden;
     }
 
-    public AzureCloudConfigForPolaris getAzureForbidden() {
+    public AzurePolarisCatalog getAzureForbidden() {
         return azureForbidden;
     }
 
 
-    public AwsCloudConfigForPolaris getAwsTrino() {
+    public AwsPolarisCatalog getAwsTrino() {
         return awsTrino;
     }
 
