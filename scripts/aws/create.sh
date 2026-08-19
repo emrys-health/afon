@@ -33,6 +33,18 @@ aws iam create-policy --policy-name AfonBucketWhiteList  --policy-document "{
       \"Resource\": \"arn:aws:s3:::$AWS_S3_BUCKET_NAME/*\"
     },
     {
+      \"Sid\": \"AllowBucketEmrysAfonBucketPolarisForbidsList\",
+      \"Effect\": \"Allow\",
+      \"Action\": \"s3:ListBucket\",
+      \"Resource\": \"arn:aws:s3:::$AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS\"
+    },
+    {
+      \"Sid\": \"AllowBucketEmrysAfonBucketPolarisForbidsObjects\",
+      \"Effect\": \"Allow\",
+      \"Action\": \"s3:*\",
+      \"Resource\": \"arn:aws:s3:::$AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS/*\"
+    },
+    {
       \"Sid\": \"AllowBucketEmrysAfonBucket2List\",
       \"Effect\": \"Allow\",
       \"Action\": \"s3:ListBucket\",
