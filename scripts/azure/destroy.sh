@@ -1,4 +1,4 @@
-source $CWD/scripts/config/afon-source.sh azure
+source $AFON_ROOT/scripts/config/afon-source.sh azure
 
 APP_ID=$(az ad app list --display-name AfonMultiTenantApp --query "[].appId" -o tsv)
 echo APP_ID=$APP_ID

@@ -1,4 +1,4 @@
-source $CWD/scripts/config/afon-source.sh azure
+source $AFON_ROOT/scripts/config/afon-source.sh azure
 
 echo creating $AZURE_RESOURCE_GROUP in $AZURE_REGION
 az group create  --name $AZURE_RESOURCE_GROUP   --location $AZURE_REGION && \

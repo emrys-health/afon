@@ -1,4 +1,4 @@
-source $CWD/scripts/config/afon-source.sh gcp
+source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
 # The call to "gcloud auth application-default login ..." below required me to use my browser to authenticate so I am not sure how best to automate it:
 gcloud storage buckets create "gs://$GCP_BUCKET_NAME" --location=europe-west2 && \

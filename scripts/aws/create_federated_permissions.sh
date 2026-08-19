@@ -1,4 +1,4 @@
-source $CWD/scripts/config/afon-source.sh aws
+source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 aws iam create-role --role-name GlueIcebergRole --assume-role-policy-document "{
    \"Version\": \"2012-10-17\",
