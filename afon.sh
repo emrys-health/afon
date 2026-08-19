@@ -235,6 +235,7 @@ exec_script(){
     echo "Action exec requires option --exec-script"
     usage; exit 0
   fi
+  echo "Executing $EXEC_SCRIPT"
   cd $AFON_ROOT/scripts
   source $EXEC_SCRIPT
 }
