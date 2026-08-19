@@ -70,7 +70,7 @@ check_acceptance(){
 }
 
 exec_ansible(){
-  cd $CWD/scripts/ansible
+  cd $AFON_ROOT/scripts/ansible
   if [ -z "$ANSIBLE_PLAYBOOK" ]; then
     ANSIBLE_PLAYBOOK="runner-setup.yml"
   fi
@@ -226,7 +226,7 @@ exec_jvm(){
     echo "Action exec requires option --exec-type"
     usage; exit 0
   fi
-  cd $CWD/afon-$EXEC_TYPE
+  cd $AFON_ROOT/afon-$EXEC_TYPE
   exec_mvn
 }
 
@@ -235,7 +235,7 @@ exec_script(){
     echo "Action exec requires option --exec-script"
     usage; exit 0
   fi
-  cd $CWD/scripts
+  cd $AFON_ROOT/scripts
   source $EXEC_SCRIPT
 }
 
@@ -507,6 +507,8 @@ if [ -n "$HOME_DIR" ]; then
 else
   HOME_DIR="$HOME/.afon"
   echo "Home dir not specified. Defaulting to $HOME_DIR"
+  AFON_HOME="$HOME_DIR"
+  echo "Setting AFON_HOME=$AFON_HOME"
 fi
 
 AFON_CLI_DIR=${AFON_CLI_DIR:-}
@@ -553,12 +555,13 @@ if [ -n "$BUILD_PROFILES" ]; then
   MVN_PROFILES="-P$BUILD_PROFILES"
 fi
 
-CWD=`pwd`
+AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "Using AFON_ROOT=$AFON_ROOT"
 MVN_CMD="mvn"
 if [ -n "$MVN_QUIET" ]; then
   MVN_CMD="$MVN_CMD -q"
 fi
-MVN_CMD="$MVN_CMD -s $CWD/settings.xml $MVN_PROFILES"
+MVN_CMD="$MVN_CMD -s $AFON_ROOT/settings.xml $MVN_PROFILES"
 case $ACTION in
 
   ansible)
@@ -661,5 +664,5 @@ case $ACTION in
     echo "Unknown action $ACTION"
     ;;
 esac
-cd $CWD
+cd $AFON_ROOT
 
