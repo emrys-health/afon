@@ -25,36 +25,36 @@ public class PermissionsConfigurer {
     }
 
     public HttpResponse associateRoles(
-        String warehouseName,
+        String catalogName,
         String principalRoleName,
         String catalogRoleName) throws IOException, IncorrectConfigException {
-        logger.info("Associating {} with catalog role {} in catalog {}", principalRoleName, catalogRoleName, warehouseName);
-        String uri  = catalogeRolesURI(principalRoleName, warehouseName);
+        logger.info("Associating {} with catalog role {} in catalog {}", principalRoleName, catalogRoleName, catalogName);
+        String uri  = catalogeRolesURI(principalRoleName, catalogName);
         String json = serialiser.catalogRoleCreation(catalogRoleName);
         return client.put(uri, json, accessToken);
     }
 
     public HttpResponse createCatalogRoleGrant(
-        String warehouseName,
-        CatalogPrivilege perm,
+        String catalogName,
+        CatalogPrivilege privilege,
         String catalogRoleName) throws IncorrectConfigException, IOException {
-        String uri  = catalogRolesGrantURI(warehouseName, catalogRoleName);
-        String json = serialiser.catalogRoleGrant(perm);
+        String uri  = catalogRolesGrantURI(catalogName, catalogRoleName);
+        String json = serialiser.catalogRoleGrant(privilege);
         return client.put(uri, json, accessToken);
     }
 
     public HttpResponse createCatalogRole(
-        String warehouseName,
+        String catalogName,
         String catalogRoleName) throws IOException, IncorrectConfigException {
-        String uri = catalogRolesURI(warehouseName);
+        String uri = catalogRolesURI(catalogName);
         String json = serialiser.catalogRoleCreation(catalogRoleName);
         return client.post(uri, json, accessToken);
     }
 
-    public HttpResponse deleteRoleIfExists(String role, String warehouseName) throws IOException {
-        String       uri      = catalogRolesURI(warehouseName) + "/" + role;
+    public HttpResponse deleteRoleIfExists(String role, String catalogName) throws IOException {
+        String       uri      = catalogRolesURI(catalogName) + "/" + role;
         HttpResponse response = client.delete(uri, accessToken);
-        logger.info("Deleting role {} for {}: HTTP code = {}", role, warehouseName, response.getCode());
+        logger.info("Deleting role {} for catalog {}: HTTP code = {}", role, catalogName, response.getCode());
         return response;
     }
 
