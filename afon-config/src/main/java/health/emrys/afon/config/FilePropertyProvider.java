@@ -20,7 +20,8 @@ import static org.slf4j.LoggerFactory.getLogger;
  * Sensitive secrets live in {@code secret.properties}
  * Cloud-specific secrets live alongside it in
  * {@code secret-<cloud>.properties} (e.g. {@code secret-aws.properties}).
- * The properties files are loaded from the ConfigUtils.configDir().
+ *
+ * The properties files are loaded from the {@link #configDir}, which defaults to {@link ConfigUtils#configDir()}.
  *
  * When {@link ConfigConstants#CLOUD_SYSTEM_PROPERTY} is unset, every cloud's files are loaded together,
  * since some deployments (e.g. cross-cloud federation) need more than one cloud's properties at the same time.
@@ -41,17 +42,23 @@ public class FilePropertyProvider implements AfonPropertyProvider {
      */
     private static final List<String> ALL_CLOUDS = List.of("aws", "azure", "gcp");
 
+    private final String configDir;
     private final List<String> types;
     private final Properties  properties;
     private final Set<String> secretKeys = new HashSet<>();
 
     public FilePropertyProvider() {
-        this(ALL_TYPES);
+        this(ConfigUtils.configDir());
     }
 
-    public FilePropertyProvider(List<String> types) {
+    public FilePropertyProvider(String configDir) {
+        this(configDir, ALL_TYPES);
+    }
+
+    public FilePropertyProvider(String configDir, List<String> types) {
+        this.configDir = configDir;
         this.types = types;
-        properties = new Properties();
+        this.properties = new Properties();
     }
 
     @Override
@@ -94,8 +101,6 @@ public class FilePropertyProvider implements AfonPropertyProvider {
     }
 
     private void loadProperties(String type) {
-        String configDir = ConfigUtils.configDir();
-
         try {
             loadPropertiesFromDir(type, configDir);
         } catch (IOException e) {

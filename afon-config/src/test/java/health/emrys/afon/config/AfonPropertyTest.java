@@ -2,7 +2,6 @@ package health.emrys.afon.config;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -12,12 +11,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class AfonPropertyTest {
 
+    static String CONFIG_DIR = "src/test/resources/config";
+
     @Test
-    public void cannotGetPropertiesWhenFilesAreMissing(){
-        AfonPropertyProvider provider = new FilePropertyProvider(List.of("missing"));
+    public void cannotGetPropertiesWhenFilesAreMissing() {
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR, List.of("missing"));
         try {
             provider.getProperties();
-        } catch ( RuntimeException e ){
+        } catch (RuntimeException e) {
             assertThat(e.getMessage()).endsWith("missing.properties (No such file or directory)");
         }
     }
@@ -28,8 +29,8 @@ public class AfonPropertyTest {
     }
 
     @Test
-    public void canGetAllProperties() throws IOException {
-        AfonPropertyProvider provider = new FilePropertyProvider();
+    public void canGetAllProperties() {
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         Properties properties = provider.getProperties();
         assertThat(properties).hasSizeGreaterThan(0);
         checkAllExpectedInPropertiesFile(properties);
@@ -40,16 +41,16 @@ public class AfonPropertyTest {
 
     @Test
     public void canGetPropertyByKey() {
-        AfonPropertyProvider provider = new FilePropertyProvider();
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         assertThat(provider.getValue(AfonProperty.CLUSTER_NAME)).isNotNull();
         assertThat(provider.getValue(AfonProperty.KC_PROTOCOL, "https")).isNotNull();
     }
 
     @Test
-    public void canGetPropertiesOnlyForAWS() throws IOException {
+    public void canGetPropertiesOnlyForAWS() {
         System.setProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY, "aws");
         try {
-            Properties properties = new FilePropertyProvider().getProperties();
+            Properties properties = new FilePropertyProvider(CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -68,10 +69,10 @@ public class AfonPropertyTest {
     }
 
     @Test
-    public void canGetPropertiesOnlyForAzure() throws IOException {
+    public void canGetPropertiesOnlyForAzure() {
         System.setProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY, "azure");
         try {
-            Properties properties = new FilePropertyProvider().getProperties();
+            Properties properties = new FilePropertyProvider(CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -90,10 +91,10 @@ public class AfonPropertyTest {
     }
 
     @Test
-    public void canGetPropertiesOnlyForGCP() throws IOException {
+    public void canGetPropertiesOnlyForGCP() {
         System.setProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY, "gcp");
         try {
-            Properties properties = new FilePropertyProvider().getProperties();
+            Properties properties = new FilePropertyProvider(CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -122,7 +123,7 @@ public class AfonPropertyTest {
         for (Object property : properties.keySet()) {
             assertTrue(
                     expectedProperties.contains(property.toString()),
-                    property.toString() + " not in " + expectedProperties);
+                    property + " not in " + expectedProperties);
         }
     }
 
@@ -131,5 +132,6 @@ public class AfonPropertyTest {
             assertThat(properties.get(property)).as("property = %s", property).isNotNull();
         }
     }
+
 
 }
