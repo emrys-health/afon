@@ -113,7 +113,7 @@ public class KeyCloakProvider {
                 properties.getValue(AfonProperty.USER_POLARIS_SECRET),
                 properties.getValue(AfonProperty.USER_POLARIS_EMAIL, "")));
         registerBrowserClient(properties, properties.getValue(AfonProperty.AWS_JUPYTER_DOMAIN));
-        configureMfa(properties);
+        configureMfa();
     }
 
     /**
@@ -445,15 +445,7 @@ public class KeyCloakProvider {
         }
     }
 
-    /**
-     * Provisions MFA on this realm when {@link AfonProperty#KC_MFA_ENABLED} allows it (the property is
-     * optional and defaults to on).
-     */
-    public void configureMfa(AfonPropertyProvider properties) {
-        if (!Boolean.parseBoolean(properties.getValue(KC_MFA_ENABLED, "true"))) {
-            logger.info("{} is false: leaving KeyCloak logins without MFA", KC_MFA_ENABLED.getName());
-            return;
-        }
+    public void configureMfa() {
         try {
             configureMfa(adminToken(), KEYCLOAK_REALM);
         } catch (IOException e) {

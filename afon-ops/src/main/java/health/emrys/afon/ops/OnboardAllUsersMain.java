@@ -46,7 +46,7 @@ public class OnboardAllUsersMain {
         }
         // Last, so that the realm is only bound to its MFA flows once the users who must pass through
         // them exist.
-        keyCloakProvider.configureMfa(provider);
+        keyCloakProvider.configureMfa();
     }
 
     public static void main(String[] args) {
