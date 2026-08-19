@@ -1,4 +1,4 @@
-source $CWD/scripts/config/afon-source.sh aws
+source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 aws s3api create-bucket --bucket $AWS_S3_EXTERNAL_BUCKET_NAME   --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION && \
 aws s3api create-bucket --bucket $AWS_S3_BUCKET_NAME_TRINO      --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION && \

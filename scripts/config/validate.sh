@@ -3,11 +3,11 @@ if [ ! -d $CONFIG_DIR ]; then
   echo "Missing config dir $CONFIG_DIR"
   exit;
 fi
-source $CWD/scripts/config/config-files.sh
+source $AFON_ROOT/scripts/config/config-files.sh
 echo "Validating config files in $CONFIG_DIR"
 for FILE in $CONFIG_FILES ; do {
   echo "$FILE"
-  TEMPLATE=$CWD/templates/config/$FILE
+  TEMPLATE=$AFON_ROOT/templates/config/$FILE
   CONFIG_FILE=$CONFIG_DIR/$FILE
   if [ -z $CONFIG_FILE ]; then
      echo "Missing config file $FILE in $CONFIG_DIR"

@@ -1,4 +1,4 @@
-source $CWD/scripts/config/afon-source.sh gcp
+source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
 gcloud storage buckets remove-iam-policy-binding  gs://$GCP_BUCKET_NAME  --member="serviceAccount:$GCP_SERVICE_ACCOUNT"  --role="roles/storage.objectAdmin"
 gcloud iam service-accounts delete  $GCP_SERVICE_ACCOUNT --quiet
