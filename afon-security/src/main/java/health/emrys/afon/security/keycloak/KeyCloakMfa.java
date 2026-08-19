@@ -1,5 +1,8 @@
 package health.emrys.afon.security.keycloak;
 
+import org.keycloak.authentication.authenticators.browser.OTPFormAuthenticatorFactory;
+import org.keycloak.authentication.authenticators.directgrant.ValidateOTP;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +20,7 @@ import java.util.Map;
  *       second factor is asked for at all, and which of OTP/WebAuthn/recovery codes to ask for;</li>
  *   <li>promoting the sub-flow itself from CONDITIONAL to REQUIRED, since a CONDITIONAL sub-flow with
  *       no live condition left in it is simply skipped;</li>
- *   <li>making the {@value #OTP_FORM} execution REQUIRED, which is what makes KeyCloak walk a user
+ *   <li>making the auth-otp-form execution REQUIRED, which is what makes KeyCloak walk a user
  *       with no authenticator app through enrolment mid-login rather than waving them past.</li>
  * </ul>
  *
@@ -30,10 +33,6 @@ import java.util.Map;
  */
 public final class KeyCloakMfa {
 
-    /** The OTP form users type their six digits into during a browser login. */
-    public static final String OTP_FORM           = "auth-otp-form";
-    /** The direct-grant flow's OTP step, which expects the six digits as a request parameter. */
-    public static final String DIRECT_GRANT_OTP   = "direct-grant-validate-otp";
     /** KeyCloak names every condition provider {@code conditional-*}; none may survive in the 2FA sub-flow. */
     public static final String CONDITION_PREFIX   = "conditional-";
 
@@ -60,7 +59,7 @@ public final class KeyCloakMfa {
      *         with no OTP step to force.
      */
     public static List<Map<String, Object>> requireOtp(List<Map<String, Object>> executions) {
-        int otp = indexOf(executions, OTP_FORM);
+        int otp = indexOf(executions, OTPFormAuthenticatorFactory.PROVIDER_ID);
         if (otp < 0) {
             return List.of();
         }
@@ -98,7 +97,7 @@ public final class KeyCloakMfa {
      *         step in play.
      */
     public static List<Map<String, Object>> skipOtp(List<Map<String, Object>> executions) {
-        int otp = indexOf(executions, DIRECT_GRANT_OTP);
+        int otp = indexOf(executions, ValidateOTP.PROVIDER_ID);
         if (otp < 0) {
             return List.of();
         }

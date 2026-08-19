@@ -74,7 +74,8 @@ public class NetworkConfig {
      * same app name but do not listen on 15002.
      */
     private static @NonNull NetworkPolicySpecEgress createSparkConnectorEgressPolicy(
-        String sparkConnectorName) {
+        String sparkConnectorName
+    ) {
         List<NetworkPolicySpecEgressTo> sparkConnectorPods = specEgressFor(
             egressPodSelectorFor(Map.of(
                 "spark.operator/spark-app-name", sparkConnectorName,
@@ -89,8 +90,8 @@ public class NetworkConfig {
     }
 
     private static @NonNull NetworkPolicySpecEgress createWebEgressPolicy() {
-        String                          bbcNews     = "151.101.0.0/16";
-        List<NetworkPolicySpecEgressTo> externalIps = ipBlocksFor(bbcNews);
+        String                          hdrsWebsite = "139.59.182.232/8";
+        List<NetworkPolicySpecEgressTo> externalIps = ipBlocksFor(hdrsWebsite);
         List<NetworkPolicySpecEgressPorts> webPorts = List.of(
             NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("80").build(),
             NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build());
@@ -121,7 +122,8 @@ public class NetworkConfig {
 
     private static @NonNull NetworkPolicySpecEgressTo egressPolicyFor(
         NetworkPolicySpecEgressToNamespaceSelector sparkNamespace,
-        NetworkPolicySpecEgressToPodSelector sparkPods) {
+        NetworkPolicySpecEgressToPodSelector sparkPods
+    ) {
         return NetworkPolicySpecEgressTo
             .builder()
             .namespaceSelector(sparkNamespace)
