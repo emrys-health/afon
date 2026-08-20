@@ -14,6 +14,7 @@ To show the active account used for cli, once logged in:
 ```shell
 ./afon.sh -a exec -t script --exec-script <cloud>/cli.sh 
 ```
+where cloud is one of `{aws|azure|gcp}`.
 
 ## Create 
 To create the cloud infrastructure, which includes storage buckets, IAM roles, service accounts, and DNS zones,
