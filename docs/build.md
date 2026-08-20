@@ -90,6 +90,7 @@ jar in the `afon-cli/target` dir.
 The script supports the following env variables: 
 
 - `AFON_HOME`: the Afon home dir, defaulting to $HOME/.afon.
+- `AFON_CLOUD`: the cloud provider to target, one of {aws,azure,gcp}.  This is optional and only affects some functionality.
 - `AFON_LOGGING`: the file logging level, defaulting to INFO.
 - `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to OFF.
 
@@ -112,6 +113,12 @@ If you just need to build and not export the artifacts, you can deactivate the `
 ./afon.sh -g "clean package" -p cli,-export
 ```
 The `export` profile is active by default because it's the most common use case when building the CLI.
+
+To build a binary distribution with the `afon-cli` files and the docs: 
+```shell
+./afon.sh -g "clean package" -p cli,distribution
+```
+You'll find the file `afon-cli` zip file in the `afon-distribution/target` dir.
 
 ### GitHub Workflows
 
