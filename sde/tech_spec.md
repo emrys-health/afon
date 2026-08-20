@@ -31,7 +31,7 @@ During a 10-week learning phase beginning in July and ending on 25th September, 
 
 **Project hypothesis**
 
-*We are testing the feasibility of moving from agreement to multi-organisation research environments that are secure and auditable at the push of a button. We will create infrastructure as code, governance as code and security as code. The TRE is destroyed every day so that no data is persisted and no data leaves the secure research network. *
+We are testing the feasibility of moving from agreement to multi-organisation research environments that are secure and auditable at the push of a button. We will create infrastructure as code, governance as code and security as code. The TRE is destroyed every day so that no data is persisted and no data leaves the secure research network.
 
 **Technical specification**
 
