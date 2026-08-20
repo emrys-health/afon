@@ -1,7 +1,7 @@
 ```
 EMRYS HEALTH
 HDRS Afon – Open Source Data Fabric – Feasibility 
-SDE specification for technical and non-technical tasks
+SDE specification for technical tasks
 Technical specification for participating Secure Data Environments
 August 2026
 ```
@@ -41,11 +41,13 @@ Technical task backlog — synthetic Iceberg catalog via Apache Polaris
 
 **Phase One Scope**
 
-Each partner Secure Data Environment has the option of one clean cloud environment — either an AWS account or an Azure subscription. Or giving Emrys access to their native Azure/AWS environment (preferably the latter). Within that environment we will support the deployment of an Apache Polaris catalog (backed by Iceberg tables containing only synthetic data), reachable over HTTPS.
+Each partner Secure Data Environment will deploy an Apache Polaris catalog (backed by Iceberg tables containing only synthetic data), reachable over HTTPS in a cloud environment. 
 
 This document breaks that work into discrete tasks for an Azure cloud. Each task is written as a user story with acceptance criteria to support an estimate of effort for the team
 
-The commands within this document can be found within the Afon-core repository. We will need a github user name to add contributors to the project and an email to add to the cloud provider.
+The commands within this document can be found within the Afon-core repository. We will need a github user name to add contributors to the project and users created for the Emrys team in the cloud to support with deployment 
+
+This document provides the detailed tasks required for an deployment with Azure.
 
 **Tasks**
 
