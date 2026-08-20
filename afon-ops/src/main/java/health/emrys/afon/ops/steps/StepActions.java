@@ -373,7 +373,7 @@ public class StepActions {
     }
 
     @NonNull String stepNameWaitOn(String domain) {
-        return "wait_on_" + domain.substring(0, domain.indexOf('.'));
+        return "wait_on_" + (domain.isBlank() ? "domain" : domain.substring(0, domain.indexOf('.')));
     }
 
     private boolean isWaitingInterrupted(int timeout) {
