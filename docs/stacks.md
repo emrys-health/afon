@@ -2,24 +2,24 @@
 
 ## Pre-requisites 
 
-## Setup Local Evn
+### Setup Local Env
 
 See [setup local env](setup_local.md).
 
-## Command API
+## afon.sh commands
 
-The top-level `afon.sh` acts the command API for all the functionality:
+The script `afon.sh` at the top-level of the source tree acts as a front-end for all the functionality, including the build:
 
 ```shell
 ./afon.sh -h
 ```
 
-**NOTE:** In the commands, all JVM packages are intended relative to the base package `health.emrys.afon`. 
+**NOTE:** In the following, all JVM packages are intended relative to the base package `health.emrys.afon`. 
 If you want, you may specify the full package or change the base package via the `--exec-package` option.
 
 ## Stack deployment
 
-To deploy a stack, we use the ops.Deploy*Main classes, e.g.:
+To deploy a stack, we execute the ops.Deploy*Main classes, e.g.:
 
 ```shell
 ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain
