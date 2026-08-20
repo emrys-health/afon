@@ -10,11 +10,9 @@ az login --help
 gcloud auth login --help
 ```
 
-To show that the login has been successful and the account used for the login:
+To show the active account used for cli, once logged in:
 ```shell
-aws sts get-caller-identity --query "Arn"
-az account show --query "user.name" -o tsv
-gcloud auth list
+./afon.sh -a exec -t script --exec-script <cloud>/cli.sh 
 ```
 
 ## Create 
