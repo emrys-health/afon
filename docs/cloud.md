@@ -10,6 +10,13 @@ az login --help
 gcloud auth login --help
 ```
 
+To show that the login has been successful and the account used for the login:
+```shell
+aws sts get-caller-identity --query "Arn"
+az account show --query "user.name" -o tsv
+gcloud auth list
+```
+
 ## Create 
 To create the cloud infrastructure, which includes storage buckets, IAM roles, service accounts, and DNS zones,
 run the cloud create scripts:
