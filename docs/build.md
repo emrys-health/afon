@@ -113,4 +113,26 @@ If you just need to build and not export the artifacts, you can deactivate the `
 ```
 The `export` profile is active by default because it's the most common use case when building the CLI.
 
+### GitHub Workflows
+
+The [GitHub Workflows](https://github.com/emrys-health/afon-core/actions) are run on a Linux Runner.
+
+To set up the runner via ansible:
+```shell
+./afon.sh -a ansible
+```
+Requires ssh access to the runner. 
+
+The workflows require the config to be uploaded to GitHub secrets:
+```shell
+./scripts/github/secrets.sh push 
+```
+This pushes the content of each config files to a separate GitHub secret.
+
+**NOTE:** upon any change in the config, the secrets need to be pushed again.
+
+
+
+
+- 
 
