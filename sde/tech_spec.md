@@ -287,4 +287,3 @@ Ideally, technical leads would become confident to deploy the data fabric in the
 
 For those SDE that are very time constrained the minimum expected tasks on this list to complete are 2, 5 and 6. 
 
-=
