@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonCloud.AWS_FORBIDDEN_BY_POLARIS;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonProperty.AWS_REGION;
 import static health.emrys.afon.config.AfonProperty.AWS_S3_BUCKET_NAME;
@@ -26,7 +27,7 @@ class AwsPolarisCatalogNonPermissioned extends AwsPolarisCatalog {
             AWS_REGION.getValueFrom(properties));
     }
     public String catalogName() {
-        return "aws_polaris_forbidden";
+        return AWS_FORBIDDEN_BY_POLARIS.toString();
     }
 }
 

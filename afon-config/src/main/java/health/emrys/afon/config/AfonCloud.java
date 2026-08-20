@@ -7,6 +7,7 @@ public enum AfonCloud {
     AWS("aws"),
     AWS_FORBIDDEN("aws_forbidden"),
     AWS_TRINO("aws_trino"),
+    AWS_FORBIDDEN_BY_POLARIS("aws_polaris_forbidden"),
     AZURE("azure"),
     AZURE_EXTERNAL("azure_external"),
     AZURE_FORBIDDEN("azure_forbidden"),
