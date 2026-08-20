@@ -2,7 +2,7 @@ package health.emrys.afon.cli;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.SortedSet;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,10 +29,16 @@ class OpsCommandsTest {
 
     @Test
     void namesListsOnlyKebabCaseFormAndIsSorted() {
-        SortedSet<String> names = opsCommands.names();
+        Set<String> names = opsCommands.names();
         assertThat(names).contains("configure-polaris-catalogs", "deploy-aws-full-stack", "purge-polaris");
         assertThat(names).allMatch(name -> name.equals(name.toLowerCase()));
         assertThat(names).isEqualTo(new java.util.TreeSet<>(names));
+    }
+
+    @Test
+    void namesCanBeFilteredByCloud() {
+        Set<String> names = opsCommands.names("azure");
+        assertThat(names).contains("deploy-azure-full-stack", "delete-azure-full-stack");
     }
 
 }
