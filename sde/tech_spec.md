@@ -146,7 +146,7 @@ Then all the configuration properties are replaced with real, env-specific value
 ```
 
 ```shell
-./afon.sh -a config-init -c <cloud>
+./afon.sh -a config-init
 ```
 
 You can also import/export config files as a zip:

@@ -131,10 +131,6 @@ exec_config(){
       fi
     ;;
     init)
-      if [ -d $CONFIG_DIR ]; then
-        echo "$CONFIG_DIR already exists.  Remove and retry."
-        exit 0
-      fi
       EXEC_TYPE="script"
       EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
       exec_script
