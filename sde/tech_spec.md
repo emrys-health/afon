@@ -209,7 +209,7 @@ Then the Afon env is created for cloud <cloud>
 **How to do it**
 
 ```shell
-./afon.sh -a exec -t script --exec-script <cloud>/create.sh 
+./afon.sh -a script --script-path <cloud>/create.sh 
 ```
 
 See the [cloud infrastructure](../docs/cloud.md) for more details.
