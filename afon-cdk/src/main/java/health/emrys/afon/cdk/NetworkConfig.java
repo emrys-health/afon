@@ -90,7 +90,7 @@ public class NetworkConfig {
     }
 
     private static @NonNull NetworkPolicySpecEgress createWebEgressPolicy() {
-        String                          hdrsWebsite = "185.230.220/8";
+        String                          hdrsWebsite = "185.230.220.0/8";
         List<NetworkPolicySpecEgressTo> externalIps = ipBlocksFor(hdrsWebsite);
         List<NetworkPolicySpecEgressPorts> webPorts = List.of(
             NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("80").build(),
