@@ -7,15 +7,12 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
- * Discovers the afon-ops {@code *Main} command classes (same naming convention already
- * used by afon-docs' DocumentAllMain) and resolves a command name to one of them.
+ * Discovers the afon-ops {@code *Main} command classes and resolves a command name to one of them.
  */
 @Component
 class OpsCommands {
@@ -73,7 +70,14 @@ class OpsCommands {
         return commandsByName.get(command.toLowerCase());
     }
 
-    SortedSet<String> names() {
+    Set<String> names() {
+        return commandNames;
+    }
+
+    Set<String> names(String cloud) {
+        if (cloud != null || !cloud.isBlank()){
+            return commandNames.stream().filter(c -> c.contains(cloud)).collect(Collectors.toSet());
+        }
         return commandNames;
     }
 
