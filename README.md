@@ -7,7 +7,7 @@ Afon is an infrastructure project that deploys [Apache Polaris](https://polaris.
 
 ### Env setup
 
-See [setup](./docs/setup.md).
+See [setup](docs/setup_local.md).
 
 ### Build from source
 

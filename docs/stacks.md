@@ -2,9 +2,9 @@
 
 ## Pre-requisites 
 
-## Setup
+## Setup Local Evn
 
-See [setup](setup.md).
+See [setup local env](setup_local.md).
 
 ## Command API
 

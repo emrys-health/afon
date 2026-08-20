@@ -12,7 +12,7 @@ git clone https://github.com/emrys-health/afon-core.git
 
 ## Build
 
-We assume [setup](setup.md) has been done. 
+We assume [setup](setup_local.md) has been done. 
 
 To build all components, running acceptance tests:
 ```shell

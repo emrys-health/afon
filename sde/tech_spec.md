@@ -201,11 +201,11 @@ So that cloud-hosted traffic resolves correctly and can be served over HTTPS
 
 Follow the [DNS configuration](../docs/dns_config.md) documentation.
 
-**5. Build the Afon components locally running acceptance tess**
+**5. Build the Afon CLI locally**
 
 ```md
 As a developer at an SDE
-I want to build the Afon components locally and run acceptance tests
+I want to build the Afon CLI locally
 So that I verify the correct behaviour needed to deploy Polaris
 ```
 
@@ -222,15 +222,33 @@ Then the Afon build env is setup locally for cloud <cloud>
 ```shell
 ./afon.sh -a setup-local -c <cloud>
 ```
+See the [setup local env](../docs/setup_local.md) for more details.
+
+```md
+Given a local system (linux or macos)
+When we run the create.sh script for the cloud <cloud> via the afon.sh script
+Then the Afon env is created for cloud <cloud>
+```
+
+```shell
+./afon.sh -a exec -t script --exec-script <cloud>/create.sh 
+```
+See the [cloud infrastructure](../docs/cloud.md) for more details.
 
 ```md
 Given a local system (linux or macos)
 When we run the following build action via the afon.sh script
-Then the Afon components are built and acceptance tests run for the chosen cloud
+Then the Afon CLI are built for the chosen cloud
 ```
 
 ```shell
-./afon.sh -a build -c <cloud>
+./afon.sh -a build -p cli -c <cloud>
+```
+
+The CLI build artifacts are available in `~/.afon/cli`.
+
+```shell
+./.afon/cli/afon-cli.sh 
 ```
 
 **6. Deploy the Afon Polaris stack**
