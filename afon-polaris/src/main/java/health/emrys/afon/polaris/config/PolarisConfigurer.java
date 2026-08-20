@@ -28,9 +28,9 @@ public class PolarisConfigurer {
 
     public static String catalogsURI(String catalogName) {
         return format(
-                "%s/%s",
-                catalogsURI(),
-                catalogName);
+            "%s/%s",
+            catalogsURI(),
+            catalogName);
     }
 
     public static String catalogRolesURI(String catalogName) {
@@ -39,9 +39,9 @@ public class PolarisConfigurer {
 
     public static String catalogeRolesURI(String roleName, String catalogName) {
         return format(
-                "/api/management/v1/principal-roles/%s/catalog-roles/%s",
-                roleName,
-                catalogName);
+            "/api/management/v1/principal-roles/%s/catalog-roles/%s",
+            roleName,
+            catalogName);
     }
 
     public static String catalogRolesGrantURI(String catalogName, String catalogRole) {
@@ -50,9 +50,9 @@ public class PolarisConfigurer {
 
     public static String catalogRolesAdminGrantsURI(String catalogName) {
         return format(
-                "%s/%s/catalog-roles/catalog_admin/grants",
-                catalogsURI(),
-                catalogName);
+            "%s/%s/catalog-roles/catalog_admin/grants",
+            catalogsURI(),
+            catalogName);
     }
 
     public static String principalsURI() {
@@ -65,18 +65,20 @@ public class PolarisConfigurer {
 
     public static String principalRolesURI(String principal) {
         return format(
-                "/api/management/v1/principals/%s/principal-roles",
-                principal);
+            "/api/management/v1/principals/%s/principal-roles",
+            principal);
     }
 
     public static String namespacesURI(
-            String catalogName) {
+        String catalogName
+    ) {
         return format("/api/catalog/v1/%s/namespaces/", catalogName);
     }
 
     public static String namespaceURI(
-            String catalogName,
-            String namespace) {
+        String catalogName,
+        String namespace
+    ) {
         return format("%s/%s", namespacesURI(catalogName), namespace);
     }
 
@@ -85,16 +87,20 @@ public class PolarisConfigurer {
     }
 
     public static String tableURI(
-            String catalogName,
-            String namespace,
-            String tableName) {
+        String catalogName,
+        String namespace,
+        String tableName
+    ) {
         return format(
-                "/api/catalog/v1/%s/namespaces/%s/tables/%s",
-                catalogName, namespace, tableName);
+            "/api/catalog/v1/%s/namespaces/%s/tables/%s",
+            catalogName, namespace, tableName);
     }
+
+    private final String accessToken;
 
     public PolarisConfigurer(PolarisRestClient client) {
         this.client = client;
+        this.accessToken = client.getAccessToken();
     }
 
     public static boolean isFailure(HttpResponse response) {
@@ -106,30 +112,33 @@ public class PolarisConfigurer {
     }
 
     public HttpResponse[] configureCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
-        String accessToken = client.getAccessToken();
         logger.info("Access token {}", accessToken);
-        String catalogName = catalog.catalogName();
-        client.delete(catalogsURI(catalogName), accessToken); // this failing is expected if there is no catalog
         HttpResponse[] responses = new HttpResponse[]{
-                client.post(
-                        catalogsURI(),
-                        catalog.catalogConfig(),
-                        accessToken),
-                client.put(
-                        catalogRolesAdminGrantsURI(catalogName),
-                        catalog.catalogAdminGrants(),
-                        accessToken),
-        };
+            createCatalog(catalog),
+            client.put(
+                catalogRolesAdminGrantsURI(catalog.catalogName()),
+                catalog.catalogAdminGrants(),
+                accessToken),
+            };
         logIfProblems(responses);
         return responses;
     }
 
+    public  HttpResponse createCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
+        client.delete(catalogsURI(catalog.catalogName()), accessToken); // this failing is expected if there is no catalog
+        return client.post(
+            catalogsURI(),
+            catalog.catalogConfig(),
+            accessToken);
+    }
+
     public PrincipalWithCredentials configureUser(
-            String accessToken,
-            String principalName) throws IncorrectConfigException, IOException {
-        String uri = principalsURI();
+        String accessToken,
+        String principalName
+    ) throws IncorrectConfigException, IOException {
+        String            uri        = principalsURI();
         PolarisSerialiser serialiser = new PolarisSerialiser();
-        String json = serialiser.principalCreation(principalName);
+        String            json       = serialiser.principalCreation(principalName);
         if (isFailure(deletePrincipalIfPresent(accessToken, principalName))) {
             logger.warn("Could not delete principal {}", principalName);
         }
