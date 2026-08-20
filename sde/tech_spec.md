@@ -43,166 +43,40 @@ Technical task backlog — synthetic Iceberg catalog via Apache Polaris
 
 Each partner Secure Data Environment will deploy an Apache Polaris catalog (backed by Iceberg tables containing only synthetic data), reachable over HTTPS in a cloud environment. 
 
-This document breaks that work into discrete tasks for an Azure cloud. Each task is written as a user story with acceptance criteria to support an estimate of effort for the team
+This document breaks that work into discrete tasks for a given cloud. Each task is written as a user story with acceptance criteria to support an estimate of effort for the team
 
 The commands within this document can be found within the Afon-core repository. We will need a github user name to add contributors to the project and users created for the Emrys team in the cloud to support with deployment 
 
-This document provides the detailed tasks required for an deployment with Azure.
+This document provides the detailed tasks required for a deployment to a given cloud.
+
+**NOTE:** We assume your chosen cloud is one of AWS, Azure or GCP.
+
+In this document the following conventions apply to the name of the cloud/CLOUD variables:
+- the 'cloud' values are in lower case: {aws,azure,gcp}
+- the 'CLOUD' values are in upper case: {AWS,AZURE,GCP}
 
 **Tasks**
 
+| # | Task                                                      | Outcome                                                 |
+|---|-----------------------------------------------------------|---------------------------------------------------------|
+| 1 | Setup local env                                           | A linux or macOS machine with tools to build and deploy | 
+| 2 | Provision app registration & permissions for chosen cloud | A clean cloud subscription with appropriate permissions |
+| 3 | Register a Polaris domain name for your env               | Domain name such as `<env>`polaris.click is registered   |
+| 4 | Create DNS zone and certificate                           | DNS nameservers are configured                          |
+| 5 | Generate configuration                                    | Config files created in $AFON_HOME/config               |
+| 6 | Create cloud env                                          | Script `<cloud>`/create.sh is run successfully          | 
+| 7 | Build Afon CLI locally                                    | Afon CLI built in $AFON_HOME/cli                        |
+| 8 | Deploy Afon Polaris stack to chosen cloud                 | Polaris stack deployed                                  |
 
-<table>
-  <tr>
-   <td><strong>#</strong>
-   </td>
-   <td><strong>Task</strong>
-   </td>
-   <td><strong>Depends on</strong>
-   </td>
-  </tr>
-  <tr>
-   <td>1
-   </td>
-   <td>Provision app registration & role assignments for chosen cloud
-   </td>
-   <td>Clean cloud subscription
-   </td>
-  </tr>
-  <tr>
-   <td>2
-   </td>
-   <td>Register a domain name
-   </td>
-   <td>Task 1
-   </td>
-  </tr>
-  <tr>
-   <td>3
-   </td>
-   <td>Generate configuration
-   </td>
-   <td>Task 1-2
-   </td>
-  </tr>
-  <tr>
-   <td>4
-   </td>
-   <td>Create DNS zone & certificate for HTTPS
-   </td>
-   <td>Task 1-3
-   </td>
-  </tr>
-  <tr>
-   <td>5
-   </td>
-   <td>Build Afon locally and run acceptance tests
-   </td>
-   <td>Task 1-4. Bash required (linux or macos).
-   </td>
-  </tr>
-  <tr>
-   <td>6
-   </td>
-   <td>Deploy the Afon Polaris stack to chosen cloud
-   </td>
-   <td>Task 1-5
-   </td>
-  </tr>
-  <tr>
-   <td>7
-   </td>
-   <td>Integration with Keycloak and OIDC
-   </td>
-   <td>Task 7
-   </td>
-  </tr>
-</table>
-
-**NOTE:** We assume your chosen cloud is one of Azure.
-In this doc the following conventions apply to the name of the cloud/CLOUD variables:
-- the 'cloud' values are in lower case: {azure}
-- the 'CLOUD' values are in upper case: {AZURE}
-
-**1. Provision app registration & role assignments for chosen cloud**
+**1. Setup local env**
 
 ```md
-As a cloud engineer at the partner organisation
-I want to register a cloud application and grant it storage permissions
-So that Polaris can vend short-lived credentials to blob containers
+As a cloud engineer
+I want to setup the local env 
+So that I build and deploy Afon on my cloud infrastrcture
 ```
 
-**Depends on:** A clean cloud subscription with rights to create resource groups, storage accounts and app registrations. 
-
-**2. Register a domain name**
-
-```md
-As the partner organisation
-I want to register a domain name for the Polaris endpoint
-So that data can be encrypted over HTTPS.
-```
-
-**Acceptance criteria**
-
-```md
-Given no suitable domain currently exists for your environment <env>
-When the organisation purchases or designates a domain
-Then a domain such as `<env>polaris.click` is available and the [dns zone](../docs/dns_config.md) are noted.
-```
-
-**Depends on:** Task 1
-
-**3. Configuration setup**
-
-```md
-As a deployment engineer at the partner organisation
-I want to generate the properties for our environment <env> and cloud
-So that the deployment script knows which domain, roles, storage and credentials belong to the env's chosen cloud.
-```
-
-**Depends on:** Task 1-2
-
-**Acceptance criteria**
-
-```md
-Given my organisation's chosen cloud, account details, region, bucket names and chosen domain
-When configuration properties are set up, both the common ones and the cloud specific ones,
-Then all the configuration properties are replaced with real, env-specific values
-```
-**How to do it**
-
-Follow the [configuration](../docs/configuration.md) documentation.
-
-**4. DNS Configuration**
-
-```md
-As a deployment engineer 
-I want to create a DNS zone for our Polaris endpoint
-So that cloud-hosted traffic resolves correctly and can be served over HTTPS
-```
-**Depends on:** Task 1-3
-
-**Acceptance criteria**
-
-```md
-Given a domain name
-When DNS records are created
-And the certificates are issued
-Then the domain is configured to resolve to the Polaris endpoint
-```
-**How to do it**
-
-Follow the [DNS configuration](../docs/dns_config.md) documentation.
-
-**5. Build the Afon CLI locally**
-
-```md
-As a developer at an SDE
-I want to build the Afon CLI locally
-So that I verify the correct behaviour needed to deploy Polaris
-```
-
-**Depends on:** Task 1-4
+**Depends on:** Access to Linux or macOS
 
 **Acceptance criteria**
 
@@ -212,15 +86,101 @@ When we run the following setup-local action for cloud <cloud> via the afon.sh s
 Then the Afon build env is setup locally for cloud <cloud>
 ```
 
-<<<<<<< HEAD
 ```shell
 ./afon.sh -a setup-local -c <cloud>
 ```
 See the [setup local env](../docs/setup_local.md) for more details.
 
+**2. Provision app registration & permissions for chosen cloud**
+
 ```md
-Given a local system (linux or macos)
-When we run the create.sh script for the cloud <cloud> via the afon.sh script
+As a cloud engineer
+I want to provision a cloud registration and grant it appropriate permissions
+So that Polaris env can be created
+```
+
+**Depends on:** A clean cloud subscription with permissions to create resource groups, storage accounts and app registrations. 
+
+**3. Register a Polaris domain name**
+
+```md
+As a cloud engineer
+I want to register a domain name for the Polaris endpoint
+So that data can be encrypted over HTTPS.
+```
+
+**Acceptance criteria**
+
+```md
+Given no suitable domain currently exists for your environment <env>
+When the organisation purchases or designates a domain
+Then a Polaris domain such as `<env>polaris.click` is available.
+```
+
+**4. DNS Configuration**
+
+```md
+As a cloud engineer 
+I want to create a DNS zone for the Polaris domain
+So that cloud-hosted traffic resolves correctly and can be served over HTTPS
+```
+**Depends on:** Task 1,3
+
+**Acceptance criteria**
+
+Follow the [DNS configuration](../docs/dns_config.md) documentation.
+
+**5. Configuration setup**
+
+```md
+As a cloud engineer
+I want to generate the properties for our environment <env> and cloud
+So that the deployment script knows which domain, roles, storage and credentials belong to the env's chosen cloud.
+```
+
+**Depends on:** Task 1-4
+
+**Acceptance criteria**
+
+```md
+Given my organisation's chosen cloud, account details, region, bucket names and chosen domain
+When configuration properties are set up, both the common ones and the cloud specific ones,
+Then all the configuration properties are replaced with real, env-specific values
+```
+
+```shell
+./afon.sh -a config-init -c <cloud>
+```
+
+You can also import/export config files as a zip:
+```shell
+./afon.sh -a config-{import|export} --config-zip <path-to-config-zip>
+```
+
+After the config files are completed (or imported) you can validate them:
+```shell
+./afon.sh -a config-validate -c <cloud>
+```
+
+**Acceptance criteria**
+
+Follow the [configuration](../docs/configuration.md) documentation.
+
+**6. Create cloud env**
+
+```md
+As a cloud engineer
+I want to build create a cloud env
+So that I can build and deploy Polaris
+```
+
+**Depends on:** Task 1-5
+
+**Acceptance criteria**
+
+```md
+Given a local system
+When we run the following exec action for the cloud <cloud>
 Then the Afon env is created for cloud <cloud>
 ```
 
@@ -228,19 +188,23 @@ Then the Afon env is created for cloud <cloud>
 ./afon.sh -a exec -t script --exec-script <cloud>/create.sh 
 ```
 See the [cloud infrastructure](../docs/cloud.md) for more details.
-=======
->>>>>>> 739d3206 (updated to docs)
+
+**7. Build the Afon CLI locally**
 
 ```md
-Given a local system (linux or macos)
+As a cloud engineer
+I want to build the Afon CLI locally
+So that I can deploy Polaris
+```
+
+**Depends on:** Task 1-6
+
+**Acceptance criteria**
+
+```md
+Given a local system 
 When we run the following build action via the afon.sh script
 Then the Afon CLI are built for the chosen cloud
-```
-**How to do it**
-
-
-```shell
-./afon.sh -a setup-local -c <cloud>
 ```
 
 ```shell
@@ -253,24 +217,27 @@ The CLI build artifacts are available in `~/.afon/cli`.
 ./.afon/cli/afon-cli.sh 
 ```
 
-**6. Deploy the Afon Polaris stack**
+**8. Deploy the Afon Polaris stack**
 
 ```md
-As a deployment engineer
+As a cloud engineer
 I want to run the Afon data provider deployment against our cloud environment
 So that Polaris is are running in the Kubernetes cluster with the catalog configured, ready to receive synthetic data
 ```
 
-**Depends on:** Tasks 1-5
+**Depends on:** Tasks 1-7
 
 **Acceptance criteria**
 
 ```md
-Given tasks 1-5 are complete
-When the following command is executed
-Then the steps are completed without failure
+Given tasks 1-7 are completed
+When the following CLI deploy command is executed
+Then all the steps are completed successfully
 ```
 
+```shell
+./afon.sh -a cli --cli-cmd deploy-<cloud>-polaris-stack
+```
 
 ```md
 Given the Polaris stack is up
@@ -284,64 +251,36 @@ When we deploy the Polaris server associated with the <CLOUD>_DOMAIN_NAME
 Then the URL https://<CLOUD_DOMAIN_NAME> loads with a valid TLS certificate and no browser certificate warnings.
 ```
 
-**How to do it**
-
-```shell
-./afon.sh -a stack-deploy --stack-type polaris -c <cloud>
-```
-
-```shell
-./afon.sh -a stack-status --stack-type polaris -c <cloud>
-```
-
-
-
-**7. Integration with Keycloak and OIDC**
-
-```md
-As a deployment engineer
-I want to create Polaris roles that are validated using a keycloak OIDC token
-So that I can confirm external users can reach Polaris securely before giving access to the organisation's users.
-```
-
-**Depends on:** Task 6
-
-**Acceptance criteria**
-
-```md
-Given Polaris is deployed with an OIDC tenant and a Keycloak server exists with appropriate users created  
-When an access_token is requred using the appropriate OIDC token  
-Then a valid access_token is received with no TLS certificate warnings and the following command returns synthetic tables.
-```
-
-```shell
-curl -X GET "https://<polaris-domain>/api/catalog/v1/<cloud>/namespaces/<namespace>/tables/<table>" \ 
-     -H "Authorization: Bearer ${TOKEN}" | jq
-```
-
 ## **Resourcing: technical**
 
 Indicative time and the role we'd typically expect it to sit with, against each task above — based on Emrys's resourcing plan for Phase One (indicatively ~4 days total technical time per SDE) and confirmed individually with your technical lead at kickoff. There are a range of technical roles across SDEs and we are mindful of capacity over the summer. We’ll work with you to support available technical leads with the build.
 
 Ideally, technical leads would become confident to deploy the data fabric in their own environment. 
-*Total indicative technical ask: 
+*Total indicative technical ask: ~4 days (~30 hrs against a 7.5-hour day) per SDE over project duration — roughly 0.4 day/week, ≈0.08 WTE.*
 
 <table>
   <tr>
    <td><strong>Task</strong>
    </td>
    <td><strong>Indicative time</strong>
+   </td>
+   <td><strong>Needed by</strong>
+   </td>
   </tr>
   <tr>
    <td>1. Cloud app registration & role assignments
    </td>
-   <td>~1 hour
+   <td>~0.5 day (2–4 hrs)
+   </td>
+   <td>w/c 3 Aug
    </td>
   </tr>
   <tr>
    <td>2. Register a domain name
    </td>
-   <td>~1 hour
+   <td>~1–2 hrs, plus registrar lead time
+   </td>
+   <td>w/c 3 Aug
    </td>
   </tr>
   <tr>
@@ -349,30 +288,39 @@ Ideally, technical leads would become confident to deploy the data fabric in the
    </td>
    <td>~2 hrs
    </td>
+   <td>w/c 3 Aug
+   </td>
   </tr>
   <tr>
    <td>4. Create DNS zone & certificate
    </td>
    <td>~0.5 day, plus ~10 min propagation
    </td>
+   <td>w/c 4 Aug — before 7 Aug Logging demo
+   </td>
   </tr>
   <tr>
-   <td>5. Build Afon locally and run automated acceptance tests
+   <td>5. Build Afon CLI locally
    </td>
    <td>~0.5 day
    </td>
-
+   <td>w/c 3 Aug
+   </td>
   </tr>
   <tr>
    <td>6. Deploy the Afon stack
    </td>
-   <td>~0.5 hours
+   <td>~0.5 day
+   </td>
+   <td>w/c 3 Aug — before 7 Aug Logging demo
    </td>
   </tr>
   <tr>
    <td>7. Integration with Keycloak / OIDC
    </td>
    <td>~0.5 day
+   </td>
+   <td>w/c 1 Sep — before 4 Sep Contract→environment demo
    </td>
   </tr>
 </table>
