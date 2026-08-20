@@ -60,6 +60,7 @@ import java.util.stream.Collectors;
 import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DNS_ZONE;
@@ -401,15 +402,18 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             format(
                 "aws eks delete-addon --cluster-name %s --addon-name kube-proxy ||" +
                     " echo no kube-proxy", clusterName));
+        // Both Cilium releases install from a chart vendored into the repo rather than
+        // pulling from https://helm.cilium.io/ on every apply. See CdkUtils#vendoredChart.
+        String ciliumChart = vendoredChart(this, "ciliumChart", "cilium-1.15.0.tgz");
         Release cilium = Release.Builder
             .create(this, "cilium")
             .name("cilium")
-            .repository("https://helm.cilium.io/")
-            .chart("cilium")
+            .chart(ciliumChart)
             .namespace("kube-system")
             .dependsOn(List.of(nodeGroup))
             .provisioners(onCiliumCreation)
-            .version("1.15.0")
+            // No version() — the vendored tarball is the version, and the provider reads it
+            // from the chart's own Chart.yaml.
             // Set the specific values to kill kube-proxy dependency
             .set(java.util.List.of(
                 // 1. Connectivity to EKS Control Plane
@@ -541,9 +545,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         Release.Builder
             .create(this, "hubble-ui")
             .name("hubble-ui")
-            .repository("https://helm.cilium.io/")
-            .chart("cilium")
-            .version("1.15.0")
+            .chart(ciliumChart)
             .namespace("kube-system")
             .dependsOn(List.of(ciliumReady))
             .set(java.util.List.of(
