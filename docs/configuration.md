@@ -31,8 +31,8 @@ The validation checks that all the template properties have a corresponding non-
 The optional `-c <cloud>` allows you to check only the cloud-specific config. 
 
 **IMPORTANT:** Some functionality still requires the config files for all clouds to be present, although only the
-values for the cloud you are using need be completed.  There is an open issue to fix this:  [#159](https://github.com/emrys-health/afon-core/issues/159).  The recommended workaround is the init without specifying 
-the cloud and to validate specifying it.
+values for the cloud you are using need be completed.  There is [open ticket to fix issue](https://github.com/emrys-health/afon-core/issues/159).  
+The recommended workaround is to init without specifying the cloud and to validate specifying it.
 
 ### Command config-import and config-export
 
