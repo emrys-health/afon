@@ -11,11 +11,9 @@ This document outlines the onboarding of participating SDEs for the Afon data fa
 This includes:
 
 * the technical tasks and who they typically sit with
-* the non-technical asks drawn from our test framework
 * what the commitment is in time and resource
-* workshops and demo cadence
 
-In terms of budgeting for capacity and cost, time is shown as an indicative person-time estimate (hours/days) against a standard 7.5-hour day; where an ask recurs weekly, it is also given as a WTE fraction (e.g. 0.1 WTE ≈ 0.5 day/week). All estimates flex to your team's capacity — please flag early if something doesn't fit.
+In terms of budgeting for capacity and cost, time is shown as an indicative person-time estimate (hours/days) against a standard 7.5-hour day; where an ask recurs weekly. All estimates flex to your team's capacity — please flag early if something doesn't fit.
 
 Emrys will work flexibly with all SDEs individually to budget for time, availability and costs.
 
@@ -33,8 +31,6 @@ During a 10-week learning phase beginning in July and ending on 25th September, 
 
 We are testing the feasibility of moving from agreement to multi-organisation research environments that are secure and auditable at the push of a button. We will create infrastructure as code, governance as code and security as code. The TRE is destroyed every day so that no data is persisted and no data leaves the secure research network.
 
-**Technical specification**
-
 **HDRS Data Fabric Feasibility - Technical Tasks for participating SDEs**
 
 Technical task backlog — synthetic Iceberg catalog via Apache Polaris
@@ -45,7 +41,7 @@ Each partner Secure Data Environment will deploy an Apache Polaris catalog (back
 
 This document breaks that work into discrete tasks for a given cloud. Each task is written as a user story with acceptance criteria to support an estimate of effort for the team
 
-The commands within this document can be found within the Afon-core repository. We will need a github user name to add contributors to the project and users created for the Emrys team in the cloud to support with deployment 
+The commands within this document can be found within the Afon-core repository. We will need a github user name to add contributors to the project and users created for the Emrys team in the cloud to support with deployment. 
 
 
 **NOTE:** We assume your chosen cloud is one of AWS, Azure or GCP.
@@ -53,6 +49,8 @@ The commands within this document can be found within the Afon-core repository. 
 In this document the following conventions apply to the name of the cloud/CLOUD variables:
 - the 'cloud' values are in lower case: {aws,azure,gcp}
 - the 'CLOUD' values are in upper case: {AWS,AZURE,GCP}
+
+We are happy to support in any stage of this task list and have developed a CLI to support the 
 
 **Tasks**
 
