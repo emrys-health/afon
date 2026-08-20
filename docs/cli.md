@@ -6,18 +6,35 @@
 
 See [setup local env](setup_local.md).
 
-## Afon CLI files
+## Afon CLI distribution
 
-The Afon CLI is a standalone executable jar which contains all the dependencies it needs.   It can then be distributed 
-without need to have access to Afon source codebase. 
+The Afon CLI distribution is a zip consisting of:
 
-The afon-cli.jar comes with an afon-cli.sh script that sets all the runtime JVM args the jar requires and executes the jar.
-In the following, we assume that the afon-cli files are found in the dir `~/.afon/cli`.
+- afon-cli.jar, a standalone executable which contains all the dependencies it requires
+- afon-cli.sh, a script that sets all the runtime JVM args the jar requires and executes the afon-cli.jar.
+- docs, the docs relating the running of the commands.
+
+The binary distribution `afon-distribution-cli` allows the use of Afon without needing access to the source codebase.
+
+In the following, we assume that the `afon-distribution-cli` zip has been unpacked in the dir `~/.afon/cli`.   
+You can add it to the PATH in your shell so that it can be executed from anywhere:
+
+```shell
+AFON_CLI_DIR=$HOME/.afon/cli
+PATH=$AFON_CLI_DIR:$PATH
+export PATH
+```
+
+In the following, we'll assume that `afon-cli.sh` in the PATH.  Else, simply prefix it with its full path.  
+You don't need to be in the location of the `afon-cli.sh` file to execute it.
 
 Running the `help` command gives a list of all the available CLI commands:
 ```shell
-~/.afon/cli/afon-cli.sh help
+afon-cli.sh help
 ```
+
+The commands are the (kebab-named) versions of the executable Java classes named `*Main` found in package `health.emrys.afon.ops` (in module `afon-ops`).
+
 The script supports the following env variables:
 
 - `AFON_HOME`: the Afon home dir, defaulting to $HOME/.afon.
@@ -28,20 +45,26 @@ The script supports the following env variables:
 For example, to run command with console logging: 
 
 ```shell
-AFON_LOGGING_CONSOLE=INFO ~/.afon/cli/afon-cli.sh <command>
+AFON_LOGGING_CONSOLE=INFO afon-cli.sh <command>
 ```
+
+**IMPORTANT:** the `deploy-*-stack` commands will produce a `cdktf.out` dir, relative to the location where you executed the command from, eg your `$HOME`.   It is important that the `cdktf.out` dir not be removed because the `delete-*-stack` commands will need it
+to retrieve the information to destroy the stack that has been deployed.   Be sure to execute the `afon-cli.sh` from a location 
+which is not ephemeral, eg a source checkout.
+
+## CLI configuration 
+
+The CLI requires the [configuration](configuration.md) to be completed for the cloud env you are targetting.
 
 ## Stack deployment
 
 To deploy a stack, using the CLI command, we run the corresponding command:
 
 ```shell
-~/.afon/cli/afon-cli.sh deploy-aws-full-stack
-~/.afon/cli/afon-cli.sh deploy-azure-polaris-stack
-~/.afon/cli/afon-cli.sh deploy-gcp-polaris-stack
+afon-cli.sh deploy-aws-full-stack
+afon-cli.sh deploy-azure-polaris-stack
+afon-cli.sh deploy-gcp-polaris-stack
 ```
-
-The credentials in the cloud-specific env properties in [config dir](configuration.md) are used by the deployed Polaris instance.
 
 **NOTE:** Currently, only AWS has the full stack.
 Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.
@@ -51,7 +74,7 @@ Azure and GCP just host Polaris at the moment. There's no particular reason for 
 The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-~/.afon/cli/afon-cli.sh deploy-aws-full-stack
+afon-cli.sh deploy-aws-full-stack
 ```
 Steps executed:
 
@@ -64,14 +87,14 @@ Steps executed:
 ### Deploy Azure Polaris only
 
 ```shell
-~/.afon/cli/afon-cli.sh deploy-azure-polaris-stack
+afon-cli.sh deploy-azure-polaris-stack
 ```
 Steps: `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
 
 ### Deploy GCP Polaris only
 
 ```shell
-~/.afon/cli/afon-cli.sh deploy-gcp-polaris-stack
+afon-cli.sh deploy-gcp-polaris-stack
 ```
 Steps: `clean_gcp` → `gcp_polaris` → `wait_on_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
 
@@ -80,7 +103,7 @@ Steps: `clean_gcp` → `gcp_polaris` → `wait_on_emryspolarisgcp` → `all_cata
 To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate to Azure Polaris for cross-cloud querying.
 
 ```shell
-~/.afon/cli/afon-cli.sh deploy-external-catalogs
+afon-cli.sh deploy-external-catalogs
 ```
 
 Steps: `clean_aws` → `aws_spark` → `wait_on_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
@@ -90,6 +113,6 @@ Steps: `clean_aws` → `aws_spark` → `wait_on_emryspolaris` → `all_catalogs_
 If a deployment fails partway through, you can resume from a specific step, e.g.:
 
 ```shell
-~/.afon/cli/afon-cli.sh deploy-external-catalogs "azure_polaris"
+afon-cli.sh deploy-external-catalogs "azure_polaris"
 ```
 

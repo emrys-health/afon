@@ -95,7 +95,7 @@
         <profile>
             <id>distribution</id>
             <activation>
-                <activeByDefault>true</activeByDefault>
+                <activeByDefault>false</activeByDefault>
             </activation>
             <modules>
                 <module>afon-distribution</module>
