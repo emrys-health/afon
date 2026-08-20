@@ -47,7 +47,6 @@ This document breaks that work into discrete tasks for a given cloud. Each task 
 
 The commands within this document can be found within the Afon-core repository. We will need a github user name to add contributors to the project and users created for the Emrys team in the cloud to support with deployment 
 
-This document provides the detailed tasks required for a deployment to a given cloud.
 
 **NOTE:** We assume your chosen cloud is one of AWS, Azure or GCP.
 
