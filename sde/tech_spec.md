@@ -119,10 +119,10 @@ This document provides the detailed tasks required for an deployment with Azure.
   </tr>
 </table>
 
-**NOTE:** We assume your chosen cloud is one of AWS, Azure or GCP.
+**NOTE:** We assume your chosen cloud is one of Azure.
 In this doc the following conventions apply to the name of the cloud/CLOUD variables:
-- the 'cloud' values are in lower case: {aws,azure,gcp}
-- the 'CLOUD' values are in upper case: {AWS,AZURE,GCP}
+- the 'cloud' values are in lower case: {azure}
+- the 'CLOUD' values are in upper case: {AZURE}
 
 **1. Provision app registration & role assignments for chosen cloud**
 
@@ -169,22 +169,7 @@ Given my organisation's chosen cloud, account details, region, bucket names and 
 When configuration properties are set up, both the common ones and the cloud specific ones,
 Then all the configuration properties are replaced with real, env-specific values
 ```
-
-```shell
-./afon.sh -a config-init -c <cloud>
-```
-
-You can also import config files as a zip:
-```shell
-./afon.sh -a config-{import|export} --config-zip <path-to-config-zip>
-```
-
-After the config files are completed (or imported) you can validate them:
-```shell
-./afon.sh -a config-validate -c <cloud>
-```
-
-**Acceptance criteria**
+**How to do it**
 
 Follow the [configuration](../docs/configuration.md) documentation.
 
@@ -198,6 +183,14 @@ So that cloud-hosted traffic resolves correctly and can be served over HTTPS
 **Depends on:** Task 1-3
 
 **Acceptance criteria**
+
+```md
+Given a domain name
+When DNS records are created
+And the certificates are issued
+Then the domain is configured to resolve to the Polaris endpoint
+```
+**How to do it**
 
 Follow the [DNS configuration](../docs/dns_config.md) documentation.
 
@@ -219,6 +212,7 @@ When we run the following setup-local action for cloud <cloud> via the afon.sh s
 Then the Afon build env is setup locally for cloud <cloud>
 ```
 
+<<<<<<< HEAD
 ```shell
 ./afon.sh -a setup-local -c <cloud>
 ```
@@ -234,11 +228,19 @@ Then the Afon env is created for cloud <cloud>
 ./afon.sh -a exec -t script --exec-script <cloud>/create.sh 
 ```
 See the [cloud infrastructure](../docs/cloud.md) for more details.
+=======
+>>>>>>> 739d3206 (updated to docs)
 
 ```md
 Given a local system (linux or macos)
 When we run the following build action via the afon.sh script
 Then the Afon CLI are built for the chosen cloud
+```
+**How to do it**
+
+
+```shell
+./afon.sh -a setup-local -c <cloud>
 ```
 
 ```shell
@@ -269,9 +271,6 @@ When the following command is executed
 Then the steps are completed without failure
 ```
 
-```shell
-./afon.sh -a stack-deploy --stack-type polaris -c <cloud>
-```
 
 ```md
 Given the Polaris stack is up
@@ -279,15 +278,23 @@ When the following commands are executed:  `kubectl get pods`
 Then the Polaris pod shows Running/Ready and the ingress has an address assigned.
 ```
 
-```shell
-./afon.sh -a stack-status --stack-type polaris -c <cloud>
-```
-
 ```md
 Given the domain <CLOUD>_DOMAIN_NAME is registered 
 When we deploy the Polaris server associated with the <CLOUD>_DOMAIN_NAME  
 Then the URL https://<CLOUD_DOMAIN_NAME> loads with a valid TLS certificate and no browser certificate warnings.
 ```
+
+**How to do it**
+
+```shell
+./afon.sh -a stack-deploy --stack-type polaris -c <cloud>
+```
+
+```shell
+./afon.sh -a stack-status --stack-type polaris -c <cloud>
+```
+
+
 
 **7. Integration with Keycloak and OIDC**
 
@@ -317,31 +324,24 @@ curl -X GET "https://<polaris-domain>/api/catalog/v1/<cloud>/namespaces/<namespa
 Indicative time and the role we'd typically expect it to sit with, against each task above — based on Emrys's resourcing plan for Phase One (indicatively ~4 days total technical time per SDE) and confirmed individually with your technical lead at kickoff. There are a range of technical roles across SDEs and we are mindful of capacity over the summer. We’ll work with you to support available technical leads with the build.
 
 Ideally, technical leads would become confident to deploy the data fabric in their own environment. 
-*Total indicative technical ask: ~4 days (~30 hrs against a 7.5-hour day) per SDE over project duration — roughly 0.4 day/week, ≈0.08 WTE.*
+*Total indicative technical ask: 
 
 <table>
   <tr>
    <td><strong>Task</strong>
    </td>
    <td><strong>Indicative time</strong>
-   </td>
-   <td><strong>Needed by</strong>
-   </td>
   </tr>
   <tr>
    <td>1. Cloud app registration & role assignments
    </td>
-   <td>~0.5 day (2–4 hrs)
-   </td>
-   <td>w/c 3 Aug
+   <td>~1 hour
    </td>
   </tr>
   <tr>
    <td>2. Register a domain name
    </td>
-   <td>~1–2 hrs, plus registrar lead time
-   </td>
-   <td>w/c 3 Aug
+   <td>~1 hour
    </td>
   </tr>
   <tr>
@@ -349,15 +349,11 @@ Ideally, technical leads would become confident to deploy the data fabric in the
    </td>
    <td>~2 hrs
    </td>
-   <td>w/c 3 Aug
-   </td>
   </tr>
   <tr>
    <td>4. Create DNS zone & certificate
    </td>
    <td>~0.5 day, plus ~10 min propagation
-   </td>
-   <td>w/c 4 Aug — before 7 Aug Logging demo
    </td>
   </tr>
   <tr>
@@ -365,23 +361,18 @@ Ideally, technical leads would become confident to deploy the data fabric in the
    </td>
    <td>~0.5 day
    </td>
-   <td>w/c 3 Aug
-   </td>
+
   </tr>
   <tr>
    <td>6. Deploy the Afon stack
    </td>
-   <td>~0.5 day
-   </td>
-   <td>w/c 3 Aug — before 7 Aug Logging demo
+   <td>~0.5 hours
    </td>
   </tr>
   <tr>
    <td>7. Integration with Keycloak / OIDC
    </td>
    <td>~0.5 day
-   </td>
-   <td>w/c 1 Sep — before 4 Sep Contract→environment demo
    </td>
   </tr>
 </table>
