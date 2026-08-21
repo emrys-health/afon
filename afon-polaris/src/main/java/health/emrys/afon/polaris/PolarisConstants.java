@@ -6,8 +6,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.config.ConfigConstants.cloudPropertySet;
-import static health.emrys.afon.config.ConfigConstants.cloudPropertyValue;
+import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
+import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
 
 public class PolarisConstants {
     /**

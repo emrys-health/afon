@@ -6,6 +6,19 @@ import static java.lang.String.format;
 
 public class ConfigUtils {
     /**
+     * System property selecting a given cloud provider.
+     */
+    public static final String CLOUD_SYSTEM_PROPERTY = "afon.cloud";
+    /**
+     * System property {@link #CLOUD_SYSTEM_PROPERTY} value for selecting all cloud providers.
+     * The following will obtain the same result:
+     *
+     * - Setting a blank value
+     * - Not setting the system property
+     */
+    public static final String CLOUD_ALL = "ALL";
+
+    /**
      * Returns the dir specified by system property ${afon.home}.
      * If not found it defaults to $HOME/.afon
      *
@@ -51,5 +64,23 @@ public class ConfigUtils {
      */
     public static @NonNull String tfStatePath(AfonCloud id) {
         return format("%s/terraform.%s.tfstate", cdktfDir(), id);
+    }
+
+    /**
+     * Checks if system property {@link #CLOUD_SYSTEM_PROPERTY} is set.
+     * @return true if property value is not null, not blank and not equal (ignoring case) to {@link #CLOUD_ALL}.
+     */
+    public static boolean cloudPropertySet() {
+        String value = System.getProperty(CLOUD_SYSTEM_PROPERTY);
+        if ( value != null && !value.isBlank() && !value.equalsIgnoreCase(CLOUD_ALL)) return true;
+        return false;
+    }
+
+    /**
+     * Return system property {@link #CLOUD_SYSTEM_PROPERTY}.
+     * @return the property, whose value must be check by {@link #cloudPropertySet()}.
+     */
+    public static String cloudPropertyValue() {
+        return System.getProperty(CLOUD_SYSTEM_PROPERTY);
     }
 }
