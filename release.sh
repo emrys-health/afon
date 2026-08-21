@@ -17,13 +17,19 @@ if [ -z "$VERSION" ] || [ -z "$QUALIFIER" ] || [ -z "$NEXT" ] ; then
 fi
 
 CWD=`pwd`
-MVN="mvn -s $CWD/settings.xml"
+MVN="mvn -q -s $CWD/settings.xml"
 PROFILES=cli,distribution
 NAME="afon"
 TAG="$NAME-$VERSION"
+
+echo "Preparing release $TAG ($QUALIFIER)."
 
 $MVN --batch-mode release:prepare -P$PROFILES -DreleaseVersion=$VERSION -Dtag=$TAG -DdevelopmentVersion=$NEXT
 $MVN release:perform -P$PROFILES
 
 echo "Release $TAG ($QUALIFIER) completed."
+MAVEN_DEPLOY_SKIP=$(mvn help:evaluate -Dexpression=maven.deploy.skip -q -DforceStdout)
+if [ "$MAVEN_DEPLOY_SKIP" == "true" ]; then
+  echo "Maven deploy has been skipped"
+fi
 
