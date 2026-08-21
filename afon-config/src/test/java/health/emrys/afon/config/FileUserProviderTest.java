@@ -6,7 +6,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class AfonUsersTest {
+public class FileUserProviderTest {
 
     static String CONFIG_DIR = "src/test/resources/config";
 

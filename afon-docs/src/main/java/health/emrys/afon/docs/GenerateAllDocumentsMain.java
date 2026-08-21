@@ -10,8 +10,8 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
-import static health.emrys.afon.config.ConfigConstants.cloudPropertySet;
-import static health.emrys.afon.config.ConfigConstants.cloudPropertyValue;
+import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
+import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class GenerateAllDocumentsMain {
