@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -29,7 +30,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
-import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
@@ -42,32 +44,54 @@ public class StepActions {
 
     @NonNull Path deleteStack(AfonCloud id) throws IOException {
         Path stackDir = stackDir(id);
-        if (stackDir.toFile().exists()) {
-            tofuDestroy(stackDir);
-            deletePath(stackDir);
-        } else {
-            logger.info("Directory {} does not exist so starting afresh", stackDir);
-        }
-        deleteTerraformStateFiles(id);
+        tofuDestroy(stackDir);
+        deletePath(stackDir);
+        deleteTfStateFiles(id);
         return stackDir;
     }
 
-    void deleteTerraformStateFiles(AfonCloud id) throws IOException {
-        deleteTerraformStateFiles(List.of(".", ".."), id);
+    private @NonNull Path stackDir(AfonCloud id) throws IOException {
+        Path stackDir = Path.of(ConfigUtils.stackDir(id));
+        logger.info("Using stack dir {}", stackDir);
+        if (!Files.exists(stackDir)){
+            stackDir.toFile().mkdirs();
+            logger.info("Created new stack dir {}, as it did not exist.", stackDir);
+        }
+        return stackDir;
     }
 
-    private void deleteTerraformStateFiles(List<String> dirs,
-                                           AfonCloud id) throws IOException {
-        for ( String dir : dirs ){
-            Files.list(Path.of(dir))
-                    .filter(x -> {
-                        String fileName = x.getFileName().toString();
-                        return fileName.startsWith(TERRAFORM_STATE_FILE_PATTERN + id)
-                                && fileName.endsWith(".tfstate");
-                    })
-                    .forEach(x -> {
-                        deletePath(x);
-                    });
+    private void tofuDestroy(Path tofuDir) {
+        try {
+            logger.info("Stopping {} if it's running already...", tofuDir);
+            run("tofu", tofuDir, "init");
+            if (run("tofu", tofuDir, "destroy", "--auto-approve") != 0) {
+                String msg = String.format("""
+                Failed to destroy %s. Your environment may be in an unstable state.
+                It may be that something irrelevant (like a Helm chart) is blocking the destroy.
+                If so, remove it with something like:
+                    tofu state rm 'helm_release.prometheusRelease'
+                and tofu destroy again.
+                
+                If you're sure nothing in the environment is still running, delete directory %s
+                """, tofuDir, tofuDir);
+                logger.error(msg);
+                throw new RuntimeException(msg);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to call tofu destroy in " + tofuDir, e);
+        }
+    }
+
+    void deleteTfStateFiles(AfonCloud id) throws IOException {
+        deletePath(Path.of(tfStatePath(id)));
+    }
+
+    void deletePath(Path path) {
+        logger.info("Deleting path {}", path);
+        try {
+            PathUtils.delete(path);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -94,7 +118,7 @@ public class StepActions {
         // google_container_cluster resource and uses GKE's built-in CNI, so the targeted apply
         // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
         // Stacks without a managed cluster yield no targets and skip straight to the full apply.
-        Path         stackDir    = stackDir(id);
+        Path stackDir = stackDir(id);
         List<String> bootstrapTargets = clusterBootstrapTargets(stackDir);
         tofuApply(stackDir, bootstrapTargets);
     }
@@ -127,32 +151,6 @@ public class StepActions {
             Files.createDirectories(kubeConfig.getParent());
             Files.createFile(kubeConfig);
         }
-    }
-
-    private void tofuDestroy(Path tofuDir) {
-        try {
-            logger.info("Stopping {} if it's running already...", tofuDir);
-            run("tofu", tofuDir, "init");
-            if (run("tofu", tofuDir, "destroy", "--auto-approve") != 0) {
-                String msg = String.format("""
-                Failed to destroy %s. Your environment may be in an unstable state.
-                It may be that something irrelevant (like a Helm chart) is blocking the destroy.
-                If so, remove it with something like:
-                    tofu state rm 'helm_release.prometheusRelease'
-                and tofu destroy again.
-                
-                If you're sure nothing in the environment is still running, delete directory %s
-                """, tofuDir, tofuDir);
-                logger.error(msg);
-                throw new RuntimeException(msg);
-            }
-        } catch (Exception e) {
-            logger.error("Failed to call tofu destroy in " + tofuDir, e);
-        }
-    }
-
-    private @NonNull Path stackDir(AfonCloud id) {
-        return Path.of("cdktf.out", "stacks", id.toString());
     }
 
     /**
@@ -307,15 +305,6 @@ public class StepActions {
                 azureBucket,
                 azureStorageAccount,
                 latest.getName());
-    }
-
-    void deletePath(Path path) {
-        logger.info("Deleting path {}", path);
-        try {
-            PathUtils.delete(path);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private void restoreSystemProperties(Properties properties, Properties original) {

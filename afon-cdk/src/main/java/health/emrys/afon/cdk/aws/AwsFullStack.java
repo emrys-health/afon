@@ -1,11 +1,12 @@
 package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
-import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 public class AwsFullStack extends AwsTrinoStack {
 
@@ -224,7 +226,8 @@ public class AwsFullStack extends AwsTrinoStack {
               # All long-term data (chunks, index, ruler rules) is shipped to
               # S3. Credentials come from afon.properties / secret.properties via
               # AfonProperty — the rendered values land in the local tofu
-              # state and cdktf.out (both gitignored), not in git history.
+              # state and the synthesized stack dir under $AFON_HOME/cdktf
+              # (both gitignored), not in git history.
               storage:
                 type: s3
                 bucketNames:
@@ -336,7 +339,9 @@ public class AwsFullStack extends AwsTrinoStack {
 
     public static void main(String[] args) {
         logger.info("Creating full stack");
-        final App app = new App();
+        final App app = new App(AppConfig.builder()
+                .outdir(cdktfDir())
+                .build());
         try {
             new AwsFullStack(app, AWS, new FilePropertyProvider());
             app.synth();

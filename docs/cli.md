@@ -48,9 +48,7 @@ For example, to run command with console logging:
 AFON_LOGGING_CONSOLE=INFO afon-cli.sh <command>
 ```
 
-**IMPORTANT:** the `deploy-*-stack` commands will produce a `cdktf.out` dir, relative to the location where you executed the command from, eg your `$HOME`.   It is important that the `cdktf.out` dir not be removed because the `delete-*-stack` commands will need it
-to retrieve the information to destroy the stack that has been deployed.   Be sure to execute the `afon-cli.sh` from a location 
-which is not ephemeral, eg a source checkout.
+**IMPORTANT:** the `deploy-*-stack` commands will used `$AFON_HOME/cdktf` as their output dir.
 
 ## CLI configuration 
 

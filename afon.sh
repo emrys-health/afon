@@ -282,7 +282,7 @@ exec_stack(){
 
 exec_tofu(){
   echo "tofu targetting cloud '$TOFU_CLOUD'"
-  TOFU_DIR="afon-ops/cdktf.out/stacks/$TOFU_CLOUD"
+  TOFU_DIR="$AFON_HOME/cdktf/stacks/$TOFU_CLOUD"
   if [ ! -d "$TOFU_DIR" ]; then
      echo "Dir $TOFU_DIR not found.  Execute deploy or configure actions first."
      usage; exit 0
