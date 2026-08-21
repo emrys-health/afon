@@ -23,7 +23,7 @@ NAME="afon"
 TAG="$NAME-$VERSION"
 
 $MVN --batch-mode release:prepare -P$PROFILES -DreleaseVersion=$VERSION -Dtag=$TAG -DdevelopmentVersion=$NEXT
-#$MVN release:perform -P$PROFILES
+$MVN release:perform -P$PROFILES
 
 echo "Release $TAG ($QUALIFIER) completed."
 

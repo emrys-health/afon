@@ -262,7 +262,7 @@
                     <configuration>
                         <autoVersionSubmodules>true</autoVersionSubmodules>
                         <preparationGoals>clean install</preparationGoals>
-                        <goals>install</goals> <!-- changed from deploy -->
+                        <goals>deploy</goals>
                         <pushChanges>false</pushChanges>
                         <localCheckout>true</localCheckout>
                     </configuration>
