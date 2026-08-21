@@ -18,12 +18,12 @@ Next:       next snapshot version
 
 For example, to release a preview version but remain on the same SNAPSHOT version: 
 ```shell
-./release 1.0-beta-1 preview 1.0-SNAPSHOT
+./release.sh 1.0-beta-1 preview 1.0-SNAPSHOT
 ```
 
 To release a stable version and move to the next SNAPSHOT version:
 ```shell
-./release 1.0 stable 1.1-SNAPSHOT
+./release.sh 1.0 stable 1.1-SNAPSHOT
 ```
 
 **NOTE:** For the moment, the deploy stage of the release to a Repository Manager is disabled,
