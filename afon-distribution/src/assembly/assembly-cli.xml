@@ -13,6 +13,7 @@
       <unpack>false</unpack>
       <scope>runtime</scope>
       <outputDirectory>/</outputDirectory>
+      <outputFileNameMapping>afon-cli.jar</outputFileNameMapping>
       <includes>
         <include>${project.groupId}:afon-cli</include>
       </includes>
