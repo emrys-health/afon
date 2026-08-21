@@ -1,13 +1,13 @@
 package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.TerraformStack;
+import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.AfonCloudStack;
+import health.emrys.afon.cdk.AbstractCloudStack;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -20,8 +20,9 @@ import java.util.Map;
 
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
-public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
+public class AwsPolarisStack extends AbstractCloudStack {
 
     protected final PolarisConfig polarisConfig;
     protected final AwsCloudProvider cloudProvider;
@@ -31,7 +32,7 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
     public AwsPolarisStack(@NonNull Construct scope,
                            AfonCloud id,
                            AfonPropertyProvider properties) {
-        super(scope, id.toString());
+        super(scope, id);
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
         cloudProvider = new AwsCloudProvider(this, id.toString(), properties);
@@ -81,7 +82,9 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App();
+        final App app = new App(AppConfig.builder()
+                .outdir(cdktfDir())
+                .build());
         new AwsPolarisStack(app, AWS, new FilePropertyProvider());
         app.synth();
     }

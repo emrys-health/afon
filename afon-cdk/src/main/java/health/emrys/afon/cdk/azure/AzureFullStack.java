@@ -1,12 +1,14 @@
 package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import health.emrys.afon.cdk.*;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
@@ -15,19 +17,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
-
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_PORT;
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_SVC_NAME;
-import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
+import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.config.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 public class AzureFullStack extends AzurePolarisStack {
 
     private final String TLS_SECRET_NAME = "jupyter-secret";
 
-    public AzureFullStack(Construct scope, String id, AfonPropertyProvider properties) {
+    public AzureFullStack(Construct scope, AfonCloud id, AfonPropertyProvider properties) {
         super(scope, id, properties);
 
         // The Azure CNI (Cilium) data plane is not necessarily ready the moment the
@@ -107,8 +109,10 @@ public class AzureFullStack extends AzurePolarisStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App();
-        new AzureFullStack(app, AZURE.toString(), new FilePropertyProvider());
+        final App app = new App(AppConfig.builder()
+                .outdir(cdktfDir())
+                .build());
+        new AzureFullStack(app, AZURE, new FilePropertyProvider());
         app.synth();
     }
 
