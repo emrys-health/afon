@@ -66,6 +66,9 @@
         <spark.compat.version>4.0</spark.compat.version>
         <spark.version>${spark.compat.version}.1</spark.version>
         <!-- distribution -->
+        <!-- Skip maven deploy until RM setup-->
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <github.packages.url>https://maven.pkg.github.com/emrys-health/afon-core</github.packages.url>
         <sonatype.nexus.url>https://s01.oss.sonatype.org</sonatype.nexus.url>
     </properties>
 
@@ -268,12 +271,11 @@
                     </configuration>
                 </plugin>
                 <plugin>
-                    <!-- Skip deploy until RM is setup-->
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-deploy-plugin</artifactId>
                     <version>3.1.4</version>
                     <configuration>
-                        <skip>true</skip>
+                        <skip>${maven.deploy.skip}</skip>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -391,7 +393,7 @@
                 <repository>
                     <id>github-maven-packages</id>
                     <name>GitHub Maven Packages</name>
-                    <url>https://maven.pkg.github.com/emrys-health/afon-core</url>
+                    <url>${github.packages.url}</url>
                 </repository>
             </distributionManagement>
         </profile>
