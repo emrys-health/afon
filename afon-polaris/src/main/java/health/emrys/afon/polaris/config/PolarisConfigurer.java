@@ -1,7 +1,7 @@
 package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.polaris.catalogs.PolarisCatalog;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.polaris.catalogs.PolarisCatalog;
 import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
@@ -12,7 +12,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 
 import static java.lang.String.format;
 
@@ -111,20 +112,35 @@ public class PolarisConfigurer {
         return format("%s/api/catalog/v1/oauth/tokens", endpoint);
     }
 
-    public HttpResponse[] configureCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
+    /**
+     * Creates a catalog and, depending on {@link PolarisCatalog#adminGrants()},
+     * additionally invokes {@link #adminGrantsCatalog(PolarisCatalog)}.
+     *
+     * @param catalog the {@link PolarisCatalog}
+     * @return A List of {@link HttpResponse}
+     * @throws IOException
+     * @throws IncorrectConfigException
+     */
+    public List<HttpResponse> configureCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
         logger.info("Access token {}", accessToken);
-        HttpResponse[] responses = new HttpResponse[]{
-            createCatalog(catalog),
-            client.put(
-                catalogRolesAdminGrantsURI(catalog.catalogName()),
-                catalog.catalogAdminGrants(),
-                accessToken),
-            };
+        List<HttpResponse> responses = new ArrayList<>();
+        responses.add(createCatalog(catalog));
+        if ( catalog.adminGrants() ){
+            responses.add(adminGrantsCatalog(catalog));
+        }
         logIfProblems(responses);
         return responses;
     }
 
-    public  HttpResponse createCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
+    private HttpResponse adminGrantsCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
+        return client.put(
+                catalogRolesAdminGrantsURI(catalog.catalogName()),
+                catalog.catalogAdminGrants(),
+                accessToken);
+    }
+
+    // TODO: check if catalog exist before attempting to delete it
+    public HttpResponse createCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
         client.delete(catalogsURI(catalog.catalogName()), accessToken); // this failing is expected if there is no catalog
         return client.post(
             catalogsURI(),
@@ -153,14 +169,14 @@ public class PolarisConfigurer {
         logger.info("Deleting principal {}", principalName);
         String uri = principalsURI() + "/" + principalName;
         try (ClassicHttpResponse response = client.delete(uri, accessToken)) {
-            logger.info("Deleting {} resulted in HTTP code {}", principalName, response.getCode());
+            logger.info("Deleting principal {} resulted in HTTP code {}", principalName, response.getCode());
             logIfProblem(response);
             return response;
         }
     }
 
-    private static void logIfProblems(HttpResponse[] responses) {
-        Arrays.stream(responses).forEach(PolarisConfigurer::logIfProblem);
+    private static void logIfProblems(List<HttpResponse> responses) {
+        responses.stream().forEach(PolarisConfigurer::logIfProblem);
     }
 
     private static void logIfProblem(HttpResponse response) {
