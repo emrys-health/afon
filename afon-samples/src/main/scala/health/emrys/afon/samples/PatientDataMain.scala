@@ -2,7 +2,7 @@ package health.emrys.afon.samples
 
 import health.emrys.afon.config.AfonCloud._
 import health.emrys.afon.cluster.ClusterPolarisConfiguration
-import health.emrys.afon.config.AfonCloud
+import health.emrys.afon.config.{AfonCloud, AfonPropertyProvider, FilePropertyProvider}
 import health.emrys.afon.samples.SampleData.{occupancyDataset, patientDataset}
 import health.emrys.afon.ops.spark.SparkSessionFactory
 import org.apache.spark.sql.SparkSession
@@ -27,8 +27,9 @@ object PatientDataMain {
   val logger = org.slf4j.LoggerFactory.getLogger(classOf[PatientDataMain])
 
   def main(array: Array[String]): Unit = {
-    val spark: SparkSession = initSpark
-    val cluster = new ClusterPolarisConfiguration();
+    val properties = new FilePropertyProvider()
+    val spark: SparkSession = initSpark(properties)
+    val cluster = new ClusterPolarisConfiguration(properties);
     logger.info("Initializing Polaris")
     cluster.initializePolaris()
     logger.info("Creating data")
@@ -54,7 +55,7 @@ object PatientDataMain {
     spark.sql(f"CREATE NAMESPACE IF NOT EXISTS $cloud.$NAMESPACE")
   }
 
-  private def initSpark(): SparkSession = {
-    SparkSessionFactory.localSparkClusterPolaris(AfonCloud.AWS)  // AWS for argument's sake...
+  private def initSpark(properties: AfonPropertyProvider): SparkSession = {
+    SparkSessionFactory.localSparkClusterPolaris(AfonCloud.AWS, properties)  // AWS for argument's sake...
   }
 }

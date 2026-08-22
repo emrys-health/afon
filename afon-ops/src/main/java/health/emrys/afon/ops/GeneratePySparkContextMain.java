@@ -3,6 +3,8 @@ package health.emrys.afon.ops;
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.cluster.PolarisClusterCredentials;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -34,8 +36,8 @@ public class GeneratePySparkContextMain {
 
     private final SparkWarehouseConfig polarisConfig;
 
-    public GeneratePySparkContextMain(AfonCloud cloud) {
-        ClusterCredentials credentials = new PolarisClusterCredentials(cloud);
+    public GeneratePySparkContextMain(AfonCloud cloud, AfonPropertyProvider properties) {
+        ClusterCredentials credentials = new PolarisClusterCredentials(cloud, properties);
         polarisId     = credentials.getPolarisId();
         polarisSecret = credentials.getPolarisSecret();
         polarisHost   = credentials.getPolarisHost();
@@ -241,11 +243,13 @@ public class GeneratePySparkContextMain {
     }
 
     public static final void main(String[] args) {
-        AfonCloud polarisCloud = AfonCloud.AWS;
-        if (args.length > 0) {
-            polarisCloud = AfonCloud.valueOf(args[0]);
+        if (args.length == 0) {
+            System.out.printf("%s requires argument: cloud", GeneratePySparkContextMain.class.getSimpleName());
+            return;
         }
-        new GeneratePySparkContextMain(polarisCloud).generatePySparkCode();
+        AfonCloud polarisCloud = AfonCloud.valueOf(args[0]);
+        var properties = new FilePropertyProvider();
+        new GeneratePySparkContextMain(polarisCloud, properties).generatePySparkCode();
     }
 
 

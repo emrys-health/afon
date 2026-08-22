@@ -16,8 +16,8 @@ public class ConfigurePolarisCatalogsMain {
         }
         String credentials = args[0];
         try {
-            PolarisCatalogClient client = new PolarisCatalogClient(new FilePropertyProvider().getProperties());
-            client.configureAllCatalogs(credentials);
+            var properties = new FilePropertyProvider();
+            new PolarisCatalogClient(properties).configureAllCatalogs(credentials);
         } catch (Exception e) {
             logger.error("Failed to configure polaris catalogs", e);
             throw new RuntimeException(e);

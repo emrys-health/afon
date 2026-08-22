@@ -30,6 +30,7 @@ import static java.lang.String.format;
 public class K8sClient {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(K8sClient.class);
+
     private final String clusterName;
 
     public K8sClient(AfonPropertyProvider properties) {
@@ -135,22 +136,4 @@ public class K8sClient {
         Configuration.setDefaultApiClient(client);
     }
 
-    protected void smokeTest() {
-        try {
-            for (V1Pod pod : listPods()) {
-                System.out.printf("Pod: %s, IP: %s%n",
-                                  pod.getMetadata().getName(),
-                                  pod.getStatus().getPodIP());
-            }
-            for (V1Service service : listServices()) {
-                System.out.println(service.getMetadata().getName());
-                List<String> externalIPs = service.getSpec().getExternalIPs();
-                for (String externalIP : externalIPs) {
-                    System.out.println(externalIP);
-                }
-            }
-        } catch (ApiException e) {
-            logger.error("Failed to connect to cluster {}", clusterName, e);
-        }
-    }
 }

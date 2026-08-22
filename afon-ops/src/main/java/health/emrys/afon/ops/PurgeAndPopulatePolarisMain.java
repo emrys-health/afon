@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.PolarisRestClient;
@@ -21,6 +22,7 @@ import java.util.List;
 
 import static health.emrys.afon.cluster.ClusterUtils.isFailure;
 import static health.emrys.afon.config.AfonCloud.*;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -28,13 +30,14 @@ public class PurgeAndPopulatePolarisMain {
 
     private static final Logger logger = getLogger(PurgeAndPopulatePolarisMain.class);
 
+    private final AfonPropertyProvider properties;
     private final PolarisRestClient client;
-    private final String            accessToken;
+    private final String accessToken;
 
-    public PurgeAndPopulatePolarisMain(String domainName) {
-        PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
-        this.domainName  = domainName;
-        this.client      = clientFactory.createClient(domainName, new FilePropertyProvider().getProperties());
+    public PurgeAndPopulatePolarisMain(AfonPropertyProvider properties) {
+        this.properties = properties;
+        this.domainName  = this.properties.getValue(POLARIS_ENDPOINT);
+        this.client      = PolarisRestClientFactory.clientFactory().createClient(domainName, properties);
         this.accessToken = client.getAccessToken();
         logger.debug("For {}/{}:\nPOLARIS_TOKEN={}", client.getClientId(), client.getClientSecret(), accessToken);
     }
@@ -44,7 +47,7 @@ public class PurgeAndPopulatePolarisMain {
 
     public void createAllCatalogs() throws IncorrectConfigException, IOException {
         purgeRecursivelyForAllCatalogs(domainName);
-        EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(domainName);
+        EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(properties);
         config.initializePolaris();
     }
 
@@ -123,8 +126,14 @@ public class PurgeAndPopulatePolarisMain {
     }
 
     public static void main(String[] args) {
-        String                  host = args[0];
-        PurgeAndPopulatePolarisMain app  = new PurgeAndPopulatePolarisMain(host);
+        if (args.length == 0) {
+            System.out.printf("%s requires argument: polaris-endpoint", PurgeAndPopulatePolarisMain.class.getSimpleName());
+            return;
+        }
+        String endpoint = args[0];
+        AfonPropertyProvider properties = new FilePropertyProvider();
+        properties.setValue(POLARIS_ENDPOINT, args[0]);
+        PurgeAndPopulatePolarisMain app = new PurgeAndPopulatePolarisMain(properties);
         try {
             if (args.length == 1) {
                 app.createAllCatalogs();
@@ -132,7 +141,7 @@ public class PurgeAndPopulatePolarisMain {
                 app.cleanTable(AfonCloud.valueOf(args[1]), args[2], args[3]);
             }
         } catch (Exception e) {
-            logger.error("Failed to purge and populate polaris for host {}", host, e);
+            logger.error("Failed to purge and populate Polaris for endpoint {}", endpoint, e);
             throw new RuntimeException(e);
         }
     }

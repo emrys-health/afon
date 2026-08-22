@@ -1,6 +1,7 @@
 package health.emrys.afon.cluster;
 
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import health.emrys.afon.polaris.config.PolarisCatalogClient;
 import org.apache.hc.core5.http.HttpResponse;
@@ -9,7 +10,6 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.function.Function;
 
 import static health.emrys.afon.polaris.config.PolarisCatalogClient.addPolarisCredentialsTo;
@@ -18,18 +18,18 @@ public abstract class AbstractPolarisConfiguration {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractPolarisConfiguration.class);
 
-    protected static final Map<AfonCloud, Function<Properties, PolarisCatalog>>
-                                      CLOUD_TO_PROVIDER = Map.of(
-        AfonCloud.AWS, AwsPolarisCatalog::new,
-        AfonCloud.AZURE, AzurePolarisCatalog::new,
-        AfonCloud.GCP, GcpPolarisCatalog::new,
-        AfonCloud.AZURE_EXTERNAL, AzureExternalPolarisCatalog::new,
-        AfonCloud.GCP_EXTERNAL, GcpExternalPolarisCatalog::new
-                                                                );
-    protected final Properties properties;
+    private static final Map<AfonCloud, Function<AfonPropertyProvider, PolarisCatalog>>
+            CLOUD_TO_CATALOG = Map.of(
+            AfonCloud.AWS, AwsPolarisCatalog::new,
+            AfonCloud.AZURE, AzurePolarisCatalog::new,
+            AfonCloud.GCP, GcpPolarisCatalog::new,
+            AfonCloud.AZURE_EXTERNAL, AzureExternalPolarisCatalog::new,
+            AfonCloud.GCP_EXTERNAL, GcpExternalPolarisCatalog::new);
+
+    protected final AfonPropertyProvider properties;
     private final PolarisCatalogClient polarisClient;
 
-    protected AbstractPolarisConfiguration(Properties properties) {
+    protected AbstractPolarisConfiguration(AfonPropertyProvider properties) {
         this.properties = properties;
         this.polarisClient = new PolarisCatalogClient(properties);
     }
@@ -41,14 +41,13 @@ public abstract class AbstractPolarisConfiguration {
             initializePolaris();
         } else if (args.length == 1) {
             AfonCloud cloud = AfonCloud.valueOf(args[0]);
-            initialize(cloud, properties);
+            initialize(cloud, this.properties);
         } else if (args.length == 2) {
             AfonCloud cloud    = AfonCloud.valueOf(args[0]);
-            Properties          external = new Properties();
-            external.putAll(properties);
             String credential = args[1];
             logger.info("Credential: " + credential);
-            initialize(cloud, addPolarisCredentialsTo(credential, external));
+            addPolarisCredentialsTo(credential, properties);
+            initialize(cloud, properties);
         }
     }
 
@@ -63,8 +62,8 @@ public abstract class AbstractPolarisConfiguration {
         return responses;
     }
 
-    public List<HttpResponse> initialize(AfonCloud cloud, Properties properties) throws IncorrectConfigException, IOException {
-        PolarisCatalog cloudConfig = CLOUD_TO_PROVIDER.get(cloud).apply(properties);
+    public List<HttpResponse> initialize(AfonCloud cloud, AfonPropertyProvider properties) throws IncorrectConfigException, IOException {
+        PolarisCatalog cloudConfig = CLOUD_TO_CATALOG.get(cloud).apply(properties);
         return initializePolaris(new PolarisCatalog[]{cloudConfig});
     }
 

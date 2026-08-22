@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
@@ -10,19 +11,18 @@ import java.io.IOException;
 
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 
-public class DeleteCatalogsMain {
+public class DeleteAllCatalogsMain {
 
-    private static final Logger            logger = org.slf4j.LoggerFactory.getLogger(DeleteCatalogsMain.class);
-    private final        String            accessToken;
+    private static final Logger            logger = org.slf4j.LoggerFactory.getLogger(DeleteAllCatalogsMain.class);
+
     private final PolarisRestClient client;
+    private final AfonPropertyProvider properties;
+    private final String accessToken;
 
-    private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
-
-    DeleteCatalogsMain() {
-        client      = clientFactory.createClient(
-            new FilePropertyProvider().getProperties(),
-            "https");
-        accessToken = client.getAccessToken();
+    public DeleteAllCatalogsMain(AfonPropertyProvider properties) {
+        this.properties = properties;
+        this.client = PolarisRestClientFactory.clientFactory().createClient(this.properties, "https");
+        this.accessToken = client.getAccessToken();
     }
 
     private void deleteAll() {
@@ -43,7 +43,8 @@ public class DeleteCatalogsMain {
     }
 
     public static void main(String[] args) {
-        DeleteCatalogsMain app = new DeleteCatalogsMain();
+        var properties = new FilePropertyProvider();
+        DeleteAllCatalogsMain app = new DeleteAllCatalogsMain(properties);
         if (args.length == 0) {
             app.deleteAll();
         } else if (args.length == 1) {

@@ -2,7 +2,8 @@ package health.emrys.afon.ops;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
@@ -27,31 +28,17 @@ import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 public class PurgePolarisSingleMain {
     private static final Logger logger = LoggerFactory.getLogger(PurgePolarisMain.class);
 
-    public static void main(String[] args) {
-        if (args.length == 2) {
-            String domainName  = args[0];
-            String catalogName = args[1];
-            try {
-                new PurgePolarisSingleMain(domainName).purge(catalogName);
-            } catch (Exception e) {
-                logger.error("Failed to purge polaris for domain {}", domainName, e);
-                throw new RuntimeException(e);
-            }
-        } else {
-            logger.error("Domain name and catalog required as first arg");
-        }
-    }
-
     private final PolarisRestClient client;
     private final String            accessToken;
     private final String            domainName;
     private final ObjectMapper      mapper = new ObjectMapper();
+    private final AfonPropertyProvider properties;
 
-    private PurgePolarisSingleMain(String domainName) {
-        PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
-        client          = clientFactory.createClient(domainName, new FilePropertyProvider().getProperties());
+    private PurgePolarisSingleMain(AfonPropertyProvider properties) {
+        this.properties = properties;
+        this.domainName = properties.getValue(AfonProperty.POLARIS_ENDPOINT);
+        client          = PolarisRestClientFactory.clientFactory().createClient(domainName, this.properties);
         accessToken     = client.getAccessToken();
-        this.domainName = domainName;
     }
 
     private void purge(String catalogName) throws IOException, ParseException {
@@ -112,4 +99,23 @@ public class PurgePolarisSingleMain {
         }
         return identifiers;
     }
+
+    public static void main(String[] args) {
+        if (args.length != 2) {
+            System.out.printf("%s requires arguments: domain-name catalog-name", PurgePolarisSingleMain.class.getSimpleName());
+            return;
+        }
+        String domainName  = args[0];
+        String catalogName = args[1];
+        var properties = new FilePropertyProvider();
+        properties.setValue(AfonProperty.POLARIS_ENDPOINT, domainName);
+        try {
+            new PurgePolarisSingleMain(properties).purge(catalogName);
+        } catch (Exception e) {
+            logger.error("Failed to purge Polaris for domain {}", domainName, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+
 }

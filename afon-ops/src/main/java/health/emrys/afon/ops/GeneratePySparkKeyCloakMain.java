@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -10,10 +11,9 @@ import org.slf4j.Logger;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static java.lang.String.format;
 
 /**
@@ -25,10 +25,7 @@ public class GeneratePySparkKeyCloakMain {
 
     private final SparkWarehouseConfig config;
 
-    GeneratePySparkKeyCloakMain(String polarisHost) {
-        log.info("Using {} as the Polaris host");
-        Properties properties = new FilePropertyProvider().getProperties();
-        properties.setProperty(POLARIS_ENDPOINT.getName(), polarisHost);
+    GeneratePySparkKeyCloakMain(AfonPropertyProvider properties) {
         SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
         config = configFactory.getConfig(properties);
     }
@@ -106,10 +103,15 @@ public class GeneratePySparkKeyCloakMain {
     }
 
     public static void main(String[] args) {
-        if (args.length > 0) {
-            String polarisHost = args[0];
-            new GeneratePySparkKeyCloakMain(polarisHost).generateAndSavePySparkCode();
+        if (args.length == 0) {
+            System.out.printf("%s requires argument: polaris-host", GeneratePySparkKeyCloakMain.class.getSimpleName());
+            return;
         }
+        String polarisHost = args[0];
+        log.info("Using {} as the Polaris host");
+        var properties = new FilePropertyProvider();
+        properties.setValue(POLARIS_ENDPOINT, polarisHost);
+        new GeneratePySparkKeyCloakMain(properties).generateAndSavePySparkCode();
     }
 
 

@@ -1,14 +1,11 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.config.PolarisRestClient;
-import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import health.emrys.afon.polaris.config.PermissionsConfigurer;
 import health.emrys.afon.polaris.config.PolarisConfigurer;
+import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
@@ -18,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.Set;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
@@ -45,10 +41,8 @@ public class ConfigurePolarisUsersMain {
     private final String roleName;
     private final String principalRoleName;
 
-    public ConfigurePolarisUsersMain(Properties properties) {
-        PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(
-            POLARIS_ENDPOINT.getValueFrom(properties),
-            properties);
+    public ConfigurePolarisUsersMain(AfonPropertyProvider properties) {
+        PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties);
         accessToken       = client.getAccessToken();
         adminClientId     = client.getClientId();
         endpoint          = client.getEndpoint();
@@ -135,27 +129,24 @@ public class ConfigurePolarisUsersMain {
     }
 
     public static void main(String[] args) {
-        String endpoint = null;
-        String catalogName = null;
-        if (args.length > 1) {
-            endpoint = args[0];
-            catalogName = args[1];
-            logger.info("Using endpoint {} and catalog name {}", endpoint, catalogName);
+        if (args.length < 2) {
+            System.out.printf("%s requires arguments: endpoint catalog-name", ConfigurePolarisUsersMain.class.getSimpleName());
+            return;
         }
-        String principalName = null;
-        if (args.length > 2){
-            principalName = args[2];
-        }
-        Properties properties = new FilePropertyProvider().getProperties();
+        String endpoint = args[0];
+        String catalogName = args[1];
+        logger.info("Using endpoint {} and catalog name {}", endpoint, catalogName);
+        AfonUserProvider userProvider = new FileUserProvider();
+        AfonPropertyProvider propertyProvider = new FilePropertyProvider();
         if ( endpoint != null ) {
-            properties.put(POLARIS_ENDPOINT.getName(), endpoint);
+            propertyProvider.setValue(POLARIS_ENDPOINT, endpoint);
         }
-        ConfigurePolarisUsersMain app = new ConfigurePolarisUsersMain(properties);
+        ConfigurePolarisUsersMain app = new ConfigurePolarisUsersMain(propertyProvider);
         try {
             app.configureCatalog(catalogName);
-            app.configureUsers(catalogName, new FileUserProvider());
+            app.configureUsers(catalogName, userProvider);
         } catch (Exception e) {
-            logger.error("Error configuring user " + principalName, e);
+            logger.error("Failed configuring Polaris users", e);
         }
     }
 
