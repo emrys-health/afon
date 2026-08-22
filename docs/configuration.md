@@ -8,21 +8,33 @@ which by default points to `$HOME/.afon`.  The default config dir is then `$HOME
 The Afon home can be overridden by the `--home <afon-home>` option of `afon.sh`.   
 In your IDE, you can override via the `-Dafon.home=<afon-home>` system property.
 
+### Command config-init
 Whichever Afon home you decide to use, you can initialise the config files by running:
 
 ```shell
 ./afon.sh -a config-init
 ```
-This generates empty config files from templates in the config dir.  
+This copies empty config files from templates to the config dir.  
 
-**NOTE**: The config-init command assumes that the config dir does not exist and is created in the process. 
+**NOTE**: The config-init command will create a new config dir, if not found, but it also can work with an existing config dir.
+However, in case of an existing config dir, any existing files will not be overwritten and will need to be removed manually.
+
 Once initialised, the config values need to be completed.
+
+### Command config-validate 
 
 Once completed, you can validate the config files by running: 
 ```shell
-./afon.sh -a config-validate
+./afon.sh -a config-validate [-c <cloud>]
 ```
 The validation checks that all the template properties have a corresponding non-empty property in the config dir.
+The optional `-c <cloud>` allows you to check only the cloud-specific config. 
+
+**IMPORTANT:** Some functionality still requires the config files for all clouds to be present, although only the
+values for the cloud you are using need be completed.  There is [open ticket to fix issue](https://github.com/emrys-health/afon-core/issues/159).  
+The recommended workaround is to init without specifying the cloud and to validate specifying it.
+
+### Command config-import and config-export
 
 You can also import or export the config files as a zip: 
 ```shell
@@ -30,7 +42,10 @@ You can also import or export the config files as a zip:
 ```
 This can be useful when sharing a pre-defined configuration.
 
-**NOTE**: The config-import command assumes that the config dir does not exist and is created in the process.
+**NOTE**: The config-import command assumes that the config dir does not exist and is created in the process.  
+If a config dir is already present, it will stop.
+
+### Command config-switch
 
 To support multiple config envs, say a `dev` and a `stg` env, you can use the `config-switch` action:
 ```shell
@@ -41,6 +56,8 @@ This will create or move the symlink `<afon-home>/config` pointing to `<afon-hom
 **NOTE**: If you're using multiple config envs, the config dir must be a symlink and not a dir.  
 Create config env dirs `<afon-home>/config-<env>` and ensure there is no config dir.   
 The config-switch action will remove any existing symlink.
+
+### Command config-status
 
 To show the status of the current config, you can use the `config-status` action:
 ```shell

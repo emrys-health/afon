@@ -12,7 +12,7 @@ git clone https://github.com/emrys-health/afon-core.git
 
 ## Build
 
-We assume [setup](setup.md) has been done. 
+We assume [setup](setup_local.md) has been done. 
 
 To build all components, running acceptance tests:
 ```shell
@@ -90,6 +90,7 @@ jar in the `afon-cli/target` dir.
 The script supports the following env variables: 
 
 - `AFON_HOME`: the Afon home dir, defaulting to $HOME/.afon.
+- `AFON_CLOUD`: the cloud provider to target, one of {aws,azure,gcp}.  This is optional and only affects some functionality.
 - `AFON_LOGGING`: the file logging level, defaulting to INFO.
 - `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to OFF.
 
@@ -113,4 +114,32 @@ If you just need to build and not export the artifacts, you can deactivate the `
 ```
 The `export` profile is active by default because it's the most common use case when building the CLI.
 
+To build a binary distribution with the `afon-cli` files and the docs: 
+```shell
+./afon.sh -g "clean package" -p cli,distribution
+```
+You'll find the file `afon-cli` zip file in the `afon-distribution/target` dir.
+
+### GitHub Workflows
+
+The [GitHub Workflows](https://github.com/emrys-health/afon-core/actions) are run on a Linux Runner.
+
+To set up the runner via ansible:
+```shell
+./afon.sh -a ansible
+```
+Requires ssh access to the runner. 
+
+The workflows require the config to be uploaded to GitHub secrets:
+```shell
+./scripts/github/secrets.sh push 
+```
+This pushes the content of each config files to a separate GitHub secret.
+
+**NOTE:** upon any change in the config, the secrets need to be pushed again.
+
+
+
+
+- 
 

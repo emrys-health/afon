@@ -1,9 +1,6 @@
 package health.emrys.afon.cdk.aws;
 
-import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.Fn;
-import com.hashicorp.cdktf.ITerraformDependable;
-import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.*;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -29,6 +26,7 @@ import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 public class AwsJupyterStack extends AwsPolarisStack {
 
@@ -147,7 +145,9 @@ public class AwsJupyterStack extends AwsPolarisStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App();
+        final App app = new App(AppConfig.builder()
+                .outdir(cdktfDir())
+                .build());
         new AwsJupyterStack(app, AWS, new FilePropertyProvider());
         app.synth();
     }

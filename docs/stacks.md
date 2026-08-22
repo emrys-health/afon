@@ -2,24 +2,24 @@
 
 ## Pre-requisites 
 
-## Setup
+### Setup Local Env
 
-See [setup](setup.md).
+See [setup local env](setup_local.md).
 
-## Command API
+## afon.sh commands
 
-The top-level `afon.sh` acts the command API for all the functionality:
+The script `afon.sh` at the top-level of the source tree acts as a front-end for all the functionality, including the build:
 
 ```shell
 ./afon.sh -h
 ```
 
-**NOTE:** In the commands, all JVM packages are intended relative to the base package `health.emrys.afon`. 
+**NOTE:** In the following, all JVM packages are intended relative to the base package `health.emrys.afon`. 
 If you want, you may specify the full package or change the base package via the `--exec-package` option.
 
 ## Stack deployment
 
-To deploy a stack, we use the ops.Deploy*Main classes, e.g.:
+To deploy a stack, we execute the ops.Deploy*Main classes, e.g.:
 
 ```shell
 ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain
@@ -106,9 +106,8 @@ Pre-requisites, on top of what the acceptance workflow needs:
   **NOT** the Polaris service account credentials in `secret-aws.properties` (see
   [configuration](configuration.md)). Leave them unset to use the credentials the runner already
   has, from an EC2 instance profile or its `~/.aws/credentials`.
-- **Tofu state**: kept on the runner in `$AFON_STATE_DIR/<owner>/<repo>/aws`, since
-  `afon-ops/cdktf.out` and `afon-ops/terraform.aws.tfstate` are gitignored and so are wiped by
-  `actions/checkout`. The workflow copies them in before running and back out afterwards. A
+- **Tofu state**: kept on the runner in `$AFON_STATE_DIR/<owner>/<repo>/aws`. 
+  The workflow copies them in before running and back out afterwards. A
   `deploy` that starts without that state deploys as if AWS were empty (and collides with whatever
   is actually still running); a `delete` that starts without it has nothing to destroy and leaves
   the running stack untouched. If you ever tear the stack down by hand, keep the two in step.
@@ -121,7 +120,7 @@ The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log i
 
 ### The afon-cdk module
 
-The afon-cdk module generates the Terraform plan using the CDKTF API to manage the cloud environment and delegates it to tofu to execute it. The plan is in `afon-ops/cdktf.out/stacks/{aws,azure,gcp}`.
+The afon-cdk module generates the Terraform plan using the CDKTF API to manage the cloud environment and delegates it to tofu to execute it. The plan is in `$AFON_HOME/cdktf/stacks/{aws,azure,gcp}`.
 
 Thereafter, you can run tofu apply or destroy commands via
 ```shell

@@ -7,11 +7,15 @@ Afon is an infrastructure project that deploys [Apache Polaris](https://polaris.
 
 ### Env setup
 
-See [setup](./docs/setup.md).
+See [setup](docs/setup_local.md).
 
 ### Build from source
 
 See [build](./docs/build.md)
+
+### Use CLI binary distribution
+
+See [cli](./docs/cli.md)
 
 ### Configure properties and users
 
@@ -66,6 +70,3 @@ See [examples](./docs/examples.md).
 - [ ] **Kubernetes cluster** creation permissions confirmed
 - [ ] **`KUBE_CONFIG_PATH`** environment variable set to your kubeconfig path
 - [ ] **`unalias aws`** if using a Dockerized AWS CLI
-
-
-
