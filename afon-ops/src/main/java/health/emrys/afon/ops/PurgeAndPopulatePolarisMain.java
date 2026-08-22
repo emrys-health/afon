@@ -25,7 +25,6 @@ public class PurgeAndPopulatePolarisMain {
     private final PolarisRestClient client;
     private final String            accessToken;
     private final String            domainName;
-    private final ObjectMapper      mapper = new ObjectMapper();
     private final Purger            purger;
 
     public PurgeAndPopulatePolarisMain(String domainName) {
