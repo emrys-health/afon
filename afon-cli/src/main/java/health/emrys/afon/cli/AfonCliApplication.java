@@ -1,6 +1,5 @@
 package health.emrys.afon.cli;
 
-import health.emrys.afon.config.ConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -13,7 +12,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
-import static health.emrys.afon.config.ConfigConstants.cloudPropertyValue;
+import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
+import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
 
 /**
  * Single executable entry point bundling all afon-ops commands. Dispatches
@@ -57,7 +57,7 @@ public class AfonCliApplication {
         System.out.println("Usage: afon-cli <command> [args...]");
         System.out.println("Commands:");
         opsCommands.names().forEach(name -> System.out.println("  " + name));
-        if (ConfigConstants.cloudPropertySet()){
+        if (cloudPropertySet()){
             String cloud = cloudPropertyValue();
             System.out.println("Commands specific to cloud: " + cloud);
             opsCommands.names(cloud).forEach(name -> System.out.println("  " + name));
