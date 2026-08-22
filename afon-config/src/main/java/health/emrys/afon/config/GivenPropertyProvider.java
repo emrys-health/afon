@@ -21,6 +21,11 @@ public record GivenPropertyProvider(Properties properties) implements AfonProper
     }
 
     @Override
+    public boolean hasProperty(AfonProperty property) {
+        return properties.containsKey(property.getName());
+    }
+
+    @Override
     public String getValue(AfonProperty property) {
         return property.getValueFrom(properties);
     }
@@ -28,5 +33,10 @@ public record GivenPropertyProvider(Properties properties) implements AfonProper
     @Override
     public String getValue(AfonProperty property, String defaultValue) {
         return property.getValueFrom(properties, defaultValue);
+    }
+
+    @Override
+    public void setValue(AfonProperty property, String value) {
+        // no-op
     }
 }

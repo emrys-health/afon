@@ -12,7 +12,11 @@ public interface AfonPropertyProvider {
 
     Properties getSecretProperties();
 
+    boolean hasProperty(AfonProperty property);
+
     String getValue(AfonProperty property);
 
     String getValue(AfonProperty property, String defaultValue);
+
+    void setValue(AfonProperty property, String value);
 }
