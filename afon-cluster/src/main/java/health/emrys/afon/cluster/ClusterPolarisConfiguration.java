@@ -1,7 +1,6 @@
 package health.emrys.afon.cluster;
 
-import health.emrys.afon.config.AfonProperty;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import io.kubernetes.client.openapi.ApiException;
 import org.slf4j.Logger;
@@ -9,6 +8,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static java.lang.String.format;
 
 /**
@@ -20,24 +20,22 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
-    private final ClusterState         state;
+    private final ClusterState state;
 
-    public ClusterPolarisConfiguration() throws IncorrectConfigException, IOException, ApiException {
-        super(new FilePropertyProvider().getProperties());
-        state           = new ClusterState();
+    public ClusterPolarisConfiguration(AfonPropertyProvider properties) throws IncorrectConfigException, IOException, ApiException {
+        super(properties);
+        state = new ClusterState();
         String endpoint = format("%s:443", state.getPolarisHost());
+        this.properties.setValue(POLARIS_ENDPOINT, endpoint);
         logger.info("Calling Polaris endpoint: {}", endpoint);
-        properties.setProperty(AfonProperty.POLARIS_ENDPOINT.getName(), endpoint);
-    }
-
-    public Properties getClusterProperties() {
-        var props = new Properties();
-        props.putAll(properties);
-        return props;
     }
 
     protected String getCredentials() {
         return state.getCredentials();
+    }
+
+    public Properties getClusterProperties() {
+        return properties.getProperties();
     }
 
     public ClusterState getClusterState() {

@@ -1,13 +1,14 @@
 package health.emrys.afon.polaris.catalogs;
 
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.GcpStorageConfigInfo;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.AfonProperty.GCP_BUCKET_NAME;
+import static health.emrys.afon.config.AfonProperty.GCP_SERVICE_ACCOUNT;
 import static org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum.GCS;
 
 public class GcpPolarisCatalog extends PolarisCatalog {
@@ -15,9 +16,9 @@ public class GcpPolarisCatalog extends PolarisCatalog {
     private final String bucket;
     private final String serviceAccount;
 
-    public GcpPolarisCatalog(Properties properties) {
-      this.bucket         = toBucketUri(GCP_BUCKET_NAME.getValueFrom(properties));
-      this.serviceAccount = GCP_SERVICE_ACCOUNT.getValueFrom(properties);
+    public GcpPolarisCatalog(AfonPropertyProvider properties) {
+      this.bucket         = toBucketUri(properties.getValue(GCP_BUCKET_NAME));
+      this.serviceAccount = properties.getValue(GCP_SERVICE_ACCOUNT);
     }
 
   public static @NonNull String toBucketUri(String bucketName) {

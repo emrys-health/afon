@@ -3,16 +3,13 @@ package health.emrys.afon.config;
 import java.util.Properties;
 
 /**
- * A record implementation of {@link AfonPropertyProvider} that provides the given already-specified
- * {@link Properties}.
+ * A record immutable implementation of {@link AfonPropertyProvider} that decorates the already-specified provider.
  */
-public record GivenPropertyProvider(Properties properties) implements AfonPropertyProvider {
+public record ImmutablePropertyProvider(AfonPropertyProvider properties) implements AfonPropertyProvider {
 
     @Override
     public Properties getProperties() {
-        Properties copy = new Properties();
-        copy.putAll(properties);
-        return copy;
+        return properties.getProperties();
     }
 
     @Override
@@ -22,17 +19,17 @@ public record GivenPropertyProvider(Properties properties) implements AfonProper
 
     @Override
     public boolean hasProperty(AfonProperty property) {
-        return properties.containsKey(property.getName());
+        return properties.hasProperty(property);
     }
 
     @Override
     public String getValue(AfonProperty property) {
-        return property.getValueFrom(properties);
+        return properties.getValue(property);
     }
 
     @Override
     public String getValue(AfonProperty property, String defaultValue) {
-        return property.getValueFrom(properties, defaultValue);
+        return properties.getValue(property, defaultValue);
     }
 
     @Override

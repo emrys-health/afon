@@ -1,6 +1,7 @@
 package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import health.emrys.afon.security.SecurityUtils;
 import org.apache.hc.core5.http.HttpResponse;
@@ -12,15 +13,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
-import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperty.*;
 
 public class PolarisCatalogClient {
 
     static final  Logger     logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogClient.class);
-    private final Properties properties;
+    private final AfonPropertyProvider properties;
 
-    public PolarisCatalogClient(Properties properties) {
+    public PolarisCatalogClient(AfonPropertyProvider properties) {
         this.properties = properties;
     }
 
@@ -47,27 +47,26 @@ public class PolarisCatalogClient {
     }
 
     private @NonNull PolarisConfigurer polarisConfigurer(String credentials) {
-        String endpoint = AfonProperty.POLARIS_ENDPOINT.getValueFrom(properties);
+        String endpoint = properties.getValue(POLARIS_ENDPOINT);
         String protocol = SecurityUtils.protocolFor(endpoint);
-        var    client   = PolarisRestClientFactory.clientFactory().createClient(addPolarisCredentialsTo(credentials, properties), protocol);
+        addPolarisCredentialsTo(credentials, properties);
+        var    client   = PolarisRestClientFactory.clientFactory().createClient(properties, protocol);
         return new PolarisConfigurer(client);
     }
 
     /**
-     * Adds id:secret credentials to properties using keys {@link AfonProperty#POLARIS_ID} and {@link AfonProperty#POLARIS_SECRET}.
+     * Sets id:secret credentials to {@link AfonPropertyProvider} using keys {@link AfonProperty#POLARIS_ID} and {@link AfonProperty#POLARIS_SECRET}.
      *
      * @param credentials the id:secret String
      * @param properties  the Properties to add to
-     * @return The updated properties
      */
-    public static Properties addPolarisCredentialsTo(String credentials, Properties properties) {
+    public static void addPolarisCredentialsTo(String credentials, AfonPropertyProvider properties) {
         String[] creds = credentials.split(":");
         if (creds.length != 2) {
             logger.error("Incorrect access token {}. The token should have a ':' delimiting ID from Secret", credentials);
         }
-        properties.setProperty(POLARIS_ID.getName(), creds[0]);
-        properties.setProperty(POLARIS_SECRET.getName(), creds[1]);
-        return properties;
+        properties.setValue(POLARIS_ID, creds[0]);
+        properties.setValue(POLARIS_SECRET, creds[1]);
     }
 
 }

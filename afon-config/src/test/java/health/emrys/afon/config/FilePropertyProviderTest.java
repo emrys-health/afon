@@ -62,6 +62,15 @@ public class FilePropertyProviderTest {
     }
 
     @Test
+    public void cannotSetPropertyValueIfImmutable() {
+        AfonPropertyProvider provider = new ImmutablePropertyProvider(new FilePropertyProvider(CONFIG_DIR, List.of("empty")));
+        AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
+        assertThat(provider.hasProperty(polarisEndpoint)).isFalse();
+        provider.setValue(polarisEndpoint, "localhost:8182");
+        assertThat(provider.hasProperty(polarisEndpoint)).isFalse();
+    }
+
+    @Test
     public void canGetAllProperties() {
         AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         checkAllProperties(provider.getProperties());

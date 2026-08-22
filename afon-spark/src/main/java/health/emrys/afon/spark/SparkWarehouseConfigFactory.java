@@ -1,9 +1,8 @@
 package health.emrys.afon.spark;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
-
-import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperty.*;
 
@@ -13,17 +12,11 @@ public class SparkWarehouseConfigFactory {
         return new SparkWarehouseConfigFactory();
     }
 
-    private static @NonNull Properties propertiesWith(String clientId, String clientSecret, String host) {
-        Properties properties = new FilePropertyProvider().getProperties();
-        properties.put(POLARIS_ENDPOINT.getName(), host);
-        return propertiesWith(clientId, clientSecret, properties);
-    }
-
-    private static @NonNull Properties propertiesWith(String clientId, String clientSecret, Properties defaults) {
-        Properties properties = new Properties();
-        properties.putAll(defaults);
-        properties.put(POLARIS_ID.getName(), clientId);
-        properties.put(POLARIS_SECRET.getName(), clientSecret);
+    private static @NonNull AfonPropertyProvider propertiesWith(String clientId, String clientSecret, String host) {
+        AfonPropertyProvider properties = new FilePropertyProvider();
+        properties.setValue(POLARIS_ENDPOINT, host);
+        properties.setValue(POLARIS_ID, clientId);
+        properties.setValue(POLARIS_SECRET, clientSecret);
         return properties;
     }
 
@@ -39,19 +32,10 @@ public class SparkWarehouseConfigFactory {
         String clientId,
         String clientSecret,
         String host) {
-        Properties properties = propertiesWith(clientId, clientSecret, host);
-        return getConfig(properties);
+        return getConfig(propertiesWith(clientId, clientSecret, host));
     }
 
-    public SparkWarehouseConfig getConfig(
-        String clientId,
-        String clientSecret,
-        Properties defaults) {
-        Properties properties = propertiesWith(clientId, clientSecret, defaults);
-        return getConfig(properties);
-    }
-
-    public SparkWarehouseConfig getConfig(Properties properties) {
+    public SparkWarehouseConfig getConfig(AfonPropertyProvider properties) {
         return new KeyCloakSparkWarehouseConfig(properties);
     }
 

@@ -1,5 +1,6 @@
 package health.emrys.afon.cluster;
 
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
@@ -21,7 +22,7 @@ public class ClusterState implements AutoCloseable {
     private final String           polarisHost;
 
     public ClusterState() throws IOException, ApiException, IncorrectConfigException {
-        k8sClient = new GenericK8sClient();
+        k8sClient = new GenericK8sClient(new FilePropertyProvider());
         V1Pod  polarisPod = k8sClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME);
         String podName    = polarisPod.getMetadata().getName();
         logger.info("Pod Name: {}", podName);

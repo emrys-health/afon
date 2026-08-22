@@ -1,7 +1,6 @@
 package health.emrys.afon.cluster;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.util.ClientBuilder;
@@ -18,10 +17,6 @@ public class GenericK8sClient extends K8sClient implements AutoCloseable {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(GenericK8sClient.class);
 
     private ApiClient client;
-
-    public GenericK8sClient(){
-        this(new FilePropertyProvider());
-    }
 
     public GenericK8sClient(AfonPropertyProvider properties) {
         super(properties);
@@ -65,8 +60,4 @@ public class GenericK8sClient extends K8sClient implements AutoCloseable {
         Configuration.setDefaultApiClient(null);
     }
 
-    public static void main(String[] args) {
-        K8sClient app = new GenericK8sClient();
-        app.smokeTest();
-    }
 }

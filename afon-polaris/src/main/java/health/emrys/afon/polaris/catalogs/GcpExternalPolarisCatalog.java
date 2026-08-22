@@ -1,16 +1,16 @@
 package health.emrys.afon.polaris.catalogs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.GcpStorageConfigInfo;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.GCP_BUCKET_NAME;
-import static health.emrys.afon.config.AfonProperty.GCP_SERVICE_ACCOUNT;
 import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.config.AfonCloud.GCP_EXTERNAL;
+import static health.emrys.afon.config.AfonProperty.GCP_BUCKET_NAME;
+import static health.emrys.afon.config.AfonProperty.GCP_SERVICE_ACCOUNT;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum.GCS;
 
@@ -18,10 +18,10 @@ public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
     private final String bucket;
     private final String serviceAccount;
 
-    public GcpExternalPolarisCatalog(Properties properties) {
+    public GcpExternalPolarisCatalog(AfonPropertyProvider properties) {
         super(properties);
-        this.bucket         = "gs://" + GCP_BUCKET_NAME.getValueFrom(properties);
-        this.serviceAccount = GCP_SERVICE_ACCOUNT.getValueFrom(properties);
+        this.bucket         = "gs://" + properties.getValue(GCP_BUCKET_NAME);
+        this.serviceAccount = properties.getValue(GCP_SERVICE_ACCOUNT);
     }
 
     @Override

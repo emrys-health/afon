@@ -1,22 +1,23 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.*;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
+import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.tokensURI;
 
 abstract public class ExternalPolarisCatalog extends PolarisCatalog {
     private final @NonNull String clientId;
     private final @NonNull String secret;
 
-    protected ExternalPolarisCatalog(Properties properties) {
-        clientId                = AfonProperty.POLARIS_ID.getValueFrom(properties);
-        secret                  = AfonProperty.POLARIS_SECRET.getValueFrom(properties);
+    protected ExternalPolarisCatalog(AfonPropertyProvider properties) {
+        clientId = properties.getValue(POLARIS_ID);
+        secret = properties.getValue(POLARIS_SECRET);
     }
 
     @Override

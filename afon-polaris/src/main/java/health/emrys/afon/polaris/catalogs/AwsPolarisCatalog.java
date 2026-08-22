@@ -1,9 +1,8 @@
 package health.emrys.afon.polaris.catalogs;
 
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
-
-import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
@@ -20,11 +19,10 @@ public class AwsPolarisCatalog extends PolarisCatalog {
         this.region  = region;
     }
 
-    public AwsPolarisCatalog(Properties properties) {
-        this(
-            AWS_S3_ROLE_ARN.getValueFrom(properties),
-            bucketToUrl(AWS_S3_BUCKET_NAME.getValueFrom(properties)),
-            AWS_REGION.getValueFrom(properties));
+    public AwsPolarisCatalog(AfonPropertyProvider properties) {
+        this(properties.getValue(AWS_S3_ROLE_ARN),
+            bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME)),
+                    properties.getValue(AWS_REGION));
     }
 
     @Override

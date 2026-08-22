@@ -18,8 +18,6 @@ object SparkHelper {
   // credentials (USER_POLARIS_ID/SECRET); Polaris maps the token's 'azp' claim back to the 'root' principal. The
   // Polaris-minted 'principal' credentials are unknown to KeyCloak, so they cannot be used here.
   val sparkWarehouse = SparkWarehouseConfigFactory.getFactory.getConfig(
-    USER_POLARIS_ID.getValueFrom(instance.getProperties),
-    USER_POLARIS_SECRET.getValueFrom(instance.getProperties),
     instance.getProperties
   )
   val sc: SparkContext = SparkContext.getOrCreate(sparkWarehouse.sparkConf())

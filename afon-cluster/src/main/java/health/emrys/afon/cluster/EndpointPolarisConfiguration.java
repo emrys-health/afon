@@ -1,10 +1,9 @@
 package health.emrys.afon.cluster;
 
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
 
-import java.util.Properties;
-
-import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 
 /**
  * Given an endpoint, this class proxies Polaris.
@@ -18,18 +17,9 @@ public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration i
 
     private final String credentials;
 
-    public EndpointPolarisConfiguration() {
-        this(new FilePropertyProvider().getProperties());
-    }
-
-    public EndpointPolarisConfiguration(String host) {
-        this(new FilePropertyProvider().getProperties());
-        properties.put(POLARIS_ENDPOINT.getName(), host);
-    }
-
-    public EndpointPolarisConfiguration(Properties properties) {
+    public EndpointPolarisConfiguration(AfonPropertyProvider properties) {
         super(properties);
-        credentials = POLARIS_ID.getValueFrom(properties) + ":" +  POLARIS_SECRET.getValueFrom(properties);
+        credentials = properties.getValue(POLARIS_ID) + ":" +  properties.getValue(POLARIS_SECRET);
     }
 
     @Override
@@ -39,6 +29,6 @@ public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration i
 
     @Override
     public void close() throws Exception {
-
+        // no-op
     }
 }

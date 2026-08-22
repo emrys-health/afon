@@ -9,7 +9,7 @@ import health.emrys.afon.polaris.config.{PermissionsConfigurer, PolarisConfigure
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials
 
 object PolarisHelper {
-  val principalName     = AfonProperty.USER_POLARIS_ID.getValueFrom(instance.getProperties)
+  val principalName     = instance.getProperties().getValue(AfonProperty.USER_POLARIS_ID)
   val principalRoleName = "myprincipalrole"
   val principal         = (new PolarisHelper).createPrincipal()
 }

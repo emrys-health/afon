@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
@@ -21,11 +20,11 @@ public class ConfigureKeyCloakUsersMain {
     private final KeyCloakProvider keyCloakProvider;
     private final ConfigurePolarisUsersMain polarisUsers;
 
-    public ConfigureKeyCloakUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider, Properties properties) {
+    public ConfigureKeyCloakUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
         this.userProvider = userProvider;
         this.propertyProvider = propertyProvider;
         this.keyCloakProvider = new KeyCloakProvider(propertyProvider);
-        this.polarisUsers = new ConfigurePolarisUsersMain(properties);
+        this.polarisUsers = new ConfigurePolarisUsersMain(propertyProvider);
     }
 
     public void configureKeyCloak(String jupyterDomain) throws IOException {
@@ -56,11 +55,10 @@ public class ConfigureKeyCloakUsersMain {
         String polarisDomain = args[0];
         String catalogName = args[1];
         String jupyterDomain = args[2];
-        var propertyProvider = new FilePropertyProvider();
         var userProvider = new FileUserProvider();
-        Properties properties = propertyProvider.getProperties();
-        properties.put(POLARIS_ENDPOINT.getName(), polarisDomain);
-        var app = new ConfigureKeyCloakUsersMain(userProvider, propertyProvider, properties);
+        var propertyProvider = new FilePropertyProvider();
+        propertyProvider.setValue(POLARIS_ENDPOINT, polarisDomain);
+        var app = new ConfigureKeyCloakUsersMain(userProvider, propertyProvider);
         try {
             app.configureKeyCloak(jupyterDomain);
             app.configurePolaris(catalogName); // just for a smoke test
