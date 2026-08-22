@@ -9,26 +9,11 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.config.AfonProperty.AWS_REGION;
-import static health.emrys.afon.config.AfonProperty.AWS_S3_BUCKET_NAME;
-import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
-
-class AwsPolarisCatalogNonPermissioned extends AwsPolarisCatalog {
-    public AwsPolarisCatalogNonPermissioned(Properties properties) {
-        super(
-            AWS_S3_ROLE_ARN.getValueFrom(properties),
-            bucketToUrl(AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS.getValueFrom(properties)),
-            AWS_REGION.getValueFrom(properties));
-    }
-    public String catalogName() {
-        return "aws_polaris_forbidden";
-    }
-}
+import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 
 public class PolarisCatalogClient {
 
@@ -46,6 +31,7 @@ public class PolarisCatalogClient {
             new AzurePolarisCatalog(properties),
             new GlueAwsPolarisCatalog(properties),
             new AzureExternalPolarisCatalog(properties),
+                new AwsForbiddenPolarisCatalog(properties)
             };
         return configureCatalogs(credentials, catalogs);
     }
@@ -55,11 +41,8 @@ public class PolarisCatalogClient {
         PolarisConfigurer  configurer   = polarisConfigurer(credentials);
         for (PolarisCatalog catalog : catalogs) {
             logger.info("Configuring {}", catalog.catalogName());
-            allResponses.addAll(Arrays.asList(configurer.configureCatalog(catalog)));
+            allResponses.addAll(configurer.configureCatalog(catalog));
         }
-
-        allResponses.add(configurer.createCatalog(new AwsPolarisCatalogNonPermissioned(properties)));
-
         return allResponses;
     }
 
