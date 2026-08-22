@@ -27,9 +27,7 @@ public class SparkConfig extends Construct {
         Release sparkOperatorRelease = Release.Builder
             .create(this, "sparkOperator")
             .name("spark-kubernetes-operator")
-            .chart("spark-kubernetes-operator")
-            .version("1.4.0")
-            .repository("https://apache.github.io/spark-kubernetes-operator")
+            .chart(CdkUtils.vendoredChart(this, "sparkOperatorChart", "spark-kubernetes-operator-1.4.0.tgz"))
             .namespace("default")
             .atomic(true)
             .set(List.of(
