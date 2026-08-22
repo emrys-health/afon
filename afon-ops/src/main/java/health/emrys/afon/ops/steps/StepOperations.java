@@ -8,7 +8,7 @@ import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.ops.OnboardAllUsersMain;
+import health.emrys.afon.ops.ConfigureKeyCloakUsersMain;
 import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
 import health.emrys.afon.ops.spark.SparkChecker;
@@ -315,7 +315,7 @@ public class StepOperations {
             description,
             () -> {
                 actions.executeMainOf(
-                    OnboardAllUsersMain.class,
+                    ConfigureKeyCloakUsersMain.class,
                     new String[]{domainName, warehouse.toString(), jupyterDomainName},
                     NO_ENV_VARIABLES);
 
