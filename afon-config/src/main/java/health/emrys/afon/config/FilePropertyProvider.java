@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
+import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
+import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -23,7 +25,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  *
  * The properties files are loaded from the {@link #configDir}, which defaults to {@link ConfigUtils#configDir()}.
  *
- * When {@link ConfigConstants#CLOUD_SYSTEM_PROPERTY} is unset, every cloud's files are loaded together,
+ * When {@link ConfigUtils#cloudPropertySet()} is {@code true}, every cloud's files are loaded together,
  * since some deployments (e.g. cross-cloud federation) need more than one cloud's properties at the same time.
  *
  * Any property will be overridden if it is provided as system property, e.g. {@code -DCLUSTER_NAME=<new-name>}.
@@ -63,7 +65,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
 
     @Override
     public Properties getProperties() {
-        loadPropertiesLazily();
+        loadLazily();
         Properties copy = new Properties();
         copy.putAll(properties);
         return copy;
@@ -71,25 +73,42 @@ public class FilePropertyProvider implements AfonPropertyProvider {
 
     @Override
     public Properties getSecretProperties() {
-        loadPropertiesLazily();
+        loadLazily();
         Properties secret = new Properties();
         secretKeys.stream().forEach(prop -> secret.put(prop, properties.getProperty(prop)));
         return secret;
     }
 
     @Override
+    public boolean hasProperty(AfonProperty property) {
+        loadLazily();
+        return properties.containsKey(property.getName());
+    }
+
+    @Override
     public String getValue(AfonProperty property) {
-        loadPropertiesLazily();
+        loadLazily();
         return property.getValueFrom(properties);
     }
 
     @Override
     public String getValue(AfonProperty property, String defaultValue) {
-        loadPropertiesLazily();
+        loadLazily();
         return property.getValueFrom(properties, defaultValue);
     }
 
-    private void loadPropertiesLazily() {
+    @Override
+    public void setValue(AfonProperty property, String value) {
+        loadLazily();
+        if ( properties.containsKey(property.getName()) ){
+            logger.info("Overriding property {} to {}", property.getName(), value);
+        } else {
+            logger.info("Setting property {} to {}", property.getName(), value);
+        }
+        this.properties.setProperty(property.getName(), value);
+    }
+
+    private void loadLazily() {
         if ( properties.isEmpty() ){
             // lazy loading and only once
             loadProperties();
@@ -111,7 +130,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
     private void loadPropertiesFromDir(String type, String dir) throws IOException {
         logger.info("Loading {} properties from {}", type, dir);
         for (String file : propertyFiles(type)) {
-            String     filename = dir + "/" + file;
+            String filename = String.format("%s/%s", dir, file);
             Properties props = loadPropertiesFromFile(filename);
             properties.putAll(props);
             if (file.startsWith("secret")) {
@@ -152,7 +171,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
 
     /**
      * Lists the {@code afon.properties} and {@code secret.properties} and its cloud-specific file(s).
-     * {@link ConfigConstants#CLOUD_SYSTEM_PROPERTY} selects a single cloud; otherwise every cloud's file
+     * {@link ConfigUtils#cloudPropertyValue()} selects a single cloud; otherwise every cloud's file
      * is listed, since some deployments (e.g. cross-cloud federation) need more than one cloud's
      * properties in the same run.
      */
@@ -160,10 +179,9 @@ public class FilePropertyProvider implements AfonPropertyProvider {
         List<String> files = new ArrayList<>();
         // first add common properties
         files.add(fileName(type, null));
-        // then add could properties
-        String cloud = System.getProperty(ConfigConstants.CLOUD_SYSTEM_PROPERTY);
-        if (cloud != null && !cloud.isBlank()) {
-            files.add(fileName(type, cloud));
+        // then add cloud properties
+        if (cloudPropertySet()) {
+            files.add(fileName(type, cloudPropertyValue()));
         } else {
             ALL_CLOUDS.forEach(c -> files.add(fileName(type, c)));
         }

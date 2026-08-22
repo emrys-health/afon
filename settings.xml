@@ -1,6 +1,22 @@
 <settings>
   <profiles>
     <profile>
+      <id>github</id>
+      <repositories>
+        <repository>
+          <id>central</id>
+          <url>https://repo.maven.apache.org/maven2</url>
+        </repository>
+        <repository>
+          <id>github-maven-packages</id>
+          <url>https://maven.pkg.github.com/emrys-health/afon-core</url>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </repository>
+      </repositories>
+    </profile>
+    <profile>
       <id>release</id>
       <activation>
         <property>
@@ -15,9 +31,16 @@
   </profiles>
   <servers>
     <server>
+      <id>github-maven-packages</id>
+      <username>${env.GITHUB_USERNAME}</username>
+      <password>${env.GITHUB_TOKEN}</password>
+    </server>
+    <server>
       <id>sonatype-nexus-oss</id>
       <username>${env.SONATYPE_USERNAME}</username>
       <password>${env.SONATYPE_PASSWORD}</password>
     </server>
   </servers>
 </settings>
+
+

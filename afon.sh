@@ -7,11 +7,11 @@ usage (){
   echo "          [--logging|-l <logging>] [--logging-console <console>] [--mvn-quiet]"
   echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
-  echo "          [--cli-command|-cli-cmd <command>] [--cli-args <args>] [--cli-dir <dir>]"
+  echo "          [--cli-command|--cli-cmd <command>] [--cli-args <args>] [--cli-dir <dir>]"
   echo "          [--config-zip <zip>] [--config-env <env>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
-  echo "          [--exec-script <script-name>]"
+  echo "          [--script-path <path>]"
   echo "          [--setup-os <os>] [--setup-output <file>]"
   echo "          [--stack-deploy] [--stack-type <type>] [--stack-args <args>] [--stack-status]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
@@ -22,6 +22,7 @@ usage (){
   echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch|status."
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
   echo "          exec        : executes the jvm classes from ops (see the docs for details)."
+  echo "          script      : executes the scripts."
   echo "          setup-*     : sets up the local env for the given os and <cloud> option.  One of local|show"
   echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|delete|status."
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state."
@@ -39,18 +40,19 @@ usage (){
   echo "build-args:       the build args.  eg '-DskipTests'."
   echo "build-goals:      the build goals.  Defaults to 'clean install'."
   echo "build-profiles:   the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
-  echo "cli-command:      the cli command."
+  echo "cli-command:      the cli command.  Exec <cli-dir>/afon-cli.sh for list of commands."
   echo "cli-args:         the cli args."
   echo "cli-dir:          the cli dir.  Defaulting to '$AFON_HOME/cli'."
   echo "                  Also settable via env variable 'AFON_CLI_DIR'."
   echo "config-zip:       the config zip path to import/export as a zip file."
   echo "config-env:       the config env name.  Assumes config dir 'AFON_HOME/config-<env>' to symlink to 'AFON_HOME/config'."
   echo "docs-dir:         the output dir for the docs. Defaulting to 'AFON_HOME/docs'."
-  echo "exec-types:       the exec types.  One of ops|samples|script.  Defaults to 'ops'."
+  echo "exec-types:       the exec types.  One of ops|samples.  Defaults to 'ops'."
   echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
   echo "exec-class:       the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
   echo "exec-args:        the jvm exec args (must be quoted if more than one arg)"
   echo "exec-envs:        the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
+  echo "script-path:      the path of the script the run."
   echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
   echo "stack-type:       the stack type.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'polaris'."
@@ -131,10 +133,6 @@ exec_config(){
       fi
     ;;
     init)
-      if [ -d $CONFIG_DIR ]; then
-        echo "$CONFIG_DIR already exists.  Remove and retry."
-        exit 0
-      fi
       EXEC_TYPE="script"
       EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
       exec_script
@@ -231,13 +229,13 @@ exec_jvm(){
 }
 
 exec_script(){
-  if [ -z "$EXEC_SCRIPT" ]; then
-    echo "Action exec requires option --exec-script"
+  if [ -z "$SCRIPT_PATH" ]; then
+    echo "Action script requires option --script-path"
     usage; exit 0
   fi
-  echo "Executing $EXEC_SCRIPT"
+  echo "Executing $SCRIPT_PATH"
   cd $AFON_ROOT/scripts
-  source $EXEC_SCRIPT
+  source $SCRIPT_PATH
 }
 
 capitaliseFirst(){
@@ -284,7 +282,7 @@ exec_stack(){
 
 exec_tofu(){
   echo "tofu targetting cloud '$TOFU_CLOUD'"
-  TOFU_DIR="afon-ops/cdktf.out/stacks/$TOFU_CLOUD"
+  TOFU_DIR="$AFON_HOME/cdktf/stacks/$TOFU_CLOUD"
   if [ ! -d "$TOFU_DIR" ]; then
      echo "Dir $TOFU_DIR not found.  Execute deploy or configure actions first."
      usage; exit 0
@@ -418,6 +416,7 @@ MVN_GOALS=
 MVN_ARGS=
 MVN_ENVS=
 MVN_QUIET=
+SCRIPT_PATH=
 SETUP_OS=
 SETUP_OUTPUT=
 STACK_TYPE=
@@ -479,6 +478,8 @@ while [[ $# -gt 0 ]]; do
       LOGGING_CONSOLE="$2"; shift 2 ;;
     --mvn-quiet)
       MVN_QUIET=true; shift ;;
+    --script-path)
+      SCRIPT_PATH="$2"; shift 2 ;;
     --setup-os)
       SETUP_OS="$2"; shift 2 ;;
     --setup-outout)
@@ -610,11 +611,10 @@ case $ACTION in
       echo "Exec type not specified.  Defaulting to 'ops'."
       EXEC_TYPE="ops"
     fi
-    if [ "$EXEC_TYPE" == "script" ]; then
-      exec_script
-    else
-      exec_jvm
-    fi
+    exec_jvm
+    ;;
+  script)
+    exec_script
     ;;
   setup-*)
     if [ -z "$SETUP_OS" ]; then

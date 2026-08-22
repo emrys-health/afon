@@ -205,21 +205,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$AWS_STATE_DIR"
-          # cdktf synthesises into afon-ops/cdktf.out/stacks/aws and keeps the state next to it in
+          # cdktf synthesises into $AFON_HOME/cdktf/stacks/aws and keeps the state next to it in
           # afon-ops/terraform.aws.tfstate. Both are gitignored, and actions/checkout runs
           # `git clean -ffdx`, so they do not survive a checkout and are kept on the runner instead.
           # Without them, deploy's teardown finds nothing to destroy and the rebuild then collides
           # with the resources still running in AWS; delete finds nothing to destroy at all and
           # leaves the running stack untouched.
           if compgen -G "$AWS_STATE_DIR/terraform.aws.tfstate*" > /dev/null; then
-            cp -v "$AWS_STATE_DIR"/terraform.aws.tfstate* afon-ops/
+            cp -v "$AWS_STATE_DIR"/terraform.aws.tfstate* $AFON_HOME/cdktf
           else
             echo "::warning::No saved tofu state in $AWS_STATE_DIR — this run will deploy as if AWS were empty. If a stack is in fact up, destroy it first (./afon.sh -a tofu-destroy) or restore its tfstate."
           fi
-          if [ -d "$AWS_STATE_DIR/cdktf.out" ]; then
-            rm -rf afon-ops/cdktf.out
-            cp -R "$AWS_STATE_DIR/cdktf.out" afon-ops/cdktf.out
-            echo "Restored cdktf.out"
+          if [ -d "$AWS_STATE_DIR/cdktf" ]; then
+            rm -rf $AFON_HOME/cdktf
+            cp -R "$AWS_STATE_DIR/cdktf" $AFON_HOME/cdktf
+            echo "Restored cdktf dir"
           fi
 
       - name: Run the AWS stack action
@@ -251,16 +251,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$AWS_STATE_DIR"
-          if compgen -G "afon-ops/terraform.aws.tfstate*" > /dev/null; then
-            cp -v afon-ops/terraform.aws.tfstate* "$AWS_STATE_DIR/"
+          if compgen -G "$AFON_HOME/cdktf/terraform.aws.tfstate*" > /dev/null; then
+            cp -v $AFON_HOME/cdktf/terraform.aws.tfstate* "$AWS_STATE_DIR/"
           else
             # Expected only when the teardown destroyed the stack and the rebuild then failed
             # before writing new state.
             echo "::warning::No tofu state in afon-ops to save"
           fi
-          rm -rf "$AWS_STATE_DIR/cdktf.out"
-          if [ -d afon-ops/cdktf.out ]; then
-            cp -R afon-ops/cdktf.out "$AWS_STATE_DIR/cdktf.out"
+          rm -rf "$AWS_STATE_DIR/cdktf"
+          if [ -d $AFON_HOME/cdktf ]; then
+            cp -R $AFON_HOME/cdktf "$AWS_STATE_DIR/cdktf"
           fi
 
       - name: Report the cluster status

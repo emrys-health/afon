@@ -1,5 +1,5 @@
 ---
-# Mirrors the packages installed by `./afon.sh -a setup` (see docs/setup.md).
+# Mirrors the packages installed by `./afon.sh -a setup-local` (see docs/setup_local.md).
 # Not needed by the acceptance tests themselves — they use the cloud SDKs — but
 # required if the runner also drives the ops/tofu actions.
 install_awscli: true

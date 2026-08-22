@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static java.lang.String.format;
 
 public class StepDocumentation extends StepActions {
@@ -92,15 +93,15 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public void deleteTerraformStateFiles(AfonCloud id) throws IOException {
+    void deleteTfStateFiles(AfonCloud id) throws IOException {
         out.println(format("""
-                           Delete `./%s%s*`
-                           """, TERRAFORM_STATE_FILE_PATTERN, id));
+                           Delete `%s`
+                           """, tfStatePath(id)));
         out.flush();
     }
 
     @Override
-    public void deletePath(Path path) {
+    void deletePath(Path path) {
         out.println(format("Delete `%s`", path));
         out.flush();
     }

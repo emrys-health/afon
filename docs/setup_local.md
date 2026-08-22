@@ -1,17 +1,15 @@
-# Env setup
+# Setup Local Env
 
 ## Bash 
 
-Env bash setup requires *bash* installed on your machine.  
+Env setup requires *bash* installed on your machine.  
 
-For linux and macos bash is provided.  
+For linux and macOS bash is provided.  
 
-For windows, use Git Bash bundled with [Git for Windows](https://github.com/git-for-windows/git/releases/latest).
-
-To setup on a given OS, run: 
+To set up on a given OS, run: 
 
 ```shell
-./afon.sh -a setup
+./afon.sh -a setup-local -c <cloud>
 ```
 
 The following packages are installed:
@@ -21,13 +19,13 @@ The following packages are installed:
 - docker
 - opentofu
 - kubernetes-cli
-- {aws, azure, gcp}-cli
+- <cloud>-cli
 
 NB: JDK 17 is currently enforced by the Maven build.
 
 To show what is currently installed:
 ```shell
-./afon.sh -a setup --setup-show
+./afon.sh -a setup-show -c <cloud>
 ```
 
 ## Docker 

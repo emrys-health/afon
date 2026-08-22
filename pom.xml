@@ -2,31 +2,41 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>health.emrys</groupId>
+    <groupId>health.emrys.afon</groupId>
     <artifactId>afon</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <description>Afon core infrastructure required to enable secure cross cloud querying</description>
+    <description>Afon Core provides the infrastructure required to enable secure cross cloud querying</description>
     <inceptionYear>2025</inceptionYear>
-    <url>https://github.com/emrys-health/afon-core/</url>
+    <url>https://github.com/emrys-health/afon-core</url>
+
     <licenses>
         <license>
             <name>Apache License Version 2.0</name>
             <url>http://www.apache.org/licenses/</url>
+            <distribution>repo</distribution>
         </license>
     </licenses>
+
     <scm>
+        <connection>scm:git:git://github.com/emrys-health/afon-core.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/emrys-health/afon-core.git</developerConnection>
         <url>https://github.com/emrys-health/afon-core.git</url>
+        <tag>HEAD</tag>
     </scm>
+
     <developers>
         <developer>
-            <name>mauro.talevi@emrys.health</name>
+            <id>mauro</id>
+            <name>Mauro Talevi</name>
         </developer>
         <developer>
-            <name>phil.henry@emrys.health</name>
+            <id>phil</id>
+            <name>Phil Henry</name>
         </developer>
         <developer>
-            <name>will@emrys.health</name>
+            <id>will</id>
+            <name>Will Browne</name>
         </developer>
     </developers>
 
@@ -55,6 +65,11 @@
         <scala.compat.version>2.13</scala.compat.version>
         <spark.compat.version>4.0</spark.compat.version>
         <spark.version>${spark.compat.version}.1</spark.version>
+        <!-- distribution -->
+        <!-- Skip maven deploy until RM setup-->
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <github.packages.url>https://maven.pkg.github.com/emrys-health/afon-core</github.packages.url>
+        <sonatype.nexus.url>https://s01.oss.sonatype.org</sonatype.nexus.url>
     </properties>
 
     <modules>
@@ -72,45 +87,6 @@
         <module>afon-ops</module>
         <module>afon-docs</module>
     </modules>
-
-    <profiles>
-        <profile>
-            <id>acceptance</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-acceptance</module>
-            </modules>
-        </profile>
-        <profile>
-            <id>cli</id>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-cli</module>
-            </modules>
-        </profile>
-        <profile>
-            <id>distribution</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-distribution</module>
-            </modules>
-        </profile>
-        <profile>
-            <id>samples</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-samples</module>
-            </modules>
-        </profile>
-    </profiles>
 
     <dependencyManagement>
         <dependencies>
@@ -283,6 +259,26 @@
                     <version>3.3.1</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-release-plugin</artifactId>
+                    <version>3.3.1</version>
+                    <configuration>
+                        <autoVersionSubmodules>true</autoVersionSubmodules>
+                        <preparationGoals>clean install</preparationGoals>
+                        <goals>deploy</goals>
+                        <pushChanges>false</pushChanges>
+                        <localCheckout>true</localCheckout>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>3.1.4</version>
+                    <configuration>
+                        <skip>${maven.deploy.skip}</skip>
+                    </configuration>
+                </plugin>
+                <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
                     <version>3.6.3</version>
@@ -353,6 +349,70 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>acceptance</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <modules>
+                <module>afon-acceptance</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>cli</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <modules>
+                <module>afon-cli</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>distribution</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <modules>
+                <module>afon-distribution</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>samples</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <modules>
+                <module>afon-samples</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>github</id>
+            <distributionManagement>
+                <repository>
+                    <id>github-maven-packages</id>
+                    <name>GitHub Maven Packages</name>
+                    <url>${github.packages.url}</url>
+                </repository>
+            </distributionManagement>
+        </profile>
+        <profile>
+            <id>sonatype</id>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>sonatype-nexus-oss</id>
+                    <name>Sonatype Nexus Snapshots</name>
+                    <url>${sonatype.nexus.url}/content/repositories/snapshots/</url>
+                </snapshotRepository>
+                <repository>
+                    <id>sonatype-nexus-oss</id>
+                    <name>Sonatype Nexus Staging</name>
+                    <url>${sonatype.nexus.url}/service/local/staging/deploy/maven2/</url>
+                </repository>
+            </distributionManagement>
+        </profile>
+    </profiles>
 
 
 </project>
