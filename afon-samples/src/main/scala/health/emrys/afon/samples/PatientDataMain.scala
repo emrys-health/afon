@@ -31,7 +31,7 @@ object PatientDataMain {
     val spark: SparkSession = initSpark(properties)
     val cluster = new ClusterPolarisConfiguration(properties);
     logger.info("Initializing Polaris")
-    cluster.initializePolaris()
+    cluster.configure()
     logger.info("Creating data")
     createData(spark, 10000)
     logger.info("Closing down Spark")

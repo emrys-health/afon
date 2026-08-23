@@ -16,7 +16,7 @@ import static java.lang.String.format;
  * Configures the AWS Polaris instance so Spark can talk to it.
  * It basically registers the clouds storage locations.
  */
-public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration implements AutoCloseable {
+public class ClusterPolarisConfiguration extends PolarisConfiguration implements AutoCloseable {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterPolarisConfiguration.class);
 
@@ -35,7 +35,7 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
     }
 
     public Properties getClusterProperties() {
-        return properties.getProperties();
+        return this.properties.getProperties();
     }
 
     public ClusterState getClusterState() {

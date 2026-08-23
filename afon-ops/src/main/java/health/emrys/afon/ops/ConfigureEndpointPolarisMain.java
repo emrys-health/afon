@@ -14,7 +14,7 @@ public class ConfigureEndpointPolarisMain {
         try {
             new EndpointPolarisConfiguration(properties).configure(args);
         } catch (Exception e) {
-            logger.error("Error configuring endpoint polaris", e);
+            logger.error("Error configuring endpoint Polaris", e);
         }
     }
 
