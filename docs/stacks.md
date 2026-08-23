@@ -103,16 +103,12 @@ Pre-requisites, on top of what the acceptance workflow needs:
   `scripts/github/secrets.sh push`.
 - **AWS admin credentials**: the repository secrets `AWS_DEPLOY_ACCESS_KEY_ID` and
   `AWS_DEPLOY_SECRET_ACCESS_KEY`. These are the user admin credentials tofu and the CLI run as,
-  **NOT** the Polaris service account credentials in `secret-aws.properties` (see
+  **NOTE** the Polaris service account credentials in `secret-aws.properties` (see
   [configuration](configuration.md)). Leave them unset to use the credentials the runner already
   has, from an EC2 instance profile or its `~/.aws/credentials`.
-- **Tofu state**: kept on the runner in `$AFON_STATE_DIR/<owner>/<repo>/aws`. 
-  The workflow copies them in before running and back out afterwards. A
-  `deploy` that starts without that state deploys as if AWS were empty (and collides with whatever
-  is actually still running); a `delete` that starts without it has nothing to destroy and leaves
-  the running stack untouched. If you ever tear the stack down by hand, keep the two in step.
+- **Tofu state**: kept on the runner in `$AFON_CDKTF/<owner>/<repo>/aws`. 
 
-**NOTE**: the `$AFON_STATE_DIR` points to `/data/afon/state` and lives outside the GitHub workspace,
+**NOTE**: the `$AFON_CDKTF` points to `/data/afon/cdktf` and lives outside the GitHub workspace,
 which is wiped out at each checkout.   On the runner, the `$AFON_HOME` points to the workspace.   
 
 The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log is uploaded as the
@@ -120,7 +116,7 @@ The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log i
 
 ### The afon-cdk module
 
-The afon-cdk module generates the Terraform plan using the CDKTF API to manage the cloud environment and delegates it to tofu to execute it. The plan is in `$AFON_HOME/cdktf/stacks/{aws,azure,gcp}`.
+The afon-cdk module generates the Terraform plan using the CDKTF API to manage the cloud environment and delegates it to tofu to execute it. The plan is in `$AFON_CDKTF/stacks/{aws,azure,gcp}`.
 
 Thereafter, you can run tofu apply or destroy commands via
 ```shell

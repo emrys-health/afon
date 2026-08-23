@@ -11,6 +11,7 @@ import health.emrys.afon.cdk.AbstractCloudStack;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
@@ -20,7 +21,6 @@ import java.util.Map;
 
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonCloud.AWS;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 public class AwsPolarisStack extends AbstractCloudStack {
 
@@ -82,9 +82,7 @@ public class AwsPolarisStack extends AbstractCloudStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App(AppConfig.builder()
-                .outdir(cdktfDir())
-                .build());
+        final App app = createApp();
         new AwsPolarisStack(app, AWS, new FilePropertyProvider());
         app.synth();
     }

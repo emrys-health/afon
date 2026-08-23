@@ -127,7 +127,7 @@ aws secretsmanager list-secrets
 ```
 
 They're the ones called `cdktf-app-config-secret-spark-cluster`, a name that comes from the code that creates the 
-Terrform plan (AwsCloudProvider.java).
+Terraform plan (AwsCloudProvider.java).
 The bridge between AWS and Kubernetes are the `csi-secrets-store-secrets-store-csi-driver-*` pods.
 
 The `aws-load-balancer-controller-chart-*` pods are the bridge between the Kubernetes cluster and the greater internet.

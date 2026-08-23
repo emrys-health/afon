@@ -21,6 +21,7 @@ if [ -z "$JAR" ]; then
 fi
 
 AFON_HOME="${AFON_HOME:-$HOME/.afon}"
+AFON_CDKTF="${AFON_CDKTF:-$AFON_HOME/cdktf}"
 AFON_CLOUD="${AFON_CLOUD:-ALL}"
 AFON_LOGGING="${AFON_LOGGING:-INFO}"
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-OFF}"
@@ -29,6 +30,7 @@ AFON_JVM_FLAGS="--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-expo
 
 exec java $AFON_JVM_FLAGS \
     -Dafon.home="$AFON_HOME" \
+    -Dafon.cdktf="$AFON_CDKTF" \
     -Dafon.cloud="$AFON_CLOUD" \
     -Dafon.logging="$AFON_LOGGING" \
     -Dafon.logging.console="$AFON_LOGGING_CONSOLE" \
