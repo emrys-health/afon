@@ -1,6 +1,6 @@
 name: AWS Stack (Linux)
 
-# Runs afon.sh's stack-deploy or stack-delete for AWS from the self-hosted Linux runner, ie
+# Runs afon.sh's stack deploy or delete for AWS from the self-hosted Linux runner, ie
 # ops.DeployAwsFullStackMain or ops.DeleteAwsFullStackMain — the same entry points as docs/stacks.md.
 #
 # deploy run first delete against the stack that is currently up, and the run then recreates it.
@@ -235,15 +235,15 @@ jobs:
             if [ -n "$FROM_STEP" ]; then
               echo "::warning::from_step is ignored by delete"
             fi
-            ./afon.sh -a stack-delete --cloud aws --stack-type full \
+            ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain \
               --home "$AFON_HOME" --logging-console INFO
           else
             if [ -n "$FROM_STEP" ]; then
               echo "Deploy resumes from step $FROM_STEP"
             fi
-            ./afon.sh -a stack-deploy --cloud aws --stack-type full \
+            ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain \
               --home "$AFON_HOME" --logging-console INFO \
-              --stack-args "$FROM_STEP"
+              --exec-args "$FROM_STEP"
           fi
 
       - name: Save the tofu state
@@ -267,7 +267,7 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
-          ./afon.sh -a stack-status --cloud aws --home "$AFON_HOME"
+          ./afon.sh -a script --script-path aws/vpcs.sh --home "$AFON_HOME"
           kubectl get pods -A
 
       - name: Upload stack logs

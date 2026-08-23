@@ -13,7 +13,6 @@ usage (){
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--script-path <path>]"
   echo "          [--setup-os <os>] [--setup-output <file>]"
-  echo "          [--stack-deploy] [--stack-type <type>] [--stack-args <args>] [--stack-status]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
   echo "          ansible:    : executes the ansible playbook."
@@ -24,7 +23,6 @@ usage (){
   echo "          exec        : executes the jvm classes from ops (see the docs for details)."
   echo "          script      : executes the scripts."
   echo "          setup-*     : sets up the local env for the given os and <cloud> option.  One of local|show"
-  echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|delete|status."
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state."
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "mvn-quiet:        the flag to hush the mvn output"
@@ -55,8 +53,6 @@ usage (){
   echo "script-path:      the path of the script the run."
   echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
-  echo "stack-type:       the stack type.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'polaris'."
-  echo "stack-args:       the stack command args."
   echo "tofu-args:        the tofu args."
   echo "tofu-cloud:       the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
 }
@@ -242,44 +238,6 @@ capitaliseFirst(){
   echo "$1" | awk '{print toupper(substr($0,1,1)) substr($0,2)}'
 }
 
-exec_stack(){
-  EXEC_TYPE="ops"
-  EXEC_ARGS="$STACK_ARGS"
-  STACK_ACTION=${ACTION#stack-}
-  case $STACK_ACTION in
-    deploy|delete)
-      if [ -z "$STACK_TYPE" ]; then
-        STACK_TYPE="polaris"
-        echo "Stack type not specified.  Defaulting to '$STACK_TYPE'."
-      fi
-      ACTION_CF=$(capitaliseFirst $STACK_ACTION)
-      CLOUD_CF=$(capitaliseFirst $CLOUD)
-      STACK_CF="$(capitaliseFirst $STACK_TYPE)Stack"
-      EXEC_CLASS="ops.${ACTION_CF}${CLOUD_CF}${STACK_CF}Main"
-      echo "$ACTION_CF using $EXEC_CLASS"
-      exec_jvm
-      ;;
-    status)
-      EXEC_TYPE="script"
-      case $STACK_TYPE in
-        full)
-          EXEC_SCRIPT="aws/vpcs.sh"
-          ;;
-        polaris)
-          EXEC_SCRIPT="$CLOUD/polaris.sh"
-          ;;
-        *)
-          echo "Stack type not supported: $STACK_TYPE"
-          usage; exit 0
-      esac
-      exec_script
-      ;;
-    *)
-      echo "Stack action not supported: $STACK_ACTION"
-      usage; exit 0
-  esac
-}
-
 exec_tofu(){
   echo "tofu targetting cloud '$TOFU_CLOUD'"
   TOFU_DIR="$AFON_HOME/cdktf/stacks/$TOFU_CLOUD"
@@ -419,8 +377,6 @@ MVN_QUIET=
 SCRIPT_PATH=
 SETUP_OS=
 SETUP_OUTPUT=
-STACK_TYPE=
-STACK_ARGS=
 TOFU_ACTION=
 TOFU_ARGS=
 TOFU_CLOUD=
@@ -484,10 +440,6 @@ while [[ $# -gt 0 ]]; do
       SETUP_OS="$2"; shift 2 ;;
     --setup-outout)
       SETUP_OUTPUT="$2"; shift 2 ;;
-    --stack-type)
-      STACK_TYPE="$2"; shift 2 ;;
-    --stack-args)
-      STACK_ARGS="$2"; shift 2 ;;
     --tofu-args)
       TOFU_ARGS="$2"; shift 2 ;;
     --tofu-cloud)
@@ -635,13 +587,6 @@ case $ACTION in
         echo "Setup action not supported: $SETUP_ACTION"
         usage; exit 0
     esac
-    ;;
-  stack-*)
-    if [ -z "$CLOUD" ]; then
-      CLOUD="aws"
-      echo "Cloud not specified.  Defaulting to '$CLOUD'."
-    fi
-    exec_stack
     ;;
   tofu-*)
     if [ -z "$TOFU_CLOUD" ]; then
