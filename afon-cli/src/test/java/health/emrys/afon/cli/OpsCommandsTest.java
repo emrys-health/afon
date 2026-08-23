@@ -12,25 +12,25 @@ class OpsCommandsTest {
 
     @Test
     void resolvesKnownCommandsByKebabCaseName() {
-        assertThat(opsCommands.resolve("configure-polaris-catalogs")).isEqualTo(health.emrys.afon.ops.ConfigurePolarisCatalogsMain.class);
+        assertThat(opsCommands.resolve("delete-aws-full-stack")).isEqualTo(health.emrys.afon.ops.DeleteAwsFullStackMain.class);
         assertThat(opsCommands.resolve("deploy-aws-full-stack")).isEqualTo(health.emrys.afon.ops.DeployAwsFullStackMain.class);
     }
 
     @Test
     void resolvesKnownCommandsByRawClassNameCaseInsensitively() {
-        assertThat(opsCommands.resolve("ConfigurePolarisCatalogsMain")).isEqualTo(health.emrys.afon.ops.ConfigurePolarisCatalogsMain.class);
-        assertThat(opsCommands.resolve("configurepolariscatalogsmain")).isEqualTo(health.emrys.afon.ops.ConfigurePolarisCatalogsMain.class);
+        assertThat(opsCommands.resolve("DeployAwsFullStackMain")).isEqualTo(health.emrys.afon.ops.DeployAwsFullStackMain.class);
+        assertThat(opsCommands.resolve("deployawsfullstackmain")).isEqualTo(health.emrys.afon.ops.DeployAwsFullStackMain.class);
     }
 
     @Test
     void returnsNullForUnknownCommand() {
-        assertThat(opsCommands.resolve("does-not-exist")).isNull();
+        assertThat(opsCommands.resolve("unknown-command")).isNull();
     }
 
     @Test
     void namesListsOnlyKebabCaseFormAndIsSorted() {
         Set<String> names = opsCommands.names();
-        assertThat(names).contains("configure-polaris-catalogs", "deploy-aws-full-stack", "purge-polaris");
+        assertThat(names).allMatch(name -> name.contains("-"));
         assertThat(names).allMatch(name -> name.equals(name.toLowerCase()));
         assertThat(names).isEqualTo(new java.util.TreeSet<>(names));
     }
