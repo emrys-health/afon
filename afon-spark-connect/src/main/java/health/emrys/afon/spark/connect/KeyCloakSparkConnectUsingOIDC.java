@@ -7,19 +7,13 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static health.emrys.afon.config.AfonProperty.*;
-
 public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
 
     private final String keyCloakToken;
 
     public KeyCloakSparkConnectUsingOIDC(AfonPropertyProvider properties) throws IOException {
         super(properties);
-        keyCloakToken = new KeyCloakProvider(
-                properties.getValue(KC_HOSTNAME),
-                properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME),
-                properties.getValue(KC_BOOTSTRAP_ADMIN_PASSWORD)
-        ).userToken(getSparkUser(), getSparkPassword());
+        keyCloakToken = new KeyCloakProvider(properties).userToken(getSparkUser(), getSparkPassword());
     }
 
     protected Map<String, String> getWarehouseConfig(String warehouseName,

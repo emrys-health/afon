@@ -7,7 +7,6 @@ import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.ConfigureKeyCloakUsersMain;
 import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
@@ -22,8 +21,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonCloud.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
@@ -38,10 +37,6 @@ public class StepOperations {
     private final StepActions actions;
 
     private final AfonPropertyProvider properties;
-
-    public StepOperations(StepActions actions) {
-        this(actions, new FilePropertyProvider());
-    }
 
     public StepOperations(StepActions actions, AfonPropertyProvider properties) {
         this.actions = actions;
@@ -338,7 +333,7 @@ public class StepOperations {
             format("Call Snowflake that uses AWS Polaris to get the credentials to read from %s storage", warehouse.name()),
             () -> {
                 logger.warn("Calling Snowflake. Note that some of these statements can take a long time");
-                actions.runSnowflakeSql(new String[]{
+                actions.runSnowflakeSql(properties, new String[]{
                     "USE DATABASE SNOWFLAKE_LEARNING_DB",
 
                     "DROP ICEBERG TABLE my_gcp_table_id",
@@ -406,7 +401,7 @@ public class StepOperations {
             "snowflake_writes_to_azure",
             "Call Snowflake so it writes sample data to Azure blob storage",
             () -> {
-                actions.runSnowflakeSql(new String[]{
+                actions.runSnowflakeSql(properties, new String[]{
                     format(
                         """
                             CREATE OR REPLACE STORAGE INTEGRATION azure_int
@@ -478,7 +473,7 @@ public class StepOperations {
                     "%s/%s*metadata.json",
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
-                String json = actions.azureFirstFile(glob, true, properties.getValue(AZURE_BUCKET), properties.getValue(AZURE_STORAGE_ACCOUNT)); // firstFileInLatestDirectoryMatching(glob);
+                String json = actions.azureFirstFile(properties, glob, true); // firstFileInLatestDirectoryMatching(glob);
                 return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterPolarisTableMain.class);
             case AWS, GCP:
             default:

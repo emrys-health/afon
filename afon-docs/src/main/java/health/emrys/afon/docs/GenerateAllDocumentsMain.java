@@ -16,14 +16,14 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 public class GenerateAllDocumentsMain {
     private static final Logger logger = getLogger(GenerateAllDocumentsMain.class);
-    private final AfonPropertyProvider provider;
+    private final AfonPropertyProvider properties;
 
     public GenerateAllDocumentsMain() {
-        this.provider = new FilePropertyProvider();
+        this.properties = new FilePropertyProvider();
     }
 
     private void generateDocuments() {
-        Documenter documenter = new Documenter(provider);
+        Documenter documenter = new Documenter(properties);
         documenter.generateDocuments(documents());
     }
 
@@ -69,7 +69,7 @@ public class GenerateAllDocumentsMain {
 
     private @NonNull DocumentMetadata document(Class<?> documentClass) {
         try {
-            return (DocumentMetadata) documentClass.getConstructor(AfonPropertyProvider.class).newInstance(provider);
+            return (DocumentMetadata) documentClass.getConstructor(AfonPropertyProvider.class).newInstance(properties);
         } catch (Exception e) {
             logger.error("Failed to create document metadata {}: {}", documentClass.getName(), e.getCause(), e);
             throw new RuntimeException(e);

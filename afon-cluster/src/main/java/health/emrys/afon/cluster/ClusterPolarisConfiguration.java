@@ -24,7 +24,7 @@ public class ClusterPolarisConfiguration extends AbstractPolarisConfiguration im
 
     public ClusterPolarisConfiguration(AfonPropertyProvider properties) throws IncorrectConfigException, IOException, ApiException {
         super(properties);
-        state = new ClusterState();
+        state = new ClusterState(properties);
         String endpoint = format("%s:443", state.getPolarisHost());
         this.properties.setValue(POLARIS_ENDPOINT, endpoint);
         logger.info("Calling Polaris endpoint: {}", endpoint);

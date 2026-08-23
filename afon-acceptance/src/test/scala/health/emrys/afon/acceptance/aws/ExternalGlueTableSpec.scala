@@ -18,11 +18,11 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 @External
 class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
 
+  val properties = AcceptanceTestConfig.instance.getProperties
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
-  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken
 
   "An external table" should {
-    val properties        = new FilePropertyProvider()
     val glueCatalogName   = properties.getValue(GLUE_CATALOG_NAME)
     val externalBucket    = properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME)
     val glueCatalog       = new GlueAwsPolarisCatalog(properties)

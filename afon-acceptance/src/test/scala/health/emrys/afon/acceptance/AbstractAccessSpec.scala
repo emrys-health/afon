@@ -4,9 +4,10 @@ import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.cluster.ClusterUtils
-import health.emrys.afon.config.{AfonUser, AfonUserAcl, AfonUserProvider, FilePropertyProvider}
+import health.emrys.afon.config.{AfonProperty, AfonUser, AfonUserAcl, AfonUserProvider, FilePropertyProvider}
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 import PolarisCatalog.METADATA_KEY
+import health.emrys.afon.config.AfonProperty.{KC_BOOTSTRAP_ADMIN_PASSWORD, KC_BOOTSTRAP_ADMIN_USERNAME, KC_HOSTNAME}
 import health.emrys.afon.ops.ConfigureKeyCloakUsersMain
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
 import health.emrys.afon.polaris.config.PolarisConfigurer
@@ -23,6 +24,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
   def config: PolarisCatalog
 
+  val properties        = AcceptanceTestConfig.instance.getProperties
   val GrantCatalogAdmin = new CatalogAdminGrant(this, config)
   val CatalogRoles      = new CatalogRoles(this, config)
   val NUM_ROWS          = 100
@@ -168,7 +170,6 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   }
 
   "Trino" should {
-    val properties          = new FilePropertyProvider()
     "vend credentials" in {
       Given(s"a catalog called ${config.catalogName()} in Polaris")
 

@@ -2,7 +2,6 @@ package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -55,7 +54,7 @@ public class ContainerHelper {
      * For testing.
      */
     public static void main(String[] args) {
-        AfonPropertyProvider properties = new FilePropertyProvider();
+        AfonPropertyProvider properties = AcceptanceTestConfig.instance.getProperties();
         // KeyCloak must be up (and the Polaris realm provisioned) before Polaris starts, as Polaris
         // resolves its OIDC configuration from KeyCloak.
         instance.startKeyCloak(properties);
@@ -101,13 +100,12 @@ public class ContainerHelper {
                             "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
-            KeyCloakProvider keyCloakProvider = new KeyCloakProvider(KEYCLOAK_HOSTNAME,
-                    properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME),
-                    properties.getValue(KC_BOOTSTRAP_ADMIN_PASSWORD));
+            properties.setValue(KC_HOSTNAME, KEYCLOAK_HOSTNAME);
+            KeyCloakProvider keyCloakProvider = new KeyCloakProvider(properties);
             keyCloakProvider
-                    .registerPolarisUser(
-                            properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME),
-                            properties.getValue(KC_BOOTSTRAP_ADMIN_PASSWORD));
+                .registerPolarisUser(
+                        properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME),
+                        properties.getValue(KC_BOOTSTRAP_ADMIN_PASSWORD));
             keyCloakProvider
                 .registerPolarisUser(
                         properties.getValue(USER_POLARIS_ID),

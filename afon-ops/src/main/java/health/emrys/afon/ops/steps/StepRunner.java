@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.steps;
 
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -8,6 +9,11 @@ import java.util.List;
 public class StepRunner {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepRunner.class);
+    private final StepOperations operations;
+
+    public StepRunner() {
+        this.operations = new StepOperations(new StepActions(), new FilePropertyProvider());
+    }
 
     /**
      * Run steps using the given provider
@@ -16,7 +22,7 @@ public class StepRunner {
      * @param startingWith the first step to run, if provided
      */
     public void runUsing(StepsProvider stepsProvider, String[] startingWith) {
-        List<Step> steps = stepsProvider.stepsUsing(new StepOperations(new StepActions()));
+        List<Step> steps = stepsProvider.stepsUsing(operations);
         if (startingWith.length == 0) {
             runSteps(steps);
         } else {

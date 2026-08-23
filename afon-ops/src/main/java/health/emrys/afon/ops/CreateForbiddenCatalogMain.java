@@ -27,8 +27,7 @@ public class CreateForbiddenCatalogMain {
 
     public CreateForbiddenCatalogMain(AfonPropertyProvider properties) {
         this.properties = properties;
-        String domainName = properties.getValue(AfonProperty.POLARIS_ENDPOINT);
-        client = PolarisRestClientFactory.clientFactory().createClient(domainName, new FilePropertyProvider());
+        client = PolarisRestClientFactory.clientFactory().createClient(properties);
     }
 
     private void create() throws IncorrectConfigException, IOException {
