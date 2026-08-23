@@ -9,11 +9,11 @@ import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
  * Given an endpoint, this class proxies Polaris.
  * You can use this class to talk to instances that are not in the cluster with:
  * <pre>
- mvn -DPOLARIS_ENDPOINT=emryspolarisazure.click -Dexec.mainClass=health.emrys.afon.cluster.EndpointPolarisConfiguration exec:java -Dexec.args="AZURE_EXTERNAL POLARIS_ID:POLARIS_SECRET"
+ ./afon.sh -a exec --exec-class ops.ConfigureEndpointPolarisMain --exec-args "AZURE_EXTERNAL POLARIS_ID:POLARIS_SECRET" --exec-envs "POLARIS_ENDPOINT=emryspolarisazure.click"
  * </pre>
  * although you will need to point your K8s current environment at the cloud.
  */
-public class EndpointPolarisConfiguration extends AbstractPolarisConfiguration implements AutoCloseable {
+public class EndpointPolarisConfiguration extends PolarisConfiguration implements AutoCloseable {
 
     private final String credentials;
 
