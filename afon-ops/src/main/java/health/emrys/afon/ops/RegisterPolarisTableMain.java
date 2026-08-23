@@ -14,7 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.cluster.ClusterUtils.isFailure;
+import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 import static health.emrys.afon.config.AfonProperty.*;
 import static java.lang.String.format;
 
