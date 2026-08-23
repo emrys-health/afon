@@ -49,8 +49,7 @@ public class DeployAzureFullStackDocument extends AbstractDocument {
             ```shell
            ./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper --exec-args azure-cleanup.sh
             ```
-            """,
-            SparkWorkloads.startConnectCommand(polarisDomainName));
+            """, new SparkWorkloads(polarisDomainName, properties).startConnectCommand());
     }
 
 

@@ -41,10 +41,9 @@ public class GeneratePySparkContextMain {
         polarisId     = credentials.getPolarisId();
         polarisSecret = credentials.getPolarisSecret();
         polarisHost   = credentials.getPolarisHost();
-        polarisConfig = SparkWarehouseConfigFactory.getFactory().getConfig(
-            polarisId,
-            polarisSecret,
-            polarisHost
+        polarisConfig = SparkWarehouseConfigFactory.getFactory().createConfig(
+                properties, polarisHost, polarisId,
+                polarisSecret
         );
     }
 

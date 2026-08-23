@@ -27,7 +27,7 @@ public class GeneratePySparkKeyCloakMain {
 
     GeneratePySparkKeyCloakMain(AfonPropertyProvider properties) {
         SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
-        config = configFactory.getConfig(properties);
+        config = configFactory.createConfig(properties);
     }
 
     public void generateAndSavePySparkCode() {
