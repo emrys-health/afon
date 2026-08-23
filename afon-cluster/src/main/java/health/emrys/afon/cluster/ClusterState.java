@@ -16,11 +16,11 @@ public class ClusterState implements AutoCloseable {
     public static final String ACCESS_TOKEN_SYS_PROP = "ACCESS_TOKEN";
 
     private final String           accessToken;
-    private final GenericK8sClient k8sClient;
+    private final KubeConfigClusterClient k8sClient;
     private final String           polarisHost;
 
     public ClusterState(AfonPropertyProvider properties) throws ApiException, IncorrectConfigException {
-        k8sClient = new GenericK8sClient(properties);
+        k8sClient = new KubeConfigClusterClient(properties);
         V1Pod  polarisPod = k8sClient.getPodExpectingOnlyOneStartingWith(POLARIS_POD_NAME);
         String podName    = polarisPod.getMetadata().getName();
         logger.info("Pod Name: {}", podName);

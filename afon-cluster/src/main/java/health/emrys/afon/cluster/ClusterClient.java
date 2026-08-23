@@ -13,12 +13,10 @@ import io.kubernetes.client.openapi.apis.CoreV1Api.APIreadNamespacedPodLogReques
 import io.kubernetes.client.openapi.apis.NetworkingV1Api;
 import io.kubernetes.client.openapi.apis.NetworkingV1Api.APIlistIngressForAllNamespacesRequest;
 import io.kubernetes.client.openapi.models.*;
-import io.kubernetes.client.util.ClientBuilder;
-import io.kubernetes.client.util.credentials.Authentication;
+import okhttp3.Dispatcher;
+import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
-import software.amazon.awssdk.services.eks.model.DescribeClusterResponse;
 
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -27,15 +25,20 @@ import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
 import static java.lang.String.format;
 
 
-public class K8sClient {
+public abstract class ClusterClient implements AutoCloseable {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(K8sClient.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterClient.class);
 
     private final String clusterName;
+    private final ApiClient apiClient;
 
-    public K8sClient(AfonPropertyProvider properties) {
+    public ClusterClient(AfonPropertyProvider properties) {
         this.clusterName = properties.getValue(CLUSTER_NAME);
+        this.apiClient = buildClient(properties);
+        Configuration.setDefaultApiClient(apiClient);
     }
+
+    protected abstract ApiClient buildClient(AfonPropertyProvider properties);
 
     public String getClusterName() {
         return clusterName;
@@ -73,7 +76,7 @@ public class K8sClient {
         }
         List<String> polarisIngress = optionalIngress.get();
         if (polarisIngress.size() != 1) {
-            throw new IncorrectConfigException(format("Was expecting 1 service address but got %s", polarisIngress.toString()));
+            throw new IncorrectConfigException(format("Was expecting 1 service address but got %s", polarisIngress));
         }
         return polarisIngress.get(0);
     }
@@ -126,14 +129,26 @@ public class K8sClient {
         return request.execute().toString();
     }
 
-    protected void registerClient(String endpoint, Authentication authentication, DescribeClusterResponse clusterInfo) {
-        ApiClient client = new ClientBuilder()
-                .setBasePath(endpoint)
-                .setAuthentication(authentication)
-                .setVerifyingSsl(true)
-                .setCertificateAuthority(Base64.getDecoder().decode(clusterInfo.cluster().certificateAuthority().data()))
-                .build();
-        Configuration.setDefaultApiClient(client);
+    @Override
+    public void close() throws Exception {
+        logger.info("Closing Kubernetes client");
+        if (apiClient != null && apiClient.getHttpClient() != null) {
+            OkHttpClient httpClient = apiClient.getHttpClient();
+            if (httpClient.cache() != null) {
+                logger.info("Closing cache");
+                httpClient.cache().close();
+            }
+            if (httpClient.connectionPool() != null) {
+                logger.info("Closing connection pool");
+                httpClient.connectionPool().evictAll();
+            }
+            Dispatcher dispatcher = httpClient.dispatcher();
+            if (dispatcher != null && dispatcher.executorService() != null) {
+                logger.info("Closing executor service");
+                dispatcher.executorService().shutdown();
+            }
+        }
+        Configuration.setDefaultApiClient(null);
     }
 
 }

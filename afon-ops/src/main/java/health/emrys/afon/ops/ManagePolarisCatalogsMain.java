@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static health.emrys.afon.cluster.ClusterUtils.isFailure;
+import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;

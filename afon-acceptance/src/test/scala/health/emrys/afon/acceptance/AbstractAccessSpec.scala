@@ -3,14 +3,13 @@ package health.emrys.afon.acceptance
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
-import health.emrys.afon.cluster.ClusterUtils
 import health.emrys.afon.config.{AfonProperty, AfonUser, AfonUserAcl, AfonUserProvider, FilePropertyProvider}
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 import PolarisCatalog.METADATA_KEY
 import health.emrys.afon.config.AfonProperty.{KC_BOOTSTRAP_ADMIN_PASSWORD, KC_BOOTSTRAP_ADMIN_USERNAME, KC_HOSTNAME}
 import health.emrys.afon.ops.ConfigureKeyCloakUsersMain
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
-import health.emrys.afon.polaris.config.PolarisConfigurer
+import health.emrys.afon.polaris.config.{PolarisConfigurer, PolarisRestClient}
 import health.emrys.afon.polaris.config.PolarisConfigurer.{catalogsURI, namespaceURI, tableURI}
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.KeyCloakProvider
@@ -165,7 +164,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val polarisClient = AcceptanceTestConfig.instance.polarisClientFor(UserName, UserPassword)
       And(s"user '$UserName' can see the table when they call Polaris at $uriGet'")
       val response = polarisClient.get(uriGet, polarisClient.getAccessToken())
-      assert(!ClusterUtils.isFailure(response))
+      assert(!PolarisRestClient.isFailure(response))
     }
   }
 
