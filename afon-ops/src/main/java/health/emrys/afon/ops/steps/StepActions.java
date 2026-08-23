@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
@@ -30,7 +31,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
-import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
@@ -257,8 +258,30 @@ public class StepActions {
         return p.exitValue();
     }
 
-    public void runSnowflakeSql(String[] statements) throws NoSuchAlgorithmException, InvalidKeySpecException, SQLException {
-        SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory();
+    @NonNull String azureFirstFile(AfonPropertyProvider properties, String glob, boolean descendingOrder) {
+        logger.info("Querying Azure for {}", glob);
+        AzureReader reader = new AzureReader(properties);
+        List<BlobItem> list = new ArrayList<>(reader.list(glob));
+        Comparator<BlobItem> comparing = comparing((BlobItem o) -> o.getProperties().getCreationTime());
+        if (descendingOrder) {
+            comparing = comparing.reversed();
+        }
+        BlobItem latest = list
+                .stream()
+                .sorted(comparing)
+                .findFirst()
+                .get();
+        logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
+        return format(
+                "abfss://%s@%s.dfs.core.windows.net/%s",
+                properties.getValue(AZURE_BUCKET),
+                properties.getValue(AZURE_STORAGE_ACCOUNT),
+                latest.getName());
+    }
+
+
+    public void runSnowflakeSql(AfonPropertyProvider properties, String[] statements) throws NoSuchAlgorithmException, InvalidKeySpecException, SQLException {
+        SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory(properties);
         try (Connection conn = factory.getConnection();
              Statement stmt = conn.createStatement()) {
             for (String sql : statements) {
@@ -284,27 +307,6 @@ public class StepActions {
         executeMainOf(EndpointPolarisConfiguration.class,
                       new String[] {catalog.name()},
                       properties);
-    }
-
-    @NonNull String azureFirstFile(String glob, boolean descendingOrder, String azureBucket, String azureStorageAccount) {
-        logger.info("Querying Azure for {}", glob);
-        AzureReader lister    = new AzureReader();
-        List<BlobItem>       list      = new ArrayList<>(lister.list(glob));
-        Comparator<BlobItem> comparing = comparing((BlobItem o) -> o.getProperties().getCreationTime());
-        if (descendingOrder) {
-            comparing = comparing.reversed();
-        }
-        BlobItem latest = list
-                .stream()
-                .sorted(comparing)
-                .findFirst()
-                .get();
-        logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
-        return format(
-                "abfss://%s@%s.dfs.core.windows.net/%s",
-                azureBucket,
-                azureStorageAccount,
-                latest.getName());
     }
 
     private void restoreSystemProperties(Properties properties, Properties original) {

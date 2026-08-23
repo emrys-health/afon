@@ -17,29 +17,16 @@ public class PolarisRestClientFactory {
         return new KeyCloakPolarisRestClient(properties);
     }
 
-    public PolarisRestClient createClient(String polarisHost, AfonPropertyProvider properties) {
-        properties.setValue(POLARIS_ENDPOINT, polarisHost);
-        return new KeyCloakPolarisRestClient(properties);
-    }
-
     public PolarisRestClient createClient(AfonPropertyProvider properties, String protocol) {
         return new KeyCloakPolarisRestClient(properties, protocol);
     }
 
-    public PolarisRestClient createClient(String endpoint, String clientId, String clientSecret) {
+    public PolarisRestClient createClient(String kcHostname, String endpoint, String clientId, String clientSecret) {
         AfonPropertyProvider properties = new FilePropertyProvider();
+        properties.setValue(KC_HOSTNAME, kcHostname);
         properties.setValue(POLARIS_ENDPOINT, endpoint);
         properties.setValue(POLARIS_ID, clientId);
         properties.setValue(POLARIS_SECRET, clientSecret);
-        return new KeyCloakPolarisRestClient(properties);
-    }
-
-    public PolarisRestClient createClient(String endpoint, String clientId, String clientSecret, String kcHost) {
-        AfonPropertyProvider properties = new FilePropertyProvider();
-        properties.setValue(POLARIS_ENDPOINT, endpoint);
-        properties.setValue(POLARIS_ID, clientId);
-        properties.setValue(POLARIS_SECRET, clientSecret);
-        properties.setValue(KC_HOSTNAME, kcHost);
         return new KeyCloakPolarisRestClient(properties);
     }
 

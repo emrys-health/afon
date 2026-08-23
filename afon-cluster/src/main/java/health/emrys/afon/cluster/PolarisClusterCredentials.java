@@ -14,7 +14,8 @@ public class PolarisClusterCredentials implements ClusterCredentials {
 
     public PolarisClusterCredentials(AfonCloud cloud, AfonPropertyProvider properties) {
         this.properties = properties;
-        this.accessToken = clientFactory.createClient(polarisDomainName(cloud), properties).getAccessToken();
+        this.properties.setValue(POLARIS_ENDPOINT, polarisDomainName(cloud));
+        this.accessToken = clientFactory.createClient(this.properties).getAccessToken();
     }
 
     private String polarisDomainName(AfonCloud cloud) {

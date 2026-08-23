@@ -21,15 +21,14 @@ import java.util.Properties
 @External
 class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
 
+  val properties = AcceptanceTestConfig.instance.getProperties
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
-  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken
 
   val FEDERATED_CATALOG_NAME  = "emrys_afon_core_2"
   val BUCKET                  = f"emrys_afon_core_2"
 
   "An external GCP table" should {
-
-    val properties        = new FilePropertyProvider()
     val config            = new GcpPolarisCatalog(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new health.emrys.afon.acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))

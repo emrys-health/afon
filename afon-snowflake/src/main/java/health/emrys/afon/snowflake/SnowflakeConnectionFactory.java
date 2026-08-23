@@ -1,7 +1,6 @@
 package health.emrys.afon.snowflake;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
 import org.slf4j.Logger;
 
 import java.security.KeyFactory;
@@ -25,10 +24,9 @@ public class SnowflakeConnectionFactory {
     private final PrivateKey privateKey;
     private final String url;
 
-    public SnowflakeConnectionFactory() throws NoSuchAlgorithmException, InvalidKeySpecException {
-        AfonPropertyProvider afonProperties = new FilePropertyProvider();
-        privateKey = getSnowflakePrivateKey(afonProperties);
-        url        = afonProperties.getValue(SNOWFLAKE_JDBC_URL);
+    public SnowflakeConnectionFactory(AfonPropertyProvider properties) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        privateKey = getSnowflakePrivateKey(properties);
+        url        = properties.getValue(SNOWFLAKE_JDBC_URL);
         log.info("Attempting to connect to database at {} ...", url);
     }
 

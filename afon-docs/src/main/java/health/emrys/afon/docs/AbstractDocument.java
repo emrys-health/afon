@@ -62,9 +62,10 @@ public abstract class AbstractDocument implements DocumentMetadata {
                 """, StepDocumentation.afonArgumentsToRun(deployClass, null, "exec"));
     }
 
-    private static String stepsBeingRun(Class<?> deployClass) {
+    private String stepsBeingRun(Class<?> deployClass) {
         StepsProvider provider = stepProvider(deployClass);
-        List<Step> steps = provider.stepsUsing(new StepOperations(new StepDocumentation(OutputStream.nullOutputStream())));
+        StepOperations operations = new StepOperations(new StepDocumentation(OutputStream.nullOutputStream()), properties);
+        List<Step> steps = provider.stepsUsing(operations);
         if (steps.size() == 0){
             return format("The steps provider %s has no steps.", deployClass.getName());
         }

@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.slf4j.Logger;
 
@@ -15,10 +16,15 @@ import java.sql.Statement;
 public class SnowflakeQuerySmoke {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(SnowflakeQuerySmoke.class);
+    private final FilePropertyProvider properties;
+
+    public SnowflakeQuerySmoke(FilePropertyProvider properties) {
+        this.properties = properties;
+    }
 
     public void query(String tableName) {
         try {
-            SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory();
+            SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory(properties);
             Connection conn = factory.getConnection() ;
             Statement stmt = conn.createStatement();
             String sql = "SELECT * from " + tableName;
@@ -39,6 +45,7 @@ public class SnowflakeQuerySmoke {
             return;
         }
         String tableName = args[0];
-        new SnowflakeQuerySmoke().query(tableName);
+        var properties = new FilePropertyProvider();
+        new SnowflakeQuerySmoke(properties).query(tableName);
     }
 }

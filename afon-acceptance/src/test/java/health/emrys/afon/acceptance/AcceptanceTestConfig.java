@@ -97,17 +97,16 @@ public class AcceptanceTestConfig {
 
     public PolarisRestClient polarisClientFor(String clientId, String clientSecret) {
         return clientFactory.createClient(
-            this.properties.getValue(POLARIS_ENDPOINT),
-            clientId,
-            clientSecret,
-            ContainerHelper.KEYCLOAK_HOSTNAME);
+                ContainerHelper.KEYCLOAK_HOSTNAME, this.properties.getValue(POLARIS_ENDPOINT),
+                clientId, clientSecret
+        );
     }
 
-    private static void startContainers(AfonPropertyProvider provider) {
+    private static void startContainers(AfonPropertyProvider properties) {
         ContainerHelper containerHelper = ContainerHelper.instance;
-        containerHelper.startKeyCloak(provider);
-        containerHelper.startPolaris(provider);
-        containerHelper.startTrino(provider);
+        containerHelper.startKeyCloak(properties);
+        containerHelper.startPolaris(properties);
+        containerHelper.startTrino(properties);
     }
 
     public PolarisRestClient getPolarisClient() {

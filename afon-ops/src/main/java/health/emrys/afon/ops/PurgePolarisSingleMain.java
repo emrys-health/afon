@@ -37,7 +37,7 @@ public class PurgePolarisSingleMain {
     private PurgePolarisSingleMain(AfonPropertyProvider properties) {
         this.properties = properties;
         this.domainName = properties.getValue(AfonProperty.POLARIS_ENDPOINT);
-        client          = PolarisRestClientFactory.clientFactory().createClient(domainName, this.properties);
+        client          = PolarisRestClientFactory.clientFactory().createClient(properties);
         accessToken     = client.getAccessToken();
     }
 

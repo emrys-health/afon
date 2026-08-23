@@ -6,6 +6,7 @@ import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.catalogsURI;
 
 public class PurgePolarisMain {
@@ -19,7 +20,8 @@ public class PurgePolarisMain {
         String domainName = args[0];
         try {
             var properties = new FilePropertyProvider();
-            var client = PolarisRestClientFactory.clientFactory().createClient(domainName, properties);
+            properties.setValue(POLARIS_ENDPOINT, domainName);
+            var client = PolarisRestClientFactory.clientFactory().createClient(properties);
             String accessToken = client.getAccessToken();
             for (AfonCloud warehouse : AfonCloud.values()) {
                 client.delete(catalogsURI(warehouse.toString()), accessToken);
