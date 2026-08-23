@@ -29,6 +29,16 @@ public class ConfigUtils {
     }
 
     /**
+     * Returns the dir specified by system property ${afon.cdktf}.
+     * If not found it defaults to {@link #afonHome()}/cdktf
+     *
+     * @return the afon cdktf dir
+     */
+    public static @NonNull String afonCkdtf() {
+        return System.getProperty("afon.cdktf", format("%s/%s", afonHome(), "cdktf"));
+    }
+
+    /**
      * Returns the config dir located in {@link #afonHome()}/config.
      *
      * @return the config dir
@@ -38,32 +48,23 @@ public class ConfigUtils {
     }
 
     /**
-     * Returns the cdktf dir located in {@link #afonHome()}/cdktf.
-     *
-     * @return the cdktf dir
-     */
-    public static @NonNull String cdktfDir() {
-        return format("%s/%s", afonHome(), "cdktf");
-    }
-
-    /**
-     * Returns the stack dir located in {@link #cdktfDir()}/stacks/{@link AfonCloud#name()}
+     * Returns the stack dir located in {@link #afonCkdtf()}/stacks/{@link AfonCloud#name()}
      *
      * @param id the {@link AfonCloud}
      * @return the stack dir
      */
     public static @NonNull String stackDir(AfonCloud id) {
-        return format("%s/stacks/%s", cdktfDir(), id);
+        return format("%s/stacks/%s", afonCkdtf(), id);
     }
 
     /**
-     * Returns the tfState path located in {@link #cdktfDir()}/terraform.{@link AfonCloud#name()}.tfstate
+     * Returns the tfState path located in {@link #afonCkdtf()}/terraform.{@link AfonCloud#name()}.tfstate
      *
      * @param id the {@link AfonCloud}
      * @return the stack dir
      */
     public static @NonNull String tfStatePath(AfonCloud id) {
-        return format("%s/terraform.%s.tfstate", cdktfDir(), id);
+        return format("%s/terraform.%s.tfstate", afonCkdtf(), id);
     }
 
     /**
@@ -78,7 +79,7 @@ public class ConfigUtils {
 
     /**
      * Return system property {@link #CLOUD_SYSTEM_PROPERTY}.
-     * @return the property, whose value must be check by {@link #cloudPropertySet()}.
+     * @return the property, whose value must be checked by {@link #cloudPropertySet()}.
      */
     public static String cloudPropertyValue() {
         return System.getProperty(CLOUD_SYSTEM_PROPERTY);

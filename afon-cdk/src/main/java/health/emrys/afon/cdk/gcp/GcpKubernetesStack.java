@@ -6,12 +6,12 @@ import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AbstractCloudStack;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.config.AfonProperty.GCP_DOMAIN_NAME;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 class GcpKubernetesStack extends AbstractCloudStack {
 
@@ -38,9 +38,7 @@ class GcpKubernetesStack extends AbstractCloudStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App(AppConfig.builder()
-                .outdir(cdktfDir())
-                .build());
+        final App app = createApp();
         AfonPropertyProvider properties = new FilePropertyProvider();
         new GcpKubernetesStack(app, GCP, properties);
         app.synth();

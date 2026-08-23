@@ -1,7 +1,6 @@
 package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
@@ -23,7 +22,6 @@ import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 public class AzureFullStack extends AzurePolarisStack {
 
@@ -109,9 +107,7 @@ public class AzureFullStack extends AzurePolarisStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App(AppConfig.builder()
-                .outdir(cdktfDir())
-                .build());
+        final App app = createApp();
         new AzureFullStack(app, AZURE, new FilePropertyProvider());
         app.synth();
     }

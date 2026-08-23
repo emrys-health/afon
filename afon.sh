@@ -2,8 +2,9 @@
 set -euo pipefail
 
 usage (){
-  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run]"
-  echo "          [--home <afon-home>] [--help|-h]"
+  echo "Usage: $0 [--action|-a <action>] [--help|-h]"
+  echo "          [--home <afon-home>] [--cdktf <afon-cdktf>]"
+  echo "          [--cloud|-c <cloud>]"
   echo "          [--logging|-l <logging>] [--logging-console <console>] [--mvn-quiet]"
   echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
@@ -24,15 +25,17 @@ usage (){
   echo "          script      : executes the scripts."
   echo "          setup-*     : sets up the local env for the given os and <cloud> option.  One of local|show"
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state."
-  echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
-  echo "mvn-quiet:        the flag to hush the mvn output"
   echo "help:             the help flag.  Prints usage."
   echo "home:             the afon home dir.  Defaults to '$HOME/.afon'."
   echo "                  Also settable via env variable 'AFON_HOME'."
+  echo "cdktf:            the afon cdktf dir.  Defaults to '$AFON_HOME/cdktf'."
+  echo "                  Also settable via env variable 'AFON_CDKTF'."
+  echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging:          the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "                  Also settable via env variable 'AFON_LOGGING'."
   echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "                  Also settable via env variable 'AFON_LOGGING_CONSOLE'."
+  echo "mvn-quiet:        the flag to hush the mvn output"
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
   echo "build-args:       the build args.  eg '-DskipTests'."
@@ -175,7 +178,7 @@ exec_docs(){
 }
 
 mvn_envs(){
-  MVN_ENVS="-Dafon.home=$HOME_DIR"
+  MVN_ENVS="-Dafon.home=$HOME_DIR -Dafon.cdktf=$CDKTF_DIR"
   if [ -n "$CLOUD" ]; then
     MVN_ENVS="$MVN_ENVS -Dafon.cloud=$CLOUD"
   fi
@@ -351,11 +354,11 @@ ANSIBLE_ARGS=
 BUILD_ARGS=
 BUILD_GOALS=
 BUILD_PROFILES=
+CDKTF_DIR=
 CLI_ARGS=
 CLI_COMMAND=
 CLI_DIR=
 CLOUD=
-DRY_RUN=false
 HELP=
 HOME_DIR=
 LOGGING=
@@ -396,10 +399,10 @@ while [[ $# -gt 0 ]]; do
       BUILD_GOALS="$2"; shift 2 ;;
     --build-profiles|-p)
       BUILD_PROFILES="$2"; shift 2 ;;
+    --cdktf)
+      CDKTF_DIR="$2"; shift 2 ;;
     --cloud|-c)
       CLOUD="$2"; shift 2 ;;
-    --dry-run)
-      DRY_RUN=true; shift ;;
     --cli-args)
       CLI_ARGS="$2"; shift 2 ;;
     --cli-command|--cli-cmd)
@@ -463,6 +466,20 @@ else
   echo "Home dir not specified. Defaulting to $HOME_DIR"
   AFON_HOME="$HOME_DIR"
   echo "Setting AFON_HOME=$AFON_HOME"
+fi
+
+AFON_CDKTF="${AFON_CDKTF:-}"
+if [ -n "$AFON_CDKTF" ]; then
+  CDKTF_DIR="$AFON_CDKTF"
+fi
+
+if [ -n "$CDKTF_DIR" ]; then
+  echo "Using cdktf dir=$CDKTF_DIR"
+else
+  CDKTF_DIR="$HOME_DIR/cdktf"
+  echo "Cdktf dir not specified. Defaulting to $CDKTF_DIR"
+  AFON_CDKTF="$CDKTF_DIR"
+  echo "Setting AFON_CDKTF=$AFON_CDKTF"
 fi
 
 AFON_CLI_DIR=${AFON_CLI_DIR:-}
