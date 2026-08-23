@@ -12,11 +12,7 @@ public class AwsCleanupHelper extends AbstractCleanupHelper {
 
     private AwsComponentNames componentNames;
 
-    public AwsCleanupHelper() {
-        this(new FilePropertyProvider());
-    }
-
-    AwsCleanupHelper(AfonPropertyProvider properties) {
+    public AwsCleanupHelper(AfonPropertyProvider properties) {
         componentNames = new AwsComponentNames(properties);
     }
 
@@ -211,7 +207,8 @@ public class AwsCleanupHelper extends AbstractCleanupHelper {
     }
 
     public static void main(String[] args) {
-        outputCleanupCommands(args, new AwsCleanupHelper().cleanupCommands());
+        var properties = new FilePropertyProvider();
+        outputCleanupCommands(args, new AwsCleanupHelper(properties).cleanupCommands());
     }
 
 

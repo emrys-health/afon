@@ -23,37 +23,31 @@ public class SparkSessionFactory {
     public static SparkSession localSparkClusterPolaris(AfonCloud polarisCloud, AfonPropertyProvider properties) throws IOException {
         ClusterCredentials credentials = new PolarisClusterCredentials(polarisCloud, properties);
         return new SparkSessionFactory(
-            credentials.getPolarisId(),
-            credentials.getPolarisSecret(),
-            credentials.getPolarisHost(),
-            "https", WAREHOUSE_NAMES
+                properties, credentials.getPolarisHost(), credentials.getPolarisId(),
+                credentials.getPolarisSecret(),
+                WAREHOUSE_NAMES
         ).createSparkSession();
     }
 
     private final SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
+    private final AfonPropertyProvider properties;
+    private final String polarisHost;
     private final String polarisId;
     private final String polarisSecret;
-    private final String polarisHost;
-    private final String protocol;
     private final String[] warehouseNames;
 
-    SparkSessionFactory(String polarisId, String polarisSecret, String polarisHost, String protocol, String[] warehouseNames) {
-        this.polarisId      = polarisId;
-        this.polarisSecret  = polarisSecret;
-        this.polarisHost    = polarisHost;
-        this.protocol       = protocol;
+    SparkSessionFactory(AfonPropertyProvider properties, String polarisHost, String polarisId, String polarisSecret, String[] warehouseNames) {
+        this.properties = properties;
+        this.polarisHost = polarisHost;
+        this.polarisId = polarisId;
+        this.polarisSecret = polarisSecret;
         this.warehouseNames = warehouseNames;
-        logger.info("polarisId = {}, polarisSecret = {}, polarisHost = {}, warehouseNames = {}",
-                    polarisId, polarisSecret, polarisHost, warehouseNames);
     }
 
     public SparkSession createSparkSession() throws IOException {
-        SparkWarehouseConfig sparkWarehouse = sparkFactory.getConfig(
-            polarisId,
-            polarisSecret,
-            polarisHost,
-            protocol
-        );
+        logger.info("SparkSession polarisHost = {}, polarisId = {}, polarisSecret = {}, warehouseNames = {}",
+                polarisHost, polarisId, polarisSecret, warehouseNames);
+        SparkWarehouseConfig sparkWarehouse = sparkFactory.createConfig(properties, polarisHost, polarisId, polarisSecret);
         SparkContext.getOrCreate(sparkWarehouse.sparkConf(4, warehouseNames));
         return SparkSession
             .builder()

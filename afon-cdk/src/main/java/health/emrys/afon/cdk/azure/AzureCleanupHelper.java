@@ -15,15 +15,11 @@ public class AzureCleanupHelper extends AbstractCleanupHelper {
     private final String resourceGroup;
     private final String subscription;
 
-    public AzureCleanupHelper() {
-        this(new FilePropertyProvider());
-    }
-
-    public AzureCleanupHelper(AfonPropertyProvider props) {
-        polarisDomainName = props.getValue(AfonProperty.AZURE_DOMAIN_NAME);
-        jupyterDomainName = props.getValue(AfonProperty.AZURE_JUPYTER_DOMAIN_NAME);
-        resourceGroup     = props.getValue(AfonProperty.AZURE_RESOURCE_GROUP);
-        subscription      = props.getValue(AfonProperty.AZURE_SUBSCRIPTION);
+    public AzureCleanupHelper(AfonPropertyProvider properties) {
+        polarisDomainName = properties.getValue(AfonProperty.AZURE_DOMAIN_NAME);
+        jupyterDomainName = properties.getValue(AfonProperty.AZURE_JUPYTER_DOMAIN_NAME);
+        resourceGroup     = properties.getValue(AfonProperty.AZURE_RESOURCE_GROUP);
+        subscription      = properties.getValue(AfonProperty.AZURE_SUBSCRIPTION);
     }
 
     private @NonNull String cleanGroupCommand() {
@@ -61,7 +57,8 @@ public class AzureCleanupHelper extends AbstractCleanupHelper {
     }
 
     public static void main(String[] args) {
-        outputCleanupCommands(args, new AzureCleanupHelper().cleanupCommands());
+        var properties = new FilePropertyProvider();
+        outputCleanupCommands(args, new AzureCleanupHelper(properties).cleanupCommands());
     }
 
 }

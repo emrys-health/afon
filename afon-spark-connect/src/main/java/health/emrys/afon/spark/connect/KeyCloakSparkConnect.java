@@ -23,7 +23,7 @@ public class KeyCloakSparkConnect {
     public KeyCloakSparkConnect(AfonPropertyProvider properties) {
         this.properties = properties;
         logger.info("Using Polaris Endpoint {}", properties.getValue(POLARIS_ENDPOINT));
-        sparkConfig = configFactory.getConfig(properties);
+        sparkConfig = configFactory.createConfig(properties);
     }
 
     public void talkToSparkConnect() {

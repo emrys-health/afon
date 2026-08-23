@@ -49,8 +49,7 @@ public class DeployAwsFullStackDocument extends AbstractDocument {
             ```shell
            ./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args aws-cleanup.sh
             ```
-            """,
-            SparkWorkloads.startConnectCommand(polarisDomainName));
+            """, new SparkWorkloads(polarisDomainName, properties).startConnectCommand());
     }
 
 

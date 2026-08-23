@@ -52,9 +52,9 @@ public class AzureReader {
     }
 
     public static void main(String[] args) {
-        AzureReader app = new AzureReader(new FilePropertyProvider());
+        var properties = new FilePropertyProvider();
+        AzureReader app = new AzureReader(properties);
         app.list("my_project_folder*metadata.json");
     }
-
 
 }

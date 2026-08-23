@@ -121,7 +121,7 @@ public class ContainerHelper {
     public synchronized void startSparkConnect(AfonPropertyProvider properties) {
         if (sparkConnect == null) {
             sparkConnect = new GenericContainer<>(SPARK_IMAGE);
-            SparkWarehouseConfig config = sparkFactory.getConfig(properties);
+            SparkWarehouseConfig config = sparkFactory.createConfig(properties);
             Stream<String> envs = Arrays.stream(AfonCloud.values()).flatMap(
                 cloudProvider ->
                     config.sparkConfigs(cloudProvider).entrySet().stream().map(

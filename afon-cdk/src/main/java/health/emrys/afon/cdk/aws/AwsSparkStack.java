@@ -44,7 +44,7 @@ public class AwsSparkStack extends AwsJupyterStack {
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
         awsPolarisDomainName = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
-        new SparkWorkloads(awsPolarisDomainName).deploy(this, id, eksDependOn);
+        new SparkWorkloads(awsPolarisDomainName, properties).deploy(this, id, eksDependOn);
         Service sparkLB = sparkExternalService(eksDependOn);
         unregisterCRDs(List.of(sparkLB));
     }

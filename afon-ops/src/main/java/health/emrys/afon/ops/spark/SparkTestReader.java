@@ -1,5 +1,7 @@
 package health.emrys.afon.ops.spark;
 
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -11,8 +13,8 @@ public class SparkTestReader extends SparkChecker {
 
     private static final Logger logger = getLogger(SparkTestWriter.class);
 
-    public static void main(String[] args) {
-        parseAndExecute(args, new SparkTestReader());
+    protected SparkTestReader(AfonPropertyProvider properties) {
+        super(properties);
     }
 
     @Override
@@ -28,4 +30,10 @@ public class SparkTestReader extends SparkChecker {
 //        spark.sql(format("SELECT * FROM %s.snapshots", fqn)).show();
 //        spark.sql(format("SELECT file_path FROM %s.files", fqn)).show();
     }
+
+    public static void main(String[] args) {
+        var properties = new FilePropertyProvider();
+        parseAndExecute(args, new SparkTestReader(properties));
+    }
+
 }
