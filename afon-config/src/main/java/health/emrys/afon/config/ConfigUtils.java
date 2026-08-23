@@ -39,6 +39,26 @@ public class ConfigUtils {
     }
 
     /**
+     * Returns the logging level specified by system property ${afon.logging}.
+     * If not found it defaults to INFO.
+     *
+     * @return the afon logging level
+     */
+    public static @NonNull String afonLoggingLevel() {
+        return System.getProperty("afon.logging", "INFO");
+    }
+
+    /**
+     * Returns the logging console level specified by system property ${afon.logging}.
+     * If not found it defaults to OFF.
+     *
+     * @return the afon logging console level
+     */
+    public static @NonNull String afonLoggingConsoleLevel() {
+        return System.getProperty("afon.logging.console", "OFF");
+    }
+
+    /**
      * Returns the config dir located in {@link #afonHome()}/config.
      *
      * @return the config dir
