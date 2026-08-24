@@ -18,11 +18,15 @@ public class ClusterPolarisFinder implements AutoCloseable {
     private final ClusterClient client;
     private final String polarisHost;
 
-    public ClusterPolarisFinder(AfonPropertyProvider properties) throws ApiException, IncorrectConfigException {
-        client = new KubeConfigClusterClient(properties);
+    public ClusterPolarisFinder(AfonPropertyProvider properties) throws ApiException, IncorrectConfigException  {
+        this(new KubeConfigClusterClient(properties));
+    }
+
+    public ClusterPolarisFinder(ClusterClient client) throws ApiException, IncorrectConfigException {
+        this.client = client;
         logger.info("Polaris pod: {}", client.getUniquePodMatchingName(POLARIS_POD_NAME).getMetadata().getName());
         polarisHost = client.getUniqueIngressFor(POLARIS_INGRESS_NAME);
-        logger.info("Polaris is available to the outside world at: {}", polarisHost);
+        logger.info("Polaris host: {}", polarisHost);
     }
 
     public String getPolarisHost() {

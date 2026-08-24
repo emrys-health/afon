@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.cluster.ClusterClient;
+import health.emrys.afon.cluster.ClusterPolarisFinder;
 import health.emrys.afon.cluster.KubeConfigClusterClient;
 import health.emrys.afon.config.FilePropertyProvider;
 import io.kubernetes.client.openapi.models.V1Pod;
@@ -42,11 +43,20 @@ public class ClusterClientSmoke {
         }
     }
 
+    public void printPolarisHost(){
+        try {
+            ClusterPolarisFinder finder = new ClusterPolarisFinder(client);
+            System.out.println("Polaris host: "+finder.getPolarisHost());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
         var app = new ClusterClientSmoke(new KubeConfigClusterClient(properties));
         app.printPods();
+        app.printPolarisHost();
         app.printServices();
     }
 }
