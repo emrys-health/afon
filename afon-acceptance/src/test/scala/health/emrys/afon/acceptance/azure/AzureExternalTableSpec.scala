@@ -2,6 +2,7 @@ package health.emrys.afon.acceptance.azure
 
 import health.emrys.afon.acceptance
 import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
+import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{Azure, External}
 import health.emrys.afon.config.AfonProperty.{AZURE_BUCKET, DATABRICKS_TOKEN}
@@ -12,7 +13,6 @@ import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEn
 import org.apache.polaris.core.admin.model._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
-import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 /**
  * This is work in progress.
