@@ -9,19 +9,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.ops.CommonSteps.awsStepsUsing;
 
 public class DeploySnowflakeReadingAwsViaAwsMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
-        steps.addAll(List.of(
-                stepOperations.deleteStack(AWS),
-                stepOperations.deployFullStackIn(AWS),
-                stepOperations.waitForPolarisIn(AWS),
-                stepOperations.createAllCatalogsFor(AWS),
-                stepOperations.checkAwsSparkWritingTo(AWS)
-        ));
+        steps.addAll(awsStepsUsing(stepOperations));
         steps.add(stepOperations.snowflakeReadingViaAwsPolaris(AWS));
         return steps;
     }

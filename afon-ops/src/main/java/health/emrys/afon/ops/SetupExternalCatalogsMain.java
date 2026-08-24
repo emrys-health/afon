@@ -8,8 +8,8 @@ import health.emrys.afon.ops.steps.StepsProvider;
 import java.util.ArrayList;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonCloud.AZURE;
+import static health.emrys.afon.ops.CommonSteps.awsStepsUsing;
 
 /**
  * Deploy external polaris catalogs:
@@ -21,13 +21,7 @@ public class SetupExternalCatalogsMain implements StepsProvider {
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
-        steps.addAll(List.of(
-                stepOperations.deleteStack(AWS),
-                stepOperations.deployFullStackIn(AWS),
-                stepOperations.waitForPolarisIn(AWS),
-                stepOperations.createAllCatalogsFor(AWS),
-                stepOperations.checkAwsSparkWritingTo(AWS)
-        ));
+        steps.addAll(awsStepsUsing(stepOperations));
         steps.addAll(List.of(
             stepOperations.deleteStack(AZURE),
             stepOperations.deployPolarisIn(AZURE),
