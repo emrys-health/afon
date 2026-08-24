@@ -33,7 +33,6 @@ public class ConfigUtils {
     /**
      * System property {@link #CLOUD_SYSTEM_PROPERTY} value for selecting all cloud providers.
      * The following will obtain the same result:
-     *
      * - Setting a blank value
      * - Not setting the system property
      */
@@ -114,8 +113,7 @@ public class ConfigUtils {
      */
     public static boolean cloudPropertySet() {
         String value = System.getProperty(CLOUD_SYSTEM_PROPERTY);
-        if ( value != null && !value.isBlank() && !value.equalsIgnoreCase(CLOUD_ALL)) return true;
-        return false;
+        return value != null && !value.isBlank() && !value.equalsIgnoreCase(CLOUD_ALL);
     }
 
     /**
