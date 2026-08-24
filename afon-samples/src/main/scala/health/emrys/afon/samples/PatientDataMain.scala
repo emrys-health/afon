@@ -30,7 +30,7 @@ object PatientDataMain {
     val properties = new FilePropertyProvider()
     val spark: SparkSession = initSpark(properties)
     val cluster = new ClusterPolarisConfiguration(properties);
-    logger.info("Initializing Polaris")
+    logger.info("Configuring Polaris")
     cluster.configure()
     logger.info("Creating data")
     createData(spark, 10000)
