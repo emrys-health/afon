@@ -3,35 +3,47 @@ package health.emrys.afon.config;
 import org.jspecify.annotations.NonNull;
 
 import static java.lang.String.format;
+import static java.lang.System.getProperty;
+import static java.lang.System.getenv;
 
+/**
+ *  Utility class to retrieve Afon runtime {@code afon.*} system properties,
+ *  allowing these values to be overridden by the env counterparts {@code AFON_*}.
+ */
 public class ConfigUtils {
 
     /**
-     * System property selecting Afon home dir
+     * System env and property to retrieve Afon home dir
      */
-    public static final String AFON_HOME_SYSTEM_PROPERTY = "afon.home";
+    public static final String AFON_HOME_ENV = "AFON_HOME";
+    public static final String AFON_HOME_PROPERTY = "afon.home";
 
     /**
-     * System property selecting Afon CDKTF dir
+     * System env and property to retrieve Afon cdktf dir
      */
-    public static final String AFON_CDKTF_SYSTEM_PROPERTY = "afon.cdktf";
+    public static final String AFON_CDKTF_ENV = "AFON_CDKTF";
+    public static final String AFON_CDKTF_PROPERTY = "afon.cdktf";
 
     /**
      * System property selecting Afon logging level
      */
-    public static final String AFON_LOGGING_SYSTEM_PROPERTY = "afon.logging";
+    public static final String AFON_LOGGING_ENV = "AFON_LOGGING";
+    public static final String AFON_LOGGING_PROPERTY = "afon.logging";
 
     /**
      * System property selecting Afon logging console level
      */
-    public static final String AFON_LOGGING_CONSOLE_SYSTEM_PROPERTY = "afon.logging.console";
+    public static final String AFON_LOGGING_CONSOLE_ENV = "AFON_LOGGING_CONSOLE";
+    public static final String AFON_LOGGING_CONSOLE_PROPERTY = "afon.logging.console";
 
     /**
-     * System property selecting a given cloud provider.
+     * System property selecting a cloud provider
      */
-    public static final String CLOUD_SYSTEM_PROPERTY = "afon.cloud";
+    public static final String AFON_CLOUD_ENV = "AFON_CLOUD";
+    public static final String AFON_CLOUD_PROPERTY = "afon.cloud";
+
     /**
-     * System property {@link #CLOUD_SYSTEM_PROPERTY} value for selecting all cloud providers.
+     * System property {@link #AFON_CLOUD_PROPERTY} value for selecting all cloud providers.
      * The following will obtain the same result:
      * - Setting a blank value
      * - Not setting the system property
@@ -39,43 +51,53 @@ public class ConfigUtils {
     public static final String CLOUD_ALL = "ALL";
 
     /**
-     * Returns the dir specified by system property {@link #AFON_HOME_SYSTEM_PROPERTY}.
-     * If not found it defaults to $HOME/.afon
+     * Returns the Afon home dir specified by env {@link #AFON_HOME_ENV} or system property {@link #AFON_HOME_PROPERTY}.
+     * If none found, it defaults to $HOME/.afon
      *
      * @return the afon home dir
      */
     public static @NonNull String afonHome() {
-        return System.getProperty(AFON_HOME_SYSTEM_PROPERTY, format("%s/%s", System.getenv("HOME"), ".afon"));
+        return envOrProperty(getenv(AFON_HOME_ENV), getProperty(AFON_HOME_PROPERTY, format("%s/%s", getenv("HOME"), ".afon")));
     }
 
     /**
-     * Returns the dir specified by system property {@link #AFON_CDKTF_SYSTEM_PROPERTY}.
-     * If not found it defaults to {@link #afonHome()}/cdktf
+     * Returns the Afon cdktf dir specified by env {@link #AFON_CDKTF_ENV} or system property {@link #AFON_CDKTF_PROPERTY}.
+     * If none found, it defaults to {@link #afonHome()}/cdktf
      *
      * @return the afon cdktf dir
      */
     public static @NonNull String afonCkdtf() {
-        return System.getProperty(AFON_CDKTF_SYSTEM_PROPERTY, format("%s/%s", afonHome(), "cdktf"));
+        return envOrProperty(getenv(AFON_CDKTF_ENV), getProperty(AFON_CDKTF_PROPERTY, format("%s/%s", afonHome(), "cdktf")));
     }
 
     /**
-     * Returns the logging level specified by system property {@link #AFON_LOGGING_SYSTEM_PROPERTY}.
-     * If not found it defaults to INFO.
+     * Returns the Afon cloud specified by env {@link #AFON_CLOUD_ENV} or system property {@link #AFON_CLOUD_PROPERTY}.
+     * If none found, it defaults to "".
+     *
+     * @return the afon cloud
+     */
+    public static @NonNull String afonCloud() {
+        return envOrProperty(getenv(AFON_CLOUD_ENV), getProperty(AFON_CLOUD_PROPERTY, ""));
+    }
+
+    /**
+     * Returns the logging level specified by env {@link #AFON_LOGGING_ENV} or by system property {@link #AFON_LOGGING_PROPERTY}.
+     * If none found, it defaults to INFO.
      *
      * @return the afon logging level
      */
     public static @NonNull String afonLoggingLevel() {
-        return System.getProperty(AFON_LOGGING_SYSTEM_PROPERTY, "INFO");
+        return envOrProperty(getenv(AFON_LOGGING_ENV), getProperty(AFON_LOGGING_PROPERTY, "INFO"));
     }
 
     /**
-     * Returns the logging console level specified by system property {@link #AFON_LOGGING_CONSOLE_SYSTEM_PROPERTY}.
-     * If not found it defaults to OFF.
+     * Returns the logging level specified by env {@link #AFON_LOGGING_CONSOLE_ENV} or by system property  {@link #AFON_LOGGING_CONSOLE_PROPERTY}.
+     * If none found, it defaults to OFF.
      *
      * @return the afon logging console level
      */
     public static @NonNull String afonLoggingConsoleLevel() {
-        return System.getProperty(AFON_LOGGING_CONSOLE_SYSTEM_PROPERTY, "OFF");
+        return envOrProperty(getenv(AFON_LOGGING_CONSOLE_ENV), getProperty(AFON_LOGGING_CONSOLE_PROPERTY, "OFF"));
     }
 
     /**
@@ -108,19 +130,31 @@ public class ConfigUtils {
     }
 
     /**
-     * Checks if system property {@link #CLOUD_SYSTEM_PROPERTY} is set.
+     * Checks if system property {@link #AFON_CLOUD_PROPERTY} is set.
      * @return true if property value is not null, not blank and not equal (ignoring case) to {@link #CLOUD_ALL}.
      */
     public static boolean cloudPropertySet() {
-        String value = System.getProperty(CLOUD_SYSTEM_PROPERTY);
+        String value = getProperty(AFON_CLOUD_PROPERTY);
         return value != null && !value.isBlank() && !value.equalsIgnoreCase(CLOUD_ALL);
     }
 
     /**
-     * Return system property {@link #CLOUD_SYSTEM_PROPERTY}.
+     * Return system property {@link #AFON_CLOUD_PROPERTY}.
      * @return the property, whose value must be checked by {@link #cloudPropertySet()}.
      */
     public static String cloudPropertyValue() {
-        return System.getProperty(CLOUD_SYSTEM_PROPERTY);
+        return getProperty(AFON_CLOUD_PROPERTY);
     }
+
+    /**
+     * Return env is not {@code null}, else the property, which is assumed to be not {@code null}.
+     *
+     * @param env
+     * @param property
+     * @return
+     */
+    static @NonNull String envOrProperty(String env, String property) {
+        return ( env != null ) ? env : property;
+    }
+
 }

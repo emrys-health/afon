@@ -75,10 +75,10 @@ public class FilePropertyProviderTest {
         AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         checkAllProperties(provider.getProperties());
         try {
-            System.setProperty(ConfigUtils.CLOUD_SYSTEM_PROPERTY, "all");
+            System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "all");
             checkAllProperties(provider.getProperties());
         } finally {
-            System.clearProperty(ConfigUtils.CLOUD_SYSTEM_PROPERTY);
+            System.clearProperty(ConfigUtils.AFON_CLOUD_PROPERTY);
         }
     }
 
@@ -104,7 +104,7 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canGetPropertiesOnlyForAWS() {
-        System.setProperty(ConfigUtils.CLOUD_SYSTEM_PROPERTY, "aws");
+        System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "aws");
         try {
             Properties properties = new FilePropertyProvider(CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
@@ -120,13 +120,13 @@ public class FilePropertyProviderTest {
                     .as("gcp properties are not loaded")
                     .isNull();
         } finally {
-            System.clearProperty(ConfigUtils.CLOUD_SYSTEM_PROPERTY);
+            System.clearProperty(ConfigUtils.AFON_CLOUD_PROPERTY);
         }
     }
 
     @Test
     public void canGetPropertiesOnlyForAzure() {
-        System.setProperty(ConfigUtils.CLOUD_SYSTEM_PROPERTY, "azure");
+        System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "azure");
         try {
             Properties properties = new FilePropertyProvider(CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
@@ -142,13 +142,13 @@ public class FilePropertyProviderTest {
                     .as("gcp properties are not loaded")
                     .isNull();
         } finally {
-            System.clearProperty(ConfigUtils.CLOUD_SYSTEM_PROPERTY);
+            System.clearProperty(ConfigUtils.AFON_CLOUD_PROPERTY);
         }
     }
 
     @Test
     public void canGetPropertiesOnlyForGCP() {
-        System.setProperty(ConfigUtils.CLOUD_SYSTEM_PROPERTY, "gcp");
+        System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "gcp");
         try {
             Properties properties = new FilePropertyProvider(CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
@@ -164,7 +164,7 @@ public class FilePropertyProviderTest {
                     .as("aws properties are not loaded")
                     .isNull();
         } finally {
-            System.clearProperty(ConfigUtils.CLOUD_SYSTEM_PROPERTY);
+            System.clearProperty(ConfigUtils.AFON_CLOUD_PROPERTY);
         }
     }
 
