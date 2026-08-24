@@ -64,7 +64,7 @@ public class DeleteGcpPolarisStackDocument extends AbstractDocument {
             
             Generate and run cleanup script:
             ```shell
-            ./afon.sh -a exec --exec-class cdk.gcp.GcpCleanupHelper --exec-args gcp-cleanup.sh
+            ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args gcp
             ```
             """,
                 properties.getValue(CLUSTER_NAME)

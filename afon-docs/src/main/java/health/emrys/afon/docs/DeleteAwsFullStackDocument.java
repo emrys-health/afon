@@ -32,7 +32,7 @@ public class DeleteAwsFullStackDocument extends AbstractDocument {
             
            Generate and run cleanup script (more than once if required):
             ```shell
-           ./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args aws-cleanup.sh
+           ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args aws
             ```
             """);
     }
