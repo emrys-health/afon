@@ -18,28 +18,28 @@ public class ConfigureUsersMain {
 
     private final AfonUserProvider userProvider;
     private final AfonPropertyProvider propertyProvider;
-    private final OAuthProvider keyCloakProvider;
+    private final OAuthProvider oauthProvider;
     private final ConfigurePolarisUsersMain polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
         this.userProvider = userProvider;
         this.propertyProvider = propertyProvider;
-        this.keyCloakProvider = new KeyCloakProvider(propertyProvider);
+        this.oauthProvider = new KeyCloakProvider(propertyProvider);
         this.polarisUsers = new ConfigurePolarisUsersMain(propertyProvider);
     }
 
-    public void configureKeyCloak(String jupyterDomain) throws IOException {
-        logger.info("Configuring KeyCloak users for jupyter domain {}", jupyterDomain);
-        keyCloakProvider.registerBrowserClient(propertyProvider, jupyterDomain);
-        String adminToken = keyCloakProvider.adminToken();
-        keyCloakProvider.createRealm(adminToken, KEYCLOAK_REALM);
+    public void configureOAuthUsers(String jupyterDomain) throws IOException {
+        logger.info("Configuring OAuth users for jupyter domain {}", jupyterDomain);
+        oauthProvider.registerBrowserClient(propertyProvider, jupyterDomain);
+        String adminToken = oauthProvider.adminToken();
+        oauthProvider.createRealm(adminToken, KEYCLOAK_REALM);
         for (AfonUser user : userProvider.getUsers()) {
-            keyCloakProvider.createUser(adminToken, KEYCLOAK_REALM, user);
-            keyCloakProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
+            oauthProvider.createUser(adminToken, KEYCLOAK_REALM, user);
+            oauthProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
         }
         // Last, so that the realm is only bound to its MFA flows once the users who must pass through
         // them exist.
-        keyCloakProvider.configureMfa();
+        oauthProvider.configureMfa();
     }
 
     public void configurePolaris(String catalogName) throws IncorrectConfigException, IOException {
@@ -49,7 +49,7 @@ public class ConfigureUsersMain {
     }
 
     public void configureUsers(String jupyterDomain, String catalogName) throws IOException, IncorrectConfigException {
-        configureKeyCloak(jupyterDomain);
+        configureOAuthUsers(jupyterDomain);
         configurePolaris(catalogName);
     }
 
