@@ -77,13 +77,13 @@ Executables are composed of reusable steps:
 - **`StepOperations`** — factory methods that create `Step` instances for common operations (clean, deploy, wait, configure, test)
 - **`StepActions`** — low-level operations that actually execute commands (run Maven, run OpenTofu, call Polaris APIs)
 - **`StepRunner`** — executes a list of steps in order, with the ability to resume from a named step
-- **`StepsProvider`** — interface implemented by `Deploy*Main` classes to provide their step list
+- **`StepsProvider`** — interface implemented by `{Delete|Deploy|Setup}*Main` classes to provide their step list
 
-Each `Deploy*Main` class composes steps from `StepOperations`. 
+Each `{Delete|Deploy|Setup}*Main` class composes steps from `StepOperations`. 
 
-For example, `DeployExternalCatalogsMain` reuses all steps from `DeployAwsFullStackMain` and then adds Azure-specific steps.
+For example, `SetupAwsFullStackWithAzurePolarisMain` reuses all steps from `DeployAwsFullStackMain` and then adds Azure-specific steps.
 
-The corresponding `Document*Main` classes generate markdown documentation describing each step — this keeps documentation in lock-step with the actual deployment code.
+The corresponding `{Delete|Deploy|Setup}*Document` classes generate markdown documentation describing each step — this keeps documentation in lock-step with the actual deployment code.
 
 ### Terraform-based deployment
 

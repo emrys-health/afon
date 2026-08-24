@@ -12,10 +12,9 @@ import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonCloud.AZURE;
 
 /**
- * Deploy external polaris catalogs:
- * - all the catalogs are in AWS plus the external one that talks to an Azure Polaris with an Azure catalog
+ * Deploy AWS full stack with Azure Polaris
  */
-public class DeployExternalCatalogsMain implements StepsProvider {
+public class DeployAwsFullStackWithAzurePolarisMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
@@ -34,7 +33,7 @@ public class DeployExternalCatalogsMain implements StepsProvider {
     }
 
     public static void main(String[] args) {
-        new StepRunner().runUsing(new DeployExternalCatalogsMain(), args);
+        new StepRunner().runUsing(new DeployAwsFullStackWithAzurePolarisMain(), args);
     }
 
 }

@@ -37,8 +37,8 @@ class OpsCommandsTest {
 
     @Test
     void namesCanBeFilteredByCloud() {
-        Set<String> names = opsCommands.names("azure");
-        assertThat(names).contains("deploy-azure-full-stack", "delete-azure-full-stack");
+        Set<String> names = opsCommands.names("aws");
+        assertThat(names).contains("deploy-aws-full-stack", "delete-aws-full-stack");
     }
 
 }
