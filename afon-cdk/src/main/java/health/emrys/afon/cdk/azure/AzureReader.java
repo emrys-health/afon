@@ -3,12 +3,12 @@ package health.emrys.afon.cdk.azure;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobContainerClientBuilder;
 import com.azure.storage.blob.models.BlobItem;
-import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.slf4j.Logger;
 
 import java.util.HashSet;
-import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -28,10 +28,9 @@ public class AzureReader {
         return Pattern.compile(regex);
     }
 
-    public AzureReader() {
-        Properties properties = new AfonPropertiesLoader().getProperties();
-        containerName    = AfonProperties.AZURE_BUCKET.getValueFrom(properties);
-        connectionString = AfonProperties.AZURE_CONNECTION_STRING.getValueFrom(properties);
+    public AzureReader(AfonPropertyProvider properties) {
+        containerName    = properties.getValue(AfonProperty.AZURE_BUCKET);
+        connectionString = properties.getValue(AfonProperty.AZURE_CONNECTION_STRING);
     }
 
     public Set<BlobItem> list(String wildcard) {
@@ -53,9 +52,9 @@ public class AzureReader {
     }
 
     public static void main(String[] args) {
-        AzureReader app = new AzureReader();
+        var properties = new FilePropertyProvider();
+        AzureReader app = new AzureReader(properties);
         app.list("my_project_folder*metadata.json");
     }
-
 
 }

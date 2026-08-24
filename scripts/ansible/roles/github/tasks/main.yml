@@ -1,0 +1,100 @@
+---
+- name: Report that the runner installation is off
+  ansible.builtin.debug:
+    msg: >-
+      github_install_runner is false, so the actions runner is left alone. Registering a runner
+      creates it against {{ github_runner_repo }} on GitHub, so it is done deliberately:
+      --tags github -e github_install_runner=true
+  when: not github_install_runner | bool
+
+- name: Install and register the actions runner
+  when: github_install_runner | bool
+  block:
+    - name: Look for an installed runner
+      ansible.builtin.stat:
+        path: "{{ github_runner_dir }}/config.sh"
+      register: afon_runner_installed
+
+    - name: Look for a registered runner
+      ansible.builtin.stat:
+        path: "{{ github_runner_dir }}/.runner"
+      register: afon_runner_registered
+
+    # runner.sh is run as the runner user, from the repo, rather than copied and
+    # kept in step by hand. It reads its settings from the environment below.
+    - name: Download and unpack the runner with runner.sh
+      ansible.builtin.script:
+        cmd: "{{ role_path }}/../../../github/runner.sh install"
+      environment:
+        VERSION: "{{ github_runner_version }}"
+        RUNNER_DIR: "{{ github_runner_dir }}"
+        RUNNER_SHA256: "{{ github_runner_checksum }}"
+      become: true
+      become_user: "{{ github_runner_user }}"
+      when: not afon_runner_installed.stat.exists
+
+    - name: Register the runner
+      when: not afon_runner_registered.stat.exists
+      block:
+        # Registration tokens expire after an hour, so one is minted per run
+        # rather than held anywhere. Run from the control machine, where gh is
+        # authenticated — the runner itself holds no GitHub credentials.
+        - name: Mint a registration token with gh
+          ansible.builtin.command: >-
+            gh api --method POST
+            /repos/{{ github_runner_repo }}/actions/runners/registration-token
+            --jq .token
+          delegate_to: localhost
+          become: false
+          register: afon_runner_token
+          changed_when: false
+          check_mode: false
+          no_log: true
+          when: github_runner_token | length == 0
+
+        - name: Assert a registration token was obtained
+          ansible.builtin.assert:
+            that: afon_runner_token.stdout | default('') | length > 0
+            fail_msg: >-
+              Could not get a registration token for {{ github_runner_repo }}. gh must be installed
+              and authenticated with admin rights on the repo, or pass a token from
+              {{ github_runner_url }}/settings/actions/runners/new as -e github_runner_token=...
+          when: github_runner_token | length == 0
+
+        - name: Register the runner and install its service with runner.sh
+          ansible.builtin.script:
+            cmd: "{{ role_path }}/../../../github/runner.sh configure"
+          environment:
+            RUNNER_DIR: "{{ github_runner_dir }}"
+            RUNNER_URL: "{{ github_runner_url }}"
+            RUNNER_TOKEN: >-
+              {{ github_runner_token if github_runner_token | length > 0
+                 else afon_runner_token.stdout | default('') }}
+            RUNNER_ARGS: >-
+              --unattended --name {{ github_runner_name }} --work _work
+              {{ '--replace' if github_runner_replace | bool else '' }}
+              {{ ('--labels ' ~ github_runner_labels | join(',')) if github_runner_labels | length > 0 else '' }}
+          become: true
+          become_user: "{{ github_runner_user }}"
+          no_log: true
+
+    - name: Find the installed runner services
+      ansible.builtin.shell:
+        cmd: set -o pipefail && systemctl list-units --type=service --all --plain --no-legend 'actions.runner.*' | awk '{print $1}'
+        executable: /bin/bash
+      register: afon_runner_services
+      changed_when: false
+      check_mode: false
+
+    - name: Run the runner service
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop: "{{ afon_runner_services.stdout_lines | select | list }}"
+
+    - name: Report the registered runner
+      ansible.builtin.debug:
+        msg: >-
+          Runner '{{ github_runner_name }}' is installed in {{ github_runner_dir }} and registered
+          with {{ github_runner_repo }}. Check it at {{ github_runner_url }}/settings/actions/runners

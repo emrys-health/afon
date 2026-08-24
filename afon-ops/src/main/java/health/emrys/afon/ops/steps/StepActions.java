@@ -3,10 +3,14 @@ package health.emrys.afon.ops.steps;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
+import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.cluster.EndpointPolarisConfiguration;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -25,13 +29,13 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
+import static java.lang.String.format;
+import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class StepActions {
@@ -41,72 +45,20 @@ public class StepActions {
 
     @NonNull Path deleteStack(AfonCloud id) throws IOException {
         Path stackDir = stackDir(id);
-        if (stackDir.toFile().exists()) {
-            tofuDestroy(stackDir);
-            deletePath(stackDir);
-        } else {
-            logger.warn("Directory {} does not exist so starting afresh", stackDir);
-        }
-        deleteTerraformStateFiles(id);
+        tofuDestroy(stackDir);
+        deletePath(stackDir);
+        deleteTfStateFiles(id);
         return stackDir;
     }
 
-    void deleteTerraformStateFiles(AfonCloud id) throws IOException {
-        deleteTerraformStateFiles(List.of(".", ".."), id);
-    }
-
-    private void deleteTerraformStateFiles(List<String> dirs,
-                                           AfonCloud id) throws IOException {
-        for ( String dir : dirs ){
-            Files.list(Path.of(dir))
-                    .filter(x -> {
-                        String fileName = x.getFileName().toString();
-                        return fileName.startsWith(TERRAFORM_STATE_FILE_PATTERN + id)
-                                && fileName.endsWith(".tfstate");
-                    })
-                    .forEach(x -> {
-                        deletePath(x);
-                    });
+    private @NonNull Path stackDir(AfonCloud id) throws IOException {
+        Path stackDir = Path.of(ConfigUtils.stackDir(id));
+        logger.info("Using stack dir {}", stackDir);
+        if (!Files.exists(stackDir)){
+            stackDir.toFile().mkdirs();
+            logger.info("Created new stack dir {}, as it did not exist.", stackDir);
         }
-    }
-
-    void startStack(Class stackClass, AfonCloud id) throws Exception {
-        executeMainOf(stackClass, new String[]{});
-        startManagedStack(id);
-    }
-
-    private void startManagedStack(AfonCloud id) throws ManagedProcessException {
-        // The kubernetes/helm providers are configured from the managed cluster's endpoint and
-        // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
-        // (plugin-framework) providers, those must be known at plan time, otherwise apply fails
-        // with "Provider produced inconsistent final plan" (the provider can't be configured
-        // until the cluster exists). So we bootstrap ONLY the cluster in a targeted first phase;
-        // the second, full apply then plans the k8s/helm resources against a cluster that
-        // already exists.
-        //
-        // We deliberately target only the control plane, not the worker nodes. On AWS the node
-        // group has no CNI of its own and only becomes Ready once Cilium (a Helm release) is
-        // installed, so it must stay in phase two alongside Cilium; the EKS cluster resource
-        // does not include the node group. On Azure the default node pool is declared inline on
-        // the cluster resource (and uses AKS-managed Cilium), so targeting the cluster brings up
-        // the nodes too. On GCP the default node pool is likewise part of the
-        // google_container_cluster resource and uses GKE's built-in CNI, so the targeted apply
-        // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
-        // Stacks without a managed cluster yield no targets and skip straight to the full apply.
-        Path         stackDir    = stackDir(id);
-        List<String> bootstrapTargets = clusterBootstrapTargets(stackDir);
-        tofuApply(stackDir, bootstrapTargets);
-    }
-
-    private void tofuApply(Path tofuDir, List<String> bootstrapTargets) throws ManagedProcessException {
-        run("tofu", tofuDir, "init");
-        if (!bootstrapTargets.isEmpty()) {
-            List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
-            phaseOne.addAll(bootstrapTargets);
-            logger.info("Bootstrapping EKS before the full apply: {}", phaseOne);
-            run("tofu", tofuDir, phaseOne.toArray(new String[0]));
-        }
-        run("tofu", tofuDir, OutputStream.nullOutputStream(), "apply", "--auto-approve", "-parallelism=5");
+        return stackDir;
     }
 
     private void tofuDestroy(Path tofuDir) {
@@ -131,8 +83,75 @@ public class StepActions {
         }
     }
 
-    private @NonNull Path stackDir(AfonCloud id) {
-        return Path.of("cdktf.out", "stacks", id.toString());
+    void deleteTfStateFiles(AfonCloud id) throws IOException {
+        deletePath(Path.of(tfStatePath(id)));
+    }
+
+    void deletePath(Path path) {
+        logger.info("Deleting path {}", path);
+        try {
+            PathUtils.delete(path);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    void startStack(Class stackClass, AfonCloud id) throws Exception {
+        executeMainOf(stackClass, new String[]{});
+        startManagedStack(id);
+    }
+
+    private void startManagedStack(AfonCloud id) throws ManagedProcessException, IOException {
+        // The kubernetes/helm providers are configured from the managed cluster's endpoint and
+        // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
+        // (plugin-framework) providers, those must be known at plan time, otherwise apply fails
+        // with "Provider produced inconsistent final plan" (the provider can't be configured
+        // until the cluster exists). So we bootstrap ONLY the cluster in a targeted first phase;
+        // the second, full apply then plans the k8s/helm resources against a cluster that
+        // already exists.
+        //
+        // We deliberately target only the control plane, not the worker nodes. On AWS the node
+        // group has no CNI of its own and only becomes Ready once Cilium (a Helm release) is
+        // installed, so it must stay in phase two alongside Cilium; the EKS cluster resource
+        // does not include the node group. On Azure the default node pool is declared inline on
+        // the cluster resource (and uses AKS-managed Cilium), so targeting the cluster brings up
+        // the nodes too. On GCP the default node pool is likewise part of the
+        // google_container_cluster resource and uses GKE's built-in CNI, so the targeted apply
+        // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
+        // Stacks without a managed cluster yield no targets and skip straight to the full apply.
+        Path stackDir = stackDir(id);
+        List<String> bootstrapTargets = clusterBootstrapTargets(stackDir);
+        tofuApply(stackDir, bootstrapTargets);
+    }
+
+    private void tofuApply(Path tofuDir, List<String> bootstrapTargets) throws ManagedProcessException, IOException {
+        ensureKubeConfigExists();
+        run("tofu", tofuDir, "init");
+        if (!bootstrapTargets.isEmpty()) {
+            List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
+            phaseOne.addAll(bootstrapTargets);
+            logger.info("Bootstrapping EKS before the full apply: {}", phaseOne);
+            run("tofu", tofuDir, phaseOne.toArray(new String[0]));
+        }
+        run("tofu", tofuDir, OutputStream.nullOutputStream(), "apply", "--auto-approve", "-parallelism=5");
+    }
+
+    /**
+     * The kubernetes/helm providers' {@code config_path} must exist before tofu can even plan the
+     * second, full apply above — but the resource that writes real content there only runs inside
+     * that same apply, once the cluster it depends on exists; {@code -target} on the cluster alone
+     * does not pull in that resource, since it is a dependent, not a dependency. On a workstation
+     * this is invisible because {@code ~/.kube/config} already exists from prior manual use —
+     * stale content is fine, since it gets overwritten once the updater resource runs.
+     * A machine that has never run either (a fresh CI runner) has no such file, and the
+     * providers fail outright with "no such file or directory". An empty file is enough.
+     */
+    private void ensureKubeConfigExists() throws IOException {
+        Path kubeConfig = Path.of(System.getProperty("user.home"), ".kube", "config");
+        if (!Files.exists(kubeConfig)) {
+            Files.createDirectories(kubeConfig.getParent());
+            Files.createFile(kubeConfig);
+        }
     }
 
     /**
@@ -140,7 +159,7 @@ public class StepActions {
      * @param metadataLocation eg gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325-b437-20900bbcf2a3.metadata.json
      * @param polarisDomainNAme eg emryspolaris.click
      * @param tableName eg AwsAccessSpec
-     * @param registerTableMainClass eg RegisterLocalPolarisMain.class
+     * @param registerTableMainClass eg RegisterPolarisTableMain.class
      * @throws Exception
      */
     public void registerTable(AfonCloud storageCloud,
@@ -239,8 +258,30 @@ public class StepActions {
         return p.exitValue();
     }
 
-    public void runSnowflakeSql(String[] statements) throws NoSuchAlgorithmException, InvalidKeySpecException, SQLException {
-        SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory();
+    @NonNull String azureFirstFile(AfonPropertyProvider properties, String glob, boolean descendingOrder) {
+        logger.info("Querying Azure for {}", glob);
+        AzureReader reader = new AzureReader(properties);
+        List<BlobItem> list = new ArrayList<>(reader.list(glob));
+        Comparator<BlobItem> comparing = comparing((BlobItem o) -> o.getProperties().getCreationTime());
+        if (descendingOrder) {
+            comparing = comparing.reversed();
+        }
+        BlobItem latest = list
+                .stream()
+                .sorted(comparing)
+                .findFirst()
+                .get();
+        logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
+        return format(
+                "abfss://%s@%s.dfs.core.windows.net/%s",
+                properties.getValue(AZURE_BUCKET),
+                properties.getValue(AZURE_STORAGE_ACCOUNT),
+                latest.getName());
+    }
+
+
+    public void runSnowflakeSql(AfonPropertyProvider properties, String[] statements) throws NoSuchAlgorithmException, InvalidKeySpecException, SQLException {
+        SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory(properties);
         try (Connection conn = factory.getConnection();
              Statement stmt = conn.createStatement()) {
             for (String sql : statements) {
@@ -266,15 +307,6 @@ public class StepActions {
         executeMainOf(EndpointPolarisConfiguration.class,
                       new String[] {catalog.name()},
                       properties);
-    }
-
-    void deletePath(Path path) {
-        logger.info("Deleting path {}", path);
-        try {
-            PathUtils.delete(path);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private void restoreSystemProperties(Properties properties, Properties original) {
@@ -305,10 +337,10 @@ public class StepActions {
         return original;
     }
 
-    public Step waitFor(String domain) {
+    public Step waitOnDNS(String domain) {
         return new Step(
-                stepNameWaitingFor(domain),
-                "wait for internet DNS servers to recognise " + domain,
+                stepNameWaitOn(domain),
+                "wait on DNS for domain " + domain,
                 () -> {
                     boolean stopResolving = false;
                     long    start         = System.currentTimeMillis();
@@ -316,7 +348,7 @@ public class StepActions {
                     logger.info("Checking DNS for {}", domain);
                     while (!stopResolving) {
                         long elapsed = System.currentTimeMillis() - start;
-                        logger.info("Waiting on DNS for {}, time elapsed {}s (until timeout {}s)", domain, elapsed/1000, timeout/1000);
+                        logger.info("Waiting on DNS for domain {}: time elapsed {}s (until timeout of {}s)", domain, elapsed/1000, timeout/1000);
                         if (!(elapsed < timeout)) break;
                         try {
                             InetAddress[] addresses = InetAddress.getAllByName(domain);
@@ -331,13 +363,13 @@ public class StepActions {
                 });
     }
 
-    static @NonNull String stepNameWaitingFor(String domain) {
-        return "waitFor_" + domain.substring(0, domain.indexOf('.'));
+    @NonNull String stepNameWaitOn(String domain) {
+        return "wait_on_" + (domain.isBlank() ? "domain" : domain.substring(0, domain.indexOf('.')));
     }
 
     private boolean isWaitingInterrupted(int timeout) {
         int pauseMs = 15_000;
-        logger.debug("Waiting {}s. Maximum = {}s", pauseMs / 1000, timeout / 1000);
+        logger.debug("Waiting {}s until timeout of {}s", pauseMs / 1000, timeout / 1000);
         try {
             Thread.sleep(pauseMs);
         } catch (InterruptedException e) {

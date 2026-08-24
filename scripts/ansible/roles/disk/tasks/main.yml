@@ -1,0 +1,56 @@
+---
+# The workflow needs room for ~/.m2, the runner workspace and the several GB of
+# container images the specs pull.
+- name: Install the partition growing tools
+  ansible.builtin.apt:
+    name: cloud-guest-utils
+    state: present
+
+- name: Grow the root partition and filesystem
+  when: grow_root_filesystem | bool
+  block:
+    # growpart exits 1 with NOCHANGE when the partition already fills the disk,
+    # and resize2fs is a no-op once the filesystem matches the partition.
+    - name: Grow the root partition onto the full volume
+      ansible.builtin.shell:
+        cmd: |
+          set -euo pipefail
+          part=$(readlink -f "$(findmnt -no SOURCE /)")
+          disk="/dev/$(lsblk -no pkname "$part")"
+          number=$(cat "/sys/class/block/$(basename "$part")/partition")
+          growpart "$disk" "$number"
+        executable: /bin/bash
+      register: afon_growpart
+      changed_when: "'CHANGED' in afon_growpart.stdout"
+      failed_when:
+        - afon_growpart.rc != 0
+        - "'NOCHANGE' not in afon_growpart.stdout ~ afon_growpart.stderr"
+
+    - name: Grow the root filesystem onto the partition
+      ansible.builtin.shell:
+        cmd: set -euo pipefail && resize2fs "$(readlink -f "$(findmnt -no SOURCE /)")"
+        executable: /bin/bash
+      register: afon_resize
+      changed_when: "'Nothing to do' not in afon_resize.stdout ~ afon_resize.stderr"
+
+- name: Reclaim the apt cache
+  when: reclaim_apt_cache | bool
+  ansible.builtin.apt:
+    autoclean: true
+    autoremove: true
+
+- name: Look for the docker binary
+  when: prune_docker | bool
+  ansible.builtin.stat:
+    path: /usr/bin/docker
+  register: afon_docker_binary
+
+# Skipped when the docker role has not run yet, in which case there is nothing
+# to reclaim anyway.
+- name: Prune the docker leftovers
+  when:
+    - prune_docker | bool
+    - afon_docker_binary.stat.exists | default(false)
+  ansible.builtin.command: docker system prune --force
+  register: afon_prune
+  changed_when: "'Total reclaimed space: 0B' not in afon_prune.stdout"

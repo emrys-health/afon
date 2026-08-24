@@ -1,11 +1,12 @@
 package health.emrys.afon.acceptance.gcp
 
 import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
+import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
-import health.emrys.afon.config.AfonProperties.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
-import health.emrys.afon.config.AfonPropertiesLoader
-import health.emrys.afon.polaris.catalogs.{GoogleCloudConfigForPolaris, JsonMaker}
+import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
+import health.emrys.afon.config.{AfonPropertyProvider, FilePropertyProvider}
+import health.emrys.afon.polaris.catalogs.{GcpPolarisCatalog, JsonSerialiser}
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.iceberg.gcp.auth.GoogleAuthManager
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
@@ -13,7 +14,6 @@ import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEn
 import org.apache.polaris.core.admin.model._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
-import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 import java.util.Properties
 
@@ -21,27 +21,26 @@ import java.util.Properties
 @External
 class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
 
+  val properties = AcceptanceTestConfig.instance.getProperties
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
-  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken
 
   val FEDERATED_CATALOG_NAME  = "emrys_afon_core_2"
   val BUCKET                  = f"emrys_afon_core_2"
 
   "An external GCP table" should {
-
-    val properties        = new AfonPropertiesLoader().getProperties
-    val config            = new GoogleCloudConfigForPolaris(properties)
+    val config            = new GcpPolarisCatalog(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new health.emrys.afon.acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
-    properties.setProperty(GCP_BUCKET_NAME.getName, BUCKET) // bit of a hack - TODO clean me up
+    properties.setValue(GCP_BUCKET_NAME, BUCKET) // bit of a hack - TODO clean me up
 
     "be registered with Polaris" in {
       Given(s"a catalog called '$FEDERATED_CATALOG_NAME' has already been created in GCP'")
       val json: String = externalCatalogJson(properties)
-      val uri: String  = PolarisConfigurer.getCreateCatalogURI
+      val uri: String  = PolarisConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
-      val response = client.postJsonCall(
+      val response = client.post(
         uri,
         json,
         accessToken)
@@ -79,8 +78,8 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
 
   // this gives:
   // Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
-  private def externalCatalogJson(properties: Properties): String = {
-    val config = new GoogleCloudConfigForPolaris(properties)
+  private def externalCatalogJson(properties: AfonPropertyProvider): String = {
+    val config = new GcpPolarisCatalog(properties)
     val warehouse = f"gs://$BUCKET"
     val bucketProperties = CatalogProperties
       .builder()
@@ -117,8 +116,8 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
         System.currentTimeMillis(),
         System.currentTimeMillis(),
         null,
-        config.getStorageConfigInfo())
+        config.storageConfigInfo())
 
-    new JsonMaker().toJson(new CreateCatalogRequest(catalog))
+    new JsonSerialiser().toJson(new CreateCatalogRequest(catalog))
   }
 }

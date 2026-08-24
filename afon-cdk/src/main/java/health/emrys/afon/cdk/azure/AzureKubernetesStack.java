@@ -1,27 +1,25 @@
 package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.TerraformStack;
-import health.emrys.afon.cdk.AfonCloudStack;
-import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.cdk.AbstractCloudStack;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
-import java.util.Properties;
+import static health.emrys.afon.config.AfonCloud.AZURE;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
-
-class AzureKubernetesStack extends TerraformStack implements AfonCloudStack {
+class AzureKubernetesStack extends AbstractCloudStack {
 
     protected final AzureCloudProvider cloudProvider;
     protected final     String              azurePolarisDomainName;
 
-    public AzureKubernetesStack(final Construct scope, final String id,
-                                Properties properties) {
+    public AzureKubernetesStack(final Construct scope, final AfonCloud id,
+                                AfonPropertyProvider properties) {
         super(scope, id);
-        cloudProvider = new AzureCloudProvider(this, id, properties);
-        this.azurePolarisDomainName = AfonProperties.AZURE_DOMAIN_NAME.getValueFrom(properties);
+        cloudProvider = new AzureCloudProvider(this, id.toString(), properties);
+        this.azurePolarisDomainName = properties.getValue(AfonProperty.AZURE_DOMAIN_NAME);
     }
 
     @Override
@@ -35,8 +33,8 @@ class AzureKubernetesStack extends TerraformStack implements AfonCloudStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App();
-        new AzureKubernetesStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
+        final App app = createApp();
+        new AzureKubernetesStack(app, AZURE, new FilePropertyProvider());
         app.synth();
     }
 

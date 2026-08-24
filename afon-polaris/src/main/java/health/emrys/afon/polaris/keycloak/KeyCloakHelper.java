@@ -1,12 +1,14 @@
 package health.emrys.afon.polaris.keycloak;
 
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static java.lang.String.format;
 
 /**
- * Configuration shared between the KeyCloak container, the {@link health.emrys.afon.security.keycloak.KeyCloakAdmin} that provisions
+ * Configuration shared between the KeyCloak container, the {@link KeyCloakProvider} that provisions
  * users in it and the Polaris container that uses KeyCloak as its OIDC identity provider.
  */
 public class KeyCloakHelper {
@@ -26,7 +28,7 @@ public class KeyCloakHelper {
         env.put("polaris.authentication.type", "external");
         env.put("polaris.authentication.authenticator.type", "default");
         // Map the token to a Polaris principal by a dedicated 'polaris_principal' claim that KeyCloak
-        // protocol mappers stamp onto every token (see KeyCloakAdmin):
+        // protocol mappers stamp onto every token (see KeyCloakProvider):
         //   - human browser logins   -> polaris_principal = the user's username (e.g. "will")
         //   - client_credentials     -> polaris_principal = the bare clientId (e.g. "will" / "root")
         // and each user/service is provisioned a Polaris principal of that same name (UserOnboarderMain,

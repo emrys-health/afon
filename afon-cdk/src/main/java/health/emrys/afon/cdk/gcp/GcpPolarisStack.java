@@ -10,18 +10,19 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.cdk.CdkHelper;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.cdk.PolarisConfig;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.GCP;
+import static health.emrys.afon.config.AfonCloud.GCP;
 
 public class GcpPolarisStack extends GcpKubernetesStack {
 
@@ -31,9 +32,9 @@ public class GcpPolarisStack extends GcpKubernetesStack {
     private static final int    POLARIS_PORT     = 8181;
 
 
-    public GcpPolarisStack(Construct scope, String id, Properties properties) {
+    public GcpPolarisStack(Construct scope, AfonCloud id, AfonPropertyProvider properties) {
         super(scope, id, properties);
-        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
+        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties);
         var util = new CdkHelper(
             this, gcpDomainName, TLS_SECRET_NAME, POLARIS_PORT
             , POLARIS_INTERNAL, POLARIS_INGRESS_NAME);
@@ -76,9 +77,9 @@ public class GcpPolarisStack extends GcpKubernetesStack {
     }
 
     public static void main(String[] args) {
-        final App  app        = new App();
-        Properties properties = new AfonPropertiesLoader().getProperties();
-        new GcpPolarisStack(app, GCP.toString(), properties);
+        final App app = createApp();
+        AfonPropertyProvider properties = new FilePropertyProvider();
+        new GcpPolarisStack(app, GCP, properties);
         app.synth();
     }
 }

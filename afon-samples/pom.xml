@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>health.emrys</groupId>
+        <groupId>health.emrys.afon</groupId>
         <artifactId>afon</artifactId>
         <version>1.0-SNAPSHOT</version>
     </parent>
@@ -79,7 +79,7 @@
                         <artifactId>exec-maven-plugin</artifactId>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
+                            <commandlineArgs>${afon.jvm} ${afon.exec} -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
                         </configuration>
                     </plugin>
                 </plugins>

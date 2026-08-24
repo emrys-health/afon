@@ -1,6 +1,6 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.SQLConf$;
 import org.apache.spark.sql.internal.StaticSQLConf$;
@@ -21,9 +21,7 @@ public class SparkWarehouseConfig {
 
     public static final String SPARK_IMAGE = "ph1ll1phenry/spark_jars:4.0.1";
 
-    public static final  String[] SUPPORTED_CLOUD_NAMES =
-        Arrays.stream(AfonCloud.values()).map(x -> x.toString()).toArray(String[]::new);
-    private static final Logger   log                   = LoggerFactory.getLogger(SparkWarehouseConfig.class);
+    private static final Logger logger = LoggerFactory.getLogger(SparkWarehouseConfig.class);
 
     private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
     private final String DEFAULT_CATALOG          = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
@@ -50,7 +48,11 @@ public class SparkWarehouseConfig {
     }
 
     public SparkConf sparkConf(int cores) throws IOException {
-        return sparkConf(cores, SUPPORTED_CLOUD_NAMES);
+        return sparkConf(cores, cloudProviders());
+    }
+
+    private String[] cloudProviders() {
+        return Arrays.stream(AfonCloud.values()).map(x -> x.toString()).toArray(String[]::new);
     }
 
     public SparkConf sparkConf(int cores, String... cloudProviders) throws IOException {
@@ -61,7 +63,7 @@ public class SparkWarehouseConfig {
             .setSparkHome(tmpDir)
             .set(WAREHOUSE_PATH, tmpDir);
         for (String cloudProvider : cloudProviders) {
-            log.info("Configuring Spark context for cloud {}", cloudProvider);
+            logger.info("Configuring Spark context for cloud {}", cloudProvider);
             configureWith(sparkConfigs(cloudProvider), sparkConf);
         }
 

@@ -1,0 +1,79 @@
+---
+- name: Assert a known java distribution was requested
+  ansible.builtin.assert:
+    that: java_distribution in ['openjdk', 'temurin']
+    fail_msg: "java_distribution must be 'openjdk' or 'temurin', got '{{ java_distribution }}'"
+
+- name: Install Temurin from the Adoptium apt repo
+  when: java_distribution == 'temurin'
+  block:
+    - name: Fetch the Adoptium signing key
+      ansible.builtin.get_url:
+        url: "{{ adoptium_key_url }}"
+        dest: "{{ adoptium_keyring }}"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Add the Adoptium apt repo
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ apt_arch }} signed-by={{ adoptium_keyring }}]
+          {{ adoptium_repo_url }} {{ ansible_facts['distribution_release'] }} main
+        filename: adoptium
+        state: present
+        update_cache: true
+
+    - name: Install the Temurin JDK
+      ansible.builtin.apt:
+        name: "temurin-{{ java_major_version }}-jdk"
+        state: present
+
+- name: Install the OpenJDK from the distro packages
+  when: java_distribution == 'openjdk'
+  ansible.builtin.apt:
+    name: "openjdk-{{ java_major_version }}-jdk"
+    state: present
+
+- name: Resolve JAVA_HOME from the installed javac
+  ansible.builtin.shell:
+    cmd: set -o pipefail && dirname "$(dirname "$(readlink -f "$(command -v javac)")")"
+    executable: /bin/bash
+  register: afon_javac_home
+  changed_when: false
+  check_mode: false
+
+# With temurin, point at its install dir rather than at whatever javac currently
+# resolves to — a host may also carry the distro OpenJDK.
+- name: Set the java home for the {{ java_distribution }} JDK
+  ansible.builtin.set_fact:
+    afon_java_home: >-
+      {{ ('/usr/lib/jvm/temurin-' ~ java_major_version ~ '-jdk-' ~ apt_arch)
+         if java_distribution == 'temurin' else afon_javac_home.stdout }}
+
+- name: List the registered javac alternatives
+  ansible.builtin.command: update-alternatives --list javac
+  register: afon_javac_alternatives
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Make the {{ java_distribution }} JDK the default java and javac
+  ansible.builtin.command: update-alternatives --set {{ item }} {{ afon_java_home }}/bin/{{ item }}
+  loop:
+    - java
+    - javac
+  register: afon_java_alternative
+  changed_when: afon_java_alternative.stdout | length > 0
+  when: afon_java_home ~ '/bin/javac' in afon_javac_alternatives.stdout_lines
+
+- name: Export JAVA_HOME for login shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/afon-java.sh
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by scripts/ansible/runner-setup.yml
+      export JAVA_HOME={{ afon_java_home }}
+      export PATH="$JAVA_HOME/bin:$PATH"

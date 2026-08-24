@@ -1,0 +1,51 @@
+---
+# Each entry is run as the runner user and must exit 0. These cover every tool
+# the workflow shells out to: the build itself (java, mvn), Testcontainers
+# (docker), the checkout (git), and the config steps of afon.sh
+# (base64, unzip, perl, jq).
+verify_commands:
+  - java -version
+  - mvn -version
+  - docker version
+  - docker info
+  - git --version
+  - base64 --version
+  - unzip -v
+  - perl --version
+  - jq --version
+  - curl --version
+
+verify_cloud_commands:
+  - kubectl version --client
+  - tofu --version
+
+verify_aws_commands:
+  - aws --version
+
+verify_azure_commands:
+  - az version
+
+verify_gcloud_commands:
+  - gcloud --version
+
+
+# Having the tools installed is not enough — the specs run a local[4] Spark
+# driver alongside the KeyCloak, Polaris, Trino and Spark Connect containers, so
+# the runner is checked for the memory and disk to hold them. Undersized, the
+# build dies in javac with 'OutOfMemoryError: Java heap space' long before any
+# spec runs. Pass -e verify_resources=false to report without failing.
+verify_resources: true
+
+# ~8GB of RAM. The default max heap is a quarter of that, which is what javac
+# and the forked test JVM get unless MAVEN_OPTS says otherwise.
+verify_min_memory_mb: 7500
+
+# The container images (spark, trino, polaris, keycloak) are several GB, on top
+# of ~/.m2 and the runner workspace. With the lvm role moving those onto
+# their own filesystem, check that one too and relax the root, e.g.
+#   verify_disk_checks:
+#     - {path: /, min_free_gb: 5}
+#     - {path: /data, min_free_gb: 40}
+verify_disk_checks:
+  - path: /data
+    min_free_gb: 25

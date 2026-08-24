@@ -1,18 +1,18 @@
 package health.emrys.afon.cdk.aws;
 
-import java.util.Properties;
+import health.emrys.afon.config.AfonPropertyProvider;
 
-import static health.emrys.afon.config.AfonProperties.AWS_REGION;
-import static health.emrys.afon.config.AfonProperties.CLUSTER_NAME;
+import static health.emrys.afon.config.AfonProperty.AWS_REGION;
+import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
 
 public class AwsComponentNames {
 
     private final String cluster;
     private final String region;
 
-    public AwsComponentNames(Properties properties) {
-        cluster = CLUSTER_NAME.getValueFrom(properties);
-        region = AWS_REGION.getValueFrom(properties);
+    public AwsComponentNames(AfonPropertyProvider properties) {
+        cluster = properties.getValue(CLUSTER_NAME);
+        region = properties.getValue(AWS_REGION);
     }
 
     public String getCluster() {

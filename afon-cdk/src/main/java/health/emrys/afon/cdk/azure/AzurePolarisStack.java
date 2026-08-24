@@ -9,10 +9,12 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.cdk.CdkHelper;
-import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.cdk.PolarisConfig;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -20,30 +22,29 @@ import software.constructs.Construct;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.AZURE;
 
 public class AzurePolarisStack extends AzureKubernetesStack {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AzureKubernetesStack.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AzurePolarisStack.class);
 
     private static final String  POLARIS_INTERNAL = "polaris-internal";
     private static final String  TLS_SECRET_NAME  = "polaris-tls";
     private static final int     POLARIS_PORT     = 8181;
-    private final        String  resourceGroup;
     protected final      Release nginxRelease;
     protected final      Release certManager;
+    private final        String  resourceGroup;
     private final        Service internalService;
 
-    public AzurePolarisStack(Construct scope, String id,
-                             Properties properties) {
+    public AzurePolarisStack(Construct scope, AfonCloud id,
+                             AfonPropertyProvider properties) {
         super(scope, id, properties);
-        resourceGroup = AfonProperties.AZURE_RESOURCE_GROUP.getValueFrom(properties);
+        resourceGroup = properties.getValue(AfonProperty.AZURE_RESOURCE_GROUP);
 
-        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider);
+        PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties);
         var helper = new CdkHelper(
             this, azurePolarisDomainName, TLS_SECRET_NAME,
             POLARIS_PORT, POLARIS_INTERNAL, POLARIS_INGRESS_NAME);
@@ -94,8 +95,8 @@ public class AzurePolarisStack extends AzureKubernetesStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App();
-        new AzurePolarisStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
+        final App app = createApp();
+        new AzurePolarisStack(app, AZURE, new FilePropertyProvider());
         app.synth();
     }
 }

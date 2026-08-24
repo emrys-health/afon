@@ -1,13 +1,13 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.security.keycloak.KeyCloakConfig;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import org.jspecify.annotations.NonNull;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
 import static java.lang.String.format;
 
@@ -26,20 +26,19 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
 
     private static final String KEYCLOAK_SCOPE = "openid";
 
-    private static String kcUriFor(Properties properties) {
-        String kcHost = KC_HOSTNAME.getValueFrom(properties);
-        return KeyCloakConfig.tokenEndpoint(kcHost, protocolFor(kcHost));
+    private static String kcUriFor(String kcHost) {
+        return KeyCloakConfigurer.tokenEndpoint(kcHost, protocolFor(kcHost));
     }
 
     private final String oauth2ServerUri;
 
-    KeyCloakSparkWarehouseConfig(Properties properties) {
-        super(USER_POLARIS_ID.getValueFrom(properties),
-              USER_POLARIS_SECRET.getValueFrom(properties),
-              POLARIS_ENDPOINT.getValueFrom(properties),
-              protocolFor(POLARIS_ENDPOINT.getValueFrom(properties))
-              );
-        this.oauth2ServerUri = kcUriFor(properties);
+    KeyCloakSparkWarehouseConfig(AfonPropertyProvider properties) {
+        super(properties.getValue(USER_POLARIS_ID),
+                properties.getValue(USER_POLARIS_SECRET),
+                properties.getValue(POLARIS_ENDPOINT),
+                protocolFor(properties.getValue(POLARIS_ENDPOINT))
+        );
+        this.oauth2ServerUri = kcUriFor(properties.getValue(KC_HOSTNAME));
     }
 
     @Override

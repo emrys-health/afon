@@ -1,0 +1,33 @@
+---
+# Installs and registers the actions runner by driving scripts/github/runner.sh,
+# so there is one definition of how a runner is installed rather than two.
+#
+# Registering a runner is an outward-facing act — it creates a runner against the
+# repo on GitHub — so it does not happen as a side effect of a routine playbook
+# run. Turn it on deliberately:
+#   ansible-playbook runner-setup.yml --tags github -e github_install_runner=true
+github_install_runner: false
+
+github_runner_repo: emrys-health/afon-core
+github_runner_url: "https://github.com/{{ github_runner_repo }}"
+github_runner_version: "2.336.0"
+
+# Checksum of the runner package for the version above, as published on the
+# release page. Set empty to skip the check; it must be updated with the version.
+github_runner_checksum: 04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d
+
+github_runner_dir: "{{ github_runner_home }}/actions-runner"
+
+# The name the runner reports on GitHub, and the labels the workflow selects it
+# by — .github/workflows/acceptance-tests-linux.yml asks for [self-hosted, Linux, X64],
+# all of which the runner applies itself.
+github_runner_name: "{{ inventory_hostname_short }}"
+github_runner_labels: []
+
+# Registration tokens last an hour, so one is fetched per run with the gh CLI —
+# the same tool scripts/github/secrets.sh needs. Set this to supply one by hand
+# instead, from https://github.com/<repo>/settings/actions/runners/new
+github_runner_token: ""
+
+# Re-register a runner of the same name rather than failing on the clash.
+github_runner_replace: true

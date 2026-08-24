@@ -1,0 +1,134 @@
+---
+# Run as the runner user, not root: `docker info` in particular only proves
+# anything if it is the user the workflow runs as that can reach the daemon.
+- name: Verify the tooling as {{ github_runner_user }}
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_commands }}"
+  register: afon_verify
+  changed_when: false
+  check_mode: false
+
+- name: Verify the cloud tooling as {{ github_runner_user }}
+  when: install_cloud_tools | bool
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_cloud_commands }}"
+  register: afon_verify
+  changed_when: false
+  check_mode: false
+
+- name: Verify the aws tooling as {{ github_runner_user }}
+  when: install_awscli | bool
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_aws_commands }}"
+  register: afon_verify
+  changed_when: false
+  check_mode: false
+
+- name: Verify the azure tooling as {{ github_runner_user }}
+  when: install_azurecli | bool
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_azure_commands }}"
+  register: afon_verify
+  changed_when: false
+  check_mode: false
+
+- name: Verify the gcloud tooling as {{ github_runner_user }}
+  when: install_gcloud | bool
+  become: true
+  become_user: "{{ github_runner_user }}"
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ verify_gcloud_commands }}"
+  register: afon_verify
+  changed_when: false
+  check_mode: false
+
+- name: Report the installed versions
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.item }} -> {{ (((item.stdout | default('')) ~ (item.stderr | default('')))
+      | trim).splitlines() | first | default('ok', true) }}
+  loop: "{{ afon_verify.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Assert the JDK is version {{ java_major_version }}
+  vars:
+    afon_java_checks: "{{ afon_verify.results | selectattr('item', 'equalto', 'java -version') | list }}"
+    afon_java_check: "{{ afon_java_checks | first | default({'stdout': '', 'stderr': ''}) }}"
+  when: afon_java_checks | length > 0
+  ansible.builtin.assert:
+    that: >-
+      ('version "' ~ java_major_version) in (afon_java_check.stderr ~ afon_java_check.stdout)
+    fail_msg: >-
+      The maven build requires JDK {{ java_major_version }}, found:
+      {{ (afon_java_check.stderr ~ afon_java_check.stdout) | trim }}
+
+# df rather than the mount facts, which do not list every filesystem.
+- name: Measure the free disk
+  ansible.builtin.command: df -B1 --output=avail,size {{ item.path }}
+  loop: "{{ verify_disk_checks }}"
+  register: afon_df
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Report the runner resources
+  ansible.builtin.debug:
+    msg: >-
+      {{ ansible_facts['processor_vcpus'] }} vcpus,
+      {{ ansible_facts['memtotal_mb'] }}MB memory,
+      {{ ansible_facts['swaptotal_mb'] }}MB swap
+
+- name: Report the filesystems
+  vars:
+    afon_fields: "{{ item.stdout_lines | default([' 0 0']) | last | split }}"
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.item.path }}:
+      {{ (afon_fields[0] | int / 1073741824) | round(1) }}GB free of
+      {{ (afon_fields[1] | int / 1073741824) | round(1) }}GB
+      (need {{ item.item.min_free_gb }}GB){{ ' — NOT FOUND' if item.rc != 0 else '' }}
+  loop: "{{ afon_df.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
+- name: Assert the runner has the memory for the acceptance tests
+  when: verify_resources | bool
+  ansible.builtin.assert:
+    that: ansible_facts['memtotal_mb'] | int >= verify_min_memory_mb | int
+    fail_msg: >-
+      This runner has {{ ansible_facts['memtotal_mb'] }}MB memory and needs
+      {{ verify_min_memory_mb }}MB: the specs run a local[4] Spark driver plus the KeyCloak,
+      Polaris, Trino and Spark Connect containers. Below that the build dies in javac, whose
+      default max heap is a quarter of the machine's memory.
+    success_msg: "{{ ansible_facts['memtotal_mb'] }}MB memory."
+
+- name: Assert the filesystems have the room for the acceptance tests
+  vars:
+    afon_fields: "{{ item.stdout_lines | default([' 0 0']) | last | split }}"
+    afon_free_gb: "{{ (afon_fields[0] | int / 1073741824) | round(1) }}"
+  when: verify_resources | bool
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - afon_free_gb | float >= item.item.min_free_gb | int
+    fail_msg: >-
+      {{ item.item.path }} has {{ afon_free_gb }}GB free and needs {{ item.item.min_free_gb }}GB
+      for the container images, ~/.m2 and the runner workspace.
+      {{ 'The path does not exist.' if item.rc != 0 else '' }}
+      Enlarge the volume and re-run — the disk role grows the root filesystem onto it, and the
+      lvm role lays out any extra volumes you declare.
+    success_msg: "{{ item.item.path }}: {{ afon_free_gb }}GB free."
+  loop: "{{ afon_df.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"

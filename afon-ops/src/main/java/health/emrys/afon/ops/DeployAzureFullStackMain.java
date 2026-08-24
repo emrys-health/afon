@@ -7,7 +7,7 @@ import health.emrys.afon.ops.steps.StepsProvider;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.AZURE;
 
 public class DeployAzureFullStackMain implements StepsProvider {
 
@@ -16,10 +16,7 @@ public class DeployAzureFullStackMain implements StepsProvider {
         return List.of(
             stepOperations.deleteStack(AZURE),
             stepOperations.deployFullStackIn(AZURE),
-            stepOperations.waitForPolarisIn(AZURE),
-            stepOperations.initializeAllCatalogsIn(AZURE),
-            stepOperations.checkSparkWritingToPolarisIn(AZURE)
-                      );
+            stepOperations.waitForPolarisIn(AZURE));
     }
 
     public static void main(String[] args) {

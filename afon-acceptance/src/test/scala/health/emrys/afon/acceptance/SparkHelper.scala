@@ -1,7 +1,7 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
-import health.emrys.afon.config.AfonProperties.{USER_POLARIS_ID, USER_POLARIS_SECRET}
+import health.emrys.afon.config.AfonProperty.{USER_POLARIS_ID, USER_POLARIS_SECRET}
 import health.emrys.afon.polaris.PolarisConstants
 import health.emrys.afon.spark.{KeyCloakSparkWarehouseConfig, SparkWarehouseConfigFactory}
 import org.apache.spark.SparkContext
@@ -15,11 +15,9 @@ object SparkHelper {
 
   // In external-auth mode Spark/Iceberg must obtain its OAuth2 token from KeyCloak, not from Polaris
   // (whose /api/catalog/v1/oauth/tokens returns HTTP 501). We authenticate with the KeyCloak client
-  // credentials (root/s3cr3t); Polaris maps the token's 'azp' claim back to the 'root' principal. The
+  // credentials (USER_POLARIS_ID/SECRET); Polaris maps the token's 'azp' claim back to the 'root' principal. The
   // Polaris-minted 'principal' credentials are unknown to KeyCloak, so they cannot be used here.
-  val sparkWarehouse = SparkWarehouseConfigFactory.getFactory.getConfig(
-    USER_POLARIS_ID.getValueFrom(instance.getProperties),
-    USER_POLARIS_SECRET.getValueFrom(instance.getProperties),
+  val sparkWarehouse = SparkWarehouseConfigFactory.getFactory.createConfig(
     instance.getProperties
   )
   val sc: SparkContext = SparkContext.getOrCreate(sparkWarehouse.sparkConf())

@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>health.emrys</groupId>
+    <groupId>health.emrys.afon</groupId>
     <artifactId>afon</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
@@ -11,7 +11,7 @@
   <dependencies>
     <dependency>
       <groupId>${project.groupId}</groupId>
-      <artifactId>afon-acceptance</artifactId>
+      <artifactId>afon-docs</artifactId>
       <version>${project.version}</version>
     </dependency>
   </dependencies>
@@ -20,45 +20,130 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
+        <artifactId>maven-dependency-plugin</artifactId>
         <executions>
           <execution>
-            <id>bin</id>
-            <phase>package</phase>
+            <id>unpack-docs</id>
+            <phase>generate-resources</phase>
             <goals>
-              <goal>single</goal>
+              <goal>unpack</goal>
             </goals>
             <configuration>
-              <descriptors>
-                <descriptor>${basedir}/src/assembly/assembly-bin.xml</descriptor>
-              </descriptors>
-              <finalName>afon-${project.version}</finalName>
-              <workDirectory>${project.build.directory}/assembly/bin</workDirectory>
-            </configuration>
-          </execution>
-          <execution>
-            <id>src</id>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-            <configuration>
-              <descriptors>
-                <descriptor>${basedir}/src/assembly/assembly-src.xml</descriptor>
-              </descriptors>
-              <finalName>afon-${project.version}</finalName>
-              <workDirectory>${project.build.directory}/assembly/src</workDirectory>
+              <outputDirectory>${project.build.directory}/docs</outputDirectory>
+              <overWriteReleases>false</overWriteReleases>
+              <overWriteSnapshots>true</overWriteSnapshots>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>${project.groupId}</groupId>
+                  <artifactId>afon-docs</artifactId>
+                  <version>${project.version}</version>
+                  <classifier>docs</classifier>
+                  <type>zip</type>
+                </artifactItem>
+              </artifactItems>
             </configuration>
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-release-plugin</artifactId>
-        <configuration>
-          <goals>deploy site-deploy</goals>
-        </configuration>
-      </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>bin</id>
+      <dependencies>
+        <dependency>
+          <groupId>${project.groupId}</groupId>
+          <artifactId>afon-ops</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>bin</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>single</goal>
+                </goals>
+                <configuration>
+                  <descriptors>
+                    <descriptor>${basedir}/src/assembly/assembly-bin.xml</descriptor>
+                  </descriptors>
+                  <finalName>afon-${project.version}</finalName>
+                  <workDirectory>${project.build.directory}/assembly/bin</workDirectory>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>cli</id>
+      <dependencies>
+        <dependency>
+          <groupId>${project.groupId}</groupId>
+          <artifactId>afon-cli</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>cli</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>single</goal>
+                </goals>
+                <configuration>
+                  <descriptors>
+                    <descriptor>${basedir}/src/assembly/assembly-cli.xml</descriptor>
+                  </descriptors>
+                  <finalName>afon-${project.version}</finalName>
+                  <workDirectory>${project.build.directory}/assembly/cli</workDirectory>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>src</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>src</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>single</goal>
+                </goals>
+                <configuration>
+                  <descriptors>
+                    <descriptor>${basedir}/src/assembly/assembly-src.xml</descriptor>
+                  </descriptors>
+                  <finalName>afon-${project.version}</finalName>
+                  <workDirectory>${project.build.directory}/assembly/src</workDirectory>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
 </project>

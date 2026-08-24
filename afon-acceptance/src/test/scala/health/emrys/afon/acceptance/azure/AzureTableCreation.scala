@@ -1,7 +1,6 @@
 package health.emrys.afon.acceptance.azure
 
-import uk.co.odinconsultants.documentation_utils.Datum
-
+import health.emrys.afon.acceptance.fixtures.Datum
 import java.lang.reflect.Field
 
 trait AzureTableCreation {

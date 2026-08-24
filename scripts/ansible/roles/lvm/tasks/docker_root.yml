@@ -1,0 +1,68 @@
+---
+# Docker's data root is moved by configuration rather than by bind mounting
+# /var/lib/docker, which is what the daemon actually supports.
+- name: Look for an installed docker daemon
+  ansible.builtin.stat:
+    path: /usr/bin/dockerd
+  register: afon_dockerd
+
+- name: Look for the new docker data root
+  ansible.builtin.stat:
+    path: "{{ lvm_docker_root }}"
+  register: afon_docker_root_dir
+
+# Anything already pulled is carried across rather than stranded in
+# /var/lib/docker, where it would go on consuming the root filesystem.
+- name: Move the existing docker data onto the new storage
+  when:
+    - afon_dockerd.stat.exists
+    - not afon_docker_root_dir.stat.exists
+  block:
+    - name: Stop docker before moving its data root
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - docker.service
+        - docker.socket
+
+    - name: Copy /var/lib/docker to {{ lvm_docker_root }}
+      ansible.builtin.command: >-
+        rsync --archive --hard-links --acls --xattrs --numeric-ids
+        /var/lib/docker/ {{ lvm_docker_root }}/
+      register: afon_docker_rsync
+      changed_when: afon_docker_rsync.rc == 0
+
+- name: Create the docker config dir
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Read the existing docker daemon config
+  ansible.builtin.slurp:
+    src: /etc/docker/daemon.json
+  register: afon_daemon_json
+  failed_when: false
+
+- name: Point docker at {{ lvm_docker_root }}
+  vars:
+    afon_daemon_config: >-
+      {{ (afon_daemon_json.content | b64decode | from_json)
+         if afon_daemon_json.content is defined else {} }}
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ afon_daemon_config | combine({'data-root': lvm_docker_root}) | to_nice_json }}\n"
+  register: afon_daemon_written
+
+- name: Run docker on the configured data root
+  when: afon_dockerd.stat.exists
+  ansible.builtin.systemd_service:
+    name: docker
+    enabled: true
+    state: "{{ 'restarted' if afon_daemon_written is changed else 'started' }}"

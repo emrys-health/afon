@@ -1,0 +1,158 @@
+name: Acceptance Tests (Linux)
+
+# Runs the acceptance tests (default tags: Access, External, Forbidden) on the self-hosted Linux runner.
+#
+# The acceptance tests hit real AWS/Azure/GCP storage and spin up local
+# KeyCloak/Polaris/Trino via Testcontainers, so the runner needs:
+#   - Java 17 and Maven (JDK is provisioned by actions/setup-java below)
+#   - a Docker daemon the runner user can talk to
+#   - the $AFON_HOME/config files, reconstructed from the GitHub Secrets listed below.
+#
+# The config files are held as base64-encoded repository secrets, one per file in ~/.afon/config.
+# Use `scripts/github/secrets.sh push` to (re)publish them from a local config dir, and
+# `scripts/github/secrets.sh list` to check which ones are set.
+on:
+  workflow_dispatch:
+    inputs:
+      cloud:
+        description: "Cloud to target (all runs the specs for every cloud)"
+        type: choice
+        options: [all, aws, azure, gcp]
+        default: all
+  push:
+    branches: [main]
+    paths:
+      - "afon-*/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "afon-*/**"
+  schedule:
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: read
+
+# The specs write to shared buckets and catalogs, so never run two of them at once.
+concurrency:
+  group: acceptance-tests-linux
+  cancel-in-progress: false
+
+env:
+  # Keep config inside the workspace rather than the runner's home, so it is scoped to this run.
+  AFON_HOME: ${{ github.workspace }}/.afon
+  # Without this the JVM takes a quarter of the runner's RAM as its max heap, which is not
+  # enough for javac to open the spark jars. Set explicitly so the build does not silently
+  # depend on the instance size.
+  MAVEN_OPTS: -Xmx3g
+
+jobs:
+  acceptance:
+    # only allow manual trigger until runner issues are sorted
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Verify runner tooling
+        run: |
+          set -euo pipefail
+          java -version
+          mvn -version
+          docker version
+          # As the specs run a Spark driver alongside four containers,
+          # showing runner memory and disk available:
+          free -h
+          df -h /
+
+      - name: Write afon config from secrets
+        env:
+          AFON_PROPERTIES: ${{ secrets.AFON_PROPERTIES }}
+          AFON_AWS_PROPERTIES: ${{ secrets.AFON_AWS_PROPERTIES }}
+          AFON_AZURE_PROPERTIES: ${{ secrets.AFON_AZURE_PROPERTIES }}
+          AFON_GCP_PROPERTIES: ${{ secrets.AFON_GCP_PROPERTIES }}
+          SECRET_PROPERTIES: ${{ secrets.SECRET_PROPERTIES }}
+          SECRET_AWS_PROPERTIES: ${{ secrets.SECRET_AWS_PROPERTIES }}
+          SECRET_AZURE_PROPERTIES: ${{ secrets.SECRET_AZURE_PROPERTIES }}
+          SECRET_GCP_PROPERTIES: ${{ secrets.SECRET_GCP_PROPERTIES }}
+          USERS_CSV: ${{ secrets.USERS_CSV }}
+          USERS_ACL_CSV: ${{ secrets.USERS_ACL_CSV }}
+        run: |
+          set -euo pipefail
+          CONFIG_DIR="$AFON_HOME/config"
+          rm -rf "$CONFIG_DIR"
+          mkdir -p "$CONFIG_DIR"
+          chmod 700 "$CONFIG_DIR"
+          echo "Using config dir $CONFIG_DIR"
+
+          # Secret values are base64 so that multi-line properties (SNOWFLAKE_PRIVATE_KEY,
+          # GOOGLE_APPLICATION_CREDENTIALS) survive the round trip byte for byte.
+          write_config() {
+            local file="$1" encoded="$2"
+            if [ -z "$encoded" ]; then
+              echo "::error::Missing repository secret for config file $file"
+              return 1
+            fi
+            printf '%s' "$encoded" | base64 -d > "$CONFIG_DIR/$file"
+            chmod 600 "$CONFIG_DIR/$file"
+            echo "Wrote $file ($(wc -c < "$CONFIG_DIR/$file") bytes)"
+          }
+          write_config afon.properties         "$AFON_PROPERTIES"
+          write_config afon-aws.properties     "$AFON_AWS_PROPERTIES"
+          write_config afon-azure.properties   "$AFON_AZURE_PROPERTIES"
+          write_config afon-gcp.properties     "$AFON_GCP_PROPERTIES"
+          write_config secret.properties       "$SECRET_PROPERTIES"
+          write_config secret-aws.properties   "$SECRET_AWS_PROPERTIES"
+          write_config secret-azure.properties "$SECRET_AZURE_PROPERTIES"
+          write_config secret-gcp.properties   "$SECRET_GCP_PROPERTIES"
+          write_config users.csv               "$USERS_CSV"
+          write_config users-acl.csv           "$USERS_ACL_CSV"
+
+      - name: Validate afon config
+        run: ./afon.sh -a config-validate --home "$AFON_HOME"
+
+      - name: Run acceptance tests
+        env:
+          # 'all' means no --cloud flag, which builds and runs the specs for every cloud.
+          CLOUD: ${{ inputs.cloud || 'all' }}
+        run: |
+          set -euo pipefail
+          CLOUD_ARG=""
+          if [ "$CLOUD" != "all" ]; then
+            CLOUD_ARG="--cloud $CLOUD"
+          fi
+          # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
+          # The Actions log renders the escape codes, so the output reads as it does in a shell.
+          ./afon.sh -a build -p acceptance --home "$AFON_HOME" \
+            --build-args "-B -ntp -Dstyle.color=always" $CLOUD_ARG
+
+      - name: Upload acceptance test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: afon-acceptance-reports-${{ github.run_id }}
+          path: |
+            afon-acceptance/target/surefire-reports/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Remove afon config
+        if: always()
+        run: | 
+          set -euo pipefail
+          CONFIG_DIR="$AFON_HOME/config"
+          rm -rf "$CONFIG_DIR"
+          echo "Removed config dir $CONFIG_DIR"

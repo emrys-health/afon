@@ -4,21 +4,24 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
-import static health.emrys.afon.config.AfonProperties.USER_POLARIS_ID;
-import static health.emrys.afon.config.AfonProperties.USER_POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
+import static health.emrys.afon.config.AfonProperty.USER_POLARIS_SECRET;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 
 /**
@@ -31,9 +34,11 @@ import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 public class SparkWorkloads {
 
     private final String polarisDomainName;
+    private final AfonPropertyProvider properties;
 
-    public SparkWorkloads(String polarisDomainName) {
+    public SparkWorkloads(String polarisDomainName, AfonPropertyProvider properties) {
         this.polarisDomainName = polarisDomainName;
+        this.properties = properties;
     }
 
     /**
@@ -92,7 +97,7 @@ public class SparkWorkloads {
                         .build();
 
         List<LocalExecProvisioner> allConnectProvisioners = new ArrayList<>();
-        allConnectProvisioners.addAll(uponCreateRun(startConnectCommand(polarisDomainName)));
+        allConnectProvisioners.addAll(uponCreateRun(startConnectCommand()));
         allConnectProvisioners.addAll(uponDestroyRun(
             "kubectl patch sparkapplication spark-connector  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
         ));
@@ -102,7 +107,7 @@ public class SparkWorkloads {
                         .build();
     }
 
-    public static String startConnectCommand(String polarisDomainName) {
+    public String startConnectCommand() {
         final Map<String, Object> sparkConnectManifest = Map.of(
             "apiVersion", "spark.apache.org/v1",
             "kind", "SparkApplication",
@@ -162,7 +167,7 @@ public class SparkWorkloads {
      * kubectl logs -f spark-connector-0-driver  | egrep -i 'SparkSqlParser|iceberg'
      * </code>
      */
-    private static Map<String, String> sparkConfig(String polarisDomainName) {
+    private Map<String, String> sparkConfig(String polarisDomainName) {
         var first = Map.of(
             "spark.kubernetes.container.image", SPARK_IMAGE,
             "spark.master.ui.title", "Prod Spark Cluster",
@@ -201,17 +206,13 @@ public class SparkWorkloads {
         }
     }
 
-    private static @NonNull Map<String, String> sparkCloudProperties(String polarisDomainName) {
+    private @NonNull Map<String, String> sparkCloudProperties(String polarisDomainName) {
         var                         toReturn     = new HashMap<String, String>();
         SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
         toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        Properties properties = new AfonPropertiesLoader().getProperties();
-        SparkWarehouseConfig sparkWarehouseConfig = sparkFactory.getConfig(
-            USER_POLARIS_ID.getValueFrom(properties),
-            USER_POLARIS_SECRET.getValueFrom(properties),
-            polarisDomainName,
-            "https"
-        );
+        String clientId = properties.getValue(USER_POLARIS_ID);
+        String clientSecret = ***REMOVED***
+        SparkWarehouseConfig sparkWarehouseConfig = sparkFactory.createConfig(properties, polarisDomainName, clientId, clientSecret);
         for (AfonCloud cloudProvider : AfonCloud.values()) {
             Map<String, String> configs = sparkWarehouseConfig.sparkConfigs(cloudProvider);
             toReturn.putAll(configs);

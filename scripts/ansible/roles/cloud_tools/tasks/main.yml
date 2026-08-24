@@ -1,0 +1,100 @@
+---
+- name: Install the aws cli
+  when: install_awscli | bool
+  block:
+    - name: Check whether the aws cli is already installed
+      ansible.builtin.command: aws --version
+      register: afon_aws_version
+      changed_when: false
+      failed_when: false
+
+    - name: Download and unpack the aws cli installer
+      ansible.builtin.unarchive:
+        src: "{{ awscli_url }}"
+        dest: /tmp
+        remote_src: true
+        creates: /tmp/aws/install
+      when: afon_aws_version.rc != 0
+
+    - name: Run the aws cli installer
+      ansible.builtin.command: /tmp/aws/install --update
+      register: afon_aws_install
+      changed_when: afon_aws_install.rc == 0
+      when: afon_aws_version.rc != 0
+
+    - name: Remove the aws cli installer
+      ansible.builtin.file:
+        path: /tmp/aws
+        state: absent
+
+- name: Install the azure cli
+  when: install_azurecli | bool
+  block:
+    - name: Fetch the microsoft signing key
+      ansible.builtin.get_url:
+        url: "{{ azure_key_url }}"
+        dest: "{{ azure_keyring }}"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Add the azure cli apt repo
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ apt_arch }} signed-by={{ azure_keyring }}]
+          {{ azure_repo_url }} {{ ansible_facts['distribution_release'] }} main
+        filename: azure-cli
+        state: present
+        update_cache: true
+
+    - name: Install azure-cli
+      ansible.builtin.apt:
+        name: azure-cli
+        state: present
+
+- name: Install the gcloud cli
+  when: install_gcloud | bool
+  block:
+    - name: Fetch the google cloud signing key
+      ansible.builtin.get_url:
+        url: "{{ gcloud_key_url }}"
+        dest: "{{ gcloud_keyring }}"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Add the google cloud apt repo
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ apt_arch }} signed-by={{ gcloud_keyring }}]
+          {{ gcloud_repo_url }} cloud-sdk main
+        filename: google-cloud-sdk
+        state: present
+        update_cache: true
+
+    - name: Install google-cloud-cli
+      ansible.builtin.apt:
+        name: google-cloud-cli
+        state: present
+
+- name: Install kubectl {{ kubectl_version }}
+  when: install_kubectl | bool
+  ansible.builtin.get_url:
+    url: "{{ kubectl_url }}"
+    dest: /usr/local/bin/kubectl
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install opentofu {{ opentofu_version }}
+  when: install_opentofu | bool
+  ansible.builtin.unarchive:
+    src: "{{ opentofu_url }}"
+    dest: /usr/local/bin
+    remote_src: true
+    include:
+      - tofu
+    owner: root
+    group: root
+    mode: "0755"
+    creates: /usr/local/bin/tofu

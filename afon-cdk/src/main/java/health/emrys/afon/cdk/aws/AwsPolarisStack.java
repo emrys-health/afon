@@ -1,44 +1,42 @@
 package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.TerraformStack;
+import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.AfonCloudStack;
+import health.emrys.afon.cdk.AbstractCloudStack;
 import health.emrys.afon.cdk.PolarisConfig;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
-import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonCloud.AWS;
 
-public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
-
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsPolarisStack.class);
+public class AwsPolarisStack extends AbstractCloudStack {
 
     protected final PolarisConfig polarisConfig;
     protected final AwsCloudProvider cloudProvider;
 
-    private AwsKeyCloakDeploymentConfig keyCloakConfig;
+    private AwsKeyCloakConfig keyCloakConfig;
 
     public AwsPolarisStack(@NonNull Construct scope,
                            AfonCloud id,
-                           Properties properties) {
-        super(scope, id.toString());
+                           AfonPropertyProvider properties) {
+        super(scope, id);
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
         cloudProvider = new AwsCloudProvider(this, id.toString(), properties);
-        polarisConfig = new PolarisConfig(this, "polaris", cloudProvider) {
+        polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties) {
             protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
                 return null; // no longer using an external service
             }
@@ -61,15 +59,15 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
                       .port(List.of(polarisConfig.POLARIS_PORTS))
                       .build())
             .build();
-        keyCloakConfig = new AwsKeyCloakDeploymentConfig(this, properties, cloudProvider);
+        keyCloakConfig = new AwsKeyCloakConfig(this, properties, cloudProvider);
         keyCloakConfig.configureHttpsAndDNS();
     }
 
     /**
      * Keycloak's AWS wiring, exposed so subclasses can depend on its DNS record (see
-     * {@link AwsKeyCloakDeploymentConfig#getAliasRecord()}).
+     * {@link AwsKeyCloakConfig#getAliasRecord()}).
      */
-    protected AwsKeyCloakDeploymentConfig getKeyCloakConfig() {
+    protected AwsKeyCloakConfig getKeyCloakConfig() {
         return keyCloakConfig;
     }
 
@@ -84,10 +82,9 @@ public class AwsPolarisStack extends TerraformStack implements AfonCloudStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App();
-        new AwsPolarisStack(app, AWS, new AfonPropertiesLoader().getProperties());
+        final App app = createApp();
+        new AwsPolarisStack(app, AWS, new FilePropertyProvider());
         app.synth();
-        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu-apply");
     }
 
 }

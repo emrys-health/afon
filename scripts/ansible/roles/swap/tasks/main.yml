@@ -1,0 +1,74 @@
+---
+- name: Configure the swap file
+  when: configure_swap | bool
+  block:
+    - name: Look for an existing swap file
+      ansible.builtin.stat:
+        path: "{{ swap_file }}"
+      register: afon_swap_file
+
+    - name: Measure the free disk on /
+      ansible.builtin.command: df -B1 --output=avail /
+      register: afon_swap_df
+      changed_when: false
+      check_mode: false
+
+    - name: Work out whether there is room for the swap file
+      ansible.builtin.set_fact:
+        afon_swap_fits: >-
+          {{ (afon_swap_df.stdout_lines | last | trim | int / 1073741824)
+             - (swap_size_gb | int) >= (swap_min_free_disk_gb | int) }}
+
+    - name: Report a swap file that will not fit
+      ansible.builtin.debug:
+        msg: >-
+          Skipping the {{ swap_size_gb }}GB swap file — it would leave less than
+          {{ swap_min_free_disk_gb }}GB free on /. Grow the volume first.
+      when:
+        - not afon_swap_file.stat.exists
+        - not afon_swap_fits | bool
+
+    - name: Create the swap file
+      when:
+        - not afon_swap_file.stat.exists
+        - afon_swap_fits | bool
+      block:
+        - name: Allocate {{ swap_size_gb }}GB at {{ swap_file }}
+          ansible.builtin.command: fallocate -l {{ swap_size_gb }}G {{ swap_file }}
+          register: afon_swap_alloc
+          changed_when: afon_swap_alloc.rc == 0
+
+        - name: Restrict the swap file to root
+          ansible.builtin.file:
+            path: "{{ swap_file }}"
+            owner: root
+            group: root
+            mode: "0600"
+
+        - name: Format the swap file
+          ansible.builtin.command: mkswap {{ swap_file }}
+          register: afon_mkswap
+          changed_when: afon_mkswap.rc == 0
+
+        - name: Enable the swap file
+          ansible.builtin.command: swapon {{ swap_file }}
+          register: afon_swapon
+          changed_when: afon_swapon.rc == 0
+
+    - name: Mount the swap file at boot
+      ansible.posix.mount:
+        path: none
+        src: "{{ swap_file }}"
+        fstype: swap
+        opts: sw
+        state: present
+      when: afon_swap_file.stat.exists or afon_swap_fits | bool
+
+    - name: Set the swappiness
+      ansible.posix.sysctl:
+        name: vm.swappiness
+        value: "{{ swap_swappiness }}"
+        state: present
+        sysctl_set: true
+        reload: true
+      when: afon_swap_file.stat.exists or afon_swap_fits | bool

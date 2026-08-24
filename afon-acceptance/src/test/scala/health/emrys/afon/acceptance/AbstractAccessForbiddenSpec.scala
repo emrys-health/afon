@@ -1,20 +1,20 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.SparkHelper.spark
-import health.emrys.afon.config.AfonProperties.AfonCloud
-import health.emrys.afon.polaris.catalogs.CloudConfigForPolaris
-import health.emrys.afon.polaris.config.PolarisConfigurer.getCreateCatalogURI
+import health.emrys.afon.acceptance.fixtures.SpecPretifier
+import health.emrys.afon.config.AfonCloud
+import health.emrys.afon.polaris.catalogs.PolarisCatalog
+import health.emrys.afon.polaris.config.PolarisConfigurer.catalogsURI
 import org.scalatest.GivenWhenThen
-import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 
-  def config: CloudConfigForPolaris
+  def config: PolarisCatalog
 
   override def cloudProvider: AfonCloud
 
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
-  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken
   val GrantCatalogAdmin = new CatalogAdminGrant(this, config)
   val CatalogRoles = new CatalogRoles(this, config)
   val NAMESPACE = "forbidden"
@@ -23,14 +23,14 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
 
   "Polaris" should {
     "be able to host a catalog that has a bucket it does not have access to" in {
-      val uri = getCreateCatalogURI
+      val uri = catalogsURI
       Given(s"an admin has set up the environment with:\n" + readEnvSetup())
       val json = config.catalogConfig
       When(s"we call $uri with payload:\n$json")
-      client.postJsonCall(uri, json, accessToken)
-      val uriGet = s"/api/catalog/v1/config?warehouse=${config.warehouseName()}"
+      client.post(uri, json, accessToken)
+      val uriGet = s"/api/catalog/v1/config?warehouse=${config.catalogName()}"
       Then(s"Polaris acknowledges the catalog when we call $uriGet")
-      val response = client.getCall(uriGet, accessToken)
+      val response = client.get(uriGet, accessToken)
       assert(response.getCode == 200)
     }
 
@@ -47,9 +47,9 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
       val sql = s"CREATE NAMESPACE IF NOT EXISTS $FULL_NAMESPACE"
       Given(s"we create a namespace with SQL '$sql'")
       spark.sql(sql)
-      val uri = s"/api/catalog/v1/${config.warehouseName()}/namespaces/$NAMESPACE"
+      val uri = s"/api/catalog/v1/${config.catalogName()}/namespaces/$NAMESPACE"
       And(s"Polaris acknowledges the namespace exists when call '$uri''")
-      val response = client.getCall(uri, accessToken)
+      val response = client.get(uri, accessToken)
       assert(response.getCode == 200)
       val fqn = s"$FULL_NAMESPACE.$tableName"
       When(s"we write $NUM_ROWS rows of data to a table in that namespace called '$fqn'")

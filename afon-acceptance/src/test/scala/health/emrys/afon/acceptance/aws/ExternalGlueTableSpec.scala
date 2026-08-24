@@ -1,15 +1,15 @@
 package health.emrys.afon.acceptance.aws
 
 import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
+import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, External}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant, CatalogRoles}
-import health.emrys.afon.config.AfonProperties.{AWS_REGION, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
-import health.emrys.afon.config.AfonPropertiesLoader
-import health.emrys.afon.polaris.catalogs.GlueCloudConfigForPolaris
+import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
+import health.emrys.afon.config.FilePropertyProvider
+import health.emrys.afon.polaris.catalogs.GlueAwsPolarisCatalog
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
-import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 /**
  * You'll need to run `scripts/aws/create_federated_permissions.sh` first if it's not been done already.
@@ -18,30 +18,30 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 @External
 class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
 
+  val properties = AcceptanceTestConfig.instance.getProperties
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
-  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken
 
   "An external table" should {
-    val properties        = new AfonPropertiesLoader().getProperties
-    val glueCatalogName   = GLUE_CATALOG_NAME.getValueFrom(properties)
-    val externalBucket    = AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)
-    val config            = new GlueCloudConfigForPolaris(properties)
-    val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(config.warehouseName()))
-    val catalogRoles      = new CatalogRoles(this, config, Some(config.warehouseName))
+    val glueCatalogName   = properties.getValue(GLUE_CATALOG_NAME)
+    val externalBucket    = properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME)
+    val glueCatalog       = new GlueAwsPolarisCatalog(properties)
+    val grantCatalogAdmin = new CatalogAdminGrant(this, glueCatalog, Some(glueCatalog.catalogName()))
+    val catalogRoles      = new CatalogRoles(this, glueCatalog, Some(glueCatalog.catalogName))
     val tableName         = "DatumAccTest2"
     val sparkNamespace    = "ph_glue_iceberg_db"
-    val awsRegion         = AWS_REGION.getValueFrom(properties)
+    val awsRegion         = properties.getValue(AWS_REGION)
 
     "be visible to our Polaris" in {
       Given(f"a bucket called $externalBucket and somebody has run the command:\n${ExternalGlueTableSpec.glueCmdLine(
         sparkNamespace, tableName, awsRegion, externalBucket
       )}")
 
-      val json: String = config.catalogConfig()
-      val uri: String  = PolarisConfigurer.getCreateCatalogURI
+      val json: String = glueCatalog.catalogConfig()
+      val uri: String  = PolarisConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
-      val response = client.postJsonCall(
+      val response = client.post(
         uri,
         json,
         accessToken)

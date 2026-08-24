@@ -1,0 +1,58 @@
+---
+# Installs the command-line tools required by the acceptance tests workflow
+# (.github/workflows/acceptance-tests-linux.yml) on a self-hosted Linux runner.
+#
+#   ansible-playbook runner-setup.yml
+#   ansible-playbook runner-setup.yml --check --diff        # dry run
+#   ansible-playbook runner-setup.yml --tags verify         # versions + resource check
+#   ansible-playbook runner-setup.yml -e install_cloud_tools=true
+#   ansible-playbook runner-setup.yml --tags github -e github_install_runner=true
+#
+# The runner itself is installed by the github role, which drives
+# scripts/github/runner.sh. That is off by default, as registering a runner acts on
+# the repo on GitHub rather than only on this host.
+- name: Set up acceptance test tooling on the GitHub runner
+  hosts: github_runners
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Assert the host is a supported (apt based) distribution
+      ansible.builtin.assert:
+        that: ansible_facts['pkg_mgr'] == 'apt'
+        fail_msg: >-
+          This playbook targets Debian/Ubuntu runners (found package manager
+          '{{ ansible_facts['pkg_mgr'] }}' on {{ ansible_facts['distribution'] }}
+          {{ ansible_facts['distribution_version'] }}).
+      tags: [always]
+
+    - name: Assert the runner user exists
+      ansible.builtin.command: id -u {{ github_runner_user }}
+      register: afon_runner_id
+      changed_when: false
+      failed_when: afon_runner_id.rc != 0
+      check_mode: false
+      tags: [always]
+
+  roles:
+    - role: shell_tools
+      tags: [shell]
+    - role: disk
+      tags: [disk]
+    - role: lvm
+      tags: [lvm]
+    - role: swap
+      tags: [swap]
+    - role: java
+      tags: [java]
+    - role: maven
+      tags: [maven]
+    - role: docker
+      tags: [docker]
+    - role: cloud_tools
+      when: install_cloud_tools | bool
+      tags: [cloud]
+    - role: github
+      tags: [github]
+    - role: verify
+      tags: [verify]
