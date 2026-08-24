@@ -12,15 +12,15 @@ import java.util.Map;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 
-public class KeyCloakSparkConnect {
+public class SparkConnect {
 
-    private static final Logger logger = LoggerFactory.getLogger(KeyCloakSparkConnect.class);
+    private static final Logger logger = LoggerFactory.getLogger(SparkConnect.class);
 
     private final SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
     protected final AfonPropertyProvider properties;
     private SparkWarehouseConfig sparkConfig;
 
-    public KeyCloakSparkConnect(AfonPropertyProvider properties) {
+    public SparkConnect(AfonPropertyProvider properties) {
         this.properties = properties;
         logger.info("Using Polaris Endpoint {}", properties.getValue(POLARIS_ENDPOINT));
         sparkConfig = configFactory.createConfig(properties);

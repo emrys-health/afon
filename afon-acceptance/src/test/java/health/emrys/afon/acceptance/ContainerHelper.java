@@ -2,6 +2,7 @@ package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.security.OAuthProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -101,7 +102,7 @@ public class ContainerHelper {
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
             properties.setValue(KC_HOSTNAME, KEYCLOAK_HOSTNAME);
-            KeyCloakProvider keyCloakProvider = new KeyCloakProvider(properties);
+            OAuthProvider keyCloakProvider = new KeyCloakProvider(properties);
             keyCloakProvider
                 .registerPolarisUser(
                         properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME),

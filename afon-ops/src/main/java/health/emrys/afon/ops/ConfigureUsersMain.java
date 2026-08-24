@@ -2,6 +2,7 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.security.OAuthProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +18,7 @@ public class ConfigureUsersMain {
 
     private final AfonUserProvider userProvider;
     private final AfonPropertyProvider propertyProvider;
-    private final KeyCloakProvider keyCloakProvider;
+    private final OAuthProvider keyCloakProvider;
     private final ConfigurePolarisUsersMain polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
