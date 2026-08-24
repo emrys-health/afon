@@ -16,10 +16,7 @@ public class DeployAwsFullStackMain implements StepsProvider {
         return List.of(
             stepOperations.deleteStack(AWS),
             stepOperations.deployFullStackIn(AWS),
-            stepOperations.waitForPolarisIn(AWS),
-            stepOperations.createAllCatalogsFor(AWS),
-            stepOperations.checkAwsSparkWritingTo(AWS)
-                      );
+            stepOperations.waitForPolarisIn(AWS));
     }
 
     public static void main(String[] args) {

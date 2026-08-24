@@ -16,10 +16,7 @@ public class DeployAzureFullStackMain implements StepsProvider {
         return List.of(
             stepOperations.deleteStack(AZURE),
             stepOperations.deployFullStackIn(AZURE),
-            stepOperations.waitForPolarisIn(AZURE),
-            stepOperations.createAllCatalogsFor(AZURE),
-            stepOperations.checkSparkWritingToPolarisIn(AZURE)
-                      );
+            stepOperations.waitForPolarisIn(AZURE));
     }
 
     public static void main(String[] args) {
