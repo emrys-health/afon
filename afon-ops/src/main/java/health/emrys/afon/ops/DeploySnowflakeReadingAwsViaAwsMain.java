@@ -19,7 +19,7 @@ public class DeploySnowflakeReadingAwsViaAwsMain implements StepsProvider {
                 stepOperations.deleteStack(AWS),
                 stepOperations.deployFullStackIn(AWS),
                 stepOperations.waitForPolarisIn(AWS),
-                stepOperations.initializeAllCatalogsIn(AWS),
+                stepOperations.createAllCatalogsFor(AWS),
                 stepOperations.checkAwsSparkWritingTo(AWS)
         ));
         steps.add(stepOperations.snowflakeReadingViaAwsPolaris(AWS));

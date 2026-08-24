@@ -65,7 +65,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
 
     @Override
     public Properties getProperties() {
-        loadPropertiesLazily();
+        loadLazily();
         Properties copy = new Properties();
         copy.putAll(properties);
         return copy;
@@ -73,25 +73,42 @@ public class FilePropertyProvider implements AfonPropertyProvider {
 
     @Override
     public Properties getSecretProperties() {
-        loadPropertiesLazily();
+        loadLazily();
         Properties secret = new Properties();
         secretKeys.stream().forEach(prop -> secret.put(prop, properties.getProperty(prop)));
         return secret;
     }
 
     @Override
+    public boolean hasProperty(AfonProperty property) {
+        loadLazily();
+        return properties.containsKey(property.getName());
+    }
+
+    @Override
     public String getValue(AfonProperty property) {
-        loadPropertiesLazily();
+        loadLazily();
         return property.getValueFrom(properties);
     }
 
     @Override
     public String getValue(AfonProperty property, String defaultValue) {
-        loadPropertiesLazily();
+        loadLazily();
         return property.getValueFrom(properties, defaultValue);
     }
 
-    private void loadPropertiesLazily() {
+    @Override
+    public void setValue(AfonProperty property, String value) {
+        loadLazily();
+        if ( properties.containsKey(property.getName()) ){
+            logger.info("Overriding property {} to {}", property.getName(), value);
+        } else {
+            logger.info("Setting property {} to {}", property.getName(), value);
+        }
+        this.properties.setProperty(property.getName(), value);
+    }
+
+    private void loadLazily() {
         if ( properties.isEmpty() ){
             // lazy loading and only once
             loadProperties();
@@ -113,7 +130,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
     private void loadPropertiesFromDir(String type, String dir) throws IOException {
         logger.info("Loading {} properties from {}", type, dir);
         for (String file : propertyFiles(type)) {
-            String     filename = dir + "/" + file;
+            String filename = String.format("%s/%s", dir, file);
             Properties props = loadPropertiesFromFile(filename);
             properties.putAll(props);
             if (file.startsWith("secret")) {

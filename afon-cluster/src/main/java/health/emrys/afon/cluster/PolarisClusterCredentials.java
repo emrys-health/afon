@@ -1,35 +1,31 @@
 package health.emrys.afon.cluster;
 
-import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
-import java.util.Properties;
+import static health.emrys.afon.config.AfonProperty.*;
 
 public class PolarisClusterCredentials implements ClusterCredentials {
 
     private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
-    private final Properties properties;
+    private final AfonPropertyProvider properties;
     private final String accessToken;
 
-    public PolarisClusterCredentials(AfonCloud cloud) {
-        this(cloud, new FilePropertyProvider().getProperties());
-    }
-
-    public PolarisClusterCredentials(AfonCloud cloud, Properties properties) {
+    public PolarisClusterCredentials(AfonCloud cloud, AfonPropertyProvider properties) {
         this.properties = properties;
-        accessToken = clientFactory.createClient(polarisDomainName(cloud), properties).getAccessToken();
+        this.properties.setValue(POLARIS_ENDPOINT, polarisDomainName(cloud));
+        this.accessToken = clientFactory.createClient(this.properties).getAccessToken();
     }
 
     private String polarisDomainName(AfonCloud cloud) {
         switch ( cloud ) {
             case AWS:
-                return AfonProperty.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
+                return properties.getValue(AWS_POLARIS_DOMAIN_NAME);
             case AZURE:
-                return AfonProperty.AZURE_DOMAIN_NAME.getValueFrom(properties);
+                return properties.getValue(AZURE_DOMAIN_NAME);
             case GCP:
-                return AfonProperty.GCP_DOMAIN_NAME.getValueFrom(properties);
+                return properties.getValue(GCP_DOMAIN_NAME);
             default:
                 throw new RuntimeException("Unsupported cloud "+cloud);
         }
@@ -42,17 +38,17 @@ public class PolarisClusterCredentials implements ClusterCredentials {
 
     @Override
     public String getPolarisId() {
-        return AfonProperty.POLARIS_ID.getValueFrom(properties);
+        return properties.getValue(POLARIS_ID);
     }
 
     @Override
     public String getPolarisSecret() {
-        return AfonProperty.POLARIS_SECRET.getValueFrom(properties);
+        return properties.getValue(POLARIS_SECRET);
     }
 
     @Override
     public String getPolarisHost() {
-        return AfonProperty.POLARIS_ENDPOINT.getValueFrom(properties);
+        return properties.getValue(POLARIS_ENDPOINT);
     }
 
 }

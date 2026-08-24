@@ -7,9 +7,8 @@ import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.ops.OnboardAllUsersMain;
-import health.emrys.afon.ops.PurgeAndPopulatePolarisMain;
+import health.emrys.afon.ops.ConfigureKeyCloakUsersMain;
+import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
 import health.emrys.afon.ops.spark.SparkChecker;
 import health.emrys.afon.ops.spark.SparkTestReader;
@@ -22,8 +21,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonCloud.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
@@ -38,10 +37,6 @@ public class StepOperations {
     private final StepActions actions;
 
     private final AfonPropertyProvider properties;
-
-    public StepOperations(StepActions actions) {
-        this(actions, new FilePropertyProvider());
-    }
 
     public StepOperations(StepActions actions, AfonPropertyProvider properties) {
         this.actions = actions;
@@ -111,93 +106,94 @@ public class StepOperations {
         }
     }
 
-    public Step purgeForeignCatalogFrom(AfonCloud id) {
+    public Step deleteExternalCatalogIn(AfonCloud id) {
         switch (id) {
             case AZURE:
-                return purgeForeignCatalogFrom(AZURE, properties.getValue(AZURE_DOMAIN_NAME));
+                return deleteExternalCatalogTableFor(AZURE, properties.getValue(AZURE_DOMAIN_NAME));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);
         }
     }
 
-    private @NonNull Step purgeForeignCatalogFrom(AfonCloud catalog, String domainName
+    private @NonNull Step deleteExternalCatalogTableFor(AfonCloud catalog, String domainName
     ) {
-        return purgePolarisFor(catalog, domainName, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
+        return deletePolarisTable(catalog, domainName, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
     }
 
-    private @NonNull Step purgePolarisFor(AfonCloud catalog, String domainName,
-                                          String namespace,
-                                          String tableName
+    private @NonNull Step deletePolarisTable(AfonCloud catalog,
+                                             String domainName,
+                                             String namespace,
+                                             String tableName
     ) {
         return new Step(
-            format("%s_purge_%s", catalog.toString(), machineNameFor(domainName)),
-            format("remove all persisted references to namespace `%s` in Polaris in domain `%s`", namespace, domainName),
+            format("%s_delete_table_%s.%s_for_%s", catalog, namespace, tableName, machineNameFor(domainName)),
+            format("delete Polaris table `%s.%s` for domain `%s`", namespace, tableName, domainName),
             () -> actions.executeMainOf(
-                PurgeAndPopulatePolarisMain.class,
-                new String[]{domainName, catalog.name(), namespace, tableName},
+                ManagePolarisCatalogsMain.class,
+                new String[]{"delete", domainName, catalog.name(), namespace, tableName},
                 NO_ENV_VARIABLES));
     }
 
-    public Step createForeignCatalogIn(AfonCloud id) {
+    public Step createExternalCatalogFor(AfonCloud id) {
         switch (id) {
             case AZURE:
                 Properties properties = new Properties();
                 properties.setProperty(
                     AZURE_BUCKET.getName(),
                         this.properties.getValue(AZURE_EXTERNAL_BUCKET));
-                return createForeignCatalogIn(AZURE, this.properties.getValue(AZURE_DOMAIN_NAME), properties);
+                return createExternalCatalogFor(AZURE, this.properties.getValue(AZURE_DOMAIN_NAME), properties);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);
         }
     }
 
-    private @NonNull Step createCatalogIn(AfonCloud catalog, String domainName) {
+    private @NonNull Step createCatalogFor(AfonCloud catalog, String domainName) {
         return new Step(
-            format("%s_catalog_in_%s", catalog.toString(), machineNameFor(domainName)),
-            format("configure a catalog called `%s` in the Polaris in domain `%s`", catalog, domainName),
+            format("%s_create_catalog_for_%s", catalog, machineNameFor(domainName)),
+            format("create a Polaris catalog `%s` for domain `%s`", catalog, domainName),
             () -> actions.createSingleCatalogsFor(domainName, catalog));
     }
 
-    private @NonNull Step createForeignCatalogIn(AfonCloud catalog, String domainName, Properties properties) {
+    private @NonNull Step createExternalCatalogFor(AfonCloud catalog, String domainName, Properties properties) {
         return new Step(
-            format("%s_foreign_catalog_in_%s", catalog.toString(), machineNameFor(domainName)),
-            format("Create a foreign catalog called `%s` in the Polaris in domain `%s`", catalog, domainName),
+            format("%s_create_external_catalog_for_%s", catalog, machineNameFor(domainName)),
+            format("create an external Polaris catalog `%s` for domain `%s`", catalog, domainName),
             () -> {
                 // swap the buckets
                 actions.createSingleCatalogsFor(domainName, catalog, properties);
             });
     }
 
-    public Step initializeAllCatalogsIn(AfonCloud id) {
+    public Step createAllCatalogsFor(AfonCloud id) {
         switch (id) {
             case AWS:
-                return initializeAllCatalogsIn(properties.getValue(AWS_POLARIS_DOMAIN_NAME));
+                return createAllCatalogsFor(properties.getValue(AWS_POLARIS_DOMAIN_NAME));
             case AZURE:
-                return initializeAllCatalogsIn(properties.getValue(AZURE_DOMAIN_NAME));
+                return createAllCatalogsFor(properties.getValue(AZURE_DOMAIN_NAME));
             case GCP:
-                return initializeAllCatalogsIn(properties.getValue(GCP_DOMAIN_NAME));
+                return createAllCatalogsFor(properties.getValue(GCP_DOMAIN_NAME));
             default:
                 throw new RuntimeException("Unsupported id " + id);
         }
     }
 
     @NonNull
-    private Step initializeAllCatalogsIn(String domainName) {
+    private Step createAllCatalogsFor(String domainName) {
         return new Step(
-            format("all_catalogs_in_%s", machineNameFor(domainName)),
-            format("initialize all the catalogs in Polaris in domain `%s`", domainName),
+            format("create_all_catalogs_for_%s", machineNameFor(domainName)),
+            format("create all Polaris catalogs for domain `%s`", domainName),
             () -> {
                 try {
                     actions.executeMainOf(
-                            PurgeAndPopulatePolarisMain.class,
-                        new String[]{domainName},
+                            ManagePolarisCatalogsMain.class,
+                        new String[]{"recreate", domainName},
                         NO_ENV_VARIABLES);
                 } catch (Exception e) {
                     logger.error(
                          """
-                         Failed to initialize all the catalogs in Polaris.
+                         Failed to delete and recreate all catalogs in Polaris for domain `%s`.
                          It may be because the certificates are not yet ready. 
                          The hint is an error message such as:
                          
@@ -205,7 +201,7 @@ public class StepOperations {
                          unable to find valid certification path to requested target
                          
                          If this is the case, try re-running this step.                         
-                         """, e);
+                         """, domainName, e);
                     throw e;
                 }
             });
@@ -311,11 +307,11 @@ public class StepOperations {
             format(
                 "%s_spark_talks_to_%s",
                 machineNameFor(domainName),
-                warehouse.toString()),
+                warehouse),
             description,
             () -> {
                 actions.executeMainOf(
-                    OnboardAllUsersMain.class,
+                    ConfigureKeyCloakUsersMain.class,
                     new String[]{domainName, warehouse.toString(), jupyterDomainName},
                     NO_ENV_VARIABLES);
 
@@ -338,7 +334,7 @@ public class StepOperations {
             format("Call Snowflake that uses AWS Polaris to get the credentials to read from %s storage", warehouse.name()),
             () -> {
                 logger.warn("Calling Snowflake. Note that some of these statements can take a long time");
-                actions.runSnowflakeSql(new String[]{
+                actions.runSnowflakeSql(properties, new String[]{
                     "USE DATABASE SNOWFLAKE_LEARNING_DB",
 
                     "DROP ICEBERG TABLE my_gcp_table_id",
@@ -404,9 +400,9 @@ public class StepOperations {
         String            formatted  = now.format(formatter);
         return new Step(
             "snowflake_writes_to_azure",
-            "Call Snowflake so it writes sample data to Azure blob storage",
+            "call Snowflake so it writes sample data to Azure blob storage",
             () -> {
-                actions.runSnowflakeSql(new String[]{
+                actions.runSnowflakeSql(properties, new String[]{
                     format(
                         """
                             CREATE OR REPLACE STORAGE INTEGRATION azure_int
@@ -460,11 +456,11 @@ public class StepOperations {
         );
     }
 
-    public Step purgeFromAwsPolarisAndRecreateFor(AfonCloud id) {
+    public Step deleteAwsPolarisCatalogAndRecreateFor(AfonCloud id) {
         switch (id) {
             case AZURE:
-                return purgePolarisFor(AZURE, properties.getValue(AWS_POLARIS_DOMAIN_NAME), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE)
-                    .andThen(createCatalogIn(AZURE, properties.getValue(AWS_POLARIS_DOMAIN_NAME)));
+                return deletePolarisTable(AZURE, properties.getValue(AWS_POLARIS_DOMAIN_NAME), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE)
+                    .andThen(createCatalogFor(AZURE, properties.getValue(AWS_POLARIS_DOMAIN_NAME)));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported id " + id);
@@ -478,7 +474,7 @@ public class StepOperations {
                     "%s/%s*metadata.json",
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
-                String json = actions.azureFirstFile(glob, true, properties.getValue(AZURE_BUCKET), properties.getValue(AZURE_STORAGE_ACCOUNT)); // firstFileInLatestDirectoryMatching(glob);
+                String json = actions.azureFirstFile(properties, glob, true); // firstFileInLatestDirectoryMatching(glob);
                 return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterPolarisTableMain.class);
             case AWS, GCP:
             default:
@@ -490,8 +486,8 @@ public class StepOperations {
                                            String tableName, Class<?> registerTableMainClass
     ) {
         return new Step(
-            format("%s_table_in_aws_polaris", warehouse.toString()),
-            format("Create `%s` table in the AWS Polaris", warehouse.name()),
+            format("%s_register_table_in_aws_polaris", warehouse),
+            format("create table `%s` in the AWS Polaris", warehouse.name()),
             () -> {
                 actions.registerTable(
                     warehouse,

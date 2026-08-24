@@ -1,7 +1,6 @@
 package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -25,7 +24,6 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DOMAIN_NAME;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 /**
  * This was initially run as a step after its superclass so it could be configured with domain names etc.
@@ -44,7 +42,7 @@ public class AwsSparkStack extends AwsJupyterStack {
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
         awsPolarisDomainName = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
-        new SparkWorkloads(awsPolarisDomainName).deploy(this, id, eksDependOn);
+        new SparkWorkloads(awsPolarisDomainName, properties).deploy(this, id, eksDependOn);
         Service sparkLB = sparkExternalService(eksDependOn);
         unregisterCRDs(List.of(sparkLB));
     }
@@ -105,9 +103,7 @@ public class AwsSparkStack extends AwsJupyterStack {
     public static void main(String[] args) {
         try {
             logger.info("Creating AWS Spark stack");
-            final App app = new App(AppConfig.builder()
-                    .outdir(cdktfDir())
-                    .build());
+            final App app = createApp();
             new AwsSparkStack(app, AWS, new FilePropertyProvider());
             app.synth();
         } catch (RuntimeException e) {

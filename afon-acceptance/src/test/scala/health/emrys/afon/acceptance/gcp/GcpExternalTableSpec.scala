@@ -4,7 +4,7 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
 import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
-import health.emrys.afon.config.FilePropertyProvider
+import health.emrys.afon.config.{AfonPropertyProvider, FilePropertyProvider}
 import health.emrys.afon.polaris.catalogs.{GcpPolarisCatalog, JsonSerialiser}
 import health.emrys.afon.polaris.config.PolarisConfigurer
 import org.apache.iceberg.gcp.auth.GoogleAuthManager
@@ -21,19 +21,18 @@ import java.util.Properties
 @External
 class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
 
+  val properties = AcceptanceTestConfig.instance.getProperties
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
-  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken
 
   val FEDERATED_CATALOG_NAME  = "emrys_afon_core_2"
   val BUCKET                  = f"emrys_afon_core_2"
 
   "An external GCP table" should {
-
-    val properties        = new FilePropertyProvider().getProperties
     val config            = new GcpPolarisCatalog(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new health.emrys.afon.acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
-    properties.setProperty(GCP_BUCKET_NAME.getName, BUCKET) // bit of a hack - TODO clean me up
+    properties.setValue(GCP_BUCKET_NAME, BUCKET) // bit of a hack - TODO clean me up
 
     "be registered with Polaris" in {
       Given(s"a catalog called '$FEDERATED_CATALOG_NAME' has already been created in GCP'")
@@ -79,7 +78,7 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
 
   // this gives:
   // Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
-  private def externalCatalogJson(properties: Properties): String = {
+  private def externalCatalogJson(properties: AfonPropertyProvider): String = {
     val config = new GcpPolarisCatalog(properties)
     val warehouse = f"gs://$BUCKET"
     val bucketProperties = CatalogProperties
@@ -91,7 +90,7 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
       GoogleAuthManager.DEFAULT_SCOPES
     )
     val clientId = "my-vendable-sa@fjords-450014.iam.gserviceaccount.com" // from GCP props
-    val clientSecret = GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties)
+    val clientSecret = properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)
     val authenticationParameters =
       new OAuthClientCredentialsParameters(
         "https://oauth2.googleapis.com/token", // this throws "Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials"

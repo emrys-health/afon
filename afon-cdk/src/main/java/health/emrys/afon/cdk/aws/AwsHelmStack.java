@@ -9,13 +9,13 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.Map;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 /**
  * This is experimental only. It creates the bare bones of an EKS environment
@@ -47,7 +47,7 @@ public class AwsHelmStack extends TerraformStack {
 
     public static void main(String[] args) {
         final App app = new App(AppConfig.builder()
-                .outdir(cdktfDir())
+                .outdir(ConfigUtils.afonCkdtf())
                 .build());
         new AwsHelmStack(app, AWS, new FilePropertyProvider());
         app.synth();

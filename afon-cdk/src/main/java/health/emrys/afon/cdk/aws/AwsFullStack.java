@@ -5,10 +5,7 @@ import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonProperty;
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.*;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -16,8 +13,8 @@ import software.constructs.Construct;
 import java.util.ArrayList;
 import java.util.List;
 
+import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.config.AfonCloud.AWS;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 public class AwsFullStack extends AwsTrinoStack {
 
@@ -90,9 +87,7 @@ public class AwsFullStack extends AwsTrinoStack {
         Release.Builder
             .create(this, "prometheusRelease")
             .name("kube-prometheus-stack")
-            .chart("kube-prometheus-stack")
-            .repository("https://prometheus-community.github.io/helm-charts")
-            .version("51.8.0") // Specify a version for consistency
+            .chart(vendoredChart(this, "prometheusChart", "kube-prometheus-stack-51.8.0.tgz"))
 
             // Reference the namespace created above
             .namespace("default")
@@ -145,8 +140,6 @@ public class AwsFullStack extends AwsTrinoStack {
         return sb.toString();
     }
 
-    private static final String GRAFANA_HELM_REPO = "https://grafana.github.io/helm-charts";
-
     /**
      * Installs the current {@code grafana/loki} chart (single-binary mode,
      * ships Loki 3.x) configured to push chunks and the index to S3. The
@@ -164,9 +157,7 @@ public class AwsFullStack extends AwsTrinoStack {
         return Release.Builder
             .create(this, "lokiRelease")
             .name("loki")
-            .chart("loki")
-            .repository(GRAFANA_HELM_REPO)
-            .version("6.16.0")
+            .chart(vendoredChart(this, "lokiChart", "loki-6.16.0.tgz"))
             .namespace("default")
             .values(List.of(lokiValues(properties)))
             .timeout(600)
@@ -189,9 +180,7 @@ public class AwsFullStack extends AwsTrinoStack {
         Release.Builder
             .create(this, "promtailRelease")
             .name("promtail")
-            .chart("promtail")
-            .repository(GRAFANA_HELM_REPO)
-            .version("6.16.5")
+            .chart(vendoredChart(this, "promtailChart", "promtail-6.16.5.tgz"))
             .namespace("default")
             .values(List.of(promtailValues(properties)))
             .timeout(600)
@@ -339,9 +328,7 @@ public class AwsFullStack extends AwsTrinoStack {
 
     public static void main(String[] args) {
         logger.info("Creating full stack");
-        final App app = new App(AppConfig.builder()
-                .outdir(cdktfDir())
-                .build());
+        final App app = createApp();
         try {
             new AwsFullStack(app, AWS, new FilePropertyProvider());
             app.synth();

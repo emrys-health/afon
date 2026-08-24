@@ -35,7 +35,7 @@
     </fileSet>
     <fileSet>
       <directory>target/docs/ops</directory>
-      <outputDirectory>/docs</outputDirectory>
+      <outputDirectory>/ops</outputDirectory>
     </fileSet>
   </fileSets>
 </assembly>

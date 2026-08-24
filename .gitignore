@@ -1,7 +1,8 @@
 # Afon
 
+# this allows to ignore the symlink to $AFON_HOME:  ln -s $AFON_HOME home
+home
 .afon/
-home/
 logs/
 *-cleanup.sh
 

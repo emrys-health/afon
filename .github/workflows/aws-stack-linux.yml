@@ -1,6 +1,6 @@
 name: AWS Stack (Linux)
 
-# Runs afon.sh's stack-deploy or stack-delete for AWS from the self-hosted Linux runner, ie
+# Runs afon.sh's stack deploy or delete for AWS from the self-hosted Linux runner, ie
 # ops.DeployAwsFullStackMain or ops.DeleteAwsFullStackMain — the same entry points as docs/stacks.md.
 #
 # deploy run first delete against the stack that is currently up, and the run then recreates it.
@@ -13,11 +13,8 @@ name: AWS Stack (Linux)
 #   - AWS *admin* credentials, which are NOT the Polaris service account credentials held in
 #     secret-aws.properties. Set them as the AWS_DEPLOY_* secrets below, or leave those unset and
 #     let the runner's own credentials (EC2 instance profile, or ~/.aws/credentials) be used.
-#   - $AFON_STATE_DIR to keep the tofu state between runs and points /data/afon/state on the runner
+#   - $AFON_CDKTF to keep the tofu state between runs and points /data/afon/cdktf on the runner
 #     and is different from $AFON_HOME which lives in the GitHub workspace.
-#     See the "Save/Restore the tofu state" steps. delete needs this every bit as much as deploy —
-#     it is the only record of what tofu destroy has to tear down — which is why this job always
-#     runs on the same runner rather than whichever self-hosted Linux runner happens to be free.
 #
 # The $AFON_HOME/config files are reconstructed from the same base64 repository secrets the
 # acceptance workflow uses; `scripts/github/secrets.sh push` publishes them.
@@ -50,6 +47,7 @@ concurrency:
 env:
   # Keep config inside the workspace rather than the runner's home, so it is scoped to this run.
   AFON_HOME: ${{ github.workspace }}/.afon
+  AFON_CDKTF: /data/afon/cdktf
   # Without this the JVM takes a quarter of the runner's RAM as its max heap, which is not
   # enough for javac to open the spark jars. Set explicitly so the build does not silently
   # depend on the instance size.
@@ -131,7 +129,7 @@ jobs:
           write_config users-acl.csv           "$USERS_ACL_CSV"
 
       - name: Validate afon config
-        run: ./afon.sh -a config-validate --home "$AFON_HOME"
+        run: ./afon.sh -a config-validate
 
       - name: Configure the deploy environment
         env:
@@ -168,14 +166,6 @@ jobs:
           mkdir -p "$HOME/.kube"
           echo "KUBE_CONFIG_PATH=$HOME/.kube/config" >> "$GITHUB_ENV"
 
-          # Where the tofu state is kept between runs — outside the workspace the checkout cleans.
-          # Held as shell vars first: a write to $GITHUB_ENV only takes effect in later steps, so
-          # reading AFON_STATE_DIR back via $GITHUB_ENV in this same step would be unbound.
-          AFON_STATE_DIR=/data/afon/state
-          AWS_STATE_DIR="$AFON_STATE_DIR/${{ github.repository }}/aws"
-          echo "AFON_STATE_DIR=$AFON_STATE_DIR" >> "$GITHUB_ENV"
-          echo "AWS_STATE_DIR=$AWS_STATE_DIR"   >> "$GITHUB_ENV"
-
       - name: Check the AWS credentials
         run: |
           set -euo pipefail
@@ -190,7 +180,7 @@ jobs:
           set -euo pipefail
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
           # The Actions log renders the escape codes, so the output reads as it does in a shell.
-          ./afon.sh -a build -g "clean package" -p cli --home "$AFON_HOME" \
+          ./afon.sh -a build -g "clean package" -p cli \
             --build-args "-Dafon.cli.dir=/data/afon/cli -B -ntp -Dstyle.color=always"
 
       - name: Build components without acceptance tests
@@ -198,29 +188,8 @@ jobs:
           set -euo pipefail
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
           # The Actions log renders the escape codes, so the output reads as it does in a shell.
-          ./afon.sh -a build -p -acceptance --home "$AFON_HOME" \
+          ./afon.sh -a build -p -acceptance \
             --build-args "-B -ntp -Dstyle.color=always"
-
-      - name: Restore the tofu state
-        run: |
-          set -euo pipefail
-          mkdir -p "$AWS_STATE_DIR"
-          # cdktf synthesises into $AFON_HOME/cdktf/stacks/aws and keeps the state next to it in
-          # afon-ops/terraform.aws.tfstate. Both are gitignored, and actions/checkout runs
-          # `git clean -ffdx`, so they do not survive a checkout and are kept on the runner instead.
-          # Without them, deploy's teardown finds nothing to destroy and the rebuild then collides
-          # with the resources still running in AWS; delete finds nothing to destroy at all and
-          # leaves the running stack untouched.
-          if compgen -G "$AWS_STATE_DIR/terraform.aws.tfstate*" > /dev/null; then
-            cp -v "$AWS_STATE_DIR"/terraform.aws.tfstate* $AFON_HOME/cdktf
-          else
-            echo "::warning::No saved tofu state in $AWS_STATE_DIR — this run will deploy as if AWS were empty. If a stack is in fact up, destroy it first (./afon.sh -a tofu-destroy) or restore its tfstate."
-          fi
-          if [ -d "$AWS_STATE_DIR/cdktf" ]; then
-            rm -rf $AFON_HOME/cdktf
-            cp -R "$AWS_STATE_DIR/cdktf" $AFON_HOME/cdktf
-            echo "Restored cdktf dir"
-          fi
 
       - name: Run the AWS stack action
         env:
@@ -235,39 +204,21 @@ jobs:
             if [ -n "$FROM_STEP" ]; then
               echo "::warning::from_step is ignored by delete"
             fi
-            ./afon.sh -a stack-delete --cloud aws --stack-type full \
-              --home "$AFON_HOME" --logging-console INFO
+            ./afon.sh -a exec --exec-class ops.DeleteAwsFullStackMain \
+               --logging-console INFO
           else
             if [ -n "$FROM_STEP" ]; then
               echo "Deploy resumes from step $FROM_STEP"
             fi
-            ./afon.sh -a stack-deploy --cloud aws --stack-type full \
-              --home "$AFON_HOME" --logging-console INFO \
-              --stack-args "$FROM_STEP"
-          fi
-
-      - name: Save the tofu state
-        if: always()
-        run: |
-          set -euo pipefail
-          mkdir -p "$AWS_STATE_DIR"
-          if compgen -G "$AFON_HOME/cdktf/terraform.aws.tfstate*" > /dev/null; then
-            cp -v $AFON_HOME/cdktf/terraform.aws.tfstate* "$AWS_STATE_DIR/"
-          else
-            # Expected only when the teardown destroyed the stack and the rebuild then failed
-            # before writing new state.
-            echo "::warning::No tofu state in afon-ops to save"
-          fi
-          rm -rf "$AWS_STATE_DIR/cdktf"
-          if [ -d $AFON_HOME/cdktf ]; then
-            cp -R $AFON_HOME/cdktf "$AWS_STATE_DIR/cdktf"
+            ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain \
+              --logging-console INFO --exec-args "$FROM_STEP"
           fi
 
       - name: Report the cluster status
         if: always()
         continue-on-error: true
         run: |
-          ./afon.sh -a stack-status --cloud aws --home "$AFON_HOME"
+          ./afon.sh -a script --script-path aws/vpcs.sh
           kubectl get pods -A
 
       - name: Upload stack logs

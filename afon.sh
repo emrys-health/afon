@@ -2,8 +2,9 @@
 set -euo pipefail
 
 usage (){
-  echo "Usage: $0 [--action|-a <action>] [--cloud|-c <cloud>] [--dry-run]"
-  echo "          [--home <afon-home>] [--help|-h]"
+  echo "Usage: $0 [--action|-a <action>] [--help|-h]"
+  echo "          [--home <afon-home>] [--cdktf <afon-cdktf>]"
+  echo "          [--cloud|-c <cloud>]"
   echo "          [--logging|-l <logging>] [--logging-console <console>] [--mvn-quiet]"
   echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
   echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
@@ -13,7 +14,6 @@ usage (){
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--script-path <path>]"
   echo "          [--setup-os <os>] [--setup-output <file>]"
-  echo "          [--stack-deploy] [--stack-type <type>] [--stack-args <args>] [--stack-status]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
   echo "          ansible:    : executes the ansible playbook."
@@ -24,17 +24,18 @@ usage (){
   echo "          exec        : executes the jvm classes from ops (see the docs for details)."
   echo "          script      : executes the scripts."
   echo "          setup-*     : sets up the local env for the given os and <cloud> option.  One of local|show"
-  echo "          stack-*     : executes the stack commands, based on the <cloud> option and the <stack-type>. One of deploy|delete|status."
   echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state."
-  echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
-  echo "mvn-quiet:        the flag to hush the mvn output"
   echo "help:             the help flag.  Prints usage."
   echo "home:             the afon home dir.  Defaults to '$HOME/.afon'."
   echo "                  Also settable via env variable 'AFON_HOME'."
+  echo "cdktf:            the afon cdktf dir.  Defaults to '$AFON_HOME/cdktf'."
+  echo "                  Also settable via env variable 'AFON_CDKTF'."
+  echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targetted."
   echo "logging:          the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "                  Also settable via env variable 'AFON_LOGGING'."
   echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "                  Also settable via env variable 'AFON_LOGGING_CONSOLE'."
+  echo "mvn-quiet:        the flag to hush the mvn output"
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
   echo "build-args:       the build args.  eg '-DskipTests'."
@@ -55,8 +56,6 @@ usage (){
   echo "script-path:      the path of the script the run."
   echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
-  echo "stack-type:       the stack type.  One of full|polaris.  Uses specified or default <cloud>. Defaults to 'polaris'."
-  echo "stack-args:       the stack command args."
   echo "tofu-args:        the tofu args."
   echo "tofu-cloud:       the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
 }
@@ -179,7 +178,7 @@ exec_docs(){
 }
 
 mvn_envs(){
-  MVN_ENVS="-Dafon.home=$HOME_DIR"
+  MVN_ENVS="-Dafon.home=$HOME_DIR -Dafon.cdktf=$CDKTF_DIR"
   if [ -n "$CLOUD" ]; then
     MVN_ENVS="$MVN_ENVS -Dafon.cloud=$CLOUD"
   fi
@@ -240,44 +239,6 @@ exec_script(){
 
 capitaliseFirst(){
   echo "$1" | awk '{print toupper(substr($0,1,1)) substr($0,2)}'
-}
-
-exec_stack(){
-  EXEC_TYPE="ops"
-  EXEC_ARGS="$STACK_ARGS"
-  STACK_ACTION=${ACTION#stack-}
-  case $STACK_ACTION in
-    deploy|delete)
-      if [ -z "$STACK_TYPE" ]; then
-        STACK_TYPE="polaris"
-        echo "Stack type not specified.  Defaulting to '$STACK_TYPE'."
-      fi
-      ACTION_CF=$(capitaliseFirst $STACK_ACTION)
-      CLOUD_CF=$(capitaliseFirst $CLOUD)
-      STACK_CF="$(capitaliseFirst $STACK_TYPE)Stack"
-      EXEC_CLASS="ops.${ACTION_CF}${CLOUD_CF}${STACK_CF}Main"
-      echo "$ACTION_CF using $EXEC_CLASS"
-      exec_jvm
-      ;;
-    status)
-      EXEC_TYPE="script"
-      case $STACK_TYPE in
-        full)
-          EXEC_SCRIPT="aws/vpcs.sh"
-          ;;
-        polaris)
-          EXEC_SCRIPT="$CLOUD/polaris.sh"
-          ;;
-        *)
-          echo "Stack type not supported: $STACK_TYPE"
-          usage; exit 0
-      esac
-      exec_script
-      ;;
-    *)
-      echo "Stack action not supported: $STACK_ACTION"
-      usage; exit 0
-  esac
 }
 
 exec_tofu(){
@@ -393,11 +354,11 @@ ANSIBLE_ARGS=
 BUILD_ARGS=
 BUILD_GOALS=
 BUILD_PROFILES=
+CDKTF_DIR=
 CLI_ARGS=
 CLI_COMMAND=
 CLI_DIR=
 CLOUD=
-DRY_RUN=false
 HELP=
 HOME_DIR=
 LOGGING=
@@ -419,8 +380,6 @@ MVN_QUIET=
 SCRIPT_PATH=
 SETUP_OS=
 SETUP_OUTPUT=
-STACK_TYPE=
-STACK_ARGS=
 TOFU_ACTION=
 TOFU_ARGS=
 TOFU_CLOUD=
@@ -440,10 +399,10 @@ while [[ $# -gt 0 ]]; do
       BUILD_GOALS="$2"; shift 2 ;;
     --build-profiles|-p)
       BUILD_PROFILES="$2"; shift 2 ;;
+    --cdktf)
+      CDKTF_DIR="$2"; shift 2 ;;
     --cloud|-c)
       CLOUD="$2"; shift 2 ;;
-    --dry-run)
-      DRY_RUN=true; shift ;;
     --cli-args)
       CLI_ARGS="$2"; shift 2 ;;
     --cli-command|--cli-cmd)
@@ -484,10 +443,6 @@ while [[ $# -gt 0 ]]; do
       SETUP_OS="$2"; shift 2 ;;
     --setup-outout)
       SETUP_OUTPUT="$2"; shift 2 ;;
-    --stack-type)
-      STACK_TYPE="$2"; shift 2 ;;
-    --stack-args)
-      STACK_ARGS="$2"; shift 2 ;;
     --tofu-args)
       TOFU_ARGS="$2"; shift 2 ;;
     --tofu-cloud)
@@ -511,6 +466,20 @@ else
   echo "Home dir not specified. Defaulting to $HOME_DIR"
   AFON_HOME="$HOME_DIR"
   echo "Setting AFON_HOME=$AFON_HOME"
+fi
+
+AFON_CDKTF="${AFON_CDKTF:-}"
+if [ -n "$AFON_CDKTF" ]; then
+  CDKTF_DIR="$AFON_CDKTF"
+fi
+
+if [ -n "$CDKTF_DIR" ]; then
+  echo "Using cdktf dir=$CDKTF_DIR"
+else
+  CDKTF_DIR="$HOME_DIR/cdktf"
+  echo "Cdktf dir not specified. Defaulting to $CDKTF_DIR"
+  AFON_CDKTF="$CDKTF_DIR"
+  echo "Setting AFON_CDKTF=$AFON_CDKTF"
 fi
 
 AFON_CLI_DIR=${AFON_CLI_DIR:-}
@@ -635,13 +604,6 @@ case $ACTION in
         echo "Setup action not supported: $SETUP_ACTION"
         usage; exit 0
     esac
-    ;;
-  stack-*)
-    if [ -z "$CLOUD" ]; then
-      CLOUD="aws"
-      echo "Cloud not specified.  Defaulting to '$CLOUD'."
-    fi
-    exec_stack
     ;;
   tofu-*)
     if [ -z "$TOFU_CLOUD" ]; then

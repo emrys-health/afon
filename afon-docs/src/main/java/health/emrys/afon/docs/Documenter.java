@@ -89,7 +89,7 @@ public class Documenter {
     }
 
      private void writeSteps(DocumentMetadata documentMetadata, OutputStream fos) {
-        List<Step> steps = documentMetadata.steps(new StepOperations(new StepDocumentation(fos)));
+        List<Step> steps = documentMetadata.steps(new StepOperations(new StepDocumentation(fos), properties));
         new StepRunner().runSteps(steps.stream().map(x -> decorating(x, fos)).toList());
     }
 

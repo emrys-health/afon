@@ -26,6 +26,7 @@ concurrency:
 env:
   # Keep config inside the workspace rather than the runner's home, so it is scoped to this run.
   AFON_HOME: ${{ github.workspace }}/.afon
+  AFON_CDKTF: /data/afon/cdktf
   # Without this the JVM takes a quarter of the runner's RAM as its max heap, which is not
   # enough for javac to open the spark jars. Set explicitly so the build does not silently
   # depend on the instance size.
@@ -105,7 +106,7 @@ jobs:
           write_config users-acl.csv           "$USERS_ACL_CSV"
 
       - name: Validate afon config
-        run: ./afon.sh -a config-validate --home "$AFON_HOME"
+        run: ./afon.sh -a config-validate
 
       - name: Configure the deploy environment
         run: |
@@ -121,7 +122,7 @@ jobs:
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
           # The Actions log renders the escape codes, so the output reads as it does in a shell.
           if [ "$ACTION" == "deploy" ]; then
-            ./afon.sh -a build -g "clean package" -p cli --home "$AFON_HOME" \
+            ./afon.sh -a build -g "clean package" -p cli \
               --build-args "-Dafon.cli.dir=$AFON_CLI_DIR -B -ntp -Dstyle.color=always"
           else 
              rm $AFON_CLI_DIR/afon-cli.jar

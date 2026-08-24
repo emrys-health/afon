@@ -1,6 +1,5 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.config.PolarisCatalogClient;
 import org.slf4j.Logger;
@@ -11,14 +10,17 @@ public class ConfigurePolarisCatalogsMain {
     static final Logger logger = LoggerFactory.getLogger(ConfigurePolarisCatalogsMain.class);
 
     public static void main(String[] args) {
+        if (args.length < 1) {
+            logger.warn("{} requires credentials as first arg", ConfigurePolarisCatalogsMain.class.getName());
+            return;
+        }
+        String credentials = args[0];
         try {
-            AfonPropertyProvider provider = new FilePropertyProvider();
-            PolarisCatalogClient client = new PolarisCatalogClient(provider.getProperties());
-            if (args.length == 1) { // credentials
-                client.configureAllCatalogs(args[0]);
-            }
+            var properties = new FilePropertyProvider();
+            new PolarisCatalogClient(properties).configureAllCatalogs(credentials);
         } catch (Exception e) {
-            logger.error("Failed configuring polaris catalogs", e);
+            logger.error("Failed to configure polaris catalogs", e);
+            throw new RuntimeException(e);
         }
     }
 

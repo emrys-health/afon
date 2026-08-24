@@ -1,7 +1,6 @@
 package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.AppConfig;
 import health.emrys.afon.cdk.AbstractCloudStack;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
@@ -10,7 +9,6 @@ import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import static health.emrys.afon.config.AfonCloud.AZURE;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 class AzureKubernetesStack extends AbstractCloudStack {
 
@@ -35,9 +33,7 @@ class AzureKubernetesStack extends AbstractCloudStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App(AppConfig.builder()
-                .outdir(cdktfDir())
-                .build());
+        final App app = createApp();
         new AzureKubernetesStack(app, AZURE, new FilePropertyProvider());
         app.synth();
     }

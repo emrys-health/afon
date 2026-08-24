@@ -38,6 +38,7 @@ The commands are the (kebab-named) versions of the executable Java classes named
 The script supports the following env variables:
 
 - `AFON_HOME`: the Afon home dir, defaulting to $HOME/.afon.
+- `AFON_CDKTF`: the Afon cdktf dir, defaulting to $AFON_HOME/cdktf.
 - `AFON_CLOUD`: the cloud provider to target, one of {aws,azure,gcp}.  This is optional and only affects some functionality.
 - `AFON_LOGGING`: the file logging level, defaulting to INFO.   The file logs are found the `$AFON_HOME/logs`.
 - `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to OFF.
@@ -48,7 +49,7 @@ For example, to run command with console logging:
 AFON_LOGGING_CONSOLE=INFO afon-cli.sh <command>
 ```
 
-**IMPORTANT:** the `deploy-*-stack` commands will used `$AFON_HOME/cdktf` as their output dir.
+**IMPORTANT:** the `deploy-*-stack` commands will used `$AFON_CDKTF` as their output dir.
 
 ## CLI configuration 
 

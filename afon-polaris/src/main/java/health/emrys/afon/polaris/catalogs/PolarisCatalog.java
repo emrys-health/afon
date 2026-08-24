@@ -34,6 +34,15 @@ public abstract class PolarisCatalog {
 
     public abstract String catalogName();
 
+    /**
+     * By default, allow admin grants.
+     * Override with {@code false} it not the case.
+     * @return flag the catalog allows admin grants
+     */
+    public boolean adminGrants() {
+        return true;
+    }
+
     protected String toJson(Object object) throws IncorrectConfigException {
         return serialiser.toJson(object);
     }

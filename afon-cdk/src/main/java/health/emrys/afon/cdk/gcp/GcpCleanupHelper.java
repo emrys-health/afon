@@ -1,10 +1,15 @@
 package health.emrys.afon.cdk.gcp;
 
-import health.emrys.afon.cdk.AbstractCleanupHelper;
+import health.emrys.afon.cdk.CleanupHelper;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 
-public class GcpCleanupHelper extends AbstractCleanupHelper {
+public class GcpCleanupHelper extends CleanupHelper {
 
-    public GcpCleanupHelper() {
+    private final AfonPropertyProvider properties;
+
+    public GcpCleanupHelper(AfonPropertyProvider properties) {
+        this.properties = properties;
     }
 
     public String cleanupCommands() {
@@ -79,7 +84,8 @@ public class GcpCleanupHelper extends AbstractCleanupHelper {
     }
 
     public static void main(String[] args) {
-        outputCleanupCommands(args, new GcpCleanupHelper().cleanupCommands());
+        var properties = new FilePropertyProvider();
+        outputCleanupCommands(new GcpCleanupHelper(properties).cleanupCommands(), args);
     }
 
 }

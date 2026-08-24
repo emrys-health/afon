@@ -1,25 +1,25 @@
 package health.emrys.afon.polaris.catalogs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum;
 import org.apache.polaris.core.admin.model.*;
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Map;
-import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 
 public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
 
-    private final String warehouseName;
+    private final String catalogName;
 
-    public GlueAwsPolarisCatalog(Properties properties) {
-        super(GLUE_S3_ROLE_ARN.getValueFrom(properties),
-              bucketToUrl(AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)),
-              AWS_REGION.getValueFrom(properties));
-        this.warehouseName = GLUE_CATALOG_NAME.getValueFrom(properties);
+    public GlueAwsPolarisCatalog(AfonPropertyProvider properties) {
+        super(properties.getValue(GLUE_S3_ROLE_ARN),
+              bucketToUrl(properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME)),
+                properties.getValue(AWS_REGION));
+        this.catalogName = properties.getValue(GLUE_CATALOG_NAME);
     }
 
     protected @NonNull CatalogProperties catalogProperties() {
@@ -55,7 +55,7 @@ public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
             new ExternalCatalog(
                     connectionConfigInfo(),
                 Catalog.TypeEnum.EXTERNAL,
-                warehouseName,
+                    catalogName,
                     catalogProperties(),
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
@@ -66,6 +66,6 @@ public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
 
     @Override
     public String catalogName() {
-        return warehouseName;
+        return catalogName;
     }
 }

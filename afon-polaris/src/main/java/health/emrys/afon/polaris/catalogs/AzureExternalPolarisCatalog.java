@@ -1,12 +1,11 @@
 package health.emrys.afon.polaris.catalogs;
 
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
-import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
@@ -24,15 +23,15 @@ public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
     private final @NonNull String clientId;
     private final @NonNull String domainName;
 
-    public AzureExternalPolarisCatalog(Properties properties) {
+    public AzureExternalPolarisCatalog(AfonPropertyProvider properties) {
         super(properties);
-        String storageAccount   = AZURE_STORAGE_ACCOUNT.getValueFrom(properties);
-        String bucketName       = AZURE_EXTERNAL_BUCKET.getValueFrom(properties);
+        String storageAccount   = properties.getValue(AZURE_STORAGE_ACCOUNT);
+        String bucketName       = properties.getValue(AZURE_EXTERNAL_BUCKET);
         this.bucketUrl          = bucketUrl(bucketName, storageAccount);
-        this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);
-        this.multiTenantAppName = AZURE_CLIENT_ID.getValueFrom(properties);
-        this.clientId           = AZURE_CLIENT_ID.getValueFrom(properties);
-        this.domainName         = "https://" + AfonProperty.AZURE_DOMAIN_NAME.getValueFrom(properties);
+        this.tenant             = properties.getValue(AZURE_TENANT_ID);
+        this.multiTenantAppName = properties.getValue(AZURE_CLIENT_ID);
+        this.clientId           = properties.getValue(AZURE_CLIENT_ID);
+        this.domainName         = "https://" + properties.getValue(AZURE_DOMAIN_NAME);
     }
 
     @Override

@@ -12,11 +12,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.cluster.ClusterUtils.isFailure;
 import static java.lang.String.format;
 
 /**
@@ -79,10 +78,9 @@ public class RegisterPolarisTableMain {
     }
 
     public static void main(String[] args) {
-        PolarisRestClientFactory clientFactory  = PolarisRestClientFactory.clientFactory();
         if (args.length < 4) {
             throw new IllegalArgumentException(format("""
-                    arguments are: 
+                    required arguments are: 
                     catalog namespace table metadata_location
                     was provided with %d arguments: %s 
                     """, args.length, Arrays.stream(args).collect(Collectors.joining(" "))));
@@ -92,22 +90,21 @@ public class RegisterPolarisTableMain {
         String table = args[2];
         String metadata = args[3];
 
-        RegisterTableConfig tableConfig = new RegisterTableConfig(catalog, namespace, table, metadata);
-        Properties properties = new FilePropertyProvider().getProperties();
+        var properties = new FilePropertyProvider();
         if (args.length > 4) {
-            properties.put(POLARIS_ENDPOINT.getName(), args[4]);
+            properties.setValue(POLARIS_ENDPOINT, args[4]);
         }
         if (args.length > 5) {
-            String userId = args[5];
-            String secret = args[6];
-            logger.info("Creating the table as {}/{}", userId, secret);
-            properties.put(POLARIS_ID.getName(), userId);
-            properties.put(POLARIS_SECRET.getName(), secret);
+            String polarisId = args[5];
+            String polarisSecret = args[6];
+            logger.info("Creating the table as {}/{}", polarisId, polarisSecret);
+            properties.setValue(POLARIS_ID, polarisId);
+            properties.setValue(POLARIS_SECRET, polarisSecret);
         }
-        String kcHost = KC_HOSTNAME.getValueFrom(properties);
+        String kcHost = properties.getValue(KC_HOSTNAME);
         logger.info("KC host: {}", kcHost);
-        properties.put(KC_HOSTNAME.getName(), kcHost);
-        PolarisRestClient client = clientFactory.createClient(properties);
+        PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties);
+        RegisterTableConfig tableConfig = new RegisterTableConfig(catalog, namespace, table, metadata);
         RegisterPolarisTableMain app    = new RegisterPolarisTableMain(client, tableConfig);
         List<String>             errors = app.createTableAndNamespace();
         if (!errors.isEmpty()) {

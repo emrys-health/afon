@@ -1,10 +1,9 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.config.GivenPropertyProvider;
-import health.emrys.afon.security.keycloak.KeyCloakProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
@@ -20,17 +19,12 @@ import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Scanner;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonCloud.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.*;
@@ -60,7 +54,7 @@ public class ContainerHelper {
      * For testing.
      */
     public static void main(String[] args) {
-        Properties properties = new FilePropertyProvider().getProperties();
+        AfonPropertyProvider properties = AcceptanceTestConfig.instance.getProperties();
         // KeyCloak must be up (and the Polaris realm provisioned) before Polaris starts, as Polaris
         // resolves its OIDC configuration from KeyCloak.
         instance.startKeyCloak(properties);
@@ -84,7 +78,7 @@ public class ContainerHelper {
     private ContainerHelper() {
     }
 
-    public synchronized GenericContainer<?> startKeyCloak(Properties properties) {
+    public synchronized GenericContainer<?> startKeyCloak(AfonPropertyProvider properties) {
         if (keyCloak == null) {
             keyCloak = new GenericContainer<>(KEYCLOAK_IMAGE)
                 .withNetwork(network)
@@ -97,8 +91,8 @@ public class ContainerHelper {
                                 .forPort(KEYCLOAK_PORT)
                                 .forStatusCode(200)
                                 .withStartupTimeout(Duration.ofMinutes(3)));
-            new KeyCloakConfigurer(new GivenPropertyProvider(properties)).config().entrySet().forEach(entry ->
-                                                          keyCloak.withEnv(entry.getKey(), entry.getValue())
+            new KeyCloakConfigurer(properties).config().entrySet().forEach(entry ->
+                    keyCloak.withEnv(entry.getKey(), entry.getValue())
             );
             // Fixed binding so the host-side KeyCloakProvider can reach it at localhost:8080.
             keyCloak.setPortBindings(List.of(KEYCLOAK_PORT + ":" + KEYCLOAK_PORT));
@@ -106,29 +100,28 @@ public class ContainerHelper {
                             "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
-            KeyCloakProvider keyCloakProvider = new KeyCloakProvider(KEYCLOAK_HOSTNAME,
-                    KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
-                    KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
+            properties.setValue(KC_HOSTNAME, KEYCLOAK_HOSTNAME);
+            KeyCloakProvider keyCloakProvider = new KeyCloakProvider(properties);
             keyCloakProvider
                 .registerPolarisUser(
-                    KC_BOOTSTRAP_ADMIN_USERNAME.getValueFrom(properties),
-                    KC_BOOTSTRAP_ADMIN_PASSWORD.getValueFrom(properties));
+                        properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME),
+                        properties.getValue(KC_BOOTSTRAP_ADMIN_PASSWORD));
             keyCloakProvider
                 .registerPolarisUser(
-                    USER_POLARIS_ID.getValueFrom(properties),
-                    USER_POLARIS_SECRET.getValueFrom(properties));
+                        properties.getValue(USER_POLARIS_ID),
+                        properties.getValue(USER_POLARIS_SECRET));
             keyCloakProvider
                 .registerPolarisUser(
-                    POLARIS_ID.getValueFrom(properties),
-                    POLARIS_SECRET.getValueFrom(properties));
+                        properties.getValue(POLARIS_ID),
+                        properties.getValue(POLARIS_SECRET));
         }
         return keyCloak;
     }
 
-    public synchronized void startSparkConnect(Properties properties) {
+    public synchronized void startSparkConnect(AfonPropertyProvider properties) {
         if (sparkConnect == null) {
             sparkConnect = new GenericContainer<>(SPARK_IMAGE);
-            SparkWarehouseConfig config = sparkFactory.getConfig(properties);
+            SparkWarehouseConfig config = sparkFactory.createConfig(properties);
             Stream<String> envs = Arrays.stream(AfonCloud.values()).flatMap(
                 cloudProvider ->
                     config.sparkConfigs(cloudProvider).entrySet().stream().map(
@@ -153,11 +146,11 @@ public class ContainerHelper {
         }
     }
 
-    public synchronized GenericContainer<?> startPolaris(Properties properties) {
+    public synchronized GenericContainer<?> startPolaris(AfonPropertyProvider properties) {
         if (polaris == null) {
-            String googleCreds   = GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties);
-            String polarisId     = POLARIS_ID.getValueFrom(properties);
-            String polarisSecret = POLARIS_SECRET.getValueFrom(properties);
+            String googleCreds   = properties.getValue(GOOGLE_APPLICATION_CREDENTIALS);
+            String polarisId     = properties.getValue(POLARIS_ID);
+            String polarisSecret = properties.getValue(POLARIS_SECRET);
             polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
                 // Same network as KeyCloak so Polaris can reach it via the KEYCLOAK_ALIAS host name.
                 .withNetwork(network)
@@ -171,13 +164,13 @@ public class ContainerHelper {
                 .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
                 .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
             getPolarisProperties().forEach((x) -> {
-                polaris.withEnv(x.getName(), x.getValueFrom(properties));
+                polaris.withEnv(x.getName(), properties.getValue(x));
             });
             // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
             polarisOidcEnv(
                 internalRealmUrl(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL),
-                USER_POLARIS_ID.getValueFrom(properties),
-                USER_POLARIS_SECRET.getValueFrom(properties)).forEach(polaris::withEnv);
+                properties.getValue(USER_POLARIS_ID),
+                    properties.getValue(USER_POLARIS_SECRET)).forEach(polaris::withEnv);
             Map.of(
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
                    "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
@@ -196,7 +189,7 @@ public class ContainerHelper {
         return polaris;
     }
 
-    public synchronized void startTrino(Properties properties) {
+    public synchronized void startTrino(AfonPropertyProvider properties) {
         if (trino == null) {
             try {
                 trino = new GenericContainer<>("trinodb/trino@sha256:5b5e0a97f599a30a2e23c7c7061e4e4d546a914b4fad2a2a002998140ceb4006");
@@ -237,14 +230,14 @@ public class ContainerHelper {
     }
 
     public static String trinoLocalConfig(
-        Properties properties,
+        AfonPropertyProvider properties,
         AfonCloud catalog) {
         String polarisDomainName = "http://" + POLARIS_NETWORK_HOST + ":" + POLARIS_PORT;
         String keyCloakUrl       = tokenEndpoint(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL);
         logger.info("Trino sees Polaris as {} and KeyCloak as {}", polarisDomainName, keyCloakUrl);
         TrinoServerConfiguration trinoConfig = new KeyCloakTrinoServerConfiguration(
             polarisDomainName,
-            new GivenPropertyProvider(properties),
+            properties,
             // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
             keyCloakUrl
         );

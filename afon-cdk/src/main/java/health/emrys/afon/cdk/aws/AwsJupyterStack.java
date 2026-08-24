@@ -13,6 +13,7 @@ import health.emrys.afon.cdk.NetworkConfig;
 import health.emrys.afon.cdk.SparkConfig;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
@@ -22,10 +23,10 @@ import java.util.List;
 import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 public class AwsJupyterStack extends AwsPolarisStack {
 
@@ -136,9 +137,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
                        .dependsOn(eksDependOn)
                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                        .name("csi-secrets-store") // The release name
-                       .chart("secrets-store-csi-driver") // The chart name within the repository
-                       .version("1.5.4")
-                       .repository("https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts")
+                       .chart(vendoredChart(this, "csiDriverChart", "secrets-store-csi-driver-1.5.4.tgz"))
                        .namespace("kube-system") // Target Kubernetes namespace
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
                        .atomic(true) // If installation fails, completely uninstall the release
@@ -146,9 +145,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App(AppConfig.builder()
-                .outdir(cdktfDir())
-                .build());
+        final App app = createApp();
         new AwsJupyterStack(app, AWS, new FilePropertyProvider());
         app.synth();
     }
