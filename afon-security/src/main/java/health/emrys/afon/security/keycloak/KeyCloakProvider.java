@@ -2,6 +2,7 @@ package health.emrys.afon.security.keycloak;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.*;
+import health.emrys.afon.security.OAuthProvider;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -32,7 +33,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  *
  * Note: In KeyCloak parlance, client is an app and user is a human
  */
-public class KeyCloakProvider {
+public class KeyCloakProvider implements OAuthProvider {
 
     private static final Logger logger = getLogger(KeyCloakProvider.class);
 
@@ -91,6 +92,7 @@ public class KeyCloakProvider {
      * Registers the Polaris user with username and password provided, leaving
      * the email unset.
      */
+    @Override
     public void registerPolarisUser(String username, String password) {
         registerPolarisUser(AfonUserProvider.createUser(username, password));
     }
@@ -107,6 +109,7 @@ public class KeyCloakProvider {
      * "sign in" on the OAuth splash yields KeyCloak's "Client not found", and puts that browser flow
      * behind MFA (see {@link #configureMfa()}).
      */
+    @Override
     public void registerPolarisUserAndBrowserClient(AfonPropertyProvider properties) {
         registerPolarisUser(AfonUserProvider.createUser(
                 properties.getValue(AfonProperty.USER_POLARIS_ID),
@@ -124,6 +127,7 @@ public class KeyCloakProvider {
      * Ensures the Polaris realm, client and user all exist.
      * Idempotent: anything that already exists is left untouched.
      */
+    @Override
     public void registerPolarisUser(AfonUser user) {
         try {
             String adminToken = adminToken();
@@ -143,6 +147,7 @@ public class KeyCloakProvider {
      * against the {@code polaris} realm. The confidential client that {@link #createConfidentialClient}
      * created for this user shares the user's name and secret, hence the doubled credentials.
      */
+    @Override
     public String userToken(String username, String password) throws IOException {
         logger.info("Getting token for {}/{}", username, password);
         String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, KEYCLOAK_REALM);
@@ -175,6 +180,7 @@ public class KeyCloakProvider {
      * @return An access token for the admin REST API.
      * @throws IOException
      */
+    @Override
     public String adminToken() throws IOException {
         return getToken("master");
     }
@@ -186,6 +192,7 @@ public class KeyCloakProvider {
      * @return An access token
      * @throws IOException
      */
+    @Override
     public String getToken(String realm) throws IOException {
         String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, realm);
         String body = form(Map.of(
@@ -221,6 +228,7 @@ public class KeyCloakProvider {
      * already-existing one (created by an earlier deploy with the old 5-minute default) is updated to
      * these lifespans rather than left stale.
      */
+    @Override
     public void createRealm(String adminToken, String realm) throws IOException {
         String json = mapper.writeValueAsString(Map.of(
             "realm", realm,
@@ -245,6 +253,7 @@ public class KeyCloakProvider {
      * Creates a confidential client with direct access grants enabled so that the user's
      * username/password can be exchanged for a token.
      */
+    @Override
     public void createConfidentialClient(
         String adminToken,
         String realm,
@@ -349,6 +358,7 @@ public class KeyCloakProvider {
      * @param properties
      * @param jupyterDomain
      */
+    @Override
     public void registerBrowserClient(AfonPropertyProvider properties, String jupyterDomain) {
         registerBrowserClient(
                 properties.getValue(AfonProperty.OAUTH2_CLIENT_ID),
@@ -373,6 +383,7 @@ public class KeyCloakProvider {
      *                     {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
      *                     {@code https://jupyter.example/hub/oauth_callback} (JupyterHub).
      */
+    @Override
     public void registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris) {
         try {
             String adminToken = adminToken();
@@ -390,6 +401,7 @@ public class KeyCloakProvider {
      * Creates a confidential client for the OAuth2 authorization-code (browser) flow: standard flow
      * on, direct grants and service accounts off, with the given redirect URIs whitelisted.
      */
+    @Override
     public void createBrowserClient(String adminToken,
                                     String realm,
                                     String clientId,
@@ -445,6 +457,7 @@ public class KeyCloakProvider {
         }
     }
 
+    @Override
     public void configureMfa() {
         try {
             configureMfa(adminToken(), KEYCLOAK_REALM);
@@ -468,6 +481,7 @@ public class KeyCloakProvider {
      * bound to the copy. Idempotent: re-running against a converged realm re-copies nothing (the copy
      * 409s) and issues no execution updates.
      */
+    @Override
     public void configureMfa(String adminToken, String realm) throws IOException {
         requireOtpForBrowserLogins(adminToken, realm);
         skipOtpForDirectGrants(adminToken, realm);
@@ -599,6 +613,7 @@ public class KeyCloakProvider {
         }
     }
 
+    @Override
     public void createUser(String adminToken,
                            String realm,
                            AfonUser user
@@ -686,6 +701,7 @@ public class KeyCloakProvider {
     /**
      * Convenience check used by callers to wait until KeyCloak is serving requests.
      */
+    @Override
     public boolean isReady() {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpGet get = new HttpGet(format("%s/realms/master", baseUrl));

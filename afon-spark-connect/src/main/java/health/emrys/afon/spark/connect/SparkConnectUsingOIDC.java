@@ -1,19 +1,22 @@
 package health.emrys.afon.spark.connect;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.security.OAuthProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
+public class SparkConnectUsingOIDC extends SparkConnect {
 
-    private final String keyCloakToken;
+    private final OAuthProvider provider;
+    private final String token;
 
-    public KeyCloakSparkConnectUsingOIDC(AfonPropertyProvider properties) throws IOException {
+    public SparkConnectUsingOIDC(AfonPropertyProvider properties) throws IOException {
         super(properties);
-        keyCloakToken = new KeyCloakProvider(properties).userToken(getSparkUser(), getSparkPassword());
+        provider = new KeyCloakProvider(properties);
+        token = provider.userToken(getSparkUser(), getSparkPassword());
     }
 
     protected Map<String, String> getWarehouseConfig(String warehouseName,
@@ -26,7 +29,7 @@ public class KeyCloakSparkConnectUsingOIDC extends KeyCloakSparkConnect {
             .filter(x -> !x.getValue().contains(getSparkUser() + ":" + getSparkPassword()))
             .forEach(x -> warehouseConfig.put(x.getKey(), x.getValue()));
 
-        warehouseConfig.put(String.format("spark.sql.catalog.%s.token", warehouseName), keyCloakToken);
+        warehouseConfig.put(String.format("spark.sql.catalog.%s.token", warehouseName), token);
         return warehouseConfig;
     }
 }
