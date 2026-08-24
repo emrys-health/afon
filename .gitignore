@@ -1,8 +1,10 @@
 # Afon
 
-# this allows to ignore the symlink to $AFON_HOME:  ln -s $AFON_HOME home
-home
-.afon/
+# this allows to ignore the symlink to ~/.afon:  ln -s ~/.afon .
+.afon
+# this allows to ignore the symlink to ~/.kube:  ln -s ~/.kube .
+.kube
+
 logs/
 *-cleanup.sh
 
