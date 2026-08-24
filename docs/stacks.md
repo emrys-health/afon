@@ -146,11 +146,9 @@ If things go astray, you may leave the stack in an unstable state.
 Use the cleanup helpers to bring your environment to a clean and stable state:
 
 ```shell
-./afon.sh -a exec --exec-class cdk.aws.AwsCleanupHelper --exec-args aws-cleanup.sh
-./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper --exec-args azure-cleanup.sh
-./afon.sh -a exec --exec-class cdk.gcp.GcpCleanupHelper --exec-args gcp-cleanup.sh
+./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args <cloud>
 ```
-The cleanup helpers output shell scripts that you can run.
+You can run the generated cleanup scripts.
 You may need to run them multiple times for the VPC to disappear from your cloud.
 
 ### AWS

@@ -34,7 +34,7 @@ public class DeleteAzurePolarisStackDocument extends AbstractDocument {
             
             Generate and run cleanup script:
             ```shell
-            ./afon.sh -a exec --exec-class cdk.azure.AzureCleanupHelper --exec-args azure-cleanup.sh
+            ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args azure
             ```
             """);
     }

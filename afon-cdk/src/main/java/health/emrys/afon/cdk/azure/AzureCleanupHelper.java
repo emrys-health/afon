@@ -1,6 +1,6 @@
 package health.emrys.afon.cdk.azure;
 
-import health.emrys.afon.cdk.AbstractCleanupHelper;
+import health.emrys.afon.cdk.CleanupHelper;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
@@ -8,7 +8,7 @@ import org.jspecify.annotations.NonNull;
 
 import static java.lang.String.format;
 
-public class AzureCleanupHelper extends AbstractCleanupHelper {
+public class AzureCleanupHelper extends CleanupHelper {
 
     private final String jupyterDomainName;
     private final String polarisDomainName;
@@ -58,7 +58,7 @@ public class AzureCleanupHelper extends AbstractCleanupHelper {
 
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
-        outputCleanupCommands(args, new AzureCleanupHelper(properties).cleanupCommands());
+        outputCleanupCommands(new AzureCleanupHelper(properties).cleanupCommands(), args);
     }
 
 }
