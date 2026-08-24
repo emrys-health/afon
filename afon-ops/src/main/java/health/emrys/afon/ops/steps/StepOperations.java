@@ -23,6 +23,8 @@ import java.util.Properties;
 
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.ops.ManagePolarisCatalogsMain.DELETE;
+import static health.emrys.afon.ops.ManagePolarisCatalogsMain.RECREATE;
 import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
 import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
@@ -131,7 +133,7 @@ public class StepOperations {
             format("delete Polaris table `%s.%s` for domain `%s`", namespace, tableName, domainName),
             () -> actions.executeMainOf(
                 ManagePolarisCatalogsMain.class,
-                new String[]{"delete", domainName, catalog.name(), namespace, tableName},
+                new String[]{DELETE, domainName, catalog.name(), namespace, tableName},
                 NO_ENV_VARIABLES));
     }
 
@@ -188,7 +190,7 @@ public class StepOperations {
                 try {
                     actions.executeMainOf(
                             ManagePolarisCatalogsMain.class,
-                        new String[]{"recreate", domainName},
+                        new String[]{RECREATE, domainName},
                         NO_ENV_VARIABLES);
                 } catch (Exception e) {
                     logger.error(
