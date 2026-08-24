@@ -96,7 +96,7 @@ public abstract class PolarisConfiguration {
         }
     }
 
-    protected static @NonNull String polarisCredentials(AfonPropertyProvider properties) {
+    public static @NonNull String polarisCredentials(AfonPropertyProvider properties) {
         return properties.getValue(POLARIS_ID) + ":" + properties.getValue(POLARIS_SECRET);
     }
 

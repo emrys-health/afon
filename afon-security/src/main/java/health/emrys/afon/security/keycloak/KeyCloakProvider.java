@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -220,8 +221,10 @@ public class KeyCloakProvider {
      * <p>Upserts rather than create-if-absent: the realm outlives a cluster rebuild, so an
      * already-existing one (created by an earlier deploy with the old 5-minute default) is updated to
      * these lifespans rather than left stale.
+     *
+     * @return
      */
-    public void createRealm(String adminToken, String realm) throws IOException {
+    public HttpResponse createRealm(String adminToken, String realm) throws IOException {
         String json = mapper.writeValueAsString(Map.of(
             "realm", realm,
             "enabled", true,
@@ -239,13 +242,14 @@ public class KeyCloakProvider {
         } else if (isFailure(created)) {
             logger.warn("Could not create KeyCloak realm '{}'", realm);
         }
+        return created;
     }
 
     /**
      * Creates a confidential client with direct access grants enabled so that the user's
      * username/password can be exchanged for a token.
      */
-    public void createConfidentialClient(
+    public HttpResponse createConfidentialClient(
         String adminToken,
         String realm,
         String clientId,
@@ -278,7 +282,7 @@ public class KeyCloakProvider {
         // A client_credentials grant carries preferred_username="service-account-<clientId>", which is
         // not a Polaris principal. Stamp the bare clientId onto the dedicated 'polaris_principal' claim
         // Polaris maps on, so this service client resolves to its bootstrapped principal (e.g. "root").
-        ensureClientMapper(adminToken, realm, clientId, hardcodedPrincipalMapper(clientId));
+        return ensureClientMapper(adminToken, realm, clientId, hardcodedPrincipalMapper(clientId));
     }
 
     /** The dedicated claim Polaris reads the principal name from (see KeyCloakHelper). */
@@ -327,16 +331,16 @@ public class KeyCloakProvider {
      * client PUT does not reliably update mappers on an existing client, so mappers are managed here
      * on their own endpoint; an already-present mapper (409) is left as-is.
      */
-    private void ensureClientMapper(String adminToken, String realm, String clientId,
-                                    Map<String, Object> mapper) throws IOException {
+    private HttpResponse ensureClientMapper(String adminToken, String realm, String clientId,
+                                            Map<String, Object> mapper) throws IOException {
         String uuid = clientUuid(adminToken, realm, clientId);
         if (uuid == null) {
             logger.warn("Cannot attach protocol mapper: client {} not found", clientId);
-            return;
+            return null;
         }
         String uri  = format("%s/admin/realms/%s/clients/%s/protocol-mappers/models", baseUrl, realm, uuid);
         String json = this.mapper.writeValueAsString(mapper);
-        postJson(adminToken, uri, json, "protocol mapper " + mapper.get("name") + " on " + clientId);
+        return postJson(adminToken, uri, json, "protocol mapper " + mapper.get("name") + " on " + clientId);
     }
 
     private boolean isFailure(HttpResponse response) {
@@ -348,9 +352,10 @@ public class KeyCloakProvider {
      *
      * @param properties
      * @param jupyterDomain
+     * @return
      */
-    public void registerBrowserClient(AfonPropertyProvider properties, String jupyterDomain) {
-        registerBrowserClient(
+    public List<HttpResponse> registerBrowserClient(AfonPropertyProvider properties, String jupyterDomain) {
+        return registerBrowserClient(
                 properties.getValue(AfonProperty.OAUTH2_CLIENT_ID),
                 properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET),
                 List.of(
@@ -372,30 +377,36 @@ public class KeyCloakProvider {
      * @param redirectUris the exact callback URLs, e.g.
      *                     {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
      *                     {@code https://jupyter.example/hub/oauth_callback} (JupyterHub).
+     * @return
      */
-    public void registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris) {
+    public List<HttpResponse> registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris) {
+        List<HttpResponse> responses = new ArrayList<>();
         try {
             String adminToken = adminToken();
-            createRealm(adminToken, KEYCLOAK_REALM);
-            createBrowserClient(adminToken, KEYCLOAK_REALM, clientId, clientSecret, redirectUris);
+            responses.add(createRealm(adminToken, KEYCLOAK_REALM));
+            responses.addAll(createBrowserClient(adminToken, KEYCLOAK_REALM, clientId, clientSecret, redirectUris));
             logger.info(
                 "KeyCloak realm '{}' provisioned with browser client '{}' (redirects {})",
                 KEYCLOAK_REALM, clientId, redirectUris);
         } catch (IOException e) {
             throw new RuntimeException("Failed to provision KeyCloak browser client", e);
         }
+        return responses;
     }
 
     /**
      * Creates a confidential client for the OAuth2 authorization-code (browser) flow: standard flow
      * on, direct grants and service accounts off, with the given redirect URIs whitelisted.
+     *
+     * @return
      */
-    public void createBrowserClient(String adminToken,
-                                    String realm,
-                                    String clientId,
-                                    String clientSecret,
-                                    List<String> redirectUris
+    public List<HttpResponse> createBrowserClient(String adminToken,
+                                                  String realm,
+                                                  String clientId,
+                                                  String clientSecret,
+                                                  List<String> redirectUris
     ) throws IOException {
+        List<HttpResponse> responses = new ArrayList<>();
         String json = mapper.writeValueAsString(Map.ofEntries(
             Map.entry("clientId", clientId),
             Map.entry("secret", clientSecret),
@@ -411,43 +422,47 @@ public class KeyCloakProvider {
         ));
         HttpResponse created = postJson(
             adminToken, format("%s/admin/realms/%s/clients", baseUrl, realm), json, "browser client " + clientId);
+        responses.add(created);
         if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
             // KeyCloak's DB outlives the cluster, so a client provisioned by an earlier deploy survives
             // with whatever redirect URIs it was created with. Creating-if-absent would leave those
             // stale — the browser then arrives with an unregistered redirect_uri and KeyCloak rejects
             // the login with "Invalid parameter: redirect_uri". Overwrite so the client converges on
             // the URIs this deploy actually uses.
-            updateBrowserClient(adminToken, realm, clientId, json);
+            responses.add(updateBrowserClient(adminToken, realm, clientId, json));
         } else if (isFailure(created)) {
             logger.warn("Could not create browser client {}", clientId);
         }
         // Human logins go through this client; copy their username into the claim Polaris maps on so
         // the captured login token resolves to that user's Polaris principal (e.g. "will").
-        ensureClientMapper(adminToken, realm, clientId, usernamePrincipalMapper());
+        responses.add(ensureClientMapper(adminToken, realm, clientId, usernamePrincipalMapper()));
+        return responses;
     }
 
     /**
      * Overwrites an existing client's representation, looking up its internal UUID by {@code clientId}
      * (the admin API keys updates on the UUID, not the human-readable client ID).
      */
-    private void updateBrowserClient(String adminToken, String realm, String clientId, String json)
+    private HttpResponse updateBrowserClient(String adminToken, String realm, String clientId, String json)
         throws IOException {
         String uuid = clientUuid(adminToken, realm, clientId);
         if (uuid == null) {
             logger.warn("Browser client {} reported as existing but could not be looked up", clientId);
-            return;
+            return null;
         }
         String uri = format("%s/admin/realms/%s/clients/%s", baseUrl, realm, uuid);
-        if (isFailure(putJson(adminToken, uri, json, "browser client " + clientId))) {
+        HttpResponse response = putJson(adminToken, uri, json, "browser client " + clientId);
+        if (isFailure(response)) {
             logger.warn("Could not update browser client {}", clientId);
         } else {
             logger.info("Updated existing KeyCloak browser client {}", clientId);
         }
+        return response;
     }
 
-    public void configureMfa() {
+    public List<HttpResponse> configureMfa() {
         try {
-            configureMfa(adminToken(), KEYCLOAK_REALM);
+            return configureMfa(adminToken(), KEYCLOAK_REALM);
         } catch (IOException e) {
             throw new RuntimeException("Failed to configure MFA on KeyCloak", e);
         }
@@ -467,34 +482,45 @@ public class KeyCloakProvider {
      * <p>KeyCloak refuses to modify its own built-in flows, so each is copied first and the realm
      * bound to the copy. Idempotent: re-running against a converged realm re-copies nothing (the copy
      * 409s) and issues no execution updates.
+     *
+     * @return the HTTP responses from the configuration calls.
      */
-    public void configureMfa(String adminToken, String realm) throws IOException {
-        requireOtpForBrowserLogins(adminToken, realm);
-        skipOtpForDirectGrants(adminToken, realm);
+    public List<HttpResponse> configureMfa(String adminToken, String realm) throws IOException {
+        List<HttpResponse> responses = new  ArrayList<>();
+        responses.addAll(requireOtpForBrowserLogins(adminToken, realm));
+        responses.addAll(skipOtpForDirectGrants(adminToken, realm));
+        return responses;
     }
 
-    /** Binds the realm to a browser flow whose OTP step is mandatory rather than opt-in. */
-    private void requireOtpForBrowserLogins(String adminToken, String realm) throws IOException {
-        copyFlow(adminToken, realm, DefaultAuthenticationFlows.BROWSER_FLOW, BROWSER_MFA_FLOW);
+    /**
+     * Binds the realm to a browser flow whose OTP step is mandatory rather than opt-in.
+     */
+    private List<HttpResponse> requireOtpForBrowserLogins(String adminToken, String realm) throws IOException {
+        List<HttpResponse> responses = new  ArrayList<>();
+        responses.add(copyFlow(adminToken, realm, DefaultAuthenticationFlows.BROWSER_FLOW, BROWSER_MFA_FLOW));
         List<Map<String, Object>> changed =
             KeyCloakMfa.requireOtp(flowExecutions(adminToken, realm, BROWSER_MFA_FLOW));
-        updateFlowExecutions(adminToken, realm, BROWSER_MFA_FLOW, changed);
-        bindFlow(adminToken, realm, "browserFlow", BROWSER_MFA_FLOW);
+        responses.addAll(updateFlowExecutions(adminToken, realm, BROWSER_MFA_FLOW, changed));
+        responses.add(bindFlow(adminToken, realm, "browserFlow", BROWSER_MFA_FLOW));
         logger.info(
             "KeyCloak realm '{}' browser flow '{}' requires OTP ({} execution(s) updated)",
             realm, BROWSER_MFA_FLOW, changed.size());
+        return responses;
     }
 
-    /** Binds the realm to a direct-grant flow with no OTP step, so headless logins keep working. */
-    private void skipOtpForDirectGrants(String adminToken, String realm) throws IOException {
+    /**
+     * Binds the realm to a direct-grant flow with no OTP step, so headless logins keep working.
+     */
+    private List<HttpResponse> skipOtpForDirectGrants(String adminToken, String realm) throws IOException {
         copyFlow(adminToken, realm, DefaultAuthenticationFlows.DIRECT_GRANT_FLOW, DIRECT_GRANT_NO_OTP_FLOW);
         List<Map<String, Object>> changed =
             KeyCloakMfa.skipOtp(flowExecutions(adminToken, realm, DIRECT_GRANT_NO_OTP_FLOW));
-        updateFlowExecutions(adminToken, realm, DIRECT_GRANT_NO_OTP_FLOW, changed);
-        bindFlow(adminToken, realm, "directGrantFlow", DIRECT_GRANT_NO_OTP_FLOW);
+        List<HttpResponse> responses = updateFlowExecutions(adminToken, realm, DIRECT_GRANT_NO_OTP_FLOW, changed);
+        responses.add(bindFlow(adminToken, realm, "directGrantFlow", DIRECT_GRANT_NO_OTP_FLOW));
         logger.info(
             "KeyCloak realm '{}' direct grant flow '{}' skips OTP ({} execution(s) updated)",
             realm, DIRECT_GRANT_NO_OTP_FLOW, changed.size());
+        return responses;
     }
 
     /**
@@ -502,11 +528,11 @@ public class KeyCloakProvider {
      * which the caller then converges rather than replaces - deleting and re-copying would leave the
      * realm bound to a missing flow in between.
      */
-    private void copyFlow(String adminToken, String realm, String from, String to) throws IOException {
+    private HttpResponse copyFlow(String adminToken, String realm, String from, String to) throws IOException {
         String uri = format(
             "%s/admin/realms/%s/authentication/flows/%s/copy",
             baseUrl, realm, pathSegment(from));
-        postJson(adminToken, uri, mapper.writeValueAsString(Map.of("newName", to)), "copy of flow " + from);
+        return postJson(adminToken, uri, mapper.writeValueAsString(Map.of("newName", to)), "copy of flow " + from);
     }
 
     /**
@@ -540,29 +566,39 @@ public class KeyCloakProvider {
      * Writes changed executions back, in the order given. The admin API keys these on the execution's
      * own id carried in the body, so each whole representation is PUT to the flow's executions
      * collection.
+     *
+     * @return
      */
-    private void updateFlowExecutions(String adminToken, String realm, String flowAlias,
-                                      List<Map<String, Object>> executions) throws IOException {
+    private List<HttpResponse> updateFlowExecutions(String adminToken, String realm, String flowAlias,
+                                                    List<Map<String, Object>> executions) throws IOException {
         String uri = format("%s/admin/realms/%s/authentication/flows/%s/executions",
                             baseUrl, realm, pathSegment(flowAlias));
+        List<HttpResponse> responses = new ArrayList<>();
         for (Map<String, Object> execution : executions) {
             String what = execution.get("displayName") + " -> " + execution.get("requirement");
-            if (isFailure(putJson(adminToken, uri, mapper.writeValueAsString(execution), "execution " + what))) {
+            HttpResponse response = putJson(adminToken, uri, mapper.writeValueAsString(execution), "execution " + what);
+            responses.add(response);
+            if (isFailure(response)) {
                 throw new IOException("Could not set KeyCloak flow execution " + what);
             }
         }
+        return responses;
     }
 
     /**
      * Points one of the realm's flow bindings at a flow. Done after that flow's executions are set, so
      * there is no window in which logins run a half-converged flow.
+     *
+     * @return
      */
-    private void bindFlow(String adminToken, String realm, String binding, String flowAlias) throws IOException {
+    private HttpResponse bindFlow(String adminToken, String realm, String binding, String flowAlias) throws IOException {
         String json = mapper.writeValueAsString(Map.of("realm", realm, binding, flowAlias));
-        if (isFailure(putJson(adminToken, format("%s/admin/realms/%s", baseUrl, realm), json, "realm " + realm))) {
+        HttpResponse response = putJson(adminToken, format("%s/admin/realms/%s", baseUrl, realm), json, "realm " + realm);
+        if (isFailure(response)) {
             throw new IOException(format(
                 "Could not bind KeyCloak realm %s %s to flow %s", realm, binding, flowAlias));
         }
+        return response;
     }
 
     /** The internal UUID KeyCloak assigns a client, or null when no such client exists. */
@@ -599,9 +635,9 @@ public class KeyCloakProvider {
         }
     }
 
-    public void createUser(String adminToken,
-                           String realm,
-                           AfonUser user
+    public HttpResponse createUser(String adminToken,
+                                   String realm,
+                                   AfonUser user
     ) throws IOException {
         Map<String, Object> userObject = new HashMap<>();
         userObject.put("username", user.username());
@@ -624,8 +660,9 @@ public class KeyCloakProvider {
                 "value", user.password(),
                 "temporary", false
             )));
-        String json = mapper.writeValueAsString(userObject);
-        int    code = postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + user.username()).getCode();
+        String       json     = mapper.writeValueAsString(userObject);
+        HttpResponse response = postJson(adminToken, format("%s/admin/realms/%s/users", baseUrl, realm), json, "user " + user.username());
+        int          code     = response.getCode();
         // A 409 on POST /users is ambiguous: it means the username already exists (genuinely
         // idempotent - fine) OR that some other unique field collides, typically a duplicate email
         // when the realm has duplicateEmailsAllowed=false. In the latter case the user is NOT created,
@@ -637,6 +674,7 @@ public class KeyCloakProvider {
                 + "username exists. The email '%s' is most likely already held by another user "
                 + "(realm duplicateEmailsAllowed=false).", user.username(), realm, user.email()));
         }
+        return response;
     }
 
     /**
