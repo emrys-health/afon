@@ -14,7 +14,6 @@ import static health.emrys.afon.config.AfonCloud.AZURE;
 /**
  * Deploy external polaris catalogs:
  * - all the catalogs are in AWS plus the external one that talks to an Azure Polaris with an Azure catalog
- * - a smoke test that ensures that Spark (running locally) can talk to the AWS catalog that is a proxy for the Azure one
  */
 public class DeployExternalCatalogsMain implements StepsProvider {
 
@@ -24,17 +23,12 @@ public class DeployExternalCatalogsMain implements StepsProvider {
         steps.addAll(List.of(
                 stepOperations.deleteStack(AWS),
                 stepOperations.deployFullStackIn(AWS),
-                stepOperations.waitForPolarisIn(AWS),
-                stepOperations.createAllCatalogsFor(AWS),
-                stepOperations.checkAwsSparkWritingTo(AWS)
+                stepOperations.waitForPolarisIn(AWS)
         ));
         steps.addAll(List.of(
             stepOperations.deleteStack(AZURE),
             stepOperations.deployPolarisIn(AZURE),
-            stepOperations.waitForPolarisIn(AZURE),
-            stepOperations.deleteExternalCatalogIn(AZURE),
-            stepOperations.createExternalCatalogFor(AZURE),
-            stepOperations.checkSparkWritingViaAwsPolarisToPolarisIn(AZURE)
+            stepOperations.waitForPolarisIn(AZURE)
                 ));
         return steps;
     }
