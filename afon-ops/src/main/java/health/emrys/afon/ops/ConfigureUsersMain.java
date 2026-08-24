@@ -3,10 +3,13 @@ package health.emrys.afon.ops;
 import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
+import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
@@ -27,29 +30,36 @@ public class ConfigureUsersMain {
         this.polarisUsers = new ConfigurePolarisUsersMain(propertyProvider);
     }
 
-    public void configureKeyCloak(String jupyterDomain) throws IOException {
+    public List<HttpResponse> configureKeyCloak(String jupyterDomain) throws IOException {
         logger.info("Configuring KeyCloak users for jupyter domain {}", jupyterDomain);
-        keyCloakProvider.registerBrowserClient(propertyProvider, jupyterDomain);
+        List<HttpResponse> responses = new ArrayList<>();
+        responses.addAll(keyCloakProvider.registerBrowserClient(propertyProvider, jupyterDomain));
         String adminToken = keyCloakProvider.adminToken();
-        keyCloakProvider.createRealm(adminToken, KEYCLOAK_REALM);
+        responses.add(keyCloakProvider.createRealm(adminToken, KEYCLOAK_REALM));
         for (AfonUser user : userProvider.getUsers()) {
-            keyCloakProvider.createUser(adminToken, KEYCLOAK_REALM, user);
-            keyCloakProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
+            responses.add(keyCloakProvider.createUser(adminToken, KEYCLOAK_REALM, user));
+            responses.add(keyCloakProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
         }
         // Last, so that the realm is only bound to its MFA flows once the users who must pass through
         // them exist.
-        keyCloakProvider.configureMfa();
+        responses.addAll(keyCloakProvider.configureMfa());
+        return responses;
     }
 
-    public void configurePolaris(String catalogName) throws IncorrectConfigException, IOException {
+    public List<HttpResponse> configurePolaris(String catalogName) throws IncorrectConfigException, IOException {
         logger.info("Configuring Polaris catalog {} and users", catalogName);
-        polarisUsers.configureCatalog(catalogName);
-        polarisUsers.configureUsers(catalogName, userProvider);
+        List<HttpResponse> responses = new ArrayList<>();
+        responses.addAll(polarisUsers.configureCatalog(catalogName));
+        responses.addAll(polarisUsers.configureUsers(catalogName, userProvider));
+        return responses;
     }
 
-    public void configureUsers(String jupyterDomain, String catalogName) throws IOException, IncorrectConfigException {
-        configureKeyCloak(jupyterDomain);
-        configurePolaris(catalogName);
+    public List<HttpResponse> configureUsers(String jupyterDomain, String catalogName) throws IOException, IncorrectConfigException, InterruptedException {
+        List<HttpResponse> responses = new  ArrayList<>();
+        responses.addAll(configureKeyCloak(jupyterDomain));
+        Thread.sleep(1000L); // yuck! But KeyClaok appears to asynchronously register users
+        responses.addAll(configurePolaris(catalogName));
+        return responses;
     }
 
     public static void main(String[] args) {
