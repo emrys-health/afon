@@ -18,31 +18,31 @@ public class ConfigureUsersMain {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigureUsersMain.class);
 
-    private final AfonUserProvider userProvider;
-    private final AfonPropertyProvider propertyProvider;
-    private final KeyCloakProvider keyCloakProvider;
+    private final AfonUserProvider          userProvider;
+    private final AfonPropertyProvider      propertyProvider;
+    private final KeyCloakProvider          oauthProvider;
     private final ConfigurePolarisUsersMain polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
-        this.userProvider = userProvider;
+        this.userProvider     = userProvider;
         this.propertyProvider = propertyProvider;
-        this.keyCloakProvider = new KeyCloakProvider(propertyProvider);
-        this.polarisUsers = new ConfigurePolarisUsersMain(propertyProvider);
+        this.oauthProvider    = new KeyCloakProvider(propertyProvider);
+        this.polarisUsers     = new ConfigurePolarisUsersMain(propertyProvider);
     }
 
     public List<HttpResponse> configureKeyCloak(String jupyterDomain) throws IOException {
         logger.info("Configuring KeyCloak users for jupyter domain {}", jupyterDomain);
         List<HttpResponse> responses = new ArrayList<>();
-        responses.addAll(keyCloakProvider.registerBrowserClient(propertyProvider, jupyterDomain));
-        String adminToken = keyCloakProvider.adminToken();
-        responses.add(keyCloakProvider.createRealm(adminToken, KEYCLOAK_REALM));
+        responses.addAll(oauthProvider.registerBrowserClient(propertyProvider, jupyterDomain));
+        String adminToken = oauthProvider.adminToken();
+        responses.add(oauthProvider.createRealm(adminToken, KEYCLOAK_REALM));
         for (AfonUser user : userProvider.getUsers()) {
-            responses.add(keyCloakProvider.createUser(adminToken, KEYCLOAK_REALM, user));
-            responses.add(keyCloakProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
+            responses.add(oauthProvider.createUser(adminToken, KEYCLOAK_REALM, user));
+            responses.add(oauthProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
         }
         // Last, so that the realm is only bound to its MFA flows once the users who must pass through
         // them exist.
-        responses.addAll(keyCloakProvider.configureMfa());
+        responses.addAll(oauthProvider.configureMfa());
         return responses;
     }
 
@@ -55,7 +55,7 @@ public class ConfigureUsersMain {
     }
 
     public List<HttpResponse> configureUsers(String jupyterDomain, String catalogName) throws IOException, IncorrectConfigException, InterruptedException {
-        List<HttpResponse> responses = new  ArrayList<>();
+        List<HttpResponse> responses = new ArrayList<>();
         responses.addAll(configureKeyCloak(jupyterDomain));
         Thread.sleep(1000L); // yuck! But KeyClaok appears to asynchronously register users
         responses.addAll(configurePolaris(catalogName));
@@ -67,18 +67,18 @@ public class ConfigureUsersMain {
             logger.warn("{} requires following args: polaris-domain catalog-name jupyter-domain", ConfigureUsersMain.class.getName());
             return;
         }
-        String polarisDomain = args[0];
-        String catalogName = args[1];
-        String jupyterDomain = args[2];
-        var userProvider = new FileUserProvider();
-        var propertyProvider = new FilePropertyProvider();
+        String polarisDomain    = args[0];
+        String catalogName      = args[1];
+        String jupyterDomain    = args[2];
+        var    userProvider     = new FileUserProvider();
+        var    propertyProvider = new FilePropertyProvider();
         propertyProvider.setValue(POLARIS_ENDPOINT, polarisDomain);
         var app = new ConfigureUsersMain(userProvider, propertyProvider);
         try {
             app.configureUsers(jupyterDomain, catalogName);
         } catch (Exception e) {
             logger.error("Failed to configure KeyCloak users {}: {}",
-                    app.userProvider.getUserNames(), e.getMessage(), e);
+                         app.userProvider.getUserNames(), e.getMessage(), e);
             throw new RuntimeException(e);
         }
     }
