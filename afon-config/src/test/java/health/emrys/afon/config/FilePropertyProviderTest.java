@@ -29,6 +29,48 @@ public class FilePropertyProviderTest {
     }
 
     @Test
+    public void canOverridePropertyValueAfterLoad() {
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
+        AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
+        assertThat(provider.hasProperty(polarisEndpoint)).isTrue();
+        assertThat(provider.getValue(polarisEndpoint)).isEqualTo("localhost:8181"); // default value
+        provider.setValue(polarisEndpoint, "localhost:8182");
+        assertThat(provider.getValue(polarisEndpoint)).isEqualTo("localhost:8182"); // overridden value
+    }
+
+
+    @Test
+    public void canOverridePropertyValueBySystemPropertyUponLoad() {
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
+        try {
+            System.setProperty(AfonProperty.POLARIS_ENDPOINT.getName(), "localhost:8182"); // overridden value
+            AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
+            assertThat(provider.hasProperty(polarisEndpoint)).isTrue();
+            assertThat(provider.getValue(polarisEndpoint)).isEqualTo("localhost:8182");
+        } finally {
+            System.clearProperty(AfonProperty.POLARIS_ENDPOINT.getName());
+        }
+    }
+
+    @Test
+    public void canSetPropertyValueAfterLoad() {
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR, List.of("empty"));
+        AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
+        assertThat(provider.hasProperty(polarisEndpoint)).isFalse();
+        provider.setValue(polarisEndpoint, "localhost:8182");
+        assertThat(provider.getValue(polarisEndpoint)).isEqualTo("localhost:8182");
+    }
+
+    @Test
+    public void cannotSetPropertyValueIfImmutable() {
+        AfonPropertyProvider provider = new ImmutablePropertyProvider(new FilePropertyProvider(CONFIG_DIR, List.of("empty")));
+        AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
+        assertThat(provider.hasProperty(polarisEndpoint)).isFalse();
+        provider.setValue(polarisEndpoint, "localhost:8182");
+        assertThat(provider.hasProperty(polarisEndpoint)).isFalse();
+    }
+
+    @Test
     public void canGetAllProperties() {
         AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         checkAllProperties(provider.getProperties());

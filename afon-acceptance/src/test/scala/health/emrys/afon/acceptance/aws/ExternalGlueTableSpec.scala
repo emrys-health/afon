@@ -18,19 +18,19 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 @External
 class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
 
+  val properties = AcceptanceTestConfig.instance.getProperties
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
-  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken
 
   "An external table" should {
-    val properties        = new FilePropertyProvider().getProperties
-    val glueCatalogName   = GLUE_CATALOG_NAME.getValueFrom(properties)
-    val externalBucket    = AWS_S3_EXTERNAL_BUCKET_NAME.getValueFrom(properties)
+    val glueCatalogName   = properties.getValue(GLUE_CATALOG_NAME)
+    val externalBucket    = properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME)
     val glueCatalog       = new GlueAwsPolarisCatalog(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, glueCatalog, Some(glueCatalog.catalogName()))
     val catalogRoles      = new CatalogRoles(this, glueCatalog, Some(glueCatalog.catalogName))
     val tableName         = "DatumAccTest2"
     val sparkNamespace    = "ph_glue_iceberg_db"
-    val awsRegion         = AWS_REGION.getValueFrom(properties)
+    val awsRegion         = properties.getValue(AWS_REGION)
 
     "be visible to our Polaris" in {
       Given(f"a bucket called $externalBucket and somebody has run the command:\n${ExternalGlueTableSpec.glueCmdLine(

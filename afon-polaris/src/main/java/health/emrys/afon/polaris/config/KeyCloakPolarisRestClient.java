@@ -1,6 +1,6 @@
 package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.jspecify.annotations.NonNull;
@@ -11,7 +11,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
@@ -39,9 +38,8 @@ public class KeyCloakPolarisRestClient extends PolarisRestClient {
 
     private static final Logger logger = getLogger(KeyCloakPolarisRestClient.class);
 
-    private static @NonNull String tokenEndpointFor(Properties properties) {
-        String kcHostname = KC_HOSTNAME.getValueFrom(properties);
-        return tokenEndpoint(kcHostname, protocolFor(kcHostname));
+    private static @NonNull String tokenEndpointFor(AfonPropertyProvider properties) {
+        return tokenEndpointFor(properties.getValue(KC_HOSTNAME));
     }
 
     private static @NonNull String tokenEndpointFor(String kcHostname) {
@@ -50,24 +48,14 @@ public class KeyCloakPolarisRestClient extends PolarisRestClient {
 
     private final String keyCloakTokenUri;
 
-    KeyCloakPolarisRestClient(Properties properties) {
-        super(format("%s://%s", "http", POLARIS_ENDPOINT.getValueFrom(properties)),
-                     POLARIS_ID.getValueFrom(properties),
-                     POLARIS_SECRET.getValueFrom(properties));
-        this.keyCloakTokenUri = tokenEndpointFor(properties);
+    public KeyCloakPolarisRestClient(AfonPropertyProvider properties) {
+        this(properties, protocolFor(properties.getValue(POLARIS_ENDPOINT)));
     }
 
-    KeyCloakPolarisRestClient(String polarisHost, Properties properties) {
-        super(format("%s://%s", protocolFor(polarisHost), polarisHost),
-                     POLARIS_ID.getValueFrom(properties),
-                     POLARIS_SECRET.getValueFrom(properties));
-        this.keyCloakTokenUri = tokenEndpointFor(properties);
-    }
-
-    KeyCloakPolarisRestClient(Properties properties, String protocol) {
-        super(format("%s://%s", protocol, POLARIS_ENDPOINT.getValueFrom(properties)),
-                     POLARIS_ID.getValueFrom(properties),
-                     POLARIS_SECRET.getValueFrom(properties));
+    public KeyCloakPolarisRestClient(AfonPropertyProvider properties, String protocol) {
+        super(format("%s://%s", protocol, properties.getValue(POLARIS_ENDPOINT)),
+                properties.getValue(POLARIS_ID),
+                properties.getValue(POLARIS_SECRET));
         this.keyCloakTokenUri = tokenEndpointFor(properties);
     }
 
@@ -100,11 +88,6 @@ public class KeyCloakPolarisRestClient extends PolarisRestClient {
               .append(URLEncoder.encode(v, StandardCharsets.UTF_8));
         });
         return sb.toString();
-    }
-
-    public static void main(String[] args) {
-        KeyCloakPolarisRestClient app = new KeyCloakPolarisRestClient(new FilePropertyProvider().getProperties());
-        logger.info("access token: {}", app.getAccessToken());
     }
 
 }

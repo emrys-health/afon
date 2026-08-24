@@ -9,6 +9,7 @@ import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicClassicHttpRequest;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -41,6 +42,10 @@ public class PolarisRestClient {
         this.endpoint     = endpoint;
         this.clientId     = clientId;
         this.clientSecret = ***REMOVED***
+    }
+
+    public static boolean isFailure(HttpResponse response) {
+        return response == null || response.getCode() / 100 != 2;
     }
 
     /**

@@ -25,14 +25,14 @@ import uk.co.odinconsultants.documentation_utils.SpecPretifier
 @External
 class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
+  val properties  = AcceptanceTestConfig.instance.getProperties
   val client      = AcceptanceTestConfig.instance.getPolarisAdminClient
-  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
+  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken
 
   val FEDERATED_CATALOG_NAME = "phdbx"
 
   "An external table" should {
-    val properties        = new FilePropertyProvider().getProperties
-    properties.setProperty(AZURE_BUCKET.getName, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
+    properties.setValue(AZURE_BUCKET, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
     val config            = new AzurePolarisCatalog(properties)
     val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
     val catalogRoles      = new acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
@@ -41,7 +41,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
     "be visible to our Polaris" in {
       Given(f"a Unity catalog called $FEDERATED_CATALOG_NAME already exists")
-      val databricksToken = DATABRICKS_TOKEN.getValueFrom(properties)
+      val databricksToken = properties.getValue(DATABRICKS_TOKEN)
       val json: String = externalCatalogJson(config, databricksToken)
       val uri: String  = PolarisConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")

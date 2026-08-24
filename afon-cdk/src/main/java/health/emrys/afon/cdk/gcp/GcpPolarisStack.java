@@ -1,7 +1,6 @@
 package health.emrys.afon.cdk.gcp;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZone;
 import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZoneConfig;
@@ -24,7 +23,6 @@ import java.util.Optional;
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
 import static health.emrys.afon.config.AfonCloud.GCP;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 public class GcpPolarisStack extends GcpKubernetesStack {
 
@@ -79,9 +77,7 @@ public class GcpPolarisStack extends GcpKubernetesStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App(AppConfig.builder()
-                .outdir(cdktfDir())
-                .build());
+        final App app = createApp();
         AfonPropertyProvider properties = new FilePropertyProvider();
         new GcpPolarisStack(app, GCP, properties);
         app.synth();

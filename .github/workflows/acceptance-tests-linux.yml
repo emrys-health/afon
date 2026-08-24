@@ -21,8 +21,12 @@ on:
         default: all
   push:
     branches: [main]
+    paths:
+      - "afon-*/**"
   pull_request:
     branches: [main]
+    paths:
+      - "afon-*/**"
   schedule:
     - cron: "0 3 * * *"
 
@@ -44,6 +48,8 @@ env:
 
 jobs:
   acceptance:
+    # only allow manual trigger until runner issues are sorted
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 120
     defaults:

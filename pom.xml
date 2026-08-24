@@ -43,6 +43,7 @@
     <properties>
         <!-- afon system properties -->
         <afon.home>${env.HOME}/.afon</afon.home>
+        <afon.cdktf>${afon.home}/cdktf</afon.cdktf>
         <afon.cloud></afon.cloud>
         <afon.logging>INFO</afon.logging>
         <!-- OFF keeps the console quiet and logs to the file only. -->

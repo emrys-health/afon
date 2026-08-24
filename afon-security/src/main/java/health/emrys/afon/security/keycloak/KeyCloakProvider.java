@@ -105,7 +105,7 @@ public class KeyCloakProvider {
      *
      * Provisions the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
      * "sign in" on the OAuth splash yields KeyCloak's "Client not found", and puts that browser flow
-     * behind MFA (see {@link #configureMfa(AfonPropertyProvider)}).
+     * behind MFA (see {@link #configureMfa()}).
      */
     public void registerPolarisUserAndBrowserClient(AfonPropertyProvider properties) {
         registerPolarisUser(AfonUserProvider.createUser(
@@ -707,24 +707,5 @@ public class KeyCloakProvider {
         });
         return sb.toString();
     }
-
-    /**
-     * Allows the realm/client/user to be provisioned independently of the containers, e.g. against an
-     * already-running KeyCloak.
-     */
-    public static void main(String[] args) {
-        AfonPropertyProvider properties = new FilePropertyProvider();
-        KeyCloakProvider keyCloakProvider = new KeyCloakProvider(properties);
-        if (args.length == 1) {
-            String username = args[0];
-            AfonUser user = new FileUserProvider().getUser(username);
-            logger.info("Registering user {} from UserProvider", username);
-            keyCloakProvider.registerPolarisUser(user);
-        } else {
-            logger.info("Registering user and client from properties");
-            keyCloakProvider.registerPolarisUserAndBrowserClient(properties);
-        }
-    }
-
 
 }

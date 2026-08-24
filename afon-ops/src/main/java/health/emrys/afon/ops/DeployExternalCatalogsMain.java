@@ -25,15 +25,15 @@ public class DeployExternalCatalogsMain implements StepsProvider {
                 stepOperations.deleteStack(AWS),
                 stepOperations.deployFullStackIn(AWS),
                 stepOperations.waitForPolarisIn(AWS),
-                stepOperations.initializeAllCatalogsIn(AWS),
+                stepOperations.createAllCatalogsFor(AWS),
                 stepOperations.checkAwsSparkWritingTo(AWS)
         ));
         steps.addAll(List.of(
             stepOperations.deleteStack(AZURE),
             stepOperations.deployPolarisIn(AZURE),
             stepOperations.waitForPolarisIn(AZURE),
-            stepOperations.purgeForeignCatalogFrom(AZURE),
-            stepOperations.createForeignCatalogIn(AZURE),
+            stepOperations.deleteExternalCatalogIn(AZURE),
+            stepOperations.createExternalCatalogFor(AZURE),
             stepOperations.checkSparkWritingViaAwsPolarisToPolarisIn(AZURE)
                 ));
         return steps;

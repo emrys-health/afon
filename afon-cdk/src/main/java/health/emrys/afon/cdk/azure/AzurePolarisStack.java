@@ -1,7 +1,6 @@
 package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_dns_zone.DataAzurermDnsZone;
 import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecord;
@@ -27,7 +26,6 @@ import java.util.Optional;
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
 import static health.emrys.afon.config.AfonCloud.AZURE;
-import static health.emrys.afon.config.ConfigUtils.cdktfDir;
 
 public class AzurePolarisStack extends AzureKubernetesStack {
 
@@ -44,7 +42,6 @@ public class AzurePolarisStack extends AzureKubernetesStack {
     public AzurePolarisStack(Construct scope, AfonCloud id,
                              AfonPropertyProvider properties) {
         super(scope, id, properties);
-        logger.info("Using local backend {}", getLocalBackendPath());
         resourceGroup = properties.getValue(AfonProperty.AZURE_RESOURCE_GROUP);
 
         PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties);
@@ -98,9 +95,7 @@ public class AzurePolarisStack extends AzureKubernetesStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App(AppConfig.builder()
-                .outdir(cdktfDir())
-                .build());
+        final App app = createApp();
         new AzurePolarisStack(app, AZURE, new FilePropertyProvider());
         app.synth();
     }

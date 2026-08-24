@@ -1,6 +1,6 @@
 package health.emrys.afon.cdk.azure;
 
-import health.emrys.afon.cdk.AbstractCleanupHelper;
+import health.emrys.afon.cdk.CleanupHelper;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
@@ -8,22 +8,18 @@ import org.jspecify.annotations.NonNull;
 
 import static java.lang.String.format;
 
-public class AzureCleanupHelper extends AbstractCleanupHelper {
+public class AzureCleanupHelper extends CleanupHelper {
 
     private final String jupyterDomainName;
     private final String polarisDomainName;
     private final String resourceGroup;
     private final String subscription;
 
-    public AzureCleanupHelper() {
-        this(new FilePropertyProvider());
-    }
-
-    public AzureCleanupHelper(AfonPropertyProvider props) {
-        polarisDomainName = props.getValue(AfonProperty.AZURE_DOMAIN_NAME);
-        jupyterDomainName = props.getValue(AfonProperty.AZURE_JUPYTER_DOMAIN_NAME);
-        resourceGroup     = props.getValue(AfonProperty.AZURE_RESOURCE_GROUP);
-        subscription      = props.getValue(AfonProperty.AZURE_SUBSCRIPTION);
+    public AzureCleanupHelper(AfonPropertyProvider properties) {
+        polarisDomainName = properties.getValue(AfonProperty.AZURE_DOMAIN_NAME);
+        jupyterDomainName = properties.getValue(AfonProperty.AZURE_JUPYTER_DOMAIN_NAME);
+        resourceGroup     = properties.getValue(AfonProperty.AZURE_RESOURCE_GROUP);
+        subscription      = properties.getValue(AfonProperty.AZURE_SUBSCRIPTION);
     }
 
     private @NonNull String cleanGroupCommand() {
@@ -61,7 +57,8 @@ public class AzureCleanupHelper extends AbstractCleanupHelper {
     }
 
     public static void main(String[] args) {
-        outputCleanupCommands(args, new AzureCleanupHelper().cleanupCommands());
+        var properties = new FilePropertyProvider();
+        outputCleanupCommands(new AzureCleanupHelper(properties).cleanupCommands(), args);
     }
 
 }

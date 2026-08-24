@@ -10,8 +10,6 @@ import health.emrys.afon.polaris.catalogs.GcpPolarisCatalog;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
-import java.util.Properties;
-
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
@@ -35,16 +33,14 @@ public class AcceptanceTestConfig {
     private final GcpPolarisCatalog gcpForbidden;
     private final String                      adminClientId;
     private final String                      adminClientSecret;
-    private final Properties                  properties;
     private final AwsPolarisCatalog awsTrino;
     private final PolarisRestClient polarisClient;
-    private final AfonPropertyProvider provider;
+    private final AfonPropertyProvider properties;
 
-    private AcceptanceTestConfig(AfonPropertyProvider provider) {
-        this.provider = provider;
-        this.properties = provider.getProperties();
-        this.properties.put(KC_HOSTNAME.getName(), ContainerHelper.KEYCLOAK_HOSTNAME);
-        this.adminClientId     = provider.getValue(POLARIS_ID);
+    private AcceptanceTestConfig(AfonPropertyProvider properties) {
+        this.properties = properties;
+        this.properties.setValue(KC_HOSTNAME, ContainerHelper.KEYCLOAK_HOSTNAME);
+        this.adminClientId     = properties.getValue(POLARIS_ID);
         this.adminClientSecret = ***REMOVED***
         startContainers(this.properties);
         this.polarisAdminClient       = polarisClientFor(adminClientId, adminClientSecret);
@@ -53,7 +49,7 @@ public class AcceptanceTestConfig {
         this.awsTrino                 = new AwsPolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
-                return bucketToUrl(provider.getValue(AWS_S3_BUCKET_NAME_TRINO));
+                return bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME_TRINO));
             }
 
             @Override
@@ -64,7 +60,7 @@ public class AcceptanceTestConfig {
         this.awsForbidden               = new AwsPolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
-                return bucketToUrl(provider.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN));
+                return bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN));
             }
 
             @Override
@@ -80,7 +76,7 @@ public class AcceptanceTestConfig {
 
             @Override
             public String bucketUri() {
-                return toBucketUri(provider.getValue(GCP_BUCKET_NAME_FORBIDDEN));
+                return toBucketUri(properties.getValue(GCP_BUCKET_NAME_FORBIDDEN));
             }
         };
         this.gcpCloudConfigForPolaris   = new GcpPolarisCatalog(this.properties);
@@ -93,21 +89,20 @@ public class AcceptanceTestConfig {
             @Override
             public String bucketUri() {
                 return bucketUrl(
-                        provider.getValue(AZURE_BUCKET_FORBIDDEN),
-                        provider.getValue(AZURE_STORAGE_ACCOUNT));
+                        properties.getValue(AZURE_BUCKET_FORBIDDEN),
+                        properties.getValue(AZURE_STORAGE_ACCOUNT));
             }
         };
     }
 
     public PolarisRestClient polarisClientFor(String clientId, String clientSecret) {
         return clientFactory.createClient(
-            POLARIS_ENDPOINT.getValueFrom(this.properties),
-            clientId,
-            clientSecret,
-            ContainerHelper.KEYCLOAK_HOSTNAME);
+                ContainerHelper.KEYCLOAK_HOSTNAME, this.properties.getValue(POLARIS_ENDPOINT),
+                clientId, clientSecret
+        );
     }
 
-    private static void startContainers(Properties properties) {
+    private static void startContainers(AfonPropertyProvider properties) {
         ContainerHelper containerHelper = ContainerHelper.instance;
         containerHelper.startKeyCloak(properties);
         containerHelper.startPolaris(properties);
@@ -167,13 +162,11 @@ public class AcceptanceTestConfig {
         return awsTrino;
     }
 
-    public Properties getProperties() {
-        Properties props = new Properties();
-        props.putAll(properties);
-        return props;
+    public AfonPropertyProvider getProperties() {
+        return this.properties;
     }
 
     public String redactSecrets(String content, String source) {
-        return Redacter.redactSecrets(content, source, provider.getSecretProperties());
+        return Redacter.redactSecrets(content, source, properties.getSecretProperties());
     }
 }

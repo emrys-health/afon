@@ -17,7 +17,7 @@ public class DeployGcpPolarisStackMain implements StepsProvider {
             stepOperations.deleteStack(GCP),
             stepOperations.deployPolarisIn(GCP),
             stepOperations.waitForPolarisIn(GCP),
-            stepOperations.initializeAllCatalogsIn(GCP)
+            stepOperations.createAllCatalogsFor(GCP)
                       );
     }
 

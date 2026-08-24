@@ -17,7 +17,7 @@ public class DeployAzureFullStackMain implements StepsProvider {
             stepOperations.deleteStack(AZURE),
             stepOperations.deployFullStackIn(AZURE),
             stepOperations.waitForPolarisIn(AZURE),
-            stepOperations.initializeAllCatalogsIn(AZURE),
+            stepOperations.createAllCatalogsFor(AZURE),
             stepOperations.checkSparkWritingToPolarisIn(AZURE)
                       );
     }

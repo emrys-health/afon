@@ -1,8 +1,7 @@
 package health.emrys.afon.polaris.catalogs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
-
-import java.util.Properties;
 
 import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonProperty.*;
@@ -15,12 +14,12 @@ public class AzurePolarisCatalog extends PolarisCatalog {
     private final String multiTenantAppName;
     private final String clientId;
 
-    public AzurePolarisCatalog(Properties properties) {
-        String bucketName = AZURE_BUCKET.getValueFrom(properties);
-        this.bucketUrl          = bucketUrl(bucketName, AZURE_STORAGE_ACCOUNT.getValueFrom(properties));
-        this.tenant             = AZURE_TENANT_ID.getValueFrom(properties);
-        this.multiTenantAppName = AZURE_CLIENT_ID.getValueFrom(properties);
-        this.clientId           = AZURE_CLIENT_ID.getValueFrom(properties);
+    public AzurePolarisCatalog(AfonPropertyProvider properties) {
+        String bucketName = properties.getValue(AZURE_BUCKET);
+        this.bucketUrl          = bucketUrl(bucketName, properties.getValue(AZURE_STORAGE_ACCOUNT));
+        this.tenant             = properties.getValue(AZURE_TENANT_ID);
+        this.multiTenantAppName = properties.getValue(AZURE_CLIENT_ID);
+        this.clientId           = properties.getValue(AZURE_CLIENT_ID);
     }
 
     protected String bucketUri() {

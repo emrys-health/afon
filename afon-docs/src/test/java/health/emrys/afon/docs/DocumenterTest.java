@@ -1,10 +1,10 @@
 package health.emrys.afon.docs;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.config.GivenPropertyProvider;
 import org.junit.Test;
 
-import java.util.Properties;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -20,12 +20,9 @@ public class DocumenterTest {
 
     @Test
     public void canRedactSecrets() {
-        Properties properties = new Properties();
-        properties.setProperty("AWS_POLARIS_DOMAIN_NAME", "domain_name");
-        DeployAwsFullStackDocument document = new DeployAwsFullStackDocument(new GivenPropertyProvider(properties));
-        Properties secretProperties = new Properties();
-        secretProperties.setProperty("POLARIS_SECRET", "s3cr3t");
-        Documenter documenter = new Documenter(new GivenPropertyProvider(secretProperties));
+        AfonPropertyProvider properties = new FilePropertyProvider("src/test/resources/config", List.of("test", "secret"));
+        DocumentMetadata document = new DeployAwsFullStackDocument(properties);
+        Documenter documenter = new Documenter(properties);
         assertThat(documenter.getContent(document)).contains("<polaris_secret>");
     }
 
