@@ -24,17 +24,17 @@ public class AcceptanceTestConfig {
 
     private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
 
-    private final PolarisRestClient polarisAdminClient;
-    private final AwsPolarisCatalog awsPolarisCatalog;
-    private final AwsPolarisCatalog awsForbidden;
-    private final AzurePolarisCatalog azurePolarisCatalog;
-    private final AzurePolarisCatalog azureForbidden;
-    private final GcpPolarisCatalog gcpCloudConfigForPolaris;
-    private final GcpPolarisCatalog gcpForbidden;
-    private final String                      adminClientId;
-    private final String                      adminClientSecret;
-    private final AwsPolarisCatalog awsTrino;
-    private final PolarisRestClient polarisClient;
+    private final PolarisRestClient    polarisAdminClient;
+    private final AwsPolarisCatalog    awsPolarisCatalog;
+    private final AwsPolarisCatalog    awsForbidden;
+    private final AzurePolarisCatalog  azurePolarisCatalog;
+    private final AzurePolarisCatalog  azureForbidden;
+    private final GcpPolarisCatalog    gcpCloudConfigForPolaris;
+    private final GcpPolarisCatalog    gcpForbidden;
+    private final String               adminClientId;
+    private final String               adminClientSecret;
+    private final AwsPolarisCatalog    awsTrino;
+    private final PolarisRestClient    polarisClient;
     private final AfonPropertyProvider properties;
 
     private AcceptanceTestConfig(AfonPropertyProvider properties) {
@@ -45,7 +45,7 @@ public class AcceptanceTestConfig {
         startContainers(this.properties);
         this.polarisAdminClient       = polarisClientFor(adminClientId, adminClientSecret);
         this.polarisClient            = clientFactory.createClient(this.properties);
-        this.awsPolarisCatalog = new AwsPolarisCatalog(this.properties);
+        this.awsPolarisCatalog        = new AwsPolarisCatalog(this.properties);
         this.awsTrino                 = new AwsPolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
@@ -57,7 +57,7 @@ public class AcceptanceTestConfig {
                 return AfonCloud.AWS_TRINO.toString();
             }
         };
-        this.awsForbidden               = new AwsPolarisCatalog(this.properties) {
+        this.awsForbidden             = new AwsPolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
                 return bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN));
@@ -68,7 +68,7 @@ public class AcceptanceTestConfig {
                 return AfonCloud.AWS_FORBIDDEN.toString();
             }
         };
-        this.gcpForbidden               = new GcpPolarisCatalog(this.properties) {
+        this.gcpForbidden             = new GcpPolarisCatalog(this.properties) {
             @Override
             public String catalogName() {
                 return AfonCloud.GCP_FORBIDDEN.toString();
@@ -79,9 +79,9 @@ public class AcceptanceTestConfig {
                 return toBucketUri(properties.getValue(GCP_BUCKET_NAME_FORBIDDEN));
             }
         };
-        this.gcpCloudConfigForPolaris   = new GcpPolarisCatalog(this.properties);
-        this.azurePolarisCatalog = new AzurePolarisCatalog(this.properties);
-        this.azureForbidden             = new AzurePolarisCatalog(this.properties) {
+        this.gcpCloudConfigForPolaris = new GcpPolarisCatalog(this.properties);
+        this.azurePolarisCatalog      = new AzurePolarisCatalog(this.properties);
+        this.azureForbidden           = new AzurePolarisCatalog(this.properties) {
             public String catalogName() {
                 return AfonCloud.AZURE_FORBIDDEN.toString();
             }
@@ -89,16 +89,16 @@ public class AcceptanceTestConfig {
             @Override
             public String bucketUri() {
                 return bucketUrl(
-                        properties.getValue(AZURE_BUCKET_FORBIDDEN),
-                        properties.getValue(AZURE_STORAGE_ACCOUNT));
+                    properties.getValue(AZURE_BUCKET_FORBIDDEN),
+                    properties.getValue(AZURE_STORAGE_ACCOUNT));
             }
         };
     }
 
     public PolarisRestClient polarisClientFor(String clientId, String clientSecret) {
         return clientFactory.createClient(
-                ContainerHelper.KEYCLOAK_HOSTNAME, this.properties.getValue(POLARIS_ENDPOINT),
-                clientId, clientSecret
+            ContainerHelper.KEYCLOAK_HOSTNAME, this.properties.getValue(POLARIS_ENDPOINT),
+            clientId, clientSecret
         );
     }
 

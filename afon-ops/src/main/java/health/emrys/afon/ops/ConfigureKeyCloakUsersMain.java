@@ -47,6 +47,11 @@ public class ConfigureKeyCloakUsersMain {
         polarisUsers.configureUsers(catalogName, userProvider);
     }
 
+    public void configureUsers(String jupyterDomain, String catalogName) throws IOException, IncorrectConfigException {
+        configureKeyCloak(jupyterDomain);
+        configurePolaris(catalogName);
+    }
+
     public static void main(String[] args) {
         if (args.length != 3) {
             logger.warn("{} requires following args: polaris-domain catalog-name jupyter-domain", ConfigureKeyCloakUsersMain.class.getName());
@@ -60,8 +65,7 @@ public class ConfigureKeyCloakUsersMain {
         propertyProvider.setValue(POLARIS_ENDPOINT, polarisDomain);
         var app = new ConfigureKeyCloakUsersMain(userProvider, propertyProvider);
         try {
-            app.configureKeyCloak(jupyterDomain);
-            app.configurePolaris(catalogName); // just for a smoke test
+            app.configureUsers(jupyterDomain, catalogName);
         } catch (Exception e) {
             logger.error("Failed to configure KeyCloak users {}: {}",
                     app.userProvider.getUserNames(), e.getMessage(), e);
