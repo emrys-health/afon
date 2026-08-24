@@ -9,7 +9,7 @@ import PolarisCatalog.METADATA_KEY
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.permissions.TestUsers
 import health.emrys.afon.config.AfonProperty.{KC_BOOTSTRAP_ADMIN_PASSWORD, KC_BOOTSTRAP_ADMIN_USERNAME, KC_HOSTNAME}
-import health.emrys.afon.ops.ConfigureKeyCloakUsersMain
+import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
 import health.emrys.afon.polaris.config.{PolarisConfigurer, PolarisRestClient}
 import health.emrys.afon.polaris.config.PolarisConfigurer.{catalogsURI, namespaceURI, tableURI}
@@ -144,7 +144,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       assert(ContainerHelper.instance.startPolaris(properties) != null)
 
       When(s"we onboard a user '$User' for catalog ${config.catalogName()}' in Polaris")
-      val onboarding = new ConfigureKeyCloakUsersMain(userProvider, properties)
+      val onboarding = new ConfigureUsersMain(userProvider, properties)
       onboarding.configurePolaris(config.catalogName())
       And("in KeyCloak")
       onboarding.configureKeyCloak("NotUsed.com")
