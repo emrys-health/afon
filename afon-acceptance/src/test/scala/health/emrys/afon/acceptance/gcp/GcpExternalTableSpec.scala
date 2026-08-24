@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance.gcp
 
 import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
+import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
 import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
@@ -13,7 +14,6 @@ import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEn
 import org.apache.polaris.core.admin.model._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
-import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 import java.util.Properties
 

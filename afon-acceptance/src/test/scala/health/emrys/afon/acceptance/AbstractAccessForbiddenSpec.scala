@@ -1,11 +1,11 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.SparkHelper.spark
+import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.config.AfonCloud
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 import health.emrys.afon.polaris.config.PolarisConfigurer.catalogsURI
 import org.scalatest.GivenWhenThen
-import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 

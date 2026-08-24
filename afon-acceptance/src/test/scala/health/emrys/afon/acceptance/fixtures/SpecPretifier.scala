@@ -1,4 +1,4 @@
-package uk.co.odinconsultants.documentation_utils
+package health.emrys.afon.acceptance.fixtures
 
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}

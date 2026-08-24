@@ -6,6 +6,7 @@ import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.config.{AfonProperty, AfonUser, AfonUserAcl, AfonUserProvider, FilePropertyProvider}
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 import PolarisCatalog.METADATA_KEY
+import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.config.AfonProperty.{KC_BOOTSTRAP_ADMIN_PASSWORD, KC_BOOTSTRAP_ADMIN_USERNAME, KC_HOSTNAME}
 import health.emrys.afon.ops.ConfigureKeyCloakUsersMain
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
@@ -15,7 +16,6 @@ import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.KeyCloakProvider
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
-import uk.co.odinconsultants.documentation_utils.SpecPretifier
 
 import java.util
 
