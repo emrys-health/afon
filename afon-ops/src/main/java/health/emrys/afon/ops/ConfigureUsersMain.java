@@ -11,16 +11,16 @@ import java.io.IOException;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 
-public class ConfigureKeyCloakUsersMain {
+public class ConfigureUsersMain {
 
-    private static final Logger logger = LoggerFactory.getLogger(ConfigureKeyCloakUsersMain.class);
+    private static final Logger logger = LoggerFactory.getLogger(ConfigureUsersMain.class);
 
     private final AfonUserProvider userProvider;
     private final AfonPropertyProvider propertyProvider;
     private final KeyCloakProvider keyCloakProvider;
     private final ConfigurePolarisUsersMain polarisUsers;
 
-    public ConfigureKeyCloakUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
+    public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
         this.userProvider = userProvider;
         this.propertyProvider = propertyProvider;
         this.keyCloakProvider = new KeyCloakProvider(propertyProvider);
@@ -54,7 +54,7 @@ public class ConfigureKeyCloakUsersMain {
 
     public static void main(String[] args) {
         if (args.length != 3) {
-            logger.warn("{} requires following args: polaris-domain catalog-name jupyter-domain", ConfigureKeyCloakUsersMain.class.getName());
+            logger.warn("{} requires following args: polaris-domain catalog-name jupyter-domain", ConfigureUsersMain.class.getName());
             return;
         }
         String polarisDomain = args[0];
@@ -63,7 +63,7 @@ public class ConfigureKeyCloakUsersMain {
         var userProvider = new FileUserProvider();
         var propertyProvider = new FilePropertyProvider();
         propertyProvider.setValue(POLARIS_ENDPOINT, polarisDomain);
-        var app = new ConfigureKeyCloakUsersMain(userProvider, propertyProvider);
+        var app = new ConfigureUsersMain(userProvider, propertyProvider);
         try {
             app.configureUsers(jupyterDomain, catalogName);
         } catch (Exception e) {
