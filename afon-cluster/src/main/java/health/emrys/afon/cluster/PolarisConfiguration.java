@@ -5,6 +5,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import health.emrys.afon.polaris.config.PolarisCatalogClient;
 import org.apache.hc.core5.http.HttpResponse;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -12,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 import static health.emrys.afon.polaris.config.PolarisCatalogClient.addPolarisCredentialsTo;
 
 public abstract class PolarisConfiguration {
@@ -91,6 +94,10 @@ public abstract class PolarisConfiguration {
                 throw new RuntimeException(badResponses.toString());
             }
         }
+    }
+
+    protected static @NonNull String polarisCredentials(AfonPropertyProvider properties) {
+        return properties.getValue(POLARIS_ID) + ":" + properties.getValue(POLARIS_SECRET);
     }
 
     abstract protected String getCredentials();

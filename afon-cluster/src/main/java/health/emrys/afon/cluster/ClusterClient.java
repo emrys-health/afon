@@ -44,14 +44,14 @@ public abstract class ClusterClient implements AutoCloseable {
         return clusterName;
     }
 
-    public String getIngressExpectingOnlyOneFor(String serviceName) throws ApiException, IncorrectConfigException {
+    public String getUniqueIngressFor(String serviceName) throws ApiException, IncorrectConfigException {
         Optional<List<String>> optionalIngress = getIngressFor(serviceName);
         if (!optionalIngress.isPresent()) {
             throw new IncorrectConfigException(format("No service called '{}'", serviceName));
         }
         List<String> polarisIngress = optionalIngress.get();
         if (polarisIngress.size() != 1) {
-            throw new IncorrectConfigException(format("Was expecting 1 service address but got {}", polarisIngress.toString()));
+            throw new IncorrectConfigException(format("Expecting unique service address but got {}", polarisIngress));
         }
         return polarisIngress.get(0);
     }
@@ -76,7 +76,7 @@ public abstract class ClusterClient implements AutoCloseable {
         }
         List<String> polarisIngress = optionalIngress.get();
         if (polarisIngress.size() != 1) {
-            throw new IncorrectConfigException(format("Was expecting 1 service address but got %s", polarisIngress));
+            throw new IncorrectConfigException(format("Expecting unique service address but got %s", polarisIngress));
         }
         return polarisIngress.get(0);
     }
@@ -119,7 +119,7 @@ public abstract class ClusterClient implements AutoCloseable {
         return pods;
     }
 
-    public V1Pod getPodExpectingOnlyOneStartingWith(String podName) throws ApiException {
+    public V1Pod getUniquePodMatchingName(String podName) throws ApiException {
         return listPods().stream().filter(x -> x.getMetadata().getName().startsWith(podName)).findFirst().orElseThrow();
     }
 
