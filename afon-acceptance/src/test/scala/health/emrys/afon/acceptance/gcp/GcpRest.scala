@@ -1,8 +1,8 @@
 package health.emrys.afon.acceptance.gcp
 
+import health.emrys.afon.acceptance.fixtures.Datum
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
-import uk.co.odinconsultants.documentation_utils.Datum
 
 import health.emrys.afon.config.AfonProperty.GOOGLE_APPLICATION_CREDENTIALS
 import health.emrys.afon.config.ConfigUtils
