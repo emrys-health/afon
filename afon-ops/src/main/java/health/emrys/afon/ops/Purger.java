@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static health.emrys.afon.cluster.ClusterUtils.isFailure;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 
 public class Purger {
@@ -27,10 +26,37 @@ public class Purger {
     private final String            domainName;
     private final ObjectMapper      mapper = new ObjectMapper();
 
-    public Purger(PolarisRestClient client, String accessToken, String domainName) {
+    public Purger(PolarisRestClient client, String domainName) {
         this.client      = client;
-        this.accessToken = accessToken;
+        this.accessToken = client.getAccessToken();
         this.domainName  = domainName;
+    }
+
+    public void deleteCatalog(String catalogName) throws IOException, ParseException {
+        purge(catalogName);
+        deleteRoles(catalogName);
+        client.delete(catalogsURI(catalogName), accessToken);
+    }
+
+    private void deleteRoles(String catalogName) throws IOException, ParseException {
+        String uri = catalogRolesURI(catalogName);
+        for (JsonNode node : getNodes(uri, "roles")) {
+            String roleName = node.get("name").toString().replace("\"", "");
+            logger.info("Deleting role {} from catalog {}", roleName, catalogName);
+            client.delete(String.format("%s/%s", uri, roleName), accessToken);
+        }
+    }
+
+    private Iterable<JsonNode> getNodes(String url, String rootNode) throws IOException, ParseException {
+        logger.info("Retrieving nodes from url {} with root node {}", url, rootNode);
+        ClassicHttpResponse response = client.get(url, accessToken);
+        JsonNode root = new ObjectMapper().readTree(EntityUtils.toString(response.getEntity()));
+        JsonNode identifiers = root.get(rootNode);
+        if (identifiers == null || !identifiers.isArray()) {
+            logger.warn("No nodes found from url {} with root node of {}", url, rootNode);
+            return Collections.emptyList();
+        }
+        return identifiers;
     }
 
     public void purge(String catalogName) throws IOException, ParseException {
