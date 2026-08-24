@@ -22,7 +22,9 @@ import static org.slf4j.LoggerFactory.getLogger;
  */
 public class ManagePolarisCatalogsMain {
 
-    private static final Logger logger = getLogger(ManagePolarisCatalogsMain.class);
+    private static final Logger logger   = getLogger(ManagePolarisCatalogsMain.class);
+    public static final  String DELETE   = "delete";
+    public static final  String RECREATE = "recreate";
 
     private final AfonPropertyProvider properties;
     private final Purger               purger;
@@ -84,7 +86,7 @@ public class ManagePolarisCatalogsMain {
         properties.setValue(POLARIS_ENDPOINT, domainName);
         ManagePolarisCatalogsMain app = new ManagePolarisCatalogsMain(properties);
         try {
-            if (action.equals("delete")) {
+            if (action.equals(DELETE)) {
                 if (catalogName == null) {
                     logger.info("Deleting all catalogs for domain {}", domainName);
                     app.deleteAllCatalogs();
@@ -101,7 +103,7 @@ public class ManagePolarisCatalogsMain {
                 logger.info("Creating all catalogs for domain {}", domainName);
                 app.createAllCatalogs();
             }
-            if (action.equals("recreate")) {
+            if (action.equals(RECREATE)) {
                 logger.info("Deleting and recreating all catalogs for domain {}", domainName);
                 app.deleteAllCatalogs();
                 app.createAllCatalogs();
