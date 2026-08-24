@@ -9,11 +9,23 @@ public class ConfigUtilsTest {
 
     @Test
     public void canRetrieveAfonHome() {
-        System.setProperty(AFON_HOME_SYSTEM_PROPERTY, "/afon/home");
+        System.setProperty(AFON_HOME_PROPERTY, "/afon/home");
         try {
             assertThat(afonHome()).isEqualTo("/afon/home");
         } finally {
-            System.clearProperty(AFON_HOME_SYSTEM_PROPERTY);
+            System.clearProperty(AFON_HOME_PROPERTY);
+        }
+        // default value
+        assertThat(afonHome()).isEqualTo(System.getenv("HOME")+"/.afon");
+    }
+
+    @Test
+    public void canOverrideAfonHomeViaEnv() {
+        System.setProperty(AFON_HOME_PROPERTY, "/afon/home");
+        try {
+            assertThat(afonHome()).isEqualTo("/afon/home");
+        } finally {
+            System.clearProperty(AFON_HOME_PROPERTY);
         }
         // default value
         assertThat(afonHome()).isEqualTo(System.getenv("HOME")+"/.afon");
@@ -21,24 +33,36 @@ public class ConfigUtilsTest {
 
     @Test
     public void canRetrieveAfonCdktf() {
-        System.setProperty(AFON_CDKTF_SYSTEM_PROPERTY, "/afon/cdktf");
+        System.setProperty(AFON_CDKTF_PROPERTY, "/afon/cdktf");
         try {
             assertThat(afonCkdtf()).isEqualTo("/afon/cdktf");
         } finally {
-            System.clearProperty(AFON_CDKTF_SYSTEM_PROPERTY);
+            System.clearProperty(AFON_CDKTF_PROPERTY);
         }
         // default value
         assertThat(afonCkdtf()).isEqualTo(afonHome()+"/cdktf");
     }
 
     @Test
+    public void canRetrieveAfonCloud() {
+        System.setProperty(AFON_CLOUD_PROPERTY, "cloud");
+        try {
+            assertThat(afonCloud()).isEqualTo("cloud");
+        } finally {
+            System.clearProperty(AFON_CLOUD_PROPERTY);
+        }
+        // default value
+        assertThat(afonCloud()).isEqualTo("");
+    }
+
+    @Test
     public void canRetrieveCloudProperty() {
-        System.setProperty(CLOUD_SYSTEM_PROPERTY, "aws");
+        System.setProperty(AFON_CLOUD_PROPERTY, "aws");
         try {
             assertThat(cloudPropertySet()).isTrue();
             assertThat(cloudPropertyValue()).isEqualTo("aws");
         } finally {
-            System.clearProperty(CLOUD_SYSTEM_PROPERTY);
+            System.clearProperty(AFON_CLOUD_PROPERTY);
         }
         assertThat(cloudPropertySet()).isFalse();
         assertThat(cloudPropertyValue()).isNull();
@@ -46,19 +70,24 @@ public class ConfigUtilsTest {
 
     @Test
     public void canRetrieveLoggingLevels() {
-        System.setProperty(AFON_LOGGING_SYSTEM_PROPERTY, "WARN");
-        System.setProperty(AFON_LOGGING_CONSOLE_SYSTEM_PROPERTY, "ERROR");
+        System.setProperty(AFON_LOGGING_PROPERTY, "WARN");
+        System.setProperty(AFON_LOGGING_CONSOLE_PROPERTY, "ERROR");
         try {
             assertThat(afonLoggingLevel()).isEqualTo("WARN");
             assertThat(afonLoggingConsoleLevel()).isEqualTo("ERROR");
         } finally {
-            System.clearProperty(AFON_LOGGING_SYSTEM_PROPERTY);
-            System.clearProperty(AFON_LOGGING_CONSOLE_SYSTEM_PROPERTY);
+            System.clearProperty(AFON_LOGGING_PROPERTY);
+            System.clearProperty(AFON_LOGGING_CONSOLE_PROPERTY);
         }
         // default values
         assertThat(afonLoggingLevel()).isEqualTo("INFO");
         assertThat(afonLoggingConsoleLevel()).isEqualTo("OFF");
     }
 
+    @Test
+    public void canOverridePropertyWithEnv() {
+        assertThat(envOrProperty("env", "property")).isEqualTo("env");
+        assertThat(envOrProperty(null, "property")).isEqualTo("property");
+    }
 
 }
