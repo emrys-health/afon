@@ -6,21 +6,21 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
-import health.emrys.afon.security.keycloak.KeyCloakConfig;
+import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
-import static health.emrys.afon.config.AfonProperties.*;
-import static health.emrys.afon.polaris.PolarisConstants.*;
+import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.polaris.PolarisConstants.POLARIS_IMAGE_NAME;
+import static health.emrys.afon.polaris.PolarisConstants.getPolarisProperties;
 import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
@@ -39,37 +39,30 @@ public class PolarisConfig extends Construct {
 
     public Map<String, String> polarisLabels;
 
-    public PolarisConfig(@NonNull Construct scope, @NonNull String id, CloudProvider cloudProvider) {
+    public PolarisConfig(@NonNull Construct scope, @NonNull String id, CloudProvider cloudProvider, AfonPropertyProvider properties) {
         super(scope, id);
         // Configure the Kubernetes Provider
         cloudProvider.configureK8s();
 
         // Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
-        Properties properties = appProperties();
         Secret.Builder
             .create(this, "mySecret")
             .dependsOn(cloudProvider.getDependables())
             .metadata(SecretMetadata.builder().name(SECRET_NAME).build())
             .data(Map.of(
                 POLARIS_ENV_FILE, getProviderCredentials(properties, cloudProvider.getId()),
-                GCP_CRED_FILE, GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties)))
+                GCP_CRED_FILE, properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)))
             .type("Opaque")
             .build();
     }
 
-    private static Properties appProperties() {
-        AfonPropertiesLoader loader     = new AfonPropertiesLoader();
-        Properties           properties = loader.getProperties();
-        return properties;
-    }
-
     static String getProviderCredentials(
-        Properties properties,
+        AfonPropertyProvider properties,
         String deploymentId) {
         List<String> exports = getPolarisProperties()
             .stream()
-            .map(x -> format("export %s=%s", x.getName(), x.getValueFrom(properties)))
+            .map(x -> format("export %s=%s", x.getName(), properties.getValue(x)))
             .sorted()
             .toList();
 
@@ -81,27 +74,27 @@ public class PolarisConfig extends Construct {
             export QUARKUS_DATASOURCE_JDBC_URL="jdbc:postgresql://%s:5432/polaris_db_%s"
             export QUARKUS_DATASOURCE_USERNAME=postgres
             export QUARKUS_DATASOURCE_PASSWORD=%s
-            
+
             """,
-            POLARIS_DB_HOST.getValueFrom(properties),
+            properties.getValue(POLARIS_DB_HOST),
             deploymentId,
-            POLARIS_DB_PASSWORD.getValueFrom(properties));
+            properties.getValue(POLARIS_DB_PASSWORD));
 
         return pgConfig + format(
             """
             %s
-            
+
             %s
             export %s='%s'
-            
+
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL=DEBUG
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL=DEBUG
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL=ERROR
             export QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL=ERROR
-            
+
             export POLARIS_FEATURES_ENABLE_CATALOG_FEDERATION=true
             export POLARIS_FEATURES_SUPPORTED_CATALOG_CONNECTION_TYPES="ICEBERG_REST,HIVE"
-            export JAVA_OPTS_APPEND=-D"polaris.features.\\"ENABLE_CATALOG_FEDERATION\\"=true" 
+            export JAVA_OPTS_APPEND=-D"polaris.features.\\"ENABLE_CATALOG_FEDERATION\\"=true"
             """,
             kcConfig,
             String.join("\n", exports),
@@ -110,12 +103,12 @@ public class PolarisConfig extends Construct {
         );
     }
 
-    private static @NonNull String kcExports(Properties properties) {
-        String kcHost = KC_HOSTNAME.getValueFrom(properties);
+    private static @NonNull String kcExports(AfonPropertyProvider properties) {
+        String kcHost = properties.getValue(KC_HOSTNAME);
         Map<String, String> kcProperties = KeyCloakHelper.polarisOidcEnv(
-            KeyCloakConfig.internalRealmUrl(kcHost, "https"),
-            KC_DB_USERNAME.getValueFrom(properties),
-            KC_DB_PASSWORD.getValueFrom(properties));
+            KeyCloakConfigurer.internalRealmUrl(kcHost, "https"),
+            properties.getValue(KC_DB_USERNAME),
+            properties.getValue(KC_DB_PASSWORD));
         return toExports(kcProperties);
     }
 
@@ -202,7 +195,4 @@ public class PolarisConfig extends Construct {
             this);
     }
 
-    public static final void main(String[] unused) {
-        System.out.println(PolarisConfig.getProviderCredentials(appProperties(), "test"));
-    }
 }

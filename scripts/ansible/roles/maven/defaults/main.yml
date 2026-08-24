@@ -1,0 +1,11 @@
+---
+maven_version: "3.9.9"
+maven_install_dir: /opt
+maven_home: "{{ maven_install_dir }}/maven"
+maven_url: >-
+  https://archive.apache.org/dist/maven/maven-3/{{ maven_version }}/binaries/apache-maven-{{ maven_version }}-bin.tar.gz
+
+# Optional integrity check, e.g. 'sha512:<hex>' taken from the .sha512 file
+# alongside the tarball on archive.apache.org. Left empty, the download is
+# verified by TLS only.
+maven_checksum: ""

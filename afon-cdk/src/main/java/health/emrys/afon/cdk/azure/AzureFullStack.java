@@ -7,27 +7,27 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import health.emrys.afon.cdk.*;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Properties;
-
-import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_PORT;
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_SVC_NAME;
-import static health.emrys.afon.config.AfonProperties.*;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AZURE;
+import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.config.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonProperty.*;
 
 public class AzureFullStack extends AzurePolarisStack {
 
     private final String TLS_SECRET_NAME = "jupyter-secret";
 
-    public AzureFullStack(Construct scope, String id, Properties properties) {
+    public AzureFullStack(Construct scope, AfonCloud id, AfonPropertyProvider properties) {
         super(scope, id, properties);
 
         // The Azure CNI (Cilium) data plane is not necessarily ready the moment the
@@ -54,10 +54,10 @@ public class AzureFullStack extends AzurePolarisStack {
         sparkDependsOn.add(sparkOperatorConfig.operatorReady);
 
         // deploy the Spark workers and driver pointing at Azure Polaris
-        SparkWorkloads sparkDeployer = new SparkWorkloads(AZURE_DOMAIN_NAME.getValueFrom(properties));
+        SparkWorkloads sparkDeployer = new SparkWorkloads(properties.getValue(AZURE_DOMAIN_NAME), properties);
         sparkDeployer.deploy(this, AZURE, sparkDependsOn);
 
-        String jupyterDomainName = AZURE_JUPYTER_DOMAIN_NAME.getValueFrom(properties);
+        String jupyterDomainName = properties.getValue(AZURE_JUPYTER_DOMAIN_NAME);
         var helper = new CdkHelper(
             this, jupyterDomainName, TLS_SECRET_NAME,
             PROXY_PORT, PROXY_SVC_NAME, JUPYTER_INGRESS);
@@ -79,11 +79,12 @@ public class AzureFullStack extends AzurePolarisStack {
                 return new JupyterMfaConfig(
                     AzureFullStack.this,
                     proxyDeps,
+                    properties,
                     JupyterHubConfig.MFA_UPSTREAMS,
                     jupyterDomainName,
-                    AZURE_OAUTH2_CLIENT_ID.getValueFrom(properties),
-                    AZURE_OAUTH2_CLIENT_SECRET.getValueFrom(properties),
-                    AZURE_OAUTH2_COOKIE_SECRET.getValueFrom(properties)
+                    properties.getValue(AZURE_OAUTH2_CLIENT_ID),
+                    properties.getValue(AZURE_OAUTH2_CLIENT_SECRET),
+                    properties.getValue(AZURE_OAUTH2_COOKIE_SECRET)
                     );
             }
 
@@ -94,20 +95,20 @@ public class AzureFullStack extends AzurePolarisStack {
 
             @Override
             protected String oauthClientId() {
-                return AZURE_OAUTH2_CLIENT_ID.getValueFrom(properties);
+                return properties.getValue(AZURE_OAUTH2_CLIENT_ID);
             }
 
             @Override
             protected String oauthClientSecret() {
-                return AZURE_OAUTH2_CLIENT_SECRET.getValueFrom(properties);
+                return properties.getValue(AZURE_OAUTH2_CLIENT_SECRET);
             }
         };
         jupyter.deployJupyterHub(cloudProvider.getDependables());
     }
 
     public static void main(String[] args) {
-        final App app = new App();
-        new AzureFullStack(app, AZURE.toString(), new AfonPropertiesLoader().getProperties());
+        final App app = createApp();
+        new AzureFullStack(app, AZURE, new FilePropertyProvider());
         app.synth();
     }
 

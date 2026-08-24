@@ -8,12 +8,12 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkHelper.envVar;
@@ -30,13 +30,13 @@ public abstract class JupyterConfig {
     private final   List<GuacamoleConfig.Session> sessions;
     private final   TerraformStack                stack;
     private final   String                        jupyterPassword;
-    protected final Properties                    properties;
+    protected final AfonPropertyProvider          properties;
 
 
     public JupyterConfig(TerraformStack stack,
-                         Properties properties) {
+                         AfonPropertyProvider properties) {
         this.stack           = stack;
-        this.jupyterPassword = AfonProperties.JUPYTER_VNC_PASSWORD.getValueFrom(properties);
+        this.jupyterPassword = properties.getValue(AfonProperty.JUPYTER_VNC_PASSWORD);
         this.sessions        = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             sessions.add(

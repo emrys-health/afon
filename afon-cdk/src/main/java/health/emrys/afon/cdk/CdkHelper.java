@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.KeyCloakDeploymentConfig.KEYCLOAK_INGRESS;
+import static health.emrys.afon.cdk.KeyCloakConfig.KEYCLOAK_INGRESS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
 import static java.lang.String.format;
 
@@ -111,8 +111,7 @@ public class CdkHelper {
             .provider(helmProvider)
             .dependsOn(dependsOn)
             .name("nginx-ingress")
-            .chart("ingress-nginx")
-            .repository("https://kubernetes.github.io/ingress-nginx")
+            .chart(CdkUtils.vendoredChart(construct, "nginxChart", "ingress-nginx-4.15.1.tgz"))
             .namespace("ingress-nginx")
             .createNamespace(true)
             .timeout(600)
@@ -259,8 +258,7 @@ public class CdkHelper {
             .provider(helmProvider)
             .dependsOn(dependsOn)
             .name("cert-manager")
-            .chart("cert-manager")
-            .repository("https://charts.jetstack.io")
+            .chart(CdkUtils.vendoredChart(construct, "certManagerChart", "cert-manager-v1.21.1.tgz"))
             .namespace("cert-manager")
             .createNamespace(true)
             .timeout(300)

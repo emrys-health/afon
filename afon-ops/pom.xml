@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>health.emrys</groupId>
+        <groupId>health.emrys.afon</groupId>
         <artifactId>afon</artifactId>
         <version>1.0-SNAPSHOT</version>
     </parent>
@@ -23,6 +23,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>afon-spark-connect</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>ch.vorburger.exec</groupId>
             <artifactId>exec</artifactId>
             <version>3.3.2</version>
@@ -30,7 +35,7 @@
         <dependency>
             <groupId>io.github.classgraph</groupId>
             <artifactId>classgraph</artifactId>
-            <version>4.8.179</version>
+            <version>${classgraph.version}</version>
         </dependency>
     </dependencies>
 
@@ -47,7 +52,7 @@
                         <artifactId>exec-maven-plugin</artifactId>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>@jvm-args.txt -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
+                            <commandlineArgs>${afon.jvm} ${afon.exec} -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
                         </configuration>
                     </plugin>
                 </plugins>

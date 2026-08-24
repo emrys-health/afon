@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>health.emrys</groupId>
+        <groupId>health.emrys.afon</groupId>
         <artifactId>afon</artifactId>
         <version>1.0-SNAPSHOT</version>
     </parent>
@@ -16,6 +16,11 @@
             <groupId>${project.groupId}</groupId>
             <artifactId>afon-ops</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.22.0</version>
         </dependency>
     </dependencies>
 
@@ -33,7 +38,8 @@
                         </goals>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>@jvm-args.txt -classpath %classpath health.emrys.afon.docs.DocumentAllMain</commandlineArgs>
+                            <commandlineArgs>${afon.jvm} ${afon.exec} -classpath %classpath
+                                health.emrys.afon.docs.GenerateAllDocumentsMain</commandlineArgs>
                         </configuration>
                     </execution>
                 </executions>

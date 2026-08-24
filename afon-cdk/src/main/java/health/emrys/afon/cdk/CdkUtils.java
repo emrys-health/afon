@@ -1,11 +1,19 @@
 package health.emrys.afon.cdk;
 
+import com.hashicorp.cdktf.AssetType;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.TerraformAsset;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -164,5 +172,52 @@ public class CdkUtils {
         Map<String, String> enriched = new LinkedHashMap<>(labels);
         enriched.put("app.kubernetes.io/name", canonical);
         return Map.copyOf(enriched);
+    }
+
+    /**
+     * Path to a Helm chart vendored into {@code src/main/resources/charts}, for use as
+     * {@code Release.chart()} with no {@code repository()}.
+     * <p>
+     * Charts pulled at apply time come from GitHub Pages, and a chart repository's
+     * {@code index.yaml} can run to megabytes (Cilium's is ~1.7MB). A single reset mid-read
+     * fails the whole apply with the provider's misleading "not a valid chart repository"
+     * error, so any flaky link between here and GitHub breaks the deployment. Vendoring the
+     * tarball removes that fetch — and pins the exact bytes we tested against, which a
+     * version constraint alone does not guarantee.
+     * <p>
+     * The resource is staged through {@link TerraformAsset} so it is copied into the stack's
+     * output directory at synth time and referenced by a path relative to it. That keeps the
+     * generated {@code cdk.tf.json} free of absolute paths from the synthesising machine, and
+     * means the chart resolves no matter which directory synth or apply was invoked from.
+     *
+     * @param scope     the stack the asset belongs to.
+     * @param id        unique construct id for the asset.
+     * @param chartFile file name under {@code resources/charts}, e.g. {@code cilium-1.15.0.tgz}.
+     * @return the chart path to hand to {@code Release.chart()}.
+     */
+    public static @NonNull String vendoredChart(@NonNull Construct scope,
+                                                @NonNull String id,
+                                                @NonNull String chartFile) {
+        String resource = "/charts/" + chartFile;
+        try (InputStream chart = CdkUtils.class.getResourceAsStream(resource)) {
+            if (chart == null) {
+                throw new IllegalArgumentException("No vendored chart on the classpath at " + resource);
+            }
+            // TerraformAsset needs a file on disk, but the chart lives in the jar. Stage it in a
+            // temp directory that is deleted on JVM exit; synth copies it onwards before then.
+            Path staging = Files.createTempDirectory("afon-chart-");
+            staging.toFile().deleteOnExit();
+            Path staged = staging.resolve(chartFile);
+            Files.copy(chart, staged, StandardCopyOption.REPLACE_EXISTING);
+            staged.toFile().deleteOnExit();
+            return TerraformAsset.Builder
+                .create(scope, id)
+                .path(staged.toString())
+                .type(AssetType.FILE)
+                .build()
+                .getPath();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not stage vendored chart " + chartFile, e);
+        }
     }
 }

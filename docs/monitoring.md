@@ -10,22 +10,21 @@ We currently have the following monitoring tools:
 - hubble: running hubble-ui in the cloud to view network traffic
 - hubble-cli: running locally to query hubble
 
-### Install cloud tools via tofu:
-
-To install all the cloud tools, assume AWS full stack has been deployed. 
-If not, deploy using command:
-```shell
-./afon.sh -a exec --exec-class cdk.aws.DeployAwsFullStack
-```
+To set up monitoring tools, we assume AWS full stack has been deployed. 
+See [stacks](stacks.md) for details on deployment of the full stack.
 
 ### Set up kube port-forwarding 
 
 Set up cloud port-forward for the tools you want to access:
 ```shell
-kubectl port-forward svc/loki 3100:3100 # loki
-kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 # prometheus
-kubectl port-forward svc/hubble-ui -n kube-system 12000:80   # hubble-ui
-kubectl port-forward svc/hubble-relay -n kube-system 4245:80 # hubble-cli
+# loki
+kubectl port-forward svc/loki 3100:3100 
+# prometheus
+kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 
+# hubble-ui
+kubectl port-forward svc/hubble-ui -n kube-system 12000:80
+# hubble-cli   
+kubectl port-forward svc/hubble-relay -n kube-system 4245:80 
 ```
 
 ### Grafana 
@@ -34,7 +33,7 @@ Run grafana via docker:
 ```shell
 docker run -d --name grafana -p 3000:3000 grafana/grafana 
 ```
-Open the Grafana UI at `http://localhost:3000` and login with credentials `admin`/`admin`.
+Open the Grafana UI at [http://localhost:3000](http://localhost:3000) and login with credentials `admin`/`admin`.
 
 #### Save local Grafana config
 You can run your dockerized Grafana persisting the config each time with:
@@ -48,30 +47,35 @@ docker cp YOUR_CONTAINER_ID:/var/lib/grafana $LOCAL_GRAFANA_CONFIG_DIR
 **Note** you may need to execute `sudo chown -R 472:472 $LOCAL_GRAFANA_CONFIG_DIR` to give Grafana permissions.
 User/group 472 is the Grafana user.
 
-![image](pics/grafana.png)
+![image](images/grafana.png)
 
 ### Loki
 
-In Grafana UI, add a Loki Data Source pointing to`http://localhost:3100`.
+In Grafana UI, add a Loki Data Source pointing to `http://localhost:3100`.
 
-NOTE: In `HTTP headers` add a single entry with:
-- Header name `X-Scope-OrgID` and as value the cluster name (`CLUSTER_NAME` from `config/afon.properties`).
+**NOTE:** In the `HTTP headers` section, a single entry needs to added with:
+- `Header` name: `X-Scope-OrgID`
+- The cluster name value (`CLUSTER_NAME` from [configuration](configuration.md)).
 
-![image](pics/grafana_multitenancy.png)
+![image](images/grafana_multitenancy.png)
 
-You should now be able to logs in `Drilldown -> Logs` in the Grafana GUI.
+**NOTE:** On macos, use http://host.docker.internal:3100 in place of http://localhost:3100, if getting connection refused when adding the data source.
+
+Once the data source is configured, logs will be available in the Grafana GUI (`Drilldown -> Logs`).
 You may need to refresh your browser.
 
-Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in `afon-aws.properties`.
-
-NOTE: On macos, if getting connection refused when adding the data source, use http://host.docker.internal:3100 in place of http://localhost:3100
+Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in the [configuration](configuration.md).
+Loki logs are stored in the cloud, eg
+```shell
+aws s3 ls s3://emrys-afon-bucket/spark-cluster
+```
 
 ### Prometheus
 
-In Grafana UI, add a Prometheus Data Source pointing to `http://localhost:9090` 
+In Grafana UI, add a Prometheus Data Source pointing to `http://localhost:9090`.
 One should see nearly 2000 metrics.
 
-NOTE:  On macos, if getting connection refused when adding the data source, use http://host.docker.internal:9090 in place of http://localhost:9090 (see https://github.com/grafana/grafana/issues/46434).  
+NOTE:  On macos, use http://host.docker.internal:9090 in place of http://localhost:9090, if getting connection refused when adding the data source (see https://github.com/grafana/grafana/issues/46434).  
 
 ### Hubble
 
@@ -79,7 +83,7 @@ NOTE:  On macos, if getting connection refused when adding the data source, use 
 Once the hubble-ui kube tunnel is setup, the Hubble UI is available at `http://localhost:12000` 
 One should see the network flows between pods.
 
-![image](pics/hubble-ui.png)
+![image](images/hubble-ui.png)
 
 #### Hubble CLI
 Install the Hubble CLI client: 
@@ -107,18 +111,15 @@ Jun  1 09:05:36.324: 10.0.2.139:55266 (remote-node) <- 10.0.1.24:4240 (health) t
 
 ### Blob storage size
 
-AWS: 
+- AWS
 ```shell
 aws s3 ls s3://emrys-afon-bucket/acceptancetests/ --recursive --summarize | grep "Total Size
 ```
-
-Azure:
+- Azure
 ```shell
 az storage blob list   --account-name afonstorageaccount   --container-name afonstorage  --prefix acceptancetests/   --query "[].properties.contentLength"   --output tsv | awk '{sum+=$1} END {printf "%.2f kb\n", sum/1024}'
 ```
-
-GCP:
+- GCP
 ```shell
 gcloud storage du -s gs://emrys_afon_core/acceptancetests/**
 ```
-

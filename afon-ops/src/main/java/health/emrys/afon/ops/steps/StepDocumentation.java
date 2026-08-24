@@ -1,7 +1,8 @@
 package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
@@ -11,6 +12,9 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET;
+import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
+import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static java.lang.String.format;
 
 public class StepDocumentation extends StepActions {
@@ -78,10 +82,10 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public Step waitFor(String domain) {
-        return new Step(stepNameWaitingFor(domain), "Wait for DNS servers", () -> {
+    public Step waitOnDNS(String domain) {
+        return new Step(stepNameWaitOn(domain), "Wait on DNS", () -> {
             out.println(format("""
-                                   Wait for DNS servers to recognise %s. On a Unix system, running:
+                                   Wait on DNS for domain %s. On a Unix system, running:
                                    ```shell
                                    dig A %s +short
                                    ```
@@ -92,21 +96,33 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public void deleteTerraformStateFiles(AfonCloud id) throws IOException {
+    void deleteTfStateFiles(AfonCloud id) throws IOException {
         out.println(format("""
-                           Delete `./%s%s*`
-                           """, TERRAFORM_STATE_FILE_PATTERN, id));
+                           Delete `%s`
+                           """, tfStatePath(id)));
         out.flush();
     }
 
     @Override
-    public void deletePath(Path path) {
+    void deletePath(Path path) {
         out.println(format("Delete `%s`", path));
         out.flush();
     }
 
     @Override
-    public void runSnowflakeSql(String[] statements) {
+    public String azureFirstFile(AfonPropertyProvider properties, String glob, boolean descendingOrder) {
+        out.println("Get Azure first file:");
+        String     bucket     = properties.getValue(AZURE_BUCKET);
+        String     account    = properties.getValue(AZURE_STORAGE_ACCOUNT);
+        return format(
+                "abfss://%s@%s.dfs.core.windows.net/%s",
+                bucket,
+                account,
+                "latestName");
+    }
+
+    @Override
+    public void runSnowflakeSql(AfonPropertyProvider properties, String[] statements) {
         out.println("Run Snowflake SQL:");
         for (String sql : statements) {
             out.println(format(
@@ -118,6 +134,5 @@ public class StepDocumentation extends StepActions {
             out.flush();
         }
     }
-
-
+    
 }

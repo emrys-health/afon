@@ -1,5 +1,7 @@
 package health.emrys.afon.ops.spark;
 
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -20,8 +22,8 @@ public class SparkTestWriter extends SparkChecker {
 
     private static final Logger logger = getLogger(SparkTestWriter.class);
 
-    public static void main(String[] args) {
-        parseAndExecute(args, new SparkTestWriter());
+    public SparkTestWriter(AfonPropertyProvider properties) {
+        super(properties);
     }
 
     public void doCheck(SparkSession spark, String warehouse, String namespace) {
@@ -48,6 +50,11 @@ public class SparkTestWriter extends SparkChecker {
         df.write()
           .mode("overwrite")   // or "append"
           .saveAsTable(fqn);
+    }
+
+    public static void main(String[] args) {
+        var properties = new FilePropertyProvider();
+        parseAndExecute(args, new SparkTestWriter(properties));
     }
 
 }

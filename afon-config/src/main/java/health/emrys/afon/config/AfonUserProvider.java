@@ -2,6 +2,8 @@ package health.emrys.afon.config;
 
 import java.util.List;
 
+import static health.emrys.afon.config.AfonUser.UNDEFINED;
+
 public interface AfonUserProvider {
 
 
@@ -10,11 +12,11 @@ public interface AfonUserProvider {
     }
 
     static AfonUser createUser(String username, String password, String email) {
-        return new AfonUser(username, password, email, null, "undefined", "undefined");
+        return createUser(username, password, email, null, UNDEFINED, UNDEFINED);
     }
 
     static AfonUser createUser(String username, String password, String email, String slug) {
-        return new AfonUser(username, password, email, slug, "undefined", "undefined");
+        return createUser(username, password, email, slug, UNDEFINED, UNDEFINED);
     }
 
     static AfonUser createUser(String username, String password, String email, String slug, String firstName, String lastName) {
@@ -35,6 +37,25 @@ public interface AfonUserProvider {
         }
     }
 
+    static AfonUserAcl createUserAcl(String username, String catalogs) {
+        return new AfonUserAcl(username, catalogs);
+    }
+
+    static AfonUserAcl createUserAcl(String... fields) {
+        if ( fields.length == 2 ){
+            return createUserAcl(fields[0], fields[1]);
+        } else {
+            throw new RuntimeException("Invalid user acl fields: "+List.of(fields));
+        }
+    }
+
     List<AfonUser> getUsers();
 
+    List<AfonUserAcl> getUserAcls();
+
+    List<String> getUserNames();
+
+    AfonUser getUser(String username);
+
+    boolean isAuthorised(String username, String catalogName);
 }

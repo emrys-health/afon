@@ -1,7 +1,8 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -10,42 +11,32 @@ import org.slf4j.Logger;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.POLARIS_ENDPOINT;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static java.lang.String.format;
 
 /**
- * Write some PySpark code that can be run in the cloud assuming you're using KeyClaok as te IdP.
+ * Write some PySpark code that can be run in the cloud assuming you're using KeyClaok.
  */
 public class GeneratePySparkKeyCloakMain {
 
     static final Logger log = org.slf4j.LoggerFactory.getLogger(GeneratePySparkKeyCloakMain.class);
 
-    public static void main(String[] args) {
-        String               polarisHost = args[0];
-        GeneratePySparkKeyCloakMain app         = new GeneratePySparkKeyCloakMain(polarisHost);
-        app.generateAndSavePySparkCode();
-    }
-
     private final SparkWarehouseConfig config;
 
-    GeneratePySparkKeyCloakMain(String polarisHost) {
-        log.info("Using {} as the Polaris host");
-        Properties properties = new AfonPropertiesLoader().getProperties();
-        properties.setProperty(POLARIS_ENDPOINT.getName(), polarisHost);
+    GeneratePySparkKeyCloakMain(AfonPropertyProvider properties) {
         SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
-        config = configFactory.getConfig(properties);
+        config = configFactory.createConfig(properties);
     }
 
-    private void generateAndSavePySparkCode() {
+    public void generateAndSavePySparkCode() {
         String pySparkCode = pySparkTestCode();
-        log.info("Config:\n\n{}", pySparkCode);
+        log.info("pySpark:\n\n{}", pySparkCode);
         save(pySparkCode);
     }
 
-    private static void save(String pySparkCode) {
+    private void save(String pySparkCode) {
         String filename = System.getProperty("java.io.tmpdir") + File.separator + "test.py";
         try {
             try (FileOutputStream fos = new FileOutputStream(filename);
@@ -96,7 +87,7 @@ public class GeneratePySparkKeyCloakMain {
         return python.toString();
     }
 
-    private static @NonNull String toSparkName(AfonCloud cloud) {
+    private @NonNull String toSparkName(AfonCloud cloud) {
         return "test_" + cloud;
     }
 
@@ -110,5 +101,18 @@ public class GeneratePySparkKeyCloakMain {
             df_read.show()
             """, toSparkName(AWS), tableName);
     }
+
+    public static void main(String[] args) {
+        if (args.length == 0) {
+            System.out.printf("%s requires argument: polaris-host", GeneratePySparkKeyCloakMain.class.getSimpleName());
+            return;
+        }
+        String polarisHost = args[0];
+        log.info("Using {} as the Polaris host");
+        var properties = new FilePropertyProvider();
+        properties.setValue(POLARIS_ENDPOINT, polarisHost);
+        new GeneratePySparkKeyCloakMain(properties).generateAndSavePySparkCode();
+    }
+
 
 }

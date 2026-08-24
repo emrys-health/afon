@@ -4,23 +4,27 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * An Afon user. {@code email} is the OIDC identity (the JupyterHub username and the
- * Guacamole login); {@code slug} is a DNS/label-safe form used for the per-user VNC Service
+ * An Afon user.
+ * {@code email} is the OIDC identity (the JupyterHub username and the
+ * Guacamole login)
+ * {@code slug} is RFC-1123 compliant form used for the per-user VNC Service
  * name and the pod label, since an email address is valid as neither.
  */
 public record AfonUser(String username,   // for login via KeyCloak
-                String password,   // for login via KeyCloak
-                String email, // for user auth across systems via X-Forwarded-Email header stamped by OAuth2-Proxy
-                String slug,       // must be RFC-1123 DNS compliant, therefore cannot use email for the slug
-                String firstName,  // needed for user registration in KeyCloak
-                String lastName) {
+                       String password,   // for login via KeyCloak
+                       String email,      // for user auth across systems via X-Forwarded-Email header stamped by OAuth2-Proxy
+                       String slug,       // for user registration in KeyCloak, must be RFC-1123 DNS compliant, therefore cannot use email for the slug
+                       String firstName,
+                       String lastName){
+
+    public static final String UNDEFINED = "undefined";
+
     /**
-     * An RFC-1123 DNS label: lower-case alphanumerics and hyphens, starting and ending with an
-     * alphanumeric, at most 63 characters. Kubernetes applies this to Service names, so a slug that
-     * violates it fails the apply rather than the build.
+     * An RFC-1123 pattern: lower-case alphanumerics and hyphens, starting and ending with alphanumeric, at most 63 characters.
+     * Kubernetes applies this to Service names, so a slug that violates it, fails apply rather than the build.
      */
-    static final Pattern RFC_1123_LABEL = Pattern.compile("[a-z0-9]([-a-z0-9]*[a-z0-9])?"); // needed for user registration in KeyCloak
-    static final int RFC_1123_MAX_LENGTH = 63;
+    private static final Pattern RFC_1123_PATTERN = Pattern.compile("[a-z0-9]([-a-z0-9]*[a-z0-9])?"); // needed for user registration in KeyCloak
+    private static final int RFC_1123_MAX_LENGTH = 63;
 
     public AfonUser {
         // KeyCloak lower-cases e-mail addresses, so the identity that arrives at runtime (as the
@@ -48,8 +52,9 @@ public record AfonUser(String username,   // for login via KeyCloak
      * Note that callers deriving a longer name from a slug (the per-user VNC Service is
      * {@code guac-vnc-<slug>}) need to leave headroom: it is the derived name Kubernetes validates.
      */
-     static boolean isRfc1123Label(String candidate) {
+     private boolean isRfc1123Label(String candidate) {
         return candidate.length() <= RFC_1123_MAX_LENGTH
-                && RFC_1123_LABEL.matcher(candidate).matches();
+                && RFC_1123_PATTERN.matcher(candidate).matches();
     }
+
 }

@@ -1,7 +1,7 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.PolarisHelper.principalRoleName
-import health.emrys.afon.polaris.catalogs.{CloudConfigForPolaris, JsonMaker, PolarisDTOs}
+import health.emrys.afon.polaris.catalogs.{PolarisCatalog, JsonSerialiser, PolarisSerialiser}
 import health.emrys.afon.polaris.config.PermissionsConfigurer
 import health.emrys.afon.polaris.config.PolarisConfigurer._
 import org.apache.polaris.core.admin.model.CatalogPrivilege._
@@ -13,7 +13,7 @@ abstract class PolarisFixture extends Function0[Any] {
 
   val client = AcceptanceTestConfig.instance.getPolarisAdminClient
   val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken()
-  val dtos = new PolarisDTOs(new JsonMaker())
+  val serialiser = new PolarisSerialiser(new JsonSerialiser())
 
 }
 
@@ -25,7 +25,7 @@ abstract class PolarisFixture extends Function0[Any] {
  * CREATE_TABLE_STAGED_WITH_WRITE_DELEGATION
  */
 class CatalogAdminGrant(test: GivenWhenThen,
-                        config: CloudConfigForPolaris,
+                        config: PolarisCatalog,
                         warehouseNameOpt: Option[String] = None,
                         noisy: Boolean = true) extends PolarisFixture {
 
@@ -33,18 +33,18 @@ class CatalogAdminGrant(test: GivenWhenThen,
 
   override def apply(): Any = {
     if (noisy) Given(s"a Polaris endpoint at ${client.getEndpoint}")
-    val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
-    val uri           = getCatalogAdminGrantsURI(warehouseName)
-    val json          = dtos.catalogAdminGrants
+    val warehouseName = warehouseNameOpt.getOrElse(config.catalogName())
+    val uri           = catalogRolesAdminGrantsURI(warehouseName)
+    val json          = serialiser.catalogAdminGrants
     if (noisy) When(s"we call '$uri' with payload:\n$json")
-    val response      = client.putJsonCall(uri, json, accessToken)
+    val response      = client.put(uri, json, accessToken)
     if (noisy) Then(s"Polaris indicates the HTTP request lead to a creation of a resource (HTTP code $REST_CODE_RESOURCE_CREATED)")
     assert(response.getCode == REST_CODE_RESOURCE_CREATED)
   }
 }
 
 class CatalogRoles(test: GivenWhenThen,
-                   config: CloudConfigForPolaris,
+                   config: PolarisCatalog,
                    warehouseNameOpt: Option[String] = None,
                    noisy: Boolean = true) extends PolarisFixture {
 
@@ -56,7 +56,7 @@ class CatalogRoles(test: GivenWhenThen,
   def apply = {
     if (noisy) Given(s"a Polaris endpoint at ${client.getEndpoint}")
     if (noisy) And(s"a principal that's already been created:\n${PolarisHelper.principal.getPrincipal}")
-    val warehouseName = warehouseNameOpt.getOrElse(config.warehouseName())
+    val warehouseName = warehouseNameOpt.getOrElse(config.catalogName())
 
     if (noisy) When(s"we create a catalog role name called '$catalogRoleName'")
     assert(permissions

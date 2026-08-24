@@ -2,35 +2,54 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>health.emrys</groupId>
+    <groupId>health.emrys.afon</groupId>
     <artifactId>afon</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <description>Afon core infrastructure required to enable secure cross cloud querying</description>
+    <description>Afon Core provides the infrastructure required to enable secure cross cloud querying</description>
     <inceptionYear>2025</inceptionYear>
-    <url>https://github.com/emrys-health/afon-core/</url>
+    <url>https://github.com/emrys-health/afon-core</url>
+
     <licenses>
         <license>
             <name>Apache License Version 2.0</name>
             <url>http://www.apache.org/licenses/</url>
+            <distribution>repo</distribution>
         </license>
     </licenses>
+
     <scm>
+        <connection>scm:git:git://github.com/emrys-health/afon-core.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/emrys-health/afon-core.git</developerConnection>
         <url>https://github.com/emrys-health/afon-core.git</url>
+        <tag>HEAD</tag>
     </scm>
+
     <developers>
         <developer>
-            <name>mauro.talevi@emrys.health</name>
+            <id>mauro</id>
+            <name>Mauro Talevi</name>
         </developer>
         <developer>
-            <name>phil.henry@emrys.health</name>
+            <id>phil</id>
+            <name>Phil Henry</name>
         </developer>
         <developer>
-            <name>will@emrys.health</name>
+            <id>will</id>
+            <name>Will Browne</name>
         </developer>
     </developers>
 
     <properties>
+        <!-- afon system properties -->
+        <afon.home>${env.HOME}/.afon</afon.home>
+        <afon.cdktf>${afon.home}/cdktf</afon.cdktf>
+        <afon.cloud></afon.cloud>
+        <afon.logging>INFO</afon.logging>
+        <!-- OFF keeps the console quiet and logs to the file only. -->
+        <afon.logging.console>OFF</afon.logging.console>
+        <afon.exec>-Dafon.home=${afon.home} -Dafon.cloud=${afon.cloud} -Dafon.logging=${afon.logging} -Dafon.logging.console=${afon.logging.console} -Dslf4j.provider=ch.qos.logback.classic.spi.LogbackServiceProvider</afon.exec>
+        <afon.jvm>--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-modules=jdk.incubator.vector --add-opens=java.base/java.nio=ALL-UNNAMED --enable-preview</afon.jvm>
         <!-- compilation and encoding -->
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -38,6 +57,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <!-- versions -->
         <documentation_utils.version>0.11</documentation_utils.version>
+        <classgraph.version>4.8.179</classgraph.version>
         <iceberg.version>1.10.1</iceberg.version>
         <hadoop.version>3.3.4</hadoop.version>
         <httpclient5-fluent.version>5.5</httpclient5-fluent.version>
@@ -46,6 +66,11 @@
         <scala.compat.version>2.13</scala.compat.version>
         <spark.compat.version>4.0</spark.compat.version>
         <spark.version>${spark.compat.version}.1</spark.version>
+        <!-- distribution -->
+        <!-- Skip maven deploy until RM setup-->
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <github.packages.url>https://maven.pkg.github.com/emrys-health/afon-core</github.packages.url>
+        <sonatype.nexus.url>https://s01.oss.sonatype.org</sonatype.nexus.url>
     </properties>
 
     <modules>
@@ -63,36 +88,6 @@
         <module>afon-ops</module>
         <module>afon-docs</module>
     </modules>
-
-    <profiles>
-        <profile>
-            <id>acceptance</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-acceptance</module>
-            </modules>
-        </profile>
-        <profile>
-            <id>distribution</id>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-distribution</module>
-            </modules>
-        </profile>
-        <profile>
-            <id>samples</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-samples</module>
-            </modules>
-        </profile>
-    </profiles>
 
     <dependencyManagement>
         <dependencies>
@@ -130,6 +125,21 @@
                 <groupId>org.jspecify</groupId>
                 <artifactId>jspecify</artifactId>
                 <version>1.0.0</version>
+            </dependency>
+            <!-- Logging uses logback over sfl4j from afon-logging.
+                 Logback 1.5 binds through the slf4j 2.x provider mechanism.
+                 Fixing the dependencies in dependencyManagement ensures that
+                 it will resolve over dependencies pulling in versions of slf4j-api 1.x.
+            -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>1.5.38</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>2.0.18</version>
             </dependency>
             <dependency>
                 <groupId>junit</groupId>
@@ -245,6 +255,31 @@
                     <version>3.6.2</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>3.3.1</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-release-plugin</artifactId>
+                    <version>3.3.1</version>
+                    <configuration>
+                        <autoVersionSubmodules>true</autoVersionSubmodules>
+                        <preparationGoals>clean install</preparationGoals>
+                        <goals>deploy</goals>
+                        <pushChanges>false</pushChanges>
+                        <localCheckout>true</localCheckout>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>3.1.4</version>
+                    <configuration>
+                        <skip>${maven.deploy.skip}</skip>
+                    </configuration>
+                </plugin>
+                <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
                     <version>3.6.3</version>
@@ -271,17 +306,27 @@
                     </executions>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.4</version>
+                    <configuration>
+                        <!-- Pass the afon properties to the forked JVM -->
+                        <argLine>${afon.jvm} ${afon.exec}</argLine>
+                    </configuration>
+                </plugin>
+                <plugin>
                     <groupId>org.scalatest</groupId>
                     <artifactId>scalatest-maven-plugin</artifactId>
                     <version>2.2.0</version>
-                    <!-- Note config is repeated in surefire config -->
                     <configuration>
+                        <!-- Reuse the surefire plugin default reportsDirectory -->
                         <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
                         <junitxml>.</junitxml>
                         <stderr/>
                         <filereports>W scenarios.txt</filereports>
                         <forkMode>once</forkMode>
-                        <argLine>--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-modules=jdk.incubator.vector --add-opens=java.base/java.nio=ALL-UNNAMED --enable-preview</argLine>
+                        <!-- Pass the afon properties to the forked JVM -->
+                        <argLine>${afon.jvm} ${afon.exec}</argLine>
                     </configuration>
                     <executions>
                         <execution>
@@ -305,6 +350,70 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>acceptance</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <modules>
+                <module>afon-acceptance</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>cli</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <modules>
+                <module>afon-cli</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>distribution</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <modules>
+                <module>afon-distribution</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>samples</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <modules>
+                <module>afon-samples</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>github</id>
+            <distributionManagement>
+                <repository>
+                    <id>github-maven-packages</id>
+                    <name>GitHub Maven Packages</name>
+                    <url>${github.packages.url}</url>
+                </repository>
+            </distributionManagement>
+        </profile>
+        <profile>
+            <id>sonatype</id>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>sonatype-nexus-oss</id>
+                    <name>Sonatype Nexus Snapshots</name>
+                    <url>${sonatype.nexus.url}/content/repositories/snapshots/</url>
+                </snapshotRepository>
+                <repository>
+                    <id>sonatype-nexus-oss</id>
+                    <name>Sonatype Nexus Staging</name>
+                    <url>${sonatype.nexus.url}/service/local/staging/deploy/maven2/</url>
+                </repository>
+            </distributionManagement>
+        </profile>
+    </profiles>
 
 
 </project>

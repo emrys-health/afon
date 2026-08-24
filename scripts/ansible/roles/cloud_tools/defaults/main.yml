@@ -1,0 +1,26 @@
+---
+# Mirrors the packages installed by `./afon.sh -a setup-local` (see docs/setup_local.md).
+# Not needed by the acceptance tests themselves — they use the cloud SDKs — but
+# required if the runner also drives the ops/tofu actions.
+install_awscli: true
+# azurecli fails on runner - excluding until issue sorted
+install_azurecli: false
+install_gcloud: true
+install_kubectl: true
+install_opentofu: true
+
+kubectl_version: "v1.32.1"
+opentofu_version: "1.11.6"
+
+awscli_url: "https://awscli.amazonaws.com/awscli-exe-linux-{{ tarball_arch }}.zip"
+kubectl_url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/{{ apt_arch }}/kubectl"
+opentofu_url: >-
+  https://github.com/opentofu/opentofu/releases/download/v{{ opentofu_version }}/tofu_{{ opentofu_version }}_linux_{{ apt_arch }}.zip
+
+azure_key_url: https://packages.microsoft.com/keys/microsoft.asc
+azure_keyring: /etc/apt/keyrings/microsoft.asc
+azure_repo_url: https://packages.microsoft.com/repos/azure-cli/
+
+gcloud_key_url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+gcloud_keyring: /etc/apt/keyrings/cloud.google.asc
+gcloud_repo_url: https://packages.cloud.google.com/apt

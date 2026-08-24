@@ -1,40 +1,34 @@
 package health.emrys.afon.cluster;
 
-import health.emrys.afon.config.AfonProperties;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
-import java.util.Properties;
+import static health.emrys.afon.config.AfonProperty.*;
 
 public class PolarisClusterCredentials implements ClusterCredentials {
 
-    public static ClusterCredentials createClusterCredentials(AfonCloud cloud) {
-        return new PolarisClusterCredentials(polarisDomainName(cloud));
+    private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
+    private final AfonPropertyProvider properties;
+    private final String accessToken;
+
+    public PolarisClusterCredentials(AfonCloud cloud, AfonPropertyProvider properties) {
+        this.properties = properties;
+        this.properties.setValue(POLARIS_ENDPOINT, polarisDomainName(cloud));
+        this.accessToken = clientFactory.createClient(this.properties).getAccessToken();
     }
 
-    private static String polarisDomainName(AfonCloud cloud) {
-        Properties properties = new AfonPropertiesLoader().getProperties();
+    private String polarisDomainName(AfonCloud cloud) {
         switch ( cloud ) {
             case AWS:
-                return AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
+                return properties.getValue(AWS_POLARIS_DOMAIN_NAME);
             case AZURE:
-                return AfonProperties.AZURE_DOMAIN_NAME.getValueFrom(properties);
+                return properties.getValue(AZURE_DOMAIN_NAME);
             case GCP:
-                return AfonProperties.GCP_DOMAIN_NAME.getValueFrom(properties);
+                return properties.getValue(GCP_DOMAIN_NAME);
             default:
                 throw new RuntimeException("Unsupported cloud "+cloud);
         }
-
-    }
-
-    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
-    private final Properties properties;
-    private final String accessToken;
-
-    public PolarisClusterCredentials(String domain) {
-        properties = new AfonPropertiesLoader().getProperties();
-        accessToken = clientFactory.getPolarisClient(domain, properties).getAccessToken();
     }
 
     @Override
@@ -44,17 +38,17 @@ public class PolarisClusterCredentials implements ClusterCredentials {
 
     @Override
     public String getPolarisId() {
-        return AfonProperties.POLARIS_ID.getValueFrom(properties);
+        return properties.getValue(POLARIS_ID);
     }
 
     @Override
     public String getPolarisSecret() {
-        return AfonProperties.POLARIS_SECRET.getValueFrom(properties);
+        return properties.getValue(POLARIS_SECRET);
     }
 
     @Override
     public String getPolarisHost() {
-        return AfonProperties.POLARIS_ENDPOINT.getValueFrom(properties);
+        return properties.getValue(POLARIS_ENDPOINT);
     }
 
 }

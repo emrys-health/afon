@@ -1,0 +1,60 @@
+---
+# Docker on this runner uses the containerd image store (Storage Driver:
+# overlayfs, io.containerd.snapshotter.v1), so the images live under
+# /var/lib/containerd, not under docker's own data root. Moving docker alone
+# leaves the several GB of Testcontainers images on the root filesystem.
+- name: Look for an installed containerd
+  ansible.builtin.stat:
+    path: /usr/bin/containerd
+  register: afon_containerd
+
+- name: Move the containerd store onto {{ lvm_data_mount }}
+  when: afon_containerd.stat.exists
+  block:
+    - name: Look for the new containerd store
+      ansible.builtin.stat:
+        path: "{{ lvm_containerd_root }}"
+      register: afon_containerd_root_dir
+
+    # docker is stopped first and started last: it requires containerd, and
+    # pulling the store out from under a running daemon loses its images.
+    - name: Stop docker and containerd before moving the store
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - docker.service
+        - docker.socket
+        - containerd.service
+      when: not afon_containerd_root_dir.stat.exists
+
+    - name: Copy /var/lib/containerd to {{ lvm_containerd_root }}
+      ansible.builtin.command: >-
+        rsync --archive --hard-links --acls --xattrs --numeric-ids
+        /var/lib/containerd/ {{ lvm_containerd_root }}/
+      register: afon_containerd_rsync
+      changed_when: afon_containerd_rsync.rc == 0
+      when: not afon_containerd_root_dir.stat.exists
+
+    # The shipped config carries the setting commented out, so this replaces
+    # that line in place. It is a top-level key and must stay above any table.
+    - name: Point containerd at {{ lvm_containerd_root }}
+      ansible.builtin.lineinfile:
+        path: /etc/containerd/config.toml
+        regexp: '^\s*#?\s*root\s*='
+        line: 'root = "{{ lvm_containerd_root }}"'
+        insertbefore: BOF
+        create: true
+        owner: root
+        group: root
+        mode: "0644"
+      register: afon_containerd_config
+
+    - name: Run containerd and docker on the configured store
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        state: "{{ 'restarted' if afon_containerd_config is changed else 'started' }}"
+      loop:
+        - containerd.service
+        - docker.service

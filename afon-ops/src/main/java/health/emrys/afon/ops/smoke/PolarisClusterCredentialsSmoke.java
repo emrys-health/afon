@@ -2,29 +2,23 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.cluster.ClusterCredentials;
 import health.emrys.afon.cluster.PolarisClusterCredentials;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
-import org.slf4j.Logger;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.FilePropertyProvider;
 
-import static health.emrys.afon.config.AfonProperties.AfonCloud.*;
+import static health.emrys.afon.config.AfonCloud.*;
 
 public class PolarisClusterCredentialsSmoke {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisClusterCredentialsSmoke.class);
-
-    public PolarisClusterCredentialsSmoke() {
+    public void smokeTest(AfonCloud cloud, ClusterCredentials credentials) {
+        System.out.printf("Access token for %s: %s", cloud, credentials.getAccessToken());
     }
 
-    public void createCredentials(AfonCloud cloud) {
-        logger.info("Creating cluster credentials for "+ cloud);
-        ClusterCredentials credentials = PolarisClusterCredentials.createClusterCredentials(cloud);
-        logger.info("Access token for {}: {}", cloud, credentials.getAccessToken());
-    }
-
-    public void main(String[] args) {
+    public static void main(String[] args) {
         var app = new PolarisClusterCredentialsSmoke();
-        app.createCredentials(AWS);
-        app.createCredentials(AZURE);
-        app.createCredentials(GCP);
+        var properties = new FilePropertyProvider();
+        app.smokeTest(AWS, new PolarisClusterCredentials(AWS, properties));
+        app.smokeTest(AZURE, new PolarisClusterCredentials(AZURE, properties));
+        app.smokeTest(GCP, new PolarisClusterCredentials(GCP, properties));
     }
 
 }

@@ -1,0 +1,239 @@
+name: AWS Stack (Linux)
+
+# Runs afon.sh's stack deploy or delete for AWS from the self-hosted Linux runner, ie
+# ops.DeployAwsFullStackMain or ops.DeleteAwsFullStackMain — the same entry points as docs/stacks.md.
+#
+# deploy run first delete against the stack that is currently up, and the run then recreates it.
+# delete just tears down the stack and leaves it down — a later deploy is what brings it back.
+# Either way there is a window of about hour or more where Polaris and Jupyter are unavailable.
+# Hence, workflow_dispatch only and never on push, but could be on a schedule.
+#
+# The runner needs, beyond what the acceptance tests need (see acceptance-tests-linux.yml):
+#   - the aws cli, tofu and kubectl on PATH  (scripts/ansible, `-e install_cloud_tools=true`)
+#   - AWS *admin* credentials, which are NOT the Polaris service account credentials held in
+#     secret-aws.properties. Set them as the AWS_DEPLOY_* secrets below, or leave those unset and
+#     let the runner's own credentials (EC2 instance profile, or ~/.aws/credentials) be used.
+#   - $AFON_CDKTF to keep the tofu state between runs and points /data/afon/cdktf on the runner
+#     and is different from $AFON_HOME which lives in the GitHub workspace.
+#
+# The $AFON_HOME/config files are reconstructed from the same base64 repository secrets the
+# acceptance workflow uses; `scripts/github/secrets.sh push` publishes them.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Stack action to run"
+        type: choice
+        options: [deploy, delete]
+        required: true
+      build_cli:
+        description: "Build cli"
+        type: boolean
+        required: false
+      from_step:
+        description: "deploy only: resume from this step, eg all_catalogs_in_emryspolaris (blank runs every step, starting with the teardown). Ignored by delete."
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+# One stack action at a time, and never cancel one in flight: a half-applied plan leaves both AWS
+# and the local tfstate in a state the next run has to untangle by hand.
+concurrency:
+  group: stack-aws-linux
+  cancel-in-progress: false
+
+env:
+  # Keep config inside the workspace rather than the runner's home, so it is scoped to this run.
+  AFON_HOME: ${{ github.workspace }}/.afon
+  AFON_CDKTF: /data/afon/cdktf
+  # Without this the JVM takes a quarter of the runner's RAM as its max heap, which is not
+  # enough for javac to open the spark jars. Set explicitly so the build does not silently
+  # depend on the instance size.
+  MAVEN_OPTS: -Xmx3g
+
+jobs:
+  stack:
+    # NOTE: in case of multiple Linux runner, we need to narrow the labels to one runner.
+    # The tofu state is kept on the runner, so the job must run on the same runner.
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Verify runner tooling
+        run: |
+          set -euo pipefail
+          java -version
+          mvn -version
+          tofu version
+          aws --version
+          kubectl version --client
+          free -h
+          df -h /
+
+      - name: Write afon config from secrets
+        env:
+          AFON_PROPERTIES: ${{ secrets.AFON_PROPERTIES }}
+          AFON_AWS_PROPERTIES: ${{ secrets.AFON_AWS_PROPERTIES }}
+          AFON_AZURE_PROPERTIES: ${{ secrets.AFON_AZURE_PROPERTIES }}
+          AFON_GCP_PROPERTIES: ${{ secrets.AFON_GCP_PROPERTIES }}
+          SECRET_PROPERTIES: ${{ secrets.SECRET_PROPERTIES }}
+          SECRET_AWS_PROPERTIES: ${{ secrets.SECRET_AWS_PROPERTIES }}
+          SECRET_AZURE_PROPERTIES: ${{ secrets.SECRET_AZURE_PROPERTIES }}
+          SECRET_GCP_PROPERTIES: ${{ secrets.SECRET_GCP_PROPERTIES }}
+          USERS_CSV: ${{ secrets.USERS_CSV }}
+          USERS_ACL_CSV: ${{ secrets.USERS_ACL_CSV }}
+        run: |
+          set -euo pipefail
+          CONFIG_DIR="$AFON_HOME/config"
+          rm -rf "$CONFIG_DIR"
+          mkdir -p "$CONFIG_DIR"
+          chmod 700 "$CONFIG_DIR"
+          echo "Writing config to $CONFIG_DIR"
+
+          # Secret values are base64 so that multi-line properties (SNOWFLAKE_PRIVATE_KEY,
+          # GOOGLE_APPLICATION_CREDENTIALS) survive the round trip byte for byte.
+          write_config() {
+            local file="$1" encoded="$2"
+            if [ -z "$encoded" ]; then
+              echo "::error::Missing repository secret for config file $file"
+              return 1
+            fi
+            printf '%s' "$encoded" | base64 -d > "$CONFIG_DIR/$file"
+            chmod 600 "$CONFIG_DIR/$file"
+            echo "Wrote $file ($(wc -c < "$CONFIG_DIR/$file") bytes)"
+          }
+          write_config afon.properties         "$AFON_PROPERTIES"
+          write_config afon-aws.properties     "$AFON_AWS_PROPERTIES"
+          write_config afon-azure.properties   "$AFON_AZURE_PROPERTIES"
+          write_config afon-gcp.properties     "$AFON_GCP_PROPERTIES"
+          write_config secret.properties       "$SECRET_PROPERTIES"
+          write_config secret-aws.properties   "$SECRET_AWS_PROPERTIES"
+          write_config secret-azure.properties "$SECRET_AZURE_PROPERTIES"
+          write_config secret-gcp.properties   "$SECRET_GCP_PROPERTIES"
+          write_config users.csv               "$USERS_CSV"
+          write_config users-acl.csv           "$USERS_ACL_CSV"
+
+      - name: Validate afon config
+        run: ./afon.sh -a config-validate
+
+      - name: Configure the deploy environment
+        env:
+          # The AWS admin credentials tofu and the aws cli run as. Distinct from the Polaris service
+          # account credentials in secret-aws.properties (see docs/configuration.md). Leave both
+          # secrets unset to use the credentials the runner already has.
+          AWS_DEPLOY_ACCESS_KEY_ID: ${{ secrets.AWS_DEPLOY_ACCESS_KEY_ID }}
+          AWS_DEPLOY_SECRET_ACCESS_KEY: ${{ secrets.AWS_DEPLOY_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+
+          # One source of truth for the region: the config we just wrote.
+          AWS_REGION=$(sed -n 's/^AWS_REGION=//p' "$AFON_HOME/config/afon-aws.properties" | tr -d '\r')
+          if [ -z "$AWS_REGION" ]; then
+            echo "::error::AWS_REGION is not set in afon-aws.properties"
+            exit 1
+          fi
+          echo "AWS_REGION=$AWS_REGION"       >> "$GITHUB_ENV"
+          echo "AWS_DEFAULT_REGION=$AWS_REGION" >> "$GITHUB_ENV"
+
+          if [ -n "$AWS_DEPLOY_ACCESS_KEY_ID" ]; then
+            echo "Using the AWS_DEPLOY_* credentials"
+            echo "AWS_ACCESS_KEY_ID=$AWS_DEPLOY_ACCESS_KEY_ID"         >> "$GITHUB_ENV"
+            echo "AWS_SECRET_ACCESS_KEY=$AWS_DEPLOY_SECRET_ACCESS_KEY" >> "$GITHUB_ENV"
+          else
+            echo "AWS_DEPLOY_* secrets not set: using the runner's own credentials"
+          fi
+
+          # The tofu kubernetes and helm providers read KUBE_CONFIG_PATH (see the deployment
+          # checklist in README.md). It has to stay at the default path: the kubeconfig is written
+          # by `aws eks update-kubeconfig` in a local-exec provisioner that passes no --kubeconfig,
+          # and GenericK8sClient reads ~/.kube/config directly, so pointing KUBECONFIG elsewhere
+          # would split the two apart.
+          mkdir -p "$HOME/.kube"
+          echo "KUBE_CONFIG_PATH=$HOME/.kube/config" >> "$GITHUB_ENV"
+
+      - name: Check the AWS credentials
+        run: |
+          set -euo pipefail
+          if ! aws sts get-caller-identity; then
+            echo "::error::No usable AWS credentials. Set the AWS_DEPLOY_ACCESS_KEY_ID and AWS_DEPLOY_SECRET_ACCESS_KEY secrets, or give the runner an instance profile."
+            exit 1
+          fi
+
+      - name: Build cli
+        if: ${{ inputs.build_cli == true }}
+        run: |
+          set -euo pipefail
+          # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
+          # The Actions log renders the escape codes, so the output reads as it does in a shell.
+          ./afon.sh -a build -g "clean package" -p cli \
+            --build-args "-Dafon.cli.dir=/data/afon/cli -B -ntp -Dstyle.color=always"
+
+      - name: Build components without acceptance tests
+        run: |
+          set -euo pipefail
+          # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
+          # The Actions log renders the escape codes, so the output reads as it does in a shell.
+          ./afon.sh -a build -p -acceptance \
+            --build-args "-B -ntp -Dstyle.color=always"
+
+      - name: Run the AWS stack action
+        env:
+          ACTION: ${{ inputs.action }}
+          # Blank runs every step; a step name (eg aws_spark) resumes from there, per docs/stacks.md.
+          # Only meaningful for deploy — DeleteAwsFullStackMain has a single step (clean_aws).
+          FROM_STEP: ${{ inputs.from_step }}
+        run: |
+          set -euo pipefail
+          # Using --logging-console INFO because a run this long is unreadable in the Actions log otherwise.
+          if [ "$ACTION" == "delete" ]; then
+            if [ -n "$FROM_STEP" ]; then
+              echo "::warning::from_step is ignored by delete"
+            fi
+            ./afon.sh -a exec --exec-class ops.DeleteAwsFullStackMain \
+               --logging-console INFO
+          else
+            if [ -n "$FROM_STEP" ]; then
+              echo "Deploy resumes from step $FROM_STEP"
+            fi
+            ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain \
+              --logging-console INFO --exec-args "$FROM_STEP"
+          fi
+
+      - name: Report the cluster status
+        if: always()
+        continue-on-error: true
+        run: |
+          ./afon.sh -a script --script-path aws/vpcs.sh
+          kubectl get pods -A
+
+      - name: Upload stack logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          # afon-core.log is the full run log (logback writes it under $AFON_HOME/logs). It
+          # carries configuration values, so the artifact is as sensitive as the config itself —
+          # it is visible to anyone with read access to this repo.
+          name: afon-stack-aws-logs-${{ github.run_id }}
+          path: |
+            ${{ github.workspace }}/.afon/logs/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Remove afon config
+        if: always()
+        run: rm -rf "$AFON_HOME/config"

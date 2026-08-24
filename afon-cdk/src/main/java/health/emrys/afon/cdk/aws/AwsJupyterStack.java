@@ -1,9 +1,6 @@
 package health.emrys.afon.cdk.aws;
 
-import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.Fn;
-import com.hashicorp.cdktf.ITerraformDependable;
-import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.*;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -14,41 +11,24 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.NetworkConfig;
 import health.emrys.afon.cdk.SparkConfig;
-import health.emrys.afon.config.AfonProperties.AfonCloud;
-import health.emrys.afon.config.AfonPropertiesLoader;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
-import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
-import static health.emrys.afon.config.AfonProperties.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonCloud.AWS;
 
-/***
- * Creates the markup to create the full stack in AWS.
- * Note: it does not create anything other than JSON files!
- * You need to run tofu on those files for the infra to be provisioned.
- * Don't forget to
- * <UL>
- *     <LI>
- *          set environment variables, something like <pre>KUBE_CONFIG_PATH=$HOME/.kube/config</pre>
- *     </LI>
- *      <LI>
- *          <pre>unalias aws</pre> if you're using the Dockerized version and put the actual binary in your
- *          <pre>PATH</pre>
- *      </LI>
- * </UL>
- * when you run the output
- */
 public class AwsJupyterStack extends AwsPolarisStack {
-
-    static final Logger logger                     = org.slf4j.LoggerFactory.getLogger(AwsJupyterStack.class);
 
     /**
      * Password the Jupyter VNC server is configured with. Kept in-cluster only — the
@@ -61,7 +41,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
 
     public AwsJupyterStack(final Construct scope,
                            final AfonCloud id,
-                           final Properties properties) {
+                           final AfonPropertyProvider properties) {
         super(scope, id, properties);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
         JupyterHubConfig jupyter = new AwsJupyterHubConfig(
@@ -157,9 +137,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
                        .dependsOn(eksDependOn)
                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                        .name("csi-secrets-store") // The release name
-                       .chart("secrets-store-csi-driver") // The chart name within the repository
-                       .version("1.5.4")
-                       .repository("https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts")
+                       .chart(vendoredChart(this, "csiDriverChart", "secrets-store-csi-driver-1.5.4.tgz"))
                        .namespace("kube-system") // Target Kubernetes namespace
                        .timeout(300) // Wait up to 300 seconds for the deployment to stabilize
                        .atomic(true) // If installation fails, completely uninstall the release
@@ -167,10 +145,8 @@ public class AwsJupyterStack extends AwsPolarisStack {
     }
 
     public static void main(String[] args) {
-        final App app = new App();
-        new AwsJupyterStack(app, AWS, new AfonPropertiesLoader().getProperties());
+        final App app = createApp();
+        new AwsJupyterStack(app, AWS, new FilePropertyProvider());
         app.synth();
-        logger.warn("Don't forget to export KUBE_CONFIG_PATH=$HOME/.kube/config and unalias aws before running tofu " +
-                    "-apply");
     }
 }

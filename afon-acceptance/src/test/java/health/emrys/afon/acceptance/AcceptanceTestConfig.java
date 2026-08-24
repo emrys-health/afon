@@ -1,15 +1,16 @@
 package health.emrys.afon.acceptance;
 
-import health.emrys.afon.config.AfonPropertiesLoader;
-import health.emrys.afon.polaris.catalogs.AwsCloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.AzureCloudConfigForPolaris;
-import health.emrys.afon.polaris.catalogs.GoogleCloudConfigForPolaris;
-import health.emrys.afon.polaris.config.AfonPolarisClient;
-import health.emrys.afon.polaris.config.AfonPolarisClientFactory;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.Redacter;
+import health.emrys.afon.polaris.catalogs.AwsPolarisCatalog;
+import health.emrys.afon.polaris.catalogs.AzurePolarisCatalog;
+import health.emrys.afon.polaris.catalogs.GcpPolarisCatalog;
+import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
-import java.util.Properties;
-
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
 
@@ -18,99 +19,97 @@ public class AcceptanceTestConfig {
     public static final AcceptanceTestConfig instance;
 
     static {
-        AfonPropertiesLoader loader = new AfonPropertiesLoader();
-        instance = new AcceptanceTestConfig(loader.getProperties());
+        instance = new AcceptanceTestConfig(new FilePropertyProvider());
     }
 
-    private final AfonPolarisClientFactory clientFactory = AfonPolarisClientFactory.clientFactory();
+    private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
 
-    private final AfonPolarisClient           polarisAdminClient;
-    private final AwsCloudConfigForPolaris    awsCloudConfigForPolaris;
-    private final AwsCloudConfigForPolaris    awsForbidden;
-    private final AzureCloudConfigForPolaris  azureCloudConfigForPolaris;
-    private final AzureCloudConfigForPolaris  azureForbidden;
-    private final GoogleCloudConfigForPolaris gcpCloudConfigForPolaris;
-    private final GoogleCloudConfigForPolaris gcpForbidden;
+    private final PolarisRestClient polarisAdminClient;
+    private final AwsPolarisCatalog awsPolarisCatalog;
+    private final AwsPolarisCatalog awsForbidden;
+    private final AzurePolarisCatalog azurePolarisCatalog;
+    private final AzurePolarisCatalog azureForbidden;
+    private final GcpPolarisCatalog gcpCloudConfigForPolaris;
+    private final GcpPolarisCatalog gcpForbidden;
     private final String                      adminClientId;
     private final String                      adminClientSecret;
-    private final Properties                  properties;
-    private final AwsCloudConfigForPolaris    awsTrino;
-    private final AfonPolarisClient           polarisClient;
+    private final AwsPolarisCatalog awsTrino;
+    private final PolarisRestClient polarisClient;
+    private final AfonPropertyProvider properties;
 
-    private AcceptanceTestConfig(Properties properties) {
-        properties.put(KC_HOSTNAME.getName(), ContainerHelper.KEYCLOAK_HOSTNAME);
-        this.adminClientId     = POLARIS_ID.getValueFrom(properties);
-        this.adminClientSecret = POLARIS_SECRET.getValueFrom(properties);
-        this.properties        = properties;
-        startContainers(properties);
+    private AcceptanceTestConfig(AfonPropertyProvider properties) {
+        this.properties = properties;
+        this.properties.setValue(KC_HOSTNAME, ContainerHelper.KEYCLOAK_HOSTNAME);
+        this.adminClientId     = properties.getValue(POLARIS_ID);
+        this.adminClientSecret = properties.getValue(POLARIS_SECRET);
+        startContainers(this.properties);
         this.polarisAdminClient       = polarisClientFor(adminClientId, adminClientSecret);
-        this.polarisClient            = clientFactory.getPolarisClient(properties);
-        this.awsCloudConfigForPolaris = new AwsCloudConfigForPolaris(properties);
-        this.awsTrino                 = new AwsCloudConfigForPolaris(properties) {
+        this.polarisClient            = clientFactory.createClient(this.properties);
+        this.awsPolarisCatalog = new AwsPolarisCatalog(this.properties);
+        this.awsTrino                 = new AwsPolarisCatalog(this.properties) {
             @Override
-            public String getBucketUri() {
-                return bucketToUrl(AWS_S3_BUCKET_NAME_TRINO.getValueFrom(properties));
+            public String bucketUri() {
+                return bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME_TRINO));
             }
 
             @Override
-            public String warehouseName() {
+            public String catalogName() {
                 return AfonCloud.AWS_TRINO.toString();
             }
         };
-        this.awsForbidden               = new AwsCloudConfigForPolaris(properties) {
+        this.awsForbidden               = new AwsPolarisCatalog(this.properties) {
             @Override
-            public String getBucketUri() {
-                return bucketToUrl(AWS_S3_BUCKET_NAME_FORBIDDEN.getValueFrom(properties));
+            public String bucketUri() {
+                return bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN));
             }
 
             @Override
-            public String warehouseName() {
+            public String catalogName() {
                 return AfonCloud.AWS_FORBIDDEN.toString();
             }
         };
-        this.gcpForbidden               = new GoogleCloudConfigForPolaris(properties) {
+        this.gcpForbidden               = new GcpPolarisCatalog(this.properties) {
             @Override
-            public String warehouseName() {
+            public String catalogName() {
                 return AfonCloud.GCP_FORBIDDEN.toString();
             }
 
             @Override
-            public String getBucketUri() {
-                return toBucketUri(GCP_BUCKET_NAME_FORBIDDEN.getValueFrom(properties));
+            public String bucketUri() {
+                return toBucketUri(properties.getValue(GCP_BUCKET_NAME_FORBIDDEN));
             }
         };
-        this.gcpCloudConfigForPolaris   = new GoogleCloudConfigForPolaris(properties);
-        this.azureCloudConfigForPolaris = new AzureCloudConfigForPolaris(properties);
-        this.azureForbidden             = new AzureCloudConfigForPolaris(properties) {
-            public String warehouseName() {
+        this.gcpCloudConfigForPolaris   = new GcpPolarisCatalog(this.properties);
+        this.azurePolarisCatalog = new AzurePolarisCatalog(this.properties);
+        this.azureForbidden             = new AzurePolarisCatalog(this.properties) {
+            public String catalogName() {
                 return AfonCloud.AZURE_FORBIDDEN.toString();
             }
 
             @Override
-            public String getBucketUri() {
+            public String bucketUri() {
                 return bucketUrl(
-                    AZURE_BUCKET_FORBIDDEN.getValueFrom(properties),
-                    AZURE_STORAGE_ACCOUNT.getValueFrom(properties));
+                        properties.getValue(AZURE_BUCKET_FORBIDDEN),
+                        properties.getValue(AZURE_STORAGE_ACCOUNT));
             }
         };
     }
 
-    public AfonPolarisClient polarisClientFor(String clientId, String clientSecret) {
-        return clientFactory.getPolarisClient(
-            POLARIS_ENDPOINT.getValueFrom(this.properties),
-            clientId,
-            clientSecret,
-            ContainerHelper.KEYCLOAK_HOSTNAME);
+    public PolarisRestClient polarisClientFor(String clientId, String clientSecret) {
+        return clientFactory.createClient(
+                ContainerHelper.KEYCLOAK_HOSTNAME, this.properties.getValue(POLARIS_ENDPOINT),
+                clientId, clientSecret
+        );
     }
 
-    private static void startContainers(Properties properties) {
+    private static void startContainers(AfonPropertyProvider properties) {
         ContainerHelper containerHelper = ContainerHelper.instance;
         containerHelper.startKeyCloak(properties);
         containerHelper.startPolaris(properties);
         containerHelper.startTrino(properties);
     }
 
-    public AfonPolarisClient getPolarisClient() {
+    public PolarisRestClient getPolarisClient() {
         return polarisClient;
     }
 
@@ -118,7 +117,7 @@ public class AcceptanceTestConfig {
         return polarisClient.getAccessToken();
     }
 
-    public AfonPolarisClient getPolarisAdminClient() {
+    public PolarisRestClient getPolarisAdminClient() {
         return polarisAdminClient;
     }
 
@@ -134,38 +133,40 @@ public class AcceptanceTestConfig {
         return adminClientSecret;
     }
 
-    public AwsCloudConfigForPolaris getAwsCloudConfigForPolaris() {
-        return awsCloudConfigForPolaris;
+    public AwsPolarisCatalog getAwsCloudConfigForPolaris() {
+        return awsPolarisCatalog;
     }
 
-    public GoogleCloudConfigForPolaris getGcpCloudConfigForPolaris() {
+    public GcpPolarisCatalog getGcpCloudConfigForPolaris() {
         return gcpCloudConfigForPolaris;
     }
 
-    public AzureCloudConfigForPolaris getAzureCloudConfigForPolaris() {
-        return azureCloudConfigForPolaris;
+    public AzurePolarisCatalog getAzureCloudConfigForPolaris() {
+        return azurePolarisCatalog;
     }
 
-    public AwsCloudConfigForPolaris getAwsForbidden() {
+    public AwsPolarisCatalog getAwsForbidden() {
         return awsForbidden;
     }
 
-    public GoogleCloudConfigForPolaris getGcpForbidden() {
+    public GcpPolarisCatalog getGcpForbidden() {
         return gcpForbidden;
     }
 
-    public AzureCloudConfigForPolaris getAzureForbidden() {
+    public AzurePolarisCatalog getAzureForbidden() {
         return azureForbidden;
     }
 
 
-    public AwsCloudConfigForPolaris getAwsTrino() {
+    public AwsPolarisCatalog getAwsTrino() {
         return awsTrino;
     }
 
-    public Properties getProperties() {
-        Properties props = new Properties();
-        props.putAll(properties);
-        return props;
+    public AfonPropertyProvider getProperties() {
+        return this.properties;
+    }
+
+    public String redactSecrets(String content, String source) {
+        return Redacter.redactSecrets(content, source, properties.getSecretProperties());
     }
 }

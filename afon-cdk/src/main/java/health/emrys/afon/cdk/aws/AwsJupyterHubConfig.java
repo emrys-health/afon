@@ -6,13 +6,13 @@ import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.JupyterMfaConfig;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 
-import static health.emrys.afon.config.AfonProperties.*;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
 
 /**
@@ -30,13 +30,13 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
 
     public AwsJupyterHubConfig(TerraformStack stack,
                                AwsCloudProvider cloudProvider,
-                               Properties properties,
+                               AfonPropertyProvider properties,
                                Route53Record keycloakAliasRecord) {
         super(stack, properties);
         this.cloudProvider       = cloudProvider;
-        this.jupyterDomain       = AWS_JUPYTER_DOMAIN.getValueFrom(properties);
-        this.jupyterDnsZoneId    = AWS_JUPYTER_DNS_ZONE.getValueFrom(properties);
-        this.jupyterCertArn      = AfonProperties.AWS_JUPYTER_CERT_ARN.getValueFrom(properties);
+        this.jupyterDomain       = properties.getValue(AWS_JUPYTER_DOMAIN);
+        this.jupyterDnsZoneId    = properties.getValue(AWS_JUPYTER_DNS_ZONE);
+        this.jupyterCertArn      = properties.getValue(AfonProperty.AWS_JUPYTER_CERT_ARN);
         this.stack               = stack;
         this.keycloakAliasRecord = keycloakAliasRecord;
     }
@@ -75,11 +75,12 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
         return new JupyterMfaConfig(
             this.stack,
             deps,
+            properties,
             JupyterHubConfig.MFA_UPSTREAMS,
             jupyterDomain,
-            OAUTH2_CLIENT_ID.getValueFrom(properties),
-            OAUTH2_CLIENT_SECRET.getValueFrom(properties),
-            OAUTH2_COOKIE_SECRET.getValueFrom(properties));
+            properties.getValue(OAUTH2_CLIENT_ID),
+            properties.getValue(OAUTH2_CLIENT_SECRET),
+            properties.getValue(OAUTH2_COOKIE_SECRET));
     }
 
     @Override
@@ -89,11 +90,11 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
 
     @Override
     protected String oauthClientId() {
-        return OAUTH2_CLIENT_ID.getValueFrom(properties);
+        return properties.getValue(OAUTH2_CLIENT_ID);
     }
 
     @Override
     protected String oauthClientSecret() {
-        return OAUTH2_CLIENT_SECRET.getValueFrom(properties);
+        return properties.getValue(OAUTH2_CLIENT_SECRET);
     }
 }

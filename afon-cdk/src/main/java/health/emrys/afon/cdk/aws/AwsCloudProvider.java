@@ -47,7 +47,8 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.AbstractCloudProvider;
-import health.emrys.afon.config.AfonProperties;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,9 +60,10 @@ import java.util.stream.Collectors;
 import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
-import static health.emrys.afon.config.AfonProperties.AWS_ACCOUNT_ID;
-import static health.emrys.afon.config.AfonProperties.AWS_POLARIS_DNS_ZONE;
+import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
+import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
 
 public class AwsCloudProvider extends AbstractCloudProvider {
@@ -85,16 +87,16 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     final         Release                    lbRelease;
     final         Vpc                        vpc;
 
-    AwsCloudProvider(final Construct scope, final String id, Properties properties) {
+    AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
         super(scope, id);
         cleanupHelper = new AwsCleanupHelper(properties);
         componentNames = new AwsComponentNames(properties);
-        clusterName    = AfonProperties.CLUSTER_NAME.getValueFrom(properties);
-        polarisCertArn = AfonProperties.AWS_POLARIS_CERT_ARN.getValueFrom(properties);
+        clusterName    = properties.getValue(AfonProperty.CLUSTER_NAME);
+        polarisCertArn = properties.getValue(AfonProperty.AWS_POLARIS_CERT_ARN);
 
-        this.polarisDomainName = AfonProperties.AWS_POLARIS_DOMAIN_NAME.getValueFrom(properties);
-        this.accountId         = AWS_ACCOUNT_ID.getValueFrom(properties);
-        this.region            = AfonProperties.AWS_REGION.getValueFrom(properties);
+        this.polarisDomainName = properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
+        this.accountId         = properties.getValue(AWS_ACCOUNT_ID);
+        this.region            = properties.getValue(AfonProperty.AWS_REGION);
         clusterPolicyArn       = format("arn:aws:iam::%s:policy/AWSLoadBalancerControllerIAMPolicyCurl", accountId);
         // --- AWS Provider Configuration (Required for EKS Addon) ---
         // 1. Configure the AWS Provider
@@ -400,15 +402,18 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             format(
                 "aws eks delete-addon --cluster-name %s --addon-name kube-proxy ||" +
                     " echo no kube-proxy", clusterName));
+        // Both Cilium releases install from a chart vendored into the repo rather than
+        // pulling from https://helm.cilium.io/ on every apply. See CdkUtils#vendoredChart.
+        String ciliumChart = vendoredChart(this, "ciliumChart", "cilium-1.15.0.tgz");
         Release cilium = Release.Builder
             .create(this, "cilium")
             .name("cilium")
-            .repository("https://helm.cilium.io/")
-            .chart("cilium")
+            .chart(ciliumChart)
             .namespace("kube-system")
             .dependsOn(List.of(nodeGroup))
             .provisioners(onCiliumCreation)
-            .version("1.15.0")
+            // No version() — the vendored tarball is the version, and the provider reads it
+            // from the chart's own Chart.yaml.
             // Set the specific values to kill kube-proxy dependency
             .set(java.util.List.of(
                 // 1. Connectivity to EKS Control Plane
@@ -540,9 +545,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         Release.Builder
             .create(this, "hubble-ui")
             .name("hubble-ui")
-            .repository("https://helm.cilium.io/")
-            .chart("cilium")
-            .version("1.15.0")
+            .chart(ciliumChart)
             .namespace("kube-system")
             .dependsOn(List.of(ciliumReady))
             .set(java.util.List.of(
@@ -564,9 +567,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         Release metricsServer = Release.Builder
             .create(this, "metrics-server")
             .name("metrics-server")
-            .repository("https://kubernetes-sigs.github.io/metrics-server/")
-            .chart("metrics-server")
-            .version("3.12.2")
+            .chart(vendoredChart(this, "metricsServerChart", "metrics-server-3.12.2.tgz"))
             .namespace("kube-system")
             .dependsOn(List.of(ciliumReady))
             .timeout(300)
@@ -654,7 +655,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
         // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
         configureDNS("IngressAliasRecord",
-                     AWS_POLARIS_DNS_ZONE.getValueFrom(properties),
+                     properties.getValue(AWS_POLARIS_DNS_ZONE),
                      this.polarisDomainName,
                      lbRelease,
                      ingress,
@@ -834,9 +835,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .create(this, "aws-load-balancer")
             .dependsOn(dependencies)
             .name(serviceAccountName + "-chart")
-            .chart("aws-load-balancer-controller")
-            .version("1.17.0")
-            .repository("https://aws.github.io/eks-charts")
+            .chart(vendoredChart(this, "loadBalancerChart", "aws-load-balancer-controller-1.17.0.tgz"))
             .namespace("kube-system")
             .timeout(600)
             .atomic(true)

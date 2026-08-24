@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.spark;
 
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.spark.sql.SparkSession;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -13,6 +14,11 @@ abstract public class SparkChecker {
 
     public static final String EXTERNAL_NAMESPACE = "namespaceph";
     public static final String TABLE              = "test_table";
+    private AfonPropertyProvider properties;
+
+    protected SparkChecker(AfonPropertyProvider properties) {
+        this.properties = properties;
+    }
 
     public static void parseAndExecute(String[] args, SparkChecker app) {
         try {
@@ -50,17 +56,8 @@ abstract public class SparkChecker {
                                           String polarisId,
                                           String polarisSecret,
                                           String warehouse) throws IOException {
-        SparkSession spark;
-        String       protocol = "https";
-        SparkSessionFactory factory = new SparkSessionFactory(
-            polarisId,
-            polarisSecret,
-            polarisHost,
-            protocol,
-            new String[]{warehouse}
-        );
-        spark = factory.createSparkSession();
-        return spark;
+        SparkSessionFactory factory = new SparkSessionFactory(properties, polarisHost, polarisId, polarisSecret, new String[]{warehouse});
+        return factory.createSparkSession();
     }
 
 }

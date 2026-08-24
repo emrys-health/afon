@@ -1,0 +1,41 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
+  <id>cli</id>
+  <formats>
+    <format>zip</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <dependencySets>
+    <dependencySet>
+      <useProjectArtifact>false</useProjectArtifact>
+      <unpack>false</unpack>
+      <scope>runtime</scope>
+      <outputDirectory>/</outputDirectory>
+      <outputFileNameMapping>afon-cli.jar</outputFileNameMapping>
+      <includes>
+        <include>${project.groupId}:afon-cli</include>
+      </includes>
+    </dependencySet>
+  </dependencySets>
+  <fileSets>
+    <fileSet>
+      <directory>..</directory>
+      <outputDirectory>/</outputDirectory>
+      <includes>
+        <include>LICENSE.txt</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>../afon-cli/src/main/scripts</directory>
+      <outputDirectory>/</outputDirectory>
+      <includes>
+        <include>afon-cli.sh</include>
+      </includes>
+      <fileMode>0755</fileMode>
+    </fileSet>
+    <fileSet>
+      <directory>target/docs/ops</directory>
+      <outputDirectory>/ops</outputDirectory>
+    </fileSet>
+  </fileSets>
+</assembly>
