@@ -3,7 +3,7 @@
 To deploy Polaris to AWS and Azure, populates catalogs, and runs a Spark smoke test, run:
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain
+./afon.sh -a exec --exec-class ops.SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain
 ```
 
 It takes approximately 45 minutes.

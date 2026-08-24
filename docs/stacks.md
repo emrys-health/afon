@@ -19,7 +19,7 @@ If you want, you may specify the full package or change the base package via the
 
 ## Stack deployment
 
-To deploy a stack, we execute the ops.Deploy*Main classes, e.g.:
+To deploy a stack, we execute the `ops.Deploy*Main` classes, e.g.:
 
 ```shell
 ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain
@@ -32,51 +32,52 @@ The credentials in the cloud-specific env properties in [config dir](configurati
 **NOTE:** Currently, only AWS has the full stack.
 Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.
 
-### AWS full stack
+### Setup AWS full stack
 
-The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
+The setup AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain
+./afon.sh -a exec --exec-class ops.SetupAwsFullStackMain
 ```
 Steps executed:
 
-1. `clean_aws` — destroy any existing AWS stack
-2. `aws_spark` — deploy Polaris + Spark to AWS via CDKTF + OpenTofu
-3. `wait_on_emryspolaris` — wait for DNS to propagate
-4. `all_catalogs_in_emryspolaris` — configure all catalogs in Polaris
-5. `aws_spark_talks_to_aws` — smoke test: Spark writes and reads via Polaris
+- `clean_aws` — destroy any existing AWS stack
+- `aws_full` — deploy AWS full stack
+- `wait_on_emryspolaris_then_wait_on_emrysoauth` — wait for DNS to propagate
+- `create_all_catalogs_for_emryspolaris` — configure all catalogs in Polaris
+- `emryspolaris_spark_talks_to_aws` — smoke test: Spark writes and reads via Polaris
 
-### Deploy only Polaris to Azure
-
-```shell
-./afon.sh -a exec --exec-class ops.DeployAzurePolarisStackMain  
-```
-Steps: `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
-
-### Deploy only Polaris to GCP
+### Setup Azure Polaris only
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployGcpPolarisStackMain  
+./afon.sh -a exec --exec-class ops.SetupAzurePolarisStackMain  
 ```
-Steps: `clean_gcp` → `gcp_polaris` → `wait_on_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
+Steps: `clean_azure → azure_polaris → wait_on_emryspolarisazure_then_wait_on_emrysoauth → create_all_catalogs_for_emryspolarisazure`
 
-### Deploy cross-cloud external catalogs (AWS + Azure)
+### Setup GCP Polaris only
+
+```shell
+./afon.sh -a exec --exec-class ops.SetupGcpPolarisStackMain  
+```
+Steps: `clean_gcp → gcp_polaris → wait_on_emryspolarisgcp_then_wait_on_emrysoauth → create_all_catalogs_for_emryspolarisgcp`
+
+### Setup cross-cloud external catalogs (AWS + Azure)
 
 To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate to Azure Polaris for cross-cloud querying.
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain  
+./afon.sh -a exec --exec-class ops.SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain  
 ```
 
-Steps: `clean_aws` → `aws_spark` → `wait_on_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
+Steps:
+`clean_aws → aws_full → wait_on_emryspolaris_then_wait_on_emrysoauth → create_all_catalogs_for_emryspolaris → emryspolaris_spark_talks_to_aws → clean_azure → azure_polaris → wait_on_emryspolarisazure_then_wait_on_emrysoauth → azure_delete_table_namespaceph.test_table_for_emryspolarisazure → azure_create_external_catalog_for_emryspolarisazure → emryspolaris_spark_talks_to_azure_external`
 
 ### Resume a failed stack deployment from a specific step
 
 If a deployment fails partway through, you can resume from a specific step, e.g.:
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain --exec-args "azure_polaris"
+./afon.sh -a exec --exec-class ops.DeployAwsFullStackWithAzurePolarisMain --exec-args "azure_polaris"
 ```
 
 ### Deploy or delete the AWS stack from GitHub
@@ -205,7 +206,7 @@ This is noted as a future improvement in the project.
 ./afon.sh -a exec --exec-class ops.DeployGcpPolarisStackMain 
 
 # Cross-cloud external catalogs (AWS + Azure federation)
-./afon.sh -a exec --exec-class ops.DeployExternalCatalogsMain 
+./afon.sh -a exec --exec-class ops.DeployAwsFullStackWithAzurePolarisMain 
 
 # Snowflake reading cross-cloud data
 ./afon.sh -a exec --exec-class ops.DeploySnowflakeReadingGcpViaAwsMain 

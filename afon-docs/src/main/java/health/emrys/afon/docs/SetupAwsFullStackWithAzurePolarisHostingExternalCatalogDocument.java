@@ -2,28 +2,28 @@ package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.azure.AzureCleanupHelper;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeployExternalCatalogsMain;
+import health.emrys.afon.ops.SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
 
-public class DeployExternalCatalogsDocument extends AbstractDocument {
+public class SetupAwsFullStackWithAzurePolarisHostingExternalCatalogDocument extends AbstractDocument {
 
-    public DeployExternalCatalogsDocument(AfonPropertyProvider properties) {
+    public SetupAwsFullStackWithAzurePolarisHostingExternalCatalogDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 
     @Override
     public String getSupplementaryIntro() {
         return """
-            Local Spark calls AWS Polaris that defers to Azure Polaris.
+            Deploy AWS full stack with Azure Polaris.
             """;
     }
 
     @Override
     public String getFilename() {
-        return "aws_azure_external_catalogs.md";
+        return "setup_aws_full_with_azure_polaris_hosting_external_catalog.md";
     }
 
     @Override
@@ -69,7 +69,7 @@ public class DeployExternalCatalogsDocument extends AbstractDocument {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return new DeployExternalCatalogsMain().stepsUsing(stepOperations);
+        return new SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain().stepsUsing(stepOperations);
     }
 
 }

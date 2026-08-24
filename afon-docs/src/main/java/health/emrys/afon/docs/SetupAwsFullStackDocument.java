@@ -3,31 +3,31 @@ package health.emrys.afon.docs;
 import health.emrys.afon.cdk.SparkWorkloads;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeployAzureFullStackMain;
+import health.emrys.afon.ops.SetupAwsFullStackMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
 
-public class DeployAzureFullStackDocument extends AbstractDocument {
+public class SetupAwsFullStackDocument extends AbstractDocument {
 
-    public DeployAzureFullStackDocument(AfonPropertyProvider properties) {
+    public SetupAwsFullStackDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 
     @Override
     public String getFilename() {
-        return "deploy_azure_full_stack.md";
+        return "setup_aws_full_stack.md";
     }
 
     @Override
     public String getSupplementaryIntro() {
-        return "Brings up the Azure full stack (Jupyter, Polaris, Spark etc).";
+        return "Setup the AWS full stack (Jupyter, Polaris, Spark etc).";
     }
 
     public String getFurtherNotes() {
         String polarisDomainName =
-            properties.getValue(AfonProperty.AZURE_DOMAIN_NAME);
+            properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
         return String.format(
             """
             # Troubleshooting
@@ -47,7 +47,7 @@ public class DeployAzureFullStackDocument extends AbstractDocument {
             
            Generate and run cleanup script (more than once if required):
             ```shell
-           ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args azure
+           ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args aws
             ```
             """, new SparkWorkloads(polarisDomainName, properties).startConnectCommand());
     }
@@ -55,7 +55,7 @@ public class DeployAzureFullStackDocument extends AbstractDocument {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return new DeployAzureFullStackMain().stepsUsing(stepOperations);
+        return new SetupAwsFullStackMain().stepsUsing(stepOperations);
     }
 
 }
