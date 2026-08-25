@@ -109,7 +109,7 @@ public class ManagePolarisCatalogsMain {
                 app.createAllCatalogs();
             }
         } catch (Exception e) {
-            logger.error("Failed {} action with args {}", ManagePolarisCatalogsMain.class.getSimpleName(), List.of(args), e);
+            logger.warn("Failed exec of {} with args {}", ManagePolarisCatalogsMain.class.getSimpleName(), List.of(args));
             throw new RuntimeException(e);
         }
     }

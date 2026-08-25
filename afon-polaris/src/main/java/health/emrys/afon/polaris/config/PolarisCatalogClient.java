@@ -1,5 +1,6 @@
 package health.emrys.afon.polaris.config;
 
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
@@ -10,8 +11,10 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
+import java.util.Map;
+import java.util.function.Function;
 
 import static health.emrys.afon.config.AfonProperty.*;
 
@@ -19,20 +22,37 @@ public class PolarisCatalogClient {
 
     static final  Logger     logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogClient.class);
     private final AfonPropertyProvider properties;
+    private final PolarisCatalog[] catalogs;
+
+    private static final Map<AfonCloud, Function<AfonPropertyProvider, PolarisCatalog>>
+            CLOUD_TO_CATALOG = Map.of(
+            AfonCloud.AWS, AwsPolarisCatalog::new,
+            AfonCloud.AZURE, AzurePolarisCatalog::new,
+            AfonCloud.GCP, GcpPolarisCatalog::new,
+            AfonCloud.AZURE_EXTERNAL, AzureExternalPolarisCatalog::new,
+            AfonCloud.GCP_EXTERNAL, GcpExternalPolarisCatalog::new);
 
     public PolarisCatalogClient(AfonPropertyProvider properties) {
         this.properties = properties;
+        this.catalogs = new PolarisCatalog[]{
+                new AwsPolarisCatalog(properties),
+                new GcpPolarisCatalog(properties),
+                new AzurePolarisCatalog(properties),
+                new GlueAwsPolarisCatalog(properties),
+                new AzureExternalPolarisCatalog(properties),
+                new AwsForbiddenPolarisCatalog(properties)
+        };
+    }
+
+    public PolarisCatalog getCatalog(String name) {
+        return CLOUD_TO_CATALOG.get(AfonCloud.valueOf(name)).apply(properties);
+    }
+
+    public List<String> getCatalogNames() {
+        return Arrays.stream(catalogs).map(PolarisCatalog::catalogName).toList();
     }
 
     public List<HttpResponse> configureAllCatalogs(String credentials) throws IncorrectConfigException, IOException {
-        PolarisCatalog[] catalogs = new PolarisCatalog[]{
-            new AwsPolarisCatalog(properties),
-            new GcpPolarisCatalog(properties),
-            new AzurePolarisCatalog(properties),
-            new GlueAwsPolarisCatalog(properties),
-            new AzureExternalPolarisCatalog(properties),
-                new AwsForbiddenPolarisCatalog(properties)
-            };
         return configureCatalogs(credentials, catalogs);
     }
 
