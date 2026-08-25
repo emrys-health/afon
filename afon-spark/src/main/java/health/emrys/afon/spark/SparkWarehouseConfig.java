@@ -51,7 +51,7 @@ public class SparkWarehouseConfig {
         return sparkConf(cores, cloudProviders());
     }
 
-    private String[] cloudProviders() {
+    protected String[] cloudProviders() {
         return Arrays.stream(AfonCloud.values()).map(x -> x.toString()).toArray(String[]::new);
     }
 
