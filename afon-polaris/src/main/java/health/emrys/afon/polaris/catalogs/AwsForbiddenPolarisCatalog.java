@@ -7,6 +7,8 @@ import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
 
 public class AwsForbiddenPolarisCatalog extends AwsPolarisCatalog {
 
+    public static final String AWS_POLARIS_FORBIDDEN = "aws_polaris_forbidden";
+
     public AwsForbiddenPolarisCatalog(AfonPropertyProvider properties) {
         super(properties.getValue(AWS_S3_ROLE_ARN),
                 bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS)),
@@ -18,6 +20,6 @@ public class AwsForbiddenPolarisCatalog extends AwsPolarisCatalog {
     }
 
     public String catalogName() {
-        return "aws_polaris_forbidden";
+        return AWS_POLARIS_FORBIDDEN;
     }
 }

@@ -54,9 +54,10 @@ public class ConfigurePolarisUsersMain {
                 accessToken, adminClientId, endpoint);
     }
 
-    public void configureUsers(String catalogName,
-                               AfonUserProvider userProvider
+    public List<HttpResponse> configureUsers(String catalogName,
+                                             AfonUserProvider userProvider
     ) throws IncorrectConfigException, IOException {
+        List<HttpResponse> responses = new ArrayList<>();
         // A previous run may have left this principal role — and hence its catalog-role association —
         // in place, which would make the create/associate below fail. Delete it first so both start
         // from a clean slate; removing the principal role also drops its catalog-role association.
@@ -69,11 +70,12 @@ public class ConfigurePolarisUsersMain {
         for (AfonUser user : userProvider.getUsers()) {
             // check if catalogName is authorised for user
             if ( userProvider.isAuthorised(user.username(), catalogName) ) {
-                configureUser(user.username(), catalogName);
+                responses.add(configureUser(user.username(), catalogName));
             } else {
                 logger.warn("Admin {} could not authorise user {} for catalog {}", adminClientId, user.username(), catalogName);
             }
         }
+        return responses;
     }
 
     private HttpResponse configureUser(
