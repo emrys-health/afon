@@ -332,6 +332,7 @@ setup_output(){
     aws --version >> $SETUP_OUTPUT
     echo "### az" >> $SETUP_OUTPUT
     az --version >> $SETUP_OUTPUT
+    kubelogin --version >> $SETUP_OUTPUT
     echo "### gcloud" >> $SETUP_OUTPUT
     gcloud --version >> $SETUP_OUTPUT
   fi
@@ -342,6 +343,7 @@ setup_output(){
   if [ "$CLOUD" == "azure" ]; then
     echo "### az" >> $SETUP_OUTPUT
     az --version >> $SETUP_OUTPUT
+    kubelogin --version >> $SETUP_OUTPUT
   fi
   if [ "$CLOUD" == "gcp" ]; then
     echo "### gcloud" >> $SETUP_OUTPUT
