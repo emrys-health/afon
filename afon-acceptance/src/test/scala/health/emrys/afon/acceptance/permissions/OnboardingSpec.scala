@@ -2,9 +2,8 @@ package health.emrys.afon.acceptance.permissions
 
 import health.emrys.afon.acceptance.SparkHelper.spark
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
-import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper}
+import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
 import health.emrys.afon.cluster.PolarisConfiguration
-import health.emrys.afon.config.AfonProperty.USER_POLARIS_ID
 import health.emrys.afon.config.AfonPropertyProvider
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.polaris.catalogs.AwsForbiddenPolarisCatalog
@@ -13,34 +12,41 @@ import org.apache.hc.core5.http.HttpResponse
 import org.scalatest.GivenWhenThen
 
 import java.util
-import java.util.{ArrayList, List}
 import scala.jdk.CollectionConverters._
 
 class OnboardingSpec extends SpecPretifier with GivenWhenThen {
-
 
   val testUsers = new TestUsers()
   import testUsers._
 
   private val APP_PROPERTIES: AfonPropertyProvider = AcceptanceTestConfig.instance.getProperties
+  val catalog: AwsForbiddenPolarisCatalog = createCatalogInPolaris(APP_PROPERTIES)
+  val warehouse: String = catalog.catalogName()
 
   "Users" should {
-    val properties = APP_PROPERTIES
-
-    "be configured concurrently for all clouds" in {
+    "not see catalogs they should not" in {
       Given("A KeyCloak and Polaris instance")
-      assert(ContainerHelper.instance.startKeyCloak(properties) != null)
-      assert(ContainerHelper.instance.startPolaris(properties) != null)
-      val catalog: AwsForbiddenPolarisCatalog = createCatalogInPolaris(properties)
-      val warehouse = catalog.catalogName()
-      When(s"we configure the users for catalog ${warehouse}")
+      assert(ContainerHelper.instance.startKeyCloak(APP_PROPERTIES) != null)
+      assert(ContainerHelper.instance.startPolaris(APP_PROPERTIES) != null)
+
+      When(s"we configure the ${warehouse} with a catalog that looks like:\n$catalog")
       configureUsersInKeyCloakAndPolaris(warehouse)
       val sql = s"CREATE NAMESPACE IF NOT EXISTS ${warehouse}.test_namespace"
       When(s"we create a namespace with SQL '$sql'")
-      Then(s"${USER_POLARIS_ID.getValueFrom(APP_PROPERTIES.getProperties)} is not allowed to see it")
+      val sparkUser = SparkHelper.sparkWarehouse.getClientId
+      Then(s"$sparkUser is not allowed to use this catalog")
       intercept[org.apache.iceberg.exceptions.ForbiddenException] {
         spark.sql(sql)
       }
+    }
+  }
+
+  "Configuring the users" should {
+    "be idempotent" in {
+      Given(s"we already have a warehouse called $warehouse")
+      When(s"we configure $warehouse again")
+      Then("there are no errors")
+      configureUsersInKeyCloakAndPolaris(warehouse)
     }
   }
 
