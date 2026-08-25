@@ -2,6 +2,7 @@ package health.emrys.afon.security;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
+import org.apache.hc.core5.http.HttpResponse;
 
 import java.io.IOException;
 import java.util.List;
@@ -58,13 +59,13 @@ public interface OAuthProvider {
     /**
      * Creates the realm if absent and, either way, converges its token lifespans.
      */
-    void createRealm(String adminToken, String realm) throws IOException;
+    HttpResponse createRealm(String adminToken, String realm) throws IOException;
 
     /**
      * Creates a confidential client with direct access grants enabled so that the user's
      * username/password can be exchanged for a token.
      */
-    void createConfidentialClient(
+    HttpResponse createConfidentialClient(
         String adminToken,
         String realm,
         String clientId,
@@ -74,7 +75,7 @@ public interface OAuthProvider {
     /**
      * Registers the browser-flow client for the Jupyter domain using the OAuth2 client configured in properties.
      */
-    void registerBrowserClient(AfonPropertyProvider properties, String jupyterDomain);
+    List<HttpResponse> registerBrowserClient(AfonPropertyProvider properties, String jupyterDomain);
 
     /**
      * Ensures the realm exists and (idempotently) provisions the confidential, browser-flow client that
@@ -84,13 +85,13 @@ public interface OAuthProvider {
      *                     {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
      *                     {@code https://jupyter.example/hub/oauth_callback} (JupyterHub).
      */
-    void registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris);
+    List<HttpResponse> registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris);
 
     /**
      * Creates a confidential client for the OAuth2 authorization-code (browser) flow: standard flow
      * on, direct grants and service accounts off, with the given redirect URIs whitelisted.
      */
-    void createBrowserClient(String adminToken,
+    List<HttpResponse> createBrowserClient(String adminToken,
                               String realm,
                               String clientId,
                               String clientSecret,
@@ -101,12 +102,12 @@ public interface OAuthProvider {
      * Makes every browser login to this realm present a TOTP second factor, while leaving headless
      * logins able to get a token from a username/password alone.
      */
-    void configureMfa();
+    List<HttpResponse> configureMfa();
 
     /** @see #configureMfa() */
-    void configureMfa(String adminToken, String realm) throws IOException;
+    List<HttpResponse> configureMfa(String adminToken, String realm) throws IOException;
 
-    void createUser(String adminToken, String realm, AfonUser user) throws IOException;
+    HttpResponse createUser(String adminToken, String realm, AfonUser user) throws IOException;
 
     /**
      * Convenience check used by callers to wait until the provider is serving requests.
