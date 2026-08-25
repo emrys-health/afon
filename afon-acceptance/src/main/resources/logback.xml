@@ -3,6 +3,7 @@
 
   <property name="DIR" value="${afon.home:-../}/logs" />
   <property name="LEVEL" value="${afon.logging:-INFO}" />
+<!--  <property name="CONSOLE_LEVEL" value="${afon.logging.console:-OFF}" />-->
   <appender name="FILE_CORE" class="ch.qos.logback.core.FileAppender">
     <file>${DIR}/afon-core.log</file>
     <append>true</append>

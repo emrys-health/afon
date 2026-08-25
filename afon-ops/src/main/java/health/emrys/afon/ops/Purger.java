@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
+import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 
 public class Purger {
 

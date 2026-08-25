@@ -6,7 +6,6 @@ import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,6 +14,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 import static java.lang.String.format;
 
 public class PolarisConfigurer {
@@ -104,14 +104,6 @@ public class PolarisConfigurer {
         this.accessToken = client.getAccessToken();
     }
 
-    public static boolean isFailure(HttpResponse response) {
-        return response == null || response.getCode() / 100 != 2;
-    }
-
-    public static @NonNull String tokensURI(String endpoint) {
-        return format("%s/api/catalog/v1/oauth/tokens", endpoint);
-    }
-
     /**
      * Creates a catalog and, depending on {@link PolarisCatalog#adminGrants()},
      * additionally invokes {@link #adminGrantsCatalog(PolarisCatalog)}.
@@ -128,7 +120,6 @@ public class PolarisConfigurer {
         if ( catalog.adminGrants() ){
             responses.add(adminGrantsCatalog(catalog));
         }
-        logIfProblems(responses);
         return responses;
     }
 
@@ -170,18 +161,7 @@ public class PolarisConfigurer {
         String uri = principalsURI() + "/" + principalName;
         try (ClassicHttpResponse response = client.delete(uri, accessToken)) {
             logger.info("Deleting principal {} resulted in HTTP code {}", principalName, response.getCode());
-            logIfProblem(response);
             return response;
-        }
-    }
-
-    private static void logIfProblems(List<HttpResponse> responses) {
-        responses.stream().forEach(PolarisConfigurer::logIfProblem);
-    }
-
-    private static void logIfProblem(HttpResponse response) {
-        if (response.getCode() / 100 != 2) {
-            logger.error("HTTP code {}. Error: {}", response.getCode(), response.getReasonPhrase());
         }
     }
 

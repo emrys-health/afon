@@ -16,6 +16,7 @@ import java.util.function.Function;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 import static health.emrys.afon.polaris.config.PolarisCatalogClient.addPolarisCredentialsTo;
+import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 
 public abstract class PolarisConfiguration {
 
@@ -88,7 +89,7 @@ public abstract class PolarisConfiguration {
     private void checkResponses(List<HttpResponse> responses) {
         logger.debug("HTTP responses: {}", responses);
         if (responses != null && !responses.isEmpty()) {
-            List<HttpResponse> badResponses = responses.stream().filter(x -> x.getCode() / 100 != 2).toList();
+            List<HttpResponse> badResponses = responses.stream().filter(x -> isFailure(x)).toList();
             if (!badResponses.isEmpty()) {
                 logger.warn("Bad HTTP responses: {}", badResponses);
                 throw new RuntimeException(badResponses.toString());
