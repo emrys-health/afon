@@ -2,17 +2,16 @@
 
 ## Authentication
 
-**IMPORTANT:** Ensure you have done a login or authentication with the cloud cli before executing the create or destroy scripts.
+**IMPORTANT:** Ensure you have done a login with the cloud cli before executing the create or destroy scripts.
 
 ```shell
-aws login help
-az login --help
-gcloud auth login --help
+./afon.sh -a script --script-path <cloud>/login.sh 
 ```
+where cloud is one of `{aws|azure|gcp}`.
 
-To show the active account used for cli, once logged in:
+To show the account used by the cloud cli, once logged in:
 ```shell
-./afon.sh -a script --script-path <cloud>/cli.sh 
+./afon.sh -a script --script-path <cloud>/account.sh 
 ```
 where cloud is one of `{aws|azure|gcp}`.
 
