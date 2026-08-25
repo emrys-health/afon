@@ -265,6 +265,10 @@ install_eksct_linux(){
   curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" && tar -xzf eksctl_Linux_amd64.tar.gz -C /tmp && sudo mv /tmp/eksctl /usr/local/bin && rm eksctl_Linux_amd64.tar.gz
 }
 
+install_kubelogin(){
+  az aks install-cli
+}
+
 setup_local(){
   case $SETUP_OS in
     linux|GNU/Linux)
@@ -281,6 +285,7 @@ setup_local(){
       fi
       if [ "$CLOUD" == "azure" ]; then
         sudo apt install azure-cli
+        install_kubelogin
       fi
       if [ "$CLOUD" == "gcp" ]; then
         sudo apt install google-cloud-cli
@@ -298,6 +303,7 @@ setup_local(){
       fi
       if [ "$CLOUD" == "azure" ]; then
         brew install azure-cli
+        install_kubelogin
       fi
       if [ "$CLOUD" == "gcp" ]; then
         brew install gcloud-cli
