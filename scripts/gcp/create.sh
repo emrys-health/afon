@@ -1,8 +1,5 @@
 source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
-# The "gcloud auth application-default login --impersonate-service-account=..." calls below require
-# interactive browser authentication, so they cannot be made idempotent/skippable like the rest of this script.
-
 PROJECT_ID="fjords-450014"
 EXTERNAL_SA="external-sa@$PROJECT_ID.iam.gserviceaccount.com"
 BLIRC_SA="blirc-600159231093-i76b@gcp-sa-biglakerestcatalog.iam.gserviceaccount.com"
@@ -28,9 +25,6 @@ else
   gcloud iam service-accounts add-iam-policy-binding $GCP_SERVICE_ACCOUNT --member="user:${GCP_USER_ACCOUNT}" --role="roles/iam.serviceAccountTokenCreator" || exit 1
 fi
 
-echo "- Authenticating as $GCP_SERVICE_ACCOUNT (interactive)"
-gcloud auth application-default login --impersonate-service-account=$GCP_SERVICE_ACCOUNT || exit 1
-
 if gcloud storage buckets get-iam-policy "gs://$GCP_BUCKET_NAME" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$GCP_SERVICE_ACCOUNT" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
   echo "- Role storage.objectAdmin already granted to $GCP_SERVICE_ACCOUNT on $GCP_BUCKET_NAME, skipping"
 else
@@ -51,9 +45,6 @@ else
   echo "- Granting iam.serviceAccountTokenCreator on $EXTERNAL_SA to $GCP_SERVICE_ACCOUNT"
   gcloud iam service-accounts add-iam-policy-binding $EXTERNAL_SA --member="serviceAccount:$GCP_SERVICE_ACCOUNT" --role="roles/iam.serviceAccountTokenCreator" || exit 1
 fi
-
-echo "- Authenticating as $EXTERNAL_SA (interactive)"
-gcloud auth application-default login --impersonate-service-account=$EXTERNAL_SA || exit 1
 
 if gcloud storage buckets get-iam-policy "gs://$GCP_EXTERNAL_BUCKET_NAME" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$EXTERNAL_SA" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
   echo "- Role storage.objectAdmin already granted to $EXTERNAL_SA on $GCP_EXTERNAL_BUCKET_NAME, skipping"
