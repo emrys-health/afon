@@ -9,15 +9,15 @@ import java.util.Map;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
-import static health.emrys.afon.polaris.config.PolarisConfigurer.tokensURI;
+import static health.emrys.afon.polaris.config.PolarisRestClient.tokensURI;
 
 abstract public class ExternalPolarisCatalog extends PolarisCatalog {
     private final @NonNull String clientId;
-    private final @NonNull String secret;
+    private final @NonNull String clientSecret;
 
     protected ExternalPolarisCatalog(AfonPropertyProvider properties) {
         clientId = properties.getValue(POLARIS_ID);
-        secret = properties.getValue(POLARIS_SECRET);
+        clientSecret = ***REMOVED***
     }
 
     @Override
@@ -31,7 +31,7 @@ abstract public class ExternalPolarisCatalog extends PolarisCatalog {
             .builder()
             .setAuthenticationType(AuthenticationParameters.AuthenticationTypeEnum.OAUTH)
             .setClientId(clientId)
-            .setClientSecret(secret)
+            .setClientSecret(clientSecret)
             .setTokenUri(tokensURI(endpoint()))
             .setScopes(scopes())
             .build();
