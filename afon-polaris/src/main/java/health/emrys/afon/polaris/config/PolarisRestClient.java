@@ -27,15 +27,13 @@ import java.util.Map;
 import static java.lang.String.format;
 
 /**
- * Closes the HTTP connection on each call.
- * So, not efficient but it won't leak resources.
- * Since you won't make many calls, this is reasonable,
+ *  A client implementing the REST commands (DELETE, GET, PUT, POST) on Polaris URIs.
  */
 public class PolarisRestClient {
 
     static final Logger logger       = org.slf4j.LoggerFactory.getLogger(PolarisRestClient.class);
     static final String CONTENT_TYPE = "Content-Type";
-    private static final @NonNull String EMPTY = "<empty>";
+    static final String EMPTY = "<empty>";
 
     private final String endpoint;
     protected final String clientId;
@@ -66,7 +64,7 @@ public class PolarisRestClient {
 
     public static void logOutcome(HttpRequest request, HttpResponse response) {
         if (isFailure(response)) {
-            logger.error("Request: {}, code: {}, response: {}", request, response.getCode(), contentOf(response));
+            logger.warn("Request: {}, code: {}, response: {}", request, response.getCode(), contentOf(response));
         } else {
             logger.info("Request: {}, code: {}", request, response.getCode());
         }
