@@ -4,7 +4,7 @@ import health.emrys.afon.acceptance.SparkHelper.{CatalogName1, CatalogName2, spa
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
 import health.emrys.afon.cluster.PolarisConfiguration.polarisCredentials
-import health.emrys.afon.config.AfonPropertyProvider
+import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.polaris.catalogs.{AwsForbiddenPolarisCatalog, AwsPolarisCatalog}
 import health.emrys.afon.polaris.config.PolarisCatalogClient
@@ -17,13 +17,11 @@ import scala.jdk.CollectionConverters._
 
 class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
-  val testUsers = new TestUsers()
-
-  import testUsers._
-
   private val APP_PROPERTIES: AfonPropertyProvider = AcceptanceTestConfig.instance.getProperties
   val catalog: AwsForbiddenPolarisCatalog = createCatalogInPolaris(APP_PROPERTIES)
   val warehouse: String = catalog.catalogName()
+
+  val sparkUser = SparkHelper.sparkWarehouse.getClientId
 
   "Users" should {
     "not see catalogs they should not" in {
@@ -32,7 +30,7 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
       assert(ContainerHelper.instance.startPolaris(APP_PROPERTIES) != null)
 
       When(s"we configure the ${warehouse} with a catalog that looks like:\n$catalog")
-      configureUsersInKeyCloakAndPolaris(warehouse)
+      configureUsersInKeyCloakAndPolaris(warehouse, TestUsers())
       val sql = s"CREATE NAMESPACE IF NOT EXISTS ${warehouse}.test_namespace"
       When(s"we create a namespace with SQL '$sql'")
       thenUserIsNotAllowedToExecute(sql)
@@ -40,17 +38,14 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
   }
 
   private def thenUserIsNotAllowedToExecute(sql: String) = {
-    val sparkUser = SparkHelper.sparkWarehouse.getClientId
+
     Then(s"$sparkUser is not allowed to use this catalog")
     intercept[ForbiddenException] {
       spark.sql(sql)
     }
   }
 
-  "Catalog permissions" should {
-
-
-
+  "Granting catalog permissions" should {
     val catalog1 = new AwsPolarisCatalog(APP_PROPERTIES) {
       override def catalogName(): String = CatalogName1
     }
@@ -60,6 +55,8 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
     val polarisClient = new PolarisCatalogClient(APP_PROPERTIES)
 
+    val sql = s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName1}.test_namespace"
+
     "prevent random users" in {
       Given(s"Catalogs $CatalogName1 and $CatalogName2")
       checkForFailures(polarisClient.configureCatalogs(
@@ -67,22 +64,42 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
         Array(catalog1, catalog2))
       )
       When("a user is not permissioned")
-      thenUserIsNotAllowedToExecute(s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName1}.test_namespace")
+      thenUserIsNotAllowedToExecute(sql)
+    }
+
+    val user = new AfonUser(sparkUser, SparkHelper.sparkWarehouse.getClientSecret, sparkUser + "@test.com", "slug", "first", "second")
+
+    "allow access" in {
+      Given(s"we configure catalog $CatalogName1 for user $sparkUser")
+      configureUsersInKeyCloakAndPolaris(CatalogName1, TestUsers(user))
+      When(s"we execute $sql")
+      Then("there are no errors")
+      spark.sql(sql)
+    }
+
+    "not revoke access when the same user is added to another catalog" ignore { // this highlights the bug for ticket 117
+      Given(s"we configure catalog $CatalogName2 for user $sparkUser")
+      configureUsersInKeyCloakAndPolaris(CatalogName2, TestUsers(user))
+      val sqlCatalog1 = s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName2}.test_namespace"
+      When(s"we execute $sqlCatalog1")
+      Then("there are no errors")
+      spark.sql(sqlCatalog1)
+      And(s"we can still see the $CatalogName1 when we call $sql")
+      spark.sql(sql)
     }
   }
-
 
   "Configuring the users" should {
     "be idempotent" in {
       Given(s"we already have a warehouse called $warehouse")
       When(s"we configure $warehouse again")
       Then("there are no errors")
-      configureUsersInKeyCloakAndPolaris(warehouse)
+      configureUsersInKeyCloakAndPolaris(warehouse, TestUsers())
     }
   }
 
-  private def configureUsersInKeyCloakAndPolaris(warehouse: String): Unit = {
-    val toTest = new ConfigureUsersMain(userProvider, APP_PROPERTIES)
+  private def configureUsersInKeyCloakAndPolaris(warehouse: String, testUsers: AfonUserProvider): Unit = {
+    val toTest = new ConfigureUsersMain(testUsers, APP_PROPERTIES)
     val responses: util.List[HttpResponse] = toTest.configureUsers(ContainerHelper.KEYCLOAK_HOSTNAME, warehouse)
     checkForFailures(responses)
   }

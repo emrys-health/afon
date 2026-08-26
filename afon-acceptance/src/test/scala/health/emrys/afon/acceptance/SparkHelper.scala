@@ -13,8 +13,8 @@ object SparkHelper {
   // Triggers creation of the Polaris principal/roles/grants exercised by the access specs.
   val principal = PolarisHelper.principal
 
-  val CatalogName1 = "catalog_one"
-  val CatalogName2 = "catalog_two"
+  val CatalogName1 = "first_catalog"
+  val CatalogName2 = "second_catalog"
 
   // In external-auth mode Spark/Iceberg must obtain its OAuth2 token from KeyCloak, not from Polaris
   // (whose /api/catalog/v1/oauth/tokens returns HTTP 501). We authenticate with the KeyCloak client
