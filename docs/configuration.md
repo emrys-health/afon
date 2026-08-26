@@ -64,7 +64,7 @@ To show the status of the current config, you can use the `config-status` action
 ./afon.sh -a config-status
 ```
 If found, it will output the content of the file `afon.md` in the config dir, which can be used to 
-provide information to the user of the configuration.  It will also list the files in the config dir.
+provide information to the user of the config content.  It will also list the files in the config dir.
 
 ## Properties
 

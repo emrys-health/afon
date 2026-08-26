@@ -115,9 +115,11 @@ which is wiped out at each checkout.   On the runner, the `$AFON_HOME` points to
 The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log is uploaded as the
 `afon-stack-aws-logs-<run id>` artifact.
 
-### The afon-cdk module
+### The Afon cdktf dir
 
-The afon-cdk module generates the Terraform plan using the CDKTF API to manage the cloud environment and delegates it to tofu to execute it. The plan is in `$AFON_CDKTF/stacks/{aws,azure,gcp}`.
+The afon-cdk module generates the Terraform plan using the cdktf API to manage the cloud environment and delegates it to tofu to execute it.   The afon-cdk module writes to the cdktf dir, which can be set either via option `--cdktf` in `afon.sh` or via env variable `AFON_CDKTF`.  It defaults to `$AFON_HOME/cdktf`.
+
+The cdktf plan is written `$AFON_CDKTF/stacks/<cloud>` where `<cloud>={aws,azure,gcp}`.
 
 Thereafter, you can run tofu apply or destroy commands via
 ```shell
@@ -126,6 +128,29 @@ Thereafter, you can run tofu apply or destroy commands via
 
 **NOTE:** The `ops.Deploy*Main` classes generate the plan and execute it without needing the `tofu-apply` execution.
 You may re-run the `tofu-apply` if needed.
+
+The cdktf dir also holds the Terraform state files: `$AFON_CDKTF/terraform.<cloud>.tfstate` where `<cloud>={aws,azure,gcp}`.
+
+#### Command cdktf-switch
+
+To support multiple config envs, say a `dev` and a `stg` env, you can use the `cdktf-switch` action:
+```shell
+./afon.sh -a cdktf-switch --cdktf-env {dev|stg} # cdktf symlink for <env> 
+```
+This will create or move the symlink `$AFON_CDKTF` pointing to `$AFON_CDKTF-<env>`.
+
+**NOTE**: If you're using multiple config envs, the cdktf dir must be a symlink and not a dir.  
+Create cdktf env dirs `$AFON_CDKTF-<env>` and ensure there is no cdktf dir.   
+The cdktf-switch action will remove any existing symlink.
+
+#### Command cdktf-status
+
+To show the status of the current cdktf dir, you can use the `cdktf-status` action:
+```shell
+./afon.sh -a cdktf-status
+```
+If found, it will output the content of the file `manifest.json` in the cdktf dir, which can be used to
+provide information to the user of the cdktf content.  It will also list the files in the cdktf dir.
 
 ## Stack teardown 
 
