@@ -62,14 +62,18 @@ public class SparkWarehouseConfig {
             .setAppName("Tests")
             .setSparkHome(tmpDir)
             .set(WAREHOUSE_PATH, tmpDir);
+        configure(sparkConf, cloudProviders);
+
+        return sparkConf;
+    }
+
+    protected void configure(SparkConf sparkConf, String[] cloudProviders) {
         for (String cloudProvider : cloudProviders) {
             logger.info("Configuring Spark context for cloud {}", cloudProvider);
             configureWith(sparkConfigs(cloudProvider), sparkConf);
         }
 
         configureWith(sparkConfigStatics(), sparkConf);
-
-        return sparkConf;
     }
 
     public static void configureWith(Map<String, String> sparkProperties, SparkConf sparkConf) {
