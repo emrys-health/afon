@@ -7,7 +7,7 @@ import java.util.List;
 
 public class AwsUtils {
 
-    public static AwsStorageConfigInfo createS3StorageConfigInfo(String roleArn,
+    public static StorageConfigInfo createS3StorageConfigInfo(String roleArn,
                                                                  String bucketUrl,
                                                                  String region) {
         return AwsStorageConfigInfo
