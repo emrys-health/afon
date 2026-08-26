@@ -134,8 +134,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
   "Polaris and KeyCloak" should {
     val properties  = AcceptanceTestConfig.instance.getProperties
-    val testUsers   = new TestUsers()
-    import testUsers._
+    import TestUsers._
     val User          = new AfonUser(UserName, UserPassword, "email@test.com", "slug", "first", "second")
 
     "agree on the token" in {
@@ -144,7 +143,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       assert(ContainerHelper.instance.startPolaris(properties) != null)
 
       When(s"we onboard a user '$User' for catalog ${config.catalogName()}' in Polaris")
-      val configureUsers = new ConfigureUsersMain(userProvider, properties)
+      val configureUsers = new ConfigureUsersMain(TestUsers(), properties)
       configureUsers.configurePolaris(config.catalogName())
       And("configure OAuth users for Jupyter domain")
       configureUsers.configureOAuthUsers("NotUsed.com")
