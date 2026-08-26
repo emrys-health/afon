@@ -59,14 +59,9 @@ public class ConfigurePolarisUsersMain {
                                              AfonUserProvider userProvider
     ) throws IncorrectConfigException, IOException {
         List<HttpResponse> responses = new ArrayList<>();
-        // A previous run may have left this principal role — and hence its catalog-role association —
-        // in place, which would make the create/associate below fail. Delete it first so both start
-        // from a clean slate; removing the principal role also drops its catalog-role association.
-        if (isFailure(permissions.deletePrincipalRoleIfExists(principalRoleName))) {
-            logger.warn("Admin {} could not delete principal role {}", adminClientId, principalRoleName);
-        }
         if (isFailure(permissions.createPrincipalRoles(principalRoleName))) {
-            logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
+            logger.warn("Admin {} failed to create principal role {}. May already exist",
+                        adminClientId, principalRoleName);
         }
         for (AfonUser user : userProvider.getUsers()) {
             // check if catalogName is authorised for user

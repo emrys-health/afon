@@ -70,6 +70,13 @@ public class PermissionsConfigurer {
         return response;
     }
 
+    public boolean checkPrincipalRoleExists(String principalRoleName) throws IOException {
+        String       uri      = principalRolesURI() + "/" + principalRoleName;
+        HttpResponse response = client.delete(uri, accessToken);
+        logger.info("Deleting principal role {}: HTTP code = {}", principalRoleName, response.getCode());
+        return response.getCode() / 100 != 4;
+    }
+
     public HttpResponse createPrincipalRoles(String principalRoleName) throws IOException, IncorrectConfigException {
         logger.info("Creating principal role {}", principalRoleName);
         String uri  = principalRolesURI();

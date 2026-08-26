@@ -77,13 +77,13 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
       spark.sql(sql)
     }
 
-    "not revoke access when the same user is added to another catalog" ignore { // this highlights the bug for ticket 117
+    "not revoke access when the same user is added to another catalog" in { // this highlights the bug for ticket 117
       Given(s"we configure catalog $CatalogName2 for user $sparkUser")
       configureUsersInKeyCloakAndPolaris(CatalogName2, TestUsers(user))
-      val sqlCatalog1 = s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName2}.test_namespace"
-      When(s"we execute $sqlCatalog1")
+      val sqlCatalog2 = s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName2}.test_namespace"
+      When(s"we execute $sqlCatalog2")
       Then("there are no errors")
-      spark.sql(sqlCatalog1)
+      spark.sql(sqlCatalog2)
       And(s"we can still see the $CatalogName1 when we call $sql")
       spark.sql(sql)
     }
