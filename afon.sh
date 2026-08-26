@@ -128,24 +128,16 @@ exec_config(){
       else
         echo "Dir $CONFIG_DIR not found."
       fi
-    ;;
+      ;;
     init|validate)
       SCRIPT_PATH="config/$CONFIG_ACTION.sh"
       exec_script
-    ;;
+      ;;
     switch)
       exec_config_switch
-    ;;
+      ;;
     status)
-      if [ -d $CONFIG_DIR ]; then
-        if [ -f "$CONFIG_DIR/afon.md" ]; then
-          cat $CONFIG_DIR/afon.md
-        fi
-        ls -lt $CONFIG_DIR
-        ls -lt $CONFIG_DIR/*
-      else
-        echo "$CONFIG_DIR not found."
-      fi
+      exec_config_status
       ;;
   esac
 }
@@ -163,6 +155,20 @@ exec_config_switch(){
   fi
   CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
   ln -s $CONFIG_ENV_DIR $CONFIG_DIR
+  echo "Switched to env $CONFIG_ENV"
+  exec_config_status
+}
+
+exec_config_status(){
+  if [ -d $CONFIG_DIR ]; then
+    if [ -f "$CONFIG_DIR/afon.md" ]; then
+      cat $CONFIG_DIR/afon.md
+    fi
+    ls -lt $CONFIG_DIR
+    ls -lt $CONFIG_DIR/*
+  else
+    echo "$CONFIG_DIR not found."
+  fi
 }
 
 exec_docs(){
