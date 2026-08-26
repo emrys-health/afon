@@ -1,20 +1,34 @@
 package health.emrys.afon.spark;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import org.bouncycastle.util.Arrays;
+import org.apache.spark.SparkConf;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class KeyCloakSparkWarehouseConfigForTesting extends KeyCloakSparkWarehouseConfig {
 
-    private final String catalog;
+    private final CatalogWarehouse[] catalogWarehouses;
 
-    public KeyCloakSparkWarehouseConfigForTesting(AfonPropertyProvider properties, String catalog) {
+    public KeyCloakSparkWarehouseConfigForTesting(AfonPropertyProvider properties,
+                                                  CatalogWarehouse[] catalogWarehouses) {
         super(properties);
-        this.catalog = catalog;
+        this.catalogWarehouses = catalogWarehouses;
     }
 
     protected String[] cloudProviders() {
-        return Arrays.append(
-            super.cloudProviders(),
-            catalog);
+        List<String> list = new ArrayList<>(Arrays.asList(super.cloudProviders()));
+        Arrays.stream(catalogWarehouses).forEach(x -> list.add(x.catalog()));
+        return list.toArray(new String[0]);
     }
+
+    @Override
+    protected void configure(SparkConf sparkConf, String[] cloudProviders) {
+        super.configure(sparkConf, cloudProviders);
+        for  (CatalogWarehouse catalogWarehouse : catalogWarehouses) {
+            configureWith(sparkConfigs(catalogWarehouse.warehouse(), catalogWarehouse.catalog()), sparkConf);
+        }
+    }
+
 }

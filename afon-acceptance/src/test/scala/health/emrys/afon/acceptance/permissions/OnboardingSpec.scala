@@ -54,8 +54,8 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
     val toTest = new ConfigureUsersMain(userProvider, APP_PROPERTIES)
     val responses: util.List[HttpResponse] = toTest.configureUsers(ContainerHelper.KEYCLOAK_HOSTNAME, warehouse)
     responses.asScala.foreach(r => {
-      println(f"code = ${r.getCode}, message = ${r.getReasonPhrase}")
       val httpCode = r.getCode()
+      println(f"code = $httpCode, message = ${r.getReasonPhrase}")
       assert(httpCode / 100 == 2 || httpCode == 409) // KeyCloakConfigurer.KEYCLOAK_REALM hardcoded
     })
   }
