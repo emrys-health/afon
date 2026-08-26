@@ -69,20 +69,42 @@ public class ConfigUtilsTest {
         assertThat(cloudPropertyValue()).isNull();
     }
 
-    @Ignore
-    public void canRetrieveLoggingLevels() {
+    @Test
+    public void canRetrieveLoggingLevel() {
         System.setProperty(AFON_LOGGING_PROPERTY, "WARN");
-        System.setProperty(AFON_LOGGING_CONSOLE_PROPERTY, "ERROR");
+        String env = System.getenv(AFON_LOGGING_ENV);
         try {
-            assertThat(afonLoggingLevel()).isEqualTo("WARN");
-            assertThat(afonLoggingConsoleLevel()).isEqualTo("ERROR");
+            if ( env != null ) {
+                assertThat(afonLoggingLevel()).isEqualTo(env);
+            } else  {
+                assertThat(afonLoggingLevel()).isEqualTo("WARN");
+            }
         } finally {
             System.clearProperty(AFON_LOGGING_PROPERTY);
+        }
+        if ( env == null ) {
+            // default values
+            assertThat(afonLoggingLevel()).isEqualTo("INFO");
+        }
+    }
+
+    @Test
+    public void canRetrieveLoggingConsoleLevel() {
+        System.setProperty(AFON_LOGGING_CONSOLE_PROPERTY, "ERROR");
+        String env = System.getenv(AFON_LOGGING_CONSOLE_ENV);
+        try {
+            if ( env != null ) {
+                assertThat(afonLoggingConsoleLevel()).isEqualTo(env);
+            } else  {
+                assertThat(afonLoggingConsoleLevel()).isEqualTo("ERROR");
+            }
+        } finally {
             System.clearProperty(AFON_LOGGING_CONSOLE_PROPERTY);
         }
-        // default values
-        assertThat(afonLoggingLevel()).isEqualTo("INFO");
-        assertThat(afonLoggingConsoleLevel()).isEqualTo("OFF");
+        if ( env == null ) {
+            // default values
+            assertThat(afonLoggingConsoleLevel()).isEqualTo("OFF");
+        }
     }
 
     @Test
