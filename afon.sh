@@ -132,13 +132,11 @@ exec_config(){
       fi
     ;;
     init)
-      EXEC_TYPE="script"
-      EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
+      SCRIPT_PATH="config/$CONFIG_ACTION.sh"
       exec_script
     ;;
     validate)
-      EXEC_TYPE="script"
-      EXEC_SCRIPT="config/$CONFIG_ACTION.sh"
+      SCRIPT_PATH="config/$CONFIG_ACTION.sh"
       exec_script
     ;;
     switch)
@@ -378,7 +376,6 @@ EXEC_CLASS=
 EXEC_ARGS=
 EXEC_ENVS=
 EXEC_PACKAGE=
-EXEC_SCRIPT=
 EXEC_TYPE=
 MVN_PROFILES=
 MVN_GOALS=
@@ -431,8 +428,6 @@ while [[ $# -gt 0 ]]; do
       EXEC_ENVS="$2"; shift 2 ;;
     --exec-package)
       EXEC_PACKAGE="$2"; shift 2 ;;
-    --exec-script)
-      EXEC_SCRIPT="$2"; shift 2 ;;
     --exec-type|-t)
       EXEC_TYPE="$2"; shift 2 ;;
     --home)
