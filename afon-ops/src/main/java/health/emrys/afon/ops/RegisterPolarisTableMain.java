@@ -2,7 +2,9 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisTableRegister;
+import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -31,16 +33,19 @@ public class RegisterPolarisTableMain {
         this.tableRegister = tableRegister;
     }
 
-    public List<String> createTableAndNamespace(String catalog, String namespace, String table, String metadata) {
-        List<String> errors = new ArrayList<String>();
+    public void createNamespaceAndTable(String catalog, String namespace, String table, String metadata) {
+        List<HttpResponse> allResponses = new ArrayList<>();
         try {
-            errors.addAll(tableRegister.createNamespace(catalog, namespace));
-            errors.addAll(tableRegister.createTable(catalog, namespace, table, metadata));
+            allResponses.addAll(tableRegister.createNamespace(catalog, namespace));
+            allResponses.addAll(tableRegister.createTable(catalog, namespace, table, metadata));
         } catch (IOException e) {
             logger.error(e.getMessage(), e);
             throw new RuntimeException(e);
         }
-        return errors;
+        List<String> failures = PolarisRestClient.failuresOf(allResponses);
+        if ( !failures.isEmpty() ){
+            throw new RuntimeException("Failed to create namespace and table: " + String.join(", ", failures));
+        }
     }
 
     public static void main(String[] args) {
@@ -72,10 +77,7 @@ public class RegisterPolarisTableMain {
         logger.info("KC host: {}", properties.getValue(KC_HOSTNAME));
         PolarisTableRegister register = new PolarisTableRegister(clientFactory().createClient(properties));
         RegisterPolarisTableMain app  = new RegisterPolarisTableMain(register);
-        List<String>           errors = app.createTableAndNamespace(catalog, namespace, table, metadata);
-        if (!errors.isEmpty()) {
-            throw new RuntimeException(errors.stream().collect(Collectors.joining("\n")));
-        }
+        app.createNamespaceAndTable(catalog, namespace, table, metadata);
     }
 
 
