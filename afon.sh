@@ -98,8 +98,6 @@ exec_cli(){
 }
 
 exec_config(){
-  CONFIG_DIR="$HOME_DIR/config"
-  echo "Using config dir $CONFIG_DIR"
   CONFIG_ACTION=${ACTION#config-}
   case $CONFIG_ACTION in
     import)
@@ -140,18 +138,7 @@ exec_config(){
       exec_script
     ;;
     switch)
-      if [ -z "$CONFIG_ENV" ]; then
-        echo "Action $ACTION requires option --config-env"
-        usage; exit 0
-      fi
-      if [ -L "$CONFIG_DIR" ]; then
-        rm $CONFIG_DIR
-      elif [ -d "$CONFIG_DIR" ]; then
-        echo "$CONFIG_DIR is not a symlink.  Remove manually."
-        exit 0
-      fi
-      CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
-      ln -s $CONFIG_ENV_DIR $CONFIG_DIR
+      exec_config_switch
     ;;
     status)
       if [ -d $CONFIG_DIR ]; then
@@ -165,6 +152,21 @@ exec_config(){
       fi
       ;;
   esac
+}
+
+exec_config_switch(){
+  if [ -z "$CONFIG_ENV" ]; then
+    echo "Action $ACTION requires option --config-env"
+    usage; exit 0
+  fi
+  if [ -L "$CONFIG_DIR" ]; then
+    rm $CONFIG_DIR
+  elif [ -d "$CONFIG_DIR" ]; then
+    echo "$CONFIG_DIR is not a symlink.  Remove manually."
+    exit 0
+  fi
+  CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
+  ln -s $CONFIG_ENV_DIR $CONFIG_DIR
 }
 
 exec_docs(){
@@ -471,6 +473,9 @@ else
   echo "Setting AFON_HOME=$AFON_HOME"
 fi
 
+CONFIG_DIR="$HOME_DIR/config"
+echo "Using config dir $CONFIG_DIR"
+
 AFON_CDKTF="${AFON_CDKTF:-}"
 if [ -n "$AFON_CDKTF" ]; then
   CDKTF_DIR="$AFON_CDKTF"
@@ -557,6 +562,9 @@ case $ACTION in
         else
           MVN_PROFILES="-P$CLOUD"
         fi
+    fi
+    if [ -n "$CONFIG_ENV" ]; then
+      exec_config_switch
     fi
     mvn_envs
     exec_mvn
