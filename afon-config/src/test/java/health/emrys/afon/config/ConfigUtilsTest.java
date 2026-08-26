@@ -1,6 +1,5 @@
 package health.emrys.afon.config;
 
-import org.junit.Ignore;
 import org.junit.jupiter.api.Test;
 
 import static health.emrys.afon.config.ConfigUtils.*;
@@ -11,49 +10,58 @@ public class ConfigUtilsTest {
     @Test
     public void canRetrieveAfonHome() {
         System.setProperty(AFON_HOME_PROPERTY, "/afon/home");
+        String env = System.getenv(AFON_HOME_ENV);
         try {
-            assertThat(afonHome()).isEqualTo("/afon/home");
+            if ( env != null ) {
+                assertThat(afonHome()).isEqualTo(env);
+            } else {
+                assertThat(afonHome()).isEqualTo("/afon/home");
+            }
         } finally {
             System.clearProperty(AFON_HOME_PROPERTY);
         }
-        // default value
-        assertThat(afonHome()).isEqualTo(System.getenv("HOME")+"/.afon");
-    }
-
-    @Test
-    public void canOverrideAfonHomeViaEnv() {
-        System.setProperty(AFON_HOME_PROPERTY, "/afon/home");
-        try {
-            assertThat(afonHome()).isEqualTo("/afon/home");
-        } finally {
-            System.clearProperty(AFON_HOME_PROPERTY);
+        if ( env == null ) {
+            // default value
+            assertThat(afonHome()).isEqualTo(System.getenv("HOME")+"/.afon");
         }
-        // default value
-        assertThat(afonHome()).isEqualTo(System.getenv("HOME")+"/.afon");
     }
 
     @Test
     public void canRetrieveAfonCdktf() {
         System.setProperty(AFON_CDKTF_PROPERTY, "/afon/cdktf");
+        String env = System.getenv(AFON_CDKTF_ENV);
         try {
-            assertThat(afonCkdtf()).isEqualTo("/afon/cdktf");
+            if ( env != null ) {
+                assertThat(afonCkdtf()).isEqualTo(env);
+            } else {
+                assertThat(afonCkdtf()).isEqualTo("/afon/cdktf");
+            }
         } finally {
             System.clearProperty(AFON_CDKTF_PROPERTY);
         }
-        // default value
-        assertThat(afonCkdtf()).isEqualTo(afonHome()+"/cdktf");
+        if ( env == null ) {
+            // default value
+            assertThat(afonCkdtf()).isEqualTo(afonHome()+"/cdktf");
+        }
     }
 
     @Test
     public void canRetrieveAfonCloud() {
         System.setProperty(AFON_CLOUD_PROPERTY, "cloud");
+        String env = System.getenv(AFON_CLOUD_ENV);
         try {
-            assertThat(afonCloud()).isEqualTo("cloud");
+            if ( env != null ){
+                assertThat(afonCloud()).isEqualTo(env);
+            } else {
+                assertThat(afonCloud()).isEqualTo("cloud");
+            }
         } finally {
             System.clearProperty(AFON_CLOUD_PROPERTY);
         }
-        // default value
-        assertThat(afonCloud()).isEqualTo("");
+        if ( env == null ) {
+            // default value
+            assertThat(afonCloud()).isEqualTo("");
+        }
     }
 
     @Test
