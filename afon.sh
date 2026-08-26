@@ -129,11 +129,7 @@ exec_config(){
         echo "Dir $CONFIG_DIR not found."
       fi
     ;;
-    init)
-      SCRIPT_PATH="config/$CONFIG_ACTION.sh"
-      exec_script
-    ;;
-    validate)
+    init|validate)
       SCRIPT_PATH="config/$CONFIG_ACTION.sh"
       exec_script
     ;;
@@ -156,7 +152,7 @@ exec_config(){
 
 exec_config_switch(){
   if [ -z "$CONFIG_ENV" ]; then
-    echo "Action $ACTION requires option --config-env"
+    echo "Action config-switch requires option --config-env"
     usage; exit 0
   fi
   if [ -L "$CONFIG_DIR" ]; then
@@ -571,6 +567,9 @@ case $ACTION in
     check_acceptance
     ;;
   cli)
+    if [ -n "$CONFIG_ENV" ]; then
+      exec_config_switch
+    fi
     exec_cli
     ;;
   config-*)
@@ -591,9 +590,15 @@ case $ACTION in
       echo "Exec type not specified.  Defaulting to 'ops'."
       EXEC_TYPE="ops"
     fi
+    if [ -n "$CONFIG_ENV" ]; then
+      exec_config_switch
+    fi
     exec_jvm
     ;;
   script)
+    if [ -n "$CONFIG_ENV" ]; then
+      exec_config_switch
+    fi
     exec_script
     ;;
   setup-*)
