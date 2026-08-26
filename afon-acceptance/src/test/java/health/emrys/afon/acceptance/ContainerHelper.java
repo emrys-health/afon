@@ -9,6 +9,7 @@ import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
 import health.emrys.afon.trino.TrinoServerConfiguration;
+import org.apache.polaris.core.config.FeatureConfiguration;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -160,6 +161,7 @@ public class ContainerHelper {
                 .withExposedPorts(POLARIS_PORT, 8182, DEBUG_PORT)
                 .withCommand("sh", "-c", POLARIS_CMD)
                 .withNetworkAliases(POLARIS_NETWORK_HOST)
+                .withEnv("polaris.features." + FeatureConfiguration.ALLOW_OVERLAPPING_CATALOG_URLS.key(), "true") // you don't want this in prod but very useful for tests
                 .withEnv(ENVIRONMENT_VARIABLE, format("POLARIS,%s,%s", polarisId, polarisSecret))
                 // GCP
                 .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
