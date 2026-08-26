@@ -632,18 +632,7 @@ case $ACTION in
       TOFU_CLOUD="aws"
       echo "Defaulting to tofu cloud: $TOFU_CLOUD"
     fi
-    if [ "$ACTION" == "tofu-destroy" ]; then
-      # workaround until we sort out the issue of the hanging process
-      # https://github.com/emrys-health/afon-core/issues/84
-      TOFU_ACTION="state"
-      TOFU_ARGS="rm helm_release.prometheusRelease"
-      exec_tofu
-      TOFU_ACTION="destroy"
-      TOFU_ARGS=
-      exec_tofu
-    else
-      exec_tofu
-    fi
+    exec_tofu
     ;;
   *)
     echo "Unknown action $ACTION"
