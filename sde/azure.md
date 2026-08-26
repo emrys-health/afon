@@ -20,6 +20,7 @@ and executes the following Azure CLI commands.
 
 ### Creating an Azure env from scratch
 
+```shell
 az group create  --name $AZURE_RESOURCE_GROUP   --location $AZURE_REGION 
 az storage account show --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP
 az storage account create  --name $AZURE_STORAGE_ACCOUNT  --resource-group $AZURE_RESOURCE_GROUP  --location $AZURE_REGION  --sku Standard_LRS  --kind StorageV2 --enable-hierarchical-namespace false 
@@ -31,6 +32,7 @@ az role assignment create  --role "Storage Blob Data Contributor" --assignee $AP
 az network dns zone show --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_DOMAIN_NAME
 az network dns zone create  --resource-group $AZURE_RESOURCE_GROUP  --name $AZURE_DOMAIN_NAME
 az ad app credential reset --id $APP_ID
+```
 
 ## Updating an Azure env partially configured 
 
