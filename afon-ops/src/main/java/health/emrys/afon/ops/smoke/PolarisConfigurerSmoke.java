@@ -10,7 +10,7 @@ import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
 import static health.emrys.afon.config.AfonProperty.AWS_S3_BUCKET_NAME_TRINO;
-import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 
 public class PolarisConfigurerSmoke {
 
@@ -18,7 +18,7 @@ public class PolarisConfigurerSmoke {
         PolarisCatalog config = new AwsPolarisCatalog(properties) {
             @Override
             public String bucketUri() {
-                return bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME_TRINO));
+                return s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_TRINO));
             }
 
             @Override

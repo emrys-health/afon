@@ -9,19 +9,21 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.config.AfonCloud.GCP_EXTERNAL;
-import static health.emrys.afon.config.AfonProperty.GCP_BUCKET_NAME;
-import static health.emrys.afon.config.AfonProperty.GCP_SERVICE_ACCOUNT;
+import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.polaris.catalogs.GcpUtils.gsBucketUrl;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum.GCS;
 
 public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
-    private final String bucket;
+    private final String bucketUrl;
     private final String serviceAccount;
+    private final String endpoint;
 
     public GcpExternalPolarisCatalog(AfonPropertyProvider properties) {
         super(properties);
-        this.bucket         = "gs://" + properties.getValue(GCP_BUCKET_NAME);
+        this.bucketUrl      = gsBucketUrl(properties.getValue(GCP_BUCKET_NAME));
         this.serviceAccount = properties.getValue(GCP_SERVICE_ACCOUNT);
+        this.endpoint       = "https://" + properties.getValue(GCP_DOMAIN_NAME);
     }
 
     @Override
@@ -35,13 +37,13 @@ public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
     }
 
     @Override
-    protected @NonNull String endpoint() {
-        return "https://emryspolarisgcp.click";
+    protected @NonNull String bucketUri() {
+        return bucketUrl;
     }
 
     @Override
-    protected @NonNull String bucketUri() {
-        return bucket;
+    protected @NonNull String endpoint() {
+        return endpoint;
     }
 
     @Override
@@ -50,7 +52,7 @@ public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
             .builder()
             .setGcsServiceAccount(serviceAccount)
             .setStorageType(GCS)
-            .setAllowedLocations(List.of(bucket))
+            .setAllowedLocations(List.of(bucketUrl))
             .build();
     }
 
