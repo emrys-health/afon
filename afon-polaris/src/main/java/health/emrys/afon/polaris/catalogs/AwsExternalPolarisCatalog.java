@@ -8,18 +8,20 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 
 public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
     private final String bucketUrl;
     private final String roleArn;
     private final String region;
+    private final String endpoint;
 
     public AwsExternalPolarisCatalog(AfonPropertyProvider properties) {
         super(properties);
-        this.bucketUrl = bucketToUrl(properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME));
+        this.bucketUrl = s3BucketUrl(properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME));
         this.roleArn = properties.getValue(AWS_S3_ROLE_ARN);
         this.region = properties.getValue(AWS_REGION);
+        this.endpoint = "https://" + properties.getValue(AWS_POLARIS_DOMAIN_NAME);
     }
 
     @Override
@@ -34,7 +36,7 @@ public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     @Override
     protected @NonNull String endpoint() {
-        return "https://emryspolaris.click";
+        return endpoint;
     }
 
     @Override
@@ -44,7 +46,7 @@ public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     @Override
     protected @NonNull StorageConfigInfo storageConfigInfo() {
-        return AwsUtils.getStorageConfigInfo(roleArn, bucketUrl, region);
+        return AwsUtils.createS3StorageConfigInfo(roleArn, bucketUrl, region);
     }
 
     @Override

@@ -10,10 +10,10 @@ import static java.lang.String.format;
 
 public class AzureUtils {
 
-    public static StorageConfigInfo getStorageConfigInfo(String tenant,
-                                                         String multiTenantAppName,
-                                                         String bucketUrl,
-                                                         String clientId) {
+    public static StorageConfigInfo createAzureStorageConfigInfo(String tenant,
+                                                                 String multiTenantAppName,
+                                                                 String bucketUrl,
+                                                                 String clientId) {
         return AzureStorageConfigInfo
             .builder()
             .setTenantId(tenant)
@@ -24,7 +24,7 @@ public class AzureUtils {
             .build();
     }
 
-    public static @NonNull String bucketUrl(String bucketName, String storageAccount) {
+    public static @NonNull String abfssBucketUrl(String bucketName, String storageAccount) {
         return format("abfss://%s@%s.dfs.core.windows.net", bucketName, storageAccount);
     }
 }

@@ -9,16 +9,20 @@ import org.jspecify.annotations.NonNull;
 import java.util.Map;
 
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 
 public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
 
+    private final String bucketUrl;
+    private final String roleArn;
+    private final String region;
     private final String catalogName;
 
     public GlueAwsPolarisCatalog(AfonPropertyProvider properties) {
-        super(properties.getValue(GLUE_S3_ROLE_ARN),
-              bucketToUrl(properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME)),
-                properties.getValue(AWS_REGION));
+        super(properties);
+        this.bucketUrl = s3BucketUrl(properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME));
+        this.roleArn = properties.getValue(GLUE_S3_ROLE_ARN);
+        this.region  = properties.getValue(AWS_REGION);
         this.catalogName = properties.getValue(GLUE_CATALOG_NAME);
     }
 
@@ -33,17 +37,17 @@ public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
     private @NonNull ConnectionConfigInfo connectionConfigInfo() {
         SigV4AuthenticationParameters glueIcebergRole =
             new SigV4AuthenticationParameters(
-                getRoleArn(),
+                roleArn(),
                 null,
                 null,
-                getRegion(),
+                region(),
                 "glue",
                 AuthenticationTypeEnum.SIGV4
             );
 
         ConnectionConfigInfo connectionInfo = new ConnectionConfigInfo(
             ConnectionTypeEnum.ICEBERG_REST,
-            "https://glue." + getRegion() + ".amazonaws.com/iceberg",
+            "https://glue." + region() + ".amazonaws.com/iceberg",
             glueIcebergRole,
             null,
             Map.of());
@@ -60,8 +64,20 @@ public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 null,
-                AwsUtils.getStorageConfigInfo(getRoleArn(), bucketUri(), getRegion()));
+                AwsUtils.createS3StorageConfigInfo(roleArn(), bucketUri(), region()));
         return catalog;
+    }
+
+    protected String roleArn() {
+        return roleArn;
+    }
+
+    protected String bucketUri() {
+        return bucketUrl;
+    }
+
+    protected String region() {
+        return region;
     }
 
     @Override

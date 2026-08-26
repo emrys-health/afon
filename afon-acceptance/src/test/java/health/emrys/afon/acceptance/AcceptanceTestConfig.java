@@ -11,8 +11,9 @@ import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.polaris.catalogs.AwsUtils.bucketToUrl;
-import static health.emrys.afon.polaris.catalogs.AzureUtils.bucketUrl;
+import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
+import static health.emrys.afon.polaris.catalogs.AzureUtils.abfssBucketUrl;
+import static health.emrys.afon.polaris.catalogs.GcpUtils.gsBucketUrl;
 
 public class AcceptanceTestConfig {
 
@@ -49,7 +50,7 @@ public class AcceptanceTestConfig {
         this.awsTrino                 = new AwsPolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
-                return bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME_TRINO));
+                return s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_TRINO));
             }
 
             @Override
@@ -60,7 +61,7 @@ public class AcceptanceTestConfig {
         this.awsForbidden             = new AwsPolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
-                return bucketToUrl(properties.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN));
+                return s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN));
             }
 
             @Override
@@ -76,7 +77,7 @@ public class AcceptanceTestConfig {
 
             @Override
             public String bucketUri() {
-                return toBucketUri(properties.getValue(GCP_BUCKET_NAME_FORBIDDEN));
+                return gsBucketUrl(properties.getValue(GCP_BUCKET_NAME_FORBIDDEN));
             }
         };
         this.gcpCloudConfigForPolaris = new GcpPolarisCatalog(this.properties);
@@ -88,7 +89,7 @@ public class AcceptanceTestConfig {
 
             @Override
             public String bucketUri() {
-                return bucketUrl(
+                return abfssBucketUrl(
                     properties.getValue(AZURE_BUCKET_FORBIDDEN),
                     properties.getValue(AZURE_STORAGE_ACCOUNT));
             }
