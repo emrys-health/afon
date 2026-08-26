@@ -4,22 +4,24 @@ import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.io.entity.BufferedHttpEntity;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicClassicHttpRequest;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import static java.lang.String.format;
@@ -33,6 +35,7 @@ public class PolarisRestClient {
 
     static final Logger logger       = org.slf4j.LoggerFactory.getLogger(PolarisRestClient.class);
     static final String CONTENT_TYPE = "Content-Type";
+    private static final @NonNull String EMPTY = "<empty>";
 
     private final String endpoint;
     protected final String clientId;
@@ -46,6 +49,50 @@ public class PolarisRestClient {
 
     public static boolean isFailure(HttpResponse response) {
         return response == null || response.getCode() / 100 != 2;
+    }
+
+    public static void logIfFailure(HttpResponse response, String description) {
+        if (isFailure(response)) {
+            logger.error("{}, code: {}, error: {}", description, response.getCode(), response.getReasonPhrase());
+        }
+    }
+
+    public static List<String> failuresOf(List<HttpResponse> responses) {
+        return responses.stream()
+            .filter(PolarisRestClient::isFailure)
+            .map(PolarisRestClient::contentOf)
+            .toList();
+    }
+
+    public static void logOutcome(HttpRequest request, HttpResponse response) {
+        if (isFailure(response)) {
+            logger.error("Request: {}, code: {}, response: {}", request, response.getCode(), contentOf(response));
+        } else {
+            logger.info("Request: {}, code: {}", request, response.getCode());
+        }
+    }
+
+    private static @NonNull String contentOf(HttpResponse response) {
+        if ( response instanceof ClassicHttpResponse classicResponse ) {
+            try {
+                HttpEntity entity = classicResponse.getEntity();
+                if (entity != null) {
+                    // Buffer the entity so logOutcome doesn't drain the one-shot stream out from
+                    // under callers that still need to read the body after this method returns.
+                    BufferedHttpEntity buffered = new BufferedHttpEntity(entity);
+                    classicResponse.setEntity(buffered);
+                    return EntityUtils.toString(buffered);
+                }
+            } catch (Exception e) {
+                logger.error("Failed to read response body", e);
+            }
+        }
+        return EMPTY;
+    }
+
+
+    public static @NonNull String tokensURI(String endpoint) {
+        return format("%s/api/catalog/v1/oauth/tokens", endpoint);
     }
 
     /**
@@ -75,70 +122,57 @@ public class PolarisRestClient {
     }
 
     public String accessToken() throws IOException {
-        String uri = PolarisConfigurer.tokensURI(endpoint);
-        logger.info("Calling " + uri);
+        String uri = tokensURI(endpoint);
+        logger.info("Access token from {}" + uri);
         HttpPost post = new HttpPost(uri);
         post.setHeader(CONTENT_TYPE, "application/x-www-form-urlencoded");
         post.setHeader("Polaris-Realm", "POLARIS");
         logger.info("client id = {}, secret = {}", clientId, clientSecret);
         String body = format("grant_type=client_credentials&client_id=%s&client_secret=***REMOVED***", clientId, clientSecret);
         ClassicHttpResponse response = post(body, post);
+        logOutcome(post, response);
         return parseAccessToken(response);
     }
 
     public ClassicHttpResponse delete(String uri, String accessToken) throws IOException {
-        logger.info("Deleting with uri {} at {}", uri, endpoint);
+        logger.info("DELETE {} at {}", uri, endpoint);
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpDelete          delete  = new HttpDelete(endpoint + uri);
+            String url = endpoint + uri;
+            HttpDelete delete = new HttpDelete(url);
             addAccessTokenToHeaders(delete, accessToken);
-            ClassicHttpResponse response = (ClassicHttpResponse) client.execute(delete);
-            String              content  = readContent(response);
-            logger.info("{}:{}:{}", delete, response.getCode(), content);
+            ClassicHttpResponse response = client.execute(delete);
+            logOutcome(delete, response);
             return response;
         }
     }
 
-    private @NonNull String readContent(ClassicHttpResponse response) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ByteArrayInputStream  bais = null;
-        try {
-            if (response.getEntity() != null) {
-                response.getEntity().writeTo(baos);
-                bais = new ByteArrayInputStream(baos.toByteArray());
-                return new String(bais.readAllBytes());
-            }
-        }  finally {
-            if (bais != null) bais.close();
-            baos.close();
+    public ClassicHttpResponse get(String uri,
+                                   String accessToken) throws IOException {
+        logger.info("GET {} at {}", uri, endpoint);
+        String  url = endpoint + uri;
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            HttpGet get = new HttpGet(url);
+            addAccessTokenToHeaders(get, accessToken);
+            ClassicHttpResponse response = client.execute(get);
+            logOutcome(get, response);
+            return response;
         }
-        return "NO CONTENT";
     }
 
     public ClassicHttpResponse put(String uri,
                                    String json,
                                    String accessToken) throws IOException {
-        return post(json, new HttpPut(endpoint + uri), accessToken);
+        logger.info("PUT {} with {} at {}", uri, json, endpoint);
+        String url = endpoint + uri;
+        return post(json, new HttpPut(url), accessToken);
     }
 
     public ClassicHttpResponse post(String uri,
                                     String json,
                                     String accessToken) throws IOException {
+        logger.info("POST {} with {} at {}", uri, json, endpoint);
         String url = endpoint + uri;
-        logger.info("Calling " + url + " with " + json);
         return post(json, new HttpPost(url), accessToken);
-    }
-
-    public ClassicHttpResponse get(String url,
-                                   String accessToken) throws IOException {
-        String  uri     = endpoint + url;
-        logger.info("Calling {}", url);
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet request = new HttpGet(uri);
-            addAccessTokenToHeaders(request, accessToken);
-            ClassicHttpResponse response = client.execute(request);
-            logger.info(format("%s:%d", request, response.getCode()));
-            return response;
-        }
     }
 
     private ClassicHttpResponse post(String payload,
@@ -166,9 +200,8 @@ public class PolarisRestClient {
                                        BasicClassicHttpRequest post) throws IOException {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             post.setEntity(new StringEntity(payload));
-            ClassicHttpResponse response = (ClassicHttpResponse) client.execute(post);
-            logger.info(format("%s:%d", post, response.getCode()));
-            assert response.getCode() == 200;
+            ClassicHttpResponse response = client.execute(post);
+            logOutcome(post, response);
             return response;
         }
     }

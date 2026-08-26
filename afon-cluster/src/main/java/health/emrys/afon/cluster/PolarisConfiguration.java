@@ -1,6 +1,5 @@
 package health.emrys.afon.cluster;
 
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import health.emrys.afon.polaris.config.PolarisCatalogClient;
@@ -9,25 +8,17 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 import static health.emrys.afon.polaris.config.PolarisCatalogClient.addPolarisCredentialsTo;
+import static health.emrys.afon.polaris.config.PolarisRestClient.failuresOf;
 
 public abstract class PolarisConfiguration {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisConfiguration.class);
-
-    private static final Map<AfonCloud, Function<AfonPropertyProvider, PolarisCatalog>>
-            CLOUD_TO_CATALOG = Map.of(
-            AfonCloud.AWS, AwsPolarisCatalog::new,
-            AfonCloud.AZURE, AzurePolarisCatalog::new,
-            AfonCloud.GCP, GcpPolarisCatalog::new,
-            AfonCloud.AZURE_EXTERNAL, AzureExternalPolarisCatalog::new,
-            AfonCloud.GCP_EXTERNAL, GcpExternalPolarisCatalog::new);
 
     protected final AfonPropertyProvider properties;
     private final PolarisCatalogClient polarisClient;
@@ -63,36 +54,34 @@ public abstract class PolarisConfiguration {
             configureAll(getCredentials());
         } else if (args.length == 1) {
             String catalogName = args[0];
-            configure(getCredentials(), polarisCatalog(catalogName));
+            configure(getCredentials(), polarisClient.getCatalog(catalogName));
         } else if (args.length == 2) {
             String catalogName = args[0];
             String credentials = args[1];
             logger.debug("Credentials: " + credentials);
             addPolarisCredentialsTo(credentials, properties);
-            configure(credentials, polarisCatalog(catalogName));
+            configure(credentials, polarisClient.getCatalog(catalogName));
         }
     }
 
-    private PolarisCatalog polarisCatalog(String name) {
-        return CLOUD_TO_CATALOG.get(AfonCloud.valueOf(name)).apply(properties);
-    }
-
     private void configureAll(String credentials) throws IncorrectConfigException, IOException {
-        checkResponses(polarisClient.configureAllCatalogs(credentials));
+        checkFailures(polarisClient.getCatalogNames(), polarisClient.configureAllCatalogs(credentials));
     }
 
     private void configure(String credentials, PolarisCatalog... catalogs) throws IncorrectConfigException, IOException {
-        checkResponses(polarisClient.configureCatalogs(credentials, catalogs));
+        checkFailures(catalogNames(catalogs), polarisClient.configureCatalogs(credentials, catalogs));
     }
 
-    private void checkResponses(List<HttpResponse> responses) {
-        logger.debug("HTTP responses: {}", responses);
-        if (responses != null && !responses.isEmpty()) {
-            List<HttpResponse> badResponses = responses.stream().filter(x -> x.getCode() / 100 != 2).toList();
-            if (!badResponses.isEmpty()) {
-                logger.warn("Bad HTTP responses: {}", badResponses);
-                throw new RuntimeException(badResponses.toString());
-            }
+    public List<String> catalogNames(PolarisCatalog... catalogs) {
+        return Arrays.stream(catalogs).map(PolarisCatalog::catalogName).toList();
+    }
+
+    private void checkFailures(List<String> catalogNames, List<HttpResponse> responses) {
+        List<String> failures = failuresOf(responses);
+        if (!failures.isEmpty()) {
+            String message = String.format("Failed to configure catalogs %s with failures %s", catalogNames, failures);
+            logger.warn(message);
+            throw new RuntimeException(message);
         }
     }
 

@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
+import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
 public class ConfigurePolarisUsersMain {
@@ -61,10 +62,10 @@ public class ConfigurePolarisUsersMain {
         // A previous run may have left this principal role — and hence its catalog-role association —
         // in place, which would make the create/associate below fail. Delete it first so both start
         // from a clean slate; removing the principal role also drops its catalog-role association.
-        if (PolarisConfigurer.isFailure(permissions.deletePrincipalRoleIfExists(principalRoleName))) {
+        if (isFailure(permissions.deletePrincipalRoleIfExists(principalRoleName))) {
             logger.warn("Admin {} could not delete principal role {}", adminClientId, principalRoleName);
         }
-        if (PolarisConfigurer.isFailure(permissions.createPrincipalRoles(principalRoleName))) {
+        if (isFailure(permissions.createPrincipalRoles(principalRoleName))) {
             logger.warn("Admin {} failed to create principal role {}", adminClientId, principalRoleName);
         }
         for (AfonUser user : userProvider.getUsers()) {
@@ -86,14 +87,14 @@ public class ConfigurePolarisUsersMain {
         PrincipalWithCredentials principal = configurer.configureUser(accessToken, principalName);
         logger.info("Admin '{}' created Polaris user {}", adminClientId, principal);
 
-        if (PolarisConfigurer.isFailure(permissions.associateRoles(catalogName, principalRoleName, roleName))) {
+        if (isFailure(permissions.associateRoles(catalogName, principalRoleName, roleName))) {
             logger.warn(
                 "Admin {} failed to associate role {} with principale role {} in catalog {}",
                 adminClientId, roleName, principalRoleName, catalogName);
         }
 
         HttpResponse response = permissions.associatePrincipalRoles(principalName, principalRoleName);
-        if (PolarisConfigurer.isFailure(response)) {
+        if (isFailure(response)) {
             logger.error("Could not create user {} with role {}. HTTP code = {}", principalName, roleName, response.getCode());
         }
         return response;
@@ -101,12 +102,12 @@ public class ConfigurePolarisUsersMain {
 
     public List<HttpResponse> configureCatalog(String catalogName) throws IOException, IncorrectConfigException {
         logger.info("Configuring Polaris catalog '{}' and role '{}'", catalogName, roleName);
-        if (PolarisConfigurer.isFailure(permissions.deleteRoleIfExists(roleName, catalogName))) {
+        if (isFailure(permissions.deleteRoleIfExists(roleName, catalogName))) {
             logger.warn("Admin {} could not delete role {} from catalog", adminClientId, roleName, catalogName);
         }
         List<HttpResponse> results = new ArrayList<>();
         HttpResponse response = permissions.createCatalogRole(catalogName, roleName);
-        if (PolarisConfigurer.isFailure(response)) {
+        if (isFailure(response)) {
             logger.error("Admin {} could not create role {} for catalog {}", adminClientId, roleName, catalogName);
             results.add(response);
         } else {
@@ -120,7 +121,7 @@ public class ConfigurePolarisUsersMain {
         List<HttpResponse> results = new ArrayList<>();
         for (CatalogPrivilege privilege : CATALOG_PRIVILEGES) {
             HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
-            if (PolarisConfigurer.isFailure(result)) {
+            if (isFailure(result)) {
                 logger.error(
                     "Admin '{}' could not grant role {} the privilege {} on  catalog {}",
                     adminClientId, roleName, privilege, catalogName);

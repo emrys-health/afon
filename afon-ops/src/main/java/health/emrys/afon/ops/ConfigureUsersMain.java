@@ -19,16 +19,16 @@ public class ConfigureUsersMain {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigureUsersMain.class);
 
-    private final AfonUserProvider userProvider;
-    private final AfonPropertyProvider propertyProvider;
-    private final OAuthProvider oauthProvider;
+    private final AfonUserProvider          userProvider;
+    private final AfonPropertyProvider      propertyProvider;
+    private final OAuthProvider             oauthProvider;
     private final ConfigurePolarisUsersMain polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
-        this.userProvider = userProvider;
+        this.userProvider     = userProvider;
         this.propertyProvider = propertyProvider;
-        this.oauthProvider = new KeyCloakProvider(propertyProvider);
-        this.polarisUsers = new ConfigurePolarisUsersMain(propertyProvider);
+        this.oauthProvider    = new KeyCloakProvider(propertyProvider);
+        this.polarisUsers     = new ConfigurePolarisUsersMain(propertyProvider);
     }
 
     public List<HttpResponse> configureOAuthUsers(String jupyterDomain) throws IOException {
@@ -78,8 +78,9 @@ public class ConfigureUsersMain {
         try {
             app.configureUsers(jupyterDomain, catalogName);
         } catch (Exception e) {
-            logger.error("Failed to configure KeyCloak users {}: {}",
-                         app.userProvider.getUserNames(), e.getMessage(), e);
+            logger.error(
+                "Failed to configure KeyCloak users {}: {}",
+                app.userProvider.getUserNames(), e.getMessage(), e);
             throw new RuntimeException(e);
         }
     }
