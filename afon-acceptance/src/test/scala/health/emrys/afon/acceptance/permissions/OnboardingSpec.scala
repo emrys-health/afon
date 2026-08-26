@@ -1,9 +1,8 @@
 package health.emrys.afon.acceptance.permissions
 
-import health.emrys.afon.acceptance.SparkHelper.spark
+import health.emrys.afon.acceptance.SparkHelper.{CatalogName1, CatalogName2, spark}
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
-import health.emrys.afon.cluster.PolarisConfiguration
 import health.emrys.afon.cluster.PolarisConfiguration.polarisCredentials
 import health.emrys.afon.config.AfonPropertyProvider
 import health.emrys.afon.ops.ConfigureUsersMain
@@ -50,8 +49,7 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
   "Catalog permissions" should {
 
-    val CatalogName1 = "catalog_one"
-    val CatalogName2 = "catalog_two"
+
 
     val catalog1 = new AwsPolarisCatalog(APP_PROPERTIES) {
       override def catalogName(): String = CatalogName1
@@ -69,7 +67,7 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
         Array(catalog1, catalog2))
       )
       When("a user is not permissioned")
-//      thenUserIsNotAllowedToExecute(s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName1}.test_namespace")
+      thenUserIsNotAllowedToExecute(s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName1}.test_namespace")
     }
   }
 
