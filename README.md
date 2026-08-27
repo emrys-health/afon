@@ -15,7 +15,7 @@ See [build](./docs/build.md)
 
 ### Use CLI binary distribution
 
-See [cli](./docs/cli/cli.md)
+See [cli](./docs/cli.md)
 
 ### Configure properties and users
 

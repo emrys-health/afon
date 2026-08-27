@@ -16,6 +16,7 @@ $AFON_CLI_DIR/afon-cli-script.sh <cloud>/account.sh
 where cloud is one of `{aws|azure|gcp}`.
 
 ## Create 
+
 To create the cloud infrastructure, which includes storage buckets, IAM roles, service accounts, and DNS zones,
 run the cloud create scripts:
 
@@ -25,6 +26,7 @@ $AFON_CLI_DIR/afon-cli-script.sh <cloud>/create.sh
 where cloud is one of `{aws|azure|gcp}`.
 
 ## Destroy
+
 To destroy the cloud infrastructure
 ```shell
 $AFON_CLI_DIR/afon-cli-script.sh <cloud>/destroy.sh 

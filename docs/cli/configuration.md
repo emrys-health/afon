@@ -2,27 +2,28 @@
 
 ## Config dir
 
-All configuration is read from the config dir, assumed to be a child dir named `config` in the Afon home dir, 
+All configuration is read from the config dir, assumed to be a child dir named `config` in the `$AFON_HOME` dir, 
 which by default points to `$HOME/.afon`.  The default config dir is then `$HOME/.afon/config`.
 
 The Afon home can be overridden by the `AFON_HOME` env. 
 
 ### Init config
-Whichever Afon home you decide to use, you can initialise the config files by running:
+
+You can initialise the config files by running:
 
 ```shell
 $AFON_CLI_DIR/afon-cli-scripts.sh config/init.sh
 ```
 This copies empty config files from templates to the config dir.  
 
-**NOTE**: The config-init command will create a new config dir, if not found, but it also can work with an existing config dir.
+**NOTE**: The script `config/init.sh` will create a new config dir, if not found, but it also can work with an existing config dir.
 However, in case of an existing config dir, any existing files will not be overwritten and will need to be removed manually.
 
 Once initialised, the config values need to be completed.
 
 ### Validate config
 
-Once completed, you can validate the config files by running: 
+You can validate the config files by running: 
 ```shell
 [AFON_CLOUD=<cloud>] $AFON_CLI_DIR/afon-cli-scripts.sh config/validate.sh
 ```
