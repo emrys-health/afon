@@ -19,9 +19,14 @@ The following packages are installed:
 - docker
 - opentofu
 - kubernetes-cli
-- <cloud>-cli
+- awscli eksctl
+- azure-cli kubelogin
+- google-cloud-cli
 
-NB: JDK 17 is currently enforced by the Maven build.
+Of the cloud cli packages, only the ones relative to the `<cloud>` specified are installed.
+If no `<cloud>` is specified all are installed.
+
+**NOTE:** JDK 17 is currently enforced by the Maven build.
 
 To show what is currently installed:
 ```shell
