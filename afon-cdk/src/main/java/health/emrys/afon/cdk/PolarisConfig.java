@@ -6,6 +6,7 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
@@ -71,13 +72,13 @@ public class PolarisConfig extends Construct {
         String pgConfig = format(
             """
             export POLARIS_PERSISTENCE_TYPE="relational-jdbc"
-            export QUARKUS_DATASOURCE_JDBC_URL="jdbc:postgresql://%s:5432/polaris_db_%s"
+            export QUARKUS_DATASOURCE_JDBC_URL="jdbc:postgresql://%s:5432/%s"
             export QUARKUS_DATASOURCE_USERNAME=postgres
             export QUARKUS_DATASOURCE_PASSWORD=%s
 
             """,
             properties.getValue(POLARIS_DB_HOST),
-            deploymentId,
+            polarisDbName(properties, deploymentId),
             properties.getValue(POLARIS_DB_PASSWORD));
 
         return pgConfig + format(
@@ -103,6 +104,34 @@ public class PolarisConfig extends Construct {
         );
     }
 
+    /**
+     * Returns the Polaris db name created using the Polaris domain name (with '.' -> '_').
+     *
+     * @param properties
+     * @param deploymentId
+     * @return The Polaris db name "polaris_db_<domain_name_with_no_dots>"
+     */
+    private static String polarisDbName(AfonPropertyProvider properties, String deploymentId) {
+        return String.format("polaris_db_%s", polarisDomainName(properties, deploymentId).replace(".", "_"));
+    }
+
+    static String polarisDomainName(AfonPropertyProvider properties, String deploymentId) {
+        switch (AfonCloud.valueOf(deploymentId.toUpperCase())) {
+            case AWS:
+                return properties.getValue(AWS_POLARIS_DOMAIN_NAME);
+            case AZURE:
+                return properties.getValue(AZURE_DOMAIN_NAME);
+            case GCP:
+                return properties.getValue(GCP_DOMAIN_NAME);
+            default:
+                throw new IllegalArgumentException(deploymentId);
+        }
+    }
+
+    private static AfonCloud afonCloud(String deploymentId) {
+        return AfonCloud.valueOf(deploymentId);
+    }
+
     private static @NonNull String kcExports(AfonPropertyProvider properties) {
         String kcHost = properties.getValue(KC_HOSTNAME);
         Map<String, String> kcProperties = KeyCloakHelper.polarisOidcEnv(
@@ -114,9 +143,9 @@ public class PolarisConfig extends Construct {
 
     static @NonNull String toExports(Map<String, String> properties) {
         return properties
-            .entrySet().stream().map(x ->
-                                         format("export %s=%s", toEnvironmentVariable(x.getKey()), x.getValue())
-            ).collect(Collectors.joining("\n"));
+                .entrySet().stream().map(x ->
+                        format("export %s=%s", toEnvironmentVariable(x.getKey()), x.getValue())
+                ).collect(Collectors.joining("\n"));
     }
 
     public static String toEnvironmentVariable(String propertyName) {
