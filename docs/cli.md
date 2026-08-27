@@ -4,7 +4,20 @@
 
 ### Setup Local Env
 
-See [setup local env](setup_local.md).
+On linux, the minimum list of apt packages to execute the CLI commands are:
+
+- openjdk-17-jre 
+- tofu
+- kubectl
+
+In addition, according to your chosen cloud provider:
+
+- awscli 
+- eksct 
+- azure-cli 
+- google-cloud-cli
+
+**NOTE:** for the `ekscli` package on linux follow the [eksctl installation](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html).
 
 ## Afon CLI distribution
 
@@ -37,11 +50,11 @@ The commands are the (kebab-named) versions of the executable Java classes named
 
 The script supports the following env variables:
 
-- `AFON_HOME`: the Afon home dir, defaulting to $HOME/.afon.
-- `AFON_CDKTF`: the Afon cdktf dir, defaulting to $AFON_HOME/cdktf.
-- `AFON_CLOUD`: the cloud provider to target, one of {aws,azure,gcp}.  This is optional and only affects some functionality.
-- `AFON_LOGGING`: the file logging level, defaulting to INFO.   The file logs are found the `$AFON_HOME/logs`.
-- `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to OFF.
+- `AFON_HOME`: the Afon home dir, defaulting to `$HOME/.afon`.
+- `AFON_CDKTF`: the Afon cdktf dir, defaulting to `$AFON_HOME/cdktf`.
+- `AFON_CLOUD`: the cloud provider to target, one of `{aws,azure,gcp}`.  This is optional and only affects some functionality.
+- `AFON_LOGGING`: the file logging level, defaulting to `INFO`.   The file logs are found the `$AFON_HOME/logs`.
+- `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to `OFF`.
 
 For example, to run command with console logging: 
 
@@ -49,11 +62,13 @@ For example, to run command with console logging:
 AFON_LOGGING_CONSOLE=INFO afon-cli.sh <command>
 ```
 
-**IMPORTANT:** the `deploy-*-stack` commands will used `$AFON_CDKTF` as their output dir.
+**IMPORTANT:** the `*-stack` commands use `$AFON_CDKTF` as their `tofu` state dir, so if you deploy or setup a stack (ie 
+deploy a stack plus configure the Polaris catalogs) you must take care not move your `$AFON_CDKTF` until the teardown of 
+the stack, other `tofu` will not know the information to destroy the stack.
 
 ## CLI configuration 
 
-The CLI requires the [configuration](configuration.md) to be completed for the cloud env you are targetting.
+The CLI requires the [configuration](configuration.md) to be completed for the cloud env you are targeting.
 
 ## Stack deployment
 
@@ -67,6 +82,7 @@ afon-cli.sh deploy-gcp-polaris-stack
 
 **NOTE:** Currently, only AWS has the full stack.
 Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.
+We could just as well have a full stack on Azure or GCP.
 
 ### Deploy AWS full stack
 
@@ -115,3 +131,13 @@ If a deployment fails partway through, you can resume from a specific step, e.g.
 afon-cli.sh deploy-external-catalogs "azure_polaris"
 ```
 
+### Teardown a deployed stack
+
+The stack teardown can be done via replacing `deploy` with `delete` in the command, eg:
+```shell
+afon-cli.sh delete-aws-full-stack
+afon-cli.sh delete-azure-polaris-stack
+afon-cli.sh delete-gcp-polaris-stack
+```
+
+The `delete` commands are equivalent to running `tofu destroy` on the appropriate `$AFON_CDKTF` dir.
