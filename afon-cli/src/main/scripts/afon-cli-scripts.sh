@@ -15,6 +15,7 @@ AFON_HOME="${AFON_HOME:-$HOME/.afon}"
 AFON_CDKTF="${AFON_CDKTF:-$AFON_HOME/cdktf}"
 AFON_CLOUD="${AFON_CLOUD:-}"
 
+CLOUD=
 if [ -n "$AFON_CLOUD" ]; then
   CLOUD="$AFON_CLOUD"
   echo "Using cloud $CLOUD"
@@ -26,5 +27,5 @@ if [ -z "$AFON_SCRIPT" ]; then
   exit 0
 fi
 
-. scripts/$AFON_SCRIPT
+. $AFON_ROOT/scripts/$AFON_SCRIPT
 
