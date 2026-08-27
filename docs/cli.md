@@ -12,12 +12,12 @@ On linux, the minimum list of apt packages to execute the CLI commands are:
 
 In addition, according to your chosen cloud provider:
 
-- awscli 
-- eksct 
-- azure-cli 
+- awscli eksct 
+- azure-cli kubelogin
 - google-cloud-cli
 
-**NOTE:** for the `ekscli` package on linux follow the [eksctl installation](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html).
+**NOTE:** for the `ekscli` package on linux follow the [eksctl installation](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html) and 
+for the `kubelogin` run `az aks install-cli` after having installed `azure-cli`.
 
 ## Afon CLI distribution
 

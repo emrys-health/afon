@@ -19,9 +19,8 @@ The following packages are installed:
 - docker
 - opentofu
 - kubernetes-cli
-- awscli
-- eksctl
-- azure-cli
+- awscli eksctl
+- azure-cli kubelogin
 - google-cloud-cli
 
 Of the cloud cli packages, only the ones relative to the `<cloud>` specified are installed.
