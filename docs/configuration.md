@@ -151,4 +151,8 @@ When running in CLI (e.g. tofu apply|destroy), you use the user admin credential
 
 **`users.csv`** (list of users, one per line):
 
-- [user.csv](../templates/config/users.csv)
+- [users.csv](../templates/config/users.csv)
+
+**`users-acl.csv`** (list of users ACL, one per line):
+
+- [users-acl.csv](../templates/config/users-acl.csv)
