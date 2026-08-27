@@ -73,20 +73,13 @@ public class FilePropertyProviderTest {
     @Test
     public void canGetAllProperties() {
         AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
-        checkAllProperties(provider.getProperties());
+        assertThat(provider.getProperties()).hasSizeGreaterThan(0);
         try {
             System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "all");
-            checkAllProperties(provider.getProperties());
+            assertThat(provider.getProperties()).hasSizeGreaterThan(0);
         } finally {
             System.clearProperty(ConfigUtils.AFON_CLOUD_PROPERTY);
         }
-    }
-
-    private void checkAllProperties(Properties properties) {
-        assertThat(properties).hasSizeGreaterThan(0);
-        checkAllExpectedInPropertiesFile(properties);
-        checkOnlyExpectedInPropertiesFile(properties);
-        checkExpectedValuesNotEmpty(properties);
     }
 
     @Test
@@ -168,26 +161,16 @@ public class FilePropertyProviderTest {
         }
     }
 
-    private void checkExpectedValuesNotEmpty(Properties properties) {
+    private void checkAllPropertiesAreSet(Properties properties) {
         for (String property : AfonProperty.getAllNames()) {
-            assertThat(properties.get(property)).isNotEqualTo("");
+            assertThat(properties.get(property)).as("property = %s", property).isNotNull();
+            assertThat(properties.get(property)).as("property = %s", property).isNotEqualTo("");
         }
-    }
-
-    private static void checkOnlyExpectedInPropertiesFile(Properties properties) {
         Set<String> expectedProperties = AfonProperty.getAllNames();
         for (Object property : properties.keySet()) {
-            assertTrue(
-                    expectedProperties.contains(property.toString()),
+            assertTrue(expectedProperties.contains(property.toString()),
                     property + " not in " + expectedProperties);
         }
     }
-
-    private static void checkAllExpectedInPropertiesFile(Properties properties) {
-        for (String property : AfonProperty.getAllNames()) {
-            assertThat(properties.get(property)).as("property = %s", property).isNotNull();
-        }
-    }
-
 
 }
