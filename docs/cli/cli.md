@@ -86,16 +86,17 @@ afon-cli.sh deploy-azure-polaris-stack
 afon-cli.sh deploy-gcp-polaris-stack
 ```
 
-**NOTE:** Currently, only AWS has the full stack.
-Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.
-We could just as well have a full stack on Azure or GCP.
+**NOTE:** To run the `delete-*-stak`, `deploy-*-stak`, `setup-*-stack` commands you need to be logged with [cloud cli](cli_cloud.md).
 
-### Deploy AWS full stack
+In the command, we use the convention that `deploy` just deploy stack (waiting for DNS to propagate) and `setup` does the deployment
+and configures the Polaris catalogs.
+
+### Setup AWS full stack
 
 The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-afon-cli.sh deploy-aws-full-stack
+afon-cli.sh setup-aws-full-stack
 ```
 Steps executed:
 
@@ -105,17 +106,17 @@ Steps executed:
 4. `all_catalogs_in_emryspolaris` — configure all catalogs in Polaris
 5. `aws_spark_talks_to_aws` — smoke test: Spark writes and reads via Polaris
 
-### Deploy Azure Polaris only
+### Setup Azure Polaris only
 
 ```shell
-afon-cli.sh deploy-azure-polaris-stack
+afon-cli.sh setup-azure-polaris-stack
 ```
 Steps: `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
 
-### Deploy GCP Polaris only
+### Setup GCP Polaris only
 
 ```shell
-afon-cli.sh deploy-gcp-polaris-stack
+afon-cli.sh setup-gcp-polaris-stack
 ```
 Steps: `clean_gcp` → `gcp_polaris` → `wait_on_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
 
