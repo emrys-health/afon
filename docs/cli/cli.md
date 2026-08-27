@@ -1,25 +1,8 @@
 # Afon CLI
 
-## Pre-requisites 
-
-### Setup Local Env
-
-On linux, the minimum list of apt packages to execute the CLI commands are:
-
-- openjdk-17-jre 
-- tofu
-- kubectl
-
-In addition, according to your chosen cloud provider:
-
-- awscli eksct 
-- azure-cli kubelogin
-- google-cloud-cli
-
-**NOTE:** for the `ekscli` package on linux follow the [eksctl installation](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html) and 
-for the `kubelogin` run `az aks install-cli` after having installed `azure-cli`.
-
 ## Afon CLI distribution
+
+The binary distribution `afon-distribution-cli` allows the use of Afon without needing access to the source codebase.
 
 The Afon CLI distribution is a zip consisting of:
 
@@ -27,10 +10,13 @@ The Afon CLI distribution is a zip consisting of:
 - afon-cli.sh, a script that sets all the runtime JVM args the jar requires and executes the afon-cli.jar.
 - docs, the docs relating the running of the commands.
 
-The binary distribution `afon-distribution-cli` allows the use of Afon without needing access to the source codebase.
+## Installing Afon CLI 
 
-In the following, we assume that the `afon-distribution-cli` zip has been unpacked in the dir `~/.afon/cli`.   
-You can add it to the PATH in your shell so that it can be executed from anywhere:
+The `afon-distribution-cli` zip is a self-contained application that can be installed anywhere by extracting zip 
+to a given dir.  
+
+Assuming it has been unpacked in the dir `~/.afon/cli` and calling this dir `AFON_CLI_DIR`,
+you can add the `AFON_CLI_DIR` to the `PATH` in your shell so that it can be executed from anywhere:
 
 ```shell
 AFON_CLI_DIR=$HOME/.afon/cli
@@ -40,6 +26,30 @@ export PATH
 
 In the following, we'll assume that `afon-cli.sh` in the PATH.  Else, simply prefix it with its full path.  
 You don't need to be in the location of the `afon-cli.sh` file to execute it.
+
+
+## Configuring local env
+
+On linux, the minimum list of apt packages to execute the CLI commands are:
+
+- openjdk-17-jre
+- tofu
+- kubectl
+
+In addition, according to your chosen cloud provider:
+
+- awscli eksct
+- azure-cli kubelogin
+- google-cloud-cli
+
+**NOTE:** for the `ekscli` package on linux follow the [eksctl installation](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html) and
+for the `kubelogin` run `az aks install-cli` after having installed `azure-cli`.
+
+## Afon CLI configuration
+
+The CLI requires the [configuration](cli_configuration.md) to be completed for the cloud env you are targeting.
+
+## Running Afon CLI
 
 Running the `help` command gives a list of all the available CLI commands:
 ```shell
@@ -65,10 +75,6 @@ AFON_LOGGING_CONSOLE=INFO afon-cli.sh <command>
 **IMPORTANT:** the `*-stack` commands use `$AFON_CDKTF` as their `tofu` state dir, so if you deploy or setup a stack (ie 
 deploy a stack plus configure the Polaris catalogs) you must take care not move your `$AFON_CDKTF` until the teardown of 
 the stack, other `tofu` will not know the information to destroy the stack.
-
-## CLI configuration 
-
-The CLI requires the [configuration](configuration.md) to be completed for the cloud env you are targeting.
 
 ## Stack deployment
 
