@@ -34,6 +34,13 @@
       <fileMode>0755</fileMode>
     </fileSet>
     <fileSet>
+      <directory>../docs</directory>
+      <outputDirectory>/docs</outputDirectory>
+      <includes>
+        <include>cli.md</include>
+      </includes>
+    </fileSet>
+    <fileSet>
       <directory>target/docs/ops</directory>
       <outputDirectory>/ops</outputDirectory>
     </fileSet>
