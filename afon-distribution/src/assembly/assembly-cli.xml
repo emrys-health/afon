@@ -29,20 +29,43 @@
       <directory>../afon-cli/src/main/scripts</directory>
       <outputDirectory>/</outputDirectory>
       <includes>
-        <include>afon-cli.sh</include>
+        <include>*.sh</include>
       </includes>
       <fileMode>0755</fileMode>
     </fileSet>
     <fileSet>
-      <directory>../docs</directory>
-      <outputDirectory>/docs</outputDirectory>
+      <directory>../scripts</directory>
+      <outputDirectory>/scripts</outputDirectory>
       <includes>
-        <include>cli.md</include>
+        <include>aws/account.sh</include>
+        <include>aws/create.sh</include>
+        <include>aws/destroy.sh</include>
+        <include>aws/login.sh</include>
+        <include>azure/account.sh</include>
+        <include>azure/create.sh</include>
+        <include>azure/destroy.sh</include>
+        <include>azure/login.sh</include>
+        <include>gcp/account.sh</include>
+        <include>gcp/create.sh</include>
+        <include>gcp/destroy.sh</include>
+        <include>gcp/login.sh</include>
+        <include>config/**</include>
+      </includes>
+      <fileMode>0755</fileMode>
+    </fileSet>
+    <fileSet>
+      <directory>../templates</directory>
+      <outputDirectory>/templates</outputDirectory>
+      <includes>
+        <include>config/**</include>
       </includes>
     </fileSet>
     <fileSet>
-      <directory>target/docs/ops</directory>
-      <outputDirectory>/ops</outputDirectory>
+      <directory>../docs/cli</directory>
+      <outputDirectory>/docs</outputDirectory>
+      <includes>
+        <include>*.md</include>
+      </includes>
     </fileSet>
   </fileSets>
 </assembly>
