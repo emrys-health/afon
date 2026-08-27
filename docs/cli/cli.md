@@ -6,9 +6,11 @@ The binary distribution `afon-distribution-cli` allows the use of Afon without n
 
 The Afon CLI distribution is a zip consisting of:
 
-- afon-cli.jar, a standalone executable which contains all the dependencies it requires
-- afon-cli.sh, a script that sets all the runtime JVM args the jar requires and executes the afon-cli.jar.
-- docs, the docs relating the running of the commands.
+- `afon-cli.jar`: a standalone executable which contains all the dependencies it requires.
+- `afon-cli.sh`: a script that executes the afon-cli.jar, setting all the runtime JVM args and env variables.
+- `afon-cli-scripts.sh`: a script that executes the cli scripts, setting the appropriate env variables.
+- `docs`: the docs relating the running of the commands.
+- `templates`: the config templates.
 
 ## Installing Afon CLI 
 
@@ -47,7 +49,7 @@ for the `kubelogin` run `az aks install-cli` after having installed `azure-cli`.
 
 ## Afon CLI configuration
 
-The CLI requires the [configuration](cli_configuration.md) to be completed for the cloud env you are targeting.
+The CLI requires the [configuration](configuration.md) to be completed for the cloud env you are targeting.
 
 ## Running Afon CLI
 
@@ -86,7 +88,7 @@ afon-cli.sh deploy-azure-polaris-stack
 afon-cli.sh deploy-gcp-polaris-stack
 ```
 
-**NOTE:** To run the `delete-*-stak`, `deploy-*-stak`, `setup-*-stack` commands you need to be logged with [cloud cli](cli_cloud.md).
+**NOTE:** To run the `delete-*-stak`, `deploy-*-stak`, `setup-*-stack` commands you need to be logged with [cloud cli](cloud.md).
 
 In the command, we use the convention that `deploy` just deploy stack (waiting for DNS to propagate) and `setup` does the deployment
 and configures the Polaris catalogs.
