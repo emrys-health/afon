@@ -42,7 +42,7 @@ import software.constructs.Construct;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.config.AfonProperty.AZURE_PROVIDER_SKIP;
+import static health.emrys.afon.config.AfonProperty.AZURE_PROVIDER_REGISTRATION_SKIP;
 import static java.lang.String.format;
 
 public class AzureCloudProvider extends AbstractCloudProvider {
@@ -75,7 +75,7 @@ public class AzureCloudProvider extends AbstractCloudProvider {
         clusterName              = properties.getValue(AfonProperty.CLUSTER_NAME);
         resourceGroup            = properties.getValue(AZURE_RESOURCE_GROUP);
         subscriptionId           = properties.getValue(AZURE_SUBSCRIPTION);
-        skipProviderRegistration = Boolean.getBoolean(properties.getValue(AZURE_PROVIDER_SKIP, "false"));
+        skipProviderRegistration = Boolean.getBoolean(properties.getValue(AZURE_PROVIDER_REGISTRATION_SKIP, "false"));
         this.region              = properties.getValue(AZURE_REGION);
         configureProviders();
         clientConfig = new DataAzurermClientConfig(this, "current");
