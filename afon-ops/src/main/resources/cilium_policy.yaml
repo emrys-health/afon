@@ -16,6 +16,7 @@ spec:
           io.kubernetes.pod.namespace: kube-system
     - toFQDNs:
         - matchName: "emryspolaris.click"
+        - matchName: "emrysoauth.click"
     - toEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": kube-system
@@ -33,4 +34,6 @@ spec:
         - matchName: "emrys-afon-bucket.s3.eu-west-2.amazonaws.com"
         - matchName: "emrys-afon-bucket-polaris-forbids.s3.eu-west-2.amazonaws.com"
         - matchName: "emrys_afon_core.storage.googleapis.com"
+        - matchName: "westmidsstorageaccount.blob.core.windows.net"
+        - matchName: "westmidspolarisazure.click"
         - matchPattern: "afonstorageaccount.blob.core.windows.net"
