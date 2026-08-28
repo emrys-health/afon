@@ -1,46 +1,39 @@
 source $AFON_ROOT/scripts/config/afon-source.sh azure
 
-APP_NAME="${1:-AfonMultiTenantApp}"
-echo "- Destroying app $APP_NAME"
-APP_IDS=$(az ad app list --display-name $APP_NAME --query "[].appId" -o tsv)
-if [ -z "$APP_IDS" ]; then
-  echo "-- No app $APP_NAME found, skipping app/role cleanup"
+AS_ADMIN="${1:-false}"
+APP_ID="${APP_ID:?APP_ID must be set - run create-admin.sh (or 'az ad app list') and export it}"
+
+### Role Assignment
+
+echo "- Deleting roles for app $APP_ID"
+
+BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET"
+if [ -n "$(az role assignment list --assignee $APP_ID --role "Storage Blob Data Contributor" --scope "$BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
+  echo "- Deleting role for $AZURE_BUCKET"
+  az role assignment delete  --assignee $APP_ID  --role "Storage Blob Data Contributor" --scope "$BUCKET_SCOPE"
 else
-  echo "-- Found $APP_NAME apps(s):"
-  echo "$APP_IDS"
-  for APP_ID in $APP_IDS; do
-    echo "- Deleting app $APP_ID"
-
-    BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET"
-    if [ -n "$(az role assignment list --assignee $APP_ID --role "Storage Blob Data Contributor" --scope "$BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
-      echo "- Deleting role for $AZURE_BUCKET"
-      az role assignment delete  --assignee $APP_ID  --role "Storage Blob Data Contributor" --scope "$BUCKET_SCOPE"
-    else
-      echo "- No role assignment for $AZURE_BUCKET, skipping"
-    fi
-
-    EXTERNAL_BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_EXTERNAL_BUCKET"
-    if [ -n "$(az role assignment list --assignee $APP_ID --role "Storage Blob Data Contributor" --scope "$EXTERNAL_BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
-      echo "- Deleting role for $AZURE_EXTERNAL_BUCKET"
-      az role assignment delete  --assignee $APP_ID  --role "Storage Blob Data Contributor" --scope "$EXTERNAL_BUCKET_SCOPE"
-    else
-      echo "- No role assignment for $AZURE_EXTERNAL_BUCKET, skipping"
-    fi
-
-    STORAGE_ACCOUNT_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT"
-    if [ -n "$(az role assignment list --assignee $APP_ID --role "Storage Blob Delegator" --scope "$STORAGE_ACCOUNT_SCOPE" --query "[].id" -o tsv)" ]; then
-      echo "- Deleting role for $AZURE_STORAGE_ACCOUNT"
-      az role assignment delete  --assignee $APP_ID  --role "Storage Blob Delegator" --scope "$STORAGE_ACCOUNT_SCOPE"
-    else
-      echo "- No role assignment for $AZURE_STORAGE_ACCOUNT, skipping"
-    fi
-
-    echo "- Deleting service principal $APP_ID"
-    az ad sp delete --id $APP_ID
-    echo "- Deleting app $APP_ID"
-    az ad app delete --id $APP_ID
-  done
+  echo "- No role assignment for $AZURE_BUCKET, skipping"
 fi
+
+EXTERNAL_BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_EXTERNAL_BUCKET"
+if [ -n "$(az role assignment list --assignee $APP_ID --role "Storage Blob Data Contributor" --scope "$EXTERNAL_BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
+  echo "- Deleting role for $AZURE_EXTERNAL_BUCKET"
+  az role assignment delete  --assignee $APP_ID  --role "Storage Blob Data Contributor" --scope "$EXTERNAL_BUCKET_SCOPE"
+else
+  echo "- No role assignment for $AZURE_EXTERNAL_BUCKET, skipping"
+fi
+
+STORAGE_ACCOUNT_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT"
+if [ -n "$(az role assignment list --assignee $APP_ID --role "Storage Blob Delegator" --scope "$STORAGE_ACCOUNT_SCOPE" --query "[].id" -o tsv)" ]; then
+  echo "- Deleting role for $AZURE_STORAGE_ACCOUNT"
+  az role assignment delete  --assignee $APP_ID  --role "Storage Blob Delegator" --scope "$STORAGE_ACCOUNT_SCOPE"
+else
+  echo "- No role assignment for $AZURE_STORAGE_ACCOUNT, skipping"
+fi
+
+### Storage
+
+echo "- Deleting storage"
 
 if az storage account show --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP -o none 2>/dev/null; then
   if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET --auth-mode login --query exists -o tsv)" = "true" ]; then
@@ -70,9 +63,21 @@ else
   echo "- Storage account $AZURE_STORAGE_ACCOUNT does not exist, skipping account and bucket cleanup"
 fi
 
+### Resource Group
+
+echo "- Deleting resource group"
+
 if [ "$(az group exists --name $AZURE_RESOURCE_GROUP)" = "true" ]; then
   echo "- Deleting resource group $AZURE_RESOURCE_GROUP"
   az group delete  --name $AZURE_RESOURCE_GROUP --yes
 else
   echo "- Resource group $AZURE_RESOURCE_GROUP does not exist, skipping"
+fi
+
+if [ "$AS_ADMIN" = "true" ]; then
+  echo "- AS_ADMIN=true, running destroy-admin.sh"
+  set --
+  source $AFON_ROOT/scripts/azure/destroy-admin.sh || exit 1
+else
+  echo "- Ask your admin to run destroy-admin.sh (or set AS_ADMIN=true if you have az ad permissions) to remove the app and service principal."
 fi
