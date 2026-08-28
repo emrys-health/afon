@@ -1,16 +1,73 @@
 package health.emrys.afon.cdk;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
+import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jspecify.annotations.NonNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
+import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 
 /**
  * Cloud independent config for the K8s network.
  */
 public class NetworkConfig {
+
+    private static final String DOMAIN_POLICY_NAME = "allow-only-whitelisted-domains";
+
+    /** The ports the whitelisted domains may be reached on. */
+    private static final List<String> WEB_PORTS = List.of("80", "443");
+
+    /**
+     * The domains pods are allowed to reach. Deliberately hard-coded: this is the perimeter
+     * that stops exfiltration, so it should change only by someone editing this list, never
+     * by an operator editing a properties file.
+     * <p>
+     * Note that {@code matching} and {@code exactly} are not interchangeable - see
+     * {@link AllowedDomain}.
+     */
+    private static final List<AllowedDomain> ALLOWED_DOMAINS = List.of( // TODO - don't hard code
+        AllowedDomain.exactly("emryspolaris.click"),
+        AllowedDomain.exactly("emrys-afon-buckettrino.s3.eu-west-2.amazonaws.com"),
+        AllowedDomain.exactly("emrys-afon-bucket.s3.eu-west-2.amazonaws.com"),
+        AllowedDomain.exactly("emrys-afon-bucket-polaris-forbids.s3.eu-west-2.amazonaws.com"),
+        AllowedDomain.exactly("emrys_afon_core.storage.googleapis.com"), // need to check this one
+        AllowedDomain.exactly("westmidsstorageaccount.blob.core.windows.net"),
+        AllowedDomain.exactly("westmidspolarisazure.click"),
+        AllowedDomain.matching("afonstorageaccount.blob.core.windows.net"));
+
+    /**
+     * One entry in {@link #ALLOWED_DOMAINS}. Cilium offers two matchers and they are not the
+     * same thing, so which one applies is stated per domain rather than guessed at from the
+     * presence of a {@code *}:
+     * <UL>
+     *     <LI>{@link #exactly} emits {@code matchName} - the name and nothing else.</LI>
+     *     <LI>{@link #matching} emits {@code matchPattern}, where {@code *} stands for a
+     *     single label, so {@code *.example.com} covers {@code a.example.com} but not
+     *     {@code a.b.example.com}.</LI>
+     * </UL>
+     */
+    private record AllowedDomain(String matcher, String domain) {
+
+        static AllowedDomain exactly(String domain) {
+            return new AllowedDomain("matchName", domain);
+        }
+
+        static AllowedDomain matching(String pattern) {
+            return new AllowedDomain("matchPattern", pattern);
+        }
+
+        Map<String, String> asFqdnSelector() {
+            return Map.of(matcher, domain);
+        }
+    }
 
     private final TerraformStack tfStack;
 
@@ -18,7 +75,15 @@ public class NetworkConfig {
         this.tfStack = tfStack;
     }
 
-    public void networkPolicies(Map<String, String> labels, String sparkConnectorName) {
+    /**
+     * @param dependsOn what must exist before the policies are applied. The Cilium policy below is
+     *                  applied with a local {@code kubectl}, which references nothing Terraform
+     *                  knows about and so would otherwise be scheduled anywhere in the graph -
+     *                  including before the cluster exists. See {@link #whitelistDomains}.
+     */
+    public void networkPolicies(Map<String, String> labels,
+                                String sparkConnectorName,
+                                List<ITerraformDependable> dependsOn) {
         // The only default-namespace peers a notebook pod may reach. An egress `to` entry carrying
         // just a podSelector is scoped to the policy's own namespace, so this is exactly "these two
         // pods in default, nothing else": Guacamole (streams the pod's VNC desktop) and the
@@ -31,31 +96,93 @@ public class NetworkConfig {
         // the notebook the ability to dial Guacamole, which nothing requires.
         List<NetworkPolicySpecEgressTo> allowedNamespacePeers = List.of(
             podEgressTo(JupyterHubConfig.HUB_LABELS));
-        // Two rules were deleted here after validating every selector in this file against a live
-        // cluster. Both matched zero pods, so removing them is a no-op at runtime, not a loosening:
-        //
-        //   * egress to a "spark-operator" namespace. SparkConfig deploys the operator into default
-        //     and nothing in the stack ever creates a namespace of that name, so the rule was inert.
-        //     It is unnecessary regardless: under Spark Connect the notebook is a thin client that
-        //     speaks to the driver alone, never to the operator.
-        //
-        //   * egress to 10.96.0.0/12:443 -- the upstream-Kubernetes default service CIDR, evidently
-        //     intended to permit calls to the kube API. EKS assigns this cluster 172.20.0.0/16, so
-        //     it matched nothing. Correcting the CIDR would not have helped either: Cilium rewrites
-        //     a ClusterIP to its backend pod address before evaluating policy, so a service-CIDR
-        //     ipBlock is not the mechanism for allowing that traffic. jupyterhub-singleuser never
-        //     calls the kube API, so no rule is needed at all.
-        //
-        // Egress is default-deny across every namespace once this policy selects a pod, so the list
-        // below is the complete set of destinations a spawned notebook may reach.
         List<NetworkPolicySpecEgress> egress = List.of(
-            createWebEgressPolicy(),
+//            createWebEgressPolicy(),
             createDnsEgressPolicy(),
             NetworkPolicySpecEgress.builder()
                                    .to(allowedNamespacePeers)
                                    .build(),
             createSparkConnectorEgressPolicy(sparkConnectorName));
         networkPolicyFor(labels, egress);
+        whitelistDomains(labels, ALLOWED_DOMAINS, dependsOn);
+    }
+
+    /**
+     * Whitelists egress to a set of domain names.
+     * <p>
+     * A Kubernetes {@link NetworkPolicy} only understands CIDRs, so a name whose address is
+     * decided by a CDN and changes underneath us cannot be expressed there - hence the
+     * hard-coded IP block in {@link #createWebEgressPolicy()}. Cilium (our CNI) does
+     * understand names: its DNS proxy watches the pod's own DNS answers and programs the
+     * addresses it sees into the policy at runtime, which is what {@code toFQDNs} below
+     * relies on. That proxy is gated cluster-wide by the {@code enable-fqdn-policy}
+     * cilium-config key, set when the Cilium chart is installed.
+     * <p>
+     * The first egress rule is not optional: Cilium can only learn an address for a name if
+     * the lookup itself passes through its DNS proxy, which happens only when a rule asks
+     * for L7 DNS visibility.
+     * <p>
+     * A CiliumNetworkPolicy is additive to the policy {@link #networkPolicyFor} creates -
+     * Cilium ORs every rule selecting an endpoint - so this widens the allowlist rather than
+     * replacing it.
+     * <p>
+     * It is applied with kubectl rather than a {@code kubernetes_manifest} resource because
+     * that resource contacts the API server during plan, before the cilium.io CRDs are
+     * registered, and fails with "Failed to construct REST client".
+     * <p>
+     * That kubectl reads the ambient {@code ~/.kube/config} and interpolates nothing from the
+     * stack, so Terraform sees no dependency and is free to run it first - against whichever
+     * cluster the kubeconfig still names. On a rebuild that is the *previous*, destroyed cluster,
+     * whose DNS record is gone, and the apply dies with "dial tcp: lookup
+     * &lt;id&gt;.gr7.&lt;region&gt;.eks.amazonaws.com: no such host". Hence {@code dependsOn}: it must
+     * carry whatever refreshes the kubeconfig (the {@code kubeconfigUpdater} resource on AWS) and
+     * the Cilium release that registers the {@code cilium.io/v2} CRD this manifest needs.
+     */
+    private void whitelistDomains(Map<String, String> labels,
+                                  List<AllowedDomain> allowedDomains,
+                                  List<ITerraformDependable> dependsOn) {
+        if (allowedDomains.isEmpty()) {
+            return;
+        }
+        Map<String, Object> dnsVisibility = Map.of(
+            "toEndpoints", List.of(Map.of("matchLabels", Map.of(
+                "k8s:io.kubernetes.pod.namespace", "kube-system",
+                "k8s:k8s-app", "kube-dns"))),
+            "toPorts", List.of(Map.of(
+                "ports", List.of(Map.of("port", "53", "protocol", "ANY")),
+                "rules", Map.of("dns", List.of(Map.of("matchPattern", "*"))))));
+        Map<String, Object> domainEgress = Map.of(
+            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList(),
+            "toPorts", List.of(Map.of(
+                "ports", WEB_PORTS.stream()
+                                  .map(port -> Map.of("port", port, "protocol", "TCP"))
+                                  .toList())));
+        Map<String, Object> manifest = Map.of(
+            "apiVersion", "cilium.io/v2",
+            "kind", "CiliumNetworkPolicy",
+            "metadata", Map.of(
+                "name", DOMAIN_POLICY_NAME,
+                "namespace", "default"),
+            "spec", Map.of(
+                "endpointSelector", Map.of("matchLabels", labels),
+                "egress", List.of(dnsVisibility, domainEgress)));
+
+        List<LocalExecProvisioner> provisioners = new ArrayList<>(
+            uponCreateRun("echo '" + toJson(manifest) + "' | kubectl apply -f -"));
+        provisioners.addAll(uponDestroyRun(
+            "kubectl delete ciliumnetworkpolicy " + DOMAIN_POLICY_NAME + " -n default"));
+        Resource.Builder.create(tfStack, "domainWhitelistPolicy")
+                        .dependsOn(dependsOn)
+                        .provisioners(provisioners)
+                        .build();
+    }
+
+    private static @NonNull String toJson(Map<String, Object> manifest) {
+        try {
+            return new ObjectMapper().writeValueAsString(manifest);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize " + DOMAIN_POLICY_NAME, e);
+        }
     }
 
     /**

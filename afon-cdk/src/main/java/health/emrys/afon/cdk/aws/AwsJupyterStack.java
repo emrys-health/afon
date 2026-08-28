@@ -59,7 +59,10 @@ public class AwsJupyterStack extends AwsPolarisStack {
         // aws-load-balancer-webhook-service". Same reasoning as AwsSparkStack's LB Service.
         List<ITerraformDependable> jupyterDependables = new ArrayList<>(dependables);
         jupyterDependables.add(cloudProvider.getLbRelease());
-        network.networkPolicies(jupyter.deployJupyterHub(jupyterDependables), SPARK_CONNECTOR_NAME);
+        // `dependables` carries the kubeconfigUpdater and the Cilium release, both of which the
+        // CiliumNetworkPolicy kubectl inside networkPolicies() needs in place first.
+        network.networkPolicies(
+            jupyter.deployJupyterHub(jupyterDependables), SPARK_CONNECTOR_NAME, dependables);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
         HelmProviderKubernetes kubernetes = HelmProviderKubernetes

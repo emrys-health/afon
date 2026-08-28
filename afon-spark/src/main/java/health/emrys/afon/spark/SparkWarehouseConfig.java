@@ -24,7 +24,6 @@ public class SparkWarehouseConfig {
     private static final Logger logger = LoggerFactory.getLogger(SparkWarehouseConfig.class);
 
     private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
-    private final String DEFAULT_CATALOG          = SQLConf$.MODULE$.DEFAULT_CATALOG().key();
     private final String WAREHOUSE_PATH           = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
 
     private final String clientId;
@@ -77,6 +76,9 @@ public class SparkWarehouseConfig {
     }
 
     public static void configureWith(Map<String, String> sparkProperties, SparkConf sparkConf) {
+        StringBuffer szb = new StringBuffer();
+        sparkProperties.entrySet().forEach(x -> szb.append(format("\n%-80s %50s", x.getKey(), x.getValue())));
+        logger.info(szb.toString());
         sparkProperties.entrySet().stream().forEach(entry -> {
             sparkConf.set(entry.getKey(), entry.getValue());
         });

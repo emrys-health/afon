@@ -6,7 +6,7 @@
   <!-- The console is filtered out entirely by default, logging to file only.
        Set it via -Dafon.logging.console to have logging to console as well.
   -->
-  <property name="CONSOLE_LEVEL" value="${afon.logging.console:-OFF}" />
+  <property name="CONSOLE_LEVEL" value="${afon.logging.console:-INFO}" />
 
   <appender name="FILE_CORE" class="ch.qos.logback.core.FileAppender">
     <file>${DIR}/afon-core.log</file>
