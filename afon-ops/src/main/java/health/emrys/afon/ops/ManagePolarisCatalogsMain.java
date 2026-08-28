@@ -44,7 +44,7 @@ public class ManagePolarisCatalogsMain {
 
     public void deleteAllCatalogs() throws IOException, ParseException {
         for (AfonCloud id : List.of(AZURE, AWS, GCP)) {
-            purger.deleteCatalog(id.name());
+            purger.deleteCatalog(id.toString());
         }
     }
 
