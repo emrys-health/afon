@@ -13,7 +13,7 @@ usage (){
   echo "          [--config-zip <zip>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
-  echo "          [--script-path <path>]"
+  echo "          [--script-path <path>] [--script-args <args>]"
   echo "          [--setup-os <os>] [--setup-output <file>]"
   echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
@@ -30,7 +30,7 @@ usage (){
   echo "help:             the help flag.  Prints usage."
   echo "home:             the afon home dir.  Defaults to '$HOME/.afon'."
   echo "                  Also settable via env variable 'AFON_HOME'."
-  echo "cdktf:            the afon cdktf dir.  Defaults to '$AFON_HOME/cdktf'."
+  echo "cdktf:            the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
   echo "                  Also settable via env variable 'AFON_CDKTF'."
   echo "env:              the afon env,  Sets both cdktf-env and config-env."
   echo "                  Also settable via env variable 'AFON_ENV'."
@@ -49,7 +49,7 @@ usage (){
   echo "build-profiles:   the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
   echo "cli-command:      the cli command.  Exec <cli-dir>/afon-cli.sh for list of commands."
   echo "cli-args:         the cli args."
-  echo "cli-dir:          the cli dir.  Defaulting to '$AFON_HOME/cli'."
+  echo "cli-dir:          the cli dir.  Defaulting to 'AFON_HOME/cli'."
   echo "                  Also settable via env variable 'AFON_CLI_DIR'."
   echo "config-zip:       the config zip path to import/export as a zip file."
   echo "docs-dir:         the output dir for the docs. Defaulting to 'AFON_HOME/docs'."
@@ -59,6 +59,7 @@ usage (){
   echo "exec-args:        the jvm exec args (must be quoted if more than one arg)"
   echo "exec-envs:        the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
   echo "script-path:      the path of the script the run."
+  echo "script-args:      the script args (must be quoted if more than one arg)"
   echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
   echo "tofu-args:        the tofu args."
@@ -280,9 +281,9 @@ exec_script(){
     echo "Action script requires option --script-path"
     usage; exit 0
   fi
-  echo "Executing $SCRIPT_PATH"
+  echo "Executing $SCRIPT_PATH $SCRIPT_ARGS"
   cd $AFON_ROOT/scripts
-  source $SCRIPT_PATH
+  source $SCRIPT_PATH $SCRIPT_ARGS
 }
 
 capitaliseFirst(){
@@ -435,6 +436,7 @@ MVN_ARGS=
 MVN_ENVS=
 MVN_QUIET=
 SCRIPT_PATH=
+SCRIPT_ARGS=
 SETUP_OS=
 SETUP_OUTPUT=
 TOFU_ACTION=
@@ -498,6 +500,8 @@ while [[ $# -gt 0 ]]; do
       MVN_QUIET=true; shift ;;
     --script-path)
       SCRIPT_PATH="$2"; shift 2 ;;
+    --script-args)
+      SCRIPT_ARGS="$2"; shift 2 ;;
     --setup-os)
       SETUP_OS="$2"; shift 2 ;;
     --setup-outout)
