@@ -2,6 +2,7 @@ package health.emrys.afon.cdk.azure;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_dns_zone.DataAzurermDnsZone;
 import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecord;
 import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecordConfig;
@@ -10,6 +11,7 @@ import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import health.emrys.afon.cdk.CdkHelper;
+import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
@@ -19,6 +21,7 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,6 +29,8 @@ import java.util.Optional;
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
 import static health.emrys.afon.config.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonProperty.AZURE_KEY_VAULT_NAME;
+import static java.lang.String.format;
 
 public class AzurePolarisStack extends AzureKubernetesStack {
 
@@ -50,14 +55,80 @@ public class AzurePolarisStack extends AzureKubernetesStack {
             POLARIS_PORT, POLARIS_INTERNAL, POLARIS_INGRESS_NAME);
         HelmProvider               helm        = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
-        nginxRelease    = configureNginx(helm, dependables);
-        certManager     = helper.installCertManager(this, helm, dependables);
+        nginxRelease = configureNginx(helm, dependables);
+
+        String keyVaultName = properties.getValue(AZURE_KEY_VAULT_NAME, "");
+        certManager = keyVaultName.isBlank()
+            ? helper.installCertManager(this, helm, dependables)
+            : helper.installCertManager(this, helm, dependables,
+                                         List.of(restoreCachedCertCommand(keyVaultName, azurePolarisDomainName)));
+
         internalService = polarisConfig.deployPolaris(cloudProvider.getDependables());
+        List<LocalExecProvisioner> ingressProvisioners = keyVaultName.isBlank()
+            ? POLARIS_PROVISIONERS
+            : withSaveCertProvisioner(keyVaultName, azurePolarisDomainName);
         IngressV1 ingress = helper.createIngress(
             List.of(
                 nginxRelease, certManager, internalService),
-            Optional.of(POLARIS_PROVISIONERS));
+            Optional.of(ingressProvisioners));
         configureDns(ingress, azurePolarisDomainName);
+    }
+
+    /**
+     * Restores the Polaris TLS secret from Key Vault before cert-manager's ingress-shim gets a
+     * chance to request a fresh cert from Let's Encrypt. Attached as an extra create-time command
+     * on the cert-manager Helm release, so it runs (and completes) before the dependent Ingress is
+     * even created. A missing or empty Key Vault entry (e.g. the very first deploy) is not an
+     * error — cert-manager simply issues a new cert as it does today, and the save step below
+     * populates the cache for next time.
+     */
+    private static String restoreCachedCertCommand(String keyVaultName, String domainName) {
+        return format(
+            """
+            CRT_B64=$(az keyvault secret show --vault-name '%1$s' --name '%2$s' --query value -o tsv 2>/dev/null)
+            KEY_B64=$(az keyvault secret show --vault-name '%1$s' --name '%3$s' --query value -o tsv 2>/dev/null)
+            if [ -n "$CRT_B64" ] && [ -n "$KEY_B64" ]; then
+              kubectl create secret generic %4$s \
+                --type=kubernetes.io/tls \
+                --from-literal=tls.crt="$(echo "$CRT_B64" | base64 -d)" \
+                --from-literal=tls.key="$(echo "$KEY_B64" | base64 -d)" \
+                --dry-run=client -o yaml | kubectl apply -f -
+            fi
+            """, keyVaultName, crtSecretName(domainName), keySecretName(domainName), TLS_SECRET_NAME);
+    }
+
+    /**
+     * Waits for cert-manager to (re)issue the Polaris TLS cert, then caches its crt/key in Key
+     * Vault as base64 (the same form Kubernetes stores them in) for the next cluster teardown/
+     * recreate cycle to restore. Assumes cert-manager's ingress-shim names the Certificate
+     * resource after the Ingress TLS secretName, which is its documented default behaviour. A
+     * failed wait or missing secret is non-fatal — the cache simply isn't refreshed this cycle.
+     */
+    private static String saveCertToVaultCommand(String keyVaultName, String domainName) {
+        return format(
+            """
+            kubectl wait --for=condition=Ready certificate/%3$s --timeout=180s || true
+            CRT_B64=$(kubectl get secret %3$s -o jsonpath='{.data.tls\\.crt}' 2>/dev/null)
+            KEY_B64=$(kubectl get secret %3$s -o jsonpath='{.data.tls\\.key}' 2>/dev/null)
+            if [ -n "$CRT_B64" ] && [ -n "$KEY_B64" ]; then
+              az keyvault secret set --vault-name '%1$s' --name '%4$s' --value "$CRT_B64" -o none
+              az keyvault secret set --vault-name '%1$s' --name '%5$s' --value "$KEY_B64" -o none
+            fi
+            """, keyVaultName, domainName, TLS_SECRET_NAME, crtSecretName(domainName), keySecretName(domainName));
+    }
+
+    private static List<LocalExecProvisioner> withSaveCertProvisioner(String keyVaultName, String domainName) {
+        List<LocalExecProvisioner> provisioners = new ArrayList<>(POLARIS_PROVISIONERS);
+        provisioners.addAll(CdkUtils.uponCreateRun(saveCertToVaultCommand(keyVaultName, domainName)));
+        return provisioners;
+    }
+
+    private static String crtSecretName(String domainName) {
+        return domainName.replace(".", "-") + "-tls-crt";
+    }
+
+    private static String keySecretName(String domainName) {
+        return domainName.replace(".", "-") + "-tls-key";
     }
 
     private @NonNull Release configureNginx(HelmProvider helm, List<ITerraformDependable> dependables) {

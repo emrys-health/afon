@@ -234,6 +234,21 @@ public class CdkHelper {
         Construct construct,
         HelmProvider helmProvider,
         final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn) {
+        return installCertManager(construct, helmProvider, dependsOn, List.of());
+    }
+
+    /**
+     * As {@link #installCertManager(Construct, HelmProvider, List)}, additionally running
+     * {@code extraCreateCommands} (e.g. restoring a cached TLS secret from an external store)
+     * once the ClusterIssuer is applied. These run before any dependent Ingress is created, so a
+     * restored secret is already in place before cert-manager's ingress-shim would otherwise
+     * trigger a fresh ACME issuance.
+     */
+    public Release installCertManager(
+        Construct construct,
+        HelmProvider helmProvider,
+        final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
+        List<String> extraCreateCommands) {
         String clusterIssuerYaml = format(
             """
             kubectl apply -f - <<'YAML'
@@ -253,6 +268,10 @@ public class CdkHelper {
                       class: nginx
             YAML""", domainName);
 
+        List<String> commands = new java.util.ArrayList<>();
+        commands.add(clusterIssuerYaml);
+        commands.addAll(extraCreateCommands);
+
         return Release.Builder
             .create(construct, "cert-manager")
             .provider(helmProvider)
@@ -264,7 +283,7 @@ public class CdkHelper {
             .timeout(300)
             .atomic(true)
             .set(List.of(ReleaseSet.builder().name("crds.enabled").value("true").build()))
-            .provisioners(CdkUtils.uponCreateRun(clusterIssuerYaml))
+            .provisioners(CdkUtils.uponCreateRun(commands.toArray(new String[0])))
             .build();
     }
 }
