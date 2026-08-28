@@ -35,6 +35,7 @@ public class NetworkConfig {
      */
     private static final List<AllowedDomain> ALLOWED_DOMAINS = List.of( // TODO - don't hard code
         AllowedDomain.exactly("emryspolaris.click"),
+        AllowedDomain.exactly("emrysoauth.click"),
         AllowedDomain.exactly("emrys-afon-buckettrino.s3.eu-west-2.amazonaws.com"),
         AllowedDomain.exactly("emrys-afon-bucket.s3.eu-west-2.amazonaws.com"),
         AllowedDomain.exactly("emrys-afon-bucket-polaris-forbids.s3.eu-west-2.amazonaws.com"),
@@ -167,12 +168,20 @@ public class NetworkConfig {
                 "endpointSelector", Map.of("matchLabels", labels),
                 "egress", List.of(dnsVisibility, domainEgress)));
 
+        String manifestJson = toJson(manifest);
         List<LocalExecProvisioner> provisioners = new ArrayList<>(
-            uponCreateRun("echo '" + toJson(manifest) + "' | kubectl apply -f -"));
+            uponCreateRun("echo '" + manifestJson + "' | kubectl apply -f -"));
         provisioners.addAll(uponDestroyRun(
             "kubectl delete ciliumnetworkpolicy " + DOMAIN_POLICY_NAME + " -n default"));
         Resource.Builder.create(tfStack, "domainWhitelistPolicy")
                         .dependsOn(dependsOn)
+                        // A provisioner runs on create only, so without a trigger an edit to
+                        // ALLOWED_DOMAINS is a no-op against a cluster that already has the policy:
+                        // the resource is unchanged, nothing re-runs, and the cluster silently keeps
+                        // yesterday's allowlist while the source says otherwise. Keying on the
+                        // manifest makes any edit to the list replace the resource, which deletes
+                        // and re-applies the policy.
+                        .triggers(Map.of("manifest", manifestJson))
                         .provisioners(provisioners)
                         .build();
     }
