@@ -1,13 +1,26 @@
 source $AFON_ROOT/scripts/config/afon-source.sh azure
 
-APP_NAME="${1:-AfonMultiTenantApp}"
-echo "- Creating app $APP_NAME"
+AS_ADMIN="${1:-false}"
+
+if [ "$AS_ADMIN" = "true" ]; then
+  echo "- AS_ADMIN=true, running create-admin.sh"
+  set --
+  source $AFON_ROOT/scripts/azure/create-admin.sh || exit 1
+elif [ -z "${APP_ID:-}" ]; then
+  echo "-- APP_ID is not set. Ask your admin to run create-admin.sh (or pass AS_ADMIN=true as the first arg if you have az ad permissions), then export the printed APP_ID before running create.sh."
+  exit 1
+fi
+
+### Resource Group
+
 if [ "$(az group exists --name $AZURE_RESOURCE_GROUP)" = "true" ]; then
   echo "- Resource group $AZURE_RESOURCE_GROUP already exists, skipping"
 else
   echo "- Creating group $AZURE_RESOURCE_GROUP in $AZURE_REGION"
   az group create  --name $AZURE_RESOURCE_GROUP   --location $AZURE_REGION || exit 1
 fi
+
+### Storage
 
 if az storage account show --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP -o none 2>/dev/null; then
   echo "- Storage account $AZURE_STORAGE_ACCOUNT already exists, skipping"
@@ -37,35 +50,9 @@ else
   az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_FORBIDDEN || exit 1
 fi
 
-APP_IDS=$(az ad app list --display-name $APP_NAME --query "[].appId" -o tsv)
-if [ -z "$APP_IDS" ]; then
-  echo "- No existing $APP_NAME found, creating one"
-  az ad app create  --display-name "$APP_NAME"  --sign-in-audience "AzureADMultipleOrgs" || exit 1
-  echo "Waiting 30s for app to be registered..."
-  sleep 30
-  APP_IDS=$(az ad app list --display-name $APP_NAME --query "[].appId" -o tsv)
-else
-  echo "- Found existing $APP_NAME app(s), reusing rather than creating a duplicate:"
-  echo "$APP_IDS"
-fi
+### Role Assignment
 
-APP_ID=$(echo "$APP_IDS" | head -n1)
-if [ -z "$APP_ID" ]; then
-  echo "-- Failed to find or create $APP_NAME"
-  exit 1
-fi
-if [ "$(echo "$APP_IDS" | wc -l)" -gt 1 ]; then
-  echo "-- As multiple $APP_NAME apps exist, using the first one: $APP_ID"
-  echo "-- Run destroy.sh to remove ALL of them, then re-run create.sh for a clean single app."
-fi
 echo "APP_ID=$APP_ID"
-
-if az ad sp show --id $APP_ID -o none 2>/dev/null; then
-  echo "- Service principal for $APP_ID already exists, skipping"
-else
-  echo "- Creating service principal for $APP_ID"
-  az ad sp create --id $APP_ID || exit 1
-fi
 
 BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET"
 if [ -n "$(az role assignment list --assignee $APP_ID --role "Storage Blob Data Contributor" --scope "$BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
@@ -91,6 +78,8 @@ else
   az role assignment create  --role "Storage Blob Delegator" --assignee $APP_ID --scope "$STORAGE_ACCOUNT_SCOPE" || exit 1
 fi
 
+### DNS zone
+
 if az network dns zone show --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_DOMAIN_NAME -o none 2>/dev/null; then
   echo "- DNS zone $AZURE_DOMAIN_NAME already exists, skipping"
 else
@@ -99,17 +88,4 @@ else
 fi
 
 echo "Azure env created."
-# App credential reset not idempotent by design: Azure never re-exposes an existing secret's value,
-# so reset command must always be run to print a new secret, invalidating any previous secret.
-APP_SECRET_RESET="${APP_SECRET_RESET:-}"
-if [ -n "$APP_SECRET_RESET" ]; then
-  echo "- Resetting app credential."
-  echo "- From the output below, add the following properties in your config/secret-azure.properties"
-  echo "AZURE_CLIENT_ID=<appId>"
-  echo "AZURE_TENANT_ID=<tenant>"
-  echo "AZURE_CLIENT_SECRET=<password>"
-  az ad app credential reset --id $APP_ID
-else
-  echo "- Not resetting app credentials, as APP_SECRET_RESET is not set."
-fi
 
