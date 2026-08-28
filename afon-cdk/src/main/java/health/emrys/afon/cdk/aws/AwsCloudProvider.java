@@ -61,7 +61,7 @@ import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
-import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
+import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
@@ -621,7 +621,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "polaris-ingress",
             polarisCertArn,
             this.polarisDomainName,
-            POLARIS_INTERNAL,
+                POLARIS_INTERNAL_SERVICE_NAME,
             8181,
             subnetIds
                                               );
