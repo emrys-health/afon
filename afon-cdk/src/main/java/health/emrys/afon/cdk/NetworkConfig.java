@@ -6,14 +6,17 @@ import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 
 /**
  * Cloud independent config for the K8s network.
@@ -26,26 +29,7 @@ public class NetworkConfig {
     private static final List<String> WEB_PORTS = List.of("80", "443");
 
     /**
-     * The domains pods are allowed to reach. Deliberately hard-coded: this is the perimeter
-     * that stops exfiltration, so it should change only by someone editing this list, never
-     * by an operator editing a properties file.
-     * <p>
-     * Note that {@code matching} and {@code exactly} are not interchangeable - see
-     * {@link AllowedDomain}.
-     */
-    private static final List<AllowedDomain> ALLOWED_DOMAINS = List.of( // TODO - don't hard code
-        AllowedDomain.exactly("emryspolaris.click"),
-        AllowedDomain.exactly("emrysoauth.click"),
-        AllowedDomain.exactly("emrys-afon-buckettrino.s3.eu-west-2.amazonaws.com"),
-        AllowedDomain.exactly("emrys-afon-bucket.s3.eu-west-2.amazonaws.com"),
-        AllowedDomain.exactly("emrys-afon-bucket-polaris-forbids.s3.eu-west-2.amazonaws.com"),
-        AllowedDomain.exactly("emrys_afon_core.storage.googleapis.com"), // need to check this one
-        AllowedDomain.exactly("westmidsstorageaccount.blob.core.windows.net"),
-        AllowedDomain.exactly("westmidspolarisazure.click"),
-        AllowedDomain.matching("afonstorageaccount.blob.core.windows.net"));
-
-    /**
-     * One entry in {@link #ALLOWED_DOMAINS}. Cilium offers two matchers and they are not the
+     * One entry in {@link #allowedDomains}. Cilium offers two matchers and they are not the
      * same thing, so which one applies is stated per domain rather than guessed at from the
      * presence of a {@code *}:
      * <UL>
@@ -70,10 +54,13 @@ public class NetworkConfig {
         }
     }
 
-    private final TerraformStack tfStack;
+    private final TerraformStack      tfStack;
+    private final List<AllowedDomain> allowedDomains;
 
-    public NetworkConfig(TerraformStack tfStack) {
+    public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties) {
         this.tfStack = tfStack;
+        String csv = ALLOWED_DOMAINS_CSV.getValueFrom(properties.getProperties());
+        allowedDomains = Arrays.stream(csv.split(",")).map(x -> AllowedDomain.exactly(x)).toList();
     }
 
     /**
@@ -105,7 +92,7 @@ public class NetworkConfig {
                                    .build(),
             createSparkConnectorEgressPolicy(sparkConnectorName));
         networkPolicyFor(labels, egress);
-        whitelistDomains(labels, ALLOWED_DOMAINS, dependsOn);
+        whitelistDomains(labels, allowedDomains, dependsOn);
     }
 
     /**
