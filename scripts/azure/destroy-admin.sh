@@ -1,8 +1,6 @@
-source $AFON_ROOT/scripts/config/afon-source.sh azure
-
 APP_NAME="${1:-AfonMultiTenantApp}"
 echo "- destroy-admin.sh $APP_NAME"
-echo "- Run destroy.sh first (with APP_ID set) to clean up role assignments before removing the app."
+echo "- Run destroy.sh <false> first (with APP_ID set) to clean up role assignments, storage and resource group, before removing the app."
 
 APP_IDS=$(az ad app list --display-name $APP_NAME --query "[].appId" -o tsv)
 if [ -z "$APP_IDS" ]; then

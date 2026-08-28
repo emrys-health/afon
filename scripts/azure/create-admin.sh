@@ -1,5 +1,3 @@
-source $AFON_ROOT/scripts/config/afon-source.sh azure
-
 APP_NAME="${1:-AfonMultiTenantApp}"
 echo "- Creating app $APP_NAME"
 
@@ -37,14 +35,12 @@ echo "- export APP_ID=$APP_ID before running create.sh to finish setting up the 
 
 # App credential reset not idempotent by design: Azure never re-exposes an existing secret's value,
 # so reset command must always be run to print a new secret, invalidating any previous secret.
-APP_SECRET_RESET="${APP_SECRET_RESET:-}"
-if [ -n "$APP_SECRET_RESET" ]; then
+APP_CREDENTIAL_RESET="${APP_CREDENTIAL_RESET:-}"
+if [ -n "$APP_CREDENTIAL_RESET" ]; then
   echo "- Resetting app credential."
   echo "- From the output below, add the following properties in your config/secret-azure.properties"
-  echo "AZURE_CLIENT_ID=<appId>"
-  echo "AZURE_TENANT_ID=<tenant>"
   echo "AZURE_CLIENT_SECRET=<password>"
   az ad app credential reset --id $APP_ID
 else
-  echo "- Not resetting app credentials, as APP_SECRET_RESET is not set."
+  echo "- Not resetting app credentials, as APP_CREDENTIAL_RESET is not set."
 fi
