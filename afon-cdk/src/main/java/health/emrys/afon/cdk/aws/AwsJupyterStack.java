@@ -49,7 +49,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
             cloudProvider,
             properties,
             getKeyCloakConfig().getAliasRecord());
-        NetworkConfig network = new NetworkConfig(this);
+        NetworkConfig network = new NetworkConfig(this, properties);
         // Every Service the hub deploy creates (guacamole-web, the per-user VNC services,
         // jupyterhub-proxy-public) fires the AWS LB Controller's mutating webhook
         // (mservice.elbv2.k8s.aws), which intercepts all Service creations — not just

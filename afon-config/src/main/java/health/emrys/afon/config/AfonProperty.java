@@ -106,7 +106,10 @@ public enum AfonProperty {
 
     // Snowflake
     SNOWFLAKE_JDBC_URL("SNOWFLAKE_JDBC_URL"),
-    SNOWFLAKE_PRIVATE_KEY("SNOWFLAKE_PRIVATE_KEY");
+    SNOWFLAKE_PRIVATE_KEY("SNOWFLAKE_PRIVATE_KEY"),
+
+    ALLOWED_DOMAINS_CSV("ALLOWED_DOMAINS_CSV"),
+    ;
 
     private final String name;
 
