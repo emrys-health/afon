@@ -142,3 +142,5 @@ scripts/azure/issue-cert.sh digicert|globalsign
 ```
 This is not a free service and the issuer needs to be registered.  
 Set as properties `AZURE_CA_ID/AZURE_CA_PASSWORD` in `config/secret-azure.properties` the issuer credentials.
+
+**NOTE**:  one advantage of using Azure CA is that Key Vault handles renewal on its own schedule going forward.
