@@ -1,11 +1,10 @@
 package health.emrys.afon.config;
 
 import org.junit.jupiter.api.Test;
-import org.junit.platform.commons.util.CollectionUtils;
 
 import java.util.List;
 import java.util.Properties;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -166,14 +165,15 @@ public class FilePropertyProviderTest {
     public void ensureTemplatePropertyNamesAreExactlyThoseOfAfonPropertyEnum() {
         Properties properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR).getProperties();
         // ensure all enum names are found and empty
-        for (String name : AfonProperty.getAllNames()) {
-            assertThat(properties.get(name)).as("name = %s", name).isNotNull();
-            assertThat(properties.get(name)).as("name = %s", name).isEqualTo("");
+        Set<String> allNames = AfonProperty.getAllNames();
+        for (String name : allNames) {
+            assertThat(properties.get(name)).as("enum name = %s", name).isNotNull();
+            assertThat(properties.get(name)).as("enum name = %s", name).isEqualTo("");
         }
         // ensure no names other than enum names are found
-        assertThat(CollectionUtils.toStream(properties.keySet())
-                .map(k -> k.toString()).collect(Collectors.toSet()))
-                .isEqualTo(AfonProperty.getAllNames());
+        for ( String name : properties.stringPropertyNames() ) {
+            assertThat(allNames).as("property name = %s", name).contains(name);
+        }
     }
 
 }
