@@ -3,7 +3,7 @@ source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 usage(){
   echo "Usage: $0 <issuer>"
-  echo "Issue and caches in Azure Key Vault the cert for the $AZURE_DOMAIN_NAME."
+  echo "Issue and stores in Azure Key Vault the cert for the $AZURE_DOMAIN_NAME."
   echo "The supported issuers are:"
   echo " - acme via Let's Encrypt (free)"
   echo " - digicert|globalsign via Key Vault CA (paying service)"
@@ -26,9 +26,9 @@ require_key_vault() {
   fi
 }
 
-# Caches a PEM cert + key pair under the secret names AzurePolarisStack's restore step reads
+# Stores a PEM cert + key pair under the secret names AzurePolarisStack's restore step reads
 # from. Common tail end for every issuer below, so the CDK side stays issuer-agnostic.
-cache_cert() {
+store_cert() {
   CERT_PEM="$1"
   KEY_PEM="$2"
   KEBAB_DOMAIN_NAME="${AZURE_DOMAIN_NAME//./-}"
@@ -60,9 +60,8 @@ install_acme() {
   fi
 }
 
-# Issues (or renews, idempotently) the domain's cert directly against Let's Encrypt via
-# DNS-01, independent of the AKS cluster/ingress. Free, but subject to Let's Encrypt's
-# 90-day validity and rate limits.
+# Issues (or renews, idempotently) the domain's cert directly against Let's Encrypt via DNS01.
+# Free, but subject to letsencrypt's 90-day validity and usage rate limits.
 issue_via_acme() {
   install_acme
 
@@ -76,6 +75,8 @@ issue_via_acme() {
     az role assignment create  --role "DNS Zone Contributor" --assignee $AZURE_CLIENT_ID --scope "$DNS_ZONE_SCOPE" || exit 1
   fi
 
+  # acme.sh's dns_azure hook reads these specific variable names to authenticate as the service
+  # principal above when it creates/deletes the _acme-challenge TXT record.
   export AZUREDNS_SUBSCRIPTIONID=$AZURE_SUBSCRIPTION
   export AZUREDNS_TENANTID=$AZURE_TENANT_ID
   export AZUREDNS_APPID=$AZURE_CLIENT_ID
@@ -96,16 +97,14 @@ issue_via_acme() {
   fi
 
   CERT_DIR="$ACME_HOME/$AZURE_DOMAIN_NAME"
-  cache_cert "$CERT_DIR/fullchain.cer" "$CERT_DIR/$AZURE_DOMAIN_NAME.key"
+  store_cert "$CERT_DIR/fullchain.cer" "$CERT_DIR/$AZURE_DOMAIN_NAME.key"
 }
 
-# Issues via Key Vault's own integrated CA (DigiCert or GlobalSign) - no ACME client, no
-# DNS-01 challenge, and Key Vault handles renewal on its own schedule going forward. Needs
-# an account already set up with that CA out of band; AZURE_CA_ID/
-# AZURE_CA_PASSWORD (secret-azure.properties) are that account's credentials, used
-# once to register the issuer in Key Vault. Unlike the acme path this hasn't been exercised
-# against a live CA account - verify the policy/issuer fields against your provider's
-# requirements before relying on it.
+# Issues via Key Vault's own integrated CA (DigiCert or GlobalSign)
+# Key Vault handles renewal on its own schedule going forward.
+# Needs an account already set up with that CA issuer;
+# AZURE_CA_ID/AZURE_CA_PASSWORD (in config/secret-azure.properties) are that account's credentials,
+# used once to register the issuer in Key Vault.
 issue_via_keyvault_ca() {
   PROVIDER="$1"
   ISSUER_NAME="afon-$(echo "$PROVIDER" | tr '[:upper:]' '[:lower:]')-issuer"
@@ -154,7 +153,7 @@ EOF
   openssl pkcs12 -in "$TMP/cert.pfx" -clcerts -nokeys -passin pass: -out "$TMP/cert.pem" || exit 1
   openssl pkcs12 -in "$TMP/cert.pfx" -nocerts -nodes -passin pass: -out "$TMP/key.pem" || exit 1
 
-  cache_cert "$TMP/cert.pem" "$TMP/key.pem"
+  store_cert "$TMP/cert.pem" "$TMP/key.pem"
   rm -rf "$TMP"
 }
 
