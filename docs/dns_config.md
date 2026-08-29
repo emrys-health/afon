@@ -108,16 +108,18 @@ dig A <domain> +short
 
 Kubernetes running in the cloud that owns the DNS servers can now ask them to map a domain name to one of its pods.
 
-## TLS certificate store
+## TLS cert issue and store
 
-Let's Encrypt limites the number of certificates per week.   
+Let's Encrypt limits the number of certificates per week.   
 
-The certificate should then be cached in a cloud secrets manager - AWS Secrets Manager, Azure Key Vault, or GCP Secret Manager.
+The cert should then be issued and stored in a secrets manager - which is necessarily cloud-specific.
 
 ### Azure 
 
+For Azure, the secrets manager is Azure Key Vault.
+
 In `config/afon-azure.properties` add property `AZURE_KEY_VAULT_NAME=<env>-afon-key-vault`.  
-If property `AZURE_KEY_VAULT_NAME` is not found or blank, the caching of the certificate is disabled.
+If property `AZURE_KEY_VAULT_NAME` is not found or blank, the storing of the cert is disabled.
 
 **IMPORTANT**:  the Azure key vault names must be unique **globally**.
 
@@ -128,7 +130,7 @@ scripts/azure/keyvault.sh create
 It will pick up the name of the key vault and all the other relevant properties from config and create the key vault.
 The operation is idempotent and will show an existing key vault if already present.
 
-To issue a cert via ACME (Let's Encrypt) and cache it in the key vault:
+To issue a cert via ACME (Let's Encrypt) and store it in the key vault:
 ```shell
 scripts/azure/issue-cert.sh acme
 ```
@@ -139,4 +141,4 @@ Optionally, Azure has its own CA which supports two issuers:
 scripts/azure/issue-cert.sh digicert|globalsign 
 ```
 This is not a free service and the issuer needs to be registered.  
-Set properties `AZURE_CA_ID` and `AZURE_CA_PASSWORD` in `config/secret-azure.properties` once the registration completed.
+Set as properties `AZURE_CA_ID/AZURE_CA_PASSWORD` in `config/secret-azure.properties` the issuer credentials.
