@@ -22,10 +22,6 @@ import com.hashicorp.cdktf.providers.azurerm.user_assigned_identity.UserAssigned
 import com.hashicorp.cdktf.providers.azurerm.user_assigned_identity.UserAssignedIdentityConfig;
 import com.hashicorp.cdktf.providers.azurerm.virtual_network.VirtualNetwork;
 import com.hashicorp.cdktf.providers.azurerm.virtual_network.VirtualNetworkConfig;
-import com.hashicorp.cdktf.providers.azurestack.provider.AzurestackProvider;
-import com.hashicorp.cdktf.providers.azurestack.provider.AzurestackProviderFeatures;
-import com.hashicorp.cdktf.providers.azurestack.resource_group.ResourceGroup;
-import com.hashicorp.cdktf.providers.azurestack.resource_group.ResourceGroupConfig;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
@@ -56,10 +52,8 @@ public class AzureCloudProvider extends AbstractCloudProvider {
     private static final String                  SUBNET_CIDR        = "10.1.1.0/24";
     private static final String                  SERVICE_CIDR       = "10.2.0.0/16";
     private static final String                  DNS_SERVICE_IP     = "10.2.0.10";
-    private static final String                  LOOKUP             = "lookup";
     private final        String                  resourceGroup;
     private final        String                  subscriptionId;
-    private final        String                  region;
     private final        KubernetesCluster       aksCluster;
     private final        String                  clusterName;
     private final        DataAzurermClientConfig clientConfig;
@@ -76,19 +70,10 @@ public class AzureCloudProvider extends AbstractCloudProvider {
         resourceGroup            = properties.getValue(AZURE_RESOURCE_GROUP);
         subscriptionId           = properties.getValue(AZURE_SUBSCRIPTION);
         skipProviderRegistration = Boolean.getBoolean(properties.getValue(AZURE_PROVIDER_REGISTRATION_SKIP, "false"));
-        this.region              = properties.getValue(AZURE_REGION);
         configureProviders();
         clientConfig = new DataAzurermClientConfig(this, "current");
-        aksCluster   = createCluster(properties.getValue(AZURE_RESOURCE_GROUP_ACTION, LOOKUP));
+        aksCluster   = createCluster(lookupResourceGroup());
         grantClusterAdmin();
-    }
-
-    private @NonNull KubernetesCluster createCluster(String resourceGroupAction) {
-        if (LOOKUP.equalsIgnoreCase(resourceGroupAction)) {
-            return createCluster(lookupResourceGroup());
-        } else {
-            return createCluster(createResourceGroup());
-        }
     }
 
     /**
@@ -98,18 +83,6 @@ public class AzureCloudProvider extends AbstractCloudProvider {
      * @return A KubernetesCluster
      */
     private @NonNull KubernetesCluster createCluster(DataAzurermResourceGroup resourceGroup) {
-        UserAssignedIdentity identity   = createIdentity(resourceGroup);
-        Subnet               nodeSubnet = createNetworking(resourceGroup, identity);
-        return createCluster(resourceGroup, nodeSubnet, identity);
-    }
-
-    /**
-     * Create cluster for created {@link ResourceGroup}
-     *
-     * @param resourceGroup
-     * @return A KubernetesCluster
-     */
-    private @NonNull KubernetesCluster createCluster(ResourceGroup resourceGroup) {
         UserAssignedIdentity identity   = createIdentity(resourceGroup);
         Subnet               nodeSubnet = createNetworking(resourceGroup, identity);
         return createCluster(resourceGroup, nodeSubnet, identity);
@@ -159,17 +132,11 @@ public class AzureCloudProvider extends AbstractCloudProvider {
 
     private void configureProviders() {
         NullProvider.Builder.create(this, "null").build();
-        AzurestackProvider.Builder
-            .create(this, "azurestack")
-            .features(AzurestackProviderFeatures.builder().build())
-            .metadataHost(region)
-            .skipProviderRegistration(skipProviderRegistration)
-            .build();
         AzurermProvider.Builder
             .create(this, "azurerm")
             .features(List.of(AzurermProviderFeatures.builder().build()))
             .subscriptionId(subscriptionId)
-            .skipProviderRegistration(skipProviderRegistration)
+            .resourceProviderRegistrations(skipProviderRegistration ? "none" : "core")
             .build();
     }
 
@@ -181,7 +148,7 @@ public class AzureCloudProvider extends AbstractCloudProvider {
      * The resource group is pre-existing and owned outside this stack, so it is looked up
      * rather than declared — declaring it would make tofu create it on apply (and delete it,
      * along with everything else in it, on destroy). Child resources take their location
-     * from the group itself rather than from {@code AZURE_REGION}.
+     * from the group itself rather than from the region.
      */
     private DataAzurermResourceGroup lookupResourceGroup() {
         return new DataAzurermResourceGroup(
@@ -368,265 +335,6 @@ public class AzureCloudProvider extends AbstractCloudProvider {
     // -------------------------------------------------------------------------
 
     private KubernetesCluster createCluster(DataAzurermResourceGroup resourceGroup,
-                                            Subnet nodeSubnet,
-                                            UserAssignedIdentity identity) {
-        KubernetesClusterDefaultNodePool nodePool = KubernetesClusterDefaultNodePool
-            .builder()
-            .name("systempool")
-            .nodeCount(3)
-            .vmSize("Standard_D2s_v3")
-            .vnetSubnetId(nodeSubnet.getId())
-            .build();
-
-        KubernetesClusterNetworkProfile networkProfile = KubernetesClusterNetworkProfile
-            .builder()
-            .networkPlugin("azure")
-            .loadBalancerSku("standard")
-            .serviceCidr(SERVICE_CIDR)
-            .dnsServiceIp(DNS_SERVICE_IP)
-            .networkPlugin("azure")
-            .networkDataPlane("cilium")
-            .networkPluginMode("overlay")
-            .build();
-
-        LocalExecProvisioner updateCredentials = LocalExecProvisioner
-            .builder()
-            .when("create")
-            .command(format(
-                "az aks get-credentials --resource-group %s " +
-                    "--name %s --overwrite-existing",
-                resourceGroup.getName(), clusterName))
-            .type("local-exec")
-            .build();
-
-        return KubernetesCluster.Builder
-            .create(this, "aks")
-            .name(clusterName)
-            .location(resourceGroup.getLocation())
-            .resourceGroupName(resourceGroup.getName())
-            .dnsPrefix(clusterName)
-            .kubernetesVersion(KUBERNETES_VERSION)
-            .defaultNodePool(nodePool)
-            // Managed AAD + Azure RBAC. Local account is disabled so credentials are no
-            // longer long-lived client certs baked into state; kubelogin mints a fresh
-            // token per provider invocation (see configureK8s/configureHelm).
-            .azureActiveDirectoryRoleBasedAccessControl(
-                KubernetesClusterAzureActiveDirectoryRoleBasedAccessControl
-                    .builder()
-                    .tenantId(clientConfig.getTenantId())
-                    .azureRbacEnabled(true)
-                    .build())
-            .roleBasedAccessControlEnabled(true)
-            .localAccountDisabled(true)
-            // The live cluster already has the OIDC issuer enabled; Azure refuses to
-            // disable it once on (OIDCIssuerFeatureCannotBeDisabled), so declare it
-            // enabled to avoid a spurious update diff.
-            .oidcIssuerEnabled(true)
-            .identity(KubernetesClusterIdentity
-                          .builder()
-                          .type("UserAssigned")
-                          .identityIds(List.of(identity.getId()))
-                          .build())
-            .networkProfile(networkProfile)
-            .timeouts(KubernetesClusterTimeouts
-                          .builder()
-                          .create("20m")
-                          .build())
-            .provisioners(List.of(updateCredentials))
-            .build();
-    }
-
-    // -------------------------------------------------------------------------
-    // Created Resource group
-    // -------------------------------------------------------------------------
-
-
-    private ResourceGroup createResourceGroup() {
-        return new ResourceGroup(
-            this,
-            "aks-rg",
-            ResourceGroupConfig
-                .builder()
-                .name(resourceGroup)
-                .location(region)
-                .build());
-    }
-
-    // -------------------------------------------------------------------------
-    // Managed identity (created before the cluster so we can pre-grant roles)
-    // -------------------------------------------------------------------------
-
-    private UserAssignedIdentity createIdentity(ResourceGroup resourceGroup) {
-        return new UserAssignedIdentity(
-            this, "aks-identity", UserAssignedIdentityConfig
-            .builder()
-            .name("aks-identity")
-            .location(resourceGroup.getLocation())
-            .resourceGroupName(resourceGroup.getName())
-            .build());
-    }
-
-    // -------------------------------------------------------------------------
-    // Networking: VNet → Subnet → NSG → association → role assignment
-    // -------------------------------------------------------------------------
-
-    private Subnet createNetworking(ResourceGroup resourceGroup, UserAssignedIdentity identity) {
-        VirtualNetwork vnet = new VirtualNetwork(
-            this,
-            "aks-vnet",
-            VirtualNetworkConfig
-                .builder()
-                .name("aks-vnet")
-                .location(resourceGroup.getLocation())
-                .resourceGroupName(resourceGroup.getName())
-                .addressSpace(List.of(VNET_CIDR))
-                .build());
-
-        NetworkSecurityGroup nsg = createNsg(resourceGroup);
-
-        Subnet subnet = new Subnet(
-            this,
-            "aks-subnet",
-            SubnetConfig
-                .builder()
-                .name("aks-subnet")
-                .resourceGroupName(resourceGroup.getName())
-                .virtualNetworkName(vnet.getName())
-                .addressPrefixes(List.of(SUBNET_CIDR))
-                .build());
-
-        new SubnetNetworkSecurityGroupAssociation(
-            this, "aks-nsg-assoc",
-            SubnetNetworkSecurityGroupAssociationConfig
-                .builder()
-                .subnetId(subnet.getId())
-                .networkSecurityGroupId(nsg.getId())
-                .build());
-
-        new RoleAssignment(
-            this, "aks-identity-network-contributor", RoleAssignmentConfig
-            .builder()
-            .principalId(identity.getPrincipalId())
-            .roleDefinitionName("Network Contributor")
-            .scope(subnet.getId())
-            .build());
-
-        return subnet;
-    }
-
-    private NetworkSecurityGroup createNsg(ResourceGroup resourceGroup) {
-        // Health probes from the Azure Load Balancer infrastructure
-        NetworkSecurityGroupSecurityRule lbInbound = NetworkSecurityGroupSecurityRule
-            .builder()
-            .name(
-                "AllowAzureLoadBalancerInbound")
-            .priority(100)
-            .direction("Inbound")
-            .access("Allow")
-            .protocol("*")
-            .sourcePortRange("*")
-            .destinationPortRange("*")
-            .sourceAddressPrefix(
-                "AzureLoadBalancer")
-            .destinationAddressPrefix("*")
-            .build();
-
-        // The subnet NSG is evaluated post-DNAT (destination = node private IP : NodePort),
-        // so we need the NodePort range here.
-        // The NIC NSG is evaluated pre-DNAT (destination = LB frontend IP : 80/443),
-        // which is why the AKS cloud controller creates NIC rules using the LB frontend IP —
-        // those are handled automatically by AKS.
-        NetworkSecurityGroupSecurityRule httpInbound = NetworkSecurityGroupSecurityRule
-            .builder()
-            .name("AllowHttpInbound")
-            .priority(110)
-            .direction("Inbound")
-            .access("Allow")
-            .protocol("Tcp")
-            .sourcePortRange("*")
-            .destinationPortRange("80")
-            .sourceAddressPrefix("Internet")
-            .destinationAddressPrefix("*")
-            .build();
-
-        NetworkSecurityGroupSecurityRule httpsInbound = NetworkSecurityGroupSecurityRule
-            .builder()
-            .name("AllowHttpsInbound")
-            .priority(120)
-            .direction("Inbound")
-            .access("Allow")
-            .protocol("Tcp")
-            .sourcePortRange("*")
-            .destinationPortRange("443")
-            .sourceAddressPrefix("Internet")
-            .destinationAddressPrefix("*")
-            .build();
-
-        // Belt-and-suspenders: also allow NodePort range in case the subnet NSG
-        // sees post-DNAT traffic (node IP : NodePort) rather than the LB frontend IP.
-        NetworkSecurityGroupSecurityRule nodePortInbound = NetworkSecurityGroupSecurityRule
-            .builder()
-            .name("AllowNodePortInbound")
-            .priority(130)
-            .direction("Inbound")
-            .access("Allow")
-            .protocol("Tcp")
-            .sourcePortRange("*")
-            .destinationPortRange(
-                "30000-32767")
-            .sourceAddressPrefix(
-                "Internet")
-            .destinationAddressPrefix(
-                "*")
-            .build();
-
-        NetworkSecurityGroupSecurityRule internetOutbound = NetworkSecurityGroupSecurityRule
-            .builder()
-            .name(
-                "AllowInternetOutbound")
-            .priority(100)
-            .direction("Outbound")
-            .access("Allow")
-            .protocol("*")
-            .sourcePortRange("*")
-            .destinationPortRange("*")
-            .sourceAddressPrefix("*")
-            .destinationAddressPrefix("Internet")
-            .build();
-
-        NetworkSecurityGroupSecurityRule outbound = NetworkSecurityGroupSecurityRule
-            .builder()
-            .name(
-                "AllowAzureLoadBalancerOutbound")
-            .priority(110)
-            .direction("Outbound")
-            .access("Allow")
-            .protocol("*")
-            .sourcePortRange("*")
-            .destinationPortRange("*")
-            .sourceAddressPrefix(
-                "AzureLoadBalancer")
-            .destinationAddressPrefix("*")
-            .build();
-
-        return new NetworkSecurityGroup(
-            this, "aks-nsg", NetworkSecurityGroupConfig
-            .builder()
-            .name("aks-nsg")
-            .location(resourceGroup.getLocation())
-            .resourceGroupName(resourceGroup.getName())
-            .securityRule(List.of(
-                lbInbound, httpInbound, httpsInbound,
-                nodePortInbound, internetOutbound,
-                outbound))
-            .build());
-    }
-
-    // -------------------------------------------------------------------------
-    // AKS cluster
-    // -------------------------------------------------------------------------
-
-    private KubernetesCluster createCluster(ResourceGroup resourceGroup,
                                             Subnet nodeSubnet,
                                             UserAssignedIdentity identity) {
         KubernetesClusterDefaultNodePool nodePool = KubernetesClusterDefaultNodePool
