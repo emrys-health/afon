@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
  */
 public enum AfonProperty {
 
+    ENV_NAME("ENV_NAME"),
     CLUSTER_NAME("CLUSTER_NAME"),
 
     // AWS
