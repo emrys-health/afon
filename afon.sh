@@ -15,7 +15,7 @@ usage (){
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
   echo "          [--script-path <path>] [--script-args <args>]"
   echo "          [--setup-os <os>] [--setup-output <file>]"
-  echo "          [--tofu-apply] [--tofu-destroy] [--tofu-state] [--tofu-args <args>] [--tofu-cloud <cloud>]"
+  echo "          [--tofu-args <args>]"
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
   echo "          ansible:    : executes the ansible playbook."
   echo "          build       : executes the mvn build."
@@ -63,7 +63,6 @@ usage (){
   echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
   echo "tofu-args:        the tofu args."
-  echo "tofu-cloud:       the cloud used by tofu. One of aws|azure|gcp. Defaults to 'aws'."
 }
 
 check_acceptance(){
@@ -291,13 +290,18 @@ capitaliseFirst(){
 }
 
 exec_tofu(){
-  echo "Using tofu cloud '$TOFU_CLOUD'"
+  TOFU_CLOUD=
+  if [ -n "$CLOUD" ]; then
+    TOFU_CLOUD="$CLOUD"
+  else
+    TOFU_CLOUD="aws"
+  fi
   TOFU_DIR="$CDKTF_DIR/stacks/$TOFU_CLOUD"
+  echo "Using tofu dir $TOFU_DIR"
   if [ ! -d "$TOFU_DIR" ]; then
-     echo "Dir $TOFU_DIR not found.  Execute deploy or configure actions first."
+     echo "Dir $TOFU_DIR not found.  Execute deploy first."
      usage; exit 0
   fi
-  echo "Using tofu dir $TOFU_DIR"
   if [ -z "$TOFU_ACTION" ]; then
     # it may have already been set by caller
     TOFU_ACTION=${ACTION#tofu-}
@@ -441,7 +445,6 @@ SETUP_OS=
 SETUP_OUTPUT=
 TOFU_ACTION=
 TOFU_ARGS=
-TOFU_CLOUD=
 VERSION=
 
 while [[ $# -gt 0 ]]; do
@@ -508,8 +511,6 @@ while [[ $# -gt 0 ]]; do
       SETUP_OUTPUT="$2"; shift 2 ;;
     --tofu-args)
       TOFU_ARGS="$2"; shift 2 ;;
-    --tofu-cloud)
-      TOFU_CLOUD="$2"; shift 2 ;;
     *)
       echo "Unknown option: $1" >&2;
       usage; exit 0
@@ -694,10 +695,6 @@ case $ACTION in
     esac
     ;;
   tofu-*)
-    if [ -z "$TOFU_CLOUD" ]; then
-      TOFU_CLOUD="aws"
-      echo "Defaulting to tofu cloud: $TOFU_CLOUD"
-    fi
     exec_tofu
     ;;
   *)
