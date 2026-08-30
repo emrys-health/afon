@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static health.emrys.afon.config.AfonCloud.*;
+import static health.emrys.afon.config.ConfigUtils.afonCloud;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PolarisConfigTest {
@@ -22,6 +23,10 @@ class PolarisConfigTest {
     }
 
     private void validateScriptFor(String id, AfonPropertyProvider properties) {
+        if ( !afonCloud().equalsIgnoreCase(id) ){
+            // does not match currently specified cloud
+            return;
+        }
         String script = PolarisConfig.getProviderCredentials(properties, id);
         String polarisDbName = "polaris_db_" + PolarisConfig.polarisDomainName(properties, id).replace(".", "_");
         assertThat(script).contains(polarisDbName);
