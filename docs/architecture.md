@@ -59,13 +59,15 @@ In the deployed environment, Spark runs as a Spark Connect server in Kubernetes.
 
 ## Properties management
 
-Runtime properties are loaded via the `FilePropertyProvider` from the config dir.   
+Runtime properties are loaded via the `AfonPropertyProvider`.   
 
-The config dir is defined relative to the `afon.home` system property.  If this is not set, it will default to the top-level dir of the afon-core project. 
+All known properties are defined as `AfonProperty` enum, which property knows its own name and can extract its value from a `Properties` object.  
 
-All known properties are defined as `AfonProperty` constants in `AfonProperties`. Each property knows its own name and can extract its value from a `Properties` object.
+The `FilePropertyProvider` loads the properties from the properties files in the config dir.
+The config dir is defined relative to the `afon.home` system property. If this is not set, it will default to the top-level dir of the afon-core project.  System properties can override any property value.
 
-System properties can override any property value.
+The `DefaultPropertyProvider` decorates the `FilePropertyProvider` allows the specification of a number of classes which can
+contain property defaults as constants, ie public static `String` fields where the name and value of the field map to the name and value of the `AfonProperty`.  The `DefaultPropertyProvider` will use the defaults defined in the constants classes if the property is not found by the `FilePropertyProvider`.   The loading of the constants classes is done at runtime.
 
 The `AfonCloud` enum defines the cloud types that Polaris can manage, used throughout the codebase to select the right storage configuration and credential vending logic.
 
