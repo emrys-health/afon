@@ -161,11 +161,9 @@ The stack can be brought down using tofu, which will use the locally stored tfst
 
 If tofu-destroy hangs on an instance of a managed type, rm manage type from tofu state and re-run destroy:
 ```shell
-./afon.sh -a tofu-state --tofu-args "rm helm_release.prometheusRelease" --tofu-cloud <cloud>
+./afon.sh -a tofu-state --tofu-args "rm helm_release.prometheusRelease" -c <cloud>
 ```
-where `<cloud>={aws,azure,gcp}`, defaulting to `aws` cloud.   
-
-**NOTE:** The cloud specification option for `tofu` is `--tofu-cloud` and not `-c|--cloud`.
+where `<cloud>={aws,azure,gcp}`, defaulting to `aws`.
 
 ## Recovery
 
