@@ -5,7 +5,8 @@ import java.util.Properties;
 /**
  * An {@link AfonPropertyProvider} provides access to configured properties.
  *
- * Implementations include {@link FilePropertyProvider} and {@link ImmutablePropertyProvider}.
+ * Implementations include {@link FilePropertyProvider}, {@link ConstantsPropertyProvider} and
+ * {@link ImmutablePropertyProvider}.
  */
 public interface AfonPropertyProvider {
 

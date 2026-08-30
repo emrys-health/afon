@@ -135,8 +135,7 @@ public enum AfonProperty {
     /**
      * As {@link #getValueFrom(Properties)} but falls back to {@code defaultValue} when the property is
      * absent, instead of throwing an {@link IllegalArgumentException}.
-     * Use for optional properties that have a sensible default (e.g. the
-     * KeyCloak scheme, which defaults to https for real deployments but is overridden to http in tests).
+     * Use for optional properties that have a sensible default.
      */
     public String getValueFrom(Properties properties, String defaultValue) {
         return properties.getProperty(name, defaultValue);
