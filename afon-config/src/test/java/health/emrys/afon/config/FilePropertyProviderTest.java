@@ -7,6 +7,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class FilePropertyProviderTest {
 
@@ -159,6 +160,54 @@ public class FilePropertyProviderTest {
         } finally {
             System.clearProperty(ConfigUtils.AFON_CLOUD_PROPERTY);
         }
+    }
+
+    @Test
+    public void canInterpolatePropertyReferencingAnotherProperty() {
+        Properties properties = new FilePropertyProvider("src/test/resources/config", List.of("interpolate")).getProperties();
+        assertThat(properties.getProperty("CLUSTER_NAME")).isEqualTo("dev");
+        assertThat(properties.getProperty("OIDC_ISSUER_URL")).isEqualTo("https://dev-oauth.click/realms/polaris");
+    }
+
+    @Test
+    public void canInterpolatePropertyReferencingAnotherPropertyForAws() {
+        System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "aws");
+        try {
+            Properties properties = new FilePropertyProvider("src/test/resources/config", List.of("interpolate")).getProperties();
+            assertThat(properties.getProperty("CLUSTER_NAME")).isEqualTo("dev");
+            assertThat(properties.getProperty("AWS_POLARIS_DOMAIN_NAME")).isEqualTo("dev-polaris.click");
+            assertThat(properties.getProperty("AWS_S3_BUCKET_NAME")).isEqualTo("dev-bucket");
+            assertThat(properties.getProperty("AWS_S3_BUCKET_NAME_TRINO")).isEqualTo("dev-bucket-trino");
+        } finally {
+            System.clearProperty(ConfigUtils.AFON_CLOUD_PROPERTY);
+        }
+    }
+
+    @Test
+    public void canInterpolateUsingSystemPropertyOverride() {
+        System.setProperty(AfonProperty.CLUSTER_NAME.getName(), "prod");
+        try {
+            Properties properties = new FilePropertyProvider("src/test/resources/config", List.of("interpolate")).getProperties();
+            assertThat(properties.getProperty("AWS_S3_BUCKET_NAME")).isEqualTo("prod-bucket");
+        } finally {
+            System.clearProperty(AfonProperty.CLUSTER_NAME.getName());
+        }
+    }
+
+    @Test
+    public void failsWhenInterpolatingUndefinedProperty() {
+        AfonPropertyProvider provider = new FilePropertyProvider("src/test/resources/config", List.of("interpolate-undefined"));
+        assertThatThrownBy(provider::getProperties)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ENV_NAME");
+    }
+
+    @Test
+    public void failsWhenInterpolatingCircularProperties() {
+        AfonPropertyProvider provider = new FilePropertyProvider("src/test/resources/config", List.of("interpolate-circular"));
+        assertThatThrownBy(provider::getProperties)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Circular");
     }
 
     @Test
