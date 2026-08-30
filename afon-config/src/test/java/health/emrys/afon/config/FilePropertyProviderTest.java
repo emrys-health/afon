@@ -165,7 +165,7 @@ public class FilePropertyProviderTest {
     @Test
     public void canInterpolatePropertyReferencingAnotherProperty() {
         Properties properties = new FilePropertyProvider("src/test/resources/config", List.of("interpolate")).getProperties();
-        assertThat(properties.getProperty("CLUSTER_NAME")).isEqualTo("dev");
+        assertThat(properties.getProperty("ENV_NAME")).isEqualTo("dev");
         assertThat(properties.getProperty("OIDC_ISSUER_URL")).isEqualTo("https://dev-oauth.click/realms/polaris");
     }
 
@@ -174,7 +174,7 @@ public class FilePropertyProviderTest {
         System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "aws");
         try {
             Properties properties = new FilePropertyProvider("src/test/resources/config", List.of("interpolate")).getProperties();
-            assertThat(properties.getProperty("CLUSTER_NAME")).isEqualTo("dev");
+            assertThat(properties.getProperty("ENV_NAME")).isEqualTo("dev");
             assertThat(properties.getProperty("AWS_POLARIS_DOMAIN_NAME")).isEqualTo("dev-polaris.click");
             assertThat(properties.getProperty("AWS_S3_BUCKET_NAME")).isEqualTo("dev-bucket");
             assertThat(properties.getProperty("AWS_S3_BUCKET_NAME_TRINO")).isEqualTo("dev-bucket-trino");
@@ -185,12 +185,12 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canInterpolateUsingSystemPropertyOverride() {
-        System.setProperty(AfonProperty.CLUSTER_NAME.getName(), "prod");
+        System.setProperty(AfonProperty.ENV_NAME.getName(), "prod");
         try {
             Properties properties = new FilePropertyProvider("src/test/resources/config", List.of("interpolate")).getProperties();
             assertThat(properties.getProperty("AWS_S3_BUCKET_NAME")).isEqualTo("prod-bucket");
         } finally {
-            System.clearProperty(AfonProperty.CLUSTER_NAME.getName());
+            System.clearProperty(AfonProperty.ENV_NAME.getName());
         }
     }
 
@@ -199,7 +199,7 @@ public class FilePropertyProviderTest {
         AfonPropertyProvider provider = new FilePropertyProvider("src/test/resources/config", List.of("interpolate-undefined"));
         assertThatThrownBy(provider::getProperties)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ENV_NAME");
+                .hasMessageContaining("UNDEFINED");
     }
 
     @Test

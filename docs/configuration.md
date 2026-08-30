@@ -99,12 +99,17 @@ When running in CLI (e.g. tofu apply|destroy), you use the user admin credential
 
 Property values can be interpolated to minimise duplication.
 
+For example, in `afon.properties`:
 ```shell
-CLUSTER_NAME=dev
-OIDC_ISSUER_URL=https://${CLUSTER_NAME}-oauth.click/realms/polaris
-AWS_POLARIS_DOMAIN_NAME=${CLUSTER_NAME}-polaris.click
-AWS_S3_BUCKET_NAME=${CLUSTER_NAME}-bucket
-AWS_S3_BUCKET_NAME_TRINO=${AWS_S3_BUCKET_NAME}-trino
+ENV_NAME=dev
+CLUSTER_NAME=${ENV_NAME}-cluster
+OIDC_ISSUER_URL=https://${ENV_NAME}-oauth.click/realms/polaris
+```
+And in `afon-aws.properties`:
+```shell
+AWS_POLARIS_DOMAIN_NAME=${ENV_NAME}-polaris.click # the reference can be defined in common file
+AWS_S3_BUCKET_NAME=${ENV_NAME}-bucket
+AWS_S3_BUCKET_NAME_TRINO=${AWS_S3_BUCKET_NAME}-trino # use of a property previously interpolated
 ```
 Circular dependencies and undefined references are caught and result in failure to load properties.
 
