@@ -1,6 +1,8 @@
 source $AFON_ROOT/scripts/config/afon-source.sh azure
+source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 AS_ADMIN="${1:-false}"
+APP_ID="${AZURE_CLIENT_ID:-}"
 
 if [ "$AS_ADMIN" = "true" ]; then
   echo "- AS_ADMIN=true, running create-admin.sh"
