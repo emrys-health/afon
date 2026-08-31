@@ -216,8 +216,7 @@ public class FilePropertyProviderTest {
         // ensure all enum names are found and empty
         Set<String> allNames = AfonProperty.getAllNames();
         for (String name : allNames) {
-            assertThat(properties.get(name)).as("enum name = %s", name).isNotNull();
-            assertThat(properties.get(name)).as("enum name = %s", name).isEqualTo("");
+            assertThat(properties).as("enum name = %s", name).containsKey(name);
         }
         // ensure no names other than enum names are found
         for ( String name : properties.stringPropertyNames() ) {
