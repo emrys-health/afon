@@ -41,7 +41,7 @@ public class Redacter {
      * @return a flag to redact or not the value
      */
     private static boolean redactable(String value) {
-        return !value.matches(NON_REDACTABLE_WORDS);
+        return !value.isBlank() && !value.matches(NON_REDACTABLE_WORDS);
     }
 
 }
