@@ -62,23 +62,23 @@ else
   az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET  --auth-mode login || exit 1
 fi
 
-if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_EXTERNAL_BUCKET --query exists -o tsv)" = "true" ]; then
+if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_EXTERNAL_BUCKET --auth-mode login --query exists -o tsv)" = "true" ]; then
   echo "- Bucket $AZURE_EXTERNAL_BUCKET already exists, skipping"
 else
   echo "- Creating bucket $AZURE_EXTERNAL_BUCKET"
-  az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_EXTERNAL_BUCKET || exit 1
+  az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_EXTERNAL_BUCKET  --auth-mode login || exit 1
 fi
 
-if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_FORBIDDEN --query exists -o tsv)" = "true" ]; then
+if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_FORBIDDEN --auth-mode login --query exists -o tsv)" = "true" ]; then
   echo "- Bucket $AZURE_BUCKET_FORBIDDEN already exists, skipping"
 else
   echo "- Creating bucket $AZURE_BUCKET_FORBIDDEN"
-  az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_FORBIDDEN || exit 1
+  az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_FORBIDDEN  --auth-mode login || exit 1
 fi
 
 ## Role Assignment
 
-PRINCIPAL_ID="$(az ad signed-in-user show --query id -o tsv)"
+source $AFON_ROOT/scripts/azure/account-principal.sh
 if az role assignment list --assignee $PRINCIPAL_ID --all --query "[?roleDefinitionName=='Owner' || roleDefinitionName=='User Access Administrator' || roleDefinitionName=='Role Based Access Control Administrator']" -o tsv | grep -q .; then
   echo "- Current user has rights to create role assignments, proceeding"
 else
