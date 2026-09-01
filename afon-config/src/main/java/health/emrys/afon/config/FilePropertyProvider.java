@@ -111,12 +111,13 @@ public class FilePropertyProvider implements AfonPropertyProvider {
     @Override
     public void setValue(AfonProperty property, String value) {
         loadLazily();
-        if ( properties.containsKey(property.getName()) ){
-            logger.info("Overriding property {} to {}", property.getName(), value);
+        String name = property.getName();
+        if ( properties.containsKey(name) ){
+            logger.info("Overriding property '{}' with value '{}'", name, value);
         } else {
-            logger.info("Setting property {} to {}", property.getName(), value);
+            logger.info("Setting property '{}' with value '{}'", name, value);
         }
-        this.properties.setProperty(property.getName(), value);
+        this.properties.setProperty(name, value);
     }
 
     private void loadLazily() {
@@ -174,9 +175,10 @@ public class FilePropertyProvider implements AfonPropertyProvider {
      */
     private void overrideWithSystemProperties() {
         for (String name : AfonProperty.getAllNames()) {
-            if (System.getProperty(name) != null) {
-                logger.debug("Using the system variable to define property '{}'", name);
-                properties.put(name, System.getProperty(name));
+            String value = System.getProperty(name);
+            if (value != null) {
+                logger.info("Using the system property to override property '{}' with value '{}'", name, value);
+                properties.put(name, value);
             }
         }
     }
