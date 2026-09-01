@@ -1,8 +1,7 @@
 package health.emrys.afon.samples
 
 import health.emrys.afon.config.AfonCloud._
-import health.emrys.afon.cluster.{ClusterPolarisFinder, EndpointPolarisConfiguration}
-import health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT
+import health.emrys.afon.cluster.EndpointPolarisConfiguration
 import health.emrys.afon.config.{AfonCloud, AfonPropertyProvider, FilePropertyProvider}
 import health.emrys.afon.samples.SampleData.{occupancyDataset, patientDataset}
 import health.emrys.afon.ops.spark.SparkSessionFactory
@@ -33,11 +32,7 @@ object PatientDataMain {
     val properties = new FilePropertyProvider()
     val spark: SparkSession = initSpark(properties)
     logger.info("Configuring Polaris")
-    val finder = new ClusterPolarisFinder(properties)
-    val endpoint = format("%s:443", finder.getPolarisHost)
-    properties.setValue(POLARIS_ENDPOINT, endpoint)
-    val config = new EndpointPolarisConfiguration(properties);
-    config.configure()
+    new EndpointPolarisConfiguration(properties).configure()
     logger.info("Creating data")
     createData(spark, 10000)
     logger.info("Closing down Spark")
