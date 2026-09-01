@@ -4,11 +4,12 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static health.emrys.afon.config.FilePropertyProviderTest.TEST_CONFIG_DIR;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class FileUserProviderTest {
 
-    static String CONFIG_DIR = "src/test/resources/config";
+    static String CONFIG_DIR = "../templates/config";
 
     @Test
     public void canLoadAllUsersAndAcls() {
@@ -20,7 +21,7 @@ public class FileUserProviderTest {
     @Test
     public void cannotLoadUsersWithInvalidSlug() {
         try {
-            AfonUserProvider provider = new FileUserProvider(CONFIG_DIR, List.of("users-invalid.csv"), List.of());
+            AfonUserProvider provider = new FileUserProvider(TEST_CONFIG_DIR, List.of("users-invalid.csv"), List.of());
             provider.getUsers();
         } catch (Exception e) {
             assertThat(e.getMessage()).contains("slug 'phil@test.com' for user 'phil' is not RFC-1123 DNS compliant");

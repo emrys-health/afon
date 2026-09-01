@@ -1,5 +1,0 @@
-# Add one user per line using the fields:
-#username,catalogs
-#catalogs are colon-separated catalog names for which the user is authorised
-mauro,azure:azure_external
-phil,all
