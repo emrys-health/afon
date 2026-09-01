@@ -1,4 +1,6 @@
-# Permissions required for create-admin.sh
+# Roles and permissions required to create Azure env
+
+## Script create-admin.sh
 
 Run once, by whoever bootstraps the multi-tenant app (`AS_ADMIN=true`, or ahead of time by an admin so the `APP_ID` and `APP_SECRET` can be shared).
 
@@ -12,13 +14,13 @@ Every command in `create-admin.sh` is an `az ad` call against the Entra ID direc
 | `az ad sp create --id` | write | Create the service principal for the app | Same tier as app create, or simply being an **owner** of the app (the creator is automatically an owner); if you created the app in the step above, no extra tenant-wide role is needed to create its service principal |
 | `az ad app credential reset --id` | write | Add/reset the app's client secret | **Owner** of the app registration, or **Application Administrator** / **Cloud Application Administrator**; only runs when `APP_CREDENTIAL_RESET` is set |
 
-### Synthesis: Roles required for this section
+### Synthesis
 
-**Entra ID roles required:** **Application Administrator** (or the narrower **Cloud Application Administrator**) at the tenant level covers every step above.
+**Entra ID roles required: Application Administrator** (or the narrower **Cloud Application Administrator**) at the tenant level covers every step above.
 
 **RBAC roles required: none.**
 
-# Permissions required for create.sh
+## Script create.sh
 
 **RBAC roles required**, consolidated across the script:
 
@@ -40,20 +42,22 @@ Every command in `create-admin.sh` is an `az ad` call against the Entra ID direc
 | Role Assignment | `az role assignment list` | read | `Microsoft.Authorization/roleAssignments/read` | Reader (included in virtually everything) | Resource group |
 | Role Assignment | `az role assignment create` | write | `Microsoft.Authorization/roleAssignments/write` | **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator** | Resource group (`Test-DataFabric`) |
 
-### Synthesis: Roles required for this section
+### Synthesis
 
-**No Entra ID roles required**
+**Entra ID roles required: none**
 
-**RBAC roles as above**
+**RBAC roles required: as above**
 
-# Custom roles for create.sh (strict security)
+## Script create.sh (custom roles for stricter security)
 
 The tables above use standard built-in roles. If the partner's security requires least-privilege custom roles instead of built-ins, custom roles can be created.
 
-Two considerations apply before assigning anything:
+Two considerations before discussing the roles:
 
 - **`Microsoft.Resources/subscriptions/providers/register/action`** is the only action that must be subscription-scoped — ARM has no resource-group-level provider registration. If the partner registers `Microsoft.Storage` themselves once, this drops to a read-only check (`Microsoft.Resources/subscriptions/providers/read`), and no subscription-scope *write* action is needed at all.
 - If the partner pre-creates the target resource group (e.g. `Test-DataFabric`), `Microsoft.Resources/subscriptions/resourceGroups/write` also drops out — the exists-check always skips.
+
+So, if `Microsoft.Storage` provider is already registered and `$AZURE_RESOURCE_GROUP` already created, the following roles apply:
 
 **RBAC roles required (custom, in place of built-ins):**
 
@@ -61,8 +65,6 @@ Two considerations apply before assigning anything:
 - `afon-create-resource-group` — resource group scope
 - `afon-create-containers` — storage account scope
 - `afon-create-role-assignments` — storage account scope
-
-With both structural reductions handled by the partner ahead of time, these four custom roles cover the rest:
 
 **Role 1 — subscription scope, read-only**
 ```json
@@ -120,10 +122,10 @@ All three role-assignment targets in `create.sh` (`BUCKET_SCOPE`, `EXTERNAL_BUCK
 }
 ```
 
-### Synthesis: Roles required for this section
+### Synthesis
 
-**No Entra ID roles required**
+**Entra ID roles required: none**
 
-**RBAC roles as above**
+**RBAC roles required: as above**
 
 The custom-role variant is a like-for-like replacement of the built-in RBAC roles from the section above.
