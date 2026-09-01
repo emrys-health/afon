@@ -1,11 +1,9 @@
-package health.emrys.afon.ops;
+package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.config.*;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.config.PermissionsConfigurer;
-import health.emrys.afon.polaris.config.PolarisConfigurer;
-import health.emrys.afon.polaris.config.PolarisRestClient;
-import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
@@ -17,15 +15,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
-public class ConfigurePolarisUsersMain {
+public class PolarisUsersManager {
 
     public static final String ROLE_NAME = "emrysrole4";
 
-    private static final Logger logger = LoggerFactory.getLogger(ConfigurePolarisUsersMain.class);
+    private static final Logger logger = LoggerFactory.getLogger(PolarisUsersManager.class);
     private static final Set<CatalogPrivilege> CATALOG_PRIVILEGES = Set.of(
             NAMESPACE_CREATE,
             NAMESPACE_FULL_METADATA,
@@ -42,7 +39,7 @@ public class ConfigurePolarisUsersMain {
     private final String roleName;
     private final String principalRoleName;
 
-    public ConfigurePolarisUsersMain(AfonPropertyProvider properties) {
+    public PolarisUsersManager(AfonPropertyProvider properties) {
         PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties);
         accessToken       = client.getAccessToken();
         adminClientId     = client.getClientId();
@@ -117,35 +114,12 @@ public class ConfigurePolarisUsersMain {
         for (CatalogPrivilege privilege : CATALOG_PRIVILEGES) {
             HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
             if (isFailure(result)) {
-                logger.error(
-                    "Admin '{}' could not grant role {} the privilege {} on  catalog {}",
-                    adminClientId, roleName, privilege, catalogName);
+                logger.error("Admin '{}' could not grant role {} the privilege {} on  catalog {}",
+                            adminClientId, roleName, privilege, catalogName);
             }
             results.add(result);
         }
         return results;
-    }
-
-    public static void main(String[] args) {
-        if (args.length < 2) {
-            System.out.printf("%s requires arguments: endpoint catalog-name", ConfigurePolarisUsersMain.class.getSimpleName());
-            return;
-        }
-        String endpoint = args[0];
-        String catalogName = args[1];
-        logger.info("Using endpoint {} and catalog name {}", endpoint, catalogName);
-        AfonUserProvider userProvider = new FileUserProvider();
-        AfonPropertyProvider propertyProvider = new FilePropertyProvider();
-        if ( endpoint != null ) {
-            propertyProvider.setValue(POLARIS_ENDPOINT, endpoint);
-        }
-        ConfigurePolarisUsersMain app = new ConfigurePolarisUsersMain(propertyProvider);
-        try {
-            app.configureCatalog(catalogName);
-            app.configureUsers(catalogName, userProvider);
-        } catch (Exception e) {
-            logger.error("Failed configuring Polaris users", e);
-        }
     }
 
 }

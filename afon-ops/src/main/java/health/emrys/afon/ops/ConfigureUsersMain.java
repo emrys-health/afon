@@ -2,6 +2,7 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.polaris.config.PolarisUsersManager;
 import health.emrys.afon.security.OAuthProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.apache.hc.core5.http.HttpResponse;
@@ -22,13 +23,13 @@ public class ConfigureUsersMain {
     private final AfonUserProvider          userProvider;
     private final AfonPropertyProvider      propertyProvider;
     private final OAuthProvider             oauthProvider;
-    private final ConfigurePolarisUsersMain polarisUsers;
+    private final PolarisUsersManager       polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
         this.userProvider     = userProvider;
         this.propertyProvider = propertyProvider;
         this.oauthProvider    = new KeyCloakProvider(propertyProvider);
-        this.polarisUsers     = new ConfigurePolarisUsersMain(propertyProvider);
+        this.polarisUsers     = new PolarisUsersManager(propertyProvider);
     }
 
     public List<HttpResponse> configureOAuthUsers(String jupyterDomain) throws IOException {
@@ -64,24 +65,44 @@ public class ConfigureUsersMain {
     }
 
     public static void main(String[] args) {
-        if (args.length != 3) {
-            logger.warn("{} requires following args: polaris-domain catalog-name jupyter-domain", ConfigureUsersMain.class.getName());
-            return;
+
+        String polarisDomain;
+        String catalogName;
+        String jupyterDomain = null;
+
+        if (args.length == 2) {
+            polarisDomain  = args[0];
+            catalogName = args[1];
+        } else if (args.length == 3) {
+            polarisDomain  = args[0];
+            catalogName = args[1];
+            jupyterDomain = args[2];
+        } else {
+            System.out.printf("%s requires arguments: polaris-domain catalog-name", ConfigureUsersMain.class.getSimpleName());
+            System.out.printf("%s requires arguments: polaris-domain catalog-name jupyter-domain", ConfigureUsersMain.class.getSimpleName());
+            throw new IllegalArgumentException();
         }
-        String polarisDomain    = args[0];
-        String catalogName      = args[1];
-        String jupyterDomain    = args[2];
         var    userProvider     = new FileUserProvider();
         var    propertyProvider = new FilePropertyProvider();
         propertyProvider.setValue(POLARIS_ENDPOINT, polarisDomain);
         var app = new ConfigureUsersMain(userProvider, propertyProvider);
-        try {
-            app.configureUsers(jupyterDomain, catalogName);
-        } catch (Exception e) {
-            logger.error(
-                "Failed to configure KeyCloak users {}: {}",
-                app.userProvider.getUserNames(), e.getMessage(), e);
-            throw new RuntimeException(e);
+
+        if (jupyterDomain == null) {
+            try {
+                app.configurePolaris(catalogName);
+            } catch (Exception e) {
+                logger.error("Failed to configure Polaris users {}: {}",
+                        userProvider.getUserNames(), e.getMessage(), e);
+                throw new RuntimeException(e);
+            }
+        } else {
+            try {
+                app.configureUsers(jupyterDomain, catalogName);
+            } catch (Exception e) {
+                logger.error("Failed to configure Keycloak users {}: {}",
+                        userProvider.getUserNames(), e.getMessage(), e);
+                throw new RuntimeException(e);
+            }
         }
     }
 
