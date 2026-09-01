@@ -263,11 +263,12 @@ exec_jvm(){
     MVN_ARGS="$MVN_ARGS -Dexec.args=\"$EXEC_ARGS\""
   fi
   if [ -n "$EXEC_ENVS" ]; then
-    EXEC_ENVS_JVM=
+    EXEC_JVM_ENVS=
     for pair in $EXEC_ENVS; do
-      EXEC_ENVS_JVM="$EXEC_ENVS_JVM -D$pair"
+      EXEC_JVM_ENVS="$EXEC_JVM_ENVS -D$pair"
     done
-    MVN_ARGS="$MVN_ARGS -Dexec.envs=\"${EXEC_ENVS_JVM# }\""
+    EXEC_JVM_ENVS="${EXEC_JVM_ENVS# }"
+    MVN_ARGS="$MVN_ARGS -Dexec.envs=\"$EXEC_JVM_ENVS\""
   fi
   mvn_envs
   if [ -z "$EXEC_TYPE" ]; then
