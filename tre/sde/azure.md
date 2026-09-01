@@ -23,11 +23,7 @@ The script reads the afon config properties in `$AFON_HOME/config` (both afon.pr
 and executes the Azure CLI commands.
 
 If you don't have the local admin rights, you'll to ask the local admin to run `azure/create-admin.sh` and 
-provide you with `APP_ID` and `APP_SECRET`
-```shell
-az ad app create --display-name "$APP_NAME"  --sign-in-audience "AzureADMultipleOrgs" 
-az ad app credential reset --id $APP_ID
-```
+provide you with `APP_ID` and `APP_SECRET`.
 
 ## Creating an Azure env from scratch
 
@@ -39,16 +35,21 @@ az ad sp create --id $APP_ID
 az ad app credential reset --id $APP_ID
 # non-admin
 az group create  --name $AZURE_RESOURCE_GROUP   --location $AZURE_REGION 
+az network dns zone create  --resource-group $AZURE_RESOURCE_GROUP  --name $AZURE_DOMAIN_NAME
 az storage account create  --name $AZURE_STORAGE_ACCOUNT  --resource-group $AZURE_RESOURCE_GROUP  --location $AZURE_REGION  --sku Standard_LRS  --kind StorageV2 --enable-hierarchical-namespace false 
 az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET  --auth-mode login
 az role assignment create  --role "Storage Blob Data Contributor" --assignee $APP_ID --scope "$BUCKET_SCOPE"
-az network dns zone create  --resource-group $AZURE_RESOURCE_GROUP  --name $AZURE_DOMAIN_NAME
 ```
 
 ## Updating an Azure env partially configured 
 
 Both `azure/create-admin.sh` and `azure/create.sh` are idempotent, so they check if any of the required
 elements are already configured and skip the step if so.
+
+## Roles and Permissions
+
+Refer to [roles and permissions](../../scripts/azure/roles.md) document for a detailed breakdown the roles and permissions
+required to set up the Azure env.
 
 ## An end-to-end example
 
