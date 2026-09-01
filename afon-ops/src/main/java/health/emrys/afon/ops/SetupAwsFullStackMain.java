@@ -1,25 +1,17 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.ops.steps.Step;
-import health.emrys.afon.ops.steps.StepOperations;
-import health.emrys.afon.ops.steps.StepRunner;
-import health.emrys.afon.ops.steps.StepsProvider;
+import health.emrys.afon.ops.steps.*;
 
 import java.util.List;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.ops.steps.StepsUtils.setupFullStackStepsUsing;
 
 public class SetupAwsFullStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
-        return List.of(
-            stepOperations.deleteStack(AWS),
-            stepOperations.deployFullStackIn(AWS),
-            stepOperations.waitForPolarisIn(AWS),
-            stepOperations.createAllCatalogsFor(AWS),
-            stepOperations.checkAwsSparkWritingTo(AWS)
-                      );
+        return setupFullStackStepsUsing(stepOperations, AWS);
     }
 
     public static void main(String[] args) {

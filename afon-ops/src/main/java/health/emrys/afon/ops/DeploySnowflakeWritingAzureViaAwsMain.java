@@ -8,22 +8,23 @@ import health.emrys.afon.ops.steps.StepsProvider;
 import java.util.ArrayList;
 import java.util.List;
 
+import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonCloud.AZURE;
-import static health.emrys.afon.ops.CommonSteps.awsStepsUsing;
+import static health.emrys.afon.ops.steps.StepsUtils.setupFullStackStepsUsing;
 
 public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
-        steps.addAll(awsStepsUsing(stepOperations));
+        steps.addAll(setupFullStackStepsUsing(stepOperations, AWS));
         steps.addAll(List.of(
-            stepOperations.snowflakeWritesTo(AZURE),
-            stepOperations.deleteAwsPolarisCatalogAndRecreateFor(AZURE),
-            stepOperations.registerMostRecentSnowflakeTableInAws(AZURE),
-            stepOperations.checkAwsSparkReadingUsing(AZURE)
-                      )
-                    );
+                        stepOperations.snowflakeWritesTo(AZURE),
+                        stepOperations.deleteAwsPolarisCatalogAndRecreateFor(AZURE),
+                        stepOperations.registerMostRecentSnowflakeTableInAws(AZURE),
+                        stepOperations.checkAwsSparkReadingUsing(AZURE)
+                )
+        );
         return steps;
     }
 
