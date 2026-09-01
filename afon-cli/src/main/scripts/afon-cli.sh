@@ -25,10 +25,17 @@ AFON_CDKTF="${AFON_CDKTF:-$AFON_HOME/cdktf}"
 AFON_CLOUD="${AFON_CLOUD:-ALL}"
 AFON_LOGGING="${AFON_LOGGING:-INFO}"
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-OFF}"
+AFON_ENVS="${AFON_ENVS:-}"
 
+AFON_JVM_ENVS=
+for pair in $AFON_ENVS; do
+  AFON_JVM_ENVS="$AFON_JVM_ENVS -D$pair"
+done
+AFON_JVM_ENVS="${AFON_JVM_ENVS# }"
 AFON_JVM_FLAGS="--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-modules=jdk.incubator.vector --add-opens=java.base/java.nio=ALL-UNNAMED --enable-preview"
 
 exec java $AFON_JVM_FLAGS \
+          $AFON_JVM_ENVS \
     -Dafon.home="$AFON_HOME" \
     -Dafon.cdktf="$AFON_CDKTF" \
     -Dafon.cloud="$AFON_CLOUD" \

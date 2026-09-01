@@ -67,6 +67,7 @@ The script supports the following env variables:
 - `AFON_CLOUD`: the cloud provider to target, one of `{aws,azure,gcp}`.  This is optional and only affects some functionality.
 - `AFON_LOGGING`: the file logging level, defaulting to `INFO`.   The file logs are found the `$AFON_HOME/logs`.
 - `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to `OFF`.
+- `AFON_ENVS`: the `NAME=VALUE` pairs of system properties passed to the CLI java process.  Can be used to override  file-based properties in config dir.
 
 For example, to run command with console logging: 
 
