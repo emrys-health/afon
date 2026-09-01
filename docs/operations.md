@@ -182,10 +182,10 @@ It will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
 ### Registering a table with Polaris
 
 When a new version of Polaris is started up, it has nothing in it.
-So, create the warehouses with:
+So, create the catalogs with:
 
 ```shell
-./afon.sh -a exec --exec-class ops.ConfigureClusterPolarisMain
+./afon.sh -a exec --exec-class ops.ManagePolarisCatalogsMain --exec-args "create emryspolarisazure.click"
 ```
 and register tables with something like:
 
