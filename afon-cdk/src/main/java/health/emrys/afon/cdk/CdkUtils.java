@@ -14,10 +14,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class CdkUtils {
 
@@ -219,5 +216,11 @@ public class CdkUtils {
         } catch (IOException e) {
             throw new UncheckedIOException("Could not stage vendored chart " + chartFile, e);
         }
+    }
+
+    public static Map<String, String> addMaps(Map<String, String> base, Map<String, String> overrides) {
+        Map<String, String> results = new HashMap<>(base);
+        results.putAll(overrides);
+        return results;
     }
 }
