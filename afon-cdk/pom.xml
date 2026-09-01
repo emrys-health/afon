@@ -49,11 +49,6 @@
         </dependency>
         <dependency>
             <groupId>com.hashicorp</groupId>
-            <artifactId>cdktf-provider-azurestack</artifactId>
-            <version>9.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.hashicorp</groupId>
             <artifactId>cdktf-provider-azurerm</artifactId>
             <version>14.3.0</version>
         </dependency>
