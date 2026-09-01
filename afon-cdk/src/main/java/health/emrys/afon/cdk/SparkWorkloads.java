@@ -127,9 +127,9 @@ public class SparkWorkloads {
                         // reads to title flows; without it the driver/executor
                         // pods show as "Unknown App".
                         "metadata", Map.of(
-                            "labels", Map.of(
+                            "labels", addMaps(Map.of(
                                 "app.kubernetes.io/name", SPARK_CONNECTOR_NAME + "-driver"
-                            )
+                            ), USER_POD_LABELS)
                         ),
                         "spec", Map.of(
                             "restartPolicy", "Always"
@@ -139,9 +139,9 @@ public class SparkWorkloads {
                 "executorSpec", Map.of(
                     "podTemplateSpec", Map.of(
                         "metadata", Map.of(
-                            "labels", Map.of(
+                            "labels", addMaps(Map.of(
                                 "app.kubernetes.io/name", SPARK_CONNECTOR_NAME + "-executor"
-                            )
+                            ), USER_POD_LABELS)
                         )
                     )
                 )
