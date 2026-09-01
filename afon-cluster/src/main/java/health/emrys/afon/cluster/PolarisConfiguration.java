@@ -20,7 +20,7 @@ public abstract class PolarisConfiguration {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisConfiguration.class);
 
-    protected final AfonPropertyProvider properties;
+    private final AfonPropertyProvider properties;
     private final PolarisCatalogClient polarisClient;
 
     protected PolarisConfiguration(AfonPropertyProvider properties) {
@@ -40,16 +40,16 @@ public abstract class PolarisConfiguration {
     /**
      * Configures catalogs based on the args provided:
      *
-     * - no args:  configures all
-     * - catalog-name:  configures the single catalog
-     * - catalog-name credentials: configures the single catalog with the credentials provided
+     * - no args:  configures all catalogs
+     * - catalog-name:  configures named catalog
+     * - catalog-name credentials: configures named catalog with credentials provided
      *
      * @param args
      * @throws IncorrectConfigException
      * @throws IOException
      */
     public void configure(String[] args) throws IncorrectConfigException, IOException {
-        logger.info("Configuring {} with arguments: {}", getClass().getSimpleName(), String.join(" ", args));
+        logger.info("Executing {} with arguments: '{}'", getClass().getSimpleName(), String.join(" ", args));
         if (args.length == 0) {
             configureAll(getCredentials());
         } else if (args.length == 1) {
@@ -61,18 +61,32 @@ public abstract class PolarisConfiguration {
             logger.debug("Credentials: " + credentials);
             addPolarisCredentialsTo(credentials, properties);
             configure(credentials, polarisClient.getCatalog(catalogName));
+        } else {
+            String message = String.format("Invalid arguments: %s", String.join(" ", args));
+            logger.warn(message);
+            logger.info(String.format("""
+                     usage: [catalog-name] [credentials]
+                     no args:  configures all
+                     <catalog-name>:  configures named catalog
+                     <catalog-name> <credentials>: configures named catalog with credentials provided                    
+                     """));
+            throw new IncorrectConfigException(message);
         }
     }
 
     private void configureAll(String credentials) throws IncorrectConfigException, IOException {
-        checkFailures(polarisClient.getCatalogNames(), polarisClient.configureAllCatalogs(credentials));
+        List<String> catalogNames = polarisClient.getCatalogNames();
+        logger.info("Configuring all catalogs: {}", String.join(", ", catalogNames));
+        checkFailures(catalogNames, polarisClient.configureAllCatalogs(credentials));
     }
 
     private void configure(String credentials, PolarisCatalog... catalogs) throws IncorrectConfigException, IOException {
-        checkFailures(catalogNames(catalogs), polarisClient.configureCatalogs(credentials, catalogs));
+        List<String> catalogNames = catalogNames(catalogs);
+        logger.info("Configuring catalogs: {}", String.join(", ", catalogNames));
+        checkFailures(catalogNames, polarisClient.configureCatalogs(credentials, catalogs));
     }
 
-    public List<String> catalogNames(PolarisCatalog... catalogs) {
+    private List<String> catalogNames(PolarisCatalog... catalogs) {
         return Arrays.stream(catalogs).map(PolarisCatalog::catalogName).toList();
     }
 
