@@ -8,8 +8,9 @@ import health.emrys.afon.ops.steps.StepsProvider;
 import java.util.ArrayList;
 import java.util.List;
 
+import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonCloud.AZURE;
-import static health.emrys.afon.ops.CommonSteps.awsStepsUsing;
+import static health.emrys.afon.ops.steps.StepsUtils.setupFullStackStepsUsing;
 
 /**
  * Setup AWS full stack with Azure Polaris hosting external catalog:
@@ -21,7 +22,7 @@ public class SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain impleme
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
-        steps.addAll(awsStepsUsing(stepOperations));
+        steps.addAll(setupFullStackStepsUsing(stepOperations, AWS));
         steps.addAll(List.of(
             stepOperations.deleteStack(AZURE),
             stepOperations.deployPolarisIn(AZURE),
