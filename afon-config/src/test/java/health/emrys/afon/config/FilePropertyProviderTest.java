@@ -31,7 +31,7 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canOverridePropertyValueAfterLoad() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR);
+        AfonPropertyProvider provider = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
         AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
         assertThat(provider.hasProperty(polarisEndpoint)).isTrue();
         assertThat(provider.getValue(polarisEndpoint)).isEqualTo("localhost:8181"); // default value
@@ -73,7 +73,7 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canGetAllProperties() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR);
+        AfonPropertyProvider provider = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
         assertThat(provider.getProperties()).hasSizeGreaterThan(0);
         try {
             System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "all");
@@ -85,13 +85,13 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canGetSecretProperties() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR);
+        AfonPropertyProvider provider = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
         assertThat(provider.getSecretProperties()).hasSizeGreaterThan(0);
     }
 
     @Test
     public void canGetPropertyByKey() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR);
+        AfonPropertyProvider provider = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
         assertThat(provider.getValue(AfonProperty.CLUSTER_NAME)).isNotNull();
         assertThat(provider.getValue(AfonProperty.KC_PROTOCOL, "https")).isNotNull();
     }
@@ -100,7 +100,7 @@ public class FilePropertyProviderTest {
     public void canGetPropertiesOnlyForAWS() {
         System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "aws");
         try {
-            Properties properties = new FilePropertyProvider(TEST_CONFIG_DIR).getProperties();
+            Properties properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -122,7 +122,7 @@ public class FilePropertyProviderTest {
     public void canGetPropertiesOnlyForAzure() {
         System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "azure");
         try {
-            Properties properties = new FilePropertyProvider(TEST_CONFIG_DIR).getProperties();
+            Properties properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -144,7 +144,7 @@ public class FilePropertyProviderTest {
     public void canGetPropertiesOnlyForGCP() {
         System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "gcp");
         try {
-            Properties properties = new FilePropertyProvider(TEST_CONFIG_DIR).getProperties();
+            Properties properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();

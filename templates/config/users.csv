@@ -1,2 +1,4 @@
 # Add one user per line using the fields:
 #username,password,email,slug,firstName,lastName
+mauro,p5ssw0rd,mauro@test.com,mauro-talevi,mauro,talevi
+phil,p5ssw0rd,phil@test.com,phil-henry,phillip,henry
