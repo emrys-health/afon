@@ -1,11 +1,14 @@
 package health.emrys.afon.samples
 
 import health.emrys.afon.config.AfonCloud._
-import health.emrys.afon.cluster.ClusterPolarisConfiguration
+import health.emrys.afon.cluster.{ClusterPolarisFinder, EndpointPolarisConfiguration}
+import health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT
 import health.emrys.afon.config.{AfonCloud, AfonPropertyProvider, FilePropertyProvider}
 import health.emrys.afon.samples.SampleData.{occupancyDataset, patientDataset}
 import health.emrys.afon.ops.spark.SparkSessionFactory
 import org.apache.spark.sql.SparkSession
+
+import java.lang.String.format
 
 case class Patient(
                     id: Long,
@@ -29,9 +32,12 @@ object PatientDataMain {
   def main(array: Array[String]): Unit = {
     val properties = new FilePropertyProvider()
     val spark: SparkSession = initSpark(properties)
-    val cluster = new ClusterPolarisConfiguration(properties);
     logger.info("Configuring Polaris")
-    cluster.configure()
+    val finder = new ClusterPolarisFinder(properties)
+    val endpoint = format("%s:443", finder.getPolarisHost)
+    properties.setValue(POLARIS_ENDPOINT, endpoint)
+    val config = new EndpointPolarisConfiguration(properties);
+    config.configure()
     logger.info("Creating data")
     createData(spark, 10000)
     logger.info("Closing down Spark")
