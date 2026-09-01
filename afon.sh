@@ -262,11 +262,14 @@ exec_jvm(){
   if [ -n "$EXEC_ARGS" ]; then
     MVN_ARGS="$MVN_ARGS -Dexec.args=\"$EXEC_ARGS\""
   fi
-  mvn_envs
   if [ -n "$EXEC_ENVS" ]; then
-    EXEC_ENVS="${EXEC_ENVS/ / -D}"
-    MVN_ENVS="$MVN_ENVS -D$EXEC_ENVS"
+    EXEC_ENVS_JVM=
+    for pair in $EXEC_ENVS; do
+      EXEC_ENVS_JVM="$EXEC_ENVS_JVM -D$pair"
+    done
+    MVN_ARGS="$MVN_ARGS -Dexec.envs=\"${EXEC_ENVS_JVM# }\""
   fi
+  mvn_envs
   if [ -z "$EXEC_TYPE" ]; then
     echo "Action exec requires option --exec-type"
     usage; exit 0
