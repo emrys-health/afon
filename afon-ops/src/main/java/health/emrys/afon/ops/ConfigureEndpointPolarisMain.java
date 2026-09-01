@@ -31,7 +31,7 @@ public class ConfigureEndpointPolarisMain {
         if (domainName != null) {
             properties.setValue(POLARIS_ENDPOINT, domainName);
         } else {
-            logger.warn("POLARIS_ENDPOINT is not defined. Defaulting to what is already defined in file properties.");
+            logger.warn("System property 'POLARIS_ENDPOINT' is not defined. Defaulting to what is already defined in file properties.");
         }
         try {
             new EndpointPolarisConfiguration(properties).configure(args);
