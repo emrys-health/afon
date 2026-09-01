@@ -7,9 +7,9 @@ import java.util.List;
 
 public class AwsUtils {
 
-    public static AwsStorageConfigInfo getStorageConfigInfo(String roleArn,
-                                                            String bucketUrl,
-                                                            String region) {
+    public static StorageConfigInfo createS3StorageConfigInfo(String roleArn,
+                                                                 String bucketUrl,
+                                                                 String region) {
         return AwsStorageConfigInfo
             .builder()
             .setRoleArn(roleArn)
@@ -19,7 +19,7 @@ public class AwsUtils {
             .build();
     }
 
-    public static String bucketToUrl(String bucketName) {
+    public static String s3BucketUrl(String bucketName) {
         return "s3://" + bucketName;
     }
 

@@ -194,16 +194,6 @@ When Azure resource group is stuck:
 az group delete --name afon_resource_group_aks --yes --no-wait
 ```
 
-When Azure Terraform import is needed:
-
-```shell
-tofu import azurestack_resource_group.XXX \
-  /subscriptions/YOUR_SUB/resourceGroups/your_resource_group_aks
-```
-
-If the import fails with `Invalid provider configuration`, temporarily comment out the offending provider lines in the generated JSON and retry.
-
-
 ## GitOps considerations
 
 Currently, the generated Terraform can contain confidential details (secrets, credentials). 
