@@ -13,7 +13,7 @@ usage (){
   echo "          [--config-zip <zip>]"
   echo "          [--docs-dir|-d <dir>]"
   echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
-  echo "          [--script-path <path>] [--script-args <args>]"
+  echo "          [--script-path|-sp <path>] [--script-args|-sa <args>]"
   echo "          [--setup-os <os>] [--setup-output <file>]"
   echo "          [--tofu-args <args>]"
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
@@ -501,9 +501,9 @@ while [[ $# -gt 0 ]]; do
       LOGGING_CONSOLE="$2"; shift 2 ;;
     --mvn-quiet)
       MVN_QUIET=true; shift ;;
-    --script-path)
+    --script-path|-sp)
       SCRIPT_PATH="$2"; shift 2 ;;
-    --script-args)
+    --script-args|-sa)
       SCRIPT_ARGS="$2"; shift 2 ;;
     --setup-os)
       SETUP_OS="$2"; shift 2 ;;
