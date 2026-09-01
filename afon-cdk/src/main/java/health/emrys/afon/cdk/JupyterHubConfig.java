@@ -141,11 +141,11 @@ public abstract class JupyterHubConfig {
      * spawn times out, so this peer is mandatory, not optional.
      */
     static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
-    private static final Map<String, String> PROXY_LABELS = Map.of("app", "jupyterhub-proxy");
+    private static final Map<String, String> PROXY_LABELS    = Map.of("app", "jupyterhub-proxy");
     /**
      * Selector for the pods KubeSpawner spawns, matching the labels it stamps on them.
      */
-    private static final Map<String, String> SINGLEUSER_LABELS =
+    static final Map<String, String>         USER_POD_LABELS =
         Map.of(SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE);
 
     private final   TerraformStack                stack;
@@ -322,7 +322,7 @@ public abstract class JupyterHubConfig {
 
         configureHttpsAndDNS();
 
-        return SINGLEUSER_LABELS;
+        return USER_POD_LABELS;
     }
 
     private static String vncServiceName(String slug) {
