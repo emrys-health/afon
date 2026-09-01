@@ -1,8 +1,7 @@
-package health.emrys.afon.ops;
+package health.emrys.afon.polaris.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import health.emrys.afon.polaris.config.PolarisRestClient;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.ParseException;
@@ -18,22 +17,23 @@ import java.util.List;
 import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
 import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 
-public class Purger {
+public class PolarisCatalogPurger {
 
-    private static final Logger logger = LoggerFactory.getLogger(Purger.class);
+    private static final Logger logger = LoggerFactory.getLogger(PolarisCatalogPurger.class);
 
     private final PolarisRestClient client;
     private final String            accessToken;
     private final String            domainName;
 
-    public Purger(PolarisRestClient client, String domainName) {
+    public PolarisCatalogPurger(PolarisRestClient client, String domainName) {
         this.client      = client;
         this.accessToken = client.getAccessToken();
         this.domainName  = domainName;
     }
 
     public void deleteCatalog(String catalogName) throws IOException, ParseException {
-        purge(catalogName);
+        purgeNamespacesAndTables(catalogName);
+        purgeCatalog(catalogName);
         purgeRoles(catalogName);
     }
 
@@ -47,20 +47,19 @@ public class Purger {
         }
     }
 
-    private void purge(String catalogName) throws IOException, ParseException {
+    private void purgeNamespacesAndTables(String catalogName) throws IOException, ParseException {
         for (JsonNode namespaces : getNodes(namespacesURI(catalogName), "namespaces")) {
             if (namespaces.isArray()) {
                 for (JsonNode node : namespaces) {
                     String namespace = node.textValue();
-                    cleanAllTables(catalogName, namespace);
-                    cleanNamespace(catalogName, namespace);
+                    deleteAllTables(catalogName, namespace);
+                    deleteNamespace(catalogName, namespace);
                 }
             }
         }
-        cleanCatalog(catalogName);
     }
 
-    private void cleanCatalog(String catalogName) throws IOException {
+    private void purgeCatalog(String catalogName) throws IOException {
         logger.info("Deleting catalog {}", catalogName);
         HttpResponse delete = client.delete(catalogsURI(catalogName), accessToken);
         if (isFailure(delete)) {
@@ -68,7 +67,7 @@ public class Purger {
         }
     }
 
-    private void cleanNamespace(String catalogName, String namespace) throws IOException {
+    public void deleteNamespace(String catalogName, String namespace) throws IOException {
         logger.info("Deleting namespace {} from catalog {}", namespace, catalogName);
         HttpResponse delete = client.delete(namespaceURI(catalogName, namespace), accessToken);
         if (isFailure(delete)) {
@@ -76,28 +75,19 @@ public class Purger {
         }
     }
 
-    private List<HttpResponse> cleanAllTables(
-        String catalogName,
-        String namespace
-    ) throws IOException, ParseException {
+    public List<HttpResponse> deleteAllTables(String catalogName, String namespace) throws IOException, ParseException {
         logger.info("Deleting tables from {}.{}", catalogName, namespace);
         String             url       = tablesURI(catalogName.toString(), namespace);
         List<HttpResponse> responses = new ArrayList<>();
         for (JsonNode node : getNodes(url, "identifiers")) {
             String table = node.get("name").toString();
-            responses.add(cleanTable(catalogName, namespace, table.replace("\"", "")));
+            responses.add(deleteTable(catalogName, namespace, table.replace("\"", "")));
         }
         return responses;
     }
 
-    public HttpResponse cleanTable(
-        String catalogName,
-        String namespace,
-        String table
-    ) throws IOException {
-        logger.info(
-            "Deleting table {} from {}.{} in {}",
-            table, catalogName, namespace, domainName);
+    public HttpResponse deleteTable(String catalogName, String namespace, String table) throws IOException {
+        logger.info("Deleting table {} from {}.{} in {}", table, catalogName, namespace, domainName);
         String       accessToken = client.getAccessToken();
         HttpResponse response    = client.delete(tableURI(catalogName.toString(), namespace, table), accessToken);
         if (isFailure(response)) {
