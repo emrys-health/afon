@@ -11,6 +11,7 @@
 
     <properties>
         <exec.args />
+        <exec.envs />
         <exec.mainClass />
     </properties>
 
@@ -50,7 +51,7 @@
                         <artifactId>exec-maven-plugin</artifactId>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>${afon.jvm} ${afon.exec} -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
+                            <commandlineArgs>${afon.jvm} ${afon.exec} ${exec.envs} -classpath %classpath ${exec.mainClass} ${exec.args}</commandlineArgs>
                         </configuration>
                     </plugin>
                 </plugins>
