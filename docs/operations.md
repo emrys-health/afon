@@ -179,16 +179,14 @@ For some hints as to what to execute, try running:
 ```
 It will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
 
-### Registering a table with Polaris
+### Creating catalogs and registering tables in Polaris
 
-When a new version of Polaris is started up, it has nothing in it.
-So, create the catalogs with:
-
+When a Polaris stack deploy, is it empty.  So, for example for `AWS` and domain `emryspolaris.click`, 
+to create the catalogs:
 ```shell
-./afon.sh -a exec --exec-class ops.ManagePolarisCatalogsMain --exec-args "create emryspolarisazure.click"
+./afon.sh -a exec --exec-class ops.ManagePolarisCatalogsMain --exec-args "create emryspolaris.click"
 ```
-and register tables with something like:
-
+and to register tables, something like:
 ```shell
 ./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click <user_polaris_id> <user_polaris_secret>"
 ```
