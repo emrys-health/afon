@@ -23,11 +23,25 @@ public class ConfigureEndpointPolarisMain {
     private static final Logger logger = LoggerFactory.getLogger(ConfigureEndpointPolarisMain.class);
 
     public static void main(String[] args) {
+        if (args.length > 2) {
+            String usage = String.format("""
+                    
+                    Invalid arguments: '%s'
+                    usage:  %s supports the following args options:
+                            [catalog-name] [polaris_id:polaris_secret]
+                            no args:  configures all
+                            <catalog-name>:  configures named catalog
+                            <catalog-name> <polaris_id:polaris_secret>: configures named catalog with credentials provided                    
+                    """, String.join(" ", args), ConfigureEndpointPolarisMain.class.getSimpleName());
+            logger.warn(usage);
+            return;
+        }
+
         var properties = new FilePropertyProvider();
         try {
             new EndpointPolarisConfiguration(properties).configure(args);
         } catch (Exception e) {
-            logger.error("Failed to configure Polaris catalogs", e);
+            logger.warn("Failed to configure Polaris catalogs", e);
         }
     }
 

@@ -19,20 +19,20 @@ import static java.lang.String.format;
 /**
  * Write some PySpark code that can be run in the cloud assuming you're using KeyClaok.
  */
-public class GeneratePySparkKeyCloakMain {
+public class GeneratePySparkKeycloakMain {
 
-    static final Logger log = org.slf4j.LoggerFactory.getLogger(GeneratePySparkKeyCloakMain.class);
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(GeneratePySparkKeycloakMain.class);
 
     private final SparkWarehouseConfig config;
 
-    GeneratePySparkKeyCloakMain(AfonPropertyProvider properties) {
+    GeneratePySparkKeycloakMain(AfonPropertyProvider properties) {
         SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
         config = configFactory.createConfig(properties);
     }
 
     public void generateAndSavePySparkCode() {
         String pySparkCode = pySparkTestCode();
-        log.info("pySpark:\n\n{}", pySparkCode);
+        logger.info("pySpark:\n\n{}", pySparkCode);
         save(pySparkCode);
     }
 
@@ -44,7 +44,7 @@ public class GeneratePySparkKeyCloakMain {
                 out.print(pySparkCode);
             }
         } catch (Exception e) {
-            log.error("Could not write to ", filename);
+            logger.error("Could not write to ", filename);
             throw new RuntimeException(e);
         }
     }
@@ -104,14 +104,19 @@ public class GeneratePySparkKeyCloakMain {
 
     public static void main(String[] args) {
         if (args.length == 0) {
-            System.out.printf("%s requires argument: polaris-host", GeneratePySparkKeyCloakMain.class.getSimpleName());
+            String usage = String.format("""
+                                                            
+                    Invalid arguments: '%s'
+                    usage:  %s requires argument: polaris-host
+                    """, String.join(" ", args), GeneratePySparkKeycloakMain.class.getSimpleName());
+            logger.warn(usage);
             return;
         }
         String polarisHost = args[0];
-        log.info("Using {} as the Polaris host");
+        logger.info("Using {} as the Polaris host");
         var properties = new FilePropertyProvider();
         properties.setValue(POLARIS_ENDPOINT, polarisHost);
-        new GeneratePySparkKeyCloakMain(properties).generateAndSavePySparkCode();
+        new GeneratePySparkKeycloakMain(properties).generateAndSavePySparkCode();
     }
 
 
