@@ -61,6 +61,7 @@ Per SDE policy, the `create-admin.sh` must be run by a local admin, who'll then 
 - SUBSCRIPTION
 - TENANT
 - APP_ID
+- APP_SP_ID
 - APP_SECRET
 
 First run:
@@ -82,6 +83,7 @@ Set in `secret-azure.properties`
 AZURE_TENANT_ID=<TENANT>
 AZURE_CLIENT_ID=<APP_ID>
 AZURE_CLIENT_SECRET=<APP_SECRET>
+AZURE_SP_ID=<APP_SP_ID>
 ```
 
 After all properties are set, switch to using env `tvs`:
@@ -101,3 +103,9 @@ Finally, to create the env:
 ```shell
 ./afon.sh -a script --script-path azure/create.sh
 ```
+
+To destroy env:
+```shell
+./afon.sh -a script --script-path azure/destroy.sh
+```
+Following this, `destroy-admin.sh` must be run by a local admin.
