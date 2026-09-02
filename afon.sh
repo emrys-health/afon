@@ -3,19 +3,19 @@ set -euo pipefail
 
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--help|-h]"
-  echo "          [--home <afon-home>] [--cdktf <afon-cdktf>] [--env <afon-env>]"
+  echo "          [--home <afon-home>] [--cdktf <afon-cdktf>] [--env|-e <afon-env>]"
   echo "          [--cdktf-env <cdktf-env>] [--config-env <config-env>]"
   echo "          [--cloud|-c <cloud>]"
-  echo "          [--logging|-l <logging>] [--logging-console <console>] [--mvn-quiet]"
-  echo "          [--ansible-playbook <playbook>] [--ansible-args <args>]"
-  echo "          [--build-args <args>] [--build-goals|-g <goals>] [--build-profiles|-p <profiles>]"
+  echo "          [--logging|-l <logging>] [--logging-console|-lc <console>] [--mvn-quiet]"
+  echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
+  echo "          [--build-args|-ba <args>] [--build-goals|-bg|-g <goals>] [--build-profiles|-bp|-p <profiles>]"
   echo "          [--cli-command|--cli-cmd <command>] [--cli-args <args>] [--cli-dir <dir>]"
   echo "          [--config-zip <zip>]"
   echo "          [--docs-dir|-d <dir>]"
-  echo "          [--exec-package <package>] [--exec-class <class>] [--exec-args <args>] [--exec-envs <envs>] [--exec-type|-t <types>]"
+  echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>] [--exec-type|-et <types>]"
   echo "          [--script-path|-sp <path>] [--script-args|-sa <args>]"
   echo "          [--setup-os <os>] [--setup-output <file>]"
-  echo "          [--tofu-args <args>]"
+  echo "          [--tofu-args|-ta <args>]"
   echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
   echo "          ansible:    : executes the ansible playbook."
   echo "          build       : executes the mvn build."
@@ -53,11 +53,11 @@ usage (){
   echo "                  Also settable via env variable 'AFON_CLI_DIR'."
   echo "config-zip:       the config zip path to import/export as a zip file."
   echo "docs-dir:         the output dir for the docs. Defaulting to 'AFON_HOME/docs'."
-  echo "exec-types:       the exec types.  One of ops|samples.  Defaults to 'ops'."
-  echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
   echo "exec-class:       the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
   echo "exec-args:        the jvm exec args (must be quoted if more than one arg)"
   echo "exec-envs:        the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
+  echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
+  echo "exec-type:        the exec type.  One of ops|samples.  Defaults to 'ops'."
   echo "script-path:      the path of the script the run."
   echo "script-args:      the script args (must be quoted if more than one arg)"
   echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
@@ -455,15 +455,15 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --action|-a)
       ACTION="$2"; shift 2 ;;
-    --ansible-playbook)
+    --ansible-playbook|-ap)
       ANSIBLE_PLAYBOOK="$2"; shift 2 ;;
-    --ansible-args)
+    --ansible-args|-aa)
       ANSIBLE_ARGS="$2"; shift 2 ;;
-    --build-args)
+    --build-args|-ba)
       BUILD_ARGS="$2"; shift 2 ;;
-    --build-goals|-g)
+    --build-goals|-bg|-g)
       BUILD_GOALS="$2"; shift 2 ;;
-    --build-profiles|-p)
+    --build-profiles|-bp|-p)
       BUILD_PROFILES="$2"; shift 2 ;;
     --cdktf)
       CDKTF_DIR="$2"; shift 2 ;;
@@ -483,17 +483,17 @@ while [[ $# -gt 0 ]]; do
       CONFIG_ZIP="$2"; shift 2 ;;
     --docs-dir|-d)
       DOCS_DIR="$2"; shift 2 ;;
-    --env)
+    --env|-e)
       ENV="$2"; shift 2 ;;
-    --exec-class)
+    --exec-class|-ec)
       EXEC_CLASS="$2"; shift 2 ;;
-    --exec-args)
+    --exec-args|-ea)
       EXEC_ARGS="$2"; shift 2 ;;
-    --exec-envs)
+    --exec-envs|-ee)
       EXEC_ENVS="$2"; shift 2 ;;
-    --exec-package)
+    --exec-package|-ep)
       EXEC_PACKAGE="$2"; shift 2 ;;
-    --exec-type|-t)
+    --exec-type|-et)
       EXEC_TYPE="$2"; shift 2 ;;
     --home)
       HOME_DIR="$2"; shift 2 ;;
@@ -501,7 +501,7 @@ while [[ $# -gt 0 ]]; do
       HELP=true; shift ;;
     --logging|-l)
       LOGGING="$2"; shift 2 ;;
-    --logging-console)
+    --logging-console|-lc)
       LOGGING_CONSOLE="$2"; shift 2 ;;
     --mvn-quiet)
       MVN_QUIET=true; shift ;;
@@ -513,7 +513,7 @@ while [[ $# -gt 0 ]]; do
       SETUP_OS="$2"; shift 2 ;;
     --setup-outout)
       SETUP_OUTPUT="$2"; shift 2 ;;
-    --tofu-args)
+    --tofu-args|-ta)
       TOFU_ARGS="$2"; shift 2 ;;
     *)
       echo "Unknown option: $1" >&2;
