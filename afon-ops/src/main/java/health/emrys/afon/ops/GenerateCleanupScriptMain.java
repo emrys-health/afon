@@ -52,7 +52,12 @@ public class GenerateCleanupScriptMain {
 
     public static final void main(String[] args) {
         if (args.length == 0) {
-            System.out.printf("%n%s requires argument: cloud%n", GenerateCleanupScriptMain.class.getSimpleName());
+            String usage = String.format("""
+                                        
+                    Invalid arguments: '%s'
+                    usage:  %s requires argument: cloud
+                    """, String.join(" ", args), GenerateCleanupScriptMain.class.getSimpleName());
+            logger.warn(usage);
             return;
         }
         AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
