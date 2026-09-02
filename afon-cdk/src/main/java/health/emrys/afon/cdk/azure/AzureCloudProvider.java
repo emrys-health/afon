@@ -38,7 +38,7 @@ import software.constructs.Construct;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.config.AfonProperty.AZURE_PROVIDER_REGISTRATION_SKIP;
+import static health.emrys.afon.config.AfonProperty.AZURE_RESOURCE_PROVIDER_REGISTRATIONS;
 import static java.lang.String.format;
 
 public class AzureCloudProvider extends AbstractCloudProvider {
@@ -57,7 +57,7 @@ public class AzureCloudProvider extends AbstractCloudProvider {
     private final        KubernetesCluster       aksCluster;
     private final        String                  clusterName;
     private final        DataAzurermClientConfig clientConfig;
-    private final        boolean                 skipProviderRegistration;
+    private final        String                  providerRegistrations;
     private              RoleAssignment          clusterAdminAssignment;
     private              KubernetesProvider      k8sProvider;
     private              HelmProvider            helmProvider;
@@ -69,7 +69,7 @@ public class AzureCloudProvider extends AbstractCloudProvider {
         clusterName              = properties.getValue(AfonProperty.CLUSTER_NAME);
         resourceGroup            = properties.getValue(AZURE_RESOURCE_GROUP);
         subscriptionId           = properties.getValue(AZURE_SUBSCRIPTION);
-        skipProviderRegistration = Boolean.getBoolean(properties.getValue(AZURE_PROVIDER_REGISTRATION_SKIP, "false"));
+        providerRegistrations    = properties.getValue(AZURE_RESOURCE_PROVIDER_REGISTRATIONS, "core");
         configureProviders();
         clientConfig = new DataAzurermClientConfig(this, "current");
         aksCluster   = createCluster(lookupResourceGroup());
@@ -136,7 +136,7 @@ public class AzureCloudProvider extends AbstractCloudProvider {
             .create(this, "azurerm")
             .features(List.of(AzurermProviderFeatures.builder().build()))
             .subscriptionId(subscriptionId)
-            .resourceProviderRegistrations(skipProviderRegistration ? "none" : "core")
+            .resourceProviderRegistrations(providerRegistrations)
             .build();
     }
 
