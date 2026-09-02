@@ -9,13 +9,10 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.config.PolarisRestClientFactory.clientFactory;
-import static java.lang.String.format;
 
 /**
  * Run with args
@@ -50,13 +47,14 @@ public class RegisterPolarisTableMain {
 
     public static void main(String[] args) {
         if (args.length < 4) {
-            System.out.println(format("""
-            %s requires arguments: catalog namespace table metadata [<polaris-endpoint>] [<polaris-id>] [<polaris-secret>]
-            """, RegisterPolarisTableMain.class.getSimpleName()));
-            throw new IllegalArgumentException(format("""
-                    required arguments are: catalog namespace table metadata
-                    was provided with %d arguments: %s 
-                    """, args.length, Arrays.stream(args).collect(Collectors.joining(" "))));
+            String usage = String.format("""
+                    
+                    Invalid arguments: '%s'
+                    usage:  %s supports the following args options:
+                            catalog namespace table metadata
+                    """, String.join(" ", args), RegisterPolarisTableMain.class.getSimpleName());
+            logger.warn(usage);
+            return;
         }
         String catalog = AfonCloud.valueOf(args[0]).name();
         String namespace = args[1];
