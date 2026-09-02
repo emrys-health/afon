@@ -41,6 +41,13 @@ public class NetworkConfig {
      */
     private record AllowedDomain(String matcher, String domain) {
 
+        static AllowedDomain create(String domain) {
+            if (domain.contains("*")) {
+                return matching(domain);
+            }
+            return exactly(domain);
+        }
+
         static AllowedDomain exactly(String domain) {
             return new AllowedDomain("matchName", domain);
         }
@@ -60,7 +67,7 @@ public class NetworkConfig {
     public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties) {
         this.tfStack = tfStack;
         String csv = ALLOWED_DOMAINS_CSV.getValueFrom(properties.getProperties());
-        allowedDomains = Arrays.stream(csv.split(",")).map(x -> AllowedDomain.exactly(x)).toList();
+        allowedDomains = Arrays.stream(csv.split(",")).map(x -> AllowedDomain.create(x)).toList();
     }
 
     /**
