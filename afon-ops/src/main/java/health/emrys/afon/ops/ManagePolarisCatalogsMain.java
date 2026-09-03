@@ -1,13 +1,10 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.polaris.config.EndpointPolarisConfiguration;
+import health.emrys.afon.polaris.config.*;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.config.PolarisCatalogPurger;
-import health.emrys.afon.polaris.config.PolarisRestClient;
-import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import org.apache.hc.core5.http.ParseException;
 import org.slf4j.Logger;
 
@@ -26,38 +23,38 @@ public class ManagePolarisCatalogsMain {
     public static final String DELETE = "delete";
     public static final String RECREATE = "recreate";
 
-    private final AfonPropertyProvider properties;
+    private final PolarisCatalogClient polarisClient;
     private final PolarisCatalogPurger purger;
 
     public ManagePolarisCatalogsMain(AfonPropertyProvider properties) {
-        this.properties = properties;
-        String            endpoint = properties.getValue(POLARIS_ENDPOINT);
-        PolarisRestClient client   = PolarisRestClientFactory.clientFactory().createClient(properties);
-        logger.debug("Polaris client for endpoint {}: clientId={}, clientSecret={}", endpoint, client.getClientId(), client.getClientSecret());
-        purger = new PolarisCatalogPurger(client, endpoint);
+        this.polarisClient = new PolarisCatalogClient(properties);
+        this.purger = new PolarisCatalogPurger(properties);
     }
 
     public void createAllCatalogs() throws IncorrectConfigException, IOException {
-        EndpointPolarisConfiguration config = new EndpointPolarisConfiguration(properties);
-        config.configure();
+        polarisClient.configureAllCatalogs();
+    }
+
+    public void createCatalog(String catalogName) throws IncorrectConfigException, IOException {
+        polarisClient.configureCatalogs(catalogName);
     }
 
     public void deleteAllCatalogs() throws IOException, ParseException {
         for (AfonCloud id : List.of(AZURE, AWS, GCP)) {
-            purger.deleteCatalog(id.toString());
+            deleteCatalog(id.toString());
         }
     }
 
-    private void deleteNamespace(String catalogName, String namespace) throws IOException {
+    public void deleteCatalog(String catalogName) throws IOException, ParseException {
+        purger.deleteCatalog(catalogName);
+    }
+
+    public void deleteNamespace(String catalogName, String namespace) throws IOException {
         purger.deleteNamespace(catalogName, namespace);
     }
 
-    private void deleteTable(String catalogName, String namespace, String tableName) throws IOException {
+    public void deleteTable(String catalogName, String namespace, String tableName) throws IOException {
         purger.deleteTable(catalogName, namespace, tableName);
-    }
-
-    private void deleteCatalog(String catalogName) throws IOException, ParseException {
-        purger.deleteCatalog(catalogName);
     }
 
     public static void main(String[] args) {
@@ -90,6 +87,7 @@ public class ManagePolarisCatalogsMain {
                     Invalid arguments: '%s'
                     usage:  %s supports the following args options:
                             [delete|create|recreate] polaris-domain-name
+                            [delete|create] polaris-domain-name catalog-name
                             [delete] polaris-domain-name catalog-name [namespace] [table-name]
                     """, String.join(" ", args), ManagePolarisCatalogsMain.class.getSimpleName());
             logger.warn(usage);
@@ -118,8 +116,13 @@ public class ManagePolarisCatalogsMain {
                 }
             }
             if (action.equals(CREATE)) {
-                logger.info("Creating all catalogs for domain {}", domainName);
-                app.createAllCatalogs();
+                if (catalogName == null) {
+                    logger.info("Creating all catalogs for domain {}", domainName);
+                    app.createAllCatalogs();
+                } else {
+                    logger.info("Creating catalog {} for domain {}", catalogName, domainName);
+                    app.createCatalog(catalogName);
+                }
             }
             if (action.equals(RECREATE)) {
                 logger.info("Deleting and recreating all catalogs for domain {}", domainName);
