@@ -1,18 +1,17 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.cluster.ClusterClient;
-import health.emrys.afon.cluster.KubeConfigClusterClient;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.kube.KubeClient;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1Service;
 
 import java.util.List;
 
-public class ClusterClientSmoke {
+public class KubeClientSmoke {
 
-    private final ClusterClient client;
+    private final KubeClient client;
 
-    public ClusterClientSmoke(ClusterClient client) {
+    public KubeClientSmoke(KubeClient client) {
         this.client = client;
     }
 
@@ -49,7 +48,7 @@ public class ClusterClientSmoke {
 
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
-        var app = new ClusterClientSmoke(new KubeConfigClusterClient(properties));
+        var app = new KubeClientSmoke(new KubeClient(properties));
         app.printCluster();
         app.printPods();
         app.printServices();
