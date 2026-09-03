@@ -1,10 +1,9 @@
-package health.emrys.afon.cluster;
+package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.catalogs.PolarisCatalog;
-import health.emrys.afon.polaris.config.PolarisCatalogClient;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

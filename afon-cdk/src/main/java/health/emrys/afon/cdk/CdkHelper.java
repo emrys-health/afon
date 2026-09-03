@@ -23,7 +23,7 @@ import java.util.Optional;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.KeyCloakConfig.KEYCLOAK_INGRESS;
-import static health.emrys.afon.cluster.Defaults.POLARIS_INGRESS_NAME;
+import static health.emrys.afon.cdk.Defaults.POLARIS_INGRESS_NAME;
 import static java.lang.String.format;
 
 public class CdkHelper {
