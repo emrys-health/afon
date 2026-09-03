@@ -56,7 +56,7 @@ public class RegisterPolarisTableMain {
             logger.warn(usage);
             return;
         }
-        String catalog = AfonCloud.valueOf(args[0]).name();
+        String catalog = AfonCloud.valueOf(args[0].toUpperCase()).name();
         String namespace = args[1];
         String table = args[2];
         String metadata = args[3];
