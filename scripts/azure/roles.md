@@ -178,3 +178,29 @@ principal is used instead), on the **resource group** that holds the cluster.
 Plus confirmation that `Microsoft.Network`, `Microsoft.ManagedIdentity`, `Microsoft.ContainerService`,
 `Microsoft.Compute`, and `Microsoft.Authorization` are already registered on the subscription,
 since `AZURE_RESOURCE_PROVIDER_REGISTRATIONS=none` means `tofu` will not register them itself.
+
+## Key Vault (keyvault.sh / issue-cert.sh)
+
+`keyvault.sh create` provisions the vault with `--enable-rbac-authorization true`, so — unlike the
+legacy vault access-policy model — read/write access to secrets and certificates inside it is
+governed by Azure RBAC role assignments **on the vault resource**, same as any other ARM resource.
+The script self-assigns one such role to the signed-in user right after creating the vault.
+
+| Command                                                                          | Operation type                | Required permission                                                    | RBAC role that grants it                                                                  | Scope      |
+|-----------------------------------------------------------------------------------|--------------------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|------------|
+| `az keyvault show`                                                                | control-plane read             | `Microsoft.KeyVault/vaults/read`                                         | Reader (or any higher role)                                                                  | Resource group |
+| `az keyvault create`                                                              | control-plane write             | `Microsoft.KeyVault/vaults/write`                                        | **Contributor** (or narrower: Key Vault Contributor)                                          | Resource group |
+| `az keyvault delete`                                                              | control-plane delete            | `Microsoft.KeyVault/vaults/delete`                                       | **Contributor** (or narrower: Key Vault Contributor)                                          | Resource group |
+| `az keyvault purge`                                                               | control-plane action            | `Microsoft.KeyVault/locations/deletedVaults/purge/action`                | **Contributor**                                                                               | Subscription (purge has no resource-group-scoped equivalent) |
+| `az role assignment create --role "Key Vault Secrets Officer"` / `"Key Vault Certificates Officer"` (`keyvault.sh` self-grants) | write   | `Microsoft.Authorization/roleAssignments/write`                          | **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator**      | Vault (`VAULT_SCOPE`) |
+| `az keyvault secret set` / `secret show` / `secret list` (`issue-cert.sh`, `keyvault.sh list`) | data-plane write/read | secrets data actions                                                     | **Key Vault Secrets Officer** — self-granted by `keyvault.sh create`                          | Vault      |
+| `az keyvault certificate issuer create` / `show`, `certificate create`, `certificate pending show` (`issue-cert.sh`, `digicert`/`globalsign` path only) | data-plane write/read | certificates data actions | **Key Vault Certificates Officer** — self-granted by `keyvault.sh create`                     | Vault      |
+
+### Synthesis
+
+**RBAC roles required:**
+
+- **Contributor** — resource group scope, for `az keyvault create` / `delete` / `show` (control-plane vault lifecycle)
+- **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator** — vault scope, for the two one-time `az role assignment create` calls that grant Secrets Officer and Certificates Officer to the signed-in user
+- **Key Vault Secrets Officer** — vault scope, self-granted by `keyvault.sh create`; covers the `acme` issuance path and `keyvault.sh list` (`secret set`/`show`/`list`)
+- **Key Vault Certificates Officer** — vault scope, self-granted by `keyvault.sh create`; covers the `digicert`/`globalsign` issuance path in `issue-cert.sh` (certificate issuers and certificates — data actions Secrets Officer does not cover)
