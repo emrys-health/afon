@@ -2,6 +2,8 @@ package health.emrys.afon.polaris.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.ParseException;
@@ -22,13 +24,13 @@ public class PolarisCatalogPurger {
     private static final Logger logger = LoggerFactory.getLogger(PolarisCatalogPurger.class);
 
     private final PolarisRestClient client;
-    private final String            accessToken;
-    private final String            domainName;
+    private final String accessToken;
+    private final String domainName;
 
-    public PolarisCatalogPurger(PolarisRestClient client, String domainName) {
-        this.client      = client;
+    public PolarisCatalogPurger(AfonPropertyProvider properties) {
+        this.client = PolarisRestClientFactory.clientFactory().createClient(properties);
         this.accessToken = client.getAccessToken();
-        this.domainName  = domainName;
+        this.domainName  = properties.getValue(AfonProperty.POLARIS_ENDPOINT);
     }
 
     public void deleteCatalog(String catalogName) throws IOException, ParseException {

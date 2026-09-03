@@ -1,8 +1,8 @@
 package health.emrys.afon.polaris.config;
 
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -26,12 +26,12 @@ import static org.slf4j.LoggerFactory.getLogger;
  *
  * Get the token with:
  * <pre>
- curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token -H "Content-Type: application/x-www-form-urlencoded" -d grant_type=client_credentials -d client_id=<polaris_id> -d client_secret=<polaris_secret>
+ curl -s -X POST {@link AfonProperty#POLARIS_ENDPOINT}/realms/polaris/protocol/openid-connect/token -H "Content-Type: application/x-www-form-urlencoded" -d grant_type=client_credentials -d client_id=<polaris_id> -d client_secret=<polaris_secret>
  * </pre>
  *
  * Validate with:
  * <pre>
- curl -s -X POST http://localhost:8080/realms/polaris/protocol/openid-connect/token/introspect -H "Content-Type: application/x-www-form-urlencoded" -d token=<polaris_token>  -d client_id=<polaris_id> -d client_secret=<polaris_secret> | jq
+ curl -s -X POST {@link AfonProperty#POLARIS_ENDPOINT}/realms/polaris/protocol/openid-connect/token/introspect -H "Content-Type: application/x-www-form-urlencoded" -d token=<polaris_token>  -d client_id=<polaris_id> -d client_secret=<polaris_secret> | jq
  * </pre>
  */
 public class KeyCloakPolarisRestClient extends PolarisRestClient {
@@ -65,16 +65,12 @@ public class KeyCloakPolarisRestClient extends PolarisRestClient {
         form.put("grant_type", "client_credentials");
         form.put("client_id", clientId);
         form.put("client_secret", clientSecret);
+        String   url  = urlEncode(form);
 
         HttpPost post = new HttpPost(keyCloakTokenUri);
-        String   url  = urlEncode(form);
         post.setHeader(CONTENT_TYPE, "application/x-www-form-urlencoded");
-        logger.info("Requesting KeyCloak access token from {} as {}/{}",
-                    keyCloakTokenUri,
-                    clientId,
-                    clientSecret);
-        ClassicHttpResponse response = post(url, post);
-        return parseAccessToken(response);
+        logger.info("Requesting KeyCloak access token from {} as client {}", keyCloakTokenUri, clientId);
+        return parseAccessToken(post(url, post));
     }
 
     private static String urlEncode(Map<String, String> params) {

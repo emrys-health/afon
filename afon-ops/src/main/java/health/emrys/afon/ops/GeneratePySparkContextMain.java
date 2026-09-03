@@ -248,7 +248,7 @@ public class GeneratePySparkContextMain {
             logger.warn(usage);
             return;
         }
-        AfonCloud polarisCloud = AfonCloud.valueOf(args[0]);
+        AfonCloud polarisCloud = AfonCloud.valueOf(args[0].toUpperCase());
         var properties = new FilePropertyProvider();
         new GeneratePySparkContextMain(polarisCloud, properties).generatePySparkCode();
     }

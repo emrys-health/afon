@@ -31,7 +31,7 @@ public class KeyCloakConfigurer {
      */
     public static String internalRealmUrl(String host, String protocol) {
         String uri = format("%s/realms/%s", urlFor(host, protocol), KEYCLOAK_REALM);
-        logger.info("host = {}, protocol = {}, uri = {}", host, protocol, uri);
+        logger.info("KeyCloak host = {}, protocol = {}, uri = {}", host, protocol, uri);
         return uri;
     }
 

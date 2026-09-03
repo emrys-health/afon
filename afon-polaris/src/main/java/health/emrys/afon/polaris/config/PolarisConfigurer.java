@@ -102,6 +102,7 @@ public class PolarisConfigurer {
     public PolarisConfigurer(PolarisRestClient client) {
         this.client = client;
         this.accessToken = client.getAccessToken();
+        logger.info("Access token: {}", accessToken);
     }
 
     /**
@@ -114,7 +115,6 @@ public class PolarisConfigurer {
      * @throws IncorrectConfigException
      */
     public List<HttpResponse> configureCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
-        logger.info("Access token {}", accessToken);
         List<HttpResponse> responses = new ArrayList<>();
         responses.add(createCatalog(catalog));
         if ( catalog.adminGrants() ){

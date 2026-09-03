@@ -4,7 +4,7 @@ import health.emrys.afon.config.AfonCloud._
 import health.emrys.afon.config.{AfonCloud, AfonPropertyProvider, FilePropertyProvider}
 import health.emrys.afon.samples.SampleData.{occupancyDataset, patientDataset}
 import health.emrys.afon.ops.spark.SparkSessionFactory
-import health.emrys.afon.polaris.config.EndpointPolarisConfiguration
+import health.emrys.afon.polaris.config.PolarisCatalogClient
 import org.apache.spark.sql.SparkSession
 
 import java.lang.String.format
@@ -31,8 +31,9 @@ object PatientDataMain {
   def main(array: Array[String]): Unit = {
     val properties = new FilePropertyProvider()
     val spark: SparkSession = initSpark(properties)
-    logger.info("Configuring Polaris")
-    new EndpointPolarisConfiguration(properties).configure()
+    logger.info("Configuring all Polaris catalogs")
+    val polarisClient = new PolarisCatalogClient(properties)
+    polarisClient.configureAllCatalogs()
     logger.info("Creating data")
     createData(spark, 10000)
     logger.info("Closing down Spark")
