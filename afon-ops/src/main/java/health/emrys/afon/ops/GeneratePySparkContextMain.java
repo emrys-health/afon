@@ -243,7 +243,12 @@ public class GeneratePySparkContextMain {
 
     public static final void main(String[] args) {
         if (args.length == 0) {
-            System.out.printf("%s requires argument: cloud", GeneratePySparkContextMain.class.getSimpleName());
+            String usage = String.format("""
+                                                            
+                    Invalid arguments: '%s'
+                    usage:  %s requires argument: cloud
+                    """, String.join(" ", args), GeneratePySparkContextMain.class.getSimpleName());
+            logger.warn(usage);
             return;
         }
         AfonCloud polarisCloud = AfonCloud.valueOf(args[0]);
