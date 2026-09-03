@@ -5,13 +5,13 @@
 **IMPORTANT:** Ensure you have done a login with the cloud cli before executing the create or destroy scripts.
 
 ```shell
-./afon.sh -a script --script-path <cloud>/login.sh 
+./afon.sh -a script -sp <cloud>/login.sh 
 ```
 where cloud is one of `{aws|azure|gcp}`.
 
 To show the account used by the cloud cli, once logged in:
 ```shell
-./afon.sh -a script --script-path <cloud>/account.sh 
+./afon.sh -a script -sp <cloud>/account.sh 
 ```
 where cloud is one of `{aws|azure|gcp}`.
 
@@ -20,14 +20,14 @@ To create the cloud infrastructure, which includes storage buckets, IAM roles, s
 run the cloud create scripts:
 
 ```shell
-./afon.sh -a script --script-path <cloud>/create.sh 
+./afon.sh -a script -sp <cloud>/create.sh 
 ```
 where cloud is one of `{aws|azure|gcp}`.
 
 ## Destroy
 To destroy the cloud infrastructure
 ```shell
-./afon.sh -a script --script-path <cloud>/destroy.sh 
+./afon.sh -a script -sp <cloud>/destroy.sh 
 ```
 where cloud is one of `{aws|azure|gcp}`.
 

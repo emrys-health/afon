@@ -32,16 +32,7 @@ cd afon-core
 ./afon.sh -a build -bp -acceptance
 ```
 
-See [acceptance tests](acceptance_tests.md) for more details.
-
-### afon.sh options in long form and short form
-
-The `afon.sh` scripts accepts options in long form and, for the most common ones, also in short form.   
-
-See usage for details:
-```shell
-./afon.sh -h
-```
+See [afon_script](afon_script.md) for more details on options and [acceptance tests](acceptance_tests.md).
 
 ### Configuration
 
@@ -125,8 +116,4 @@ This pushes the content of each config files to a separate GitHub secret.
 
 **NOTE:** upon any change in the config, the secrets need to be pushed again.
 
-
-
-
-- 
 
