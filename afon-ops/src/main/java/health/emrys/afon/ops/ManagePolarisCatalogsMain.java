@@ -85,11 +85,15 @@ public class ManagePolarisCatalogsMain {
             namespace   = args[3];
             tableName   = args[4];
         } else {
-            System.out.printf("%s requires arguments: [delete|create|recreate] domain-name", ManagePolarisCatalogsMain.class.getSimpleName());
-            System.out.printf("%s requires arguments: [delete] domain-name catalog-name", ManagePolarisCatalogsMain.class.getSimpleName());
-            System.out.printf("%s requires arguments: [delete] domain-name catalog-name namespace", ManagePolarisCatalogsMain.class.getSimpleName());
-            System.out.printf("%s requires arguments: [delete] domain-name catalog-name namespace table-name", ManagePolarisCatalogsMain.class.getSimpleName());
-            throw new IllegalArgumentException();
+            String usage = String.format("""
+                    
+                    Invalid arguments: '%s'
+                    usage:  %s supports the following args options:
+                            [delete|create|recreate] polaris-domain-name
+                            [delete] polaris-domain-name catalog-name [namespace] [table-name]
+                    """, String.join(" ", args), ManagePolarisCatalogsMain.class.getSimpleName());
+            logger.warn(usage);
+            return;
         }
 
         var properties = new FilePropertyProvider();
