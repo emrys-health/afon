@@ -1,7 +1,6 @@
 package health.emrys.afon.ops.spark;
 
-import health.emrys.afon.cluster.ClusterCredentials;
-import health.emrys.afon.cluster.PolarisClusterCredentials;
+import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -21,7 +20,7 @@ public class SparkSessionFactory {
             Arrays.stream(AfonCloud.values()).map(x -> x.toString()).toArray(String[]::new);
 
     public static SparkSession localSparkClusterPolaris(AfonCloud polarisCloud, AfonPropertyProvider properties) throws IOException {
-        ClusterCredentials credentials = new PolarisClusterCredentials(polarisCloud, properties);
+        PolarisCredentials credentials = new PolarisCredentials(polarisCloud, properties);
         return new SparkSessionFactory(
                 properties, credentials.getPolarisHost(), credentials.getPolarisId(),
                 credentials.getPolarisSecret(),
