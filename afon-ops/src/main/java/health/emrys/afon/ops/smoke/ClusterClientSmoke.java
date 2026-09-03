@@ -16,6 +16,11 @@ public class ClusterClientSmoke {
         this.client = client;
     }
 
+    public void printCluster() {
+        System.out.printf("Cluster: %s%n",
+                client.getClusterName());
+    }
+
     public void printPods(){
         try {
             for (V1Pod pod : client.listPods()) {
@@ -45,7 +50,9 @@ public class ClusterClientSmoke {
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
         var app = new ClusterClientSmoke(new KubeConfigClusterClient(properties));
+        app.printCluster();
         app.printPods();
         app.printServices();
     }
+
 }

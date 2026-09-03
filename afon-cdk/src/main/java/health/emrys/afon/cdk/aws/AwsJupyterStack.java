@@ -13,7 +13,6 @@ import health.emrys.afon.cdk.NetworkConfig;
 import health.emrys.afon.cdk.SparkConfig;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
@@ -24,8 +23,8 @@ import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
-import static health.emrys.afon.cluster.Defaults.SPARK_CONNECTOR_NAME;
-import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.cdk.Defaults.SPARK_CONNECTOR_NAME;
+import static health.emrys.afon.cdk.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
 
 public class AwsJupyterStack extends AwsPolarisStack {

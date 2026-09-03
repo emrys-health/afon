@@ -13,7 +13,7 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>afon-polaris</artifactId>
+            <artifactId>afon-config</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

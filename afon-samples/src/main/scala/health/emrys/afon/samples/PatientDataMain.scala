@@ -1,10 +1,10 @@
 package health.emrys.afon.samples
 
 import health.emrys.afon.config.AfonCloud._
-import health.emrys.afon.cluster.EndpointPolarisConfiguration
 import health.emrys.afon.config.{AfonCloud, AfonPropertyProvider, FilePropertyProvider}
 import health.emrys.afon.samples.SampleData.{occupancyDataset, patientDataset}
 import health.emrys.afon.ops.spark.SparkSessionFactory
+import health.emrys.afon.polaris.config.EndpointPolarisConfiguration
 import org.apache.spark.sql.SparkSession
 
 import java.lang.String.format

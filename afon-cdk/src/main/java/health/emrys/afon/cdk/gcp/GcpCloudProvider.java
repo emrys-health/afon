@@ -30,7 +30,7 @@ import software.constructs.Construct;
 import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.cluster.Defaults.GCP_REGION;
+import static health.emrys.afon.cdk.Defaults.GCP_REGION;
 import static java.lang.String.format;
 
 /**
