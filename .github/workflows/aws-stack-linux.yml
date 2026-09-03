@@ -180,16 +180,16 @@ jobs:
           set -euo pipefail
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
           # The Actions log renders the escape codes, so the output reads as it does in a shell.
-          ./afon.sh -a build -g "clean package" -p cli \
-            --build-args "-Dafon.cli.dir=/data/afon/cli -B -ntp -Dstyle.color=always"
+          ./afon.sh -a build -bg "clean package" -bp cli \
+            -ba "-Dafon.cli.dir=/data/afon/cli -B -ntp -Dstyle.color=always"
 
       - name: Build components without acceptance tests
         run: |
           set -euo pipefail
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
           # The Actions log renders the escape codes, so the output reads as it does in a shell.
-          ./afon.sh -a build -p -acceptance \
-            --build-args "-B -ntp -Dstyle.color=always"
+          ./afon.sh -a build -bp -acceptance \
+            --ba "-B -ntp -Dstyle.color=always"
 
       - name: Run the AWS stack action
         env:

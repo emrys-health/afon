@@ -136,8 +136,8 @@ jobs:
           fi
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
           # The Actions log renders the escape codes, so the output reads as it does in a shell.
-          ./afon.sh -a build -p acceptance --home "$AFON_HOME" \
-            --build-args "-B -ntp -Dstyle.color=always" $CLOUD_ARG
+          ./afon.sh -a build -bp acceptance --home "$AFON_HOME" \
+            -ba "-B -ntp -Dstyle.color=always" $CLOUD_ARG
 
       - name: Upload acceptance test reports
         if: always()

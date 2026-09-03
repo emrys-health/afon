@@ -1,31 +1,26 @@
 # Stacks
 
-## Pre-requisites 
+## Pre-requisites
+
+### Afon.sh 
+
+See [afon_script](afon_script.md) for more details on options used to run deployments.
 
 ### Setup Local Env
 
 See [setup local env](setup_local.md).
-
-## afon.sh commands
-
-The script `afon.sh` at the top-level of the source tree acts as a front-end for all the functionality, including the build:
-
-```shell
-./afon.sh -h
-```
-
-**NOTE:** In the following, all JVM packages are intended relative to the base package `health.emrys.afon`. 
-If you want, you may specify the full package or change the base package via the `--exec-package` option.
 
 ## Stack deployment
 
 To deploy a stack, we execute the `ops.Deploy*Main` classes, e.g.:
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain
-./afon.sh -a exec --exec-class ops.DeployAzurePolarisStackMain
-./afon.sh -a exec --exec-class ops.DeployGcpPolarisStackMain
+./afon.sh -a exec -ec ops.DeployAwsFullStackMain
+./afon.sh -a exec -ec ops.DeployAzurePolarisStackMain
+./afon.sh -a exec -ec ops.DeployGcpPolarisStackMain
 ```
+**NOTE:** In the following, all JVM packages are intended relative to the base package `health.emrys.afon`.
+If you want, you may specify the full package or change the base package via the `--exec-package` option.
 
 The credentials in the cloud-specific env properties in [config dir](configuration.md) are used by the deployed Polaris instance.
 
@@ -37,7 +32,7 @@ Azure and GCP just host Polaris at the moment. There's no particular reason for 
 The setup AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-./afon.sh -a exec --exec-class ops.SetupAwsFullStackMain
+./afon.sh -a exec -ec ops.SetupAwsFullStackMain
 ```
 Steps executed:
 
@@ -50,14 +45,14 @@ Steps executed:
 ### Setup Azure Polaris only
 
 ```shell
-./afon.sh -a exec --exec-class ops.SetupAzurePolarisStackMain  
+./afon.sh -a exec -ec ops.SetupAzurePolarisStackMain  
 ```
 Steps: `clean_azure → azure_polaris → wait_on_emryspolarisazure_then_wait_on_emrysoauth → create_all_catalogs_for_emryspolarisazure`
 
 ### Setup GCP Polaris only
 
 ```shell
-./afon.sh -a exec --exec-class ops.SetupGcpPolarisStackMain  
+./afon.sh -a exec -ec ops.SetupGcpPolarisStackMain  
 ```
 Steps: `clean_gcp → gcp_polaris → wait_on_emryspolarisgcp_then_wait_on_emrysoauth → create_all_catalogs_for_emryspolarisgcp`
 
@@ -66,7 +61,7 @@ Steps: `clean_gcp → gcp_polaris → wait_on_emryspolarisgcp_then_wait_on_emrys
 To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate to Azure Polaris for cross-cloud querying.
 
 ```shell
-./afon.sh -a exec --exec-class ops.SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain  
+./afon.sh -a exec -ec ops.SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain  
 ```
 
 Steps:
@@ -77,7 +72,7 @@ Steps:
 If a deployment fails partway through, you can resume from a specific step, e.g.:
 
 ```shell
-./afon.sh -a exec --exec-class ops.DeployAwsFullStackWithAzurePolarisMain --exec-args "azure_polaris"
+./afon.sh -a exec -ec ops.DeployAwsFullStackWithAzurePolarisMain -ea "azure_polaris"
 ```
 
 ### Deploy or delete the AWS stack from GitHub
@@ -171,7 +166,7 @@ If things go astray, you may leave the stack in an unstable state.
 Use the cleanup helpers to bring your environment to a clean and stable state:
 
 ```shell
-./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args <cloud>
+./afon.sh -a exec -ec ops.GenerateCleanupScriptMain -ea <cloud>
 ```
 You can run the generated cleanup scripts.
 You may need to run them multiple times for the VPC to disappear from your cloud.
@@ -211,22 +206,22 @@ This is noted as a future improvement in the project.
 
 ```shell
 # AWS full stack (Polaris + Spark + Jupyter)
-./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain 
+./afon.sh -a exec -ec ops.DeployAwsFullStackMain 
 
 # Azure Polaris (standalone)
-./afon.sh -a exec --exec-class ops.DeployAzurePolarisStackMain
+./afon.sh -a exec -ec ops.DeployAzurePolarisStackMain
 
 # GCP Polaris (standalone)
-./afon.sh -a exec --exec-class ops.DeployGcpPolarisStackMain 
+./afon.sh -a exec -ec ops.DeployGcpPolarisStackMain 
 
 # Cross-cloud external catalogs (AWS + Azure federation)
-./afon.sh -a exec --exec-class ops.DeployAwsFullStackWithAzurePolarisMain 
+./afon.sh -a exec -ec ops.DeployAwsFullStackWithAzurePolarisMain 
 
 # Snowflake reading cross-cloud data
-./afon.sh -a exec --exec-class ops.DeploySnowflakeReadingGcpViaAwsMain 
-./afon.sh -a exec --exec-class ops.DeploySnowflakeReadingAzureViaAwsMain 
+./afon.sh -a exec -ec ops.DeploySnowflakeReadingGcpViaAwsMain 
+./afon.sh -a exec -ec ops.DeploySnowflakeReadingAzureViaAwsMain 
 
 # Snowflake writing to Azure
-./afon.sh -a exec --exec-class ops.DeploySnowflakeWritingAzureViaAwsMain 
+./afon.sh -a exec -ec ops.DeploySnowflakeWritingAzureViaAwsMain 
 ```
 

@@ -12,7 +12,7 @@ We assume that the roles and permissions to create a kubernetes cluster have bee
 For the chosen cloud provider, run the corresponding script:
 
 ```shell
-./afon.sh -a script --script-path <cloud>/create.sh
+./afon.sh -a script -sp <cloud>/create.sh
 ```
 where valid cloud values are `{aws|azure|gcp}`.
 
@@ -175,7 +175,7 @@ az network dns zone create  --resource-group afon_resource_group  --name emryspo
 For some hints as to what to execute, try running:
 
 ```shell
-./afon.sh -a exec --exec-class ops.GeneratePySparkContextMain
+./afon.sh -a exec -ec ops.GeneratePySparkContextMain
 ```
 It will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
 
@@ -184,9 +184,9 @@ It will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
 When a Polaris stack deploy, is it empty.  So, for example for `AWS` and domain `emryspolaris.click`, 
 to create the catalogs:
 ```shell
-./afon.sh -a exec --exec-class ops.ManagePolarisCatalogsMain --exec-args "create emryspolaris.click"
+./afon.sh -a exec -ec ops.ManagePolarisCatalogsMain -ea "create emryspolaris.click"
 ```
 and to register tables, something like:
 ```shell
-./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click <user_polaris_id> <user_polaris_secret>"
+./afon.sh -a exec -ec ops.RegisterPolarisTableMain -ea "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click <user_polaris_id> <user_polaris_secret>"
 ```

@@ -122,8 +122,8 @@ jobs:
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
           # The Actions log renders the escape codes, so the output reads as it does in a shell.
           if [ "$ACTION" == "deploy" ]; then
-            ./afon.sh -a build -g "clean package" -p cli \
-              --build-args "-Dafon.cli.dir=$AFON_CLI_DIR -B -ntp -Dstyle.color=always"
+            ./afon.sh -a build -bg "clean package" -bp cli \
+              -ba "-Dafon.cli.dir=$AFON_CLI_DIR -B -ntp -Dstyle.color=always"
           else 
              rm $AFON_CLI_DIR/afon-cli.jar
              rm $AFON_CLI_DIR/afon-cli.sh

@@ -9,7 +9,7 @@ Spark connects to Polaris, which vends short-lived cloud credentials so Spark ca
 **Generate PySpark code for Jupyter:**
 
 ```shell
-./afon.sh -a exec --exec-class ops.GeneratePySparkContextMain
+./afon.sh -a exec -ec ops.GeneratePySparkContextMain
 ```
 
 This prints ready-to-run PySpark code that:
@@ -60,7 +60,7 @@ df_joined.show()
 **Write:**
 
 ```shell
-./afon.sh -a exec --exec-class ops.spark.SparkTestWriter --exec-args "azure_external <polaris_id> <polaris_secret> emryspolaris.click namespaceph"
+./afon.sh -a exec -ec ops.spark.SparkTestWriter -ea "azure_external <polaris_id> <polaris_secret> emryspolaris.click namespaceph"
 ```
 
 This creates a namespace, creates an Iceberg table, and writes three rows ("apple", "banana", "cherry").
@@ -68,7 +68,7 @@ This creates a namespace, creates an Iceberg table, and writes three rows ("appl
 **Read:**
 
 ```shell
-./afon.sh -a exec --exec-class ops.spark.SparkTestReader --exec-args "azure_external <polaris_id> <polaris_secret> emryspolaris.click namespaceph"
+./afon.sh -a exec -ec ops.spark.SparkTestReader -ea "azure_external <polaris_id> <polaris_secret> emryspolaris.click namespaceph"
 ```
 
 ### Create sample patient data
@@ -76,7 +76,7 @@ This creates a namespace, creates an Iceberg table, and writes three rows ("appl
 The `afon-samples` module contains a sample data generator:
 
 ```shell
-./afon.sh -a exec -t samples --exec-class samples.PatientDataMain 
+./afon.sh -a exec -et samples -ec samples.PatientDataMain 
 ```
 
 This creates `patients` (in AWS) and `occupancy` (in GCP) tables with 10,000 rows each, demonstrating cross-cloud data placement.

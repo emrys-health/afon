@@ -4,8 +4,8 @@ The acceptance tests in `afon-acceptance` verify that cross-cloud access works c
 
 The acceptance tests can be run against all cloud providers or just a single one:
 ```shell
-./afon.sh -a build -p acceptance # builds components running acceptance tests for all cloud providers
-./afon.sh -a build -p acceptance -c <cloud> # builds components running acceptance tests for cloud <cloud>
+./afon.sh -a build -bp acceptance # builds components running acceptance tests for all cloud providers
+./afon.sh -a build -bp acceptance -c <cloud> # builds components running acceptance tests for cloud <cloud>
 ```
 ## Acceptance test flow
 
@@ -35,7 +35,7 @@ Test specs include:
 ## Continuous integration
 
 The [Acceptance tests (Linux)](../.github/workflows/acceptance-tests-linux.yml) workflow runs the same
-`./afon.sh -a build -p acceptance` command on the self-hosted Linux runner. It is triggered on push and
+`./afon.sh -a build -bp acceptance` command on the self-hosted Linux runner. It is triggered on push and
 pull request to `main`, nightly at 03:00 UTC, and manually via `workflow_dispatch` — the manual trigger
 takes a `cloud` input (`all`, `aws`, `azure` or `gcp`) which maps to the `--cloud` flag.
 
