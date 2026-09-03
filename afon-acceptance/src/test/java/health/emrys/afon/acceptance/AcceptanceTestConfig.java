@@ -20,6 +20,7 @@ public class AcceptanceTestConfig {
     public static final AcceptanceTestConfig instance;
 
     static {
+        System.clearProperty("afon.cloud");
         instance = new AcceptanceTestConfig(new FilePropertyProvider());
     }
 
