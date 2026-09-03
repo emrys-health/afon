@@ -11,7 +11,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
+import static health.emrys.afon.cdk.Defaults.JUPYTER_INGRESS;
 
 public class AwsJupyterConfig extends JupyterConfig {
     private final AwsCloudProvider cloudProvider;

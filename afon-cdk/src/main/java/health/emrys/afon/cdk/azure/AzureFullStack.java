@@ -18,8 +18,8 @@ import java.util.Optional;
 
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_PORT;
 import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_SVC_NAME;
-import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
-import static health.emrys.afon.cluster.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.cdk.Defaults.JUPYTER_INGRESS;
+import static health.emrys.afon.cdk.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonProperty.*;
 
