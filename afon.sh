@@ -9,9 +9,9 @@ usage (){
   echo "          [--logging|-l <logging>] [--logging-console|-lc <console>] [--mvn-quiet]"
   echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
   echo "          [--build-args|-ba <args>] [--build-goals|-bg|-g <goals>] [--build-profiles|-bp|-p <profiles>]"
-  echo "          [--cli-command|--cli-cmd <command>] [--cli-args <args>] [--cli-dir <dir>]"
+  echo "          [--cli-command|-cc <command>] [--cli-args|-ca <args>] [--cli-dir|-cd <dir>]"
   echo "          [--config-zip <zip>]"
-  echo "          [--docs-dir|-d <dir>]"
+  echo "          [--docs-dir|-dd <dir>]"
   echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>] [--exec-type|-et <types>]"
   echo "          [--script-path|-sp <path>] [--script-args|-sa <args>]"
   echo "          [--setup-os <os>] [--setup-output <file>]"
@@ -471,17 +471,17 @@ while [[ $# -gt 0 ]]; do
       CDKTF_ENV="$2"; shift 2 ;;
     --cloud|-c)
       CLOUD="$2"; shift 2 ;;
-    --cli-args)
+    --cli-args|-ca)
       CLI_ARGS="$2"; shift 2 ;;
-    --cli-command|--cli-cmd)
+    --cli-command|-cc)
       CLI_COMMAND="$2"; shift 2 ;;
-    --cli-dir)
+    --cli-dir|-cd)
       CLI_DIR="$2"; shift 2 ;;
     --config-env)
       CONFIG_ENV="$2"; shift 2 ;;
     --config-zip)
       CONFIG_ZIP="$2"; shift 2 ;;
-    --docs-dir|-d)
+    --docs-dir|-dd)
       DOCS_DIR="$2"; shift 2 ;;
     --env|-e)
       ENV="$2"; shift 2 ;;
