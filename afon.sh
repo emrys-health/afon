@@ -20,7 +20,7 @@ usage (){
   echo "          ansible:    : executes the ansible playbook."
   echo "          build       : executes the mvn build."
   echo "          cli         : executes the cli commands."
-  echo "          cdktf-*     : executes the cdktf commands.  One of switch|status."
+  echo "          cdktf-*     : executes the cdktf commands.  One of init|switch|status."
   echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch|status."
   echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
   echo "          exec        : executes the jvm classes from ops (see the docs for details)."
@@ -105,6 +105,9 @@ exec_cli(){
 exec_cdktf(){
   CDKTF_ACTION=${ACTION#cdktf-}
   case $CDKTF_ACTION in
+    init)
+      exec_cdktf_init
+      ;;
     switch)
       exec_cdktf_switch
       ;;
@@ -114,21 +117,31 @@ exec_cdktf(){
   esac
 }
 
+exec_cdktf_init(){
+  INIT_DIR=
+  if [ -n "$CDKTF_ENV" ]; then
+    INIT_DIR="$CDKTF_DIR-$CDKTF_ENV"
+  else
+    INIT_DIR="$CDKTF_DIR_DIR"
+  fi
+  mkdir -p $INIT_DIR
+}
+
 exec_cdktf_switch(){
   if [ -z "$CDKTF_ENV" ]; then
     echo "Action cdktf-switch requires option --cdktf-env"
     usage; exit 0
   fi
+  CDKTF_ENV_DIR="$CDKTF_DIR-$CDKTF_ENV"
   if [ -L "$CDKTF_DIR" ]; then
     rm $CDKTF_DIR
   elif [ -d "$CDKTF_DIR" ]; then
-    echo "$CDKTF_DIR is not a symlink.  Remove manually."
-    exit 0
+    echo "$CDKTF_DIR is not a symlink. Moving $CDKTF_DIR to $CDKTF_ENV_DIR"
+    echo "NOTE:  You may have used option --env instead of narrower --cdktf-env."
+    mv $CDKTF_DIR $CDKTF_ENV_DIR
   fi
-  CDKTF_ENV_DIR="$CDKTF_DIR-$CDKTF_ENV"
   ln -s $CDKTF_ENV_DIR $CDKTF_DIR
   echo "Switched to cdktf env $CDKTF_ENV"
-  exec_cdktf_status
 }
 
 exec_cdktf_status(){
@@ -193,16 +206,16 @@ exec_config_switch(){
     echo "Action config-switch requires option --config-env"
     usage; exit 0
   fi
+  CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
   if [ -L "$CONFIG_DIR" ]; then
     rm $CONFIG_DIR
   elif [ -d "$CONFIG_DIR" ]; then
-    echo "$CONFIG_DIR is not a symlink.  Remove manually."
-    exit 0
+    echo "$CONFIG_DIR is not a symlink. Moving $CONFIG_DIR to $CONFIG_ENV_DIR"
+    echo "NOTE:  You may have used option --env instead of narrower --config-env."
+    mv $CONFIG_DIR $CONFIG_ENV_DIR
   fi
-  CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
   ln -s $CONFIG_ENV_DIR $CONFIG_DIR
   echo "Switched to config env $CONFIG_ENV"
-  exec_config_status
 }
 
 exec_config_status(){
