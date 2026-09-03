@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.cluster.EndpointPolarisConfiguration;
+import health.emrys.afon.polaris.config.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.slf4j.Logger;

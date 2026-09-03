@@ -7,7 +7,7 @@ import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.azure.AzureReader;
-import health.emrys.afon.cluster.EndpointPolarisConfiguration;
+import health.emrys.afon.polaris.config.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;

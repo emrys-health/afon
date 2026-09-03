@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.cluster.Defaults.JUPYTER_INGRESS;
+import static health.emrys.afon.cdk.Defaults.JUPYTER_INGRESS;
 
 /**
  * AWS wiring for {@link JupyterHubConfig}: terminates HTTPS at an ALB and routes to the oauth2-proxy
