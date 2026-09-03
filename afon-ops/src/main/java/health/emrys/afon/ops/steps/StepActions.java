@@ -7,10 +7,10 @@ import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.azure.AzureReader;
-import health.emrys.afon.polaris.config.EndpointPolarisConfiguration;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -304,8 +304,8 @@ public class StepActions {
                                         AfonCloud catalog,
                                         Properties properties) throws Exception {
         properties.put(POLARIS_ENDPOINT.getName(), domainName);
-        executeMainOf(EndpointPolarisConfiguration.class,
-                      new String[] {catalog.name()},
+        executeMainOf(ManagePolarisCatalogsMain.class,
+                      new String[] {ManagePolarisCatalogsMain.CREATE, catalog.name()},
                       properties);
     }
 

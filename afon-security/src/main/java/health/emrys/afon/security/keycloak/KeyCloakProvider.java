@@ -150,7 +150,7 @@ public class KeyCloakProvider implements OAuthProvider {
      */
     @Override
     public String userToken(String username, String password) throws IOException {
-        logger.info("Getting token for {}/{}", username, password);
+        logger.info("Getting token for user {}", username);
         String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, KEYCLOAK_REALM);
         String body = form(Map.of(
             "grant_type",    "password",

@@ -6,7 +6,7 @@ import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
 import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
-import health.emrys.afon.polaris.catalogs.{AwsForbiddenPolarisCatalog, AwsPolarisCatalog}
+import health.emrys.afon.polaris.catalogs.{AwsForbiddenPolarisCatalog, AwsPolarisCatalog, PolarisCatalog}
 import health.emrys.afon.polaris.config.PolarisCatalogClient
 import org.apache.hc.core5.http.HttpResponse
 import org.apache.iceberg.exceptions.ForbiddenException
@@ -18,7 +18,7 @@ import scala.jdk.CollectionConverters._
 class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
   private val APP_PROPERTIES: AfonPropertyProvider = AcceptanceTestConfig.instance.getProperties
-  val catalog: AwsForbiddenPolarisCatalog = createCatalogInPolaris(APP_PROPERTIES)
+  val catalog: PolarisCatalog = createCatalogInPolaris(APP_PROPERTIES)
   val warehouse: String = catalog.catalogName()
 
   val sparkUser = SparkHelper.sparkWarehouse.getClientId
@@ -46,10 +46,10 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
   }
 
   "Granting catalog permissions" should {
-    val catalog1 = new AwsPolarisCatalog(APP_PROPERTIES) {
+    val catalog1: PolarisCatalog = new AwsPolarisCatalog(APP_PROPERTIES) {
       override def catalogName(): String = CatalogName1
     }
-    val catalog2 = new AwsPolarisCatalog(APP_PROPERTIES) {
+    val catalog2: PolarisCatalog = new AwsPolarisCatalog(APP_PROPERTIES) {
       override def catalogName(): String = CatalogName2
     }
 
@@ -60,7 +60,6 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
     "prevent random users" in {
       Given(s"Catalogs $CatalogName1 and $CatalogName2")
       checkForFailures(polarisClient.configureCatalogs(
-        polarisCredentials(APP_PROPERTIES),
         Array(catalog1, catalog2))
       )
       When("a user is not permissioned")
@@ -113,9 +112,8 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
   }
 
   private def createCatalogInPolaris(properties: AfonPropertyProvider) = {
-    val catalog = new AwsForbiddenPolarisCatalog(properties)
+    val catalog: PolarisCatalog = new AwsForbiddenPolarisCatalog(properties)
     new PolarisCatalogClient(properties).configureCatalogs(
-      polarisCredentials(properties),
       Array(catalog)
     )
     catalog
