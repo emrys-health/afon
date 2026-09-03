@@ -1,18 +1,19 @@
-package health.emrys.afon.cluster;
+package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
 import static health.emrys.afon.config.AfonProperty.*;
 
-public class PolarisClusterCredentials implements ClusterCredentials {
+public class PolarisCredentials {
 
     private final PolarisRestClientFactory clientFactory = PolarisRestClientFactory.clientFactory();
+    private final AfonCloud cloud;
     private final AfonPropertyProvider properties;
     private final String accessToken;
 
-    public PolarisClusterCredentials(AfonCloud cloud, AfonPropertyProvider properties) {
+    public PolarisCredentials(AfonCloud cloud, AfonPropertyProvider properties) {
+        this.cloud = cloud;
         this.properties = properties;
         this.properties.setValue(POLARIS_ENDPOINT, polarisDomainName(cloud));
         this.accessToken = clientFactory.createClient(this.properties).getAccessToken();
@@ -31,22 +32,22 @@ public class PolarisClusterCredentials implements ClusterCredentials {
         }
     }
 
-    @Override
     public String getAccessToken() {
         return accessToken;
     }
 
-    @Override
+    public AfonCloud getCloud() {
+        return cloud;
+    }
+
     public String getPolarisId() {
         return properties.getValue(POLARIS_ID);
     }
 
-    @Override
     public String getPolarisSecret() {
         return properties.getValue(POLARIS_SECRET);
     }
 
-    @Override
     public String getPolarisHost() {
         return properties.getValue(POLARIS_ENDPOINT);
     }

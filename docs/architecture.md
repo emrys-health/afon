@@ -53,7 +53,7 @@ Spark connects to Polaris via the Iceberg REST catalog protocol. `SparkWarehouse
 - OAuth2 credentials (`client_id` / `client_secret`)
 - Warehouse names for each cloud catalog
 
-`SparkSessionFactory` creates a `SparkSession` configured to talk to a Polaris instance. It can discover the Polaris endpoint by interrogating the Kubernetes cluster (`PolarisClusterCredentials`) or use an explicit endpoint.
+`SparkSessionFactory` creates a `SparkSession` configured to talk to a Polaris instance.
 
 In the deployed environment, Spark runs as a Spark Connect server in Kubernetes. Jupyter notebooks connect to it via the Spark Connect protocol (`sc://spark-connector-0-driver-svc:15002`).
 

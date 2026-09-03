@@ -171,4 +171,8 @@ public class AcceptanceTestConfig {
     public String redactSecrets(String content, String source) {
         return Redacter.redactSecrets(content, source, properties.getSecretProperties());
     }
+
+    public static String polarisCredentials(AfonPropertyProvider properties) {
+        return properties.getValue(POLARIS_ID) + ":" + properties.getValue(POLARIS_SECRET);
+    }
 }
