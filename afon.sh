@@ -8,7 +8,7 @@ usage (){
   echo "          [--cloud|-c <cloud>]"
   echo "          [--logging|-l <logging>] [--logging-console|-lc <console>] [--mvn-quiet]"
   echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
-  echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp|-p <profiles>]"
+  echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp <profiles>]"
   echo "          [--cli-command|-cc <command>] [--cli-args|-ca <args>] [--cli-dir|-cd <dir>]"
   echo "          [--config-zip <zip>]"
   echo "          [--docs-dir|-dd <dir>]"
@@ -94,7 +94,7 @@ exec_cli(){
   if [ ! -f "$CLI_JAR" ] || [ ! -f "$CLI_SH" ]; then
     echo "The cli artifacts are not found in $CLI_DIR"
     echo "Build cli artifacts:"
-    echo "./afon.sh -p cli --build-args -Dafon.cli.dir=$CLI_DIR"
+    echo "./afon.sh -bp cli -ba -Dafon.cli.dir=$CLI_DIR"
     usage; exit 0
   fi
   CLI="$CLI_SH $CLI_COMMAND $CLI_ARGS"
