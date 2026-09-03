@@ -252,7 +252,7 @@ mvn_envs(){
 }
 
 exec_mvn() {
-  MVN="$MVN_CMD $MVN_ENVS $MVN_ARGS $MVN_GOALS"
+  MVN="$MVN_CMD $MVN_PROFILES $MVN_ENVS $MVN_ARGS $MVN_GOALS"
   echo "Executing: $MVN"
   eval "$MVN"
 }
@@ -474,7 +474,7 @@ while [[ $# -gt 0 ]]; do
       ANSIBLE_ARGS="$2"; shift 2 ;;
     --build-args|-ba)
       BUILD_ARGS="$2"; shift 2 ;;
-    --build-goals|-bg|-g)
+    --build-goals|-bg)
       BUILD_GOALS="$2"; shift 2 ;;
     --build-profiles|-bp|-p)
       BUILD_PROFILES="$2"; shift 2 ;;
@@ -636,7 +636,7 @@ MVN_CMD="mvn"
 if [ -n "$MVN_QUIET" ]; then
   MVN_CMD="$MVN_CMD -q"
 fi
-MVN_CMD="$MVN_CMD -s $AFON_ROOT/settings.xml $MVN_PROFILES"
+MVN_CMD="$MVN_CMD -s $AFON_ROOT/settings.xml"
 case $ACTION in
   ansible)
     exec_ansible
