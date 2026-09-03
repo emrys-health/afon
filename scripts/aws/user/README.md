@@ -31,7 +31,7 @@ where I've redacted sensitive values that should become `AWS_ACCESS_KEY_ID` and 
 First, let's get all the properties into our shell:
 
 ```shell
-./afon.sh -a exec -t --exec-script config/afon-source.sh aws
+./afon.sh -a script -sp config/afon-source.sh -sa aws
 ```
 
 Then create a role:

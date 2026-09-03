@@ -8,7 +8,7 @@ usage (){
   echo "          [--cloud|-c <cloud>]"
   echo "          [--logging|-l <logging>] [--logging-console|-lc <console>] [--mvn-quiet]"
   echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
-  echo "          [--build-args|-ba <args>] [--build-goals|-bg|-g <goals>] [--build-profiles|-bp|-p <profiles>]"
+  echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp|-p <profiles>]"
   echo "          [--cli-command|-cc <command>] [--cli-args|-ca <args>] [--cli-dir|-cd <dir>]"
   echo "          [--config-zip <zip>]"
   echo "          [--docs-dir|-dd <dir>]"

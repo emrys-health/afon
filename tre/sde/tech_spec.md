@@ -235,7 +235,7 @@ Then the Afon CLI are built for the chosen cloud
 **How to do it**
 
 ```shell
-./afon.sh -a build -p cli -c <cloud>
+./afon.sh -a build -bp cli -c <cloud>
 ```
 
 The CLI build artifacts are available in `~/.afon/cli`.
