@@ -20,19 +20,28 @@ cd afon-core
 ./afon.sh -a build
 ```
 
-The acceptance profile is active by default but can be explicitly activated as well:
+The acceptance build profile is active by default but can be explicitly activated as well:
 ```shell
 cd afon-core
-./afon.sh -a build -p acceptance
+./afon.sh -a build -bp acceptance
 ```
 
 To build all components without running acceptance tests:
 ```shell
 cd afon-core
-./afon.sh -a build -p -acceptance
+./afon.sh -a build -bp -acceptance
 ```
 
 See [acceptance tests](acceptance_tests.md) for more details.
+
+### afon.sh options in long form and short form
+
+The `afon.sh` scripts accepts options in long form and, for the most common ones, also in short form.   
+
+See usage for details:
+```shell
+./afon.sh -h
+```
 
 ### Configuration
 
@@ -42,7 +51,7 @@ If you want to build with the configuration relative to single cloud:
 
 ```shell
 cd afon-core
-./afon.sh -a build -c <cloud> -p -acceptance
+./afon.sh -a build -bp -acceptance -c <cloud>
 ```
 
 **NOTE:** acceptance tests require the configuration for all clouds.
@@ -78,18 +87,18 @@ To export all the docs (including the static) to an external dir:
 
 To build the `afon-cli` jar and export it to an external directory, **without installing** in your local maven repository:
 ```shell
-./afon.sh -g "clean package" -p cli --build-args "-Dafon.cli.dir=<export-path>"
+./afon.sh -bg "clean package" -bp cli -ba "-Dafon.cli.dir=<cli-dir>"
 ```
 If the `-Dafon.cli.dir` is omitted, the `afon-cli` artifacts will be exported to `AFON_HOME/cli`.  
 If you just need to build and not export the artifacts, you can deactivate the `export` profile:
 ```shell
-./afon.sh -g "clean package" -p cli,-export
+./afon.sh -bg "clean package" -bp cli,-export
 ```
 The `export` profile is active by default because it's the most common use case when building the CLI.
 
 To build a binary distribution with the `afon-cli` files and the docs:
 ```shell
-./afon.sh -g "clean package" -p cli,distribution
+./afon.sh -bg "clean package" -bp cli,distribution
 ```
 You'll find the file `afon-cli` zip file in the `afon-distribution/target` dir.
 
