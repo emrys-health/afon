@@ -1,7 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.cluster.ClusterCredentials;
-import health.emrys.afon.cluster.PolarisClusterCredentials;
+import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
@@ -37,14 +36,12 @@ public class GeneratePySparkContextMain {
     private final SparkWarehouseConfig polarisConfig;
 
     public GeneratePySparkContextMain(AfonCloud cloud, AfonPropertyProvider properties) {
-        ClusterCredentials credentials = new PolarisClusterCredentials(cloud, properties);
+        PolarisCredentials credentials = new PolarisCredentials(cloud, properties);
         polarisId     = credentials.getPolarisId();
         polarisSecret = credentials.getPolarisSecret();
         polarisHost   = credentials.getPolarisHost();
-        polarisConfig = SparkWarehouseConfigFactory.getFactory().createConfig(
-                properties, polarisHost, polarisId,
-                polarisSecret
-        );
+        polarisConfig = SparkWarehouseConfigFactory.getFactory()
+                        .createConfig(properties, polarisHost, polarisId, polarisSecret);
     }
 
     public void generatePySparkCode() {

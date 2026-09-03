@@ -1,9 +1,9 @@
 package health.emrys.afon.acceptance.permissions
 
+import health.emrys.afon.acceptance.AcceptanceTestConfig.polarisCredentials
 import health.emrys.afon.acceptance.SparkHelper.{CatalogName1, CatalogName2, spark}
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
-import health.emrys.afon.cluster.PolarisConfiguration.polarisCredentials
 import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.polaris.catalogs.{AwsForbiddenPolarisCatalog, AwsPolarisCatalog}
