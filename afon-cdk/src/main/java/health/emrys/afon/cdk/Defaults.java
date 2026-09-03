@@ -1,4 +1,4 @@
-package health.emrys.afon.cluster;
+package health.emrys.afon.cdk;
 
 public interface Defaults {
 

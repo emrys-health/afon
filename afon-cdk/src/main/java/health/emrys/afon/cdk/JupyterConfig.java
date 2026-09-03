@@ -17,7 +17,7 @@ import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkHelper.envVar;
-import static health.emrys.afon.cluster.Defaults.JUPYTER_SERVICE_NAME;
+import static health.emrys.afon.cdk.Defaults.JUPYTER_SERVICE_NAME;
 
 public abstract class JupyterConfig {
     /**
