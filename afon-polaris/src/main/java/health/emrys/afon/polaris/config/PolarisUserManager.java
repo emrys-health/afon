@@ -25,9 +25,9 @@ import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
  *
  * Provides default {@link #DEFAULT_CATALOG_ROLE_NAME} and {@link #DEFAULT_CATALOG_PRIVILEGES}, if not specified.
  */
-public class PolarisUsersManager {
+public class PolarisUserManager {
 
-    private static final Logger logger = LoggerFactory.getLogger(PolarisUsersManager.class);
+    private static final Logger logger = LoggerFactory.getLogger(PolarisUserManager.class);
 
     public static final String DEFAULT_CATALOG_ROLE_NAME = "emrysrole4";
     public static final Set<CatalogPrivilege> DEFAULT_CATALOG_PRIVILEGES =
@@ -43,11 +43,11 @@ public class PolarisUsersManager {
     private final String principalRoleName;
     private final Set<CatalogPrivilege> privileges;
 
-    public PolarisUsersManager(AfonPropertyProvider properties) {
+    public PolarisUserManager(AfonPropertyProvider properties) {
         this(properties, DEFAULT_CATALOG_ROLE_NAME, DEFAULT_CATALOG_PRIVILEGES);
     }
 
-    public PolarisUsersManager(AfonPropertyProvider properties, String catalogRoleName, Set<CatalogPrivilege> privileges) {
+    public PolarisUserManager(AfonPropertyProvider properties, String catalogRoleName, Set<CatalogPrivilege> privileges) {
         PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties);
         this.configurer = new CatalogConfigurer(client);
         this.accessToken = client.getAccessToken();

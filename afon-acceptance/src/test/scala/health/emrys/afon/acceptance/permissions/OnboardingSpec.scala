@@ -6,7 +6,7 @@ import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, Spar
 import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.polaris.catalogs.{AwsForbiddenPolarisCatalog, AwsPolarisCatalog, PolarisCatalog}
-import health.emrys.afon.polaris.config.PolarisCatalogClient
+import health.emrys.afon.polaris.config.PolarisCatalogManager
 import org.apache.hc.core5.http.HttpResponse
 import org.apache.iceberg.exceptions.ForbiddenException
 import org.scalatest.GivenWhenThen
@@ -52,13 +52,13 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
       override def catalogName(): String = CatalogName2
     }
 
-    val catalogClient = new PolarisCatalogClient(APP_PROPERTIES)
+    val catalogManager = new PolarisCatalogManager(APP_PROPERTIES)
 
     val sql = s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName1}.test_namespace"
 
     "prevent random users" in {
       Given(s"Catalogs $CatalogName1 and $CatalogName2")
-      checkForFailures(catalogClient.configureCatalogs(catalog1, catalog2))
+      checkForFailures(catalogManager.configureCatalogs(catalog1, catalog2))
       When("a user is not permissioned")
       thenUserIsNotAllowedToExecute(sql)
     }
@@ -110,7 +110,7 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
   private def createCatalogInPolaris(properties: AfonPropertyProvider) = {
     val catalog: PolarisCatalog = new AwsForbiddenPolarisCatalog(properties)
-    new PolarisCatalogClient(properties).configureCatalogs(catalog)
+    new PolarisCatalogManager(properties).configureCatalogs(catalog)
     catalog
   }
 }

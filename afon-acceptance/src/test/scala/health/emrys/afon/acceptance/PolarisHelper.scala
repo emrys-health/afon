@@ -3,7 +3,7 @@ package health.emrys.afon.acceptance
 import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
 import health.emrys.afon.acceptance.PolarisHelper.{principalName, principalRoleName}
 import health.emrys.afon.config.AfonProperty
-import health.emrys.afon.polaris.config.PolarisUsersManager
+import health.emrys.afon.polaris.config.PolarisUserManager
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials
 
 object PolarisHelper {
@@ -14,10 +14,10 @@ object PolarisHelper {
 
 class PolarisHelper {
   def createPrincipal(): PrincipalWithCredentials = {
-    val usersManager = new PolarisUsersManager(instance.getProperties)
-    val principal    = usersManager.createPrincipal(principalName)
-    usersManager.createPrincipalRole(principalRoleName)
-    usersManager.associatePrincipalRole(principalName, principalRoleName)
+    val userManager = new PolarisUserManager(instance.getProperties)
+    val principal   = userManager.createPrincipal(principalName)
+    userManager.createPrincipalRole(principalRoleName)
+    userManager.associatePrincipalRole(principalName, principalRoleName)
     principal
   }
 }

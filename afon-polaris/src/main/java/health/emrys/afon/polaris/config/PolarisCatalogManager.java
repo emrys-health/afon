@@ -16,9 +16,9 @@ import java.util.function.Function;
 
 import static health.emrys.afon.polaris.config.PolarisRestClient.failuresOf;
 
-public class PolarisCatalogClient {
+public class PolarisCatalogManager {
 
-    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogClient.class);
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogManager.class);
 
     private static final Map<AfonCloud, Function<AfonPropertyProvider, PolarisCatalog>>
             CLOUD_TO_CATALOG = Map.of(
@@ -43,7 +43,7 @@ public class PolarisCatalogClient {
     private final PolarisCatalog[] catalogs;
     private final CatalogConfigurer configurer;
 
-    public PolarisCatalogClient(AfonPropertyProvider properties) {
+    public PolarisCatalogManager(AfonPropertyProvider properties) {
         this.properties = properties;
         this.configurer = new CatalogConfigurer(PolarisRestClientFactory.clientFactory().createClient(properties));
         this.catalogs = catalogs(properties);
