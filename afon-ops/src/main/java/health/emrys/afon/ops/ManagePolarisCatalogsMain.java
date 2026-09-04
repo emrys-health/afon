@@ -23,20 +23,18 @@ public class ManagePolarisCatalogsMain {
     public static final String DELETE = "delete";
     public static final String RECREATE = "recreate";
 
-    private final PolarisCatalogClient polarisClient;
-    private final PolarisCatalogPurger purger;
+    private final PolarisCatalogClient catalogClient;
 
     public ManagePolarisCatalogsMain(AfonPropertyProvider properties) {
-        this.polarisClient = new PolarisCatalogClient(properties);
-        this.purger = new PolarisCatalogPurger(properties);
+        this.catalogClient = new PolarisCatalogClient(properties);
     }
 
     public void createAllCatalogs() throws IncorrectConfigException, IOException {
-        polarisClient.configureAllCatalogs();
+        catalogClient.configureAllCatalogs();
     }
 
     public void createCatalog(String catalogName) throws IncorrectConfigException, IOException {
-        polarisClient.configureCatalogs(catalogName);
+        catalogClient.configureCatalogs(catalogName);
     }
 
     public void deleteAllCatalogs() throws IOException, ParseException {
@@ -46,15 +44,15 @@ public class ManagePolarisCatalogsMain {
     }
 
     public void deleteCatalog(String catalogName) throws IOException, ParseException {
-        purger.deleteCatalog(catalogName);
+        catalogClient.deleteCatalog(catalogName);
     }
 
     public void deleteNamespace(String catalogName, String namespace) throws IOException {
-        purger.deleteNamespace(catalogName, namespace);
+        catalogClient.deleteNamespace(catalogName, namespace);
     }
 
     public void deleteTable(String catalogName, String namespace, String tableName) throws IOException {
-        purger.deleteTable(catalogName, namespace, tableName);
+        catalogClient.deleteTable(catalogName, namespace, tableName);
     }
 
     public static void main(String[] args) {
