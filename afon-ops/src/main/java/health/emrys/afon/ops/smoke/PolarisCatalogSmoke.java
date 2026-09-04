@@ -5,17 +5,17 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.AwsPolarisCatalog;
 import health.emrys.afon.polaris.catalogs.PolarisCatalog;
-import health.emrys.afon.polaris.config.PolarisConfigurer;
+import health.emrys.afon.polaris.config.CatalogConfigurer;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 
 import static health.emrys.afon.config.AfonProperty.AWS_S3_BUCKET_NAME_TRINO;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 
-public class PolarisConfigurerSmoke {
+public class PolarisCatalogSmoke {
 
-    public void smokeTest(PolarisConfigurer configurer, AfonPropertyProvider properties) {
-        PolarisCatalog config = new AwsPolarisCatalog(properties) {
+    public void smokeTest(CatalogConfigurer configurer, AfonPropertyProvider properties) {
+        PolarisCatalog catalog = new AwsPolarisCatalog(properties) {
             @Override
             public String bucketUri() {
                 return s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_TRINO));
@@ -27,17 +27,17 @@ public class PolarisConfigurerSmoke {
             }
         };
         try {
-            configurer.configureCatalog(config);
+            configurer.configureCatalog(catalog);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     public static void main(String[] args) {
-        var app = new PolarisConfigurerSmoke();
+        var app = new PolarisCatalogSmoke();
         var properties = new FilePropertyProvider();
         PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties, "http");
-        PolarisConfigurer configurer = new PolarisConfigurer(client);
+        CatalogConfigurer configurer = new CatalogConfigurer(client);
         app.smokeTest(configurer, properties);
     }
 }

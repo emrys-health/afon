@@ -8,7 +8,7 @@ import health.emrys.afon.acceptance.tags.{Azure, External}
 import health.emrys.afon.config.AfonProperty.{AZURE_BUCKET, DATABRICKS_TOKEN}
 import health.emrys.afon.config.FilePropertyProvider
 import health.emrys.afon.polaris.catalogs.{AzurePolarisCatalog, JsonSerialiser}
-import health.emrys.afon.polaris.config.PolarisConfigurer
+import health.emrys.afon.polaris.config.CatalogConfigurer
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
 import org.apache.polaris.core.admin.model._
 import org.apache.spark.sql.SparkSession
@@ -43,7 +43,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
       Given(f"a Unity catalog called $FEDERATED_CATALOG_NAME already exists")
       val databricksToken = properties.getValue(DATABRICKS_TOKEN)
       val json: String = externalCatalogJson(config, databricksToken)
-      val uri: String  = PolarisConfigurer.catalogsURI
+      val uri: String  = CatalogConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
       val response = client.post(

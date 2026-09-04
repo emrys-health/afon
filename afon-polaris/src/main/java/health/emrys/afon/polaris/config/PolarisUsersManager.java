@@ -4,6 +4,8 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
@@ -18,108 +20,108 @@ import java.util.Set;
 import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
+/**
+ * Manages Polaris users, allowing the configuration of users and their catalog roles and privileges.
+ *
+ * Provides default {@link #DEFAULT_CATALOG_ROLE_NAME} and {@link #DEFAULT_CATALOG_PRIVILEGES}, if not specified.
+ */
 public class PolarisUsersManager {
 
-    public static final String ROLE_NAME = "emrysrole4";
-
     private static final Logger logger = LoggerFactory.getLogger(PolarisUsersManager.class);
-    private static final Set<CatalogPrivilege> CATALOG_PRIVILEGES = Set.of(
-            NAMESPACE_CREATE,
-            NAMESPACE_FULL_METADATA,
-            TABLE_CREATE,
-            TABLE_READ_DATA,
-            TABLE_WRITE_DATA);
 
-    private final PolarisConfigurer configurer;
-    private final PermissionsConfigurer permissions;
+    public static final String DEFAULT_CATALOG_ROLE_NAME = "emrysrole4";
+    public static final Set<CatalogPrivilege> DEFAULT_CATALOG_PRIVILEGES =
+            Set.of(NAMESPACE_CREATE, NAMESPACE_FULL_METADATA, TABLE_CREATE, TABLE_READ_DATA, TABLE_WRITE_DATA);
+    public static final String principalRoleName(String catalogRoleName){
+        return String.format("%sPrincipal", catalogRoleName);
+    }
+    private final CatalogConfigurer configurer;
 
     private final String accessToken;
-    private final String adminClientId;
-    private final String endpoint;
-    private final String roleName;
+    private final String clientId;
+    private final String catalogRoleName;
     private final String principalRoleName;
+    private final Set<CatalogPrivilege> privileges;
 
     public PolarisUsersManager(AfonPropertyProvider properties) {
-        PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties);
-        accessToken       = client.getAccessToken();
-        adminClientId     = client.getClientId();
-        endpoint          = client.getEndpoint();
-        configurer        = new PolarisConfigurer(client);
-        permissions       = new PermissionsConfigurer(client);
-        roleName          = ROLE_NAME;
-        principalRoleName = roleName + "Principal";
-        logger.debug("Polaris access token {} for user {} when calling endpoint {}",
-                accessToken, adminClientId, endpoint);
+        this(properties, DEFAULT_CATALOG_ROLE_NAME, DEFAULT_CATALOG_PRIVILEGES);
     }
 
-    public List<HttpResponse> configureUsers(String catalogName,
-                                             AfonUserProvider userProvider
-    ) throws IncorrectConfigException, IOException {
+    public PolarisUsersManager(AfonPropertyProvider properties, String catalogRoleName, Set<CatalogPrivilege> privileges) {
+        PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties);
+        this.configurer = new CatalogConfigurer(client);
+        this.accessToken = client.getAccessToken();
+        this.clientId = client.getClientId();
+        this.catalogRoleName = catalogRoleName;
+        this.principalRoleName = principalRoleName(catalogRoleName);
+        this.privileges = privileges;
+        logger.debug("Polaris access token for admin {} when calling endpoint {}: {}",
+                clientId, client.getEndpoint(), accessToken);
+    }
+
+    public List<HttpResponse> configureUsers(String catalogName, AfonUserProvider userProvider) throws IncorrectConfigException, IOException {
+        createCatalogRole(catalogName);
+        createPrincipalRole(principalRoleName);
         List<HttpResponse> responses = new ArrayList<>();
-        if (isFailure(permissions.createPrincipalRoles(principalRoleName))) {
-            logger.warn("Admin {} failed to create principal role {}. May already exist",
-                        adminClientId, principalRoleName);
-        }
         for (AfonUser user : userProvider.getUsers()) {
             // check if catalogName is authorised for user
-            if ( userProvider.isAuthorised(user.username(), catalogName) ) {
+            if (userProvider.isAuthorised(user.username(), catalogName)) {
                 responses.add(configureUser(user.username(), catalogName));
             } else {
-                logger.warn("Admin {} could not authorise user {} for catalog {}", adminClientId, user.username(), catalogName);
+                logger.warn("Admin {} failed to authorise user {} for catalog {}",
+                        clientId, user.username(), catalogName);
             }
         }
         return responses;
     }
 
-    private HttpResponse configureUser(
-        String principalName,
-        String catalogName
-    ) throws IncorrectConfigException, IOException {
-        logger.info("Configuring Polaris user '{}' for catalog '{}'", principalName, catalogName);
-        PrincipalWithCredentials principal = configurer.configureUser(accessToken, principalName);
-        logger.info("Admin '{}' created Polaris user {}", adminClientId, principal);
-
-        if (isFailure(permissions.associateRoles(catalogName, principalRoleName, roleName))) {
-            logger.warn(
-                "Admin {} failed to associate role {} with principale role {} in catalog {}",
-                adminClientId, roleName, principalRoleName, catalogName);
-        }
-
-        HttpResponse response = permissions.associatePrincipalRoles(principalName, principalRoleName);
-        if (isFailure(response)) {
-            logger.error("Could not create user {} with role {}. HTTP code = {}", principalName, roleName, response.getCode());
-        }
-        return response;
+    private HttpResponse configureUser(String principalName, String catalogName) throws IncorrectConfigException, IOException {
+        logger.info("Configuring user '{}' for catalog '{}'", principalName, catalogName);
+        PrincipalWithCredentials principal = createPrincipal(principalName);
+        logger.info("Admin {} created user {}", clientId, principal);
+        configurer.associatePrincipalRole(catalogName, principalRoleName, catalogRoleName);
+        return configurer.associatePrincipalRole(principalName, principalRoleName);
     }
 
-    public List<HttpResponse> configureCatalog(String catalogName) throws IOException, IncorrectConfigException {
-        logger.info("Configuring Polaris catalog '{}' and role '{}'", catalogName, roleName);
-        if (isFailure(permissions.deleteRoleIfExists(roleName, catalogName))) {
-            logger.warn("Admin {} could not delete role {} from catalog", adminClientId, roleName, catalogName);
-        }
-        List<HttpResponse> results = new ArrayList<>();
-        HttpResponse response = permissions.createCatalogRole(catalogName, roleName);
+    private List<HttpResponse> createCatalogRole(String catalogName) throws IOException, IncorrectConfigException {
+        logger.info("Creating role '{}' on catalog '{}'", catalogRoleName, catalogName);
+        configurer.deleteCatalogRole(catalogName, catalogRoleName);
+        List<HttpResponse> responses = new ArrayList<>();
+        HttpResponse response = configurer.createCatalogRole(catalogName, catalogRoleName);
         if (isFailure(response)) {
-            logger.error("Admin {} could not create role {} for catalog {}", adminClientId, roleName, catalogName);
-            results.add(response);
+            responses.add(response);
         } else {
-            logger.info("Admin {} created role {}", adminClientId, roleName);
-            results.addAll(addPermissions(catalogName, roleName));
+            logger.info("Admin {} created role {} on catalog {}", clientId, catalogRoleName, catalogName);
+            responses.addAll(addPrivileges(catalogName, catalogRoleName, privileges));
         }
-        return results;
+        return responses;
     }
 
-    private List<HttpResponse> addPermissions(String catalogName, String roleName) throws IncorrectConfigException, IOException {
-        List<HttpResponse> results = new ArrayList<>();
-        for (CatalogPrivilege privilege : CATALOG_PRIVILEGES) {
-            HttpResponse result = permissions.createCatalogRoleGrant(catalogName, privilege, roleName);
-            if (isFailure(result)) {
-                logger.error("Admin '{}' could not grant role {} the privilege {} on  catalog {}",
-                            adminClientId, roleName, privilege, catalogName);
-            }
-            results.add(result);
+    private List<HttpResponse> addPrivileges(String catalogName, String roleName, Set<CatalogPrivilege> privileges) throws IncorrectConfigException, IOException {
+        logger.info("Adding privileges '{}' for role '{}' on catalog '{}'", privileges, roleName, catalogName);
+        List<HttpResponse> responses = new ArrayList<>();
+        for (CatalogPrivilege privilege : privileges) {
+            responses.add(configurer.createCatalogRoleGrant(catalogName, roleName, privilege));
         }
-        return results;
+        return responses;
+    }
+
+    public PrincipalWithCredentials createPrincipal(String principalName) throws IncorrectConfigException, IOException {
+        configurer.deletePrincipal(principalName);
+        return principalWithCredentials(configurer.createPrincipal(principalName));
+    }
+
+    public void createPrincipalRole(String principalRoleName) throws IOException, IncorrectConfigException {
+        configurer.createPrincipalRole(principalRoleName);
+    }
+
+    public void associatePrincipalRole(String principalName, String principalRoleName) throws IncorrectConfigException, IOException {
+        configurer.associatePrincipalRole(principalName, principalRoleName);
+    }
+
+    private PrincipalWithCredentials principalWithCredentials(ClassicHttpResponse response) throws IOException {
+        PolarisSerialiser serialiser = new PolarisSerialiser();
+        return serialiser.fromJson(response.getEntity().getContent(), PrincipalWithCredentials.class);
     }
 
 }

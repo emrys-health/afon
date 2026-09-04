@@ -7,7 +7,7 @@ import health.emrys.afon.acceptance.tags.{External, Gcp}
 import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.{AfonPropertyProvider, FilePropertyProvider}
 import health.emrys.afon.polaris.catalogs.{GcpPolarisCatalog, JsonSerialiser}
-import health.emrys.afon.polaris.config.PolarisConfigurer
+import health.emrys.afon.polaris.config.CatalogConfigurer
 import org.apache.iceberg.gcp.auth.GoogleAuthManager
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
@@ -37,7 +37,7 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
     "be registered with Polaris" in {
       Given(s"a catalog called '$FEDERATED_CATALOG_NAME' has already been created in GCP'")
       val json: String = externalCatalogJson(properties)
-      val uri: String  = PolarisConfigurer.catalogsURI
+      val uri: String  = CatalogConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
       val response = client.post(
