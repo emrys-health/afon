@@ -2,7 +2,7 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.polaris.config.PolarisCatalogClient;
+import health.emrys.afon.polaris.config.PolarisCatalogManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,13 +25,13 @@ public class PolarisCatalogSmoke {
 
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
-        PolarisCatalogClient polarisClient = new PolarisCatalogClient(properties);
+        PolarisCatalogManager catalogManager = new PolarisCatalogManager(properties);
         try {
             if (args.length == 0) {
-                polarisClient.configureAllCatalogs();
+                catalogManager.configureAllCatalogs();
             } else if (args.length == 1) {
                 String catalogName = args[0];
-                polarisClient.configureCatalogs(catalogName);
+                catalogManager.configureCatalogs(catalogName);
             } else if (args.length == 2) {
                 String catalogName = args[0];
                 String credentials = args[1];
@@ -42,7 +42,7 @@ public class PolarisCatalogSmoke {
                 }
                 properties.setValue(POLARIS_ID, creds[0]);
                 properties.setValue(POLARIS_SECRET, creds[1]);
-                polarisClient.configureCatalogs(catalogName);
+                catalogManager.configureCatalogs(catalogName);
             } else {
                 String usage = String.format("""
                     
