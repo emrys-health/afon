@@ -3,22 +3,19 @@ package health.emrys.afon.acceptance
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
-import health.emrys.afon.config.{AfonProperty, AfonUser, AfonUserAcl, AfonUserProvider, FilePropertyProvider}
+import health.emrys.afon.config.AfonUser
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 import PolarisCatalog.METADATA_KEY
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.permissions.TestUsers
-import health.emrys.afon.config.AfonProperty.{KC_BOOTSTRAP_ADMIN_PASSWORD, KC_BOOTSTRAP_ADMIN_USERNAME, KC_HOSTNAME}
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
-import health.emrys.afon.polaris.config.{PolarisConfigurer, PolarisRestClient}
-import health.emrys.afon.polaris.config.PolarisConfigurer.{catalogsURI, namespaceURI, tableURI}
+import health.emrys.afon.polaris.config.{CatalogConfigurer, PolarisRestClient}
+import CatalogConfigurer.{catalogsURI, namespaceURI, tableURI}
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.KeyCloakProvider
 import org.apache.polaris.core.admin.model.Catalog
 import org.scalatest.GivenWhenThen
-
-import java.util
 
 abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with SpecHelper {
 
@@ -53,7 +50,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
     "associate properties with catalog" in {
       Given(s"the catalog has a metadata property '$METADATA_KEY'")
       assert(config.catalogContainsKey(METADATA_KEY))
-      val uriGet = s"${PolarisConfigurer.catalogsURI}/${config.catalogName()}"
+      val uriGet = s"${CatalogConfigurer.catalogsURI}/${config.catalogName()}"
       When(s"we call GET at $uriGet and deserialize the response")
       val response = client.get(uriGet, accessToken)
       val entity = new String(response.getEntity.getContent.readAllBytes())
@@ -144,7 +141,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
       When(s"we onboard a user '$User' for catalog ${config.catalogName()}' in Polaris")
       val configureUsers = new ConfigureUsersMain(TestUsers(), properties)
-      configureUsers.configurePolaris(config.catalogName())
+      configureUsers.configurePolarisUsers(config.catalogName())
       And("configure OAuth users for Jupyter domain")
       configureUsers.configureOAuthUsers("NotUsed.com")
 

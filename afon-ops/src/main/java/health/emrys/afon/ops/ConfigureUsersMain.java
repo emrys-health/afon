@@ -33,7 +33,7 @@ public class ConfigureUsersMain {
     }
 
     public List<HttpResponse> configureOAuthUsers(String jupyterDomain) throws IOException {
-        logger.info("Configuring KeyCloak users for jupyter domain {}", jupyterDomain);
+        logger.info("Configuring OAuth users for jupyter domain {}", jupyterDomain);
         List<HttpResponse> responses = new ArrayList<>();
         responses.addAll(oauthProvider.registerBrowserClient(propertyProvider, jupyterDomain));
         String adminToken = oauthProvider.adminToken();
@@ -48,19 +48,16 @@ public class ConfigureUsersMain {
         return responses;
     }
 
-    public List<HttpResponse> configurePolaris(String catalogName) throws IncorrectConfigException, IOException {
-        logger.info("Configuring Polaris catalog {} and users", catalogName);
-        List<HttpResponse> responses = new ArrayList<>();
-        responses.addAll(polarisUsers.configureCatalog(catalogName));
-        responses.addAll(polarisUsers.configureUsers(catalogName, userProvider));
-        return responses;
+    public List<HttpResponse> configurePolarisUsers(String catalogName) throws IncorrectConfigException, IOException {
+        logger.info("Configuring Polaris users on catalog {}", catalogName);
+        return polarisUsers.configureUsers(catalogName, userProvider);
     }
 
     public List<HttpResponse> configureUsers(String jupyterDomain, String catalogName) throws IOException, IncorrectConfigException, InterruptedException {
         List<HttpResponse> responses = new ArrayList<>();
         responses.addAll(configureOAuthUsers(jupyterDomain));
         Thread.sleep(1000L); // yuck! But KeyClaok appears to asynchronously register users
-        responses.addAll(configurePolaris(catalogName));
+        responses.addAll(configurePolarisUsers(catalogName));
         return responses;
     }
 
@@ -89,7 +86,7 @@ public class ConfigureUsersMain {
 
         if (jupyterDomain == null) {
             try {
-                app.configurePolaris(catalogName);
+                app.configurePolarisUsers(catalogName);
             } catch (Exception e) {
                 logger.error("Failed to configure Polaris users {}: {}",
                         userProvider.getUserNames(), e.getMessage(), e);

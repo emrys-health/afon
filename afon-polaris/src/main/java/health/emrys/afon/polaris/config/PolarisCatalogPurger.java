@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static health.emrys.afon.polaris.config.PolarisConfigurer.*;
+import static health.emrys.afon.polaris.config.CatalogConfigurer.*;
 import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
 
 public class PolarisCatalogPurger {
@@ -79,7 +79,7 @@ public class PolarisCatalogPurger {
 
     public List<HttpResponse> deleteAllTables(String catalogName, String namespace) throws IOException, ParseException {
         logger.info("Deleting tables from {}.{}", catalogName, namespace);
-        String             url       = tablesURI(catalogName.toString(), namespace);
+        String url = tablesURI(catalogName.toString(), namespace);
         List<HttpResponse> responses = new ArrayList<>();
         for (JsonNode node : getNodes(url, "identifiers")) {
             String table = node.get("name").toString();
@@ -90,8 +90,8 @@ public class PolarisCatalogPurger {
 
     public HttpResponse deleteTable(String catalogName, String namespace, String table) throws IOException {
         logger.info("Deleting table {} from {}.{} in {}", table, catalogName, namespace, domainName);
-        String       accessToken = client.getAccessToken();
-        HttpResponse response    = client.delete(tableURI(catalogName.toString(), namespace, table), accessToken);
+        String accessToken = client.getAccessToken();
+        HttpResponse response = client.delete(tableURI(catalogName.toString(), namespace, table), accessToken);
         if (isFailure(response)) {
             logger.warn("Could not delete table {} in {}", table, catalogName);
         }
