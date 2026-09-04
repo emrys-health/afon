@@ -5,7 +5,7 @@ import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
 import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
-import health.emrys.afon.config.{AfonPropertyProvider, FilePropertyProvider}
+import health.emrys.afon.config.AfonPropertyProvider
 import health.emrys.afon.polaris.catalogs.{GcpPolarisCatalog, JsonSerialiser}
 import health.emrys.afon.polaris.config.CatalogConfigurer
 import org.apache.iceberg.gcp.auth.GoogleAuthManager

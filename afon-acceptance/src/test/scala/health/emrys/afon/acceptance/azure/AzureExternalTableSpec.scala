@@ -6,7 +6,6 @@ import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
 import health.emrys.afon.acceptance.tags.{Azure, External}
 import health.emrys.afon.config.AfonProperty.{AZURE_BUCKET, DATABRICKS_TOKEN}
-import health.emrys.afon.config.FilePropertyProvider
 import health.emrys.afon.polaris.catalogs.{AzurePolarisCatalog, JsonSerialiser}
 import health.emrys.afon.polaris.config.CatalogConfigurer
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
