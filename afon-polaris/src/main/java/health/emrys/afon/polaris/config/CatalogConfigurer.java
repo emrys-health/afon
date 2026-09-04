@@ -1,16 +1,21 @@
 package health.emrys.afon.polaris.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.catalogs.PolarisCatalog;
 import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
@@ -119,13 +124,74 @@ public class CatalogConfigurer {
     }
 
     private ClassicHttpResponse deleteCatalog(PolarisCatalog catalog) throws IOException {
-        String catalogName = catalog.catalogName();
+        return deleteCatalog(catalog.catalogName());
+    }
+
+    public ClassicHttpResponse deleteCatalog(String catalogName) throws IOException {
         logger.info("Deleting catalog {}", catalogName);
         ClassicHttpResponse response = client.delete(catalogsURI(catalogName), accessToken);
         if (isFailure(response)) {
             logger.warn("Failed to delete catalog {}", catalogName);
         }
         return response;
+    }
+
+    public List<String> catalogRoleNames(String catalogName) throws IOException, ParseException {
+        List<String> roleNames = new ArrayList<>();
+        for (JsonNode node : getNodes(catalogRolesURI(catalogName), "roles")) {
+            roleNames.add(node.get("name").toString().replace("\"", ""));
+        }
+        return roleNames;
+    }
+
+    public List<String> namespacesOf(String catalogName) throws IOException, ParseException {
+        List<String> namespaceNames = new ArrayList<>();
+        for (JsonNode namespaces : getNodes(namespacesURI(catalogName), "namespaces")) {
+            if (namespaces.isArray()) {
+                for (JsonNode node : namespaces) {
+                    namespaceNames.add(node.textValue());
+                }
+            }
+        }
+        return namespaceNames;
+    }
+
+    public ClassicHttpResponse deleteNamespace(String catalogName, String namespace) throws IOException {
+        logger.info("Deleting namespace {} from catalog {}", namespace, catalogName);
+        ClassicHttpResponse response = client.delete(namespaceURI(catalogName, namespace), accessToken);
+        if (isFailure(response)) {
+            logger.warn("Could not delete namespace {} from {}", namespace, catalogName);
+        }
+        return response;
+    }
+
+    public List<String> tableNamesOf(String catalogName, String namespace) throws IOException, ParseException {
+        List<String> tableNames = new ArrayList<>();
+        for (JsonNode node : getNodes(tablesURI(catalogName, namespace), "identifiers")) {
+            tableNames.add(node.get("name").toString().replace("\"", ""));
+        }
+        return tableNames;
+    }
+
+    public ClassicHttpResponse deleteTable(String catalogName, String namespace, String table) throws IOException {
+        logger.info("Deleting table {} from {}.{}", table, catalogName, namespace);
+        ClassicHttpResponse response = client.delete(tableURI(catalogName, namespace, table), accessToken);
+        if (isFailure(response)) {
+            logger.warn("Could not delete table {} in {}", table, catalogName);
+        }
+        return response;
+    }
+
+    private Iterable<JsonNode> getNodes(String url, String rootNode) throws IOException, ParseException {
+        logger.info("Retrieving nodes from url {} with root node {}", url, rootNode);
+        ClassicHttpResponse response = client.get(url, accessToken);
+        JsonNode root = new ObjectMapper().readTree(EntityUtils.toString(response.getEntity()));
+        JsonNode identifiers = root.get(rootNode);
+        if (identifiers == null || !identifiers.isArray()) {
+            logger.warn("No nodes found from url {} with root node of {}", url, rootNode);
+            return Collections.emptyList();
+        }
+        return identifiers;
     }
 
     public ClassicHttpResponse associatePrincipalRole(String catalogName, String principalRoleName, String catalogRoleName) throws IOException, IncorrectConfigException {
