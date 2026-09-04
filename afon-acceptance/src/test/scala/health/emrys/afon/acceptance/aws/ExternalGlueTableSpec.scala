@@ -5,7 +5,6 @@ import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, External}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant, CatalogRoles}
 import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
-import health.emrys.afon.config.FilePropertyProvider
 import health.emrys.afon.polaris.catalogs.GlueAwsPolarisCatalog
 import health.emrys.afon.polaris.config.CatalogConfigurer
 import org.apache.spark.sql.SparkSession
