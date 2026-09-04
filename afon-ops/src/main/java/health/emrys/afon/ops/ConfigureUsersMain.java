@@ -2,7 +2,7 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
-import health.emrys.afon.polaris.config.PolarisUsersManager;
+import health.emrys.afon.polaris.config.PolarisUserManager;
 import health.emrys.afon.security.OAuthProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.apache.hc.core5.http.HttpResponse;
@@ -23,13 +23,13 @@ public class ConfigureUsersMain {
     private final AfonUserProvider          userProvider;
     private final AfonPropertyProvider      propertyProvider;
     private final OAuthProvider             oauthProvider;
-    private final PolarisUsersManager       polarisUsers;
+    private final PolarisUserManager        polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
         this.userProvider     = userProvider;
         this.propertyProvider = propertyProvider;
         this.oauthProvider    = new KeyCloakProvider(propertyProvider);
-        this.polarisUsers     = new PolarisUsersManager(propertyProvider);
+        this.polarisUsers     = new PolarisUserManager(propertyProvider);
     }
 
     public List<HttpResponse> configureOAuthUsers(String jupyterDomain) throws IOException {
