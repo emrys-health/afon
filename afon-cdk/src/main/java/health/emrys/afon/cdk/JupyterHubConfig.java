@@ -72,7 +72,7 @@ public abstract class JupyterHubConfig {
      * Same multi-VNC notebook image the single-pod {@link JupyterConfig} uses.
      */
     private static final String SINGLEUSER_IMAGE =
-        "ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi";
+        "ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi_pkg";
 
     private static final int HUB_PORT        = 8081;
     private static final int PROXY_PUBLIC    = 8000;
