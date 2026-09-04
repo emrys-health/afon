@@ -32,16 +32,17 @@ Afon's architecture has four layers:
 - **Jupyter access** — Jupyter is served via Apache Guacamole (pixel streaming via X11 VNC) behind an OAuth2 proxy that delegates to Google. This requires `OAUTH2_CLIENT_ID`, `OAUTH2_CLIENT_SECRET`, and `OAUTH2_COOKIE_SECRET`.
 - **Network policies** — Kubernetes network policies restrict pod-to-pod communication. The `NetworkConfiguration` class sets up policies between Jupyter, Spark, and Polaris pods.
 
-### Polaris client
+### Polaris catalog and user management
 
 `PolarisRestClient` is the HTTP client for talking to Polaris REST APIs. It handles:
 
 - **Authentication** — OAuth2 client credentials flow to get an access token (with retry logic for intermittent 503s)
-- **Catalog management** — POST to create catalogs, PUT to update, DELETE to remove
+- **Catalog/User management** — POST to create catalogs/users, PUT to update, DELETE to remove
 - **Namespace and table operations** — CRUD via REST endpoints
-- **JSON calls** — POST/PUT with JSON payloads for catalog configuration
 
-`CatalogConfigurer` builds on top of the client to provide higher-level operations: creating catalogs with admin grants, configuring principal roles, and creating users.
+`CatalogConfigurer` builds on top of the `PolarisRestClient` to provide higher-level operations and the REST API URIs for creating catalogs with admin grants, configuring principal roles, and creating users.
+
+`PolarisCatalogManager` and `PolarisUserManager` build on top of the `CatalogConfigurer` to provide catalog and user specific configuration. 
 
 `PolarisCatalog` is the abstract base for per-cloud catalog configuration. Each cloud has a concrete subclass (e.g. `AwsPolarisCatalog`, `GcpPolarisCatalog`, `AzurePolarisCatalog`) that knows how to generate the JSON payload for creating a catalog in that cloud, including the correct storage configuration info and bucket URI.
 
