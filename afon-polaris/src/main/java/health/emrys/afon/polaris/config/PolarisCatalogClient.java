@@ -4,7 +4,6 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.HttpResponse;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -20,9 +19,11 @@ import static health.emrys.afon.security.SecurityUtils.protocolFor;
 
 public class PolarisCatalogClient {
 
-    static final  Logger     logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogClient.class);
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogClient.class);
+
     private final AfonPropertyProvider properties;
     private final PolarisCatalog[] catalogs;
+    private final CatalogConfigurer configurer;
 
     private static final Map<AfonCloud, Function<AfonPropertyProvider, PolarisCatalog>>
             CLOUD_TO_CATALOG = Map.of(
@@ -34,7 +35,12 @@ public class PolarisCatalogClient {
 
     public PolarisCatalogClient(AfonPropertyProvider properties) {
         this.properties = properties;
-        this.catalogs = new PolarisCatalog[]{
+        this.catalogs = catalogs(properties);
+        this.configurer = catalogConfigurer();
+    }
+
+    private PolarisCatalog[] catalogs(AfonPropertyProvider properties) {
+        return new PolarisCatalog[]{
                 new AwsPolarisCatalog(properties),
                 new GcpPolarisCatalog(properties),
                 new AzurePolarisCatalog(properties),
@@ -42,6 +48,12 @@ public class PolarisCatalogClient {
                 new AzureExternalPolarisCatalog(properties),
                 new AwsForbiddenPolarisCatalog(properties)
         };
+    }
+
+    private CatalogConfigurer catalogConfigurer() {
+        String endpoint = properties.getValue(POLARIS_ENDPOINT);
+        var client = PolarisRestClientFactory.clientFactory().createClient(properties, protocolFor(endpoint));
+        return new CatalogConfigurer(client);
     }
 
     public List<HttpResponse> configureAllCatalogs() throws IncorrectConfigException, IOException {
@@ -52,20 +64,18 @@ public class PolarisCatalogClient {
         return configureCatalogs(catalogsOf(catalogNames));
     }
 
-    public List<HttpResponse> configureCatalogs(PolarisCatalog[] catalogs) throws IOException, IncorrectConfigException {
+    public List<HttpResponse> configureCatalogs(PolarisCatalog... catalogs) throws IOException, IncorrectConfigException {
         List<String> catalogNames = catalogNames(catalogs);
         logger.info("Configuring catalogs: {}", String.join(", ", catalogNames));
         List<HttpResponse> allResponses = new ArrayList<HttpResponse>();
-        PolarisConfigurer  configurer   = polarisConfigurer();
         for (PolarisCatalog catalog : catalogs) {
-            logger.info("Configuring catalog: {}", catalog.catalogName());
             allResponses.addAll(configurer.configureCatalog(catalog));
         }
         checkFailures(catalogNames, allResponses);
         return allResponses;
     }
 
-    private PolarisCatalog[] catalogsOf(String[] names) {
+    private PolarisCatalog[] catalogsOf(String... names) {
         return Arrays.stream(names).map(name -> catalogOf(name)).toArray(PolarisCatalog[]::new);
     }
 
@@ -75,12 +85,6 @@ public class PolarisCatalogClient {
 
     private List<String> catalogNames(PolarisCatalog... catalogs) {
         return Arrays.stream(catalogs).map(PolarisCatalog::catalogName).toList();
-    }
-
-    private @NonNull PolarisConfigurer polarisConfigurer() {
-        String endpoint = properties.getValue(POLARIS_ENDPOINT);
-        var    client   = PolarisRestClientFactory.clientFactory().createClient(properties, protocolFor(endpoint));
-        return new PolarisConfigurer(client);
     }
 
     private void checkFailures(List<String> catalogNames, List<HttpResponse> responses) {

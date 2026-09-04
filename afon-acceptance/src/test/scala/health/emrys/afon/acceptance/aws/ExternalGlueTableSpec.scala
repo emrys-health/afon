@@ -7,7 +7,7 @@ import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant, Ca
 import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
 import health.emrys.afon.config.FilePropertyProvider
 import health.emrys.afon.polaris.catalogs.GlueAwsPolarisCatalog
-import health.emrys.afon.polaris.config.PolarisConfigurer
+import health.emrys.afon.polaris.config.CatalogConfigurer
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
 
@@ -38,7 +38,7 @@ class ExternalGlueTableSpec extends SpecPretifier with GivenWhenThen {
       )}")
 
       val json: String = glueCatalog.catalogConfig()
-      val uri: String  = PolarisConfigurer.catalogsURI
+      val uri: String  = CatalogConfigurer.catalogsURI
       When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
 
       val response = client.post(

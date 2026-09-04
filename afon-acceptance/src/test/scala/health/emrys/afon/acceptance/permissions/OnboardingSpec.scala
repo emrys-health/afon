@@ -1,6 +1,5 @@
 package health.emrys.afon.acceptance.permissions
 
-import health.emrys.afon.acceptance.AcceptanceTestConfig.polarisCredentials
 import health.emrys.afon.acceptance.SparkHelper.{CatalogName1, CatalogName2, spark}
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
@@ -19,7 +18,7 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
   private val APP_PROPERTIES: AfonPropertyProvider = AcceptanceTestConfig.instance.getProperties
   val catalog: PolarisCatalog = createCatalogInPolaris(APP_PROPERTIES)
-  val warehouse: String = catalog.catalogName()
+  val catalogName: String = catalog.catalogName()
 
   val sparkUser = SparkHelper.sparkWarehouse.getClientId
 
@@ -29,9 +28,9 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
       assert(ContainerHelper.instance.startKeyCloak(APP_PROPERTIES) != null)
       assert(ContainerHelper.instance.startPolaris(APP_PROPERTIES) != null)
 
-      When(s"we configure the ${warehouse} with a catalog that looks like:\n$catalog")
-      configureUsersInKeyCloakAndPolaris(warehouse, TestUsers())
-      val sql = s"CREATE NAMESPACE IF NOT EXISTS ${warehouse}.test_namespace"
+      When(s"we configure the ${catalogName} with a catalog that looks like:\n$catalog")
+      configureUsersInKeyCloakAndPolaris(catalogName, TestUsers())
+      val sql = s"CREATE NAMESPACE IF NOT EXISTS ${catalogName}.test_namespace"
       When(s"we create a namespace with SQL '$sql'")
       thenUserIsNotAllowedToExecute(sql)
     }
@@ -45,7 +44,7 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
     }
   }
 
-  "Granting catalog permissions" should {
+  "Granting catalog privileges" should {
     val catalog1: PolarisCatalog = new AwsPolarisCatalog(APP_PROPERTIES) {
       override def catalogName(): String = CatalogName1
     }
@@ -53,15 +52,13 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
       override def catalogName(): String = CatalogName2
     }
 
-    val polarisClient = new PolarisCatalogClient(APP_PROPERTIES)
+    val catalogClient = new PolarisCatalogClient(APP_PROPERTIES)
 
     val sql = s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName1}.test_namespace"
 
     "prevent random users" in {
       Given(s"Catalogs $CatalogName1 and $CatalogName2")
-      checkForFailures(polarisClient.configureCatalogs(
-        Array(catalog1, catalog2))
-      )
+      checkForFailures(catalogClient.configureCatalogs(catalog1, catalog2))
       When("a user is not permissioned")
       thenUserIsNotAllowedToExecute(sql)
     }
@@ -90,16 +87,16 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
   "Configuring the users" should {
     "be idempotent" in {
-      Given(s"we already have a warehouse called $warehouse")
-      When(s"we configure $warehouse again")
+      Given(s"we already have a catalogName called $catalogName")
+      When(s"we configure $catalogName again")
       Then("there are no errors")
-      configureUsersInKeyCloakAndPolaris(warehouse, TestUsers())
+      configureUsersInKeyCloakAndPolaris(catalogName, TestUsers())
     }
   }
 
-  private def configureUsersInKeyCloakAndPolaris(warehouse: String, testUsers: AfonUserProvider): Unit = {
+  private def configureUsersInKeyCloakAndPolaris(catalogName: String, testUsers: AfonUserProvider): Unit = {
     val toTest = new ConfigureUsersMain(testUsers, APP_PROPERTIES)
-    val responses: util.List[HttpResponse] = toTest.configureUsers(ContainerHelper.KEYCLOAK_HOSTNAME, warehouse)
+    val responses: util.List[HttpResponse] = toTest.configureUsers(ContainerHelper.KEYCLOAK_HOSTNAME, catalogName)
     checkForFailures(responses)
   }
 
@@ -113,9 +110,7 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
   private def createCatalogInPolaris(properties: AfonPropertyProvider) = {
     val catalog: PolarisCatalog = new AwsForbiddenPolarisCatalog(properties)
-    new PolarisCatalogClient(properties).configureCatalogs(
-      Array(catalog)
-    )
+    new PolarisCatalogClient(properties).configureCatalogs(catalog)
     catalog
   }
 }
