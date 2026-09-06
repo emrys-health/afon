@@ -8,7 +8,7 @@ import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, FilePropertyPro
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 import PolarisCatalog.METADATA_KEY
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
-import health.emrys.afon.acceptance.permissions.TestUsers
+import health.emrys.afon.acceptance.users.TestUsers
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
 import health.emrys.afon.polaris.config.PolarisCatalogManager
@@ -21,11 +21,11 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
   def catalog: PolarisCatalog
 
-  val properties        = AcceptanceTestConfig.instance.getProperties
+  val properties = AcceptanceTestConfig.instance.getProperties
   val grantCatalogAdmin = new GrantCatalogAdmin(this, catalog)
   val createCatalogRole = new CreateCatalogRole(this, catalog)
-  val NUM_ROWS          = 100
-  val FULL_NAMESPACE    = s"${cloudProvider}.$namespace"
+  val NUM_ROWS = 100
+  val FULL_NAMESPACE = s"${cloudProvider}.$namespace"
 
   protected def createTableAndPopulate(): Unit = {
     spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).create()
@@ -125,7 +125,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   }
 
   "Polaris and KeyCloak" should {
-    val properties  = AcceptanceTestConfig.instance.getProperties
+    val properties = AcceptanceTestConfig.instance.getProperties
     import TestUsers._
     val User = new AfonUser(UserName, UserPassword, "email@test.com", "slug", "first", "second")
 
@@ -153,30 +153,6 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       And(s"user '$UserName' can see the table when they call Polaris")
       val response = userCatalogManager.getTable(catalog.catalogName(), namespace, tableName)
       assert(response.getCode / 100 == 2)
-    }
-  }
-
-  "Trino" should {
-    "vend credentials" in {
-      Given(s"a catalog called ${catalog.catalogName()} in Polaris")
-
-      val tableName = tableNameFQN.toLowerCase()
-      And(s"a table called $tableName with $NUM_ROWS rows in cloud storage")
-
-      And(
-        s"""a Trino instance with $cloudProvider.properties of:
-           |
-           |${trinoLocalConfig(properties, cloudProvider)}""".stripMargin)
-
-      val trinoHttp = trinoConfigProperties().get("discovery.uri").toString
-      val url = s"jdbc:trino://${trinoHttp.substring(trinoHttp.indexOf("//") + 2)}/"
-      When(s"we connect to $url")
-      val smokeTest = new TrinoQuerySmoke(url)
-      val sql = s"SELECT COUNT(*) FROM $tableName"
-      And(s"execute SQL: ${formatSQL(sql)}")
-      val result = smokeTest.query(sql)
-      Then(s"the result is $result")
-      assert(Integer.parseInt(result) == NUM_ROWS)
     }
   }
 

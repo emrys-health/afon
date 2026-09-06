@@ -25,6 +25,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static health.emrys.afon.acceptance.AcceptanceTestConfig.isAfonCloudEmptyOrEqualTo;
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
@@ -150,44 +151,47 @@ public class ContainerHelper {
 
     public synchronized GenericContainer<?> startPolaris(AfonPropertyProvider properties) {
         if (polaris == null) {
-            String googleCreds   = properties.getValue(GOOGLE_APPLICATION_CREDENTIALS);
-            String polarisId     = properties.getValue(POLARIS_ID);
+            String polarisId = properties.getValue(POLARIS_ID);
             String polarisSecret = properties.getValue(POLARIS_SECRET);
             polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
-                // Same network as KeyCloak so Polaris can reach it via the KEYCLOAK_ALIAS host name.
-                .withNetwork(network)
-                // Declare the ports so the HTTP wait strategy can resolve them (the fixed bindings
-                // below pin the host ports to the same numbers).
-                .withExposedPorts(POLARIS_PORT, 8182, DEBUG_PORT)
-                .withCommand("sh", "-c", POLARIS_CMD)
-                .withNetworkAliases(POLARIS_NETWORK_HOST)
-                .withEnv("polaris.features." + FeatureConfiguration.ALLOW_OVERLAPPING_CATALOG_URLS.key(), "true") // you don't want this in prod but very useful for tests
-                .withEnv(ENVIRONMENT_VARIABLE, format("POLARIS,%s,%s", polarisId, polarisSecret))
-                // GCP
-                .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
-                .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
+                    // Same network as KeyCloak so Polaris can reach it via the KEYCLOAK_ALIAS host name.
+                    .withNetwork(network)
+                    // Declare the ports so the HTTP wait strategy can resolve them (the fixed bindings
+                    // below pin the host ports to the same numbers).
+                    .withExposedPorts(POLARIS_PORT, 8182, DEBUG_PORT)
+                    .withCommand("sh", "-c", POLARIS_CMD)
+                    .withNetworkAliases(POLARIS_NETWORK_HOST)
+                    .withEnv("polaris.features." + FeatureConfiguration.ALLOW_OVERLAPPING_CATALOG_URLS.key(), "true") // you don't want this in prod but very useful for tests
+                    .withEnv(ENVIRONMENT_VARIABLE, format("POLARIS,%s,%s", polarisId, polarisSecret))
+                    // GCP
+                    .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
+                    .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
             getPolarisProperties().forEach((x) -> {
                 polaris.withEnv(x.getName(), properties.getValue(x));
             });
             // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
             polarisOidcEnv(
-                internalRealmUrl(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL),
-                properties.getValue(USER_POLARIS_ID),
+                    internalRealmUrl(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL),
+                    properties.getValue(USER_POLARIS_ID),
                     properties.getValue(USER_POLARIS_SECRET)).forEach(polaris::withEnv);
             Map.of(
-                   "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
-                   "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
-                   "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL", "DEBUG",
-                   "QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL", "DEBUG"
-               )
-               .entrySet()
-               .forEach(x -> polaris.withEnv(x.getKey(), x.getValue()));
+                            "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
+                            "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",
+                            "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL", "DEBUG",
+                            "QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS-LOG__LEVEL", "DEBUG"
+                    )
+                    .entrySet()
+                    .forEach(x -> polaris.withEnv(x.getKey(), x.getValue()));
 
             polaris.setPortBindings(List.of("8181:8181", "8182:8182", DEBUG_PORT + ":" + DEBUG_PORT));
             logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading " +
-                            "the image.");
+                    "the image.");
             polaris.start();
-            polaris.copyFileToContainer(Transferable.of(googleCreds.getBytes()), GOOGLE_FILE);
+            if ( isAfonCloudEmptyOrEqualTo("gcp") ){
+                polaris.copyFileToContainer(
+                        Transferable.of(properties.getValue(GOOGLE_APPLICATION_CREDENTIALS).getBytes()),
+                        GOOGLE_FILE);
+            }
         }
         return polaris;
     }
@@ -227,9 +231,7 @@ public class ContainerHelper {
     }
 
     private static File trinoConfigPropertiesFile() throws IOException {
-        FileFinder fileFinder = new FileFinder();
-        File       config     = fileFinder.fullPathOf("scripts/trino/config.properties");
-        return config;
+        return new FileFinder().fullPathOf("scripts/trino/config.properties");
     }
 
     public static String trinoLocalConfig(

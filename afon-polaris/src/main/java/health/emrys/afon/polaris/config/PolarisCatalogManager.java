@@ -2,6 +2,7 @@ package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
@@ -25,19 +26,34 @@ public class PolarisCatalogManager {
             CLOUD_TO_CATALOG = Map.of(
             AfonCloud.AWS, AwsPolarisCatalog::new,
             AfonCloud.AZURE, AzurePolarisCatalog::new,
-            AfonCloud.GCP, GcpPolarisCatalog::new,
             AfonCloud.AZURE_EXTERNAL, AzureExternalPolarisCatalog::new,
+            AfonCloud.GCP, GcpPolarisCatalog::new,
             AfonCloud.GCP_EXTERNAL, GcpExternalPolarisCatalog::new);
 
     private static PolarisCatalog[] catalogs(AfonPropertyProvider properties) {
-        return new PolarisCatalog[]{
-                new AwsPolarisCatalog(properties),
-                new GcpPolarisCatalog(properties),
-                new AzurePolarisCatalog(properties),
-                new GlueAwsPolarisCatalog(properties),
-                new AzureExternalPolarisCatalog(properties),
-                new AwsForbiddenPolarisCatalog(properties)
-        };
+        List<PolarisCatalog> catalogs = new ArrayList<>();
+        switch ( ConfigUtils.afonCloud() ){
+            case "aws":
+                catalogs.add(new AwsPolarisCatalog(properties));
+                catalogs.add(new AwsForbiddenPolarisCatalog(properties));
+                catalogs.add(new GlueAwsPolarisCatalog(properties));
+                break;
+            case "azure":
+                catalogs.add(new AzurePolarisCatalog(properties));
+                catalogs.add(new AzureExternalPolarisCatalog(properties));
+                break;
+            case "gcp":
+                catalogs.add(new GcpPolarisCatalog(properties));
+                break;
+            default:
+                catalogs.add(new AwsPolarisCatalog(properties));
+                catalogs.add(new AwsForbiddenPolarisCatalog(properties));
+                catalogs.add(new GlueAwsPolarisCatalog(properties));
+                catalogs.add(new AzurePolarisCatalog(properties));
+                catalogs.add(new AzureExternalPolarisCatalog(properties));
+                catalogs.add(new GcpPolarisCatalog(properties));
+        }
+        return catalogs.toArray(PolarisCatalog[]::new);
     }
 
     private final AfonPropertyProvider properties;

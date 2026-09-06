@@ -1,4 +1,4 @@
-package health.emrys.afon.acceptance.permissions
+package health.emrys.afon.acceptance.users
 
 import health.emrys.afon.config.{AfonUser, AfonUserAcl, AfonUserProvider}
 
