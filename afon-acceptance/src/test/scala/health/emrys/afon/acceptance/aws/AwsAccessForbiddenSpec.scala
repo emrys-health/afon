@@ -9,12 +9,12 @@ import health.emrys.afon.polaris.catalogs.PolarisCatalog
 @Forbidden
 class AwsAccessForbiddenSpec extends AbstractAccessForbiddenSpec {
 
-  def config: PolarisCatalog = AcceptanceTestConfig.instance.getAwsForbidden
+  def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getAwsForbidden
 
   override def cloudProvider: AfonCloud = AfonCloud.AWS_FORBIDDEN
 
-  def readEnvSetup(): String = {
-    FileHelper.readFromRoot("scripts/aws/create.sh")
+  def envSetupScript(): String = {
+    "scripts/aws/create.sh"
   }
 
 }

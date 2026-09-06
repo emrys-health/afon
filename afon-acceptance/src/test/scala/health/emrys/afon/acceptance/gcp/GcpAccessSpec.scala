@@ -9,7 +9,7 @@ import health.emrys.afon.polaris.catalogs.PolarisCatalog
 @Access
 class GcpAccessSpec extends AbstractAccessSpec {
 
-  override def config: PolarisCatalog = AcceptanceTestConfig.instance.getGcpCloudConfigForPolaris
+  override def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getGcpCatalog
 
   override def cloudProvider: AfonCloud = AfonCloud.GCP
 }

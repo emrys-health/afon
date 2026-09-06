@@ -26,6 +26,7 @@ abstract public class ExternalPolarisCatalog extends PolarisCatalog {
         return toJson(catalog);
     }
 
+    @Override
     protected @NonNull Catalog createCatalog() {
         OAuthClientCredentialsParameters credentialsParameters = OAuthClientCredentialsParameters
             .builder()

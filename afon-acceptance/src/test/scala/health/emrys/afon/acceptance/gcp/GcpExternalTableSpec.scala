@@ -2,12 +2,10 @@ package health.emrys.afon.acceptance.gcp
 
 import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
-import health.emrys.afon.acceptance.{AcceptanceTestConfig, CatalogAdminGrant}
+import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
 import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
-import health.emrys.afon.config.AfonPropertyProvider
-import health.emrys.afon.polaris.catalogs.{GcpPolarisCatalog, JsonSerialiser}
-import health.emrys.afon.polaris.config.CatalogConfigurer
+import health.emrys.afon.polaris.catalogs.{ExternalPolarisCatalog, GcpPolarisCatalog}
 import org.apache.iceberg.gcp.auth.GoogleAuthManager
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
@@ -15,41 +13,74 @@ import org.apache.polaris.core.admin.model._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
 
-import java.util.Properties
-
 @Gcp
 @External
-class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
+class GcpExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
-  val properties = AcceptanceTestConfig.instance.getProperties
-  val client = AcceptanceTestConfig.instance.getPolarisAdminClient
-  val accessToken = AcceptanceTestConfig.instance.getAdminAccessToken
+  val properties     = AcceptanceTestConfig.instance.getProperties
+  val catalogManager = AcceptanceTestConfig.instance.getCatalogManager
 
-  val FEDERATED_CATALOG_NAME  = "emrys_afon_core_2"
-  val BUCKET                  = f"emrys_afon_core_2"
+  val FEDERATED_CATALOG_NAME = "emrys_afon_core_2"
+  val BUCKET                 = "emrys_afon_core_2"
 
   "An external GCP table" should {
-    val config            = new GcpPolarisCatalog(properties)
-    val grantCatalogAdmin = new CatalogAdminGrant(this, config, Some(FEDERATED_CATALOG_NAME))
-    val catalogRoles      = new health.emrys.afon.acceptance.CatalogRoles(this, config, Some(FEDERATED_CATALOG_NAME))
     properties.setValue(GCP_BUCKET_NAME, BUCKET) // bit of a hack - TODO clean me up
+    val gcpCatalog = new GcpPolarisCatalog(properties)
+
+    // this gives:
+    // Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
+    val externalCatalog: ExternalPolarisCatalog = new ExternalPolarisCatalog(properties) {
+      override def catalogName(): String = FEDERATED_CATALOG_NAME
+      override protected def bucketUri(): String = s"gs://$BUCKET"
+      override protected def storageConfigInfo(): StorageConfigInfo = gcpCatalog.storageConfigInfo()
+      override protected def remoteCatalogName(): String = bucketUri()
+      override protected def scopes(): java.util.List[String] = java.util.List.of[String](GoogleAuthManager.DEFAULT_SCOPES)
+      override protected def endpoint(): String = "https://biglake.googleapis.com"
+
+      override protected def createCatalog(): ExternalCatalog = {
+        val bucketProperties = CatalogProperties.builder().setDefaultBaseLocation(bucketUri()).build()
+        val clientId     = "my-vendable-sa@fjords-450014.iam.gserviceaccount.com" // from GCP props
+        val clientSecret = properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)
+        val authenticationParameters =
+          new OAuthClientCredentialsParameters(
+            "https://oauth2.googleapis.com/token", // this throws "Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials"
+            clientId,
+            clientSecret,
+            scopes(),
+            AuthenticationTypeEnum.OAUTH // OAuth leads to: Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
+          )
+        val connectionInfo = IcebergRestConnectionConfigInfo.builder()
+          .setRemoteCatalogName(bucketUri())
+          .setConnectionType(ConnectionTypeEnum.ICEBERG_REST)
+          .setUri("https://biglake.googleapis.com/iceberg/v1/restcatalog")
+          .setAuthenticationParameters(authenticationParameters)
+          .build()
+        val catalog = new ExternalCatalog(
+          connectionInfo,
+          Catalog.TypeEnum.EXTERNAL,
+          FEDERATED_CATALOG_NAME,
+          bucketProperties,
+          System.currentTimeMillis(),
+          System.currentTimeMillis(),
+          null,
+          storageConfigInfo())
+        catalog
+      }
+    }
+
+    val grantCatalogAdmin = new GrantCatalogAdmin(this, externalCatalog)
+    val createCatalogRole = new CreateCatalogRole(this, externalCatalog)
 
     "be registered with Polaris" in {
       Given(s"a catalog called '$FEDERATED_CATALOG_NAME' has already been created in GCP'")
-      val json: String = externalCatalogJson(properties)
-      val uri: String  = CatalogConfigurer.catalogsURI
-      When(f"Polaris is invoked at URI '$uri' with payload:\n$json")
-
-      val response = client.post(
-        uri,
-        json,
-        accessToken)
-      val responseCode = response.getCode
+      When(f"Polaris is configured with the federated catalog '$FEDERATED_CATALOG_NAME'")
+      val responses    = catalogManager.configureCatalogs(externalCatalog)
+      val responseCode = responses.get(0).getCode
       Then(s"the response code ($responseCode) is HTTP 2XX indicating the external catalog was created")
       assert(responseCode / 100 == 2)
     }
     "be given catalog admin grants" in grantCatalogAdmin()
-    "be given the catalog roles" in catalogRoles()
+    "be given the catalog roles" in createCatalogRole()
 
 
     val sparkNamespace = "ph_namespace"
@@ -61,7 +92,7 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
     "can have a namespace created" ignore { // to work, this needs this Polaris issue to be fixed https://github.com/apache/polaris/issues/3451
       Given(f"a namespace called $FEDERATED_CATALOG_NAME")
       val nsSQL = s"CREATE NAMESPACE IF NOT EXISTS $FEDERATED_CATALOG_NAME.$sparkNamespace"
-      When(f"we createa a namespace called $sparkNamespace execute:\n$nsSQL")
+      When(f"we create a namespace called $sparkNamespace execute:\n$nsSQL")
       spark.sql(nsSQL)
       Then(f"the namespace $sparkNamespace exists")
     }
@@ -76,48 +107,4 @@ class GcpExternalTableSpec  extends SpecPretifier with GivenWhenThen {
     }
   }
 
-  // this gives:
-  // Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
-  private def externalCatalogJson(properties: AfonPropertyProvider): String = {
-    val config = new GcpPolarisCatalog(properties)
-    val warehouse = f"gs://$BUCKET"
-    val bucketProperties = CatalogProperties
-      .builder()
-      .setDefaultBaseLocation(warehouse) // TODO make configurable
-      .build()
-
-    val scopes = java.util.List.of[String](
-      GoogleAuthManager.DEFAULT_SCOPES
-    )
-    val clientId = "my-vendable-sa@fjords-450014.iam.gserviceaccount.com" // from GCP props
-    val clientSecret = properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)
-    val authenticationParameters =
-      new OAuthClientCredentialsParameters(
-        "https://oauth2.googleapis.com/token", // this throws "Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials"
-        clientId,
-        clientSecret,
-        scopes,
-        AuthenticationTypeEnum.OAUTH // OAuth leads to: Malformed request: Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
-      )
-
-    val connectionInfo = IcebergRestConnectionConfigInfo.builder()
-      .setRemoteCatalogName(warehouse)
-      .setConnectionType(ConnectionTypeEnum.ICEBERG_REST)
-      .setUri("https://biglake.googleapis.com/iceberg/v1/restcatalog")
-      .setAuthenticationParameters(authenticationParameters)
-      .build()
-
-    val catalog =
-      new ExternalCatalog(
-        connectionInfo,
-        Catalog.TypeEnum.EXTERNAL,
-        FEDERATED_CATALOG_NAME,
-        bucketProperties,
-        System.currentTimeMillis(),
-        System.currentTimeMillis(),
-        null,
-        config.storageConfigInfo())
-
-    new JsonSerialiser().toJson(new CreateCatalogRequest(catalog))
-  }
 }
