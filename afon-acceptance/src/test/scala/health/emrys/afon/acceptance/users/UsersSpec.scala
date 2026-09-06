@@ -1,7 +1,8 @@
-package health.emrys.afon.acceptance.permissions
+package health.emrys.afon.acceptance.users
 
 import health.emrys.afon.acceptance.SparkHelper.{CatalogName1, CatalogName2, spark}
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
+import health.emrys.afon.acceptance.tags.{Aws, Users}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
 import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
@@ -13,9 +14,11 @@ import org.scalatest.GivenWhenThen
 import java.util
 import scala.jdk.CollectionConverters._
 
-class OnboardingSpec extends SpecPretifier with GivenWhenThen {
+@Aws
+@Users
+class UsersSpec extends SpecPretifier with GivenWhenThen {
 
-  val catalog: PolarisCatalog = createCatalogInPolaris(AcceptanceTestConfig.instance.getProperties)
+  val catalog: PolarisCatalog = createAwsForbiddenPolarisCatalog()
   val catalogName: String = catalog.catalogName()
 
   val sparkUser = SparkHelper.sparkWarehouse.getClientId
@@ -106,8 +109,8 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
     })
   }
 
-  private def createCatalogInPolaris(properties: AfonPropertyProvider) = {
-    val catalog: PolarisCatalog = new AwsForbiddenPolarisCatalog(properties)
+  private def createAwsForbiddenPolarisCatalog() = {
+    val catalog: PolarisCatalog = new AwsForbiddenPolarisCatalog(AcceptanceTestConfig.instance.getProperties)
     AcceptanceTestConfig.instance.getCatalogManager.configureCatalogs(catalog)
     catalog
   }

@@ -69,7 +69,7 @@
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
                 <configuration>
-                    <tagsToInclude>health.emrys.afon.acceptance.tags.Access,health.emrys.afon.acceptance.tags.External,health.emrys.afon.acceptance.tags.Forbidden</tagsToInclude>
+                    <tagsToInclude>health.emrys.afon.acceptance.tags.Access,health.emrys.afon.acceptance.tags.External,health.emrys.afon.acceptance.tags.Forbidden,health.emrys.afon.acceptance.tags.Users</tagsToInclude>
                 </configuration>
             </plugin>
         </plugins>
@@ -87,7 +87,8 @@
                         <groupId>org.scalatest</groupId>
                         <artifactId>scalatest-maven-plugin</artifactId>
                         <configuration>
-                            <tagsToInclude>health.emrys.afon.acceptance.tags.Aws</tagsToInclude>
+                            <tagsToInclude>health.emrys.afon.acceptance.tags.Aws,health.emrys.afon.acceptance.tags.Users</tagsToInclude>
+                            <wildcardSuites>health.emrys.afon.acceptance.aws,health.emrys.afon.acceptance.users</wildcardSuites>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -102,6 +103,7 @@
                         <artifactId>scalatest-maven-plugin</artifactId>
                         <configuration>
                             <tagsToInclude>health.emrys.afon.acceptance.tags.Azure</tagsToInclude>
+                            <wildcardSuites>health.emrys.afon.acceptance.azure</wildcardSuites>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -116,6 +118,7 @@
                         <artifactId>scalatest-maven-plugin</artifactId>
                         <configuration>
                             <tagsToInclude>health.emrys.afon.acceptance.tags.Gcp</tagsToInclude>
+                            <wildcardSuites>health.emrys.afon.acceptance.gcp</wildcardSuites>
                         </configuration>
                     </plugin>
                 </plugins>
