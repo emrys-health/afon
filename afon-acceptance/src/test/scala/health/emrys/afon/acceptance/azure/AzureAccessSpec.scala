@@ -10,7 +10,7 @@ import health.emrys.afon.polaris.catalogs.PolarisCatalog
 @Access
 class AzureAccessSpec extends AbstractAccessSpec with AzureTableCreation {
 
-  override def config: PolarisCatalog = AcceptanceTestConfig.instance.getAzureCloudConfigForPolaris
+  override def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getAzureCatalog
 
   override def cloudProvider: AfonCloud = AfonCloud.AZURE
 

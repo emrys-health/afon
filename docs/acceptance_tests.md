@@ -28,7 +28,7 @@ Test specs include:
 - [AzureAccessForbiddenSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/azure/AzureAccessForbiddenSpec.scala) — verify that access to forbidden buckets is denied for Azure
 - [GcpAccessSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpAccessSpec.scala) — write and read via AWS Polaris to GCP
 - [GcpAccessForbiddenSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpAccessForbiddenSpec.scala) — verify that access to forbidden buckets is denied for GCP
-- [ExternalGlueTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/aws/ExternalGlueTableSpec.scala) — cross-cloud: federated Glue catalog access
+- [AwsGlueExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/aws/AwsGlueExternalTableSpec.scala) — cross-cloud: federated AWS Glue catalog access
 - [AzureExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/azure/AzureExternalTableSpec.scala) — cross-cloud: Spark talks to AWS Polaris which federates to Azure Polaris
 - [GcpExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpExternalTableSpec.scala) — cross-cloud: Spark talks to AWS Polaris which federates to GCP Polaris
 

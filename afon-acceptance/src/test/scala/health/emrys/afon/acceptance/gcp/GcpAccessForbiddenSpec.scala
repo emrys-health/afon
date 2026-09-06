@@ -9,12 +9,12 @@ import health.emrys.afon.polaris.catalogs.PolarisCatalog
 @Forbidden
 class GcpAccessForbiddenSpec extends AbstractAccessForbiddenSpec {
 
-  def config: PolarisCatalog = AcceptanceTestConfig.instance.getGcpForbidden
+  def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getGcpForbidden
 
   override def cloudProvider: AfonCloud = AfonCloud.GCP_FORBIDDEN
 
-  def readEnvSetup(): String = {
-    FileHelper.readFromRoot("scripts/gcp/create.sh")
+  def envSetupScript(): String = {
+    "scripts/gcp/create.sh"
   }
 
 }

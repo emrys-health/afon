@@ -33,6 +33,10 @@ public class CatalogConfigurer {
         return format("%s/%s", catalogsURI(), catalogName);
     }
 
+    public static String catalogConfigURI(String catalogName) {
+        return format("/api/catalog/v1/config?warehouse=%s", catalogName);
+    }
+
     public static String catalogRolesURI(String catalogName) {
         return format("/api/management/v1/catalogs/%s/catalog-roles", catalogName);
     }
@@ -108,12 +112,24 @@ public class CatalogConfigurer {
     }
 
     private ClassicHttpResponse adminGrantsCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
-        return client.put(catalogRolesAdminGrantsURI(catalog.catalogName()), catalog.catalogAdminGrants(), accessToken);
+        return adminGrantsCatalog(catalog, catalog.catalogName());
+    }
+
+    public ClassicHttpResponse adminGrantsCatalog(PolarisCatalog catalog, String catalogName) throws IOException, IncorrectConfigException {
+        return client.put(catalogRolesAdminGrantsURI(catalogName), catalog.catalogAdminGrants(), accessToken);
     }
 
     // TODO: check if catalog exist before attempting to delete it, failure is expected if there is no catalog
     public ClassicHttpResponse createCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
         deleteCatalog(catalog);
+        return createCatalogIfAbsent(catalog);
+    }
+
+    /**
+     * Creates the catalog without first deleting any existing one, so an already-existing catalog
+     * (and anything set up against it - grants, roles, cached readers) is left untouched.
+     */
+    public ClassicHttpResponse createCatalogIfAbsent(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
         String catalogName = catalog.catalogName();
         logger.info("Creating catalog {}", catalogName);
         ClassicHttpResponse response = client.post(catalogsURI(), catalog.catalogConfig(), accessToken);
@@ -180,6 +196,22 @@ public class CatalogConfigurer {
             logger.warn("Could not delete table {} in {}", table, catalogName);
         }
         return response;
+    }
+
+    public ClassicHttpResponse getCatalogConfig(String catalogName) throws IOException {
+        return client.get(catalogConfigURI(catalogName), accessToken);
+    }
+
+    public ClassicHttpResponse getCatalog(String catalogName) throws IOException {
+        return client.get(catalogsURI(catalogName), accessToken);
+    }
+
+    public ClassicHttpResponse getNamespace(String catalogName, String namespace) throws IOException {
+        return client.get(namespaceURI(catalogName, namespace), accessToken);
+    }
+
+    public ClassicHttpResponse getTable(String catalogName, String namespace, String table) throws IOException {
+        return client.get(tableURI(catalogName, namespace, table) + "?snapshots=all", accessToken);
     }
 
     private Iterable<JsonNode> getNodes(String url, String rootNode) throws IOException, ParseException {
