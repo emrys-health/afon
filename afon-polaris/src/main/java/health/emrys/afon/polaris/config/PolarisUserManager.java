@@ -59,6 +59,18 @@ public class PolarisUserManager {
                 clientId, client.getEndpoint(), accessToken);
     }
 
+    public String getCatalogRoleName() {
+        return catalogRoleName;
+    }
+
+    public String getPrincipalRoleName() {
+        return principalRoleName;
+    }
+
+    public Set<CatalogPrivilege> getPrivileges() {
+        return privileges;
+    }
+
     public List<HttpResponse> configureUsers(String catalogName, AfonUserProvider userProvider) throws IncorrectConfigException, IOException {
         createCatalogRole(catalogName);
         createPrincipalRole(principalRoleName);
@@ -83,27 +95,38 @@ public class PolarisUserManager {
         return configurer.associatePrincipalRole(principalName, principalRoleName);
     }
 
-    private List<HttpResponse> createCatalogRole(String catalogName) throws IOException, IncorrectConfigException {
-        logger.info("Creating role '{}' on catalog '{}'", catalogRoleName, catalogName);
+    public List<HttpResponse> createCatalogRole(String catalogName) throws IOException, IncorrectConfigException {
         configurer.deleteCatalogRole(catalogName, catalogRoleName);
-        List<HttpResponse> responses = new ArrayList<>();
+        return createCatalogRoleIfAbsent(catalogName);
+    }
+
+    /**
+     * Creates the catalog role without first deleting any existing one, so an already-existing role
+     * (and anything associated with it) is left untouched.
+     */
+    public List<HttpResponse> createCatalogRoleIfAbsent(String catalogName) throws IOException, IncorrectConfigException {
+        logger.info("Creating role '{}' on catalog '{}'", catalogRoleName, catalogName);
+        List<HttpResponse> failures = new ArrayList<>();
         HttpResponse response = configurer.createCatalogRole(catalogName, catalogRoleName);
         if (isFailure(response)) {
-            responses.add(response);
+            failures.add(response);
         } else {
             logger.info("Admin {} created role {} on catalog {}", clientId, catalogRoleName, catalogName);
-            responses.addAll(addPrivileges(catalogName, catalogRoleName, privileges));
+            failures.addAll(addPrivileges(catalogName, catalogRoleName, privileges));
         }
-        return responses;
+        return failures;
     }
 
     private List<HttpResponse> addPrivileges(String catalogName, String roleName, Set<CatalogPrivilege> privileges) throws IncorrectConfigException, IOException {
         logger.info("Adding privileges '{}' for role '{}' on catalog '{}'", privileges, roleName, catalogName);
-        List<HttpResponse> responses = new ArrayList<>();
+        List<HttpResponse> failures = new ArrayList<>();
         for (CatalogPrivilege privilege : privileges) {
-            responses.add(configurer.createCatalogRoleGrant(catalogName, roleName, privilege));
+            HttpResponse response = configurer.createCatalogRoleGrant(catalogName, roleName, privilege);
+            if (isFailure(response)) {
+                failures.add(response);
+            }
         }
-        return responses;
+        return failures;
     }
 
     public PrincipalWithCredentials createPrincipal(String principalName) throws IncorrectConfigException, IOException {
@@ -117,6 +140,10 @@ public class PolarisUserManager {
 
     public void associatePrincipalRole(String principalName, String principalRoleName) throws IncorrectConfigException, IOException {
         configurer.associatePrincipalRole(principalName, principalRoleName);
+    }
+
+    public HttpResponse associatePrincipalRole(String catalogName, String principalRoleName, String catalogRoleName) throws IncorrectConfigException, IOException {
+        return configurer.associatePrincipalRole(catalogName, principalRoleName, catalogRoleName);
     }
 
     private PrincipalWithCredentials principalWithCredentials(ClassicHttpResponse response) throws IOException {

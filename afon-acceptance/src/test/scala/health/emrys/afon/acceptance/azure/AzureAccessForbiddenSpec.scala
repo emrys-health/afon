@@ -10,12 +10,12 @@ import health.emrys.afon.polaris.catalogs.PolarisCatalog
 @Forbidden
 class AzureAccessForbiddenSpec extends AbstractAccessForbiddenSpec with AzureTableCreation {
 
-  def config: PolarisCatalog = AcceptanceTestConfig.instance.getAzureForbidden
+  def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getAzureForbidden
 
   override def cloudProvider: AfonCloud = AfonCloud.AZURE_FORBIDDEN
 
-  def readEnvSetup(): String = {
-    FileHelper.readFromRoot("scripts/azure/create.sh")
+  def envSetupScript(): String = {
+    "scripts/azure/create.sh"
   }
 
   override protected def createTableAndPopulate(fqn: String): Exception = {

@@ -6,7 +6,6 @@ import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, Spar
 import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.polaris.catalogs.{AwsForbiddenPolarisCatalog, AwsPolarisCatalog, PolarisCatalog}
-import health.emrys.afon.polaris.config.PolarisCatalogManager
 import org.apache.hc.core5.http.HttpResponse
 import org.apache.iceberg.exceptions.ForbiddenException
 import org.scalatest.GivenWhenThen
@@ -16,8 +15,7 @@ import scala.jdk.CollectionConverters._
 
 class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
-  private val APP_PROPERTIES: AfonPropertyProvider = AcceptanceTestConfig.instance.getProperties
-  val catalog: PolarisCatalog = createCatalogInPolaris(APP_PROPERTIES)
+  val catalog: PolarisCatalog = createCatalogInPolaris(AcceptanceTestConfig.instance.getProperties)
   val catalogName: String = catalog.catalogName()
 
   val sparkUser = SparkHelper.sparkWarehouse.getClientId
@@ -25,8 +23,8 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
   "Users" should {
     "not see catalogs they should not" in {
       Given("A KeyCloak and Polaris instance")
-      assert(ContainerHelper.instance.startKeyCloak(APP_PROPERTIES) != null)
-      assert(ContainerHelper.instance.startPolaris(APP_PROPERTIES) != null)
+      assert(ContainerHelper.instance.startKeyCloak(AcceptanceTestConfig.instance.getProperties) != null)
+      assert(ContainerHelper.instance.startPolaris(AcceptanceTestConfig.instance.getProperties) != null)
 
       When(s"we configure the ${catalogName} with a catalog that looks like:\n$catalog")
       configureUsersInKeyCloakAndPolaris(catalogName, TestUsers())
@@ -45,14 +43,14 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
   }
 
   "Granting catalog privileges" should {
-    val catalog1: PolarisCatalog = new AwsPolarisCatalog(APP_PROPERTIES) {
+    val catalog1: PolarisCatalog = new AwsPolarisCatalog(AcceptanceTestConfig.instance.getProperties) {
       override def catalogName(): String = CatalogName1
     }
-    val catalog2: PolarisCatalog = new AwsPolarisCatalog(APP_PROPERTIES) {
+    val catalog2: PolarisCatalog = new AwsPolarisCatalog(AcceptanceTestConfig.instance.getProperties) {
       override def catalogName(): String = CatalogName2
     }
 
-    val catalogManager = new PolarisCatalogManager(APP_PROPERTIES)
+    val catalogManager = AcceptanceTestConfig.instance.getCatalogManager
 
     val sql = s"CREATE NAMESPACE IF NOT EXISTS ${CatalogName1}.test_namespace"
 
@@ -95,7 +93,7 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
   }
 
   private def configureUsersInKeyCloakAndPolaris(catalogName: String, testUsers: AfonUserProvider): Unit = {
-    val toTest = new ConfigureUsersMain(testUsers, APP_PROPERTIES)
+    val toTest = new ConfigureUsersMain(testUsers, AcceptanceTestConfig.instance.getProperties)
     val responses: util.List[HttpResponse] = toTest.configureUsers(ContainerHelper.KEYCLOAK_HOSTNAME, catalogName)
     checkForFailures(responses)
   }
@@ -110,7 +108,7 @@ class OnboardingSpec extends SpecPretifier with GivenWhenThen {
 
   private def createCatalogInPolaris(properties: AfonPropertyProvider) = {
     val catalog: PolarisCatalog = new AwsForbiddenPolarisCatalog(properties)
-    new PolarisCatalogManager(properties).configureCatalogs(catalog)
+    AcceptanceTestConfig.instance.getCatalogManager.configureCatalogs(catalog)
     catalog
   }
 }

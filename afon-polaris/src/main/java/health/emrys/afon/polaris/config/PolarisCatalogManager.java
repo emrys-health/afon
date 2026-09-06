@@ -3,6 +3,7 @@ package health.emrys.afon.polaris.config;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.ParseException;
 import org.slf4j.Logger;
@@ -122,5 +123,33 @@ public class PolarisCatalogManager {
 
     public HttpResponse deleteTable(String catalogName, String namespace, String table) throws IOException {
         return configurer.deleteTable(catalogName, namespace, table);
+    }
+
+    public HttpResponse grantCatalogAdmin(PolarisCatalog catalog, String warehouseName) throws IOException, IncorrectConfigException {
+        return configurer.adminGrantsCatalog(catalog, warehouseName);
+    }
+
+    /**
+     * Creates the catalog without first deleting any existing one, so an already-existing catalog
+     * (and anything set up against it - grants, roles, cached readers) is left untouched.
+     */
+    public ClassicHttpResponse createCatalogIfAbsent(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
+        return configurer.createCatalogIfAbsent(catalog);
+    }
+
+    public ClassicHttpResponse getCatalogConfig(String catalogName) throws IOException {
+        return configurer.getCatalogConfig(catalogName);
+    }
+
+    public ClassicHttpResponse getCatalog(String catalogName) throws IOException {
+        return configurer.getCatalog(catalogName);
+    }
+
+    public ClassicHttpResponse getNamespace(String catalogName, String namespace) throws IOException {
+        return configurer.getNamespace(catalogName, namespace);
+    }
+
+    public ClassicHttpResponse getTable(String catalogName, String namespace, String table) throws IOException {
+        return configurer.getTable(catalogName, namespace, table);
     }
 }
