@@ -20,7 +20,7 @@ public class CloudConfigTest {
     }
 
     @Test
-    public void testWhitelistedDomainNamesAreValid() {
+    public void testWhitelistedAreValidDomainNames() {
         for (String domain : getWhitelistedDomains()) {
             assertThat(isRfc1123Domain(domain)).as(domain).isTrue();
         }
