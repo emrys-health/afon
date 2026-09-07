@@ -23,6 +23,7 @@ import static health.emrys.afon.cdk.JupyterHubConfig.USER_POD_LABELS;
 import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
 import static health.emrys.afon.config.AfonProperty.USER_POLARIS_SECRET;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
+import static java.lang.String.format;
 
 /**
  * Cloud-agnostic application of the Spark operator's custom resources: a {@code SparkCluster}
@@ -32,6 +33,8 @@ import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
  * manifests leaves it idle, which is why both the AWS and Azure stacks must call {@link #deploy}.
  */
 public class SparkWorkloads {
+
+    public static final String MASTER = "emrys-master";
 
     private final String polarisDomainName;
     private final AfonPropertyProvider properties;
@@ -87,7 +90,7 @@ public class SparkWorkloads {
         List<LocalExecProvisioner> allClusterProvisioners = new ArrayList<>();
         allClusterProvisioners.addAll(uponCreateRun("echo '" + sparkClusterJson + "' | kubectl apply -f -"));
         allClusterProvisioners.addAll(uponDestroyRun(
-            "kubectl delete statefulset emrys-master --force --grace-period=0",
+            format("kubectl delete statefulset %s --force --grace-period=0", MASTER),
             "kubectl delete statefulset emrys-worker --force --grace-period=0",
             "kubectl patch sparkclusters emrys  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
         ));
@@ -174,7 +177,7 @@ public class SparkWorkloads {
             "spark.master.rest.enabled", "true",
             "spark.master.rest.host", "0.0.0.0",
             "spark.ui.reverseProxy", "true",
-            "spark.master", "spark://emrys-master-svc:7077",
+            "spark.master", format("spark://%s-svc:7077", MASTER),
             "spark.submit.deployMode", "cluster",
             "spark.executor.cores", "1",
             "spark.cores.max", "3",
