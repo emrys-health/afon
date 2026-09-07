@@ -25,7 +25,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static health.emrys.afon.acceptance.AcceptanceTestConfig.isAfonCloudEmptyOrEqualTo;
+import static health.emrys.afon.acceptance.AcceptanceTestConfig.testConfigIncludes;
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
@@ -187,7 +187,7 @@ public class ContainerHelper {
             logger.info("Starting Polaris docker container. This usually takes about 10s, longer if it's downloading " +
                     "the image.");
             polaris.start();
-            if ( isAfonCloudEmptyOrEqualTo("gcp") ){
+            if ( testConfigIncludes(GCP) ){
                 polaris.copyFileToContainer(
                         Transferable.of(properties.getValue(GOOGLE_APPLICATION_CREDENTIALS).getBytes()),
                         GOOGLE_FILE);
