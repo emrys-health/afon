@@ -16,6 +16,11 @@ fi
 ### Role Assignment
 
 echo "- Deleting roles for app '$APP_ID'"
+
+source $AFON_ROOT/scripts/azure/rbac.sh
+source $AFON_ROOT/scripts/azure/account-principal.sh
+require_role_assignment_rights $PRINCIPAL_ID delete destroy.sh
+
 echo "- Using APP_SP_ID='$APP_SP_ID' as assignee for deleting role assignments"
 ASSIGNEE_ID=$APP_SP_ID
 STORAGE_BUCKET_ROLE="Storage Blob Data Contributor"

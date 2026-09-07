@@ -89,13 +89,9 @@ fi
 
 echo "- Creating role assignments"
 
+source $AFON_ROOT/scripts/azure/rbac.sh
 source $AFON_ROOT/scripts/azure/account-principal.sh
-if az role assignment list --assignee $PRINCIPAL_ID --all --query "[?roleDefinitionName=='Owner' || roleDefinitionName=='User Access Administrator' || roleDefinitionName=='Role Based Access Control Administrator']" -o tsv | grep -q .; then
-  echo "- Current principal '$PRINCIPAL_ID' has rights to create role assignments, proceeding"
-else
-  echo "- FAILURE: Current principal '$PRINCIPAL_ID' lacks RBAC rights needed to create role assignments. Ask your admin to grant one of these roles on '$AZURE_RESOURCE_GROUP', then re-run create.sh."
-  exit 1
-fi
+require_role_assignment_rights $PRINCIPAL_ID create create.sh
 
 echo "- Using APP_SP_ID='$APP_SP_ID' as assignee for creating role assignments"
 ASSIGNEE_ID="$APP_SP_ID"
@@ -125,6 +121,8 @@ else
   echo "- Assigning role '$STORAGE_ACCOUNT_ROLE' to '$AZURE_STORAGE_ACCOUNT'"
   az role assignment create --role "$STORAGE_ACCOUNT_ROLE" --assignee-object-id $ASSIGNEE_ID --assignee-principal-type ServicePrincipal --scope "$STORAGE_ACCOUNT_SCOPE" || exit 1
 fi
+
+warn_if_operational_identity_can_manage_roles $ASSIGNEE_ID
 
 echo "Env created."
 
