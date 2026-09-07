@@ -26,7 +26,7 @@ public class NetworkConfig {
     private static final String DOMAIN_POLICY_NAME = "allow-only-whitelisted-domains";
 
     /** The ports the whitelisted domains may be reached on. */
-    private static final List<String> WEB_PORTS = List.of("80", "443");
+    private static final List<String> ALLOWED_PORTS = List.of("80", "443", "7077", "15002");
 
     /**
      * One entry in {@link #allowedDomains}. Cilium offers two matchers and they are not the
@@ -149,9 +149,9 @@ public class NetworkConfig {
         Map<String, Object> domainEgress = Map.of(
             "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList(),
             "toPorts", List.of(Map.of(
-                "ports", WEB_PORTS.stream()
-                                  .map(port -> Map.of("port", port, "protocol", "TCP"))
-                                  .toList())));
+                "ports", ALLOWED_PORTS.stream()
+                                      .map(port -> Map.of("port", port, "protocol", "TCP"))
+                                      .toList())));
         Map<String, Object> manifest = Map.of(
             "apiVersion", "cilium.io/v2",
             "kind", "CiliumNetworkPolicy",

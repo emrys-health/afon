@@ -16,10 +16,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
-import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.CdkUtils.*;
 import static health.emrys.afon.cdk.Defaults.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cdk.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.cdk.JupyterHubConfig.USER_POD_LABELS;
 import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
 import static health.emrys.afon.config.AfonProperty.USER_POLARIS_SECRET;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
