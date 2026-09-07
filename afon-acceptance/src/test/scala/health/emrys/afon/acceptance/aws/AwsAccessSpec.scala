@@ -4,6 +4,7 @@ import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trin
 import health.emrys.afon.acceptance.{AbstractAccessSpec, AcceptanceTestConfig}
 import health.emrys.afon.acceptance.tags.{Access, Aws}
 import health.emrys.afon.config.AfonCloud
+import health.emrys.afon.config.AfonCloud.AWS
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 
@@ -11,9 +12,9 @@ import health.emrys.afon.polaris.catalogs.PolarisCatalog
 @Access
 class AwsAccessSpec extends AbstractAccessSpec {
 
-  override def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getAwsCatalog
+  override def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(AWS);
 
-  override def cloudProvider: AfonCloud = AfonCloud.AWS
+  override def cloudProvider: AfonCloud = AWS
 
   "Trino" should {
     "vend credentials" in {
