@@ -9,13 +9,13 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
 
   def catalog: PolarisCatalog
 
-  override def catalogProvider(): Any
+  override def afonCatalog(): Any
 
   val catalogManager = AcceptanceTestConfig.instance.getCatalogManager
   val grantCatalogAdmin = new GrantCatalogAdmin(this, catalog)
   val createCatalogRole = new CreateCatalogRole(this, catalog)
   val NAMESPACE = "forbidden"
-  val FULL_NAMESPACE = s"$catalogProvider.$NAMESPACE"
+  val FULL_NAMESPACE = s"$afonCatalog.$NAMESPACE"
   val NUM_ROWS = 10
 
   "Polaris" should {

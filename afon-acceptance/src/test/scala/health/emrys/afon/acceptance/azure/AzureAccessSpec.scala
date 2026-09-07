@@ -13,7 +13,7 @@ class AzureAccessSpec extends AbstractAccessSpec with AzureTableCreation {
 
   override def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(AZURE)
 
-  override def catalogProvider(): Any = AZURE
+  override def afonCatalog(): Any = AZURE
 
   override protected def createTableAndPopulate(): Unit = {
     spark.sql(createDatumTable(s" IF NOT EXISTS $FULL_NAMESPACE.$tableName"))

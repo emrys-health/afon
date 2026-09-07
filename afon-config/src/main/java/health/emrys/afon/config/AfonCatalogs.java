@@ -1,39 +1,39 @@
 package health.emrys.afon.config;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.NoSuchElementException;
+import org.jspecify.annotations.NonNull;
 
-import static health.emrys.afon.config.AfonProperty.AFON_CATALOGS_CSV;
+import java.util.*;
+
+import static health.emrys.afon.config.AfonProperty.CATALOG_NAMES_CSV;
 
 /**
- * The currently configured {@link AfonCatalog}s, sourced from an {@link AfonPropertyProvider}: the
- * active catalog set is read from {@link AfonProperty#AFON_CATALOGS_CSV}, so it inherits that
- * property's usual file/env/system-property override and interpolation behaviour. Defaults to
- * {@link #DEFAULT_CATALOGS_CSV} (the full built-in catalog set) when unset.
+ * The configured set of {@link AfonCatalog}s, created from {@link AfonProperty#CATALOG_NAMES_CSV}.
+ * Defaults to {@link #DEFAULT_CATALOG_NAMES_CSV} (the full built-in catalog set) when unset.
  */
 public class AfonCatalogs {
 
-    public static final String DEFAULT_CATALOGS_CSV =
+    public static final String DEFAULT_CATALOG_NAMES_CSV =
         "aws,aws_forbidden,aws_trino,azure,azure_external,azure_forbidden,gcp,gcp_external,gcp_forbidden";
 
     private final AfonPropertyProvider properties;
-
-    public AfonCatalogs() {
-        this(new FilePropertyProvider());
-    }
+    private final List<AfonCatalog> catalogs;
 
     public AfonCatalogs(AfonPropertyProvider properties) {
         this.properties = properties;
+        this.catalogs = createCatalogs();
     }
 
     public List<AfonCatalog> all() {
-        String csv = properties.getValue(AFON_CATALOGS_CSV, DEFAULT_CATALOGS_CSV);
+        return catalogs;
+    }
+
+    private @NonNull List<AfonCatalog> createCatalogs() {
+        String csv = properties.getValue(CATALOG_NAMES_CSV, DEFAULT_CATALOG_NAMES_CSV);
         return Arrays.stream(csv.split(","))
-                     .map(String::trim)
-                     .filter(name -> !name.isEmpty())
-                     .map(AfonCatalog::of)
-                     .toList();
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .map(AfonCatalog::of)
+                .toList();
     }
 
     /**

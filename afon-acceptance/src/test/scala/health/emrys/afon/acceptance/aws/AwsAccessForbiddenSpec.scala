@@ -12,7 +12,7 @@ class AwsAccessForbiddenSpec extends AbstractAccessForbiddenSpec {
 
   def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(AWS_FORBIDDEN)
 
-  override def catalogProvider(): Any = AWS_FORBIDDEN
+  override def afonCatalog(): Any = AWS_FORBIDDEN
 
   def envSetupScript(): String = {
     "scripts/aws/create.sh"

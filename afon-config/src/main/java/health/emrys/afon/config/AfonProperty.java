@@ -116,10 +116,10 @@ public enum AfonProperty {
     ALLOWED_DOMAINS_CSV("ALLOWED_DOMAINS_CSV"),
 
     /**
-     * Comma-separated list of active {@link AfonCatalog} names (see {@link AfonCatalogs}).
+     * Comma-separated list of active {@link AfonCatalog} names.
      * Optional; defaults to the full built-in catalog set when absent.
      */
-    AFON_CATALOGS_CSV("AFON_CATALOGS_CSV"),
+    CATALOG_NAMES_CSV("CATALOG_NAMES_CSV"),
     ;
 
     private final String name;

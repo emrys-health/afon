@@ -56,12 +56,12 @@ public class RegisterPolarisTableMain {
             logger.warn(usage);
             return;
         }
-        String catalog = new AfonCatalogs().get(args[0]).name();
+        var properties = new FilePropertyProvider();
+        String catalog = new AfonCatalogs(properties).get(args[0]).name();
         String namespace = args[1];
         String table = args[2];
         String metadata = args[3];
 
-        var properties = new FilePropertyProvider();
         if (args.length > 4) {
             properties.setValue(POLARIS_ENDPOINT, args[4]);
         }

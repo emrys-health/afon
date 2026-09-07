@@ -13,7 +13,7 @@ class AzureAccessForbiddenSpec extends AbstractAccessForbiddenSpec with AzureTab
 
   def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(AZURE_FORBIDDEN)
 
-  override def catalogProvider(): Any = AZURE_FORBIDDEN
+  override def afonCatalog(): Any = AZURE_FORBIDDEN
 
   def envSetupScript(): String = {
     "scripts/azure/create.sh"
