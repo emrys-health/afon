@@ -12,5 +12,5 @@ class GcpAccessSpec extends AbstractAccessSpec {
 
   override def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(GCP)
 
-  override def catalogProvider(): Any = GCP
+  override def afonCatalog(): Any = GCP
 }

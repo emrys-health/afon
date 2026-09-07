@@ -14,7 +14,7 @@ class AwsAccessSpec extends AbstractAccessSpec {
 
   override def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(AWS);
 
-  override def catalogProvider(): Any = AWS
+  override def afonCatalog(): Any = AWS
 
   "Trino" should {
     "vend credentials" in {
@@ -24,9 +24,9 @@ class AwsAccessSpec extends AbstractAccessSpec {
       And(s"a table called $tableName with $NUM_ROWS rows in cloud storage")
 
       And(
-        s"""a Trino instance with $catalogProvider.properties of:
+        s"""a Trino instance with $afonCatalog.properties of:
            |
-           |${trinoLocalConfig(properties, catalogProvider.toString)}""".stripMargin)
+           |${trinoLocalConfig(properties, afonCatalog.toString)}""".stripMargin)
 
       var trinoHttp = trinoConfigProperties().get("discovery.uri").toString
       trinoHttp = trinoHttp.substring(trinoHttp.indexOf("//") + 2)

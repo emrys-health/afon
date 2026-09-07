@@ -12,7 +12,7 @@ class GcpAccessForbiddenSpec extends AbstractAccessForbiddenSpec {
 
   def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(GCP_FORBIDDEN)
 
-  override def catalogProvider(): Any = GCP_FORBIDDEN
+  override def afonCatalog(): Any = GCP_FORBIDDEN
 
   def envSetupScript(): String = {
     "scripts/gcp/create.sh"
