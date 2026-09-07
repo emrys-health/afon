@@ -32,13 +32,13 @@ public class SparkConnect {
             warehouse,
             AfonCloud.AWS.toString()
         );
-        String tableName = warehouse + ".acceptancetests.AwsAccessSpec"; // aws_trino.acceptancetests.AwsAccessSpec
+        String tableName = warehouse + ".namespaceph.test_table"; // aws_trino.acceptancetests.AwsAccessSpec
         logger.info("Reading table {}", tableName);
         // spark.read().table(tableName).show();
         // this works but unlike the line above, running this:
         // kubectl logs -f  spark-connector-0-driver | grep SELECT
         // shows the actual query in Spark Connect's log. Otherwise, grep "scan-report"
-        spark.sql(String.format("SELECT * FROM %s WHERE randomInt > -1", tableName)).show();
+        spark.sql(String.format("SELECT * FROM %s", tableName)).show();
     }
 
     private SparkSession sparkWithWarehouseCalled(

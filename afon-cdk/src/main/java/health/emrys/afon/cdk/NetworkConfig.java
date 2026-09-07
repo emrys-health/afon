@@ -7,6 +7,7 @@ import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.JupyterHubConfig.USER_POD_LABELS;
 import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 
 /**
@@ -27,6 +29,16 @@ public class NetworkConfig {
 
     /** The ports the whitelisted domains may be reached on. */
     private static final List<String> ALLOWED_PORTS = List.of("80", "443", "7077", "15002");
+
+    /**
+     * The pods backing {@code emrys-master-svc}, expressed exactly as the Service selects them
+     * (see {@code AwsSparkStack.sparkExternalService}). {@link SparkWorkloads#MASTER} names the
+     * StatefulSet the Spark operator creates for the {@code SparkCluster}; the {@code k8s:} prefix
+     * is Cilium's source qualifier for a Kubernetes label.
+     */
+    private static final Map<String, String> SPARK_MASTER_LABELS = Map.of(
+        "k8s:io.kubernetes.pod.namespace", "default",
+        "k8s:spark-role", "master");
 
     /**
      * One entry in {@link #allowedDomains}. Cilium offers two matchers and they are not the
@@ -64,10 +76,22 @@ public class NetworkConfig {
     private final TerraformStack      tfStack;
     private final List<AllowedDomain> allowedDomains;
 
+    public static void main(String[] args) {
+        Map<String, Object> manifest = connectionManifest(USER_POD_LABELS,
+                                                          getAllowedDomainsFrom(new FilePropertyProvider()));
+        System.out.println(toJson(manifest));
+    }
+
+    private static @NonNull List<AllowedDomain> getAllowedDomainsFrom(AfonPropertyProvider properties) {
+        final List<AllowedDomain> allowedDomains;
+        String                    csv = ALLOWED_DOMAINS_CSV.getValueFrom(properties.getProperties());
+        allowedDomains = Arrays.stream(csv.split(",")).map(x -> AllowedDomain.create(x)).toList();
+        return allowedDomains;
+    }
+
     public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties) {
         this.tfStack = tfStack;
-        String csv = ALLOWED_DOMAINS_CSV.getValueFrom(properties.getProperties());
-        allowedDomains = Arrays.stream(csv.split(",")).map(x -> AllowedDomain.create(x)).toList();
+        allowedDomains = getAllowedDomainsFrom(properties);
     }
 
     /**
@@ -139,29 +163,7 @@ public class NetworkConfig {
         if (allowedDomains.isEmpty()) {
             return;
         }
-        Map<String, Object> dnsVisibility = Map.of(
-            "toEndpoints", List.of(Map.of("matchLabels", Map.of(
-                "k8s:io.kubernetes.pod.namespace", "kube-system",
-                "k8s:k8s-app", "kube-dns"))),
-            "toPorts", List.of(Map.of(
-                "ports", List.of(Map.of("port", "53", "protocol", "ANY")),
-                "rules", Map.of("dns", List.of(Map.of("matchPattern", "*"))))));
-        Map<String, Object> domainEgress = Map.of(
-            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList()
-//            "toPorts", List.of(Map.of(
-//                "ports", ALLOWED_PORTS.stream()
-//                                      .map(port -> Map.of("port", port, "protocol", "TCP"))
-//                                      .toList()))
-        );
-        Map<String, Object> manifest = Map.of(
-            "apiVersion", "cilium.io/v2",
-            "kind", "CiliumNetworkPolicy",
-            "metadata", Map.of(
-                "name", DOMAIN_POLICY_NAME,
-                "namespace", "default"),
-            "spec", Map.of(
-                "endpointSelector", Map.of("matchLabels", labels),
-                "egress", List.of(dnsVisibility, domainEgress)));
+        Map<String, Object> manifest = connectionManifest(labels, allowedDomains);
 
         String manifestJson = toJson(manifest);
         List<LocalExecProvisioner> provisioners = new ArrayList<>(
@@ -179,6 +181,44 @@ public class NetworkConfig {
                         .triggers(Map.of("manifest", manifestJson))
                         .provisioners(provisioners)
                         .build();
+    }
+
+    private static @NonNull Map<String, Object> connectionManifest(Map<String, String> labels,
+                                                                   List<AllowedDomain> allowedDomains) {
+        Map<String, Object> dnsVisibility = Map.of(
+            "toEndpoints", List.of(Map.of("matchLabels", Map.of(
+                "k8s:io.kubernetes.pod.namespace", "kube-system",
+                "k8s:k8s-app", "kube-dns"))),
+            "toPorts", List.of(Map.of(
+                "ports", List.of(Map.of("port", "53", "protocol", "ANY")),
+                "rules", Map.of("dns", List.of(Map.of("matchPattern", "*"))))));
+        Map<String, Object> domainEgress = Map.of(
+            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList()
+//            "toPorts", List.of(Map.of(
+//                "ports", ALLOWED_PORTS.stream()
+//                                      .map(port -> Map.of("port", port, "protocol", "TCP"))
+//                                      .toList()))
+        );
+        // Egress to emrys-master-svc, the Spark master (spark://emrys-master-svc:7077).
+        // Named rather than listed among the whitelisted domains because a cluster-local name is
+        // not something toFQDNs can express: Cilium's DNS proxy turns an answer into a CIDR
+        // identity, whereas a pod inside the cluster carries a label-derived one, so the FQDN rule
+        // would never match it. Traffic to a ClusterIP is DNAT'd to a backing pod before egress
+        // policy is evaluated in any case, so selecting those pods on the same label the Service
+        // selects on is the rule that actually applies. No toPorts, matching the domain rule
+        // above: every port the master listens on (7077, 6066, 8080) is reachable.
+        Map<String, Object> sparkMasterEgress = Map.of(
+            "toEndpoints", List.of(Map.of("matchLabels", SPARK_MASTER_LABELS)));
+        Map<String, Object> manifest = Map.of(
+            "apiVersion", "cilium.io/v2",
+            "kind", "CiliumNetworkPolicy",
+            "metadata", Map.of(
+                "name", DOMAIN_POLICY_NAME,
+                "namespace", "default"),
+            "spec", Map.of(
+                "endpointSelector", Map.of("matchLabels", labels),
+                "egress", List.of(dnsVisibility, domainEgress, sparkMasterEgress)));
+        return manifest;
     }
 
     private static @NonNull String toJson(Map<String, Object> manifest) {
