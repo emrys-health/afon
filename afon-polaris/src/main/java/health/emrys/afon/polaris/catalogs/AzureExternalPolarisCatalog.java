@@ -1,6 +1,5 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
@@ -13,9 +12,9 @@ import static health.emrys.afon.polaris.catalogs.AzureUtils.abfssBucketUrl;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 
 /**
- * This helps to create a catalog called {@link AfonCatalog#AZURE_EXTERNAL}
+ * This helps to create a catalog called {@code azure_external}
  * in whichever Polaris is the current that points to a remote catalog called
- * {@link AfonCatalog#AZURE} in {@link AfonProperty#AZURE_DOMAIN_NAME}
+ * {@code azure} in {@link AfonProperty#AZURE_DOMAIN_NAME}
  */
 public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
     private final @NonNull String bucketUrl;
@@ -37,7 +36,7 @@ public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     @Override
     protected String remoteCatalogName() {
-        return AfonCatalog.AZURE.toString();
+        return "azure";
     }
 
     @Override
@@ -60,6 +59,6 @@ public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
     }
 
     public String catalogName() {
-        return AfonCatalog.AZURE_EXTERNAL.toString();
+        return "azure_external";
     }
 }

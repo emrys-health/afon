@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -23,10 +24,12 @@ public class GeneratePySparkKeycloakMain {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(GeneratePySparkKeycloakMain.class);
 
     private final SparkWarehouseConfig config;
+    private final AfonCatalogs afonCatalogs;
 
     GeneratePySparkKeycloakMain(AfonPropertyProvider properties) {
         SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
         config = configFactory.createConfig(properties);
+        afonCatalogs = new AfonCatalogs(properties);
     }
 
     public void generateAndSavePySparkCode() {
@@ -56,7 +59,7 @@ public class GeneratePySparkKeycloakMain {
                                                      OIDC_TOKEN = os.environ["OIDC_TOKEN"]
                                                      spark = (SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002")
                                                      """);
-        for (AfonCatalog catalog : AfonCatalog.values()) {
+        for (AfonCatalog catalog : afonCatalogs.all()) {
             python.append(format("# %s \n", catalog.name()));
             String sparkCatalog = toSparkName(catalog);
             config.sparkConfigs(sparkCatalog, catalog.toString()).entrySet()
@@ -98,7 +101,7 @@ public class GeneratePySparkKeycloakMain {
             #
             df_read = spark.read.table("%s.acceptancetests.%s")
             df_read.show()
-            """, toSparkName(AfonCatalog.AWS), tableName);
+            """, toSparkName(afonCatalogs.aws()), tableName);
     }
 
     public static void main(String[] args) {

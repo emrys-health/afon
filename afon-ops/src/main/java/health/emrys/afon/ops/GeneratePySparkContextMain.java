@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
@@ -33,6 +34,7 @@ public class GeneratePySparkContextMain {
     private final String polarisHost;
 
     private final SparkWarehouseConfig polarisConfig;
+    private final AfonCatalogs afonCatalogs;
 
     public GeneratePySparkContextMain(AfonCloud cloud, AfonPropertyProvider properties) {
         PolarisCredentials credentials = new PolarisCredentials(cloud, properties);
@@ -41,6 +43,7 @@ public class GeneratePySparkContextMain {
         polarisHost   = credentials.getPolarisHost();
         polarisConfig = SparkWarehouseConfigFactory.getFactory()
                         .createConfig(properties, polarisHost, polarisId, polarisSecret);
+        afonCatalogs = new AfonCatalogs(properties);
     }
 
     public void generatePySparkCode() {
@@ -91,8 +94,8 @@ public class GeneratePySparkContextMain {
                            """);
 
         System.out.println("\u001B[34m");
-        System.out.println(snowflakeSql(AfonCatalog.AZURE, "smoketesttable260217491351"));
-        System.out.println(snowflakeSql(AfonCatalog.GCP, "smoketesttable260318240929"));
+        System.out.println(snowflakeSql(afonCatalogs.azure(), "smoketesttable260217491351"));
+        System.out.println(snowflakeSql(afonCatalogs.gcp(), "smoketesttable260318240929"));
 
         System.out.println(format(
             """
@@ -122,7 +125,7 @@ public class GeneratePySparkContextMain {
                                     REPLACE_INVALID_CHARACTERS = TRUE
                                   """));
         System.out.println("\u001B[0m");
-        for (AfonCatalog catalog : AfonCatalog.values()) {
+        for (AfonCatalog catalog : afonCatalogs.all()) {
             Map<String, String> configs = polarisConfig.sparkConfigs(catalog.toString());
             System.out.println("# " + catalog);
             configs.forEach((key, value) -> System.out.println(format(".config('%s', '%s')", key, value)));

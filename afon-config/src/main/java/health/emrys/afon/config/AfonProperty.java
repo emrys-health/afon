@@ -114,6 +114,12 @@ public enum AfonProperty {
     SNOWFLAKE_PRIVATE_KEY("SNOWFLAKE_PRIVATE_KEY"),
 
     ALLOWED_DOMAINS_CSV("ALLOWED_DOMAINS_CSV"),
+
+    /**
+     * Comma-separated list of active {@link AfonCatalog} names (see {@link AfonCatalogs}).
+     * Optional; defaults to the full built-in catalog set when absent.
+     */
+    AFON_CATALOGS_CSV("AFON_CATALOGS_CSV"),
     ;
 
     private final String name;

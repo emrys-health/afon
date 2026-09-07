@@ -1,6 +1,5 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepRunner;
@@ -18,7 +17,7 @@ public class DeploySnowflakeReadingAwsViaAwsMain implements StepsProvider {
     public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(setupFullStackStepsUsing(stepOperations, AWS));
-        steps.add(stepOperations.snowflakeReadingViaAwsPolaris(AfonCatalog.AWS));
+        steps.add(stepOperations.snowflakeReadingViaAwsPolaris(stepOperations.afonCatalogs().aws()));
         return steps;
     }
 

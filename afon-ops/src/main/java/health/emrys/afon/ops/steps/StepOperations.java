@@ -6,6 +6,7 @@ import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.ConfigureUsersMain;
@@ -40,10 +41,16 @@ public class StepOperations {
     private final StepActions actions;
 
     private final AfonPropertyProvider properties;
+    private final AfonCatalogs afonCatalogs;
 
     public StepOperations(StepActions actions, AfonPropertyProvider properties) {
         this.actions = actions;
         this.properties = properties;
+        this.afonCatalogs = new AfonCatalogs(properties);
+    }
+
+    public AfonCatalogs afonCatalogs() {
+        return afonCatalogs;
     }
 
     @NonNull
@@ -112,7 +119,7 @@ public class StepOperations {
     public Step deleteExternalCatalogIn(AfonCloud cloud) {
         switch (cloud) {
             case AZURE:
-                return deleteExternalCatalogTableFor(AfonCatalog.AZURE, properties.getValue(AZURE_DOMAIN_NAME));
+                return deleteExternalCatalogTableFor(afonCatalogs.azure(), properties.getValue(AZURE_DOMAIN_NAME));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -145,7 +152,7 @@ public class StepOperations {
                 properties.setProperty(
                         AZURE_BUCKET.getName(),
                         this.properties.getValue(AZURE_EXTERNAL_BUCKET));
-                return createExternalCatalogFor(AfonCatalog.AZURE, this.properties.getValue(AZURE_DOMAIN_NAME), properties);
+                return createExternalCatalogFor(afonCatalogs.azure(), this.properties.getValue(AZURE_DOMAIN_NAME), properties);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -236,11 +243,11 @@ public class StepOperations {
     public Step checkAwsSparkWritingTo(AfonCloud cloud) {
         switch (cloud) {
             case AWS:
-                return awsSparkWritingTo(AfonCatalog.AWS, EXTERNAL_NAMESPACE);
+                return awsSparkWritingTo(afonCatalogs.aws(), EXTERNAL_NAMESPACE);
             case AZURE:
-                return awsSparkWritingTo(AfonCatalog.AZURE, EXTERNAL_NAMESPACE);
+                return awsSparkWritingTo(afonCatalogs.azure(), EXTERNAL_NAMESPACE);
             case GCP:
-                return awsSparkWritingTo(AfonCatalog.GCP, EXTERNAL_NAMESPACE);
+                return awsSparkWritingTo(afonCatalogs.gcp(), EXTERNAL_NAMESPACE);
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
@@ -260,7 +267,7 @@ public class StepOperations {
         switch (cloud) {
             case AZURE:
                 return sparkTestUsing(
-                    AfonCatalog.AZURE_EXTERNAL,
+                    afonCatalogs.azureExternal(),
                     format("local Spark call that uses %s which defers to %s", properties.getValue(AWS_POLARIS_DOMAIN_NAME), properties.getValue(AZURE_DOMAIN_NAME)),
                     EXTERNAL_NAMESPACE,
                     SparkTestWriter.class,
@@ -276,7 +283,7 @@ public class StepOperations {
         switch (cloud) {
             case AZURE:
                 return sparkTestUsing(
-                    AfonCatalog.AZURE,
+                    afonCatalogs.azure(),
                     format("local Spark call that uses %s", properties.getValue(AZURE_DOMAIN_NAME)),
                     EXTERNAL_NAMESPACE,
                     SparkTestWriter.class,
@@ -462,8 +469,8 @@ public class StepOperations {
     public Step deleteAwsPolarisCatalogAndRecreateFor(AfonCloud cloud) {
         switch (cloud) {
             case AZURE:
-                return deletePolarisTable(AfonCatalog.AZURE, properties.getValue(AWS_POLARIS_DOMAIN_NAME), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE)
-                    .andThen(createCatalogFor(AfonCatalog.AZURE, properties.getValue(AWS_POLARIS_DOMAIN_NAME)));
+                return deletePolarisTable(afonCatalogs.azure(), properties.getValue(AWS_POLARIS_DOMAIN_NAME), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE)
+                    .andThen(createCatalogFor(afonCatalogs.azure(), properties.getValue(AWS_POLARIS_DOMAIN_NAME)));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);

@@ -5,6 +5,7 @@ import health.emrys.afon.cdk.TrinoWorkloads;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.AfonCatalogs;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -25,6 +26,6 @@ public class AwsTrinoStack extends AwsSparkStack {
         List<ITerraformDependable> dependsOn = new ArrayList<>(cloudProvider.getDependables());
         dependsOn.addAll(cloudProvider.getServiceDependables());
         new TrinoWorkloads(properties, awsPolarisDomainName)
-            .deploy(this, helmProvider, ConfigUtils.cloudToCatalog(id), dependsOn);
+            .deploy(this, helmProvider, ConfigUtils.cloudToCatalog(id, new AfonCatalogs(properties)), dependsOn);
     }
 }

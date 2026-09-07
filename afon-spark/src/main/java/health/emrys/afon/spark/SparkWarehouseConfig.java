@@ -1,6 +1,7 @@
 package health.emrys.afon.spark;
 
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.StaticSQLConf$;
 import org.slf4j.Logger;
@@ -8,7 +9,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,16 +29,19 @@ public class SparkWarehouseConfig {
     private final String clientSecret;
     private final String host;
     private final String polarisProtocol;
+    private final AfonCatalogs afonCatalogs;
 
     SparkWarehouseConfig(
         String clientId,
         String clientSecret,
         String host,
-        String polarisProtocol) {
+        String polarisProtocol,
+        AfonCatalogs afonCatalogs) {
         this.clientId        = clientId;
         this.clientSecret    = clientSecret;
         this.host            = host;
         this.polarisProtocol = polarisProtocol;
+        this.afonCatalogs = afonCatalogs;
     }
 
     public SparkConf sparkConf() throws IOException {
@@ -50,7 +53,7 @@ public class SparkWarehouseConfig {
     }
 
     protected String[] catalogNames() {
-        return Arrays.stream(AfonCatalog.values()).map(x -> x.toString()).toArray(String[]::new);
+        return afonCatalogs.all().stream().map(AfonCatalog::toString).toArray(String[]::new);
     }
 
     public SparkConf sparkConf(int cores, String... catalogNames) throws IOException {

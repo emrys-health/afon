@@ -5,6 +5,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.trino.TrinoServerConfiguration;
@@ -41,10 +42,12 @@ public class TrinoWorkloads {
     private static final int    TRINO_PORT    = 8080;
 
     private final TrinoServerConfiguration trinoConfig;
+    private final AfonCatalogs afonCatalogs;
 
     public TrinoWorkloads(AfonPropertyProvider properties,
                           String polarisDomainName) {
         this.trinoConfig = new TrinoServerConfiguration(properties, polarisDomainName);
+        this.afonCatalogs = new AfonCatalogs(properties);
     }
 
     /**
@@ -97,7 +100,7 @@ public class TrinoWorkloads {
         // LinkedHashMap so the default catalog is emitted first for readability.
         Map<String, String> catalogs = new LinkedHashMap<>();
         catalogs.put(defaultCatalog, trinoConfig.catalogProperties(defaultCatalog));
-        for (AfonCatalog catalog : AfonCatalog.values()) {
+        for (AfonCatalog catalog : afonCatalogs.all()) {
             String catalogName = catalog.toString();
             if (catalogName == defaultCatalog) {
                 continue;

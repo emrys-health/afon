@@ -1,6 +1,7 @@
 package health.emrys.afon.spark;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import org.jspecify.annotations.NonNull;
 
@@ -36,7 +37,8 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
         super(properties.getValue(USER_POLARIS_ID),
                 properties.getValue(USER_POLARIS_SECRET),
                 properties.getValue(POLARIS_ENDPOINT),
-                protocolFor(properties.getValue(POLARIS_ENDPOINT))
+                protocolFor(properties.getValue(POLARIS_ENDPOINT)),
+                new AfonCatalogs(properties)
         );
         this.oauth2ServerUri = kcUriFor(properties.getValue(KC_HOSTNAME));
     }
