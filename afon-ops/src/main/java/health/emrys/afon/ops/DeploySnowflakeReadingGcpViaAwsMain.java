@@ -1,5 +1,6 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepRunner;
@@ -19,7 +20,7 @@ public class DeploySnowflakeReadingGcpViaAwsMain implements StepsProvider {
         List<Step> steps = new ArrayList<>();
         steps.addAll(setupFullStackStepsUsing(stepOperations, AWS));
         steps.add(stepOperations.checkAwsSparkWritingTo(GCP));
-        steps.add(stepOperations.snowflakeReadingViaAwsPolaris(GCP));
+        steps.add(stepOperations.snowflakeReadingViaAwsPolaris(AfonCatalog.GCP));
         return steps;
     }
 

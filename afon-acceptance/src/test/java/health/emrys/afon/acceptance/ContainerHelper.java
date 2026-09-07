@@ -1,6 +1,6 @@
 package health.emrys.afon.acceptance;
 
-import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.security.OAuthProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static health.emrys.afon.acceptance.AcceptanceTestConfig.testConfigIncludes;
-import static health.emrys.afon.config.AfonCloud.*;
+import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
@@ -125,10 +125,10 @@ public class ContainerHelper {
         if (sparkConnect == null) {
             sparkConnect = new GenericContainer<>(SPARK_IMAGE);
             SparkWarehouseConfig config = sparkFactory.createConfig(properties);
-            Stream<String> envs = Arrays.stream(AfonCloud.values()).flatMap(
-                cloudProvider ->
-                    config.sparkConfigs(cloudProvider).entrySet().stream().map(
-                        entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
+            Stream<String> envs = Arrays.stream(AfonCatalog.values()).flatMap(
+                catalog ->
+                        config.sparkConfigs(catalog.toString()).entrySet().stream().map(
+                            entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
             );
             String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger" +
                 ".netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
@@ -208,11 +208,11 @@ public class ContainerHelper {
                 trino.withNetwork(network);
 //                trino.withLogConsumer(new Slf4jLogConsumer(logger));
                 trino.start();
-                for (AfonCloud catalog : Set.of(AWS_TRINO, AWS, GCP, AZURE)) {
+                for (AfonCatalog catalog : Set.of(AfonCatalog.AWS_TRINO, AfonCatalog.AWS, AfonCatalog.GCP, AfonCatalog.AZURE)) {
                     String containerDestination = format("%s/%s.properties", catalogPath, catalog);
                     logger.info("Copying config file to container: {}", containerDestination);
                     trino.copyFileToContainer(
-                        Transferable.of(trinoLocalConfig(properties, catalog).getBytes()),
+                        Transferable.of(trinoLocalConfig(properties, catalog.toString()).getBytes()),
                         containerDestination);
                 }
                 logger.info("Started Trino with container ID: {}", trino.getContainerId());
@@ -236,14 +236,13 @@ public class ContainerHelper {
 
     public static String trinoLocalConfig(
         AfonPropertyProvider properties,
-        AfonCloud catalog) {
+        String catalog) {
         String polarisDomainName = "http://" + POLARIS_NETWORK_HOST + ":" + POLARIS_PORT;
         String keyCloakUrl       = tokenEndpoint(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL);
         logger.info("Trino sees Polaris as {} and KeyCloak as {}", polarisDomainName, keyCloakUrl);
         TrinoServerConfiguration trinoConfig = new KeyCloakTrinoServerConfiguration(
-            polarisDomainName,
-            properties,
-            // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
+                properties, polarisDomainName,
+                // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
             keyCloakUrl
         );
         return trinoConfig.catalogProperties(catalog);

@@ -2,10 +2,10 @@ package health.emrys.afon.config;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Properties;
 import java.util.regex.Pattern;
 
 import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.ConfigUtils.afonCloud;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,48 +15,50 @@ public class CloudConfigTest {
         + "[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
     );
 
-    public static boolean isRfc1123Domain(String domain) {
+    private static boolean isRfc1123Domain(String domain) {
         return domain != null && RFC_1123_DOMAIN.matcher(domain).matches();
     }
 
+    private FilePropertyProvider properties = new FilePropertyProvider();
+
     @Test
     public void testWhitelistedAreValidDomainNames() {
-        for (String domain : getWhitelistedDomains()) {
-            assertThat(isRfc1123Domain(domain)).as(domain).isTrue();
+        for (String domain : whitelistedDomains()) {
+            assertThat(isRfc1123Domain(domain)).as("domain "+domain+" is valid").isTrue();
         }
     }
 
     @Test
-    public void testAwsBucketIsWhitelisted() {
-        checkPropertiesContain(AWS_S3_BUCKET_NAME.getValueFrom(getProperties()));
+    public void testBucketNameIsWhitelisted() {
+        switch ( afonCloud() ){
+            case "aws":
+                checkPropertyIsWhitelisted(AWS_S3_BUCKET_NAME);
+                break;
+            case "azure":
+                checkPropertyIsWhitelisted(AZURE_BUCKET);
+                break;
+            case "gcp":
+                checkPropertyIsWhitelisted(GCP_BUCKET_NAME);
+                break;
+            default:
+                checkPropertyIsWhitelisted(AWS_S3_BUCKET_NAME);
+                checkPropertyIsWhitelisted(AZURE_BUCKET);
+                checkPropertyIsWhitelisted(GCP_BUCKET_NAME);
+        }
     }
 
-    @Test
-    public void testAzueBucketIsWhitelisted() {
-        checkPropertiesContain(AZURE_BUCKET.getValueFrom(getProperties()));
+    private String[] whitelistedDomains() {
+        return properties.getValue(ALLOWED_DOMAINS_CSV, "").split(",");
     }
 
-    @Test
-    public void testGcpBucketIsWhitelisted() {
-        checkPropertiesContain(GCP_BUCKET_NAME.getValueFrom(getProperties()));
-    }
-
-    private String[] getWhitelistedDomains() {
-        String     allowed    = ALLOWED_DOMAINS_CSV.getValueFrom(getProperties());
-        String[]   domains    = allowed.split(",");
-        return domains;
-    }
-
-    private static Properties getProperties() {
-        return new FilePropertyProvider().getProperties();
-    }
-
-    private void checkPropertiesContain(String value) {
+    private void checkPropertyIsWhitelisted(AfonProperty property) {
+        String value = properties.getValue(property);
+        String[] whitelistedDomains = whitelistedDomains();
         boolean found = false;
-        for (String domain : getWhitelistedDomains()) {
+        for (String domain : whitelistedDomains) {
             found |= domain.contains(value);
         }
-        assertThat(found).as(format("%s not found in %s", value, String.join(", ", getWhitelistedDomains()))).isTrue();
+        assertThat(found).as(format("%s not found in %s", value, String.join(", ", whitelistedDomains))).isTrue();
     }
 
 }

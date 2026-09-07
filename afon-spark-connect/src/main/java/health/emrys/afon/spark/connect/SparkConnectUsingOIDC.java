@@ -20,9 +20,9 @@ public class SparkConnectUsingOIDC extends SparkConnect {
     }
 
     protected Map<String, String> getWarehouseConfig(String warehouseName,
-                                                     String polarisCatalog
+                                                     String catalogName
     ) {
-        Map<String, String>               defaults        = super.getWarehouseConfig(warehouseName, polarisCatalog);
+        Map<String, String>               defaults        = super.getWarehouseConfig(warehouseName, catalogName);
         Map<String, String>               warehouseConfig = new HashMap<>();
         defaults
             .entrySet().stream()

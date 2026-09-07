@@ -1,7 +1,6 @@
 package health.emrys.afon.acceptance
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
-import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.config.AfonProperty.{KC_HOSTNAME, POLARIS_ENDPOINT, POLARIS_ID, POLARIS_SECRET}
 import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, FilePropertyProvider}
@@ -10,7 +9,6 @@ import PolarisCatalog.METADATA_KEY
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.users.TestUsers
 import health.emrys.afon.ops.ConfigureUsersMain
-import health.emrys.afon.ops.smoke.TrinoQuerySmoke
 import health.emrys.afon.polaris.config.PolarisCatalogManager
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.KeyCloakProvider
@@ -25,7 +23,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   val grantCatalogAdmin = new GrantCatalogAdmin(this, catalog)
   val createCatalogRole = new CreateCatalogRole(this, catalog)
   val NUM_ROWS = 100
-  val FULL_NAMESPACE = s"${cloudProvider}.$namespace"
+  val FULL_NAMESPACE = s"${catalogProvider}.$namespace"
 
   protected def createTableAndPopulate(): Unit = {
     spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).create()
@@ -69,7 +67,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
     "have a namespace" in {
       import scala.jdk.CollectionConverters._
-      var conf = SparkHelper.sparkWarehouse.sparkConfigs(cloudProvider).asScala.map {
+      var conf = SparkHelper.sparkWarehouse.sparkConfigs(catalogProvider.toString).asScala.map {
         case (k, v) =>
           val value = if (k.toLowerCase.contains("token") || k.toLowerCase.contains("oauth")) String.format("<%s>", k.toLowerCase) else v
           String.format("%-50s%50s", k, value)

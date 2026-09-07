@@ -17,15 +17,15 @@ public class KeyCloakSparkWarehouseConfigForTesting extends KeyCloakSparkWarehou
         this.catalogWarehouses = catalogWarehouses;
     }
 
-    protected String[] cloudProviders() {
-        List<String> list = new ArrayList<>(Arrays.asList(super.cloudProviders()));
+    protected String[] catalogNames() {
+        List<String> list = new ArrayList<>(Arrays.asList(super.catalogNames()));
         Arrays.stream(catalogWarehouses).forEach(x -> list.add(x.catalog()));
         return list.toArray(new String[0]);
     }
 
     @Override
-    protected void configure(SparkConf sparkConf, String[] cloudProviders) {
-        super.configure(sparkConf, cloudProviders);
+    protected void configure(SparkConf sparkConf, String[] catalogNames) {
+        super.configure(sparkConf, catalogNames);
         for  (CatalogWarehouse catalogWarehouse : catalogWarehouses) {
             configureWith(sparkConfigs(catalogWarehouse.warehouse(), catalogWarehouse.catalog()), sparkConf);
         }

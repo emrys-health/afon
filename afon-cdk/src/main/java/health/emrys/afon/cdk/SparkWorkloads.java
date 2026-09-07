@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -197,27 +198,26 @@ public class SparkWorkloads {
             "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
         );
         try {
-            Map<String, String> toReturn = sparkCloudProperties(polarisDomainName);
-            toReturn.putAll(first);
-            toReturn.putAll(second);
-            return toReturn;
+            Map<String, String> config = sparkCloudConfig(polarisDomainName);
+            config.putAll(first);
+            config.putAll(second);
+            return config;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    private @NonNull Map<String, String> sparkCloudProperties(String polarisDomainName) {
-        var                         toReturn     = new HashMap<String, String>();
+    private @NonNull Map<String, String> sparkCloudConfig(String polarisDomainName) {
+        var config = new HashMap<String, String>();
         SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
-        toReturn.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
+        config.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
         String clientId = properties.getValue(USER_POLARIS_ID);
         String clientSecret = properties.getValue(USER_POLARIS_SECRET);
         SparkWarehouseConfig sparkWarehouseConfig = sparkFactory.createConfig(properties, polarisDomainName, clientId, clientSecret);
-        for (AfonCloud cloudProvider : AfonCloud.values()) {
-            Map<String, String> configs = sparkWarehouseConfig.sparkConfigs(cloudProvider);
-            toReturn.putAll(configs);
+        for (AfonCatalog catalog : AfonCatalog.values()) {
+            config.putAll(sparkWarehouseConfig.sparkConfigs(catalog.toString()));
         }
-        toReturn.putAll(sparkWarehouseConfig.sparkConfigs("federatedCatalogName")); // taken from afon.properties
-        return toReturn;
+        config.putAll(sparkWarehouseConfig.sparkConfigs("federatedCatalogName")); // taken from afon.properties
+        return config;
     }
 }

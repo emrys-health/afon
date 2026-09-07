@@ -3,8 +3,7 @@ package health.emrys.afon.acceptance.azure
 import health.emrys.afon.acceptance.SparkHelper.spark
 import health.emrys.afon.acceptance.{AbstractAccessForbiddenSpec, AcceptanceTestConfig, FileHelper}
 import health.emrys.afon.acceptance.tags.{Azure, Forbidden}
-import health.emrys.afon.config.AfonCloud
-import health.emrys.afon.config.AfonCloud.AZURE_FORBIDDEN
+import health.emrys.afon.config.AfonCatalog.AZURE_FORBIDDEN
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 
 @Azure
@@ -13,7 +12,7 @@ class AzureAccessForbiddenSpec extends AbstractAccessForbiddenSpec with AzureTab
 
   def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(AZURE_FORBIDDEN)
 
-  override def cloudProvider: AfonCloud = AZURE_FORBIDDEN
+  override def catalogProvider(): Any = AZURE_FORBIDDEN
 
   def envSetupScript(): String = {
     "scripts/azure/create.sh"

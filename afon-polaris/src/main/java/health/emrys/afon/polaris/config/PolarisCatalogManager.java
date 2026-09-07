@@ -1,6 +1,6 @@
 package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.polaris.catalogs.*;
@@ -22,13 +22,13 @@ public class PolarisCatalogManager {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogManager.class);
 
-    private static final Map<AfonCloud, Function<AfonPropertyProvider, PolarisCatalog>>
+    private static final Map<AfonCatalog, Function<AfonPropertyProvider, PolarisCatalog>>
             CLOUD_TO_CATALOG = Map.of(
-            AfonCloud.AWS, AwsPolarisCatalog::new,
-            AfonCloud.AZURE, AzurePolarisCatalog::new,
-            AfonCloud.AZURE_EXTERNAL, AzureExternalPolarisCatalog::new,
-            AfonCloud.GCP, GcpPolarisCatalog::new,
-            AfonCloud.GCP_EXTERNAL, GcpExternalPolarisCatalog::new);
+            AfonCatalog.AWS, AwsPolarisCatalog::new,
+            AfonCatalog.AZURE, AzurePolarisCatalog::new,
+            AfonCatalog.AZURE_EXTERNAL, AzureExternalPolarisCatalog::new,
+            AfonCatalog.GCP, GcpPolarisCatalog::new,
+            AfonCatalog.GCP_EXTERNAL, GcpExternalPolarisCatalog::new);
 
     private static PolarisCatalog[] catalogs(AfonPropertyProvider properties) {
         List<PolarisCatalog> catalogs = new ArrayList<>();
@@ -90,7 +90,7 @@ public class PolarisCatalogManager {
     }
 
     private PolarisCatalog catalogOf(String name) {
-        return CLOUD_TO_CATALOG.get(AfonCloud.valueOf(name.toUpperCase())).apply(properties);
+        return CLOUD_TO_CATALOG.get(AfonCatalog.valueOf(name.toUpperCase())).apply(properties);
     }
 
     private List<String> catalogNames(PolarisCatalog... catalogs) {

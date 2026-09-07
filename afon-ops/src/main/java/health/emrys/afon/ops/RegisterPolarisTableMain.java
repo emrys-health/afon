@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisTableRegister;
@@ -56,7 +56,7 @@ public class RegisterPolarisTableMain {
             logger.warn(usage);
             return;
         }
-        String catalog = AfonCloud.valueOf(args[0].toUpperCase()).name();
+        String catalog = AfonCatalog.valueOf(args[0].toUpperCase()).name();
         String namespace = args[1];
         String table = args[2];
         String metadata = args[3];
