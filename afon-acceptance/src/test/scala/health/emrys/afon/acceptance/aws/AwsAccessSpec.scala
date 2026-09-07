@@ -3,13 +3,14 @@ package health.emrys.afon.acceptance.aws
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.{AbstractAccessSpec, AcceptanceTestConfig}
 import health.emrys.afon.acceptance.tags.{Access, Aws}
-import health.emrys.afon.config.AfonCatalog.AWS
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 
 @Aws
 @Access
 class AwsAccessSpec extends AbstractAccessSpec {
+
+  private lazy val AWS = AcceptanceTestConfig.instance.afonCatalogs().aws()
 
   override def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(AWS);
 

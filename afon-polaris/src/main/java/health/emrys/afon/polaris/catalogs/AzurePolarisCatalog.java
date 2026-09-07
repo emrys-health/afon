@@ -3,7 +3,6 @@ package health.emrys.afon.polaris.catalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 
-import static health.emrys.afon.config.AfonCatalog.AZURE;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.abfssBucketUrl;
 
@@ -35,6 +34,6 @@ public class AzurePolarisCatalog extends PolarisCatalog {
 
     @Override
     public String catalogName() {
-        return AZURE.toString();
+        return "azure";
     }
 }

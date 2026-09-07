@@ -1,6 +1,6 @@
 package health.emrys.afon.spark.connect;
 
-import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -17,17 +17,19 @@ public class SparkConnect {
     private static final Logger logger = LoggerFactory.getLogger(SparkConnect.class);
 
     protected final AfonPropertyProvider properties;
+    private final AfonCatalogs afonCatalogs;
     private SparkWarehouseConfig sparkConfig;
 
     public SparkConnect(AfonPropertyProvider properties) {
         this.properties = properties;
+        this.afonCatalogs = new AfonCatalogs(properties);
         logger.info("Using Polaris Endpoint {}", properties.getValue(POLARIS_ENDPOINT));
         sparkConfig = SparkWarehouseConfigFactory.getFactory().createConfig(properties);
     }
 
     public void talkToSparkConnect() {
         String warehouse = "test_warehouse";
-        SparkSession spark = sparkWithWarehouseCalled(warehouse, AfonCatalog.AWS.toString());
+        SparkSession spark = sparkWithWarehouseCalled(warehouse, afonCatalogs.aws().toString());
         String tableName = warehouse + ".acceptancetests.AwsAccessSpec"; // aws_trino.acceptancetests.AwsAccessSpec
         logger.info("Reading table {}", tableName);
         // spark.read().table(tableName).show();

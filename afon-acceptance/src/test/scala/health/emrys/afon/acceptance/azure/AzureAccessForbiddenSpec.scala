@@ -3,12 +3,13 @@ package health.emrys.afon.acceptance.azure
 import health.emrys.afon.acceptance.SparkHelper.spark
 import health.emrys.afon.acceptance.{AbstractAccessForbiddenSpec, AcceptanceTestConfig, FileHelper}
 import health.emrys.afon.acceptance.tags.{Azure, Forbidden}
-import health.emrys.afon.config.AfonCatalog.AZURE_FORBIDDEN
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 
 @Azure
 @Forbidden
 class AzureAccessForbiddenSpec extends AbstractAccessForbiddenSpec with AzureTableCreation {
+
+  private lazy val AZURE_FORBIDDEN = AcceptanceTestConfig.instance.afonCatalogs().azureForbidden()
 
   def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(AZURE_FORBIDDEN)
 

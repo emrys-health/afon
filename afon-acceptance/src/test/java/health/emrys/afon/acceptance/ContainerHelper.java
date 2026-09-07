@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.security.OAuthProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
@@ -125,7 +126,8 @@ public class ContainerHelper {
         if (sparkConnect == null) {
             sparkConnect = new GenericContainer<>(SPARK_IMAGE);
             SparkWarehouseConfig config = sparkFactory.createConfig(properties);
-            Stream<String> envs = Arrays.stream(AfonCatalog.values()).flatMap(
+            AfonCatalogs afonCatalogs = new AfonCatalogs(properties);
+            Stream<String> envs = afonCatalogs.all().stream().flatMap(
                 catalog ->
                         config.sparkConfigs(catalog.toString()).entrySet().stream().map(
                             entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
@@ -208,7 +210,8 @@ public class ContainerHelper {
                 trino.withNetwork(network);
 //                trino.withLogConsumer(new Slf4jLogConsumer(logger));
                 trino.start();
-                for (AfonCatalog catalog : Set.of(AfonCatalog.AWS_TRINO, AfonCatalog.AWS, AfonCatalog.GCP, AfonCatalog.AZURE)) {
+                AfonCatalogs afonCatalogs = new AfonCatalogs(properties);
+                for (AfonCatalog catalog : Set.of(afonCatalogs.awsTrino(), afonCatalogs.aws(), afonCatalogs.gcp(), afonCatalogs.azure())) {
                     String containerDestination = format("%s/%s.properties", catalogPath, catalog);
                     logger.info("Copying config file to container: {}", containerDestination);
                     trino.copyFileToContainer(

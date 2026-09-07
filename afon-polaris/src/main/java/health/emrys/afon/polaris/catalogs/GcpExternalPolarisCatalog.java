@@ -7,8 +7,6 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCatalog.GCP;
-import static health.emrys.afon.config.AfonCatalog.GCP_EXTERNAL;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.GcpUtils.gsBucketUrl;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
@@ -28,7 +26,7 @@ public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     @Override
     protected String remoteCatalogName() {
-        return GCP.toString();
+        return "gcp";
     }
 
     @Override
@@ -58,6 +56,6 @@ public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     @Override
     public String catalogName() {
-        return GCP_EXTERNAL.toString();
+        return "gcp_external";
     }
 }

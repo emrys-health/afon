@@ -26,11 +26,13 @@ public class AcceptanceTestConfig {
     }
 
     private final AfonPropertyProvider properties;
+    private final AfonCatalogs afonCatalogs;
     private final PolarisCatalogManager catalogManager;
     private final Map<AfonCatalog, PolarisCatalog> polarisCatalogs;
 
     private AcceptanceTestConfig(AfonPropertyProvider properties) {
         this.properties = properties;
+        this.afonCatalogs = new AfonCatalogs(properties);
         this.properties.setValue(KC_HOSTNAME, ContainerHelper.KEYCLOAK_HOSTNAME);
         this.polarisCatalogs = new HashMap<>();
         addPolarisCatalogs();
@@ -58,8 +60,8 @@ public class AcceptanceTestConfig {
     }
 
     private void addAwsCatalogs() {
-        polarisCatalogs.put(AfonCatalog.AWS, new AwsPolarisCatalog(this.properties));
-        polarisCatalogs.put(AfonCatalog.AWS_FORBIDDEN, new AwsPolarisCatalog(this.properties) {
+        polarisCatalogs.put(afonCatalogs.aws(), new AwsPolarisCatalog(this.properties));
+        polarisCatalogs.put(afonCatalogs.awsForbidden(), new AwsPolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
                 return s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN));
@@ -67,10 +69,10 @@ public class AcceptanceTestConfig {
 
             @Override
             public String catalogName() {
-                return AfonCatalog.AWS_FORBIDDEN.toString();
+                return afonCatalogs.awsForbidden().toString();
             }
         });
-        polarisCatalogs.put(AfonCatalog.AWS_TRINO, new AwsPolarisCatalog(this.properties) {
+        polarisCatalogs.put(afonCatalogs.awsTrino(), new AwsPolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
                 return s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_TRINO));
@@ -78,14 +80,14 @@ public class AcceptanceTestConfig {
 
             @Override
             public String catalogName() {
-                return AfonCatalog.AWS_TRINO.toString();
+                return afonCatalogs.awsTrino().toString();
             }
         });
     }
 
     private void addAzureCatalogs() {
-        polarisCatalogs.put(AfonCatalog.AZURE, new AzurePolarisCatalog(this.properties));
-        polarisCatalogs.put(AfonCatalog.AZURE_FORBIDDEN, new AzurePolarisCatalog(this.properties) {
+        polarisCatalogs.put(afonCatalogs.azure(), new AzurePolarisCatalog(this.properties));
+        polarisCatalogs.put(afonCatalogs.azureForbidden(), new AzurePolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
                 return abfssBucketUrl(
@@ -95,14 +97,14 @@ public class AcceptanceTestConfig {
 
             @Override
             public String catalogName() {
-                return AfonCatalog.AZURE_FORBIDDEN.toString();
+                return afonCatalogs.azureForbidden().toString();
             }
         });
     }
 
     private void addGcpCatalogs() {
-        polarisCatalogs.put(AfonCatalog.GCP, new GcpPolarisCatalog(this.properties));
-        polarisCatalogs.put(AfonCatalog.GCP_FORBIDDEN, new GcpPolarisCatalog(this.properties) {
+        polarisCatalogs.put(afonCatalogs.gcp(), new GcpPolarisCatalog(this.properties));
+        polarisCatalogs.put(afonCatalogs.gcpForbidden(), new GcpPolarisCatalog(this.properties) {
             @Override
             public String bucketUri() {
                 return gsBucketUrl(properties.getValue(GCP_BUCKET_NAME_FORBIDDEN));
@@ -110,7 +112,7 @@ public class AcceptanceTestConfig {
 
             @Override
             public String catalogName() {
-                return AfonCatalog.GCP_FORBIDDEN.toString();
+                return afonCatalogs.gcpForbidden().toString();
             }
         });
     }
@@ -131,6 +133,10 @@ public class AcceptanceTestConfig {
 
     public AfonPropertyProvider getProperties() {
         return this.properties;
+    }
+
+    public AfonCatalogs afonCatalogs() {
+        return this.afonCatalogs;
     }
 
     public PolarisCatalogManager getCatalogManager() {

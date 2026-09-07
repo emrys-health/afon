@@ -7,6 +7,7 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -214,7 +215,7 @@ public class SparkWorkloads {
         String clientId = properties.getValue(USER_POLARIS_ID);
         String clientSecret = ***REMOVED***
         SparkWarehouseConfig sparkWarehouseConfig = sparkFactory.createConfig(properties, polarisDomainName, clientId, clientSecret);
-        for (AfonCatalog catalog : AfonCatalog.values()) {
+        for (AfonCatalog catalog : new AfonCatalogs(properties).all()) {
             config.putAll(sparkWarehouseConfig.sparkConfigs(catalog.toString()));
         }
         config.putAll(sparkWarehouseConfig.sparkConfigs("federatedCatalogName")); // taken from afon.properties

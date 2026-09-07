@@ -3,7 +3,6 @@ package health.emrys.afon.polaris.catalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 
-import static health.emrys.afon.config.AfonCatalog.GCP;
 import static health.emrys.afon.config.AfonProperty.GCP_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperty.GCP_SERVICE_ACCOUNT;
 import static health.emrys.afon.polaris.catalogs.GcpUtils.gsBucketUrl;
@@ -24,7 +23,7 @@ public class GcpPolarisCatalog extends PolarisCatalog {
 
     @Override
     public String catalogName() {
-        return GCP.toString();
+        return "gcp";
     }
 
     protected String bucketUri() {

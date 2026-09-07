@@ -157,16 +157,7 @@ public class ConfigUtils {
         return ( env != null ) ? env : property;
     }
 
-    public static @NonNull AfonCatalog cloudToCatalog(AfonCloud cloud) {
-        switch (cloud) {
-            case AWS:
-                return AfonCatalog.AWS;
-            case AZURE:
-                return AfonCatalog.AZURE;
-            case GCP:
-                return AfonCatalog.GCP;
-            default:
-                throw new IllegalArgumentException("Unknown cloud type: " + cloud);
-        }
+    public static @NonNull AfonCatalog cloudToCatalog(AfonCloud cloud, AfonCatalogs catalogs) {
+        return catalogs.get(cloud.toString());
     }
 }
