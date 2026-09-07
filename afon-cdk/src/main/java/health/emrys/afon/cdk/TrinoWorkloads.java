@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.trino.TrinoServerConfiguration;
@@ -39,13 +40,11 @@ public class TrinoWorkloads {
     private static final int    WORKERS       = 2;
     private static final int    TRINO_PORT    = 8080;
 
-    private final String polarisDomainName;
     private final TrinoServerConfiguration trinoConfig;
 
     public TrinoWorkloads(AfonPropertyProvider properties,
                           String polarisDomainName) {
-        trinoConfig            = new TrinoServerConfiguration(polarisDomainName, properties);
-        this.polarisDomainName = polarisDomainName;
+        this.trinoConfig = new TrinoServerConfiguration(properties, polarisDomainName);
     }
 
     /**
@@ -62,13 +61,13 @@ public class TrinoWorkloads {
      */
     public void deploy(@NonNull Construct scope,
                        @NonNull HelmProvider helmProvider,
-                       @NonNull AfonCloud id,
+                       @NonNull AfonCatalog id,
                        @NonNull List<? extends ITerraformDependable> dependsOn) {
         Map<String, Object> values = Map.of(
             "image", Map.of("tag", IMAGE_TAG),
             "server", Map.of("workers", WORKERS), // Integer type
             "service", Map.of("type", "ClusterIP", "port", TRINO_PORT),
-            "additionalCatalogs", catalogFiles(id));
+            "additionalCatalogs", catalogFiles(id.toString()));
 
         try {
             // JSON is valid YAML, so the existing ObjectMapper produces a values document Helm
@@ -94,15 +93,16 @@ public class TrinoWorkloads {
      * One catalog per supported cloud, keyed by the cloud name (the chart writes each entry to
      * {@code <name>.properties}). Mirrors {@code SparkWarehouseConfig.sparkConfigs}.
      */
-    private Map<String, String> catalogFiles(AfonCloud defaultCatalog) {
+    private Map<String, String> catalogFiles(String defaultCatalog) {
         // LinkedHashMap so the default catalog is emitted first for readability.
         Map<String, String> catalogs = new LinkedHashMap<>();
-        catalogs.put(defaultCatalog.toString(), trinoConfig.catalogProperties(defaultCatalog));
-        for (AfonCloud cloud : AfonCloud.values()) {
-            if (cloud == defaultCatalog) {
+        catalogs.put(defaultCatalog, trinoConfig.catalogProperties(defaultCatalog));
+        for (AfonCatalog catalog : AfonCatalog.values()) {
+            String catalogName = catalog.toString();
+            if (catalogName == defaultCatalog) {
                 continue;
             }
-            catalogs.put(cloud.toString(), trinoConfig.catalogProperties(cloud));
+            catalogs.put(catalogName, trinoConfig.catalogProperties(catalogName));
         }
         return catalogs;
     }

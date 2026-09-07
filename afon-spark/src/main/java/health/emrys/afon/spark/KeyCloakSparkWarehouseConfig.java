@@ -42,8 +42,8 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
     }
 
     @Override
-    public Map<String, String> sparkConfigs(String sparkCatalog, String polarisCatalog) {
-        return addOauthServer(sparkCatalog, super.sparkConfigs(sparkCatalog, polarisCatalog));
+    public Map<String, String> sparkConfigs(String sparkCatalog, String catalogName) {
+        return addOauthServer(sparkCatalog, super.sparkConfigs(sparkCatalog, catalogName));
     }
 
     @Override

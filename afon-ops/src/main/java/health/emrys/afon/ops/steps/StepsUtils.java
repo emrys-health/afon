@@ -6,13 +6,13 @@ import java.util.List;
 
 public class StepsUtils {
 
-    public static List<Step> setupFullStackStepsUsing(StepOperations stepOperations, AfonCloud id) {
+    public static List<Step> setupFullStackStepsUsing(StepOperations stepOperations, AfonCloud cloud) {
         return List.of(
-                    stepOperations.deleteStack(id),
-                    stepOperations.deployFullStackIn(id),
-                    stepOperations.waitForPolarisIn(id),
-                    stepOperations.createAllCatalogsFor(id),
-                    stepOperations.checkAwsSparkWritingTo(id)
+                    stepOperations.deleteStack(cloud),
+                    stepOperations.deployFullStackIn(cloud),
+                    stepOperations.waitForPolarisIn(cloud),
+                    stepOperations.createAllCatalogsFor(cloud),
+                    stepOperations.checkAwsSparkWritingTo(cloud)
                 );
     }
 }

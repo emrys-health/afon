@@ -4,7 +4,7 @@ import health.emrys.afon.config.AfonCloud;
 
 public class SnowflakeDocumentUtils {
 
-    public static String getSupplementaryIntro(AfonCloud warehouse) {
+    public static String getSupplementaryIntro(AfonCloud cloud) {
         return String.format("""
                ### Summary of this deployment
                
@@ -13,7 +13,7 @@ public class SnowflakeDocumentUtils {
                the creation process.
                
                We then point Snowflake at this Polaris running in our real estate and run a SF query against it.
-               """, warehouse.name());
+               """, cloud.name());
     }
 
 }

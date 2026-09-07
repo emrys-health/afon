@@ -2,7 +2,6 @@ package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.SparkHelper.namespace
 import health.emrys.afon.acceptance.fixtures.Datum
-import health.emrys.afon.config.AfonCloud
 
 import java.sql.{Date, Timestamp}
 import java.time.LocalDateTime
@@ -17,8 +16,8 @@ trait SpecHelper {
   val formatted: String = now.format(formatter)
 
   val tableName: String = simpleTableName + formatted
-  def cloudProvider: AfonCloud
-  val tableNameFQN = cloudProvider + "." + namespace + "." + tableName
+  def catalogProvider(): Any
+  val tableNameFQN = catalogProvider + "." + namespace + "." + tableName
 
   def syntheticData(numRows: Int, numPartitions: Int = 4): Seq[Datum] = {
     Seq.range(0, numRows).map((i: Int) => Datum(

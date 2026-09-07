@@ -1,8 +1,7 @@
 package health.emrys.afon.spark;
 
-import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCatalog;
 import org.apache.spark.SparkConf;
-import org.apache.spark.sql.internal.SQLConf$;
 import org.apache.spark.sql.internal.StaticSQLConf$;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,52 +46,48 @@ public class SparkWarehouseConfig {
     }
 
     public SparkConf sparkConf(int cores) throws IOException {
-        return sparkConf(cores, cloudProviders());
+        return sparkConf(cores, catalogNames());
     }
 
-    protected String[] cloudProviders() {
-        return Arrays.stream(AfonCloud.values()).map(x -> x.toString()).toArray(String[]::new);
+    protected String[] catalogNames() {
+        return Arrays.stream(AfonCatalog.values()).map(x -> x.toString()).toArray(String[]::new);
     }
 
-    public SparkConf sparkConf(int cores, String... cloudProviders) throws IOException {
+    public SparkConf sparkConf(int cores, String... catalogNames) throws IOException {
         String tmpDir = Files.createTempDirectory("SparkForTesting").toString();
         SparkConf sparkConf = new SparkConf()
             .setMaster(format("local[%d]", cores))
             .setAppName("Tests")
             .setSparkHome(tmpDir)
             .set(WAREHOUSE_PATH, tmpDir);
-        configure(sparkConf, cloudProviders);
+        configure(sparkConf, catalogNames);
 
         return sparkConf;
     }
 
-    protected void configure(SparkConf sparkConf, String[] cloudProviders) {
-        for (String cloudProvider : cloudProviders) {
-            logger.info("Configuring Spark context for cloud {}", cloudProvider);
-            configureWith(sparkConfigs(cloudProvider), sparkConf);
+    protected void configure(SparkConf sparkConf, String[] catalogNames) {
+        for (String catalogName : catalogNames) {
+            logger.info("Configuring Spark context for catalog {}", catalogName);
+            configureWith(sparkConfigs(catalogName), sparkConf);
         }
 
         configureWith(sparkConfigStatics(), sparkConf);
     }
 
     public static void configureWith(Map<String, String> sparkProperties, SparkConf sparkConf) {
-        StringBuffer szb = new StringBuffer();
-        sparkProperties.entrySet().forEach(x -> szb.append(format("\n%-80s %50s", x.getKey(), x.getValue())));
-        logger.info(szb.toString());
+        StringBuffer sb = new StringBuffer();
+        sparkProperties.entrySet().forEach(x -> sb.append(format("\n%-80s %50s", x.getKey(), x.getValue())));
+        logger.info(sb.toString());
         sparkProperties.entrySet().stream().forEach(entry -> {
             sparkConf.set(entry.getKey(), entry.getValue());
         });
-    }
-
-    public Map<String, String> sparkConfigs(AfonCloud sparkCatalog) {
-        return sparkConfigs(sparkCatalog.toString());
     }
 
     public Map<String, String> sparkConfigs(String sparkCatalog) {
         return sparkConfigs(sparkCatalog, sparkCatalog);
     }
 
-    public Map<String, String> sparkConfigs(String sparkCatalog, String polarisCatalog) {
+    public Map<String, String> sparkConfigs(String sparkCatalog, String catalogName) {
         Map conf = new HashMap<String, String>();
         conf.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
         conf.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
@@ -102,8 +97,7 @@ public class SparkWarehouseConfig {
         conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
         conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol,
                                                                           host));
-        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), polarisCatalog); // this is the Polaris
-        // catalog name
+        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), catalogName); // this is the Polaris catalog name
         return Map.copyOf(conf);
     }
 

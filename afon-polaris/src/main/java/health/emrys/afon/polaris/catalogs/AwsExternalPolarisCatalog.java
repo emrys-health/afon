@@ -6,7 +6,7 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonCatalog.AWS;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 

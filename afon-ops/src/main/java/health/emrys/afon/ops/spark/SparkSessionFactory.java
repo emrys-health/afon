@@ -1,7 +1,8 @@
 package health.emrys.afon.ops.spark;
 
-import health.emrys.afon.polaris.config.PolarisCredentials;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -17,10 +18,10 @@ public class SparkSessionFactory {
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(SparkSessionFactory.class);
 
     private static final  String[] WAREHOUSE_NAMES =
-            Arrays.stream(AfonCloud.values()).map(x -> x.toString()).toArray(String[]::new);
+            Arrays.stream(AfonCatalog.values()).map(x -> x.toString()).toArray(String[]::new);
 
-    public static SparkSession localSparkClusterPolaris(AfonCloud polarisCloud, AfonPropertyProvider properties) throws IOException {
-        PolarisCredentials credentials = new PolarisCredentials(polarisCloud, properties);
+    public static SparkSession localSparkClusterPolaris(AfonCloud cloud, AfonPropertyProvider properties) throws IOException {
+        PolarisCredentials credentials = new PolarisCredentials(cloud, properties);
         return new SparkSessionFactory(
                 properties, credentials.getPolarisHost(), credentials.getPolarisId(),
                 credentials.getPolarisSecret(),

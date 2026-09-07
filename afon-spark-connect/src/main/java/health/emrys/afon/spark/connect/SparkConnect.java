@@ -1,6 +1,6 @@
 package health.emrys.afon.spark.connect;
 
-import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -16,22 +16,18 @@ public class SparkConnect {
 
     private static final Logger logger = LoggerFactory.getLogger(SparkConnect.class);
 
-    private final SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
     protected final AfonPropertyProvider properties;
     private SparkWarehouseConfig sparkConfig;
 
     public SparkConnect(AfonPropertyProvider properties) {
         this.properties = properties;
         logger.info("Using Polaris Endpoint {}", properties.getValue(POLARIS_ENDPOINT));
-        sparkConfig = configFactory.createConfig(properties);
+        sparkConfig = SparkWarehouseConfigFactory.getFactory().createConfig(properties);
     }
 
     public void talkToSparkConnect() {
         String warehouse = "test_warehouse";
-        SparkSession spark = sparkWithWarehouseCalled(
-            warehouse,
-            AfonCloud.AWS.toString()
-        );
+        SparkSession spark = sparkWithWarehouseCalled(warehouse, AfonCatalog.AWS.toString());
         String tableName = warehouse + ".acceptancetests.AwsAccessSpec"; // aws_trino.acceptancetests.AwsAccessSpec
         logger.info("Reading table {}", tableName);
         // spark.read().table(tableName).show();
@@ -43,7 +39,7 @@ public class SparkConnect {
 
     private SparkSession sparkWithWarehouseCalled(
         String warehouseName,
-        String polarisCatalog
+        String catalogName
     ) {
         SparkSession.Builder builder = SparkSession
             .builder()
@@ -52,7 +48,7 @@ public class SparkConnect {
             .remote("sc://localhost:15002/;token=deadbeef");
 
         final StringBuffer szb = new StringBuffer();
-        getWarehouseConfig(warehouseName, polarisCatalog)
+        getWarehouseConfig(warehouseName, catalogName)
             .entrySet()
             .forEach(entry -> {
                 String key   = entry.getKey();
@@ -66,8 +62,8 @@ public class SparkConnect {
     }
 
     protected Map<String, String> getWarehouseConfig(String warehouseName,
-                                                     String polarisCatalog) {
-        return sparkConfig.sparkConfigs(warehouseName, polarisCatalog);
+                                                     String catalogName) {
+        return sparkConfig.sparkConfigs(warehouseName, catalogName);
     }
 
     protected String getSparkUser() {

@@ -1,6 +1,5 @@
 package health.emrys.afon.trino;
 
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 
@@ -10,20 +9,15 @@ import static java.lang.String.format;
 
 public class TrinoServerConfiguration {
 
+    private final AfonPropertyProvider properties;
     private final String polarisDomainName;
-    private final String awsRegion;
-    private final String polarisClientId;
-    private final String polarisSecret;
 
-    public TrinoServerConfiguration(String polarisDomainName,
-                                    AfonPropertyProvider properties) {
+    public TrinoServerConfiguration(AfonPropertyProvider properties, String polarisDomainName) {
+        this.properties = properties;
         this.polarisDomainName = polarisDomainName;
-        this.awsRegion         = properties.getValue(AWS_REGION);
-        this.polarisClientId   = properties.getValue(USER_POLARIS_ID);
-        this.polarisSecret     = properties.getValue(USER_POLARIS_SECRET);
     }
 
-    public String catalogProperties(AfonCloud cloud) {
+    public String catalogProperties(String catalogName) {
         String protocol = "https://";
         if (polarisDomainName.toLowerCase().contains("localhost")
             || polarisDomainName.toLowerCase().contains("127.0.0.1")) {
@@ -45,13 +39,11 @@ public class TrinoServerConfiguration {
             iceberg.rest-catalog.oauth2.scope=%s
             %s
             %s""",
-            protocol,
-            polarisDomainName,
-            cloud,
-            polarisClientId,
-            polarisSecret,
+            protocol, polarisDomainName,
+            catalogName,
+            properties.getValue(USER_POLARIS_ID), properties.getValue(USER_POLARIS_SECRET),
             getOauthScope(),
-            fileSystemProperties(cloud),
+            fileSystemProperties(catalogName),
             additionalProperties()
             );
     }
@@ -68,15 +60,14 @@ public class TrinoServerConfiguration {
      * The object-store plugin Trino uses to read a warehouse's data files; vended credentials
      * from Polaris supply the actual access. Selected from the cloud-name prefix.
      */
-    private String fileSystemProperties(AfonCloud cloud) {
-        String name = cloud.toString();
-        if (name.startsWith("aws")) {
-            return format("fs.s3.enabled=true%ns3.region=%s%n", awsRegion);
+    private String fileSystemProperties(String catalogName) {
+        if (catalogName.startsWith("aws")) {
+            return format("fs.s3.enabled=true%ns3.region=%s%n", properties.getValue(AWS_REGION));
         }
-        if (name.startsWith("azure")) {
+        if (catalogName.startsWith("azure")) {
             return "fs.azure.enabled=true\n";
         }
-        if (name.startsWith("gcp")) {
+        if (catalogName.startsWith("gcp")) {
             // see https://github.com/trinodb/trino/issues/26772
             return "fs.gcs.enabled=true\ngcs.auth-type=APPLICATION_DEFAULT\n";
         }

@@ -1,9 +1,9 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 
+import static health.emrys.afon.config.AfonCatalog.AWS;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 
@@ -21,7 +21,7 @@ public class AwsPolarisCatalog extends PolarisCatalog {
 
     @Override
     public String catalogName() {
-        return AfonCloud.AWS.toString();
+        return AWS.toString();
     }
 
     @Override

@@ -1,5 +1,6 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepRunner;
@@ -22,7 +23,7 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
                         stepOperations.snowflakeWritesTo(AZURE),
                         stepOperations.deleteAwsPolarisCatalogAndRecreateFor(AZURE),
                         stepOperations.registerMostRecentSnowflakeTableInAws(AZURE),
-                        stepOperations.checkAwsSparkReadingUsing(AZURE)
+                        stepOperations.checkAwsSparkReadingUsing(AfonCatalog.AZURE)
                 )
         );
         return steps;
