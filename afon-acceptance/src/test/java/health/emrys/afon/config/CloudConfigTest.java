@@ -1,6 +1,5 @@
 package health.emrys.afon.config;
 
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 
 import java.util.Properties;
@@ -21,7 +20,7 @@ public class CloudConfigTest {
     }
 
     @Test
-    public void testCloudConfig() {
+    public void testWhitelistedDomainNamesAreValid() {
         for (String domain : getWhitelistedDomains()) {
             assertThat(isRfc1123Domain(domain)).as(domain).isTrue();
         }
@@ -42,7 +41,7 @@ public class CloudConfigTest {
         checkPropertiesContain(GCP_BUCKET_NAME.getValueFrom(getProperties()));
     }
 
-    private String @NonNull [] getWhitelistedDomains() {
+    private String[] getWhitelistedDomains() {
         String     allowed    = ALLOWED_DOMAINS_CSV.getValueFrom(getProperties());
         String[]   domains    = allowed.split(",");
         return domains;
