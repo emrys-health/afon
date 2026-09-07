@@ -1,17 +1,28 @@
 # Shared RBAC checks for the Azure create/destroy scripts.
 # Source this file to use the functions below
 
-# Azure built-in roles that grant Microsoft.Authorization/roleAssignments/write (and /delete):
-# 'Owner', 'User Access Administrator', and 'Role Based Access Control Administrator'.
-# In some envs role is held as a PIM-eligible, RBAC-restricted 'User Access Administrator' assignment
-# rather than a standing grant.
-ROLE_ASSIGNMENT_GRANT_QUERY="[?roleDefinitionName=='Owner' || roleDefinitionName=='User Access Administrator' || roleDefinitionName=='Role Based Access Control Administrator'].roleDefinitionName"
+# Azure built-in roles that grant Microsoft.Authorization/roleAssignments/write (and /delete),
+# pipe-separated. Configurable per env via AZURE_GRANT_ROLES in afon-azure.properties;
+# defaults to the three roles that grant it by default. Some envs restrict this to a single role
+# held as a PIM-eligible, condition-restricted 'User Access Administrator' assignment rather than
+# a standing grant - set AZURE_GRANT_ROLES="User Access Administrator" there.
+AZURE_GRANT_ROLES="${AZURE_GRANT_ROLES:-Owner|User Access Administrator|Role Based Access Control Administrator}"
+
+# Builds the `az role assignment list --query` JMESPath expression for AZURE_GRANT_ROLES.
+role_assignment_grant_query() {
+  local IFS='|' role query=""
+  for role in $AZURE_GRANT_ROLES; do
+    [ -n "$query" ] && query="$query || "
+    query="${query}roleDefinitionName=='$role'"
+  done
+  echo "[?$query].roleDefinitionName"
+}
 
 # Prints the role-assignment-granting roles (if any) held by the given principal in the subscription.
 # $1: principal id to check
 role_assignment_grant_roles_held() {
   local principal_id="$1"
-  az role assignment list --assignee "$principal_id" --all --query "$ROLE_ASSIGNMENT_GRANT_QUERY" -o tsv
+  az role assignment list --assignee "$principal_id" --all --query "$(role_assignment_grant_query)" -o tsv
 }
 
 # True if the given principal holds role assignments roles in the subscription, i.e. can create/delete role assignments.
