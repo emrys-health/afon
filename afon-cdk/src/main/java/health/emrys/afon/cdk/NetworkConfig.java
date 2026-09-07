@@ -147,11 +147,12 @@ public class NetworkConfig {
                 "ports", List.of(Map.of("port", "53", "protocol", "ANY")),
                 "rules", Map.of("dns", List.of(Map.of("matchPattern", "*"))))));
         Map<String, Object> domainEgress = Map.of(
-            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList(),
-            "toPorts", List.of(Map.of(
-                "ports", ALLOWED_PORTS.stream()
-                                      .map(port -> Map.of("port", port, "protocol", "TCP"))
-                                      .toList())));
+            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList()
+//            "toPorts", List.of(Map.of(
+//                "ports", ALLOWED_PORTS.stream()
+//                                      .map(port -> Map.of("port", port, "protocol", "TCP"))
+//                                      .toList()))
+        );
         Map<String, Object> manifest = Map.of(
             "apiVersion", "cilium.io/v2",
             "kind", "CiliumNetworkPolicy",
