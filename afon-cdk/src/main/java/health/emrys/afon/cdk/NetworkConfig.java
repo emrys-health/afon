@@ -31,6 +31,21 @@ public class NetworkConfig {
     private static final List<String> ALLOWED_PORTS = List.of("80", "443", "7077", "15002");
 
     /**
+     * Zones the cluster's own resolvers answer, and which a lookup therefore cannot escape
+     * through. CoreDNS is authoritative for {@code cluster.local} and returns NXDOMAIN itself
+     * rather than forwarding, and {@code compute.internal} goes to the VPC resolver. Neither
+     * reaches a nameserver an attacker could operate, so a query smuggling data in its labels has
+     * nowhere to arrive - which is why these can be wildcarded freely while external names cannot.
+     */
+    private static final List<String> INTERNAL_DNS_ZONES = List.of("cluster.local", "compute.internal");
+
+    /**
+     * Labels a search-domain suffix adds beyond the zone itself. The longest suffix in play is
+     * {@code default.svc.cluster.local}, two labels more than {@code cluster.local}.
+     */
+    private static final int SEARCH_PATH_LABELS = 2;
+
+    /**
      * The pods backing {@code emrys-master-svc}, expressed exactly as the Service selects them
      * (see {@code AwsSparkStack.sparkExternalService}). {@link SparkWorkloads#MASTER} names the
      * StatefulSet the Spark operator creates for the {@code SparkCluster}; the {@code k8s:} prefix
@@ -70,6 +85,11 @@ public class NetworkConfig {
 
         Map<String, String> asFqdnSelector() {
             return Map.of(matcher, domain);
+        }
+
+        /** How many dot-separated labels the name has, {@code a.b.com} being three. */
+        int labelCount() {
+            return domain.split("\\.").length;
         }
     }
 
@@ -191,7 +211,7 @@ public class NetworkConfig {
                 "k8s:k8s-app", "kube-dns"))),
             "toPorts", List.of(Map.of(
                 "ports", List.of(Map.of("port", "53", "protocol", "ANY")),
-                "rules", Map.of("dns", List.of(Map.of("matchPattern", "*"))))));
+                "rules", Map.of("dns", dnsQueryRules(allowedDomains)))));
         Map<String, Object> domainEgress = Map.of(
             "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList()
 //            "toPorts", List.of(Map.of(
@@ -219,6 +239,50 @@ public class NetworkConfig {
                 "endpointSelector", Map.of("matchLabels", labels),
                 "egress", List.of(dnsVisibility, domainEgress, sparkMasterEgress)));
         return manifest;
+    }
+
+    /**
+     * The names the DNS proxy will answer. Anything else is refused, which closes DNS itself as an
+     * exfiltration channel: with the previous {@code matchPattern: "*"} every name resolved, so a
+     * pod could tunnel data out in the labels of a query to a nameserver it controlled, no matter
+     * how tight {@code toFQDNs} was. {@code toFQDNs} governs which addresses may be *connected to*
+     * and says nothing about which names may be *looked up*.
+     * <p>
+     * Two groups have to be here or the pods lose DNS.
+     * <p>
+     * First, the whitelisted domains, reusing the very selectors {@link #connectionManifest} feeds
+     * to {@code toFQDNs}: Cilium only learns an address for a name whose lookup passed the proxy,
+     * so a name allowed to connect but not to resolve would never work.
+     * <p>
+     * Second, the search-path expansions. A pod's resolver has {@code ndots:5}, so a name with
+     * fewer than five dots is tried against each search domain before being tried as written -
+     * {@code storage.googleapis.com} is first queried as
+     * {@code storage.googleapis.com.default.svc.cluster.local}, and so on down the list. Those
+     * misses have to reach CoreDNS to be answered NXDOMAIN. Refusing them instead would leave the
+     * resolver to interpret a REFUSED rcode mid-search, which glibc mostly walks past but musl
+     * treats far less forgivingly - a failure mode that would show up as intermittent,
+     * base-image-dependent DNS breakage rather than anything obviously caused by this policy.
+     * <p>
+     * Hence the ladder. Cilium's {@code *} is not a glob over the whole name: {@code
+     * escapeRegexpCharacters} rewrites it to {@code [-a-zA-Z0-9_]*}, which excludes the dot, so one
+     * {@code *} spans exactly one label and {@code *.cluster.local} does not match
+     * {@code emrys-master-svc.default.svc.cluster.local}. Covering every depth therefore means
+     * emitting a pattern per depth, up to the longest whitelisted name plus
+     * {@link #SEARCH_PATH_LABELS}.
+     */
+    private static List<Map<String, String>> dnsQueryRules(List<AllowedDomain> allowedDomains) {
+        List<Map<String, String>> rules = new ArrayList<>(
+            allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList());
+        int deepest = allowedDomains.stream().mapToInt(AllowedDomain::labelCount).max().orElse(1)
+                      + SEARCH_PATH_LABELS;
+        for (String zone : INTERNAL_DNS_ZONES) {
+            StringBuilder wildcards = new StringBuilder("*");
+            for (int depth = 0; depth < deepest; depth++) {
+                rules.add(Map.of("matchPattern", wildcards + "." + zone));
+                wildcards.append(".*");
+            }
+        }
+        return List.copyOf(rules);
     }
 
     private static @NonNull String toJson(Map<String, Object> manifest) {
