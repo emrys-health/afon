@@ -4,6 +4,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
+import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.JupyterMfaConfig;
 import health.emrys.afon.config.AfonProperty;
@@ -13,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.cdk.Defaults.JUPYTER_INGRESS;
+import static health.emrys.afon.cdk.CdkHelper.JUPYTER_INGRESS_NAME;
 
 /**
  * AWS wiring for {@link JupyterHubConfig}: terminates HTTPS at an ALB and routes to the oauth2-proxy
@@ -47,11 +48,11 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
         // Traffic flow: internet → ALB (443) → oauth2-proxy:4180 → proxy-public:8000 → hub / user pods
         IngressV1 ingress = cloudProvider.createHttpsIngress(
             "jupyterhub-https-ingress",
-            JUPYTER_INGRESS,
+                JUPYTER_INGRESS_NAME,
             jupyterCertArn,
             jupyterDomain,
-            JupyterMfaConfig.PROXY_SVC_NAME,
-            JupyterMfaConfig.PROXY_PORT,
+            CdkHelper.PROXY_SERVICE_NAME,
+            CdkHelper.PROXY_PORT,
             cloudProvider.getSubnetIds());
 
         cloudProvider.configureDNS(
@@ -60,7 +61,7 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
             jupyterDomain,
             cloudProvider.getLbRelease(),
             ingress,
-            JUPYTER_INGRESS);
+                JUPYTER_INGRESS_NAME);
     }
 
     @Override

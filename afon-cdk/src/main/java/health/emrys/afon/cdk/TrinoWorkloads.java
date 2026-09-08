@@ -53,7 +53,7 @@ public class TrinoWorkloads {
     /**
      * Installs the Trino chart against the cluster targeted by {@code helmProvider}. The release
      * id/name is kept stable ("trino") so existing stack state is preserved and the resulting
-     * {@code Service} is named {@link Defaults#TRINO_SERVICE_NAME}.
+     * {@code Service} is named {@link CdkHelper#TRINO_SERVICE_NAME}.
      *
      * @param scope        the CDKTF stack the release is scoped to.
      * @param helmProvider the Helm provider wired to the target cluster (Azure aliases its

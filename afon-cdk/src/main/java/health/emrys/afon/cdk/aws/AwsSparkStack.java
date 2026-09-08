@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.NO_SPARK_LB_FINALIZERS;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.Defaults.SPARK_SERVICE_NAME;
+import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DOMAIN_NAME;
 
