@@ -3,7 +3,9 @@ package health.emrys.afon.polaris;
 import health.emrys.afon.config.AfonProperty;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
@@ -11,7 +13,7 @@ import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
 
 public class PolarisConstants {
     /**
-     * 'Magic' namespace that is used for acceptance tests and infra
+     * 'Magic' namespace that is used for acceptance tests and ops
      */
     public static final String ACCEPTANCE_TEST_NAMESPACE = "acceptancetests";
 
@@ -38,7 +40,18 @@ public class PolarisConstants {
     public static final String POLARIS_ADMIN_TOOL_IMAGE_NAME = "apache/polaris-admin-tool:1.5.0";
     public static final String POLARIS_INTERNAL_SERVICE_NAME = "polaris-internal";
 
-    public static final Set<AfonProperty> getPolarisProperties(){
+    /**
+     * The Afon properties Polaris needs, keyed to the literal env var name Polaris's own process
+     * must see them under. This is usually just {@link AfonProperty#getName()}, but Polaris vends
+     * Azure ADLS credentials via the Azure SDK's {@code DefaultAzureCredential}, whose {@code
+     * EnvironmentCredential} step requires the exact names {@code AZURE_CLIENT_ID} and {@code
+     * AZURE_CLIENT_SECRET} — a contract of the Azure SDK.
+     * Afon's properties {@link AfonProperty#AZURE_APP_ID}/{@link AfonProperty#AZURE_APP_SECRET}
+     * match the Azure CLI's terminology instead.
+     * The mapping is resolved here, in the one place that enumerates what Polaris needs,
+     * so every caller gets the correct env var name.
+     */
+    public static Map<AfonProperty, String> getPolarisProperties(){
         Set<AfonProperty> set = new HashSet<>();
         set.addAll(Set.of(POLARIS_ID, POLARIS_SECRET));
         if ( cloudPropertySet() ){
@@ -49,8 +62,8 @@ public class PolarisConstants {
                             AWS_REGION));
                     break;
                 case "azure":
-                    set.addAll(Set.of(AZURE_CLIENT_SECRET,
-                            AZURE_CLIENT_ID,
+                    set.addAll(Set.of(AZURE_APP_SECRET,
+                            AZURE_APP_ID,
                             AZURE_TENANT_ID));
                     break;
                 default:
@@ -59,12 +72,20 @@ public class PolarisConstants {
             // add all cloud providers
             set.addAll(Set.of(AWS_ACCESS_KEY_ID,
                     AWS_SECRET_ACCESS_KEY,
-                    AWS_REGION, AZURE_CLIENT_SECRET,
-                    AZURE_CLIENT_ID,
+                    AWS_REGION, AZURE_APP_SECRET,
+                    AZURE_APP_ID,
                     AZURE_TENANT_ID));
 
         }
-        return set;
+        return set.stream().collect(Collectors.toMap(property -> property, PolarisConstants::polarisEnvNameFor));
+    }
+
+    private static String polarisEnvNameFor(AfonProperty property) {
+        return switch (property) {
+            case AZURE_APP_ID -> "AZURE_CLIENT_ID";
+            case AZURE_APP_SECRET -> "AZURE_CLIENT_SECRET";
+            default -> property.getName();
+        };
     }
 
 }

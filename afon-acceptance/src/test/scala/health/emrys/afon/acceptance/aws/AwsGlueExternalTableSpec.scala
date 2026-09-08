@@ -4,7 +4,7 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, External}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
-import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_EXTERNAL_BUCKET_NAME, GLUE_CATALOG_NAME}
+import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_BUCKET_NAME_EXTERNAL, AWS_GLUE_CATALOG_NAME}
 import health.emrys.afon.polaris.catalogs.GlueAwsPolarisCatalog
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
@@ -20,8 +20,8 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
   val catalogManager = AcceptanceTestConfig.instance.getCatalogManager
 
   "An external table" should {
-    val glueCatalogName   = properties.getValue(GLUE_CATALOG_NAME)
-    val externalBucket    = properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME)
+    val glueCatalogName   = properties.getValue(AWS_GLUE_CATALOG_NAME)
+    val externalBucket    = properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL)
     val glueCatalog       = new GlueAwsPolarisCatalog(properties)
     val grantCatalogAdmin = new GrantCatalogAdmin(this, glueCatalog, Some(glueCatalog.catalogName()))
     val createCatalogRole = new CreateCatalogRole(this, glueCatalog, Some(glueCatalog.catalogName))

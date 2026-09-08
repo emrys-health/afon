@@ -4,7 +4,7 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
 import health.emrys.afon.acceptance.tags.{Azure, External}
-import health.emrys.afon.config.AfonProperty.{AZURE_BUCKET, DATABRICKS_TOKEN}
+import health.emrys.afon.config.AfonProperty.{AZURE_BUCKET_NAME, AZURE_DATABRICKS_TOKEN}
 import health.emrys.afon.polaris.catalogs.{AzurePolarisCatalog, ExternalPolarisCatalog}
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
 import org.apache.polaris.core.admin.model._
@@ -18,7 +18,7 @@ import java.util.Collections
  * You'll need to generate a Databricks token for this test to run successfully and put it in your secret.properties
  *
  * Test Databricks is actually ready to receive calls with:
- * curl -X GET   https://adb-7405611337270626.6.azuredatabricks.net/api/2.1/unity-catalog/iceberg-rest/v1/catalogs/phdbx/namespaces/default   -H "Authorization: Bearer $DATABRICKS_TOKEN"
+ * curl -X GET   https://adb-7405611337270626.6.azuredatabricks.net/api/2.1/unity-catalog/iceberg-rest/v1/catalogs/phdbx/namespaces/default   -H "Authorization: Bearer $AZURE_DATABRICKS_TOKEN"
  */
 @Azure
 @External
@@ -31,7 +31,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
   val DATABRICKS_URI         = "https://adb-7405611337270626.6.azuredatabricks.net"
 
   "An external table" should {
-    properties.setValue(AZURE_BUCKET, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
+    properties.setValue(AZURE_BUCKET_NAME, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
     val azureCatalog = new AzurePolarisCatalog(properties)
 
     val externalCatalog: ExternalPolarisCatalog = new ExternalPolarisCatalog(properties) {
@@ -46,7 +46,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
       override protected def createCatalog(): ExternalCatalog = {
         val bucketProperties = CatalogProperties.builder().setDefaultBaseLocation(bucketUri()).build()
         val dbToken = new BearerAuthenticationParameters(
-          properties.getValue(DATABRICKS_TOKEN),
+          properties.getValue(AZURE_DATABRICKS_TOKEN),
           AuthenticationParameters.AuthenticationTypeEnum.BEARER)
         val connectionInfo = IcebergRestConnectionConfigInfo.builder()
           .setRemoteCatalogName(FEDERATED_CATALOG_NAME)

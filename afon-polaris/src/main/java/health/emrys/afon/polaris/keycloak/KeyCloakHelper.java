@@ -5,8 +5,6 @@ import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static java.lang.String.format;
-
 /**
  * Configuration shared between the KeyCloak container, the {@link KeyCloakProvider} that provisions
  * users in it and the Polaris container that uses KeyCloak as its OIDC identity provider.
@@ -20,9 +18,9 @@ public class KeyCloakHelper {
      * <p>The keys are the canonical (dotted) Polaris/Quarkus property names; SmallRye Config reads
      * them from the environment, which is how the official Polaris docker images are configured.
      */
-    public static Map<String, String> polarisOidcEnv(String keyCloakURL,
-                                                     String user,
-                                                     String userPassword) {
+    public static Map<String, String> polarisOidcEnv(String authServerUrl,
+                                                     String clientId,
+                                                     String clientSecret) {
         Map<String, String> env = new LinkedHashMap<>();
         // Use KeyCloak instead of Polaris' internal token store.
         env.put("polaris.authentication.type", "external");
@@ -42,9 +40,9 @@ public class KeyCloakHelper {
         env.put("polaris.oidc.principal-roles-mapper.type", "default");
         // Point Quarkus OIDC at the KeyCloak realm. OIDC is disabled by default, so enable the tenant.
         env.put("quarkus.oidc.tenant-enabled", "true");
-        env.put("quarkus.oidc.auth-server-url", keyCloakURL);
-        env.put("quarkus.oidc.client-id", user);
-        env.put("quarkus.oidc.credentials.secret", userPassword);
+        env.put("quarkus.oidc.auth-server-url", authServerUrl);
+        env.put("quarkus.oidc.client-id", clientId);
+        env.put("quarkus.oidc.credentials.secret", clientSecret);
         env.put("quarkus.oidc.application-type", "service");
         // TESTING RELAXATION: accept any issuer. KeyCloak (KC_HOSTNAME_STRICT=false) stamps 'iss' from
         // the request host, so a token minted via 'localhost' differs from Polaris' 'keycloak' issuer.

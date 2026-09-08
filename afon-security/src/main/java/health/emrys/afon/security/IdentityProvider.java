@@ -7,7 +7,7 @@ import org.apache.hc.core5.http.HttpResponse;
 import java.io.IOException;
 import java.util.List;
 
-public interface OAuthProvider {
+public interface IdentityProvider {
 
     /**
      * Registers the Polaris user with username and password provided, leaving
