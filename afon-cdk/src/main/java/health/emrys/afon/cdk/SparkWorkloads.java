@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -219,11 +217,6 @@ public class SparkWorkloads {
         String clientId = properties.getValue(USER_POLARIS_ID);
         String clientSecret = properties.getValue(USER_POLARIS_SECRET);
         SparkWarehouseConfig sparkWarehouseConfig = SparkWarehouseConfigFactory.getFactory().createConfig(properties, polarisDomainName, clientId, clientSecret);
-        Map<String, String> config =  new HashMap<>();
-        for (AfonCatalog catalog : new AfonCatalogs(properties).all()) {
-            config.putAll(sparkWarehouseConfig.sparkConfigs(catalog.toString()));
-        }
-        config.putAll(sparkWarehouseConfig.sparkConfigs("federatedCatalogName")); // taken from afon.properties
-        return config;
+        return sparkWarehouseConfig.allSparkConfigs("federatedCatalogName"); // taken from afon.properties
     }
 }
