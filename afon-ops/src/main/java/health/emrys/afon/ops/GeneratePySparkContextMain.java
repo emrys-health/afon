@@ -1,9 +1,11 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.polaris.config.PolarisCredentials;
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -13,8 +15,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
-import static health.emrys.afon.config.AfonCloud.AZURE;
-import static health.emrys.afon.config.AfonCloud.GCP;
 import static java.lang.String.format;
 
 /**
@@ -34,6 +34,7 @@ public class GeneratePySparkContextMain {
     private final String polarisHost;
 
     private final SparkWarehouseConfig polarisConfig;
+    private final AfonCatalogs afonCatalogs;
 
     public GeneratePySparkContextMain(AfonCloud cloud, AfonPropertyProvider properties) {
         PolarisCredentials credentials = new PolarisCredentials(cloud, properties);
@@ -42,6 +43,7 @@ public class GeneratePySparkContextMain {
         polarisHost   = credentials.getPolarisHost();
         polarisConfig = SparkWarehouseConfigFactory.getFactory()
                         .createConfig(properties, polarisHost, polarisId, polarisSecret);
+        afonCatalogs = new AfonCatalogs(properties);
     }
 
     public void generatePySparkCode() {
@@ -92,8 +94,8 @@ public class GeneratePySparkContextMain {
                            """);
 
         System.out.println("\u001B[34m");
-        System.out.println(snowflakeSql(AZURE, "smoketesttable260217491351"));
-        System.out.println(snowflakeSql(GCP, "smoketesttable260318240929"));
+        System.out.println(snowflakeSql(afonCatalogs.azure(), "smoketesttable260217491351"));
+        System.out.println(snowflakeSql(afonCatalogs.gcp(), "smoketesttable260318240929"));
 
         System.out.println(format(
             """
@@ -123,16 +125,16 @@ public class GeneratePySparkContextMain {
                                     REPLACE_INVALID_CHARACTERS = TRUE
                                   """));
         System.out.println("\u001B[0m");
-        for (AfonCloud cloud : AfonCloud.values()) {
-            Map<String, String> configs = polarisConfig.sparkConfigs(cloud);
-            System.out.println("# " + cloud);
+        for (AfonCatalog catalog : afonCatalogs.all()) {
+            Map<String, String> configs = polarisConfig.sparkConfigs(catalog.toString());
+            System.out.println("# " + catalog);
             configs.forEach((key, value) -> System.out.println(format(".config('%s', '%s')", key, value)));
         }
     }
 
-    private String snowflakeSql(AfonCloud cloud, String catalog_table) {
-        String     catalog    = "iceberg_" + cloud.name();
-        String     table      = format("my_%s_table", cloud.name());
+    private String snowflakeSql(AfonCatalog catalog, String catalogTable) {
+        String catalogName = "iceberg_" + catalog.name();
+        String tableName = format("my_%s_table", catalog.name());
         return format(
             """
             CREATE OR REPLACE CATALOG INTEGRATION %s
@@ -160,9 +162,9 @@ public class GeneratePySparkContextMain {
                                              REPLACE_INVALID_CHARACTERS = TRUE;
             
             select * from %s;
-            """, catalog, polarisHost, cloud,
+            """, catalogName, polarisHost, catalog,
             polarisId, polarisSecret,
-            table, catalog, catalog_table, table);
+            tableName, catalogName, catalogTable, tableName);
     }
 
     private @NonNull String azureSmokeTest(String tableName) {

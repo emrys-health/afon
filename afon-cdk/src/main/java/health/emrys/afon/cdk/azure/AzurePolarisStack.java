@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
-import static health.emrys.afon.cdk.Defaults.POLARIS_INGRESS_NAME;
+import static health.emrys.afon.cdk.CdkHelper.POLARIS_INGRESS_NAME;
 import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonProperty.AZURE_KEY_VAULT_NAME;
 import static java.lang.String.format;

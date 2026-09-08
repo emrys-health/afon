@@ -2,6 +2,7 @@ package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
+import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.cdk.KeyCloakConfig;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -30,11 +31,11 @@ public class AwsKeyCloakConfig extends KeyCloakConfig<AwsCloudProvider> {
     @Override
     protected void configureHttpsAndDNS() {
         IngressV1 ingress = cloudProvider.createHttpsIngress(
-            KEYCLOAK_HTTPS_INGRESS,
-            KEYCLOAK_INGRESS,
+            CdkHelper.KEYCLOAK_HTTPS_INGRESS_NAME,
+            CdkHelper.KEYCLOAK_INGRESS_NAME,
             certArn,
             hostname,
-            KC_SVC,
+            CdkHelper.KEYCLOAK_SERVICE_NAME,
             KEYCLOAK_PORT,
             cloudProvider.getSubnetIds());
 
@@ -44,7 +45,7 @@ public class AwsKeyCloakConfig extends KeyCloakConfig<AwsCloudProvider> {
             hostname,
             cloudProvider.getLbRelease(),
             ingress,
-            KEYCLOAK_INGRESS);
+            CdkHelper.KEYCLOAK_INGRESS_NAME);
     }
 
     /**

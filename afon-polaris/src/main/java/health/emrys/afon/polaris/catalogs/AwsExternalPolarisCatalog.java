@@ -6,7 +6,6 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 
@@ -26,7 +25,7 @@ public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     @Override
     protected String remoteCatalogName() {
-        return AWS.toString();
+        return "aws";
     }
 
     @Override
@@ -51,6 +50,6 @@ public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     @Override
     public String catalogName() {
-        return AWS + "_EXTERNAL";
+        return "aws_external";
     }
 }

@@ -3,8 +3,6 @@ package health.emrys.afon.acceptance.aws
 import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.{AbstractAccessSpec, AcceptanceTestConfig}
 import health.emrys.afon.acceptance.tags.{Access, Aws}
-import health.emrys.afon.config.AfonCloud
-import health.emrys.afon.config.AfonCloud.AWS
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 
@@ -12,9 +10,11 @@ import health.emrys.afon.polaris.catalogs.PolarisCatalog
 @Access
 class AwsAccessSpec extends AbstractAccessSpec {
 
+  private lazy val AWS = AcceptanceTestConfig.instance.afonCatalogs().aws()
+
   override def catalog: PolarisCatalog = AcceptanceTestConfig.instance.getCatalog(AWS);
 
-  override def cloudProvider: AfonCloud = AWS
+  override def afonCatalog(): Any = AWS
 
   "Trino" should {
     "vend credentials" in {
@@ -24,9 +24,9 @@ class AwsAccessSpec extends AbstractAccessSpec {
       And(s"a table called $tableName with $NUM_ROWS rows in cloud storage")
 
       And(
-        s"""a Trino instance with $cloudProvider.properties of:
+        s"""a Trino instance with $afonCatalog.properties of:
            |
-           |${trinoLocalConfig(properties, cloudProvider)}""".stripMargin)
+           |${trinoLocalConfig(properties, afonCatalog.toString)}""".stripMargin)
 
       var trinoHttp = trinoConfigProperties().get("discovery.uri").toString
       trinoHttp = trinoHttp.substring(trinoHttp.indexOf("//") + 2)

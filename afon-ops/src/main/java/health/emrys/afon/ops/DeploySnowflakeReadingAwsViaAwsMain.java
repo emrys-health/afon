@@ -17,7 +17,7 @@ public class DeploySnowflakeReadingAwsViaAwsMain implements StepsProvider {
     public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(setupFullStackStepsUsing(stepOperations, AWS));
-        steps.add(stepOperations.snowflakeReadingViaAwsPolaris(AWS));
+        steps.add(stepOperations.snowflakeReadingViaAwsPolaris(stepOperations.afonCatalogs().aws()));
         return steps;
     }
 

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.trino.TrinoServerConfiguration;
@@ -39,19 +41,19 @@ public class TrinoWorkloads {
     private static final int    WORKERS       = 2;
     private static final int    TRINO_PORT    = 8080;
 
-    private final String polarisDomainName;
     private final TrinoServerConfiguration trinoConfig;
+    private final AfonCatalogs afonCatalogs;
 
     public TrinoWorkloads(AfonPropertyProvider properties,
                           String polarisDomainName) {
-        trinoConfig            = new TrinoServerConfiguration(polarisDomainName, properties);
-        this.polarisDomainName = polarisDomainName;
+        this.trinoConfig = new TrinoServerConfiguration(properties, polarisDomainName);
+        this.afonCatalogs = new AfonCatalogs(properties);
     }
 
     /**
      * Installs the Trino chart against the cluster targeted by {@code helmProvider}. The release
      * id/name is kept stable ("trino") so existing stack state is preserved and the resulting
-     * {@code Service} is named {@link Defaults#TRINO_SERVICE_NAME}.
+     * {@code Service} is named {@link CdkHelper#TRINO_SERVICE_NAME}.
      *
      * @param scope        the CDKTF stack the release is scoped to.
      * @param helmProvider the Helm provider wired to the target cluster (Azure aliases its
@@ -62,13 +64,13 @@ public class TrinoWorkloads {
      */
     public void deploy(@NonNull Construct scope,
                        @NonNull HelmProvider helmProvider,
-                       @NonNull AfonCloud id,
+                       @NonNull AfonCatalog id,
                        @NonNull List<? extends ITerraformDependable> dependsOn) {
         Map<String, Object> values = Map.of(
             "image", Map.of("tag", IMAGE_TAG),
             "server", Map.of("workers", WORKERS), // Integer type
             "service", Map.of("type", "ClusterIP", "port", TRINO_PORT),
-            "additionalCatalogs", catalogFiles(id));
+            "additionalCatalogs", catalogFiles(id.toString()));
 
         try {
             // JSON is valid YAML, so the existing ObjectMapper produces a values document Helm
@@ -94,15 +96,16 @@ public class TrinoWorkloads {
      * One catalog per supported cloud, keyed by the cloud name (the chart writes each entry to
      * {@code <name>.properties}). Mirrors {@code SparkWarehouseConfig.sparkConfigs}.
      */
-    private Map<String, String> catalogFiles(AfonCloud defaultCatalog) {
+    private Map<String, String> catalogFiles(String defaultCatalog) {
         // LinkedHashMap so the default catalog is emitted first for readability.
         Map<String, String> catalogs = new LinkedHashMap<>();
-        catalogs.put(defaultCatalog.toString(), trinoConfig.catalogProperties(defaultCatalog));
-        for (AfonCloud cloud : AfonCloud.values()) {
-            if (cloud == defaultCatalog) {
+        catalogs.put(defaultCatalog, trinoConfig.catalogProperties(defaultCatalog));
+        for (AfonCatalog catalog : afonCatalogs.all()) {
+            String catalogName = catalog.toString();
+            if (catalogName == defaultCatalog) {
                 continue;
             }
-            catalogs.put(cloud.toString(), trinoConfig.catalogProperties(cloud));
+            catalogs.put(catalogName, trinoConfig.catalogProperties(catalogName));
         }
         return catalogs;
     }

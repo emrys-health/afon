@@ -33,15 +33,13 @@ POLARIS_FEATURES_SUPPORTED_CATALOG_CONNECTION_TYPES="ICEBERG_REST,HIVE"
 
 When enabled, a Polaris instance in one cloud (e.g. AWS) can be configured with an **external catalog** that points to a Polaris instance in another cloud (e.g. Azure). When Spark queries the external catalog, the AWS Polaris proxies the request to the Azure Polaris, which vends Azure credentials. Spark then reads directly from Azure Blob Storage — no data passes through the Polaris servers.
 
-The `AfonCloud` defines the catalog types:
+The `AfonCatalog` defines the catalog types:
 
-- `AWS` — internal catalog, data in S3
-- `GCP` — internal catalog, data in GCS
-- `AZURE` — internal catalog, data in Azure Blob
-- `AZURE_EXTERNAL` — external/federated catalog pointing to another Polaris
-- `GCP_EXTERNAL` — same for GCP
-- `{AWS|AZURE|GCP}_FORBIDDEN` — catalogs pointing at buckets the user should NOT have access to (used for security testing)
-
+- `aws` — internal catalog, data in S3
+- `gcp` — internal catalog, data in GCS
+- `azure` — internal catalog, data in Azure Blob
+- `{azure|gcp}_external` — external/federated catalog pointing to another Polaris
+- `{aws|azure|gcp}_forbidden` — catalogs pointing at buckets the user should NOT have access to (used for security testing)
 
 
 ### Diagnosing Polaris issues

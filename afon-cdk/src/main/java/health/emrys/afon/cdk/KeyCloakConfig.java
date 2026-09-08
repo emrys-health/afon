@@ -35,18 +35,15 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PO
  * KC_DB_PASSWORD
  */
 public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct {
-    public static final String          KEYCLOAK_INGRESS       = "keycloak-ingress";
-    public static final String          KEYCLOAK_HTTPS_INGRESS = "keycloak-https-ingress";
-    public static final String          APP_NAME               = "keycloak";
-    public static final String          KC_SVC                 = "keycloak-service";
-    public static final ServiceSpecPort KC_PORT                = ServiceSpecPort.builder()
-                                                                                .name("web")
-                                                                                .port(KEYCLOAK_PORT)
-                                                                                .targetPort("" + KEYCLOAK_PORT)
-                                                                                .protocol("TCP")
-                                                                                .build();
-    private final       String          SECRET_NAME            = "kcsecrets";
-    protected final     T               cloudProvider;
+    private static final String APP_NAME = "keycloak";
+    private static final String SECRET_NAME = "kcsecrets";
+    private static final ServiceSpecPort SERVICE_SPEC_PORT = ServiceSpecPort.builder()
+            .name("web")
+            .port(KEYCLOAK_PORT)
+            .targetPort("" + KEYCLOAK_PORT)
+            .protocol("TCP")
+            .build();
+    protected final T cloudProvider;
 
     public KeyCloakConfig(
         @NonNull Construct scope,
@@ -128,7 +125,7 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         dependants.addAll(cloudProvider.getServiceDependables());
         // NodePort (not ClusterIP): the AWS Load Balancer Controller uses instance targets by
         // default and requires a node port to build the ingress TargetGroup.
-        nodePortService(dependants, labels, KC_SVC, List.of(KC_PORT), this);
+        nodePortService(dependants, labels, KEYCLOAK_SERVICE_NAME, List.of(SERVICE_SPEC_PORT), this);
     }
 
     protected abstract void configureHttpsAndDNS();
