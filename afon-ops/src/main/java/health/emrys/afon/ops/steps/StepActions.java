@@ -7,6 +7,7 @@ import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.azure.AzureReader;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
@@ -43,16 +44,16 @@ public class StepActions {
     private static final Logger logger = getLogger(StepActions.class);
     static final String TERRAFORM_STATE_FILE_PATTERN = "terraform.";
 
-    @NonNull Path deleteStack(AfonCloud id) throws IOException {
-        Path stackDir = stackDir(id);
+    @NonNull Path deleteStack(AfonCloud cloud) throws IOException {
+        Path stackDir = stackDir(cloud);
         tofuDestroy(stackDir);
         deletePath(stackDir);
-        deleteTfStateFiles(id);
+        deleteTfStateFiles(cloud);
         return stackDir;
     }
 
-    private @NonNull Path stackDir(AfonCloud id) throws IOException {
-        Path stackDir = Path.of(ConfigUtils.stackDir(id));
+    private @NonNull Path stackDir(AfonCloud cloud) throws IOException {
+        Path stackDir = Path.of(ConfigUtils.stackDir(cloud));
         logger.info("Using stack dir {}", stackDir);
         if (!Files.exists(stackDir)){
             stackDir.toFile().mkdirs();
@@ -83,8 +84,8 @@ public class StepActions {
         }
     }
 
-    void deleteTfStateFiles(AfonCloud id) throws IOException {
-        deletePath(Path.of(tfStatePath(id)));
+    void deleteTfStateFiles(AfonCloud cloud) throws IOException {
+        deletePath(Path.of(tfStatePath(cloud)));
     }
 
     void deletePath(Path path) {
@@ -96,12 +97,12 @@ public class StepActions {
         }
     }
 
-    void startStack(Class stackClass, AfonCloud id) throws Exception {
+    void startStack(Class stackClass, AfonCloud cloud) throws Exception {
         executeMainOf(stackClass, new String[]{});
-        startManagedStack(id);
+        startManagedStack(cloud);
     }
 
-    private void startManagedStack(AfonCloud id) throws ManagedProcessException, IOException {
+    private void startManagedStack(AfonCloud cloud) throws ManagedProcessException, IOException {
         // The kubernetes/helm providers are configured from the managed cluster's endpoint and
         // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
         // (plugin-framework) providers, those must be known at plan time, otherwise apply fails
@@ -119,7 +120,7 @@ public class StepActions {
         // google_container_cluster resource and uses GKE's built-in CNI, so the targeted apply
         // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
         // Stacks without a managed cluster yield no targets and skip straight to the full apply.
-        Path stackDir = stackDir(id);
+        Path stackDir = stackDir(cloud);
         List<String> bootstrapTargets = clusterBootstrapTargets(stackDir);
         tofuApply(stackDir, bootstrapTargets);
     }
@@ -155,19 +156,19 @@ public class StepActions {
     }
 
     /**
-     * @param storageCloud eg GCP
+     * @param cloud eg GCP
      * @param metadataLocation eg gs://emrys_afon_core/acceptancetests/GcpAccessSpec260430301114/metadata/00000-ce6be45b-1257-4325-b437-20900bbcf2a3.metadata.json
      * @param polarisDomainNAme eg emryspolaris.click
      * @param tableName eg AwsAccessSpec
      * @param registerTableMainClass eg RegisterPolarisTableMain.class
      * @throws Exception
      */
-    public void registerTable(AfonCloud storageCloud,
+    public void registerTable(AfonCloud cloud,
                               String metadataLocation,
                               String polarisDomainNAme,
                               String tableName, Class<?> registerTableMainClass) throws Exception {
         executeMainOf(registerTableMainClass,
-                      new String[]{storageCloud.name(),
+                      new String[]{cloud.name(),
                                    ACCEPTANCE_TEST_NAMESPACE,
                                    tableName,
                                    metadataLocation,
@@ -296,13 +297,13 @@ public class StepActions {
     }
     
     void createSingleCatalogsFor(String domainName,
-                                        AfonCloud catalog) throws Exception {
+                                        AfonCatalog catalog) throws Exception {
         createSingleCatalogsFor(domainName, catalog, new Properties());
     }
 
     void createSingleCatalogsFor(String domainName,
-                                        AfonCloud catalog,
-                                        Properties properties) throws Exception {
+                                 AfonCatalog catalog,
+                                 Properties properties) throws Exception {
         properties.put(POLARIS_ENDPOINT.getName(), domainName);
         executeMainOf(ManagePolarisCatalogsMain.class,
                       new String[] {ManagePolarisCatalogsMain.CREATE, catalog.name()},

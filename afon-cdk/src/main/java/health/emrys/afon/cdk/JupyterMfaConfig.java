@@ -32,11 +32,8 @@ import static java.lang.String.format;
  */
 public class JupyterMfaConfig {
 
-    public static final int    PROXY_PORT     = 4180;
-    public static final String PROXY_SVC_NAME = "oauth2-proxy";
-
-    private static final Map<String, String> PROXY_LABELS = Map.of("app", "oauth2-proxy");
-    private static final String              SECRET_NAME  = "oauth2-proxy-secret";
+    private static final Map<String, String> PROXY_LABELS = Map.of("app", CdkHelper.PROXY_SERVICE_NAME);
+    private static final String              SECRET_NAME  = CdkHelper.PROXY_SERVICE_NAME +"-secret";
 
     public JupyterMfaConfig(Construct scope,
                      List<ITerraformDependable> dependsOn,
@@ -82,7 +79,7 @@ public class JupyterMfaConfig {
             "--provider=oidc",
             "--oidc-issuer-url=" + issuer,
             "--email-domain=" + properties.getValue(OIDC_EMAIL_DOMAIN),
-            "--http-address=0.0.0.0:" + PROXY_PORT,
+            "--http-address=0.0.0.0:" + CdkHelper.PROXY_PORT,
             "--cookie-secure=true",                           // set true when TLS terminates at this proxy
             // Accept id_tokens whose email is unverified: this Keycloak has no SMTP verification flow,
             // so users are provisioned with emailVerified=true, but manually-created users may not be.
@@ -114,10 +111,10 @@ public class JupyterMfaConfig {
         CdkUtils.deploy(scope, deps, PROXY_LABELS, List.of(proxyContainer),
                                List.of(waitForIssuer(issuer)), List.of(), "oauth2-proxy", "15m");
 
-        Service.Builder.create(scope, PROXY_SVC_NAME)
+        Service.Builder.create(scope, CdkHelper.PROXY_SERVICE_NAME)
                        .metadata(ServiceMetadata
                                      .builder()
-                                     .name(PROXY_SVC_NAME)
+                                     .name(CdkHelper.PROXY_SERVICE_NAME)
                                      .namespace("default")
                                      .build())
                        .dependsOn(deps)
@@ -127,8 +124,8 @@ public class JupyterMfaConfig {
                                         .port(List.of(ServiceSpecPort
                                                           .builder()
                                                           .name("http")
-                                                          .port(PROXY_PORT)
-                                                          .targetPort(String.valueOf(PROXY_PORT))
+                                                          .port(CdkHelper.PROXY_PORT)
+                                                          .targetPort(String.valueOf(CdkHelper.PROXY_PORT))
                                                           .protocol("TCP")
                                                           .build()))
                                         .build())

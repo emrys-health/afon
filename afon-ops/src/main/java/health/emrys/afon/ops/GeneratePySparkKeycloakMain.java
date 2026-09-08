@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -12,7 +13,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
 
-import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static java.lang.String.format;
 
@@ -24,10 +24,12 @@ public class GeneratePySparkKeycloakMain {
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(GeneratePySparkKeycloakMain.class);
 
     private final SparkWarehouseConfig config;
+    private final AfonCatalogs afonCatalogs;
 
     GeneratePySparkKeycloakMain(AfonPropertyProvider properties) {
         SparkWarehouseConfigFactory configFactory = SparkWarehouseConfigFactory.getFactory();
         config = configFactory.createConfig(properties);
+        afonCatalogs = new AfonCatalogs(properties);
     }
 
     public void generateAndSavePySparkCode() {
@@ -57,10 +59,10 @@ public class GeneratePySparkKeycloakMain {
                                                      OIDC_TOKEN = os.environ["OIDC_TOKEN"]
                                                      spark = (SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002")
                                                      """);
-        for (AfonCloud cloud : AfonCloud.values()) {
-            python.append(format("# %s \n", cloud.name()));
-            String sparkCatalog = toSparkName(cloud);
-            config.sparkConfigs(sparkCatalog, cloud.toString()).entrySet()
+        for (AfonCatalog catalog : afonCatalogs.all()) {
+            python.append(format("# %s \n", catalog.name()));
+            String sparkCatalog = toSparkName(catalog);
+            config.sparkConfigs(sparkCatalog, catalog.toString()).entrySet()
                   .forEach(entry -> {
                       String key   = entry.getKey();
                       String value = entry.getValue();
@@ -87,8 +89,8 @@ public class GeneratePySparkKeycloakMain {
         return python.toString();
     }
 
-    private @NonNull String toSparkName(AfonCloud cloud) {
-        return "test_" + cloud;
+    private @NonNull String toSparkName(AfonCatalog catalog) {
+        return "test_" + catalog;
     }
 
     String awsSmokeTest(String tableName) {
@@ -99,7 +101,7 @@ public class GeneratePySparkKeycloakMain {
             #
             df_read = spark.read.table("%s.acceptancetests.%s")
             df_read.show()
-            """, toSparkName(AWS), tableName);
+            """, toSparkName(afonCatalogs.aws()), tableName);
     }
 
     public static void main(String[] args) {

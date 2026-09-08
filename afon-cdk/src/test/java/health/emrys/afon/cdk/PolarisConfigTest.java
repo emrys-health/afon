@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.PolarisConstants;
@@ -8,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.ConfigUtils.afonCloud;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,18 +17,19 @@ class PolarisConfigTest {
     @Test
     public void canGenerateConfigScriptForGivenCloud() {
         AfonPropertyProvider properties = new FilePropertyProvider();
-        validateScriptFor(AWS.toString(), properties);
-        validateScriptFor(AZURE.toString(), properties);
-        validateScriptFor(GCP.toString(), properties);
+        for (AfonCloud cloud : AfonCloud.values()) {
+            validateScriptFor(cloud, properties);
+        }
     }
 
-    private void validateScriptFor(String id, AfonPropertyProvider properties) {
-        if ( !afonCloud().equalsIgnoreCase(id) ){
+    private void validateScriptFor(AfonCloud cloud, AfonPropertyProvider properties) {
+        if ( !afonCloud().equalsIgnoreCase(cloud.toString()) ){
             // does not match currently specified cloud
             return;
         }
-        String script = PolarisConfig.getProviderCredentials(properties, id);
-        String polarisDbName = "polaris_db_" + PolarisConfig.polarisDomainName(properties, id).replace(".", "_");
+        String deploymentId = cloud.toString();
+        String script = PolarisConfig.getProviderCredentials(properties, deploymentId);
+        String polarisDbName = "polaris_db_" + PolarisConfig.polarisDomainName(properties, deploymentId).replace(".", "_");
         assertThat(script).contains(polarisDbName);
         PolarisConstants.getPolarisProperties()
                 .forEach(x -> {

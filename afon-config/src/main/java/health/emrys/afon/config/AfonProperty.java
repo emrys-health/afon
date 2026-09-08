@@ -36,6 +36,7 @@ public enum AfonProperty {
     AWS_KEYCLOAK_CERT_ARN("AWS_KEYCLOAK_CERT_ARN"),
 
     // GCP
+    GCP_REGION("GCP_REGION"),
     GCP_BUCKET_NAME("GCP_BUCKET_NAME"),
     GCP_BUCKET_NAME_FORBIDDEN("GCP_BUCKET_NAME_FORBIDDEN"),
     GCP_EXTERNAL_BUCKET_NAME("GCP_EXTERNAL_BUCKET_NAME"),
@@ -58,6 +59,7 @@ public enum AfonProperty {
     AZURE_STORAGE_ACCOUNT("AZURE_STORAGE_ACCOUNT"),
     DATABRICKS_TOKEN("DATABRICKS_TOKEN"),
 
+    AZURE_GRANT_ROLES("AZURE_GRANT_ROLES"),
     AZURE_TENANT_ID("AZURE_TENANT_ID"),
     AZURE_CLIENT_ID("AZURE_CLIENT_ID"),
     AZURE_CLIENT_SECRET("AZURE_CLIENT_SECRET"),
@@ -113,6 +115,12 @@ public enum AfonProperty {
     SNOWFLAKE_PRIVATE_KEY("SNOWFLAKE_PRIVATE_KEY"),
 
     ALLOWED_DOMAINS_CSV("ALLOWED_DOMAINS_CSV"),
+
+    /**
+     * Comma-separated list of active {@link AfonCatalog} names.
+     * Optional; defaults to the full built-in catalog set when absent.
+     */
+    CATALOG_NAMES_CSV("CATALOG_NAMES_CSV"),
     ;
 
     private final String name;

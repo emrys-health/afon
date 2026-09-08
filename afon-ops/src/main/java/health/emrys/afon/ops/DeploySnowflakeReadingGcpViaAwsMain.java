@@ -19,7 +19,7 @@ public class DeploySnowflakeReadingGcpViaAwsMain implements StepsProvider {
         List<Step> steps = new ArrayList<>();
         steps.addAll(setupFullStackStepsUsing(stepOperations, AWS));
         steps.add(stepOperations.checkAwsSparkWritingTo(GCP));
-        steps.add(stepOperations.snowflakeReadingViaAwsPolaris(GCP));
+        steps.add(stepOperations.snowflakeReadingViaAwsPolaris(stepOperations.afonCatalogs().gcp()));
         return steps;
     }
 

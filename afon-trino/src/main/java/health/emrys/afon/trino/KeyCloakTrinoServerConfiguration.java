@@ -20,10 +20,10 @@ public class KeyCloakTrinoServerConfiguration extends TrinoServerConfiguration {
 
     private final String oauth2ServerUri;
 
-    public KeyCloakTrinoServerConfiguration(String polarisDomainName,
-                                            AfonPropertyProvider properties,
+    public KeyCloakTrinoServerConfiguration(AfonPropertyProvider properties,
+                                            String polarisDomainName,
                                             String oauth2ServerUri) {
-        super(polarisDomainName, properties);
+        super(properties, polarisDomainName);
         this.oauth2ServerUri = oauth2ServerUri;
     }
 

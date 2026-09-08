@@ -1,6 +1,5 @@
 package health.emrys.afon.polaris.catalogs;
 
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 
@@ -24,7 +23,7 @@ public class GcpPolarisCatalog extends PolarisCatalog {
 
     @Override
     public String catalogName() {
-        return AfonCloud.GCP.toString();
+        return "gcp";
     }
 
     protected String bucketUri() {

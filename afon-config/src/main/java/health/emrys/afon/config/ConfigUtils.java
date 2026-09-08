@@ -112,21 +112,21 @@ public class ConfigUtils {
     /**
      * Returns the stack dir located in {@link #afonCkdtf()}/stacks/{@link AfonCloud#name()}
      *
-     * @param id the {@link AfonCloud}
+     * @param cloud the {@link AfonCloud}
      * @return the stack dir
      */
-    public static @NonNull String stackDir(AfonCloud id) {
-        return format("%s/stacks/%s", afonCkdtf(), id);
+    public static @NonNull String stackDir(AfonCloud cloud) {
+        return format("%s/stacks/%s", afonCkdtf(), cloud);
     }
 
     /**
      * Returns the tfState path located in {@link #afonCkdtf()}/terraform.{@link AfonCloud#name()}.tfstate
      *
-     * @param id the {@link AfonCloud}
+     * @param cloud the {@link AfonCloud}
      * @return the stack dir
      */
-    public static @NonNull String tfStatePath(AfonCloud id) {
-        return format("%s/terraform.%s.tfstate", afonCkdtf(), id);
+    public static @NonNull String tfStatePath(AfonCloud cloud) {
+        return format("%s/terraform.%s.tfstate", afonCkdtf(), cloud);
     }
 
     /**
@@ -157,4 +157,7 @@ public class ConfigUtils {
         return ( env != null ) ? env : property;
     }
 
+    public static @NonNull AfonCatalog cloudToCatalog(AfonCloud cloud, AfonCatalogs catalogs) {
+        return catalogs.get(cloud.toString());
+    }
 }

@@ -2,7 +2,6 @@ package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.SparkHelper.spark
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
-import health.emrys.afon.config.AfonCloud
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 import org.scalatest.GivenWhenThen
 
@@ -10,13 +9,13 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
 
   def catalog: PolarisCatalog
 
-  override def cloudProvider: AfonCloud
+  override def afonCatalog(): Any
 
   val catalogManager = AcceptanceTestConfig.instance.getCatalogManager
   val grantCatalogAdmin = new GrantCatalogAdmin(this, catalog)
   val createCatalogRole = new CreateCatalogRole(this, catalog)
   val NAMESPACE = "forbidden"
-  val FULL_NAMESPACE = s"$cloudProvider.$NAMESPACE"
+  val FULL_NAMESPACE = s"$afonCatalog.$NAMESPACE"
   val NUM_ROWS = 10
 
   "Polaris" should {

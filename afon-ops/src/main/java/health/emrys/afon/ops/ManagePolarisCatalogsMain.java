@@ -1,17 +1,17 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.polaris.config.*;
-import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.polaris.config.PolarisCatalogManager;
 import org.apache.hc.core5.http.ParseException;
 import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -24,9 +24,11 @@ public class ManagePolarisCatalogsMain {
     public static final String RECREATE = "recreate";
 
     private final PolarisCatalogManager catalogManager;
+    private final AfonCatalogs afonCatalogs;
 
     public ManagePolarisCatalogsMain(AfonPropertyProvider properties) {
         this.catalogManager = new PolarisCatalogManager(properties);
+        this.afonCatalogs = new AfonCatalogs(properties);
     }
 
     public void createAllCatalogs() throws IncorrectConfigException, IOException {
@@ -38,7 +40,7 @@ public class ManagePolarisCatalogsMain {
     }
 
     public void deleteAllCatalogs() throws IOException, ParseException {
-        for (AfonCloud id : List.of(AZURE, AWS, GCP)) {
+        for (AfonCatalog id : afonCatalogs.base()) {
             deleteCatalog(id.toString());
         }
     }

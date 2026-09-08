@@ -96,10 +96,10 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    void deleteTfStateFiles(AfonCloud id) throws IOException {
+    void deleteTfStateFiles(AfonCloud cloud) throws IOException {
         out.println(format("""
                            Delete `%s`
-                           """, tfStatePath(id)));
+                           """, tfStatePath(cloud)));
         out.flush();
     }
 
