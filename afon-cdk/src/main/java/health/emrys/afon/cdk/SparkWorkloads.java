@@ -210,11 +210,16 @@ public class SparkWorkloads {
 
     private @NonNull Map<String, String> sparkCloudConfig(String polarisDomainName) {
         var config = new HashMap<String, String>();
-        SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
         config.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
+        config.putAll(userSparkWarehouseConfig(polarisDomainName));
+        return config;
+    }
+
+    private Map<String, String> userSparkWarehouseConfig(String polarisDomainName) {
         String clientId = properties.getValue(USER_POLARIS_ID);
         String clientSecret = ***REMOVED***
-        SparkWarehouseConfig sparkWarehouseConfig = sparkFactory.createConfig(properties, polarisDomainName, clientId, clientSecret);
+        SparkWarehouseConfig sparkWarehouseConfig = SparkWarehouseConfigFactory.getFactory().createConfig(properties, polarisDomainName, clientId, clientSecret);
+        Map<String, String> config =  new HashMap<>();
         for (AfonCatalog catalog : new AfonCatalogs(properties).all()) {
             config.putAll(sparkWarehouseConfig.sparkConfigs(catalog.toString()));
         }
