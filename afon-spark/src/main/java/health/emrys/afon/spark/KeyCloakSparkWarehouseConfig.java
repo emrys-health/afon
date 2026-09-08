@@ -40,7 +40,7 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
                 protocolFor(properties.getValue(POLARIS_ENDPOINT)),
                 new AfonCatalogs(properties)
         );
-        this.oauth2ServerUri = kcUriFor(properties.getValue(KC_HOSTNAME));
+        this.oauth2ServerUri = kcUriFor(properties.getValue(OIDC_DOMAIN_NAME));
     }
 
     @Override

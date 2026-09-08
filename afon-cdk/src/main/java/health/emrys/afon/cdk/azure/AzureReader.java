@@ -29,7 +29,7 @@ public class AzureReader {
     }
 
     public AzureReader(AfonPropertyProvider properties) {
-        containerName    = properties.getValue(AfonProperty.AZURE_BUCKET);
+        containerName    = properties.getValue(AfonProperty.AZURE_BUCKET_NAME);
         connectionString = properties.getValue(AfonProperty.AZURE_CONNECTION_STRING);
     }
 

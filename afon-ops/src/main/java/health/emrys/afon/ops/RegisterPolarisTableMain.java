@@ -72,7 +72,7 @@ public class RegisterPolarisTableMain {
             properties.setValue(POLARIS_ID, polarisId);
             properties.setValue(POLARIS_SECRET, polarisSecret);
         }
-        logger.info("KC host: {}", properties.getValue(KC_HOSTNAME));
+        logger.info("OIDC domain: {}", properties.getValue(OIDC_DOMAIN_NAME));
         PolarisTableRegister register = new PolarisTableRegister(clientFactory().createClient(properties));
         RegisterPolarisTableMain app  = new RegisterPolarisTableMain(register);
         app.createNamespaceAndTable(catalog, namespace, table, metadata);

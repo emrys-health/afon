@@ -46,11 +46,11 @@ else
   gcloud iam service-accounts add-iam-policy-binding $EXTERNAL_SA --member="serviceAccount:$GCP_SERVICE_ACCOUNT" --role="roles/iam.serviceAccountTokenCreator" || exit 1
 fi
 
-if gcloud storage buckets get-iam-policy "gs://$GCP_EXTERNAL_BUCKET_NAME" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$EXTERNAL_SA" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
-  echo "- Role storage.objectAdmin already granted to $EXTERNAL_SA on $GCP_EXTERNAL_BUCKET_NAME, skipping"
+if gcloud storage buckets get-iam-policy "gs://$GCP_BUCKET_NAME_EXTERNAL" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$EXTERNAL_SA" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
+  echo "- Role storage.objectAdmin already granted to $EXTERNAL_SA on $GCP_BUCKET_NAME_EXTERNAL, skipping"
 else
-  echo "- Granting storage.objectAdmin on $GCP_EXTERNAL_BUCKET_NAME to $EXTERNAL_SA"
-  gcloud storage buckets add-iam-policy-binding "gs://$GCP_EXTERNAL_BUCKET_NAME" --member="serviceAccount:$EXTERNAL_SA" --role="roles/storage.objectAdmin" || exit 1
+  echo "- Granting storage.objectAdmin on $GCP_BUCKET_NAME_EXTERNAL to $EXTERNAL_SA"
+  gcloud storage buckets add-iam-policy-binding "gs://$GCP_BUCKET_NAME_EXTERNAL" --member="serviceAccount:$EXTERNAL_SA" --role="roles/storage.objectAdmin" || exit 1
 fi
 
 if gcloud storage buckets describe "gs://$GCP_BUCKET_NAME_FORBIDDEN" >/dev/null 2>&1; then

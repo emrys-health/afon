@@ -275,7 +275,7 @@ public class StepActions {
         logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
         return format(
                 "abfss://%s@%s.dfs.core.windows.net/%s",
-                properties.getValue(AZURE_BUCKET),
+                properties.getValue(AZURE_BUCKET_NAME),
                 properties.getValue(AZURE_STORAGE_ACCOUNT),
                 latest.getName());
     }

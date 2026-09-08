@@ -3,7 +3,7 @@ package health.emrys.afon.ops;
 import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.PolarisUserManager;
-import health.emrys.afon.security.OAuthProvider;
+import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
@@ -20,31 +20,31 @@ public class ConfigureUsersMain {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigureUsersMain.class);
 
-    private final AfonUserProvider          userProvider;
-    private final AfonPropertyProvider      propertyProvider;
-    private final OAuthProvider             oauthProvider;
-    private final PolarisUserManager        polarisUsers;
+    private final AfonUserProvider userProvider;
+    private final AfonPropertyProvider propertyProvider;
+    private final IdentityProvider identityProvider;
+    private final PolarisUserManager polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
         this.userProvider     = userProvider;
         this.propertyProvider = propertyProvider;
-        this.oauthProvider    = new KeyCloakProvider(propertyProvider);
+        this.identityProvider = new KeyCloakProvider(propertyProvider);
         this.polarisUsers     = new PolarisUserManager(propertyProvider);
     }
 
-    public List<HttpResponse> configureOAuthUsers(String jupyterDomain) throws IOException {
-        logger.info("Configuring OAuth users for jupyter domain {}", jupyterDomain);
+    public List<HttpResponse> configureOidcUsers(String jupyterDomain) throws IOException {
+        logger.info("Configuring OIDC users for jupyter domain {}", jupyterDomain);
         List<HttpResponse> responses = new ArrayList<>();
-        responses.addAll(oauthProvider.registerBrowserClient(propertyProvider, jupyterDomain));
-        String adminToken = oauthProvider.adminToken();
-        responses.add(oauthProvider.createRealm(adminToken, KEYCLOAK_REALM));
+        responses.addAll(identityProvider.registerBrowserClient(propertyProvider, jupyterDomain));
+        String adminToken = identityProvider.adminToken();
+        responses.add(identityProvider.createRealm(adminToken, KEYCLOAK_REALM));
         for (AfonUser user : userProvider.getUsers()) {
-            responses.add(oauthProvider.createUser(adminToken, KEYCLOAK_REALM, user));
-            responses.add(oauthProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
+            responses.add(identityProvider.createUser(adminToken, KEYCLOAK_REALM, user));
+            responses.add(identityProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
         }
         // Last, so that the realm is only bound to its MFA flows once the users who must pass through
         // them exist.
-        responses.addAll(oauthProvider.configureMfa());
+        responses.addAll(identityProvider.configureMfa());
         return responses;
     }
 
@@ -55,7 +55,7 @@ public class ConfigureUsersMain {
 
     public List<HttpResponse> configureUsers(String jupyterDomain, String catalogName) throws IOException, IncorrectConfigException, InterruptedException {
         List<HttpResponse> responses = new ArrayList<>();
-        responses.addAll(configureOAuthUsers(jupyterDomain));
+        responses.addAll(configureOidcUsers(jupyterDomain));
         Thread.sleep(1000L); // yuck! But KeyClaok appears to asynchronously register users
         responses.addAll(configurePolarisUsers(catalogName));
         return responses;

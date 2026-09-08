@@ -2,7 +2,7 @@ package health.emrys.afon.acceptance
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
-import health.emrys.afon.config.AfonProperty.{KC_HOSTNAME, POLARIS_ENDPOINT, POLARIS_ID, POLARIS_SECRET}
+import health.emrys.afon.config.AfonProperty.{OIDC_DOMAIN_NAME, POLARIS_ENDPOINT, POLARIS_ID, POLARIS_SECRET}
 import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, FilePropertyProvider}
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 import PolarisCatalog.METADATA_KEY
@@ -136,14 +136,14 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val configureUsers = new ConfigureUsersMain(TestUsers(), properties)
       configureUsers.configurePolarisUsers(catalog.catalogName())
       And("configure OAuth users for Jupyter domain")
-      configureUsers.configureOAuthUsers("NotUsed.com")
+      configureUsers.configureOidcUsers("NotUsed.com")
 
       Then(s"we can get a token from KeyCloak for user '$UserName' in Realm '$KEYCLOAK_REALM'")
       val keyCloakProvider = new KeyCloakProvider("localhost", UserName, UserPassword)
       assert(keyCloakProvider.getToken(KEYCLOAK_REALM) != null)
 
       val userProperties: AfonPropertyProvider = new FilePropertyProvider()
-      userProperties.setValue(KC_HOSTNAME, ContainerHelper.KEYCLOAK_HOSTNAME)
+      userProperties.setValue(OIDC_DOMAIN_NAME, ContainerHelper.KEYCLOAK_HOSTNAME)
       userProperties.setValue(POLARIS_ENDPOINT, properties.getValue(POLARIS_ENDPOINT))
       userProperties.setValue(POLARIS_ID, UserName)
       userProperties.setValue(POLARIS_SECRET, UserPassword)

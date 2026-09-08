@@ -1,6 +1,6 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
-for BUCKET in $AWS_S3_EXTERNAL_BUCKET_NAME $AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS $AWS_S3_BUCKET_NAME_TRINO $AWS_S3_BUCKET_NAME $AWS_S3_BUCKET_NAME_FORBIDDEN; do
+for BUCKET in $AWS_S3_BUCKET_NAME_EXTERNAL $AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS $AWS_S3_BUCKET_NAME_TRINO $AWS_S3_BUCKET_NAME $AWS_S3_BUCKET_NAME_FORBIDDEN; do
   if aws s3api head-bucket --bucket $BUCKET 2>/dev/null; then
     echo "- Bucket $BUCKET already exists, skipping"
   else
@@ -62,13 +62,13 @@ else
       \"Sid\": \"AllowBucketEmrysAfonBucket2List\",
       \"Effect\": \"Allow\",
       \"Action\": \"s3:ListBucket\",
-      \"Resource\": \"arn:aws:s3:::$AWS_S3_EXTERNAL_BUCKET_NAME\"
+      \"Resource\": \"arn:aws:s3:::$AWS_S3_BUCKET_NAME_EXTERNAL\"
     },
     {
       \"Sid\": \"AllowBucketEmrysAfonBucket2Objects\",
       \"Effect\": \"Allow\",
       \"Action\": \"s3:*\",
-      \"Resource\": \"arn:aws:s3:::$AWS_S3_EXTERNAL_BUCKET_NAME/*\"
+      \"Resource\": \"arn:aws:s3:::$AWS_S3_BUCKET_NAME_EXTERNAL/*\"
     },
     {
       \"Sid\": \"AllowBucketEmrysAfonBucketTrinoList\",
