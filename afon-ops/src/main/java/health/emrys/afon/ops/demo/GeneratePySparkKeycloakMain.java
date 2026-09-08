@@ -1,4 +1,4 @@
-package health.emrys.afon.ops;
+package health.emrys.afon.ops.demo;
 
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
