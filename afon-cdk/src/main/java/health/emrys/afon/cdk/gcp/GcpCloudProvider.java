@@ -30,7 +30,6 @@ import software.constructs.Construct;
 import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.cdk.Defaults.GCP_REGION;
 import static java.lang.String.format;
 
 /**
@@ -61,6 +60,7 @@ public class GcpCloudProvider extends AbstractCloudProvider {
     GcpCloudProvider(final Construct scope, final String id, String projectID, AfonPropertyProvider properties) {
         super(scope, id);
         String clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
+        String gcpRegion = properties.getValue(AfonProperty.GCP_REGION);
         String vpcName     = "gke-private-vpc-" + clusterName;
         String subnetName  = "gke-private-subnet-" + clusterName;
 
@@ -70,7 +70,7 @@ public class GcpCloudProvider extends AbstractCloudProvider {
             this, "google", GoogleProviderConfig
             .builder()
             .project(projectID)
-            .region(GCP_REGION).zone("europe-west2-a")
+            .region(gcpRegion).zone("europe-west2-a")
             .accessToken(printGcloudAccessToken())
             .build());
 
@@ -86,7 +86,7 @@ public class GcpCloudProvider extends AbstractCloudProvider {
             .builder()
             .name(subnetName)
             .ipCidrRange("10.10.0.0/24")
-            .region(GCP_REGION)
+            .region(gcpRegion)
             .network(vpc.getName())
             // Enable IP Aliasing/VPC-native networking
             .privateIpGoogleAccess(true)
@@ -121,7 +121,7 @@ public class GcpCloudProvider extends AbstractCloudProvider {
             this, "router", ComputeRouterConfig
             .builder()
             .name("gke-router-" + clusterName)
-            .region(GCP_REGION)
+            .region(gcpRegion)
             .network(vpc.getName())
             .build());
         new ComputeRouterNat(
@@ -129,14 +129,14 @@ public class GcpCloudProvider extends AbstractCloudProvider {
             .builder()
             .name("gke-nat")
             .router(router.getName())
-            .region(GCP_REGION)
+            .region(gcpRegion)
             .natIpAllocateOption("AUTO_ONLY")
             .sourceSubnetworkIpRangesToNat("ALL_SUBNETWORKS_ALL_IP_RANGES")
             .build());
 
         String gcloudCommand = format(
             "gcloud container clusters get-credentials %s --region %s --project %s",
-            clusterName, GCP_REGION, PROJECT_ID);
+            clusterName, gcpRegion, PROJECT_ID);
         // This refreshes your local K8s config
         LocalExecProvisioner refreshCredentials = LocalExecProvisioner
             .builder()
@@ -147,7 +147,7 @@ public class GcpCloudProvider extends AbstractCloudProvider {
         ContainerClusterConfig clusterConfig = ContainerClusterConfig
             .builder()
             .name(clusterName)
-            .location(GCP_REGION)
+            .location(gcpRegion)
             .network(vpc.getName())
             .subnetwork(subnet.getName())
             .networkingMode("VPC_NATIVE")

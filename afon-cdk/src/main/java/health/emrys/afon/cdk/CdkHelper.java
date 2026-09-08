@@ -22,19 +22,30 @@ import java.util.Map;
 import java.util.Optional;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
-import static health.emrys.afon.cdk.KeyCloakConfig.KEYCLOAK_INGRESS;
-import static health.emrys.afon.cdk.Defaults.POLARIS_INGRESS_NAME;
 import static java.lang.String.format;
 
 public class CdkHelper {
 
+    public static final String KEYCLOAK_INGRESS_NAME = "keycloak-ingress";
+    public static final String KEYCLOAK_HTTPS_INGRESS_NAME = "keycloak-https-ingress";
+    public static final String KEYCLOAK_SERVICE_NAME = "keycloak-service";
+    public static final int    PROXY_PORT     = 4180;
+    public static final String PROXY_SERVICE_NAME = "oauth2-proxy";
+    public static final String POLARIS_INGRESS_NAME = "polaris-ingress";
+    public static final String JUPYTER_INGRESS_NAME = "jupyter-ingress";
+    public static final String JUPYTER_SERVICE_NAME = "jupyter-web";
+    public static final String SPARK_CONNECTOR_NAME = "spark-connector";
+    public static final String SPARK_SERVICE_NAME = "spark-master-lb";
+    public static final String SPARK_SERVICE_ACCOUNT_NAME = "spark-application-sa";
+    public static final String TRINO_SERVICE_NAME = "trino";
+
     public static final String NO_POLARIS_FINALIZERS = finalizeIngress(POLARIS_INGRESS_NAME);
     public static final List<LocalExecProvisioner> POLARIS_PROVISIONERS
             = uponDestroyRun(NO_POLARIS_FINALIZERS);
-    public static final String NO_KEYCLOAK_FINALIZERS = finalizeIngress(KEYCLOAK_INGRESS);
-    public static final String NO_JUPYTER_FINALIZERS = finalizeIngress("jupyter-ingress");
-    public static final String NO_JUPYTER_LB_FINALIZERS = finalizeService("jupyter-web");
-    public static final String NO_SPARK_LB_FINALIZERS = finalizeService("spark-master-lb");
+    public static final String NO_KEYCLOAK_FINALIZERS = finalizeIngress(KEYCLOAK_INGRESS_NAME);
+    public static final String NO_JUPYTER_FINALIZERS = finalizeIngress(JUPYTER_INGRESS_NAME);
+    public static final String NO_JUPYTER_LB_FINALIZERS = finalizeService(JUPYTER_SERVICE_NAME);
+    public static final String NO_SPARK_LB_FINALIZERS = finalizeService(SPARK_SERVICE_NAME);
     public static final String NO_INSTALLATION_FINALIZERS = finalizeInstallation("default");
 
     public static String finalizeIngress(String service) {

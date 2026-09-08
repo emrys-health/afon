@@ -16,10 +16,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_PORT;
-import static health.emrys.afon.cdk.JupyterMfaConfig.PROXY_SVC_NAME;
-import static health.emrys.afon.cdk.Defaults.JUPYTER_INGRESS;
-import static health.emrys.afon.cdk.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.cdk.CdkHelper.PROXY_PORT;
+import static health.emrys.afon.cdk.CdkHelper.PROXY_SERVICE_NAME;
+import static health.emrys.afon.cdk.CdkHelper.JUPYTER_INGRESS_NAME;
+import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonProperty.*;
 
@@ -60,7 +60,7 @@ public class AzureFullStack extends AzurePolarisStack {
         String jupyterDomainName = properties.getValue(AZURE_JUPYTER_DOMAIN_NAME);
         var helper = new CdkHelper(
             this, jupyterDomainName, TLS_SECRET_NAME,
-            PROXY_PORT, PROXY_SVC_NAME, JUPYTER_INGRESS);
+            PROXY_PORT, PROXY_SERVICE_NAME, JUPYTER_INGRESS_NAME);
         JupyterHubConfig jupyter = new JupyterHubConfig(this, properties) {
 
             @Override

@@ -23,8 +23,8 @@ import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
-import static health.emrys.afon.cdk.Defaults.SPARK_CONNECTOR_NAME;
-import static health.emrys.afon.cdk.Defaults.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.cdk.CdkHelper.SPARK_CONNECTOR_NAME;
+import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
 
 public class AwsJupyterStack extends AwsPolarisStack {
