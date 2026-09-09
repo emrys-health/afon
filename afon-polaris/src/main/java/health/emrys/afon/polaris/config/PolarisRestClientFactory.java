@@ -23,7 +23,7 @@ public class PolarisRestClientFactory {
 
     public PolarisRestClient createClient(String kcHostname, String endpoint, String clientId, String clientSecret) {
         AfonPropertyProvider properties = new FilePropertyProvider();
-        properties.setValue(KC_HOSTNAME, kcHostname);
+        properties.setValue(OIDC_DOMAIN_NAME, kcHostname);
         properties.setValue(POLARIS_ENDPOINT, endpoint);
         properties.setValue(POLARIS_ID, clientId);
         properties.setValue(POLARIS_SECRET, clientSecret);

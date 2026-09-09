@@ -3,7 +3,7 @@ source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 usage(){
   echo "Usage: $0 <issuer>"
-  echo "Issue and stores in Azure Key Vault the cert for the $AZURE_DOMAIN_NAME."
+  echo "Issue and stores in Azure Key Vault the cert for the $AZURE_POLARIS_DOMAIN_NAME."
   echo "The supported issuers are:"
   echo " - acme via Let's Encrypt (free)"
   echo " - digicert|globalsign via Key Vault CA (paying service)"
@@ -31,11 +31,11 @@ require_key_vault() {
 store_cert() {
   CERT_PEM="$1"
   KEY_PEM="$2"
-  KEBAB_DOMAIN_NAME="${AZURE_DOMAIN_NAME//./-}"
+  KEBAB_DOMAIN_NAME="${AZURE_POLARIS_DOMAIN_NAME//./-}"
   AZURE_TLS_CRT_NAME="${KEBAB_DOMAIN_NAME}-tls-crt"
   AZURE_TLS_KEY_NAME="${KEBAB_DOMAIN_NAME}-tls-key"
 
-  echo "- Caching $AZURE_DOMAIN_NAME cert in Key Vault $AZURE_KEY_VAULT_NAME"
+  echo "- Caching $AZURE_POLARIS_DOMAIN_NAME cert in Key Vault $AZURE_KEY_VAULT_NAME"
   az keyvault secret set --vault-name $AZURE_KEY_VAULT_NAME --name "$AZURE_TLS_CRT_NAME" \
     --value "$(base64 < "$CERT_PEM" | tr -d '\n')" -o none || exit 1
   az keyvault secret set --vault-name $AZURE_KEY_VAULT_NAME --name "$AZURE_TLS_KEY_NAME" \
@@ -67,27 +67,27 @@ issue_via_acme() {
 
   # DNS Zone role, needed by acme.sh's dns_azure hook to create/delete the
   # _acme-challenge TXT record on our behalf.
-  DNS_ZONE_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Network/dnsZones/$AZURE_DOMAIN_NAME"
-  if [ -n "$(az role assignment list --assignee $AZURE_CLIENT_ID --role "DNS Zone Contributor" --scope "$DNS_ZONE_SCOPE" --query "[].id" -o tsv)" ]; then
-    echo "- Role DNS Zone Contributor already assigned on $AZURE_DOMAIN_NAME, skipping"
+  DNS_ZONE_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Network/dnsZones/$AZURE_POLARIS_DOMAIN_NAME"
+  if [ -n "$(az role assignment list --assignee $AZURE_APP_ID --role "DNS Zone Contributor" --scope "$DNS_ZONE_SCOPE" --query "[].id" -o tsv)" ]; then
+    echo "- Role DNS Zone Contributor already assigned on $AZURE_POLARIS_DOMAIN_NAME, skipping"
   else
-    echo "- Granting DNS Zone Contributor on $AZURE_DOMAIN_NAME to $AZURE_CLIENT_ID"
-    az role assignment create  --role "DNS Zone Contributor" --assignee $AZURE_CLIENT_ID --scope "$DNS_ZONE_SCOPE" || exit 1
+    echo "- Granting DNS Zone Contributor on $AZURE_POLARIS_DOMAIN_NAME to $AZURE_APP_ID"
+    az role assignment create  --role "DNS Zone Contributor" --assignee $AZURE_APP_ID --scope "$DNS_ZONE_SCOPE" || exit 1
   fi
 
   # acme.sh's dns_azure hook reads these specific variable names to authenticate as the service
   # principal above when it creates/deletes the _acme-challenge TXT record.
   export AZUREDNS_SUBSCRIPTIONID=$AZURE_SUBSCRIPTION
   export AZUREDNS_TENANTID=$AZURE_TENANT_ID
-  export AZUREDNS_APPID=$AZURE_CLIENT_ID
-  export AZUREDNS_CLIENTSECRET=$AZURE_CLIENT_SECRET
+  export AZUREDNS_APPID=$AZURE_APP_ID
+  export AZUREDNS_CLIENTSECRET=$AZURE_APP_SECRET
 
-  echo "- Requesting/renewing $AZURE_DOMAIN_NAME via Let's Encrypt (DNS-01)"
+  echo "- Requesting/renewing $AZURE_POLARIS_DOMAIN_NAME via Let's Encrypt (DNS-01)"
   "$ACME_HOME/acme.sh" --config-home "$ACME_HOME" --issue --dns dns_azure \
-    -d "$AZURE_DOMAIN_NAME" \
+    -d "$AZURE_POLARIS_DOMAIN_NAME" \
     --keylength 2048 \
     --server letsencrypt \
-    --accountemail "admin@$AZURE_DOMAIN_NAME"
+    --accountemail "admin@$AZURE_POLARIS_DOMAIN_NAME"
   ACME_EXIT=$?
   # acme.sh exits 2 for "not yet due for renewal" - not an error, the cached cert is
   # still valid and gets re-pushed below unchanged.
@@ -96,8 +96,8 @@ issue_via_acme() {
     exit 1
   fi
 
-  CERT_DIR="$ACME_HOME/$AZURE_DOMAIN_NAME"
-  store_cert "$CERT_DIR/fullchain.cer" "$CERT_DIR/$AZURE_DOMAIN_NAME.key"
+  CERT_DIR="$ACME_HOME/$AZURE_POLARIS_DOMAIN_NAME"
+  store_cert "$CERT_DIR/fullchain.cer" "$CERT_DIR/$AZURE_POLARIS_DOMAIN_NAME.key"
 }
 
 # Issues via Key Vault's own integrated CA (DigiCert or GlobalSign)
@@ -108,7 +108,7 @@ issue_via_acme() {
 issue_via_keyvault_ca() {
   PROVIDER="$1"
   ISSUER_NAME="afon-$(echo "$PROVIDER" | tr '[:upper:]' '[:lower:]')-issuer"
-  CERT_NAME="${AZURE_DOMAIN_NAME//./-}"
+  CERT_NAME="${AZURE_POLARIS_DOMAIN_NAME//./-}"
 
   if [ -z "$AZURE_CA_ID" ] || [ -z "$AZURE_CA_PASSWORD" ]; then
     echo "- AZURE_CA_ID/AZURE_CA_PASSWORD are blank - set them in secret-azure.properties (from your $PROVIDER account) first"
@@ -128,11 +128,11 @@ issue_via_keyvault_ca() {
   "issuerParameters": { "name": "$ISSUER_NAME" },
   "keyProperties": { "exportable": true, "keyType": "RSA", "keySize": 2048, "reuseKey": false },
   "secretProperties": { "contentType": "application/x-pkcs12" },
-  "x509CertificateProperties": { "subject": "CN=$AZURE_DOMAIN_NAME", "validityInMonths": 12 }
+  "x509CertificateProperties": { "subject": "CN=$AZURE_POLARIS_DOMAIN_NAME", "validityInMonths": 12 }
 }
 EOF
 )
-  echo "- Requesting $PROVIDER cert for $AZURE_DOMAIN_NAME via Key Vault"
+  echo "- Requesting $PROVIDER cert for $AZURE_POLARIS_DOMAIN_NAME via Key Vault"
   az keyvault certificate create --vault-name $AZURE_KEY_VAULT_NAME --name "$CERT_NAME" --policy "$POLICY" || exit 1
 
   echo "- Waiting for issuance to complete"

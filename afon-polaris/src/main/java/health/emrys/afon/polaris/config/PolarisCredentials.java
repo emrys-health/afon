@@ -24,9 +24,9 @@ public class PolarisCredentials {
             case AWS:
                 return properties.getValue(AWS_POLARIS_DOMAIN_NAME);
             case AZURE:
-                return properties.getValue(AZURE_DOMAIN_NAME);
+                return properties.getValue(AZURE_POLARIS_DOMAIN_NAME);
             case GCP:
-                return properties.getValue(GCP_DOMAIN_NAME);
+                return properties.getValue(GCP_POLARIS_DOMAIN_NAME);
             default:
                 throw new RuntimeException("Unsupported cloud "+cloud);
         }

@@ -3,7 +3,7 @@ package health.emrys.afon.acceptance;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.security.OAuthProvider;
+import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -104,17 +104,17 @@ public class ContainerHelper {
                             "it's downloading the image.");
             keyCloak.start();
             // Provision the realm, client and user/password that Polaris will trust.
-            properties.setValue(KC_HOSTNAME, KEYCLOAK_HOSTNAME);
-            OAuthProvider keyCloakProvider = new KeyCloakProvider(properties);
-            keyCloakProvider
+            properties.setValue(OIDC_DOMAIN_NAME, KEYCLOAK_HOSTNAME);
+            IdentityProvider identityProvider = new KeyCloakProvider(properties);
+            identityProvider
                 .registerPolarisUser(
-                        properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME),
-                        properties.getValue(KC_BOOTSTRAP_ADMIN_PASSWORD));
-            keyCloakProvider
+                        properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
+                        properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD));
+            identityProvider
                 .registerPolarisUser(
                         properties.getValue(USER_POLARIS_ID),
                         properties.getValue(USER_POLARIS_SECRET));
-            keyCloakProvider
+            identityProvider
                 .registerPolarisUser(
                         properties.getValue(POLARIS_ID),
                         properties.getValue(POLARIS_SECRET));
@@ -168,8 +168,8 @@ public class ContainerHelper {
                     // GCP
                     .withEnv("GOOGLE_APPLICATION_CREDENTIALS", GOOGLE_FILE)
                     .waitingFor(Wait.forHttp("/q/health").forPort(8182).forStatusCode(200));
-            getPolarisProperties().forEach((x) -> {
-                polaris.withEnv(x.getName(), properties.getValue(x));
+            getPolarisProperties().forEach((property, envName) -> {
+                polaris.withEnv(envName, properties.getValue(property));
             });
             // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
             polarisOidcEnv(
