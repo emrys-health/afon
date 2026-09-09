@@ -53,7 +53,7 @@ APP_CREDENTIAL_RESET="${APP_CREDENTIAL_RESET:-}"
 if [ -n "$APP_CREDENTIAL_RESET" ]; then
   echo "- Resetting app credential."
   echo "- From the output below, add the following properties in your config/secret-azure.properties"
-  echo "AZURE_CLIENT_SECRET=<password>"
+  echo "AZURE_APP_SECRET=<password>"
   az ad app credential reset --id $APP_ID
 else
   echo "- Not resetting app credentials, as APP_CREDENTIAL_RESET is not set."

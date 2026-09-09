@@ -35,9 +35,9 @@ az ad sp create --id $APP_ID
 az ad app credential reset --id $APP_ID
 # non-admin
 az group create  --name $AZURE_RESOURCE_GROUP   --location $AZURE_REGION 
-az network dns zone create  --resource-group $AZURE_RESOURCE_GROUP  --name $AZURE_DOMAIN_NAME
+az network dns zone create  --resource-group $AZURE_RESOURCE_GROUP  --name $AZURE_POLARIS_DOMAIN_NAME
 az storage account create  --name $AZURE_STORAGE_ACCOUNT  --resource-group $AZURE_RESOURCE_GROUP  --location $AZURE_REGION  --sku Standard_LRS  --kind StorageV2 --enable-hierarchical-namespace false 
-az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET  --auth-mode login
+az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME  --auth-mode login
 az role assignment create  --role "Storage Blob Data Contributor" --assignee $APP_ID --scope "$BUCKET_SCOPE"
 ```
 
@@ -81,8 +81,8 @@ AZURE_SUBSCRIPTION=<SUBSCRIPTION>
 Set in `secret-azure.properties`
 ```shell
 AZURE_TENANT_ID=<TENANT>
-AZURE_CLIENT_ID=<APP_ID>
-AZURE_CLIENT_SECRET=<APP_SECRET>
+AZURE_APP_ID=<APP_ID>
+AZURE_APP_SECRET=<APP_SECRET>
 AZURE_SP_ID=<APP_SP_ID>
 ```
 

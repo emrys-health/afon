@@ -86,6 +86,21 @@ public class SparkWarehouseConfig {
         });
     }
 
+    /**
+     * Spark configs registering every {@link AfonCatalogs} catalog under its own name, plus any
+     * {@code additionalCatalogNames} (e.g. a federated catalog not part of {@link AfonCatalogs}).
+     */
+    public Map<String, String> allSparkConfigs(String... additionalCatalogNames) {
+        Map<String, String> config = new HashMap<>();
+        for (String catalogName : catalogNames()) {
+            config.putAll(sparkConfigs(catalogName));
+        }
+        for (String catalogName : additionalCatalogNames) {
+            config.putAll(sparkConfigs(catalogName));
+        }
+        return Map.copyOf(config);
+    }
+
     public Map<String, String> sparkConfigs(String sparkCatalog) {
         return sparkConfigs(sparkCatalog, sparkCatalog);
     }

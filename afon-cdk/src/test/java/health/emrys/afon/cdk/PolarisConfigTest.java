@@ -13,10 +13,11 @@ import static health.emrys.afon.config.ConfigUtils.afonCloud;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PolarisConfigTest {
+    static String TEMPLATES_CONFIG_DIR = "../templates/config";
 
     @Test
     public void canGenerateConfigScriptForGivenCloud() {
-        AfonPropertyProvider properties = new FilePropertyProvider();
+        AfonPropertyProvider properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
         for (AfonCloud cloud : AfonCloud.values()) {
             validateScriptFor(cloud, properties);
         }
@@ -32,15 +33,15 @@ class PolarisConfigTest {
         String polarisDbName = "polaris_db_" + PolarisConfig.polarisDomainName(properties, deploymentId).replace(".", "_");
         assertThat(script).contains(polarisDbName);
         PolarisConstants.getPolarisProperties()
-                .forEach(x -> {
-                    assertThat(script).contains(x.getName());
-                    assertThat(script).contains(properties.getValue(x));
+                .forEach((property, envName) -> {
+                    assertThat(script).contains(envName);
+                    assertThat(script).contains(properties.getValue(property));
                 });
     }
 
     @Test
     public void cannotGenerateConfigScriptForUnsupportedCloud() {
-        AfonPropertyProvider properties = new FilePropertyProvider();
+        AfonPropertyProvider properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
         try {
             PolarisConfig.getProviderCredentials(properties, "unsupported");
         } catch (IllegalArgumentException e) {

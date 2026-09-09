@@ -16,7 +16,7 @@ public class AzureCleanupHelper extends CleanupHelper {
     private final String subscription;
 
     public AzureCleanupHelper(AfonPropertyProvider properties) {
-        polarisDomainName = properties.getValue(AfonProperty.AZURE_DOMAIN_NAME);
+        polarisDomainName = properties.getValue(AfonProperty.AZURE_POLARIS_DOMAIN_NAME);
         jupyterDomainName = properties.getValue(AfonProperty.AZURE_JUPYTER_DOMAIN_NAME);
         resourceGroup     = properties.getValue(AfonProperty.AZURE_RESOURCE_GROUP);
         subscription      = properties.getValue(AfonProperty.AZURE_SUBSCRIPTION);

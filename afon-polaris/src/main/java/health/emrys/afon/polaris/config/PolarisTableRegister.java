@@ -2,6 +2,7 @@ package health.emrys.afon.polaris.config;
 
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.List;
@@ -11,6 +12,8 @@ import static java.lang.String.format;
 
 public class PolarisTableRegister {
 
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisTableRegister.class);
+
     private PolarisRestClient client;
 
     public PolarisTableRegister(PolarisRestClient client){
@@ -18,6 +21,7 @@ public class PolarisTableRegister {
     }
 
     public List<HttpResponse> createTable(String catalog, String namespace, String table, String metadata) throws IOException {
+        logger.info("Creating table {}.{}.{} in catalog {}", namespace, table, metadata, catalog);
         String uri = format("/api/catalog/v1/%s/namespaces/%s/register", catalog, namespace);
         String json = format("""
                 {
@@ -35,6 +39,7 @@ public class PolarisTableRegister {
     }
 
     public List<HttpResponse> createNamespace(String catalog, String namespace) throws IOException {
+        logger.info("Creating namespace {} in catalog {}", namespace, catalog);
         String uri = format("/api/catalog/v1/%s/namespaces", catalog);
         String json = format("""
                 {

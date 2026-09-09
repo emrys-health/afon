@@ -43,7 +43,7 @@ Note that it might take a few minutes to propagate.
 
 Create a DNS zone for the combination of domain name and resource group: 
 ```shell
-az network dns zone create --name $AZURE_DOMAIN_NAME --resource-group $AZURE_RESOURCE_GROUP  
+az network dns zone create --name $AZURE_POLARIS_DOMAIN_NAME --resource-group $AZURE_RESOURCE_GROUP  
 ```
 This will show a list of nameservers, for example:
 ```json
@@ -62,7 +62,7 @@ If a Kubernetes service is gone but DNS record remains, run the Azure DNS cleanu
 ```shell
 az network dns record-set a delete \
   --resource-group $AZURE_RESOURCE_GROUP \
-  --zone-name $AZURE_DOMAIN_NAME \
+  --zone-name $AZURE_POLARIS_DOMAIN_NAME \
   --name "@" \
   --yes
 ```
@@ -73,7 +73,7 @@ Create a DNS zone through the GUI.  Note you might need admin rights to do this.
 
 Once it's created, you can run:
 ```shell
-$ gcloud dns managed-zones describe $GCP_DOMAIN_NAME --project=$PROJECT_ID
+$ gcloud dns managed-zones describe $GCP_POLARIS_DOMAIN_NAME --project=$PROJECT_ID
 ```
 Just like for Azure, this will show a list of name servers:
 ```

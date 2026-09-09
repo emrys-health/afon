@@ -17,7 +17,7 @@ public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     public AwsExternalPolarisCatalog(AfonPropertyProvider properties) {
         super(properties);
-        this.bucketUrl = s3BucketUrl(properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME));
+        this.bucketUrl = s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL));
         this.roleArn = properties.getValue(AWS_S3_ROLE_ARN);
         this.region = properties.getValue(AWS_REGION);
         this.endpoint = "https://" + properties.getValue(AWS_POLARIS_DOMAIN_NAME);

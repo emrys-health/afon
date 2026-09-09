@@ -12,7 +12,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET;
+import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static java.lang.String.format;
@@ -112,7 +112,7 @@ public class StepDocumentation extends StepActions {
     @Override
     public String azureFirstFile(AfonPropertyProvider properties, String glob, boolean descendingOrder) {
         out.println("Get Azure first file:");
-        String     bucket     = properties.getValue(AZURE_BUCKET);
+        String     bucket     = properties.getValue(AZURE_BUCKET_NAME);
         String     account    = properties.getValue(AZURE_STORAGE_ACCOUNT);
         return format(
                 "abfss://%s@%s.dfs.core.windows.net/%s",

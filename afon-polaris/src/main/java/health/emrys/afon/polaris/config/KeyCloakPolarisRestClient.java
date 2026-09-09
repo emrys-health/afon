@@ -39,7 +39,7 @@ public class KeyCloakPolarisRestClient extends PolarisRestClient {
     private static final Logger logger = getLogger(KeyCloakPolarisRestClient.class);
 
     private static @NonNull String tokenEndpointFor(AfonPropertyProvider properties) {
-        return tokenEndpointFor(properties.getValue(KC_HOSTNAME));
+        return tokenEndpointFor(properties.getValue(OIDC_DOMAIN_NAME));
     }
 
     private static @NonNull String tokenEndpointFor(String kcHostname) {

@@ -20,10 +20,10 @@ public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
 
     public GlueAwsPolarisCatalog(AfonPropertyProvider properties) {
         super(properties);
-        this.bucketUrl = s3BucketUrl(properties.getValue(AWS_S3_EXTERNAL_BUCKET_NAME));
-        this.roleArn = properties.getValue(GLUE_S3_ROLE_ARN);
+        this.bucketUrl = s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL));
+        this.roleArn = properties.getValue(AWS_GLUE_ROLE_ARN);
         this.region  = properties.getValue(AWS_REGION);
-        this.catalogName = properties.getValue(GLUE_CATALOG_NAME);
+        this.catalogName = properties.getValue(AWS_GLUE_CATALOG_NAME);
     }
 
     protected @NonNull CatalogProperties catalogProperties() {

@@ -14,7 +14,7 @@ import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 /**
  * This helps to create a catalog called {@code azure_external}
  * in whichever Polaris is the current that points to a remote catalog called
- * {@code azure} in {@link AfonProperty#AZURE_DOMAIN_NAME}
+ * {@code azure} in {@link AfonProperty#AZURE_POLARIS_DOMAIN_NAME}
  */
 public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
     private final @NonNull String bucketUrl;
@@ -26,12 +26,12 @@ public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
     public AzureExternalPolarisCatalog(AfonPropertyProvider properties) {
         super(properties);
         String storageAccount   = properties.getValue(AZURE_STORAGE_ACCOUNT);
-        String bucketName       = properties.getValue(AZURE_EXTERNAL_BUCKET);
+        String bucketName       = properties.getValue(AZURE_BUCKET_NAME_EXTERNAL);
         this.bucketUrl          = abfssBucketUrl(bucketName, storageAccount);
         this.tenant             = properties.getValue(AZURE_TENANT_ID);
-        this.multiTenantAppName = properties.getValue(AZURE_CLIENT_ID);
-        this.clientId           = properties.getValue(AZURE_CLIENT_ID);
-        this.endpoint           = "https://" + properties.getValue(AZURE_DOMAIN_NAME);
+        this.multiTenantAppName = properties.getValue(AZURE_APP_ID);
+        this.clientId           = properties.getValue(AZURE_APP_ID);
+        this.endpoint           = "https://" + properties.getValue(AZURE_POLARIS_DOMAIN_NAME);
     }
 
     @Override

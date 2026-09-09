@@ -35,14 +35,14 @@ public class CloudConfigTest {
                 checkPropertyIsWhitelisted(AWS_S3_BUCKET_NAME);
                 break;
             case "azure":
-                checkPropertyIsWhitelisted(AZURE_BUCKET);
+                checkPropertyIsWhitelisted(AZURE_BUCKET_NAME);
                 break;
             case "gcp":
                 checkPropertyIsWhitelisted(GCP_BUCKET_NAME);
                 break;
             default:
                 checkPropertyIsWhitelisted(AWS_S3_BUCKET_NAME);
-                checkPropertyIsWhitelisted(AZURE_BUCKET);
+                checkPropertyIsWhitelisted(AZURE_BUCKET_NAME);
                 checkPropertyIsWhitelisted(GCP_BUCKET_NAME);
         }
     }

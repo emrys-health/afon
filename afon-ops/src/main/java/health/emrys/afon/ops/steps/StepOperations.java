@@ -28,7 +28,7 @@ import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.DELETE;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.RECREATE;
 import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
-import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
+import static health.emrys.afon.ops.spark.SparkChecker.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 
 public class StepOperations {
@@ -119,7 +119,7 @@ public class StepOperations {
     public Step deleteExternalCatalogIn(AfonCloud cloud) {
         switch (cloud) {
             case AZURE:
-                return deleteExternalCatalogTableFor(afonCatalogs.azure(), properties.getValue(AZURE_DOMAIN_NAME));
+                return deleteExternalCatalogTableFor(afonCatalogs.azure(), properties.getValue(AZURE_POLARIS_DOMAIN_NAME));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -128,7 +128,7 @@ public class StepOperations {
 
     private @NonNull Step deleteExternalCatalogTableFor(AfonCatalog catalog, String domainName
     ) {
-        return deletePolarisTable(catalog, domainName, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
+        return deletePolarisTable(catalog, domainName, EXTERNAL_NAMESPACE, SparkChecker.TEST_TABLE);
     }
 
     private @NonNull Step deletePolarisTable(AfonCatalog catalog,
@@ -150,9 +150,9 @@ public class StepOperations {
             case AZURE:
                 Properties properties = new Properties();
                 properties.setProperty(
-                        AZURE_BUCKET.getName(),
-                        this.properties.getValue(AZURE_EXTERNAL_BUCKET));
-                return createExternalCatalogFor(afonCatalogs.azure(), this.properties.getValue(AZURE_DOMAIN_NAME), properties);
+                        AZURE_BUCKET_NAME.getName(),
+                        this.properties.getValue(AZURE_BUCKET_NAME_EXTERNAL));
+                return createExternalCatalogFor(afonCatalogs.azure(), this.properties.getValue(AZURE_POLARIS_DOMAIN_NAME), properties);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -181,9 +181,9 @@ public class StepOperations {
             case AWS:
                 return createAllCatalogsFor(properties.getValue(AWS_POLARIS_DOMAIN_NAME));
             case AZURE:
-                return createAllCatalogsFor(properties.getValue(AZURE_DOMAIN_NAME));
+                return createAllCatalogsFor(properties.getValue(AZURE_POLARIS_DOMAIN_NAME));
             case GCP:
-                return createAllCatalogsFor(properties.getValue(GCP_DOMAIN_NAME));
+                return createAllCatalogsFor(properties.getValue(GCP_POLARIS_DOMAIN_NAME));
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
@@ -228,16 +228,16 @@ public class StepOperations {
             case AWS:
                 return actions.waitOnDNS(properties.getValue(AWS_POLARIS_DOMAIN_NAME));
             case AZURE:
-                return actions.waitOnDNS(properties.getValue(AZURE_DOMAIN_NAME));
+                return actions.waitOnDNS(properties.getValue(AZURE_POLARIS_DOMAIN_NAME));
             case GCP:
-                return actions.waitOnDNS(properties.getValue(GCP_DOMAIN_NAME));
+                return actions.waitOnDNS(properties.getValue(GCP_POLARIS_DOMAIN_NAME));
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
     }
 
     private Step waitForKeyCloak() {
-        return actions.waitOnDNS(properties.getValue(KC_HOSTNAME));
+        return actions.waitOnDNS(properties.getValue(OIDC_DOMAIN_NAME));
     }
 
     public Step checkAwsSparkWritingTo(AfonCloud cloud) {
@@ -260,7 +260,7 @@ public class StepOperations {
             namespace,
             SparkTestWriter.class,
                 properties.getValue(AWS_POLARIS_DOMAIN_NAME),
-                properties.getValue(AWS_JUPYTER_DOMAIN));
+                properties.getValue(AWS_JUPYTER_DOMAIN_NAME));
     }
 
     public @NonNull Step checkSparkWritingViaAwsPolarisToPolarisIn(AfonCloud cloud) {
@@ -268,11 +268,11 @@ public class StepOperations {
             case AZURE:
                 return sparkTestUsing(
                     afonCatalogs.azureExternal(),
-                    format("local Spark call that uses %s which defers to %s", properties.getValue(AWS_POLARIS_DOMAIN_NAME), properties.getValue(AZURE_DOMAIN_NAME)),
+                    format("local Spark call that uses %s which defers to %s", properties.getValue(AWS_POLARIS_DOMAIN_NAME), properties.getValue(AZURE_POLARIS_DOMAIN_NAME)),
                     EXTERNAL_NAMESPACE,
                     SparkTestWriter.class,
                         properties.getValue(AWS_POLARIS_DOMAIN_NAME),
-                        properties.getValue(AWS_JUPYTER_DOMAIN));
+                        properties.getValue(AWS_JUPYTER_DOMAIN_NAME));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -284,10 +284,10 @@ public class StepOperations {
             case AZURE:
                 return sparkTestUsing(
                     afonCatalogs.azure(),
-                    format("local Spark call that uses %s", properties.getValue(AZURE_DOMAIN_NAME)),
+                    format("local Spark call that uses %s", properties.getValue(AZURE_POLARIS_DOMAIN_NAME)),
                     EXTERNAL_NAMESPACE,
                     SparkTestWriter.class,
-                        properties.getValue(AZURE_DOMAIN_NAME),
+                        properties.getValue(AZURE_POLARIS_DOMAIN_NAME),
                         properties.getValue(AZURE_JUPYTER_DOMAIN_NAME));
             case AWS, GCP:
             default:
@@ -298,12 +298,12 @@ public class StepOperations {
     public @NonNull Step checkAwsSparkReadingUsing(AfonCatalog catalog) {
         return sparkTestUsing(
             catalog, format("read via Spark table `%s.%s.%s` by calling `%s`",
-                       catalog, ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE,
+                       catalog, ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TEST_TABLE,
                         properties.getValue(AWS_POLARIS_DOMAIN_NAME)),
             ACCEPTANCE_TEST_NAMESPACE,
             SparkTestReader.class,
                 properties.getValue(AWS_POLARIS_DOMAIN_NAME),
-                properties.getValue(AWS_JUPYTER_DOMAIN));
+                properties.getValue(AWS_JUPYTER_DOMAIN_NAME));
     }
 
     private @NonNull Step sparkTestUsing(AfonCatalog catalog,
@@ -385,7 +385,7 @@ public class StepOperations {
                                  CATALOG_NAMESPACE = '%s'
                                  REPLACE_INVALID_CHARACTERS = TRUE;
                             """,
-                        SparkChecker.TABLE,
+                        SparkChecker.TEST_TABLE,
                         EXTERNAL_NAMESPACE),
 
                     "SELECT COUNT(*) FROM my_gcp_table_id"
@@ -421,7 +421,7 @@ public class StepOperations {
                               ENABLED = TRUE
                               STORAGE_ALLOWED_LOCATIONS = ('azure://%s.blob.core.windows.net/%s')
                               AZURE_TENANT_ID='%s';
-                            """, properties.getValue(AZURE_BUCKET), properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_BUCKET), properties.getValue(AZURE_TENANT_ID)),
+                            """, properties.getValue(AZURE_BUCKET_NAME), properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_BUCKET_NAME), properties.getValue(AZURE_TENANT_ID)),
 
                     """
                     DROP ICEBERG TABLE IF EXISTS my_azure_iceberg_table ;
@@ -438,7 +438,7 @@ public class StepOperations {
                                   AZURE_TENANT_ID='%s'
                                 )
                               );
-                            """, properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_BUCKET), ACCEPTANCE_TEST_NAMESPACE, properties.getValue(AZURE_TENANT_ID)),
+                            """, properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_BUCKET_NAME), ACCEPTANCE_TEST_NAMESPACE, properties.getValue(AZURE_TENANT_ID)),
 
                     """
                     USE DATABASE SNOWFLAKE_LEARNING_DB;
@@ -469,7 +469,7 @@ public class StepOperations {
     public Step deleteAwsPolarisCatalogAndRecreateFor(AfonCloud cloud) {
         switch (cloud) {
             case AZURE:
-                return deletePolarisTable(afonCatalogs.azure(), properties.getValue(AWS_POLARIS_DOMAIN_NAME), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE)
+                return deletePolarisTable(afonCatalogs.azure(), properties.getValue(AWS_POLARIS_DOMAIN_NAME), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TEST_TABLE)
                     .andThen(createCatalogFor(afonCatalogs.azure(), properties.getValue(AWS_POLARIS_DOMAIN_NAME)));
             case AWS, GCP:
             default:
@@ -485,7 +485,7 @@ public class StepOperations {
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
                 String json = actions.azureFirstFile(properties, glob, true); // firstFileInLatestDirectoryMatching(glob);
-                return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterPolarisTableMain.class);
+                return registerTableInAwsPolaris(AZURE, json, SparkChecker.TEST_TABLE, RegisterPolarisTableMain.class);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
