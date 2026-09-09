@@ -40,18 +40,13 @@ else
   az network dns zone create --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_POLARIS_DOMAIN_NAME || exit 1
 fi
 
+## Resource Providers
+
+source $AFON_ROOT/scripts/azure/providers.sh
+
 # Storage
 
 echo "- Creating storage"
-
-## Storage Resource Provider
-
-if [ "$(az provider show --namespace Microsoft.Storage --query registrationState -o tsv)" = "Registered" ]; then
-  echo "- Resource provider 'Microsoft.Storage' already registered, skipping"
-else
-  echo "- Registering resource provider 'Microsoft.Storage'"
-  az provider register --namespace Microsoft.Storage --wait || exit 1
-fi
 
 ## Storage Account
 
