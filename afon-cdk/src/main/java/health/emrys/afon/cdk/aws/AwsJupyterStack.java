@@ -60,8 +60,8 @@ public class AwsJupyterStack extends AwsPolarisStack {
         jupyterDependables.add(cloudProvider.getLbRelease());
         // `dependables` carries the kubeconfigUpdater and the Cilium release, both of which the
         // CiliumNetworkPolicy kubectl inside networkPolicies() needs in place first.
-        network.networkPolicies(
-            jupyter.deployJupyterHub(jupyterDependables), SPARK_CONNECTOR_NAME, dependables);
+        jupyter.deployJupyterHub(jupyterDependables);
+        network.networkPolicies(SPARK_CONNECTOR_NAME, dependables);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
         HelmProviderKubernetes kubernetes = HelmProviderKubernetes

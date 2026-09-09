@@ -35,6 +35,11 @@ import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
  */
 public class SparkWorkloads {
 
+    public static final Map<String, String> MASTER_LABELS = Map.of(
+        "spark-role", "master");
+    public static final Map<String, String> DRIVER_LABELS = Map.of(
+        "spark-role", "driver");
+
     private final String polarisDomainName;
     private final AfonPropertyProvider properties;
 
