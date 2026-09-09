@@ -16,13 +16,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
-import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_ACCOUNT_NAME;
+import static health.emrys.afon.cdk.CdkUtils.*;
+import static health.emrys.afon.cdk.JupyterHubConfig.USER_POD_LABELS;
 import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
 import static health.emrys.afon.config.AfonProperty.USER_POLARIS_SECRET;
 import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
+import static java.lang.String.format;
 
 /**
  * Cloud-agnostic application of the Spark operator's custom resources: a {@code SparkCluster}
@@ -132,9 +133,9 @@ public class SparkWorkloads {
                         // reads to title flows; without it the driver/executor
                         // pods show as "Unknown App".
                         "metadata", Map.of(
-                            "labels", Map.of(
+                            "labels", addMaps(Map.of(
                                 "app.kubernetes.io/name", SPARK_CONNECTOR_NAME + "-driver"
-                            )
+                            ), USER_POD_LABELS)
                         ),
                         "spec", Map.of(
                             "restartPolicy", "Always"
@@ -144,9 +145,9 @@ public class SparkWorkloads {
                 "executorSpec", Map.of(
                     "podTemplateSpec", Map.of(
                         "metadata", Map.of(
-                            "labels", Map.of(
+                            "labels", addMaps(Map.of(
                                 "app.kubernetes.io/name", SPARK_CONNECTOR_NAME + "-executor"
-                            )
+                            ), USER_POD_LABELS)
                         )
                     )
                 )
@@ -179,7 +180,7 @@ public class SparkWorkloads {
             "spark.master.rest.enabled", "true",
             "spark.master.rest.host", "0.0.0.0",
             "spark.ui.reverseProxy", "true",
-            "spark.master", "spark://emrys-master-svc:7077",
+            "spark.master", format("spark://%s-svc:7077", MASTER),
             "spark.submit.deployMode", "cluster",
             "spark.executor.cores", "1",
             "spark.cores.max", "3",

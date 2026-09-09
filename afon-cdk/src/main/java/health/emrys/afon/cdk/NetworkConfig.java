@@ -7,6 +7,7 @@ import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
@@ -15,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.*;
-import static health.emrys.afon.cdk.JupyterHubConfig.SINGLEUSER_LABELS;
+import static health.emrys.afon.cdk.JupyterHubConfig.USER_POD_LABELS;
 import static health.emrys.afon.cdk.SparkWorkloads.DRIVER_LABELS;
 import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 
@@ -27,7 +28,32 @@ public class NetworkConfig {
     private static final String DOMAIN_POLICY_NAME = "allow-only-whitelisted-domains";
 
     /** The ports the whitelisted domains may be reached on. */
-    private static final List<String> WEB_PORTS = List.of("80", "443");
+    private static final List<String> ALLOWED_PORTS = List.of("80", "443", "7077", "15002");
+
+    /**
+     * Zones the cluster's own resolvers answer, and which a lookup therefore cannot escape
+     * through. CoreDNS is authoritative for {@code cluster.local} and returns NXDOMAIN itself
+     * rather than forwarding, and {@code compute.internal} goes to the VPC resolver. Neither
+     * reaches a nameserver an attacker could operate, so a query smuggling data in its labels has
+     * nowhere to arrive - which is why these can be wildcarded freely while external names cannot.
+     */
+    private static final List<String> INTERNAL_DNS_ZONES = List.of("cluster.local", "compute.internal");
+
+    /**
+     * Labels a search-domain suffix adds beyond the zone itself. The longest suffix in play is
+     * {@code default.svc.cluster.local}, two labels more than {@code cluster.local}.
+     */
+    private static final int SEARCH_PATH_LABELS = 2;
+
+    /**
+     * The pods backing {@code emrys-master-svc}, expressed exactly as the Service selects them
+     * (see {@code AwsSparkStack.sparkExternalService}). {@link SparkWorkloads#MASTER} names the
+     * StatefulSet the Spark operator creates for the {@code SparkCluster}; the {@code k8s:} prefix
+     * is Cilium's source qualifier for a Kubernetes label.
+     */
+    private static final Map<String, String> SPARK_MASTER_LABELS = Map.of(
+        "k8s:io.kubernetes.pod.namespace", "default",
+        "k8s:spark-role", "master");
 
     /**
      * One entry in {@link #allowedDomains}. Cilium offers two matchers and they are not the
@@ -42,6 +68,13 @@ public class NetworkConfig {
      */
     private record AllowedDomain(String matcher, String domain) {
 
+        static AllowedDomain create(String domain) {
+            if (domain.contains("*")) {
+                return matching(domain);
+            }
+            return exactly(domain);
+        }
+
         static AllowedDomain exactly(String domain) {
             return new AllowedDomain("matchName", domain);
         }
@@ -53,15 +86,32 @@ public class NetworkConfig {
         Map<String, String> asFqdnSelector() {
             return Map.of(matcher, domain);
         }
+
+        /** How many dot-separated labels the name has, {@code a.b.com} being three. */
+        int labelCount() {
+            return domain.split("\\.").length;
+        }
     }
 
     private final TerraformStack      tfStack;
     private final List<AllowedDomain> allowedDomains;
 
+    public static void main(String[] args) {
+        Map<String, Object> manifest = connectionManifest(USER_POD_LABELS,
+                                                          getAllowedDomainsFrom(new FilePropertyProvider()));
+        System.out.println(toJson(manifest));
+    }
+
+    private static @NonNull List<AllowedDomain> getAllowedDomainsFrom(AfonPropertyProvider properties) {
+        final List<AllowedDomain> allowedDomains;
+        String                    csv = ALLOWED_DOMAINS_CSV.getValueFrom(properties.getProperties());
+        allowedDomains = Arrays.stream(csv.split(",")).map(x -> AllowedDomain.create(x)).toList();
+        return allowedDomains;
+    }
+
     public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties) {
         this.tfStack = tfStack;
-        String csv = ALLOWED_DOMAINS_CSV.getValueFrom(properties.getProperties());
-        allowedDomains = Arrays.stream(csv.split(",")).map(x -> AllowedDomain.exactly(x)).toList();
+        allowedDomains = getAllowedDomainsFrom(properties);
     }
 
     /**
@@ -91,8 +141,8 @@ public class NetworkConfig {
                                    .to(allowedNamespacePeers)
                                    .build(),
             createSparkConnectorEgressPolicy(sparkConnectorName));
-        networkPolicyFor(SINGLEUSER_LABELS, egress);
-        whitelistDomains(SINGLEUSER_LABELS, allowedDomains, dependsOn);
+        networkPolicyFor(USER_POD_LABELS, egress);
+        whitelistDomains(USER_POD_LABELS, allowedDomains, dependsOn);
     }
 
     /**
@@ -132,28 +182,7 @@ public class NetworkConfig {
         if (allowedDomains.isEmpty()) {
             return;
         }
-        Map<String, Object> dnsVisibility = Map.of(
-            "toEndpoints", List.of(Map.of("matchLabels", Map.of(
-                "k8s:io.kubernetes.pod.namespace", "kube-system",
-                "k8s:k8s-app", "kube-dns"))),
-            "toPorts", List.of(Map.of(
-                "ports", List.of(Map.of("port", "53", "protocol", "ANY")),
-                "rules", Map.of("dns", List.of(Map.of("matchPattern", "*"))))));
-        Map<String, Object> domainEgress = Map.of(
-            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList(),
-            "toPorts", List.of(Map.of(
-                "ports", WEB_PORTS.stream()
-                                  .map(port -> Map.of("port", port, "protocol", "TCP"))
-                                  .toList())));
-        Map<String, Object> manifest = Map.of(
-            "apiVersion", "cilium.io/v2",
-            "kind", "CiliumNetworkPolicy",
-            "metadata", Map.of(
-                "name", DOMAIN_POLICY_NAME,
-                "namespace", "default"),
-            "spec", Map.of(
-                "endpointSelector", Map.of("matchLabels", labels),
-                "egress", List.of(dnsVisibility, domainEgress)));
+        Map<String, Object> manifest = connectionManifest(labels, allowedDomains);
 
         String manifestJson = toJson(manifest);
         List<LocalExecProvisioner> provisioners = new ArrayList<>(
@@ -171,6 +200,88 @@ public class NetworkConfig {
                         .triggers(Map.of("manifest", manifestJson))
                         .provisioners(provisioners)
                         .build();
+    }
+
+    private static @NonNull Map<String, Object> connectionManifest(Map<String, String> labels,
+                                                                   List<AllowedDomain> allowedDomains) {
+        Map<String, Object> dnsVisibility = Map.of(
+            "toEndpoints", List.of(Map.of("matchLabels", Map.of(
+                "k8s:io.kubernetes.pod.namespace", "kube-system",
+                "k8s:k8s-app", "kube-dns"))),
+            "toPorts", List.of(Map.of(
+                "ports", List.of(Map.of("port", "53", "protocol", "ANY")),
+                "rules", Map.of("dns", dnsQueryRules(allowedDomains)))));
+        Map<String, Object> domainEgress = Map.of(
+            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList()
+//            "toPorts", List.of(Map.of(
+//                "ports", ALLOWED_PORTS.stream()
+//                                      .map(port -> Map.of("port", port, "protocol", "TCP"))
+//                                      .toList()))
+        );
+        // Egress to emrys-master-svc, the Spark master (spark://emrys-master-svc:7077).
+        // Named rather than listed among the whitelisted domains because a cluster-local name is
+        // not something toFQDNs can express: Cilium's DNS proxy turns an answer into a CIDR
+        // identity, whereas a pod inside the cluster carries a label-derived one, so the FQDN rule
+        // would never match it. Traffic to a ClusterIP is DNAT'd to a backing pod before egress
+        // policy is evaluated in any case, so selecting those pods on the same label the Service
+        // selects on is the rule that actually applies. No toPorts, matching the domain rule
+        // above: every port the master listens on (7077, 6066, 8080) is reachable.
+        Map<String, Object> sparkMasterEgress = Map.of(
+            "toEndpoints", List.of(Map.of("matchLabels", SPARK_MASTER_LABELS)));
+        Map<String, Object> manifest = Map.of(
+            "apiVersion", "cilium.io/v2",
+            "kind", "CiliumNetworkPolicy",
+            "metadata", Map.of(
+                "name", DOMAIN_POLICY_NAME,
+                "namespace", "default"),
+            "spec", Map.of(
+                "endpointSelector", Map.of("matchLabels", labels),
+                "egress", List.of(dnsVisibility, domainEgress, sparkMasterEgress)));
+        return manifest;
+    }
+
+    /**
+     * The names the DNS proxy will answer. Anything else is refused, which closes DNS itself as an
+     * exfiltration channel: with the previous {@code matchPattern: "*"} every name resolved, so a
+     * pod could tunnel data out in the labels of a query to a nameserver it controlled, no matter
+     * how tight {@code toFQDNs} was. {@code toFQDNs} governs which addresses may be *connected to*
+     * and says nothing about which names may be *looked up*.
+     * <p>
+     * Two groups have to be here or the pods lose DNS.
+     * <p>
+     * First, the whitelisted domains, reusing the very selectors {@link #connectionManifest} feeds
+     * to {@code toFQDNs}: Cilium only learns an address for a name whose lookup passed the proxy,
+     * so a name allowed to connect but not to resolve would never work.
+     * <p>
+     * Second, the search-path expansions. A pod's resolver has {@code ndots:5}, so a name with
+     * fewer than five dots is tried against each search domain before being tried as written -
+     * {@code storage.googleapis.com} is first queried as
+     * {@code storage.googleapis.com.default.svc.cluster.local}, and so on down the list. Those
+     * misses have to reach CoreDNS to be answered NXDOMAIN. Refusing them instead would leave the
+     * resolver to interpret a REFUSED rcode mid-search, which glibc mostly walks past but musl
+     * treats far less forgivingly - a failure mode that would show up as intermittent,
+     * base-image-dependent DNS breakage rather than anything obviously caused by this policy.
+     * <p>
+     * Hence the ladder. Cilium's {@code *} is not a glob over the whole name: {@code
+     * escapeRegexpCharacters} rewrites it to {@code [-a-zA-Z0-9_]*}, which excludes the dot, so one
+     * {@code *} spans exactly one label and {@code *.cluster.local} does not match
+     * {@code emrys-master-svc.default.svc.cluster.local}. Covering every depth therefore means
+     * emitting a pattern per depth, up to the longest whitelisted name plus
+     * {@link #SEARCH_PATH_LABELS}.
+     */
+    private static List<Map<String, String>> dnsQueryRules(List<AllowedDomain> allowedDomains) {
+        List<Map<String, String>> rules = new ArrayList<>(
+            allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList());
+        int deepest = allowedDomains.stream().mapToInt(AllowedDomain::labelCount).max().orElse(1)
+                      + SEARCH_PATH_LABELS;
+        for (String zone : INTERNAL_DNS_ZONES) {
+            StringBuilder wildcards = new StringBuilder("*");
+            for (int depth = 0; depth < deepest; depth++) {
+                rules.add(Map.of("matchPattern", wildcards + "." + zone));
+                wildcards.append(".*");
+            }
+        }
+        return List.copyOf(rules);
     }
 
     private static @NonNull String toJson(Map<String, Object> manifest) {
