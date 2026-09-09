@@ -33,7 +33,7 @@ import static java.lang.String.format;
  * manifests leaves it idle, which is why both the AWS and Azure stacks must call {@link #deploy}.
  */
 public class SparkWorkloads {
-
+    public static final String MASTER = "emrys-master";
     public static final Map<String, String> MASTER_LABELS = Map.of(
         "spark-role", "master");
     public static final Map<String, String> DRIVER_LABELS = Map.of(
