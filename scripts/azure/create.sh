@@ -2,7 +2,7 @@ source $AFON_ROOT/scripts/config/afon-source.sh azure
 source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 AS_ADMIN="${1:-false}"
-APP_ID="${AZURE_CLIENT_ID:-}"
+APP_ID="${AZURE_APP_ID:-}"
 APP_SP_ID="${AZURE_SP_ID:-}"
 
 echo "- Creating env for subscription '$AZURE_SUBSCRIPTION'"
@@ -33,11 +33,11 @@ fi
 
 echo "- Creating DNS zone"
 
-if az network dns zone show --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_DOMAIN_NAME -o none 2>/dev/null; then
-  echo "- DNS zone for domain name '$AZURE_DOMAIN_NAME' already exists, skipping"
+if az network dns zone show --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_POLARIS_DOMAIN_NAME -o none 2>/dev/null; then
+  echo "- DNS zone for domain name '$AZURE_POLARIS_DOMAIN_NAME' already exists, skipping"
 else
-  echo "- Creating DNS zone for domain name '$AZURE_DOMAIN_NAME'"
-  az network dns zone create --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_DOMAIN_NAME || exit 1
+  echo "- Creating DNS zone for domain name '$AZURE_POLARIS_DOMAIN_NAME'"
+  az network dns zone create --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_POLARIS_DOMAIN_NAME || exit 1
 fi
 
 # Storage
@@ -64,25 +64,25 @@ fi
 
 ## Storage Buckets
 
-if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET --auth-mode login --query exists -o tsv)" = "true" ]; then
-  echo "- Bucket '$AZURE_BUCKET' already exists, skipping"
+if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME --auth-mode login --query exists -o tsv)" = "true" ]; then
+  echo "- Bucket '$AZURE_BUCKET_NAME' already exists, skipping"
 else
-  echo "- Creating bucket '$AZURE_BUCKET'"
-  az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET --auth-mode login || exit 1
+  echo "- Creating bucket '$AZURE_BUCKET_NAME'"
+  az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME --auth-mode login || exit 1
 fi
 
-if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_EXTERNAL_BUCKET --auth-mode login --query exists -o tsv)" = "true" ]; then
-  echo "- Bucket '$AZURE_EXTERNAL_BUCKET' already exists, skipping"
+if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_EXTERNAL --auth-mode login --query exists -o tsv)" = "true" ]; then
+  echo "- Bucket '$AZURE_BUCKET_NAME_EXTERNAL' already exists, skipping"
 else
-  echo "- Creating bucket '$AZURE_EXTERNAL_BUCKET'"
-  az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_EXTERNAL_BUCKET --auth-mode login || exit 1
+  echo "- Creating bucket '$AZURE_BUCKET_NAME_EXTERNAL'"
+  az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_EXTERNAL --auth-mode login || exit 1
 fi
 
-if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_FORBIDDEN --auth-mode login --query exists -o tsv)" = "true" ]; then
-  echo "- Bucket '$AZURE_BUCKET_FORBIDDEN' already exists, skipping"
+if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_FORBIDDEN --auth-mode login --query exists -o tsv)" = "true" ]; then
+  echo "- Bucket '$AZURE_BUCKET_NAME_FORBIDDEN' already exists, skipping"
 else
-  echo "- Creating bucket '$AZURE_BUCKET_FORBIDDEN'"
-  az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_FORBIDDEN --auth-mode login || exit 1
+  echo "- Creating bucket '$AZURE_BUCKET_NAME_FORBIDDEN'"
+  az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_FORBIDDEN --auth-mode login || exit 1
 fi
 
 ## Role Assignment
@@ -98,19 +98,19 @@ ASSIGNEE_ID="$APP_SP_ID"
 STORAGE_BUCKET_ROLE="Storage Blob Data Contributor"
 STORAGE_ACCOUNT_ROLE="Storage Blob Delegator"
 
-BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET"
+BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET_NAME"
 if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
-  echo "- Role '$STORAGE_BUCKET_ROLE' already assigned on '$AZURE_BUCKET', skipping"
+  echo "- Role '$STORAGE_BUCKET_ROLE' already assigned on '$AZURE_BUCKET_NAME', skipping"
 else
-  echo "- Assigning role '$STORAGE_BUCKET_ROLE' to bucket '$AZURE_BUCKET'"
+  echo "- Assigning role '$STORAGE_BUCKET_ROLE' to bucket '$AZURE_BUCKET_NAME'"
   az role assignment create --role "$STORAGE_BUCKET_ROLE" --assignee-object-id $ASSIGNEE_ID --assignee-principal-type ServicePrincipal --scope "$BUCKET_SCOPE" || exit 1
 fi
 
-EXTERNAL_BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_EXTERNAL_BUCKET"
+EXTERNAL_BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET_NAME_EXTERNAL"
 if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$EXTERNAL_BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
-  echo "- Role '$STORAGE_BUCKET_ROLE' already assigned on '$AZURE_EXTERNAL_BUCKET', skipping"
+  echo "- Role '$STORAGE_BUCKET_ROLE' already assigned on '$AZURE_BUCKET_NAME_EXTERNAL', skipping"
 else
-  echo "- Assigning role '$STORAGE_BUCKET_ROLE' to bucket '$AZURE_EXTERNAL_BUCKET'"
+  echo "- Assigning role '$STORAGE_BUCKET_ROLE' to bucket '$AZURE_BUCKET_NAME_EXTERNAL'"
   az role assignment create --role "$STORAGE_BUCKET_ROLE" --assignee-object-id $ASSIGNEE_ID --assignee-principal-type ServicePrincipal --scope "$EXTERNAL_BUCKET_SCOPE" || exit 1
 fi
 

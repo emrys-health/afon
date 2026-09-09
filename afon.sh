@@ -188,7 +188,7 @@ exec_config(){
         echo "Dir $CONFIG_DIR not found."
       fi
       ;;
-    init|validate)
+    init|validate|renames)
       SCRIPT_PATH="config/$CONFIG_ACTION.sh"
       exec_script
       ;;

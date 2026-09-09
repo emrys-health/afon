@@ -25,7 +25,7 @@ public class AwsKeyCloakConfig extends KeyCloakConfig<AwsCloudProvider> {
         super(scope, properties, cloudProvider);
         dnsZone  = properties.getValue(AfonProperty.AWS_KEYCLOAK_DNS_ZONE);
         certArn  = properties.getValue(AfonProperty.AWS_KEYCLOAK_CERT_ARN);
-        hostname = properties.getValue(AfonProperty.KC_HOSTNAME);
+        hostname = properties.getValue(AfonProperty.OIDC_DOMAIN_NAME);
     }
 
     @Override

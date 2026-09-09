@@ -302,8 +302,8 @@ public abstract class JupyterHubConfig {
             properties.getValue(AfonProperty.POLARIS_DB_HOST),
             5432,
             "guacamole",
-            properties.getValue(AfonProperty.KC_DB_USERNAME),
-            properties.getValue(AfonProperty.KC_DB_PASSWORD));
+            properties.getValue(AfonProperty.KEYCLOAK_DB_USERNAME),
+            properties.getValue(AfonProperty.KEYCLOAK_DB_PASSWORD));
         new GuacamoleConfig(
             stack,
             guacamoleDeps,

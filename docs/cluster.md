@@ -92,7 +92,7 @@ kubectl get sparkapplications spark-connector -o yaml | grep token
 The `hub-deployment-*` pod hosts the Jupyter Hub. 
 We've slightly modified the Docker image (scripts/docker/jupyter/Dockerfile) so it uses Spark v4 libraries.
 
-When the user logs into the Jupyter, using the `AWS_JUPYTER_DOMAIN`, a new *personal* pod is spun up with the 
+When the user logs into the Jupyter, using the `AWS_JUPYTER_DOMAIN_NAME`, a new *personal* pod is spun up with the 
 username used to log in in the pod name.   
 
 You can find the pod name by running

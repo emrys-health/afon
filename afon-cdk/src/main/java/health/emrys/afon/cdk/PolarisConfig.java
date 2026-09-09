@@ -221,8 +221,9 @@ public class PolarisConfig extends Construct {
         AfonPropertyProvider properties,
         String deploymentId) {
         List<String> exports = getPolarisProperties()
+            .entrySet()
             .stream()
-            .map(x -> format("export %s=%s", x.getName(), properties.getValue(x)))
+            .map(e -> format("export %s=%s", e.getValue(), properties.getValue(e.getKey())))
             .sorted()
             .toList();
 
@@ -280,20 +281,20 @@ public class PolarisConfig extends Construct {
             case AWS:
                 return properties.getValue(AWS_POLARIS_DOMAIN_NAME);
             case AZURE:
-                return properties.getValue(AZURE_DOMAIN_NAME);
+                return properties.getValue(AZURE_POLARIS_DOMAIN_NAME);
             case GCP:
-                return properties.getValue(GCP_DOMAIN_NAME);
+                return properties.getValue(GCP_POLARIS_DOMAIN_NAME);
             default:
                 throw new IllegalArgumentException(deploymentId);
         }
     }
 
     private static @NonNull String kcExports(AfonPropertyProvider properties) {
-        String kcHost = properties.getValue(KC_HOSTNAME);
+        String kcHost = properties.getValue(OIDC_DOMAIN_NAME);
         Map<String, String> kcProperties = KeyCloakHelper.polarisOidcEnv(
             KeyCloakConfigurer.internalRealmUrl(kcHost, "https"),
-            properties.getValue(KC_DB_USERNAME),
-            properties.getValue(KC_DB_PASSWORD));
+            properties.getValue(KEYCLOAK_DB_USERNAME),
+            properties.getValue(KEYCLOAK_DB_PASSWORD));
         return toExports(kcProperties);
     }
 

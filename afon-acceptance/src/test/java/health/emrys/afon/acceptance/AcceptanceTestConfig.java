@@ -33,7 +33,7 @@ public class AcceptanceTestConfig {
     private AcceptanceTestConfig(AfonPropertyProvider properties) {
         this.properties = properties;
         this.afonCatalogs = new AfonCatalogs(properties);
-        this.properties.setValue(KC_HOSTNAME, ContainerHelper.KEYCLOAK_HOSTNAME);
+        this.properties.setValue(OIDC_DOMAIN_NAME, ContainerHelper.KEYCLOAK_HOSTNAME);
         this.polarisCatalogs = new HashMap<>();
         addPolarisCatalogs();
         startContainers(this.properties);
@@ -91,7 +91,7 @@ public class AcceptanceTestConfig {
             @Override
             public String bucketUri() {
                 return abfssBucketUrl(
-                        properties.getValue(AZURE_BUCKET_FORBIDDEN),
+                        properties.getValue(AZURE_BUCKET_NAME_FORBIDDEN),
                         properties.getValue(AZURE_STORAGE_ACCOUNT));
             }
 
