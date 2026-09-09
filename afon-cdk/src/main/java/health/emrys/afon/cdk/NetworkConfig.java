@@ -14,8 +14,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
-import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
+import static health.emrys.afon.cdk.CdkUtils.*;
+import static health.emrys.afon.cdk.JupyterHubConfig.SINGLEUSER_LABELS;
+import static health.emrys.afon.cdk.SparkWorkloads.DRIVER_LABELS;
 import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 
 /**
@@ -69,8 +70,7 @@ public class NetworkConfig {
      *                  knows about and so would otherwise be scheduled anywhere in the graph -
      *                  including before the cluster exists. See {@link #whitelistDomains}.
      */
-    public void networkPolicies(Map<String, String> labels,
-                                String sparkConnectorName,
+    public void networkPolicies(String sparkConnectorName,
                                 List<ITerraformDependable> dependsOn) {
         // The only default-namespace peers a notebook pod may reach. An egress `to` entry carrying
         // just a podSelector is scoped to the policy's own namespace, so this is exactly "these two
@@ -91,8 +91,8 @@ public class NetworkConfig {
                                    .to(allowedNamespacePeers)
                                    .build(),
             createSparkConnectorEgressPolicy(sparkConnectorName));
-        networkPolicyFor(labels, egress);
-        whitelistDomains(labels, allowedDomains, dependsOn);
+        networkPolicyFor(SINGLEUSER_LABELS, egress);
+        whitelistDomains(SINGLEUSER_LABELS, allowedDomains, dependsOn);
     }
 
     /**
@@ -200,9 +200,8 @@ public class NetworkConfig {
         String sparkConnectorName
     ) {
         List<NetworkPolicySpecEgressTo> sparkConnectorPods = specEgressFor(
-            egressPodSelectorFor(Map.of(
-                "spark.operator/spark-app-name", sparkConnectorName,
-                "spark-role", "driver")));
+            egressPodSelectorFor(addMaps(DRIVER_LABELS, Map.of(
+                "spark.operator/spark-app-name", sparkConnectorName))));
         List<NetworkPolicySpecEgressPorts> sparkConnectorPorts = List.of(
             NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("15002").build());
         return NetworkPolicySpecEgress

@@ -20,8 +20,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.NO_SPARK_LB_FINALIZERS;
+import static health.emrys.afon.cdk.CdkUtils.addMaps;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_NAME;
+import static health.emrys.afon.cdk.SparkWorkloads.MASTER_LABELS;
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DOMAIN_NAME;
 
@@ -32,8 +34,9 @@ import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DOMAIN_NAME;
  */
 public class AwsSparkStack extends AwsJupyterStack {
 
-    private final static Logger logger = org.slf4j.LoggerFactory.getLogger(AwsSparkStack.class);
-    protected final String awsPolarisDomainName;
+    private final static Logger              logger = org.slf4j.LoggerFactory.getLogger(AwsSparkStack.class);
+
+    protected final      String              awsPolarisDomainName;
 
     public AwsSparkStack(@NonNull Construct scope,
                          @NonNull AfonCloud id,
@@ -61,11 +64,11 @@ public class AwsSparkStack extends AwsJupyterStack {
         return Service.Builder.create(this, SPARK_SERVICE_NAME)
                       .metadata(ServiceMetadata.builder()
                                                .name(SPARK_SERVICE_NAME)
-                                               .labels(Map.of("spark-role", "master",
+                                               .labels(addMaps(MASTER_LABELS, Map.of(
                                                               "spark-version", "4.0.1",
                                                               "spark.operator/name", "spark-kubernetes-operator",
                                                               "spark.operator/spark-cluster-name", "prod"
-                                                             ))
+                                                             )))
                                                .annotations(Map.of(
                                                        "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
                                                        "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
@@ -73,8 +76,7 @@ public class AwsSparkStack extends AwsJupyterStack {
                       .dependsOn(lbDependencies)
                       .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
                       .spec(ServiceSpec.builder()
-                                       .selector(Map.of(
-                                               "spark-role", "master"))
+                                       .selector(MASTER_LABELS)
                                        .type("LoadBalancer")
                                        .port(List.of(
                                                ServiceSpecPort.builder()
