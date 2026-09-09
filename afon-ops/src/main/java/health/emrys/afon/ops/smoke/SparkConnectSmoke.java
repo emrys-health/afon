@@ -22,6 +22,10 @@ public class SparkConnectSmoke {
         connect.talkToSparkConnect();
     }
 
+    public void smokeTestAllWarehouses(SparkConnect connect) {
+        connect.talkToSparkConnectAllWarehouses();
+    }
+
     public static void main(String[] args) {
         if (args.length == 0) {
             System.out.printf("%s requires argument: polaris-endpoint", SparkConnectSmoke.class.getSimpleName());
@@ -34,6 +38,8 @@ public class SparkConnectSmoke {
         try {
             app.smokeTest(new SparkConnect(properties));
             app.smokeTest(new SparkConnectUsingOIDC(properties));
+            app.smokeTestAllWarehouses(new SparkConnect(properties));
+            app.smokeTestAllWarehouses(new SparkConnectUsingOIDC(properties));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

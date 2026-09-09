@@ -19,7 +19,7 @@ class AzureKubernetesStack extends AbstractCloudStack {
                                 AfonPropertyProvider properties) {
         super(scope, id);
         cloudProvider = new AzureCloudProvider(this, id.toString(), properties);
-        this.azurePolarisDomainName = properties.getValue(AfonProperty.AZURE_DOMAIN_NAME);
+        this.azurePolarisDomainName = properties.getValue(AfonProperty.AZURE_POLARIS_DOMAIN_NAME);
     }
 
     @Override

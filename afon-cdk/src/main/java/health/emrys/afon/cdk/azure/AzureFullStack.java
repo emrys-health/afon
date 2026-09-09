@@ -54,7 +54,7 @@ public class AzureFullStack extends AzurePolarisStack {
         sparkDependsOn.add(sparkOperatorConfig.operatorReady);
 
         // deploy the Spark workers and driver pointing at Azure Polaris
-        SparkWorkloads sparkDeployer = new SparkWorkloads(properties.getValue(AZURE_DOMAIN_NAME), properties);
+        SparkWorkloads sparkDeployer = new SparkWorkloads(properties.getValue(AZURE_POLARIS_DOMAIN_NAME), properties);
         sparkDeployer.deploy(this, AZURE, sparkDependsOn);
 
         String jupyterDomainName = properties.getValue(AZURE_JUPYTER_DOMAIN_NAME);

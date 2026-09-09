@@ -28,7 +28,7 @@ else
   echo "- Role S3ReadWriteRole does not exist, skipping"
 fi
 
-for BUCKET in $AWS_S3_EXTERNAL_BUCKET_NAME $AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS $AWS_S3_BUCKET_NAME_TRINO $AWS_S3_BUCKET_NAME $AWS_S3_BUCKET_NAME_FORBIDDEN; do
+for BUCKET in $AWS_S3_BUCKET_NAME_EXTERNAL $AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS $AWS_S3_BUCKET_NAME_TRINO $AWS_S3_BUCKET_NAME $AWS_S3_BUCKET_NAME_FORBIDDEN; do
   if aws s3api head-bucket --bucket $BUCKET 2>/dev/null; then
     echo "- Emptying and deleting bucket $BUCKET"
     aws s3 rm s3://$BUCKET --recursive

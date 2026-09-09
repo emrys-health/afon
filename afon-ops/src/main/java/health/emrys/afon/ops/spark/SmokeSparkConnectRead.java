@@ -36,9 +36,9 @@ import static java.lang.String.format;
  *       chain and stall on EC2 instance metadata that a Kubernetes-hosted driver cannot reach.</li>
  * </ol>
  */
-public class SparkConnectTextRead {
+public class SmokeSparkConnectRead {
 
-    private static final Logger logger = LoggerFactory.getLogger(SparkConnectTextRead.class);
+    private static final Logger logger = LoggerFactory.getLogger(SmokeSparkConnectRead.class);
 
     private static final String REMOTE   = "sc://localhost:15002";
     private static final String REGION   = "eu-north-1";
@@ -71,6 +71,6 @@ public class SparkConnectTextRead {
     }
 
     public static void main(final String[] args) {
-        new SparkConnectTextRead().readText();
+        new SmokeSparkConnectRead().readText();
     }
 }

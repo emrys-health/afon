@@ -175,7 +175,7 @@ az network dns zone create  --resource-group afon_resource_group  --name emryspo
 For some hints as to what to execute, try running:
 
 ```shell
-./afon.sh -a exec -ec ops.GeneratePySparkContextMain
+./afon.sh -a exec -ec ops.smoke.GeneratePySparkContextMain
 ```
 It will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
 

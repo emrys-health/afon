@@ -34,7 +34,7 @@ import java.util.*;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
-import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
+import static health.emrys.afon.ops.spark.SparkChecker.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -275,7 +275,7 @@ public class StepActions {
         logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
         return format(
                 "abfss://%s@%s.dfs.core.windows.net/%s",
-                properties.getValue(AZURE_BUCKET),
+                properties.getValue(AZURE_BUCKET_NAME),
                 properties.getValue(AZURE_STORAGE_ACCOUNT),
                 latest.getName());
     }

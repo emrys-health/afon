@@ -14,10 +14,10 @@ public class AzurePolarisCatalog extends PolarisCatalog {
     private final String clientId;
 
     public AzurePolarisCatalog(AfonPropertyProvider properties) {
-        this.bucketUrl          = abfssBucketUrl(properties.getValue(AZURE_BUCKET), properties.getValue(AZURE_STORAGE_ACCOUNT));
+        this.bucketUrl          = abfssBucketUrl(properties.getValue(AZURE_BUCKET_NAME), properties.getValue(AZURE_STORAGE_ACCOUNT));
         this.tenant             = properties.getValue(AZURE_TENANT_ID);
-        this.multiTenantAppName = properties.getValue(AZURE_CLIENT_ID);
-        this.clientId           = properties.getValue(AZURE_CLIENT_ID);
+        this.multiTenantAppName = properties.getValue(AZURE_APP_ID);
+        this.clientId           = properties.getValue(AZURE_APP_ID);
     }
 
     protected String bucketUri() {
