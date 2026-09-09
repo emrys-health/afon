@@ -19,7 +19,7 @@ require_key_vault() {
     exit 1
   fi
   if az keyvault show --name $AZURE_KEY_VAULT_NAME -o none 2>/dev/null; then
-    :
+    echo "- Using Key Vault $AZURE_KEY_VAULT_NAME"
   else
     echo "- Key Vault $AZURE_KEY_VAULT_NAME does not exist, creating"
     "$AFON_ROOT/scripts/azure/keyvault.sh" create || exit 1
