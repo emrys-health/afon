@@ -133,8 +133,8 @@ public class GeneratePySparkContextMain {
     }
 
     private String snowflakeSql(AfonCatalog catalog, String catalogTable) {
-        String catalogName = "iceberg_" + catalog.name();
-        String tableName = format("my_%s_table", catalog.name());
+        String catalogName = "iceberg_" + catalog.toString();
+        String tableName = format("my_%s_table", catalog.toString());
         return format(
             """
             CREATE OR REPLACE CATALOG INTEGRATION %s

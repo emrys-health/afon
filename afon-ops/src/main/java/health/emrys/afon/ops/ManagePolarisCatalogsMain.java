@@ -69,16 +69,16 @@ public class ManagePolarisCatalogsMain {
         } else if (args.length == 3) {
             action      = args[0];
             domainName  = args[1];
-            catalogName = args[2];
+            catalogName = args[2].toLowerCase();
         } else if (args.length == 4) {
             action      = args[0];
             domainName  = args[1];
-            catalogName = args[2];
+            catalogName = args[2].toLowerCase();
             namespace   = args[3];
         } else if (args.length == 5) {
             action      = args[0];
             domainName  = args[1];
-            catalogName = args[2];
+            catalogName = args[2].toLowerCase();
             namespace   = args[3];
             tableName   = args[4];
         } else {
