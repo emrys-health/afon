@@ -18,6 +18,22 @@ elif [ -z "${APP_ID:-}" ] || [ -z "${APP_SP_ID:-}" ]; then
   exit 1
 fi
 
+## Resource Providers
+
+echo "- Registering resource provides"
+
+AZURE_RESOURCE_PROVIDERS="Microsoft.Authorization Microsoft.Storage Microsoft.Network Microsoft.ManagedIdentity Microsoft.ContainerService Microsoft.Compute"
+
+for ns in $AZURE_RESOURCE_PROVIDERS; do
+  STATE="$(az provider show --namespace "$ns" --query registrationState -o tsv 2>/dev/null)"
+  if [ "$STATE" = "Registered" ]; then
+    echo "-- $ns already registered, skipping"
+  else
+    echo "-- Registering $ns (was: ${STATE:-NotFound}), waiting for it to complete..."
+    az provider register --namespace "$ns" --wait || exit 1
+  fi
+done
+
 # Resource Group
 
 echo "- Creating resource group"
@@ -39,10 +55,6 @@ else
   echo "- Creating DNS zone for domain name '$AZURE_POLARIS_DOMAIN_NAME'"
   az network dns zone create --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_POLARIS_DOMAIN_NAME || exit 1
 fi
-
-## Resource Providers
-
-source $AFON_ROOT/scripts/azure/providers.sh
 
 # Storage
 
