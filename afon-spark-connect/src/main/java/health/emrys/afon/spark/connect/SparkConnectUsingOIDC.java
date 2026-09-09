@@ -1,7 +1,7 @@
 package health.emrys.afon.spark.connect;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.security.OAuthProvider;
+import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 
 import java.io.IOException;
@@ -10,7 +10,7 @@ import java.util.Map;
 
 public class SparkConnectUsingOIDC extends SparkConnect {
 
-    private final OAuthProvider provider;
+    private final IdentityProvider provider;
     private final String token;
 
     public SparkConnectUsingOIDC(AfonPropertyProvider properties) throws IOException {

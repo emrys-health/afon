@@ -11,9 +11,13 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 abstract public class SparkChecker {
     private static final Logger logger = getLogger(SparkChecker.class);
-
+    /**
+     * 'Magic' namespace that is used for acceptance tests and ops
+     */
+    public static final String ACCEPTANCE_TEST_NAMESPACE = "acceptancetests";
     public static final String EXTERNAL_NAMESPACE = "namespaceph";
-    public static final String TABLE              = "test_table";
+    public static final String TEST_TABLE = "test_table";
+
     private AfonPropertyProvider properties;
 
     protected SparkChecker(AfonPropertyProvider properties) {
@@ -44,7 +48,7 @@ abstract public class SparkChecker {
     }
 
     protected static @NonNull String tableFQN(String warehouse, String namespace) {
-        return warehouse + "." + namespace + "." + TABLE;
+        return warehouse + "." + namespace + "." + TEST_TABLE;
     }
 
 

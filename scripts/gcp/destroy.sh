@@ -57,17 +57,17 @@ else
   echo "- Service account $GCP_SERVICE_ACCOUNT does not exist, skipping"
 fi
 
-if gcloud storage buckets describe "gs://$GCP_EXTERNAL_BUCKET_NAME" >/dev/null 2>&1; then
-  if gcloud storage buckets get-iam-policy "gs://$GCP_EXTERNAL_BUCKET_NAME" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$EXTERNAL_SA" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
-    echo "- Revoking storage.objectAdmin on $GCP_EXTERNAL_BUCKET_NAME from $EXTERNAL_SA"
-    gcloud storage buckets remove-iam-policy-binding "gs://$GCP_EXTERNAL_BUCKET_NAME" --member="serviceAccount:$EXTERNAL_SA" --role="roles/storage.objectAdmin"
+if gcloud storage buckets describe "gs://$GCP_BUCKET_NAME_EXTERNAL" >/dev/null 2>&1; then
+  if gcloud storage buckets get-iam-policy "gs://$GCP_BUCKET_NAME_EXTERNAL" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$EXTERNAL_SA" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
+    echo "- Revoking storage.objectAdmin on $GCP_BUCKET_NAME_EXTERNAL from $EXTERNAL_SA"
+    gcloud storage buckets remove-iam-policy-binding "gs://$GCP_BUCKET_NAME_EXTERNAL" --member="serviceAccount:$EXTERNAL_SA" --role="roles/storage.objectAdmin"
   else
-    echo "- Role storage.objectAdmin not granted to $EXTERNAL_SA on $GCP_EXTERNAL_BUCKET_NAME, skipping"
+    echo "- Role storage.objectAdmin not granted to $EXTERNAL_SA on $GCP_BUCKET_NAME_EXTERNAL, skipping"
   fi
-  echo "- Deleting bucket $GCP_EXTERNAL_BUCKET_NAME"
-  gcloud storage rm -r "gs://$GCP_EXTERNAL_BUCKET_NAME"
+  echo "- Deleting bucket $GCP_BUCKET_NAME_EXTERNAL"
+  gcloud storage rm -r "gs://$GCP_BUCKET_NAME_EXTERNAL"
 else
-  echo "- Bucket $GCP_EXTERNAL_BUCKET_NAME does not exist, skipping"
+  echo "- Bucket $GCP_BUCKET_NAME_EXTERNAL does not exist, skipping"
 fi
 
 if gcloud iam service-accounts describe $EXTERNAL_SA >/dev/null 2>&1; then

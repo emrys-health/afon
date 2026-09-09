@@ -1,4 +1,4 @@
-package health.emrys.afon.ops;
+package health.emrys.afon.ops.demo;
 
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
@@ -60,7 +60,7 @@ public class GeneratePySparkKeycloakMain {
                                                      spark = (SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002")
                                                      """);
         for (AfonCatalog catalog : afonCatalogs.all()) {
-            python.append(format("# %s \n", catalog.name()));
+            python.append(format("# %s \n", catalog.toString()));
             String sparkCatalog = toSparkName(catalog);
             config.sparkConfigs(sparkCatalog, catalog.toString()).entrySet()
                   .forEach(entry -> {
