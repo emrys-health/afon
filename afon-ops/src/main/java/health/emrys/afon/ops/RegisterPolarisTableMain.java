@@ -57,7 +57,7 @@ public class RegisterPolarisTableMain {
             return;
         }
         var properties = new FilePropertyProvider();
-        String catalog = new AfonCatalogs(properties).get(args[0]).name();
+        String catalog = new AfonCatalogs(properties).get(args[0]).toString();
         String namespace = args[1];
         String table = args[2];
         String metadata = args[3];
