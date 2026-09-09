@@ -2,7 +2,7 @@ package health.emrys.afon.security.keycloak;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.*;
-import health.emrys.afon.security.OAuthProvider;
+import health.emrys.afon.security.IdentityProvider;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -34,7 +34,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  *
  * Note: In KeyCloak parlance, client is an app and user is a human
  */
-public class KeyCloakProvider implements OAuthProvider {
+public class KeyCloakProvider implements IdentityProvider {
 
     private static final Logger logger = getLogger(KeyCloakProvider.class);
 
@@ -69,15 +69,15 @@ public class KeyCloakProvider implements OAuthProvider {
 
     /**
      * Create a provider using the configured properties:
-     * {@link AfonProperty#KC_HOSTNAME},
-     * {@link AfonProperty#KC_BOOTSTRAP_ADMIN_USERNAME},
-     * {@link AfonProperty#KC_BOOTSTRAP_ADMIN_PASSWORD}
+     * {@link AfonProperty#OIDC_DOMAIN_NAME},
+     * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME},
+     * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD}
      * @param properties
      */
     public KeyCloakProvider(AfonPropertyProvider properties) {
-        this(properties.getValue(KC_HOSTNAME),
-                properties.getValue(KC_BOOTSTRAP_ADMIN_USERNAME),
-                properties.getValue(KC_BOOTSTRAP_ADMIN_PASSWORD));
+        this(properties.getValue(OIDC_DOMAIN_NAME),
+                properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
+                properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD));
     }
 
     public KeyCloakProvider(String hostname,
@@ -104,7 +104,7 @@ public class KeyCloakProvider implements OAuthProvider {
      * {@link AfonProperty#USER_POLARIS_SECRET},
      * {@link AfonProperty#USER_POLARIS_EMAIL}.
      *
-     * Registers the browser for the {@link AfonProperty#AWS_JUPYTER_DOMAIN}.
+     * Registers the browser for the {@link AfonProperty#AWS_JUPYTER_DOMAIN_NAME}.
      *
      * Provisions the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
      * "sign in" on the OAuth splash yields KeyCloak's "Client not found", and puts that browser flow
@@ -116,7 +116,7 @@ public class KeyCloakProvider implements OAuthProvider {
                 properties.getValue(AfonProperty.USER_POLARIS_ID),
                 properties.getValue(AfonProperty.USER_POLARIS_SECRET),
                 properties.getValue(AfonProperty.USER_POLARIS_EMAIL, "")));
-        registerBrowserClient(properties, properties.getValue(AfonProperty.AWS_JUPYTER_DOMAIN));
+        registerBrowserClient(properties, properties.getValue(AfonProperty.AWS_JUPYTER_DOMAIN_NAME));
         configureMfa();
     }
 

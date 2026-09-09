@@ -26,7 +26,7 @@ public class AwsJupyterConfig extends JupyterConfig {
                             AfonPropertyProvider properties) {
         super(stack, properties);
         this.cloudProvider    = cloudProvider;
-        this.jupyterDomain    = properties.getValue(AWS_JUPYTER_DOMAIN);
+        this.jupyterDomain    = properties.getValue(AWS_JUPYTER_DOMAIN_NAME);
         this.jupyterDnsZoneId = properties.getValue(AWS_JUPYTER_DNS_ZONE);
         this.jupyterCertArn   = properties.getValue(AfonProperty.AWS_JUPYTER_CERT_ARN);
         this.stack            = stack;

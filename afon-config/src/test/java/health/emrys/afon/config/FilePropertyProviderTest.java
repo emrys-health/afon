@@ -93,7 +93,7 @@ public class FilePropertyProviderTest {
     public void canGetPropertyByKey() {
         AfonPropertyProvider provider = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
         assertThat(provider.getValue(AfonProperty.CLUSTER_NAME)).isNotNull();
-        assertThat(provider.getValue(AfonProperty.KC_PROTOCOL, "https")).isNotNull();
+        assertThat(provider.getValue(AfonProperty.OIDC_PROTOCOL, "https")).isNotNull();
     }
 
     @Test

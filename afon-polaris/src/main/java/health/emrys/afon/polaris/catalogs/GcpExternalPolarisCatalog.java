@@ -21,7 +21,7 @@ public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
         super(properties);
         this.bucketUrl      = gsBucketUrl(properties.getValue(GCP_BUCKET_NAME));
         this.serviceAccount = properties.getValue(GCP_SERVICE_ACCOUNT);
-        this.endpoint       = "https://" + properties.getValue(GCP_DOMAIN_NAME);
+        this.endpoint       = "https://" + properties.getValue(GCP_POLARIS_DOMAIN_NAME);
     }
 
     @Override
