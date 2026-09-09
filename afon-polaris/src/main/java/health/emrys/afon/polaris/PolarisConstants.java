@@ -10,10 +10,6 @@ import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
 import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
 
 public class PolarisConstants {
-    /**
-     * 'Magic' namespace that is used for acceptance tests and infra
-     */
-    public static final String ACCEPTANCE_TEST_NAMESPACE = "acceptancetests";
 
     public static final int DEBUG_PORT = 5006;
 

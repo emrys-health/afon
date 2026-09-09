@@ -28,7 +28,7 @@ import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.DELETE;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.RECREATE;
 import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
-import static health.emrys.afon.polaris.PolarisConstants.ACCEPTANCE_TEST_NAMESPACE;
+import static health.emrys.afon.ops.spark.SparkChecker.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 
 public class StepOperations {
@@ -128,7 +128,7 @@ public class StepOperations {
 
     private @NonNull Step deleteExternalCatalogTableFor(AfonCatalog catalog, String domainName
     ) {
-        return deletePolarisTable(catalog, domainName, EXTERNAL_NAMESPACE, SparkChecker.TABLE);
+        return deletePolarisTable(catalog, domainName, EXTERNAL_NAMESPACE, SparkChecker.TEST_TABLE);
     }
 
     private @NonNull Step deletePolarisTable(AfonCatalog catalog,
@@ -298,7 +298,7 @@ public class StepOperations {
     public @NonNull Step checkAwsSparkReadingUsing(AfonCatalog catalog) {
         return sparkTestUsing(
             catalog, format("read via Spark table `%s.%s.%s` by calling `%s`",
-                       catalog, ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE,
+                       catalog, ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TEST_TABLE,
                         properties.getValue(AWS_POLARIS_DOMAIN_NAME)),
             ACCEPTANCE_TEST_NAMESPACE,
             SparkTestReader.class,
@@ -385,7 +385,7 @@ public class StepOperations {
                                  CATALOG_NAMESPACE = '%s'
                                  REPLACE_INVALID_CHARACTERS = TRUE;
                             """,
-                        SparkChecker.TABLE,
+                        SparkChecker.TEST_TABLE,
                         EXTERNAL_NAMESPACE),
 
                     "SELECT COUNT(*) FROM my_gcp_table_id"
@@ -469,7 +469,7 @@ public class StepOperations {
     public Step deleteAwsPolarisCatalogAndRecreateFor(AfonCloud cloud) {
         switch (cloud) {
             case AZURE:
-                return deletePolarisTable(afonCatalogs.azure(), properties.getValue(AWS_POLARIS_DOMAIN_NAME), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TABLE)
+                return deletePolarisTable(afonCatalogs.azure(), properties.getValue(AWS_POLARIS_DOMAIN_NAME), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TEST_TABLE)
                     .andThen(createCatalogFor(afonCatalogs.azure(), properties.getValue(AWS_POLARIS_DOMAIN_NAME)));
             case AWS, GCP:
             default:
@@ -485,7 +485,7 @@ public class StepOperations {
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
                 String json = actions.azureFirstFile(properties, glob, true); // firstFileInLatestDirectoryMatching(glob);
-                return registerTableInAwsPolaris(AZURE, json, SparkChecker.TABLE, RegisterPolarisTableMain.class);
+                return registerTableInAwsPolaris(AZURE, json, SparkChecker.TEST_TABLE, RegisterPolarisTableMain.class);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
