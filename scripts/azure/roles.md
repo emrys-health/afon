@@ -1,206 +1,78 @@
 # Roles and permissions required to create and deploy to Azure env
 
-## Script create-admin.sh
+Confirmed working end-to-end on two partner subscriptions (tvs, wessex) with `create.sh` /
+`destroy.sh` and the AKS stack (`tofu apply`). 
+For the fuller partner-facing rationale (ABAC-condition delegation, PIM, custom roles, self-elevation risk) see
+`roles_tvs.md` - this doc only covers the current implementation.
 
-Run once, by whoever bootstraps the multi-tenant app (`AS_ADMIN=true`, or ahead of time by an admin so the `APP_ID` and `APP_SECRET` can be shared).
+**The model:** two kinds of identity, never the same principal.
 
-Every command in `create-admin.sh` is an `az ad` call against the Entra ID directory — nothing touches Azure Resource Manager (ARM), so no subscription or resource-scoped RBAC role applies here.
+- **Deployer** - a human or CI identity, whoever is logged in via `az login` when a script runs.
+Creates resources and creates role assignments.
+- **Operational identities**: 
+  - multi-tenant app's service principal (`APP_SP_ID`) 
+  - AKS's own `aks-identity`. 
+  - Only ever the *target* of a role assignment, never able to create one. `rbac.sh` checks this in `warn_if_operational_identity_can_manage_roles`.
 
-| Command                           | Operation type | Required permission                      | Entra ID role that grants it                                                                                                                                                                                                                                       |
-|-----------------------------------|----------------|------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `az ad app list --display-name`   | read           | Read application registrations           | none needed by default — any authenticated user can read app registrations unless the tenant restricts directory reads                                                                                                                                             |
-| `az ad app create`                | write          | Create an application registration       | **Application Administrator**, **Cloud Application Administrator**, or **Application Developer** — or the default tenant setting "Users can register applications" (enabled by default); only required if self-service app registration has been disabled org-wide |
-| `az ad sp show --id`              | read           | Read service principal                   | none needed by default                                                                                                                                                                                                                                             |
-| `az ad sp create --id`            | write          | Create the service principal for the app | Same tier as app create, or simply being an **owner** of the app (the creator is automatically an owner); if you created the app in the step above, no extra tenant-wide role is needed to create its service principal                                            |
-| `az ad app credential reset --id` | write          | Add/reset the app's client secret        | **Owner** of the app registration, or **Application Administrator** / **Cloud Application Administrator**; only runs when `APP_CREDENTIAL_RESET` is set                                                                                                            |
+## Entra ID - one-time app bootstrap (`create-admin.sh`, admin only)
 
-### Synthesis
+Admin is required - one-off - to mint `APP_ID`/`APP_SP_ID`/`APP_SECRET` for a new partner. 
+These values are set in `AZURE_APP_ID`/`AZURE_SP_ID`/`AZURE_APP_SECRET` in `secret-azure.properties`.
+Thereafter, `create.sh` runs with `AS_ADMIN=false`.
 
-**Entra ID roles required: Application Administrator** (or the narrower **Cloud Application Administrator**) at the tenant level covers every step above.
+- **Application Owner** - tenant-wide, for the one-time: 
+  - `az ad app create`
+  - `az ad sp show/create`
+  - `az ad app credential reset`
+- No standing tenant-wide role needed for the **deployer**.
 
-**RBAC roles required: none.**
+## `create.sh` / `destroy.sh` - resource group, DNS, storage
 
-## Script create.sh
+Roles required for the **deployer**:
 
-**RBAC roles required**, consolidated across the script:
+- **Contributor**
+  - subscription scope - required specifically for registering the resource providers below
+    (`Microsoft.Resources/subscriptions/providers/register/action` has no resource-group
+    equivalent)
+  - resource provider registrations
+  - resource group scope - resource group / DNS zone / storage account create and delete
+- **A role-assignment-granting role**
+  - One of **Owner|User Access Administrator|Role Based Access Control Administrator**
+  - Configurable via `AZURE_GRANT_ROLES` in `afon-azure.properties` (defaults to any of the 3 roles).
+    Narrow to **User Access Administrator** if the partner prefers a least-privileg (possibly PIM-eligible grant). 
+  - Used by the **deployer** to create/delete the two role assignments below on `APP_SP_ID` - never held by `APP_SP_ID` itself.
 
-- **Reader** — subscription scope (resource group existence check, provider registration state, role assignment reads)
-- **Contributor** — subscription scope for `az provider register` specifically (provider registration is a subscription-level action; resource-group-scoped Contributor is not sufficient for this one call), and resource group scope for resource group / DNS zone / storage account create
-- **Storage Blob Data Contributor** — storage account scope, for all three bucket exists/create calls (uniformly `--auth-mode login`)
-- **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator** — resource group scope, for `az role assignment create`
+Roles granted **to the app's service principal** (`APP_SP_ID`), by the **deployer**:
 
-| Section         | Command                                                                                  | Operation type        | ARM permission                                                | RBAC role that grants it                                                                                                                               | Scope needed    |
-|-----------------|------------------------------------------------------------------------------------------|-----------------------|---------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
-| Resource Group  | `az group exists`                                                                        | read                  | `Microsoft.Resources/subscriptions/resourceGroups/read`       | Reader (or any higher role)                                                                                                                            | Subscription    |
-| Resource Group  | `az group create`                                                                        | write                 | `Microsoft.Resources/subscriptions/resourceGroups/write`      | **Contributor**                                                                                                                                        | Subscription    |
-| DNS zone        | `az network dns zone show` / `create`                                                    | read/write            | `Microsoft.Network/dnsZones/read`, `.../write`                | **Contributor** (or narrower: DNS Zone Contributor)                                                                                                    | Resource group  |
-| Storage RP      | `az provider show`                                                                       | read                  | `Microsoft.Resources/subscriptions/providers/read`            | Reader                                                                                                                                                 | Subscription    |
-| Storage RP      | `az provider register`                                                                   | action                | `Microsoft.Resources/subscriptions/providers/register/action` | **Contributor** — must be at **subscription** scope specifically; RG-scoped Contributor isn't enough since provider registration is subscription-level | Subscription    |
-| Storage Account | `az storage account show` / `create`                                                     | read/write            | `Microsoft.Storage/storageAccounts/read`, `.../write`         | **Contributor** (or Storage Account Contributor)                                                                                                       | Resource group  |
-| Buckets         | all three `az storage container exists` / `create` calls (uniformly `--auth-mode login`) | data-plane read/write | Blob data actions                                             | **Storage Blob Data Contributor** and **Storage Blob Delegator**                                                                                       | Storage account |
-| Role Assignment | `account-principal.sh` (`az account get-access-token`, decoded locally for `oid`)        | read, ARM only        | none — reads a claim out of a token already issued for ARM    | none (default for any signed-in identity, user or service principal)                                                                                   | —               |
-| Role Assignment | `az role assignment list`                                                                | read                  | `Microsoft.Authorization/roleAssignments/read`                | Reader (included in virtually everything)                                                                                                              | Resource group  |
-| Role Assignment | `az role assignment create`                                                              | write                 | `Microsoft.Authorization/roleAssignments/write`               | **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator**                                                               | Resource group  |
+- **Storage Blob Data Contributor** - both storage containers
+- **Storage Blob Delegator** - the storage account
 
-### Synthesis
+## AKS cluster (`tofu apply` / `DeployAzurePolarisStackMain`)
 
-**Entra ID roles required: none**
+Runs as the **deployer's** own `az login` session too, not `APP_SP_ID`.
 
-**RBAC roles required: as above**
+- **Contributor**
+  - resource group scope - covers every resource it creates (`aks-identity`, VNet,
+    NSG, subnet, the AKS cluster itself) and the credential read.
+- **A role-assignment-granting role**
+  - One of roles, as above, used to create two more role assignments:
+  - **Network Contributor** → `aks-identity` (subnet scope)
+  - **Azure Kubernetes Service RBAC Cluster Admin** → the deployer itself (cluster scope)
 
-## Script create.sh (custom roles for stricter security)
+## Key Vault - `issue-cert.sh` 
 
-The tables above use standard built-in roles. If the partner's security requires least-privilege custom roles instead of built-ins, custom roles can be created.
+TLS certs can be issued and stored in Key Vault by `issue-cert.sh`.
+Partner admins are most likely to deny write access to the Key Vault. 
+In this case, the `issue-cert.sh` can be run by the admin and the app only requires runtime read access to a stored TLS cert.
 
-Two considerations before discussing the roles:
+Role required for the **deployer**:
+- **Key Vault Secrets User** - yet to be tested.
 
-- **`Microsoft.Resources/subscriptions/providers/register/action`** is the only action that must be subscription-scoped — ARM has no resource-group-level provider registration. If the partner registers `Microsoft.Storage` themselves once, this drops to a read-only check (`Microsoft.Resources/subscriptions/providers/read`), and no subscription-scope *write* action is needed at all.
-- If the partner pre-creates the target resource group, `Microsoft.Resources/subscriptions/resourceGroups/write` also drops out — the exists-check always skips.
+**NOTE:** Deployment works without stored certs, as cert-manager just falls back to issuing via Let's Encrypt.
 
-So, if `Microsoft.Storage` provider is already registered and `$AZURE_RESOURCE_GROUP` already created, the following roles apply:
+## Config reference
 
-**RBAC roles required (custom, in place of built-ins):**
-
-- `afon-create-subscription-read` — subscription scope
-- `afon-create-resource-group` — resource group scope
-- `afon-create-containers` — storage account scope
-- `afon-create-role-assignments` — storage account scope
-
-**Role 1 — subscription scope, read-only**
-```json
-{
-  "Name": "afon-create-subscription-read",
-  "Actions": [
-    "Microsoft.Resources/subscriptions/resourceGroups/read",
-    "Microsoft.Resources/subscriptions/providers/read"
-  ],
-  "AssignableScopes": ["/subscriptions/<sub-id>"]
-}
-```
-
-**Role 2 — resource group scope**
-```json
-{
-  "Name": "afon-create-resource-group",
-  "Actions": [
-    "Microsoft.Network/dnsZones/read",
-    "Microsoft.Network/dnsZones/write",
-    "Microsoft.Storage/storageAccounts/read",
-    "Microsoft.Storage/storageAccounts/write"
-  ],
-  "AssignableScopes": ["/subscriptions/<sub-id>/resourceGroups/<rg-name>"]
-}
-```
-Add `Microsoft.Resources/subscriptions/resourceGroups/write` back into this role only if the resource group is not pre-created by the partner.
-
-**Role 3 — storage account scope, container-only data access**
-
-Narrower than the built-in `Storage Blob Data Contributor`, which also grants blob read/write/delete on data inside containers — unneeded here since `create.sh` only creates empty containers.
-```json
-{
-  "Name": "afon-create-containers",
-  "Actions": [],
-  "DataActions": [
-    "Microsoft.Storage/storageAccounts/blobServices/containers/read",
-    "Microsoft.Storage/storageAccounts/blobServices/containers/write"
-  ],
-  "AssignableScopes": ["/subscriptions/<sub-id>/resourceGroups/<rg-name>/providers/Microsoft.Storage/storageAccounts/<storage-account-name>"]
-}
-```
-
-**Role 4 — role assignment management, storage account scope (not resource group)**
-
-All three role-assignment targets in `create.sh` (`BUCKET_SCOPE`, `EXTERNAL_BUCKET_SCOPE`, `STORAGE_ACCOUNT_SCOPE`) are the storage account or its children, so this doesn't need resource-group-wide scope the way the built-in `Role Based Access Control Administrator` implies — scope it to the storage account resource only:
-```json
-{
-  "Name": "afon-create-role-assignments",
-  "Actions": [
-    "Microsoft.Authorization/roleAssignments/read",
-    "Microsoft.Authorization/roleAssignments/write"
-  ],
-  "AssignableScopes": ["/subscriptions/<sub-id>/resourceGroups/<rg-name>/providers/Microsoft.Storage/storageAccounts/<storage-account-name>"]
-}
-```
-
-### Synthesis
-
-**Entra ID roles required: none**
-
-**RBAC roles required: as above**
-
-The custom-role variant is a like-for-like replacement of the built-in RBAC roles from the section above.
-
-## AKS cluster
-
-`AzureCloudProvider` (`afon-cdk`) drives `tofu apply` to build the AKS cluster and its
-networking inside a **pre-existing** resource group. Unlike `create.sh`, which authenticates as the `AZURE_SP_ID`
-service principal, this stack runs as whichever identity is logged in via `az login` —
-typically the operator's own Entra user.
-
-With `AZURE_RESOURCE_PROVIDER_REGISTRATIONS=none` (see `templates/config/afon-azure.properties`),
-`tofu` does not attempt to auto-register resource providers, so no subscription-level
-`*/register/action` right is needed at apply time — but the resource providers below must
-already be registered on the subscription, or the first write against each will 403.
-
-| Resource / step                                                                                                          | Operation       | ARM permission                                                                                                                                                                | RBAC role that grants it                                                                 | Scope                                                               |
-|--------------------------------------------------------------------------------------------------------------------------|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
-| Resource group lookup                                                                                                    | read            | `Microsoft.Resources/subscriptions/resourceGroups/read`                                                                                                                       | Reader (or any higher role)                                                              | Resource group                                                      |
-| `az aks get-credentials` (create-time provisioner)                                                                       | read            | `Microsoft.ContainerService/managedClusters/read` (kubeconfig is AAD-only — no `listClusterAdminCredential/action` needed since `localAccountDisabled=true`)                  | **Contributor** (or Reader)                                                              | Resource group                                                      |
-| `UserAssignedIdentity` (`aks-identity`)                                                                                  | write           | `Microsoft.ManagedIdentity/userAssignedIdentities/write`                                                                                                                      | **Contributor**                                                                          | Resource group                                                      |
-| `VirtualNetwork` (`aks-vnet`)                                                                                            | write           | `Microsoft.Network/virtualNetworks/write`                                                                                                                                     | **Contributor**                                                                          | Resource group                                                      |
-| `NetworkSecurityGroup` (`aks-nsg`)                                                                                       | write           | `Microsoft.Network/networkSecurityGroups/write`                                                                                                                               | **Contributor**                                                                          | Resource group                                                      |
-| `Subnet` (`aks-subnet`)                                                                                                  | write           | `Microsoft.Network/virtualNetworks/subnets/write`                                                                                                                             | **Contributor**                                                                          | Resource group                                                      |
-| `SubnetNetworkSecurityGroupAssociation`                                                                                  | write           | `Microsoft.Network/virtualNetworks/subnets/write`, `Microsoft.Network/networkSecurityGroups/join/action`                                                                      | **Contributor**                                                                          | Resource group                                                      |
-| `KubernetesCluster` (`aks`)                                                                                              | write           | `Microsoft.ContainerService/managedClusters/write`, `Microsoft.Network/virtualNetworks/subnets/join/action`, `Microsoft.ManagedIdentity/userAssignedIdentities/assign/action` | **Contributor**                                                                          | Resource group                                                      |
-| `RoleAssignment` (`aks-identity-network-contributor`: grants Network Contributor to the AKS identity, subnet scope)      | write           | `Microsoft.Authorization/roleAssignments/write`                                                                                                                               | **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator** | Resource group (assignment scope is the subnet, which is inside it) |
-| `RoleAssignment` (`tofu-cluster-admin`: grants Azure Kubernetes Service RBAC Cluster Admin to the caller, cluster scope) | write           | `Microsoft.Authorization/roleAssignments/write`                                                                                                                               | **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator** | AKS cluster (or resource group)                                     |
-| `kubectl auth can-i ...` (waits for the above to propagate)                                                              | in-cluster read | n/a (Kubernetes RBAC via the Azure RBAC grant above, not ARM)                                                                                                                 | —                                                                                        | —                                                                   |
-
-### Resource providers that must already be registered
-
-- `Microsoft.Network`
-- `Microsoft.ManagedIdentity`
-- `Microsoft.ContainerService`
-- `Microsoft.Compute` (AKS node pools)
-- `Microsoft.Authorization` (role assignments — usually pre-registered on every subscription)
-
-### Synthesis
-
-To the identity that will run `tofu apply` (the operator's own Entra user, unless a service
-principal is used instead), on the **resource group** that holds the cluster.
-
-- **Contributor** — covers every resource create/update above (identity, VNet, subnet, NSG,
-  association, AKS cluster) and the credential read.
-- **User Access Administrator** (or the narrower **Role Based Access Control Administrator**) —
-  covers the two `RoleAssignment` resources the stack creates (Network Contributor for the AKS
-  managed identity, and AKS RBAC Cluster Admin for the operator).
-
-Plus confirmation that `Microsoft.Network`, `Microsoft.ManagedIdentity`, `Microsoft.ContainerService`,
-`Microsoft.Compute`, and `Microsoft.Authorization` are already registered on the subscription,
-since `AZURE_RESOURCE_PROVIDER_REGISTRATIONS=none` means `tofu` will not register them itself.
-
-## Key Vault (keyvault.sh / issue-cert.sh)
-
-`keyvault.sh create` provisions the vault with `--enable-rbac-authorization true`, so — unlike the
-legacy vault access-policy model — read/write access to secrets and certificates inside it is
-governed by Azure RBAC role assignments **on the vault resource**, same as any other ARM resource.
-The script self-assigns one such role to the signed-in user right after creating the vault.
-
-| Command                                                                          | Operation type                | Required permission                                                    | RBAC role that grants it                                                                  | Scope      |
-|-----------------------------------------------------------------------------------|--------------------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|------------|
-| `az keyvault show`                                                                | control-plane read             | `Microsoft.KeyVault/vaults/read`                                         | Reader (or any higher role)                                                                  | Resource group |
-| `az keyvault create`                                                              | control-plane write             | `Microsoft.KeyVault/vaults/write`                                        | **Contributor** (or narrower: Key Vault Contributor)                                          | Resource group |
-| `az keyvault delete`                                                              | control-plane delete            | `Microsoft.KeyVault/vaults/delete`                                       | **Contributor** (or narrower: Key Vault Contributor)                                          | Resource group |
-| `az keyvault purge`                                                               | control-plane action            | `Microsoft.KeyVault/locations/deletedVaults/purge/action`                | **Contributor**                                                                               | Subscription (purge has no resource-group-scoped equivalent) |
-| `az role assignment create --role "Key Vault Secrets Officer"` / `"Key Vault Certificates Officer"` (`keyvault.sh` self-grants) | write   | `Microsoft.Authorization/roleAssignments/write`                          | **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator**      | Vault (`VAULT_SCOPE`) |
-| `az keyvault secret set` / `secret show` / `secret list` (`issue-cert.sh`, `keyvault.sh list`) | data-plane write/read | secrets data actions                                                     | **Key Vault Secrets Officer** — self-granted by `keyvault.sh create`                          | Vault      |
-| `az keyvault certificate issuer create` / `show`, `certificate create`, `certificate pending show` (`issue-cert.sh`, `digicert`/`globalsign` path only) | data-plane write/read | certificates data actions | **Key Vault Certificates Officer** — self-granted by `keyvault.sh create`                     | Vault      |
-
-### Synthesis
-
-**RBAC roles required:**
-
-- **Contributor** — resource group scope, for `az keyvault create` / `delete` / `show` (control-plane vault lifecycle)
-- **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator** — vault scope, for the two one-time `az role assignment create` calls that grant Secrets Officer and Certificates Officer to the signed-in user
-- **Key Vault Secrets Officer** — vault scope, self-granted by `keyvault.sh create`; covers the `acme` issuance path and `keyvault.sh list` (`secret set`/`show`/`list`)
-- **Key Vault Certificates Officer** — vault scope, self-granted by `keyvault.sh create`; covers the `digicert`/`globalsign` issuance path in `issue-cert.sh` (certificate issuers and certificates — data actions Secrets Officer does not cover)
+| Property | Set where | Purpose |
+|---|---|---|
+| `AZURE_GRANT_ROLES` | `afon-azure.properties`, read by `rbac.sh` | Which role(s) count as "can manage role assignments". Optional, defaults to the three built-ins. |
+| `AZURE_AKS_NODE_POOL` | `afon-azure.properties`, read by `AzureCloudProvider` | AKS system node pool overrides (`vmSize`, `nodeCount`). Optional, defaults to `Standard_D2s_v3`/`3`. |
