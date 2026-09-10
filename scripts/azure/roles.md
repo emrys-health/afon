@@ -90,6 +90,15 @@ AZURE_TLS_CRT_NAME="${KEBAB_DOMAIN_NAME}-tls-crt"
 AZURE_TLS_KEY_NAME="${KEBAB_DOMAIN_NAME}-tls-key"
 ```
 
+### DNS validation (`acme` only)
+
+Role granted **to the app's service principal** (`APP_SP_ID`), by the **deployer**:
+
+- **DNS Zone Contributor** (role ID `befefa01-2a29-4197-83a8-272ff33ce314`) - DNS zone scope.
+  Needed by `acme.sh`'s `dns_azure` hook to create/delete the `_acme-challenge` TXT record that
+  proves domain ownership to Let's Encrypt. Not needed by `digicert`/`globalsign` - validation
+  happens through the CA's own integration with Key Vault instead, never touching Azure DNS.
+
 ### Restoring the certs
 
 If admin does not allow `write` access to the Key Vault, `issue-cert.sh`
