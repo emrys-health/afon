@@ -184,14 +184,17 @@ public class NetworkConfig {
     ) {
         List<Map<String, Object>> endpoints = new ArrayList<>();
 
+        endpoints.addAll(
+            whitelist.stream().map(x -> Map.of(x.matcher, (Object)x.domain)).toList());
+
         Map<String, Object> sparkMaster = Map.of(
-            "toEndpoints", List.of(Map.of("matchLabels", MASTER_LABELS)));
+            "toEndpoints", List.of(Map.of("matchLabels", MASTER_LABELS))
+            );
+        Map<String, Object> fqns = Map.of(
+            "toFQDNs", endpoints
+            );
 
-        endpoints.add(sparkMaster);
-        endpoints.addAll(new ArrayList(
-            whitelist.stream().map(x -> Map.of(x.matcher, (Object)x.domain)).toList()));
-
-        Map<String, Object> manifest = createManifestFor(labels, pod, whitelist, List.of(sparkMaster));
+        Map<String, Object> manifest = createManifestFor(labels, pod, whitelist, List.of(sparkMaster, fqns));
         return manifest;
     }
 
