@@ -26,6 +26,23 @@ require_key_vault() {
   fi
 }
 
+# Retries `az role assignment create` for up to two minutes. A just-activated PIM role (or a
+# just-updated ABAC condition) can take a short while to propagate to Microsoft.Authorization
+# itself, so the create call can fail with AuthorizationFailed even though the grant is otherwise
+# correct - failing outright here would abort the whole script before store_cert (or whatever
+# needed the grant) ever runs, silently leaving the cert issued locally but never cached in the
+# vault. See roles.md for the tvs incident this was written for.
+create_role_assignment_with_retry() {
+  ROLE="$1" OBJECT_ID="$2" PRINCIPAL_TYPE="$3" SCOPE="$4"
+  for i in $(seq 1 12); do
+    az role assignment create --role "$ROLE" --assignee-object-id $OBJECT_ID \
+      --assignee-principal-type "$PRINCIPAL_TYPE" --scope "$SCOPE" -o none && return
+    [ "$i" -eq 12 ] && { echo "- Failed to grant $ROLE after repeated retries"; exit 1; }
+    echo "- Grant not accepted yet (propagation?), retrying in 10s..."
+    sleep 10
+  done
+}
+
 # Grants the given Key Vault role to the signed-in principal, at vault scope, if not already
 # held, then waits for it to propagate to the data plane before returning - a just-created role
 # assignment can take a short while to reach Key Vault, so an immediate data-plane call can 403
@@ -42,7 +59,7 @@ grant_vault_role() {
   fi
 
   echo "- Granting $ROLE on $AZURE_KEY_VAULT_NAME to $PRINCIPAL_ID"
-  az role assignment create  --role "$ROLE" --assignee-object-id $PRINCIPAL_ID --assignee-principal-type User --scope "$VAULT_SCOPE" || exit 1
+  create_role_assignment_with_retry "$ROLE" "$PRINCIPAL_ID" "User" "$VAULT_SCOPE"
 
   # Probe with an operation actually covered by the role just granted - Secrets Officer and
   # Certificates Officer cover disjoint data actions, so a single hardcoded probe would give a
@@ -109,7 +126,7 @@ grant_dns_zone_role() {
     echo "- Role DNS Zone Contributor already assigned on $AZURE_POLARIS_DOMAIN_NAME, skipping"
   else
     echo "- Granting DNS Zone Contributor on $AZURE_POLARIS_DOMAIN_NAME to $AZURE_SP_ID"
-    az role assignment create  --role "DNS Zone Contributor" --assignee-object-id $AZURE_SP_ID --assignee-principal-type ServicePrincipal --scope "$DNS_ZONE_SCOPE" || exit 1
+    create_role_assignment_with_retry "DNS Zone Contributor" "$AZURE_SP_ID" "ServicePrincipal" "$DNS_ZONE_SCOPE"
   fi
 }
 
