@@ -67,15 +67,13 @@ Roles required for the **deployer**:
 
 ## TLS certs issuance (`issue-cert.sh`)
 
-TLS certs can be issued and stored in Key Vault by `issue-cert.sh`, against a vault that already
-exists - no control-plane **Contributor/vault-create** role needed for any of the roles below, all
-are vault-scoped data-plane roles (verified against the built-in role definitions via `az role
-definition list`).
+TLS certs can be issued and stored in Key Vault by `issue-cert.sh`.
 
 ### Storing the certs
 
 Roles required to store the certs (either by the **deployer** or by the admin):
 
+- **Contributor** at resource group scope is needed, create or show a Key Vault.
 - **Key Vault Secrets Officer** (`Microsoft.KeyVault/vaults/secrets/*`) - required for every
   issuer path. `store_cert()` always writes the final crt+key as two named secrets via `az
   keyvault secret set`, regardless of which issuer produced them.
@@ -84,9 +82,6 @@ Roles required to store the certs (either by the **deployer** or by the admin):
   issuer path (`issue_via_keyvault_ca`), which registers a CA issuer and requests the cert
   through Key Vault's own CA integration. Not needed for the `acme` path, and does **not** cover
   reading secrets.
-- **Reader** (or **Contributor**) at resource group/vault scope is also needed, since
-  `require_key_vault()` calls `az keyvault show` (control-plane read) before anything else -
-  without it, the script would wrongly conclude the vault doesn't exist and try to create one.
 
 For each Polaris domain name, the two secrets stored for the TLS cert are:
 ```shell
