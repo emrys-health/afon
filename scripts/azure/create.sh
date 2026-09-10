@@ -22,7 +22,7 @@ fi
 
 echo "- Registering resource provides"
 
-AZURE_RESOURCE_PROVIDERS="Microsoft.Authorization Microsoft.Storage Microsoft.Network Microsoft.ManagedIdentity Microsoft.ContainerService Microsoft.Compute"
+AZURE_RESOURCE_PROVIDERS="Microsoft.Authorization Microsoft.Storage Microsoft.Network Microsoft.ManagedIdentity Microsoft.ContainerService Microsoft.Compute Microsoft.KeyVault"
 
 for ns in $AZURE_RESOURCE_PROVIDERS; do
   STATE="$(az provider show --namespace "$ns" --query registrationState -o tsv 2>/dev/null)"
