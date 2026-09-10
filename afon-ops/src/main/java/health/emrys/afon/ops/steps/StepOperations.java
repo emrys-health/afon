@@ -11,7 +11,6 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
-import health.emrys.afon.ops.RegisterPolarisTableMain;
 import health.emrys.afon.ops.spark.SparkChecker;
 import health.emrys.afon.ops.spark.SparkTestReader;
 import health.emrys.afon.ops.spark.SparkTestWriter;
@@ -453,35 +452,27 @@ public class StepOperations {
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
                 String json = actions.azureFirstFile(properties, glob, true); // firstFileInLatestDirectoryMatching(glob);
-                return registerTableInAwsPolaris(AZURE, json, SparkChecker.TEST_TABLE, RegisterPolarisTableMain.class);
+                return registerTableInAwsPolaris(afonCatalogs.azure(), SparkChecker.TEST_TABLE, json);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
     }
 
-    private Step registerTableInAwsPolaris(AfonCloud warehouse, String jsonMetadataFQN,
-                                           String tableName, Class<?> registerTableMainClass
+    private Step registerTableInAwsPolaris(AfonCatalog catalog,
+                                           String tableName, String metadata
     ) {
         return new Step(
-            format("%s_register_table_in_aws_polaris", warehouse),
-            format("create table `%s` in the AWS Polaris", warehouse.name()),
+            format("register_table_%s_in_aws_polaris", tableName),
+            format("register table `%s` in the AWS Polaris", tableName),
             () -> {
-                actions.registerTable(
-                    warehouse,
-                    jsonMetadataFQN,
-                        properties.getValue(AWS_POLARIS_DOMAIN_NAME),
-                    tableName, registerTableMainClass);
+                actions.registerTable(AWS,
+                        catalog,
+                        tableName,
+                        metadata
+                );
             }
         );
-    }
-
-    private static @NonNull String machineNameFor(String domainName) {
-        String name = domainName;
-        if (domainName.contains(".")) {
-            name = domainName.substring(0, domainName.indexOf("."));
-        }
-        return name;
     }
 
 }
