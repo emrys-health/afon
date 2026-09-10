@@ -22,7 +22,7 @@ role_assignment_grant_query() {
 # $1: principal id to check
 role_assignment_grant_roles_held() {
   local principal_id="$1"
-  az role assignment list --assignee "$principal_id" --all --query "$(role_assignment_grant_query)" -o tsv
+  az role assignment list --assignee-object-id "$principal_id" --all --query "$(role_assignment_grant_query)" -o tsv
 }
 
 # True if the given principal holds role assignments roles in the subscription, i.e. can create/delete role assignments.

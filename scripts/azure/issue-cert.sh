@@ -5,11 +5,11 @@ usage(){
   echo "Usage: $0 <issuer>"
   echo "Issue and stores in Azure Key Vault the cert for the $AZURE_POLARIS_DOMAIN_NAME."
   echo "The supported issuers are:"
-  echo " - acme via Let's Encrypt (free)"
+  echo " - acme via Let's Encrypt (free - default)"
   echo " - digicert|globalsign via Key Vault CA (paying service)"
 }
 
-ISSUER="${1:-}"
+ISSUER="${1:-acme}"
 
 ACME_HOME="${ACME_HOME:-$AFON_HOME/acme}"
 
@@ -26,23 +26,43 @@ require_key_vault() {
   fi
 }
 
-# Grants the given Key Vault role to the signed-in principal, at vault scope, if not already held.
-# Requested here rather than at vault-creation time (keyvault.sh), since which role is actually
-# needed depends on the issuer - acme never needs Key Vault Certificates Officer.
+# Grants the given Key Vault role to the signed-in principal, at vault scope, if not already
+# held, then waits for it to propagate to the data plane before returning - a just-created role
+# assignment can take a short while to reach Key Vault, so an immediate data-plane call can 403
+# even though the assignment exists. Requested here rather than at vault-creation time
+# (keyvault.sh), since which role is actually needed depends on the issuer - acme never needs
+# Key Vault Certificates Officer.
 grant_vault_role() {
   ROLE="$1"
   PRINCIPAL_ID="$(az ad signed-in-user show --query id -o tsv)"
   VAULT_SCOPE="$(az keyvault show --name $AZURE_KEY_VAULT_NAME --query id -o tsv)"
-  if [ -n "$(az role assignment list --assignee $PRINCIPAL_ID --role "$ROLE" --scope "$VAULT_SCOPE" --query "[].id" -o tsv)" ]; then
+  if [ -n "$(az role assignment list --assignee-object-id $PRINCIPAL_ID --role "$ROLE" --scope "$VAULT_SCOPE" --query "[].id" -o tsv)" ]; then
     echo "- Role $ROLE already assigned on $AZURE_KEY_VAULT_NAME, skipping"
-  else
-    echo "- Granting $ROLE on $AZURE_KEY_VAULT_NAME to $PRINCIPAL_ID"
-    az role assignment create  --role "$ROLE" --assignee $PRINCIPAL_ID --scope "$VAULT_SCOPE" || exit 1
+    return
   fi
+
+  echo "- Granting $ROLE on $AZURE_KEY_VAULT_NAME to $PRINCIPAL_ID"
+  az role assignment create  --role "$ROLE" --assignee-object-id $PRINCIPAL_ID --assignee-principal-type User --scope "$VAULT_SCOPE" || exit 1
+
+  # Probe with an operation actually covered by the role just granted - Secrets Officer and
+  # Certificates Officer cover disjoint data actions, so a single hardcoded probe would give a
+  # false negative for whichever role it doesn't match (and spin the full retry for nothing).
+  case "$ROLE" in
+    *Certificates*) PROBE_ARGS="certificate list --vault-name $AZURE_KEY_VAULT_NAME" ;;
+    *)              PROBE_ARGS="secret list --vault-name $AZURE_KEY_VAULT_NAME" ;;
+  esac
+
+  echo "- Waiting for the grant to propagate..."
+  for i in $(seq 1 12); do
+    az keyvault $PROBE_ARGS -o none 2>/dev/null && return
+    [ "$i" -eq 12 ] && { echo "- Grant did not propagate in time, re-run issue-cert.sh"; exit 1; }
+    sleep 10
+  done
 }
 
 # Stores a PEM cert + key pair under the secret names AzurePolarisStack's restore step reads
 # from. Common tail end for every issuer below, so the CDK side stays issuer-agnostic.
+# Requires role "Key Vault Secrets Officer"
 store_cert() {
   CERT_PEM="$1"
   KEY_PEM="$2"
@@ -80,15 +100,16 @@ install_acme() {
 # Needed only for acme's DNS-01 challenge: acme.sh's dns_azure hook creates/deletes the
 # _acme-challenge TXT record in the DNS zone to prove domain ownership to Let's Encrypt. The
 # digicert/globalsign path never touches Azure DNS - validation happens through the CA's own
-# integration with Key Vault instead - so it never needs this role. Granted to APP_ID (not the
-# deployer) since that's who acme.sh authenticates as below, via AZUREDNS_*.
+# integration with Key Vault instead - so it never needs this role. Granted to the app's service
+# principal object ID (AZURE_SP_ID), not AZURE_APP_ID (the application/client ID, a different
+# GUID) - AZUREDNS_APPID below is a separate concern, that's how acme.sh authenticates.
 grant_dns_zone_role() {
   DNS_ZONE_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Network/dnsZones/$AZURE_POLARIS_DOMAIN_NAME"
-  if [ -n "$(az role assignment list --assignee $AZURE_APP_ID --role "DNS Zone Contributor" --scope "$DNS_ZONE_SCOPE" --query "[].id" -o tsv)" ]; then
+  if [ -n "$(az role assignment list --assignee-object-id $AZURE_SP_ID --role "DNS Zone Contributor" --scope "$DNS_ZONE_SCOPE" --query "[].id" -o tsv)" ]; then
     echo "- Role DNS Zone Contributor already assigned on $AZURE_POLARIS_DOMAIN_NAME, skipping"
   else
-    echo "- Granting DNS Zone Contributor on $AZURE_POLARIS_DOMAIN_NAME to $AZURE_APP_ID"
-    az role assignment create  --role "DNS Zone Contributor" --assignee $AZURE_APP_ID --scope "$DNS_ZONE_SCOPE" || exit 1
+    echo "- Granting DNS Zone Contributor on $AZURE_POLARIS_DOMAIN_NAME to $AZURE_SP_ID"
+    az role assignment create  --role "DNS Zone Contributor" --assignee-object-id $AZURE_SP_ID --assignee-principal-type ServicePrincipal --scope "$DNS_ZONE_SCOPE" || exit 1
   fi
 }
 
