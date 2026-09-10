@@ -1,12 +1,35 @@
 source $AFON_ROOT/scripts/config/afon-source.sh azure
 
 usage(){
-  echo "Usage: $0 <create|delete|list>"
+  echo "Usage: $0 <create|delete|list|show>"
 }
 
 ACTION="${1:-}"
 
 ### Key Vault
+
+# Grants the given Key Vault role to the signed-in principal, at vault scope, if not already
+# held, then waits for it to propagate to the data plane before returning - a just-created role
+# assignment can take a short while to reach Key Vault, so an immediate data-plane call can 403
+# even though the assignment exists.
+grant_vault_role() {
+  ROLE="$1"
+  PRINCIPAL_ID="$(az ad signed-in-user show --query id -o tsv)"
+  VAULT_SCOPE="$(az keyvault show --name $AZURE_KEY_VAULT_NAME --query id -o tsv)"
+  if [ -n "$(az role assignment list --assignee $PRINCIPAL_ID --role "$ROLE" --scope "$VAULT_SCOPE" --query "[].id" -o tsv)" ]; then
+    return
+  fi
+
+  echo "- Granting $ROLE on $AZURE_KEY_VAULT_NAME to $PRINCIPAL_ID"
+  az role assignment create  --role "$ROLE" --assignee $PRINCIPAL_ID --scope "$VAULT_SCOPE" || exit 1
+
+  echo "- Waiting for the grant to propagate..."
+  for i in $(seq 1 12); do
+    az keyvault secret list --vault-name $AZURE_KEY_VAULT_NAME -o none 2>/dev/null && return
+    [ "$i" -eq 12 ] && { echo "- Grant did not propagate in time, re-run 'keyvault.sh $ACTION'"; exit 1; }
+    sleep 10
+  done
+}
 
 case "$ACTION" in
   create)
@@ -32,8 +55,20 @@ case "$ACTION" in
 
   list)
     if az keyvault show --name $AZURE_KEY_VAULT_NAME -o none 2>/dev/null; then
+      # Self-contained, unlike issue-cert.sh's write roles: list needs read access regardless of
+      # which issuer (if any) has been used, so it can't rely on issue-cert.sh having run first.
+      grant_vault_role "Key Vault Secrets User"
+
       echo "- Secrets in $AZURE_KEY_VAULT_NAME:"
       az keyvault secret list --vault-name $AZURE_KEY_VAULT_NAME --query "[].{name:name, updated:attributes.updated, enabled:attributes.enabled}" -o table
+    else
+      echo "- Key Vault $AZURE_KEY_VAULT_NAME does not exist"
+    fi
+    ;;
+
+  show)
+    if az keyvault show --name $AZURE_KEY_VAULT_NAME -o none 2>/dev/null; then
+      echo "- Key Vault $AZURE_KEY_VAULT_NAME exists"
     else
       echo "- Key Vault $AZURE_KEY_VAULT_NAME does not exist"
     fi
