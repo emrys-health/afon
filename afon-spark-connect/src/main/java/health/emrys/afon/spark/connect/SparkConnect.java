@@ -46,9 +46,9 @@ public class SparkConnect {
      */
     public void talkToSparkConnectAllWarehouses() {
         SparkSession spark = sparkWithAllWarehouses("federatedCatalogName");
-        String tableName = afonCatalogs.aws() + ".acceptancetests.AwsAccessSpec";
+        String tableName = afonCatalogs.aws() + ".namespaceph.test_table";
         logger.info("Reading table {}", tableName);
-        spark.sql(String.format("SELECT * FROM %s WHERE randomInt > -1", tableName)).show();
+        spark.sql(String.format("SELECT * FROM %s", tableName)).show();
     }
 
     private SparkSession sparkWithWarehouseCalled(

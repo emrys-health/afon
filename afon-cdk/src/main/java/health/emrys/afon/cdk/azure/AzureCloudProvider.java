@@ -35,7 +35,9 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonProperty.AZURE_RESOURCE_PROVIDER_REGISTRATIONS;
@@ -58,6 +60,7 @@ public class AzureCloudProvider extends AbstractCloudProvider {
     private final        String                  clusterName;
     private final        DataAzurermClientConfig clientConfig;
     private final        String                  providerRegistrations;
+    private final        Map<String, String>     nodePoolConfig;
     private              RoleAssignment          clusterAdminAssignment;
     private              KubernetesProvider      k8sProvider;
     private              HelmProvider            helmProvider;
@@ -70,10 +73,30 @@ public class AzureCloudProvider extends AbstractCloudProvider {
         resourceGroup            = properties.getValue(AZURE_RESOURCE_GROUP);
         subscriptionId           = properties.getValue(AZURE_SUBSCRIPTION);
         providerRegistrations    = properties.getValue(AZURE_RESOURCE_PROVIDER_REGISTRATIONS, "core");
+        nodePoolConfig           = parseNodePoolConfig(properties.getValue(AZURE_AKS_NODE_POOL, ""));
         configureProviders();
         clientConfig = new DataAzurermClientConfig(this, "current");
         aksCluster   = createCluster(lookupResourceGroup());
         grantClusterAdmin();
+    }
+
+    /**
+     * Parses the {@code key1:value1;...;keyN:valueN} encoding used by {@link AfonProperty#AZURE_AKS_NODE_POOL}
+     * into a {@code Map} keyed on the camel-cased name of the node pool builder method, eg {@code nodeCount} or {@code vmSize}.
+     * If a key is missing, the value will fall back to its own default upon {@code Map#getOrDefault()}. .
+     */
+    private static Map<String, String> parseNodePoolConfig(String encoded) {
+        Map<String, String> config = new HashMap<>();
+        if (encoded == null || encoded.isBlank()) {
+            return config;
+        }
+        for (String entry : encoded.split(";")) {
+            String[] keyValue = entry.split(":", 2);
+            if (keyValue.length == 2) {
+                config.put(keyValue[0].trim(), keyValue[1].trim());
+            }
+        }
+        return config;
     }
 
     /**
@@ -340,8 +363,8 @@ public class AzureCloudProvider extends AbstractCloudProvider {
         KubernetesClusterDefaultNodePool nodePool = KubernetesClusterDefaultNodePool
             .builder()
             .name("systempool")
-            .nodeCount(3)
-            .vmSize("Standard_D2s_v3")
+            .nodeCount(Integer.parseInt(nodePoolConfig.getOrDefault("nodeCount", "3")))
+            .vmSize(nodePoolConfig.getOrDefault("vmSize", "Standard_D2s_v3"))
             .vnetSubnetId(nodeSubnet.getId())
             .build();
 
