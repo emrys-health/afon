@@ -21,7 +21,16 @@ grant_vault_role() {
   fi
 
   echo "- Granting $ROLE on $AZURE_KEY_VAULT_NAME to $PRINCIPAL_ID"
-  az role assignment create  --role "$ROLE" --assignee-object-id $PRINCIPAL_ID --assignee-principal-type User --scope "$VAULT_SCOPE" || exit 1
+  # A just-activated PIM role (or a just-updated ABAC condition) can take a short while to
+  # propagate to Microsoft.Authorization itself, so the create call can fail with
+  # AuthorizationFailed even though the grant is otherwise correct - retry rather than aborting.
+  for i in $(seq 1 12); do
+    az role assignment create --role "$ROLE" --assignee-object-id $PRINCIPAL_ID \
+      --assignee-principal-type User --scope "$VAULT_SCOPE" -o none && break
+    [ "$i" -eq 12 ] && { echo "- Failed to grant $ROLE after repeated retries"; exit 1; }
+    echo "- Grant not accepted yet (propagation?), retrying in 10s..."
+    sleep 10
+  done
 
   echo "- Waiting for the grant to propagate..."
   for i in $(seq 1 12); do
