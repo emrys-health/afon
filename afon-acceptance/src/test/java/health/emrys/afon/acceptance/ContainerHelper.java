@@ -3,6 +3,7 @@ package health.emrys.afon.acceptance;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
@@ -107,17 +108,17 @@ public class ContainerHelper {
             properties.setValue(OIDC_DOMAIN_NAME, KEYCLOAK_HOSTNAME);
             IdentityProvider identityProvider = new KeyCloakProvider(properties);
             identityProvider
-                .registerPolarisUser(
+                .registerPolarisUser(AfonUserProvider.createUser(
                         properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
-                        properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD));
+                        properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD)));
             identityProvider
-                .registerPolarisUser(
-                        properties.getValue(USER_POLARIS_ID),
-                        properties.getValue(USER_POLARIS_SECRET));
+                .registerPolarisUser(AfonUserProvider.createUser(
+                            properties.getValue(USER_POLARIS_ID),
+                            properties.getValue(USER_POLARIS_SECRET)));
             identityProvider
-                .registerPolarisUser(
+                .registerPolarisUser(AfonUserProvider.createUser(
                         properties.getValue(POLARIS_ID),
-                        properties.getValue(POLARIS_SECRET));
+                        properties.getValue(POLARIS_SECRET)));
         }
         return keyCloak;
     }

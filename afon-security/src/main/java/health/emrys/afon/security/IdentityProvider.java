@@ -1,30 +1,13 @@
 package health.emrys.afon.security;
 
-import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.apache.hc.core5.http.HttpResponse;
 
 import java.io.IOException;
 import java.util.List;
 
 public interface IdentityProvider {
-
-    /**
-     * Registers the Polaris user with username and password provided, leaving
-     * the email unset.
-     */
-    void registerPolarisUser(String username, String password);
-
-    /**
-     * Registers the Polaris user with the configured properties.
-     *
-     * <p>Registers the browser for the Jupyter domain.
-     *
-     * <p>Provisions the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
-     * "sign in" on the OAuth splash yields "Client not found", and puts that browser flow
-     * behind MFA (see {@link #configureMfa()}).
-     */
-    void registerPolarisUserAndBrowserClient(AfonPropertyProvider properties);
 
     /**
      * Registers a Polaris user, also setting the user's (verified) email.
@@ -73,17 +56,12 @@ public interface IdentityProvider {
     ) throws IOException;
 
     /**
-     * Registers the browser-flow client for the Jupyter domain using the OAuth2 client configured in properties.
-     */
-    List<HttpResponse> registerBrowserClient(AfonPropertyProvider properties, String jupyterDomain);
-
-    /**
      * Ensures the realm exists and (idempotently) provisions the confidential, browser-flow client that
      * oauth2-proxy and JupyterHub use to log users in.
      *
-     * @param redirectUris the exact callback URLs, e.g.
-     *                     {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
-     *                     {@code https://jupyter.example/hub/oauth_callback} (JupyterHub).
+     * @param clientId the OAUTH2 client ID
+     * @param clientSecret the OAUTH2 client secret
+     * @param redirectUris the exact callback URLs, e.g. {@link KeyCloakProvider#callbackURIs(String)}
      */
     List<HttpResponse> registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris);
 
