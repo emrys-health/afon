@@ -11,6 +11,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.jspecify.annotations.NonNull;
 import org.keycloak.models.utils.DefaultAuthenticationFlows;
 import org.slf4j.Logger;
 
@@ -47,6 +48,17 @@ public class KeyCloakProvider implements IdentityProvider {
      * owns the domain root (base_url "/"), so this is "/hub/oauth_callback" rather than under /jupyter/.
      */
     public static final String JUPYTERHUB_CALLBACK   = "/hub/oauth_callback";
+
+    /**
+     * The callback URIs, for the given domain, eg
+     * {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
+     * {@code https://jupyter.example/hub/oauth_callback} (JupyterHub).
+    */
+    public static @NonNull List<String> callbackURIs(String jupyterDomain) {
+        return List.of(
+                "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
+                "https://" + jupyterDomain + JUPYTERHUB_CALLBACK);
+    }
 
     /** Alias of the copied browser flow that this realm binds to, with its OTP step forced on. */
     public static final String BROWSER_MFA_FLOW = "browser-mfa";
@@ -89,36 +101,6 @@ public class KeyCloakProvider implements IdentityProvider {
         logger.info("Using KeyCloak URL: {}, admin: {}", this.baseUrl, this.adminUser);
     }
 
-    /**
-     * Registers the Polaris user with username and password provided, leaving
-     * the email unset.
-     */
-    @Override
-    public void registerPolarisUser(String username, String password) {
-        registerPolarisUser(AfonUserProvider.createUser(username, password));
-    }
-
-    /**
-     * Registers the Polaris user with the configured properties:
-     * {@link AfonProperty#USER_POLARIS_ID},
-     * {@link AfonProperty#USER_POLARIS_SECRET},
-     * {@link AfonProperty#USER_POLARIS_EMAIL}.
-     *
-     * Registers the browser for the {@link AfonProperty#AWS_JUPYTER_DOMAIN_NAME}.
-     *
-     * Provisions the browser-flow client that oauth2-proxy and JupyterHub share, otherwise clicking
-     * "sign in" on the OAuth splash yields KeyCloak's "Client not found", and puts that browser flow
-     * behind MFA (see {@link #configureMfa()}).
-     */
-    @Override
-    public void registerPolarisUserAndBrowserClient(AfonPropertyProvider properties) {
-        registerPolarisUser(AfonUserProvider.createUser(
-                properties.getValue(AfonProperty.USER_POLARIS_ID),
-                properties.getValue(AfonProperty.USER_POLARIS_SECRET),
-                properties.getValue(AfonProperty.USER_POLARIS_EMAIL, "")));
-        registerBrowserClient(properties, properties.getValue(AfonProperty.AWS_JUPYTER_DOMAIN_NAME));
-        configureMfa();
-    }
 
     /**
      * Registers a Polaris user, also setting the user's (verified) email.
@@ -355,22 +337,6 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     /**
-     * Registers the browser-flow client for the Jupyter domain using the OAuth2 client configured in properties.
-     *
-     * @param properties
-     * @param jupyterDomain
-     */
-    @Override
-    public List<HttpResponse> registerBrowserClient(AfonPropertyProvider properties, String jupyterDomain) {
-        return registerBrowserClient(
-                properties.getValue(AfonProperty.OAUTH2_CLIENT_ID),
-                properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET),
-                List.of(
-                        "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
-                        "https://" + jupyterDomain + JUPYTERHUB_CALLBACK));
-    }
-
-    /**
      * Ensures the realm exists and (idempotently) provisions the confidential, browser-flow client that
      * oauth2-proxy and JupyterHub use to log users in. Unlike {@link #createConfidentialClient} (a
      * direct-grant client for Polaris), this client has the authorization-code flow enabled and
@@ -381,9 +347,9 @@ public class KeyCloakProvider implements IdentityProvider {
      * below rather than left alone, since KeyCloak's database survives a cluster rebuild and would
      * otherwise pin the callbacks of whichever deploy first created it.
      *
-     * @param redirectUris the exact callback URLs, e.g.
-     *                     {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
-     *                     {@code https://jupyter.example/hub/oauth_callback} (JupyterHub).
+     * @param clientId the OAUTH2 client id
+     * @param clientSecret the OAUTH2 client secret
+     * @param redirectUris the {@link #callbackURIs(String)}
      */
     @Override
     public List<HttpResponse> registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris) {

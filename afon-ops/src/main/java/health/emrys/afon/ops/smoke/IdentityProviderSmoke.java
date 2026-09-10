@@ -1,9 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.config.*;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.slf4j.Logger;
@@ -24,8 +21,14 @@ public class IdentityProviderSmoke {
     }
 
     private void smokeTest(IdentityProvider provider, AfonPropertyProvider properties) {
-        logger.info("Registering user and client from properties");
-        provider.registerPolarisUserAndBrowserClient(properties);
+        String jupyterDomain = properties.getValue(AfonProperty.AWS_JUPYTER_DOMAIN_NAME);
+        logger.info("Registering browser client for jupyter domain {}", jupyterDomain);
+        provider.registerBrowserClient(
+                properties.getValue(AfonProperty.OAUTH2_CLIENT_ID),
+                properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET),
+                KeyCloakProvider.callbackURIs(jupyterDomain)
+        );
+        provider.configureMfa();
     }
 
     public static void main(String[] args) {

@@ -35,7 +35,10 @@ public class ConfigureUsersMain {
     public List<HttpResponse> configureOidcUsers(String jupyterDomain) throws IOException {
         logger.info("Configuring OIDC users for jupyter domain {}", jupyterDomain);
         List<HttpResponse> responses = new ArrayList<>();
-        responses.addAll(identityProvider.registerBrowserClient(propertyProvider, jupyterDomain));
+        responses.addAll(identityProvider.registerBrowserClient(
+                propertyProvider.getValue(OAUTH2_CLIENT_ID),
+                propertyProvider.getValue(OAUTH2_CLIENT_SECRET),
+                KeyCloakProvider.callbackURIs(jupyterDomain)));
         String adminToken = identityProvider.adminToken();
         responses.add(identityProvider.createRealm(adminToken, KEYCLOAK_REALM));
         for (AfonUser user : userProvider.getUsers()) {
@@ -100,7 +103,7 @@ public class ConfigureUsersMain {
         if (jupyterDomain != null) {
             try {
                 app.configureOidcUsers(jupyterDomain);
-                Thread.sleep(1000L); // yuck! But KeyClaok appears to asynchronously register users
+                Thread.sleep(1000L); // yuck! But KeyCloak appears to asynchronously register users
             } catch (Exception e) {
                 logger.error("Failed to configure OIDC users {}: {}",
                         userProvider.getUserNames(), e.getMessage(), e);
