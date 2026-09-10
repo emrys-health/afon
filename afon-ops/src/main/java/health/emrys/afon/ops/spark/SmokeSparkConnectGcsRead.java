@@ -97,6 +97,8 @@ public class SmokeSparkConnectGcsRead {
         options.put("fs.gs.impl.disable.cache", "true");
         options.put("fs.gs.impl", GCS_FILE_SYSTEM);
         options.put("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS");
+        options.put("spark.jars.packages",
+                       "com.google.cloud.bigdataoss:gcs-connector:4.0.5");
         // gcs-connector >= 2.2.3. Older releases spell this google.cloud.auth.null.enable=true.
         options.put("fs.gs.auth.type", "UNAUTHENTICATED");
         return options;
