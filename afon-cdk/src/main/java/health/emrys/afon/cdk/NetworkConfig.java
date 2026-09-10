@@ -17,8 +17,9 @@ import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.*;
 import static health.emrys.afon.cdk.JupyterHubConfig.USER_POD_LABELS;
-import static health.emrys.afon.cdk.SparkWorkloads.DRIVER_LABELS;
+import static health.emrys.afon.cdk.SparkWorkloads.*;
 import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
+import static java.lang.String.format;
 
 /**
  * Cloud independent config for the K8s network.
@@ -27,8 +28,10 @@ public class NetworkConfig {
 
     private static final String DOMAIN_POLICY_NAME = "allow-only-whitelisted-domains";
 
-    /** The ports the whitelisted domains may be reached on. */
-    private static final List<String> ALLOWED_PORTS = List.of("80", "443", "7077", "15002");
+    /**
+     * The ports the whitelisted domains may be reached on.
+     */
+    private static final List<String> ALLOWED_PORTS = List.of("80", "443");
 
     /**
      * Zones the cluster's own resolvers answer, and which a lookup therefore cannot escape
@@ -60,10 +63,10 @@ public class NetworkConfig {
      * same thing, so which one applies is stated per domain rather than guessed at from the
      * presence of a {@code *}:
      * <UL>
-     *     <LI>{@link #exactly} emits {@code matchName} - the name and nothing else.</LI>
-     *     <LI>{@link #matching} emits {@code matchPattern}, where {@code *} stands for a
-     *     single label, so {@code *.example.com} covers {@code a.example.com} but not
-     *     {@code a.b.example.com}.</LI>
+     * <LI>{@link #exactly} emits {@code matchName} - the name and nothing else.</LI>
+     * <LI>{@link #matching} emits {@code matchPattern}, where {@code *} stands for a
+     * single label, so {@code *.example.com} covers {@code a.example.com} but not
+     * {@code a.b.example.com}.</LI>
      * </UL>
      */
     private record AllowedDomain(String matcher, String domain) {
@@ -87,7 +90,9 @@ public class NetworkConfig {
             return Map.of(matcher, domain);
         }
 
-        /** How many dot-separated labels the name has, {@code a.b.com} being three. */
+        /**
+         * How many dot-separated labels the name has, {@code a.b.com} being three.
+         */
         int labelCount() {
             return domain.split("\\.").length;
         }
@@ -97,9 +102,21 @@ public class NetworkConfig {
     private final List<AllowedDomain> allowedDomains;
 
     public static void main(String[] args) {
-        Map<String, Object> manifest = connectionManifest(USER_POD_LABELS,
-                                                          getAllowedDomainsFrom(new FilePropertyProvider()));
-        System.out.println(toJson(manifest));
+
+        List<AllowedDomain> allowedDomains = getAllowedDomainsFrom(new FilePropertyProvider());
+
+        List<AllowedDomain> whitelist = new ArrayList<>();
+        whitelist.addAll(allowedDomains);
+        whitelist.add(AllowedDomain.create(MASTER + "-svc"));
+
+        Map<String, Object> manifest = sparkManifest(DRIVER_LABELS,
+                                                     "spark-driver",
+                                                     whitelist);
+
+//        Map<String, Object> manifest = connectionManifest(
+//            USER_POD_LABELS,
+//            allowedDomains);
+        System.out.println(format("echo '%s' | kubectl apply -f -", toJson(manifest)));
     }
 
     private static @NonNull List<AllowedDomain> getAllowedDomainsFrom(AfonPropertyProvider properties) {
@@ -110,7 +127,7 @@ public class NetworkConfig {
     }
 
     public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties) {
-        this.tfStack = tfStack;
+        this.tfStack   = tfStack;
         allowedDomains = getAllowedDomainsFrom(properties);
     }
 
@@ -118,10 +135,11 @@ public class NetworkConfig {
      * @param dependsOn what must exist before the policies are applied. The Cilium policy below is
      *                  applied with a local {@code kubectl}, which references nothing Terraform
      *                  knows about and so would otherwise be scheduled anywhere in the graph -
-     *                  including before the cluster exists. See {@link #whitelistDomains}.
+     *                  including before the cluster exists. See {@link #lockdownJupyterPods}.
      */
     public void networkPolicies(String sparkConnectorName,
-                                List<ITerraformDependable> dependsOn) {
+                                List<ITerraformDependable> dependsOn
+    ) {
         // The only default-namespace peers a notebook pod may reach. An egress `to` entry carrying
         // just a podSelector is scoped to the policy's own namespace, so this is exactly "these two
         // pods in default, nothing else": Guacamole (streams the pod's VNC desktop) and the
@@ -142,7 +160,56 @@ public class NetworkConfig {
                                    .build(),
             createSparkConnectorEgressPolicy(sparkConnectorName));
         networkPolicyFor(USER_POD_LABELS, egress);
-        whitelistDomains(USER_POD_LABELS, allowedDomains, dependsOn);
+        lockdownJupyterPods(USER_POD_LABELS, allowedDomains, dependsOn);
+
+        lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of());
+        lockdownSpark(dependsOn, DRIVER_LABELS, "spark-driver", List.of(AllowedDomain.create(MASTER + "-svc")));
+    }
+
+    private void lockdownSpark(List<ITerraformDependable> dependsOn,
+                               Map<String, String> labels,
+                               String pod,
+                               List<AllowedDomain> additional
+    ) {
+        List<AllowedDomain> whitelist = new ArrayList();
+        whitelist.addAll(additional);
+        whitelist.addAll(allowedDomains);
+        Map<String, Object> manifest = sparkManifest(labels, pod, whitelist);
+        createWhitelistFor(dependsOn, manifest, pod + "-policy");
+    }
+
+    private static @NonNull Map<String, Object> sparkManifest(Map<String, String> labels,
+                                                              String pod,
+                                                              List<AllowedDomain> whitelist
+    ) {
+        List<Map<String, Object>> endpoints = new ArrayList<>();
+
+        Map<String, Object> sparkMaster = Map.of(
+            "toEndpoints", List.of(Map.of("matchLabels", MASTER_LABELS)));
+
+        endpoints.add(sparkMaster);
+        endpoints.addAll(new ArrayList(
+            whitelist.stream().map(x -> Map.of(x.matcher, (Object)x.domain)).toList()));
+
+        Map<String, Object> manifest = createManifestFor(labels, pod, whitelist, List.of(sparkMaster));
+        return manifest;
+    }
+
+    private static @NonNull Map<String, Object> createManifestFor(Map<String, String> labels,
+                                                                  String pod,
+                                                                  List<AllowedDomain> whitelist,
+                                                                  List<Map<String, Object>> extraEgress
+    ) {
+        Map<String, Object>       dnsEgress    = dnsConfigFor(whitelist);
+        List<Map<String, Object>> egressConfig = new ArrayList<>();
+        egressConfig.add(dnsEgress);
+        egressConfig.addAll(extraEgress);
+
+        Map<String, Object> manifest = manifestUsing(
+            labels,
+            pod + "-manifest",
+            egressConfig);
+        return manifest;
     }
 
     /**
@@ -176,20 +243,27 @@ public class NetworkConfig {
      * carry whatever refreshes the kubeconfig (the {@code kubeconfigUpdater} resource on AWS) and
      * the Cilium release that registers the {@code cilium.io/v2} CRD this manifest needs.
      */
-    private void whitelistDomains(Map<String, String> labels,
-                                  List<AllowedDomain> allowedDomains,
-                                  List<ITerraformDependable> dependsOn) {
+    private void lockdownJupyterPods(Map<String, String> labels,
+                                     List<AllowedDomain> allowedDomains,
+                                     List<ITerraformDependable> dependsOn
+    ) {
         if (allowedDomains.isEmpty()) {
             return;
         }
         Map<String, Object> manifest = connectionManifest(labels, allowedDomains);
+        createWhitelistFor(dependsOn, manifest, "jupyterNetworkPolicy");
+    }
 
+    private void createWhitelistFor(List<ITerraformDependable> dependsOn,
+                                    Map<String, Object> manifest,
+                                    String whiteListName
+    ) {
         String manifestJson = toJson(manifest);
         List<LocalExecProvisioner> provisioners = new ArrayList<>(
             uponCreateRun("echo '" + manifestJson + "' | kubectl apply -f -"));
         provisioners.addAll(uponDestroyRun(
             "kubectl delete ciliumnetworkpolicy " + DOMAIN_POLICY_NAME + " -n default"));
-        Resource.Builder.create(tfStack, "domainWhitelistPolicy")
+        Resource.Builder.create(tfStack, whiteListName)
                         .dependsOn(dependsOn)
                         // A provisioner runs on create only, so without a trigger an edit to
                         // ALLOWED_DOMAINS is a no-op against a cluster that already has the policy:
@@ -203,20 +277,15 @@ public class NetworkConfig {
     }
 
     private static @NonNull Map<String, Object> connectionManifest(Map<String, String> labels,
-                                                                   List<AllowedDomain> allowedDomains) {
-        Map<String, Object> dnsVisibility = Map.of(
-            "toEndpoints", List.of(Map.of("matchLabels", Map.of(
-                "k8s:io.kubernetes.pod.namespace", "kube-system",
-                "k8s:k8s-app", "kube-dns"))),
-            "toPorts", List.of(Map.of(
-                "ports", List.of(Map.of("port", "53", "protocol", "ANY")),
-                "rules", Map.of("dns", dnsQueryRules(allowedDomains)))));
+                                                                   List<AllowedDomain> allowedDomains
+    ) {
+        Map<String, Object> dnsVisibility = dnsConfigFor(allowedDomains);
         Map<String, Object> domainEgress = Map.of(
-            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList()
-//            "toPorts", List.of(Map.of(
-//                "ports", ALLOWED_PORTS.stream()
-//                                      .map(port -> Map.of("port", port, "protocol", "TCP"))
-//                                      .toList()))
+            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList(),
+            "toPorts", List.of(Map.of(
+                "ports", ALLOWED_PORTS.stream()
+                                      .map(port -> Map.of("port", port, "protocol", "TCP"))
+                                      .toList()))
         );
         // Egress to emrys-master-svc, the Spark master (spark://emrys-master-svc:7077).
         // Named rather than listed among the whitelisted domains because a cluster-local name is
@@ -228,16 +297,35 @@ public class NetworkConfig {
         // above: every port the master listens on (7077, 6066, 8080) is reachable.
         Map<String, Object> sparkMasterEgress = Map.of(
             "toEndpoints", List.of(Map.of("matchLabels", SPARK_MASTER_LABELS)));
-        Map<String, Object> manifest = Map.of(
+        List<Map<String, Object>> allowedEgress = List.of(dnsVisibility, domainEgress, sparkMasterEgress);
+        return manifestUsing(labels, DOMAIN_POLICY_NAME, allowedEgress);
+    }
+
+    private static @NonNull Map<String, Object> manifestUsing(Map<String, String> labels,
+                                                              String domainPolicyName,
+                                                              List<Map<String, Object>> allowedEgress
+    ) {
+        return Map.of(
             "apiVersion", "cilium.io/v2",
             "kind", "CiliumNetworkPolicy",
             "metadata", Map.of(
-                "name", DOMAIN_POLICY_NAME,
+                "name", domainPolicyName,
                 "namespace", "default"),
             "spec", Map.of(
                 "endpointSelector", Map.of("matchLabels", labels),
-                "egress", List.of(dnsVisibility, domainEgress, sparkMasterEgress)));
-        return manifest;
+                "egress", allowedEgress));
+    }
+
+    private static @NonNull Map<String, Object> dnsConfigFor(List<AllowedDomain> allowedDomains) {
+        Map<String, Object> dnsVisibility = Map.of(
+            "toEndpoints", List.of(Map.of(
+                "matchLabels", Map.of(
+                    "k8s:io.kubernetes.pod.namespace", "kube-system",
+                    "k8s:k8s-app", "kube-dns"))),
+            "toPorts", List.of(Map.of(
+                "ports", List.of(Map.of("port", "53", "protocol", "ANY")),
+                "rules", Map.of("dns", dnsQueryRules(allowedDomains)))));
+        return dnsVisibility;
     }
 
     /**
@@ -311,8 +399,9 @@ public class NetworkConfig {
         String sparkConnectorName
     ) {
         List<NetworkPolicySpecEgressTo> sparkConnectorPods = specEgressFor(
-            egressPodSelectorFor(addMaps(DRIVER_LABELS, Map.of(
-                "spark.operator/spark-app-name", sparkConnectorName))));
+            egressPodSelectorFor(addMaps(
+                DRIVER_LABELS, Map.of(
+                    "spark.operator/spark-app-name", sparkConnectorName))));
         List<NetworkPolicySpecEgressPorts> sparkConnectorPorts = List.of(
             NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("15002").build());
         return NetworkPolicySpecEgress
