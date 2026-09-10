@@ -19,15 +19,13 @@ import org.slf4j.Logger;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.DELETE;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.RECREATE;
-import static health.emrys.afon.ops.spark.SparkChecker.EXTERNAL_NAMESPACE;
-import static health.emrys.afon.ops.spark.SparkChecker.ACCEPTANCE_TEST_NAMESPACE;
+import static health.emrys.afon.ops.spark.SparkChecker.*;
 import static java.lang.String.format;
 
 public class StepOperations {
@@ -127,7 +125,7 @@ public class StepOperations {
 
     private @NonNull Step deleteExternalPolarisTableFor(AfonCloud cloud, AfonCatalog catalog
     ) {
-        return deletePolarisTable(cloud, catalog, EXTERNAL_NAMESPACE, SparkChecker.TEST_TABLE);
+        return deletePolarisTable(cloud, catalog, EXTERNAL_NAMESPACE, TEST_TABLE);
     }
 
     private @NonNull Step deletePolarisTable(AfonCloud cloud, AfonCatalog catalog,
@@ -238,53 +236,30 @@ public class StepOperations {
     }
 
     private Step awsSparkWritingTo(AfonCatalog catalog, String namespace) {
-        return sparkTestUsing(AWS, catalog,
-                   "local Spark writing table", namespace, SparkTestWriter.class);
+        return sparkTestUsing("Spark writing table",
+                AWS, catalog, namespace, TEST_TABLE, SparkTestWriter.class);
     }
 
-    public @NonNull Step checkSparkWritingViaAwsPolarisToPolarisIn(AfonCloud cloud) {
-        switch (cloud) {
-            case AZURE:
-                return sparkTestUsing(AWS,
-                        afonCatalogs.azureExternal(),
-                        format("local Spark defers to %s writing table", AZURE),
-                        EXTERNAL_NAMESPACE,
-                        SparkTestWriter.class);
-            case AWS, GCP:
-            default:
-                throw new RuntimeException("Unsupported cloud " + cloud);
-        }
-    }
-
-    public @NonNull Step checkSparkWritingToPolarisIn(AfonCloud cloud) {
-        switch (cloud) {
-            case AZURE:
-                return sparkTestUsing(AZURE, afonCatalogs.azure(),
-                        "local Spark writing external table",
-                        EXTERNAL_NAMESPACE,
-                        SparkTestWriter.class);
-            case AWS, GCP:
-            default:
-                throw new RuntimeException("Unsupported cloud " + cloud);
-        }
+    public @NonNull Step checkAwsSparkDeferringToAzurePolarisHostingExternalCatalog() {
+        return sparkTestUsing(format("Spark defers to %s writing table", AZURE),
+                AWS, afonCatalogs.azureExternal(), EXTERNAL_NAMESPACE, TEST_TABLE, SparkTestWriter.class);
     }
 
     public @NonNull Step checkAwsSparkReadingUsing(AfonCatalog catalog) {
-        return sparkTestUsing(AWS,
-                catalog, "local Spark reading table",
-                ACCEPTANCE_TEST_NAMESPACE,
-                SparkTestReader.class);
+        return sparkTestUsing("Spark reading table",
+                AWS, catalog, ACCEPTANCE_TEST_NAMESPACE, TEST_TABLE, SparkTestReader.class);
     }
 
-    private @NonNull Step sparkTestUsing(AfonCloud cloud,
+    private @NonNull Step sparkTestUsing(String description,
+                                         AfonCloud cloud,
                                          AfonCatalog catalog,
-                                         String description,
                                          String namespace,
+                                         String tableName,
                                          Class<? extends SparkChecker> sparkChecker
     ) {
         return new Step(format("%s_spark_talks_to_catalog_%s", cloud, catalog),
                 format("%s `%s.%s.%s` on cloud `%s`",
-                        description, catalog, namespace, SparkChecker.TEST_TABLE,
+                        description, catalog, namespace, tableName,
                         cloud),
             () -> {
                 actions.executeMainOf(
@@ -292,15 +267,9 @@ public class StepOperations {
                     new String[]{cloud.toString(), catalog.toString()},
                     NO_ENV_VARIABLES);
 
-                List<String> args = List.of(
-                    catalog.toString(),
-                    cloud.toString(),
-                    properties.getValue(USER_POLARIS_ID),
-                    properties.getValue(USER_POLARIS_SECRET),
-                    namespace);
                 actions.executeMainOf(
                     sparkChecker,
-                    args.toArray(new String[0]),
+                    new String[]{cloud.toString(), catalog.toString(), namespace, tableName},
                     NO_ENV_VARIABLES);
             });
     }
@@ -313,11 +282,8 @@ public class StepOperations {
                 logger.warn("Calling Snowflake. Note that some of these statements can take a long time");
                 actions.runSnowflakeSql(properties, new String[]{
                     "USE DATABASE SNOWFLAKE_LEARNING_DB",
-
                     "DROP ICEBERG TABLE my_gcp_table_id",
-
                     "DROP CATALOG INTEGRATION iceberg_gcp_id",
-
                     format(
                         """
                             CREATE OR REPLACE CATALOG INTEGRATION iceberg_gcp_id
@@ -337,10 +303,9 @@ public class StepOperations {
                               ENABLED = TRUE;
                             """,
                             properties.getValue(AWS_POLARIS_DOMAIN_NAME),
-                            catalog.toString(),
+                            catalog,
                             properties.getValue(POLARIS_ID),
                             properties.getValue(POLARIS_SECRET)),
-
                     format(
                         """              
                             -- NOTE!!!!
@@ -352,9 +317,8 @@ public class StepOperations {
                                  CATALOG_NAMESPACE = '%s'
                                  REPLACE_INVALID_CHARACTERS = TRUE;
                             """,
-                        SparkChecker.TEST_TABLE,
+                        TEST_TABLE,
                         EXTERNAL_NAMESPACE),
-
                     "SELECT COUNT(*) FROM my_gcp_table_id"
                 });
             }
@@ -388,12 +352,14 @@ public class StepOperations {
                               ENABLED = TRUE
                               STORAGE_ALLOWED_LOCATIONS = ('azure://%s.blob.core.windows.net/%s')
                               AZURE_TENANT_ID='%s';
-                            """, properties.getValue(AZURE_BUCKET_NAME), properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_BUCKET_NAME), properties.getValue(AZURE_TENANT_ID)),
-
+                            """, properties.getValue(AZURE_BUCKET_NAME),
+                            properties.getValue(AZURE_STORAGE_ACCOUNT),
+                            properties.getValue(AZURE_STORAGE_ACCOUNT),
+                            properties.getValue(AZURE_BUCKET_NAME),
+                            properties.getValue(AZURE_TENANT_ID)),
                     """
                     DROP ICEBERG TABLE IF EXISTS my_azure_iceberg_table ;
                     """,
-
                     format(
                         """
                             CREATE OR REPLACE EXTERNAL VOLUME my_external_volume
@@ -405,12 +371,13 @@ public class StepOperations {
                                   AZURE_TENANT_ID='%s'
                                 )
                               );
-                            """, properties.getValue(AZURE_STORAGE_ACCOUNT), properties.getValue(AZURE_BUCKET_NAME), ACCEPTANCE_TEST_NAMESPACE, properties.getValue(AZURE_TENANT_ID)),
-
+                            """, properties.getValue(AZURE_STORAGE_ACCOUNT),
+                            properties.getValue(AZURE_BUCKET_NAME),
+                            ACCEPTANCE_TEST_NAMESPACE,
+                            properties.getValue(AZURE_TENANT_ID)),
                     """
                     USE DATABASE SNOWFLAKE_LEARNING_DB;
                     """,
-
                     format(
                         """
                             CREATE OR REPLACE ICEBERG TABLE my_azure_iceberg_table (
@@ -420,7 +387,6 @@ public class StepOperations {
                               CATALOG = 'SNOWFLAKE'
                               BASE_LOCATION = '%s/';
                             """, SNOWFLAKE_OUT_DIR),
-
                     format(
                         """
                             INSERT INTO my_azure_iceberg_table (value)
@@ -436,7 +402,7 @@ public class StepOperations {
     public Step deleteAwsPolarisCatalogAndRecreateFor(AfonCloud cloud) {
         switch (cloud) {
             case AZURE:
-                return deletePolarisTable(AWS, afonCatalogs.azure(), ACCEPTANCE_TEST_NAMESPACE, SparkChecker.TEST_TABLE)
+                return deletePolarisTable(AWS, afonCatalogs.azure(), ACCEPTANCE_TEST_NAMESPACE, TEST_TABLE)
                     .andThen(createCatalogFor(AWS, afonCatalogs.azure()));
             case AWS, GCP:
             default:
@@ -452,7 +418,7 @@ public class StepOperations {
                     ACCEPTANCE_TEST_NAMESPACE,
                     SNOWFLAKE_OUT_DIR);
                 String json = actions.azureFirstFile(properties, glob, true); // firstFileInLatestDirectoryMatching(glob);
-                return registerTableInAwsPolaris(afonCatalogs.azure(), SparkChecker.TEST_TABLE, json);
+                return registerTableInAwsPolaris(afonCatalogs.azure(), TEST_TABLE, json);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -464,7 +430,7 @@ public class StepOperations {
     ) {
         return new Step(
             format("register_table_%s_in_aws_polaris", tableName),
-            format("register table `%s` in the AWS Polaris", tableName),
+            format("Register table `%s` in the AWS Polaris", tableName),
             () -> {
                 actions.registerTable(AWS,
                         catalog,

@@ -29,7 +29,7 @@ public class SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain impleme
             stepOperations.waitForPolarisIn(AZURE),
             stepOperations.deleteExternalCatalogIn(AZURE),
             stepOperations.createExternalCatalogFor(AZURE),
-            stepOperations.checkSparkWritingViaAwsPolarisToPolarisIn(AZURE)
+            stepOperations.checkAwsSparkDeferringToAzurePolarisHostingExternalCatalog()
                 ));
         return steps;
     }
