@@ -11,15 +11,15 @@ It takes approximately 45 minutes.
 
 ### Configure Polaris catalogs
 
-When a new Polaris instance starts, it has no catalogs. You can create all catalogs for a domain at once:
+When a new Polaris instance starts, it has no catalogs. You can create all catalogs at once for `aws` cloud:
 ```shell
-./afon.sh -a exec -ec ops.ManagePolarisCatalogsMain -ea "create emryspolaris.click" -lc INFO
+./afon.sh -a exec -ec ops.ManagePolarisCatalogsMain -ea "create aws" -lc INFO
 ```
 This creates catalogs for `{aws,azure,gcp}` and their external/forbidden variants in a single call.
 
-To configure a single catalog, eg `azure`, on a specific endpoint:
+To configure a single catalog, eg `azure_external`, for `azure` cloud:
 ```shell
-./afon.sh -a exec -ec ops.ManagePolarisCatalogsMain -ea "create emryspolarisazure.click azure" -lc INFO
+./afon.sh -a exec -ec ops.ManagePolarisCatalogsMain -ea "create azure azure_external" -lc INFO
 ```
 
 ### Cross-cloud querying
