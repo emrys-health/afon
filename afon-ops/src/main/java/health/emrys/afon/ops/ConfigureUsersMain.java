@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 
 public class ConfigureUsersMain {
@@ -48,59 +48,77 @@ public class ConfigureUsersMain {
         return responses;
     }
 
+    public List<HttpResponse> configurePolarisUsers() throws IncorrectConfigException, IOException {
+        logger.info("Configuring Polaris users on all catalogs");
+        return polarisUsers.configureUsers(userProvider);
+    }
+
     public List<HttpResponse> configurePolarisUsers(String catalogName) throws IncorrectConfigException, IOException {
         logger.info("Configuring Polaris users on catalog {}", catalogName);
         return polarisUsers.configureUsers(catalogName, userProvider);
     }
 
-    public List<HttpResponse> configureUsers(String jupyterDomain, String catalogName) throws IOException, IncorrectConfigException, InterruptedException {
-        List<HttpResponse> responses = new ArrayList<>();
-        responses.addAll(configureOidcUsers(jupyterDomain));
-        Thread.sleep(1000L); // yuck! But KeyClaok appears to asynchronously register users
-        responses.addAll(configurePolarisUsers(catalogName));
-        return responses;
-    }
-
     public static void main(String[] args) {
 
-        String polarisDomain;
-        String catalogName;
-        String jupyterDomain = null;
+        String cloud;
+        String catalogName = null;
 
-        if (args.length == 2) {
-            polarisDomain  = args[0];
+        if (args.length == 1) {
+            cloud  = args[0];
+        } else if (args.length == 2) {
+            cloud  = args[0];
             catalogName = args[1];
-        } else if (args.length == 3) {
-            polarisDomain  = args[0];
-            catalogName = args[1];
-            jupyterDomain = args[2];
         } else {
-            System.out.printf("%s requires arguments: polaris-domain catalog-name", ConfigureUsersMain.class.getSimpleName());
-            System.out.printf("%s requires arguments: polaris-domain catalog-name jupyter-domain", ConfigureUsersMain.class.getSimpleName());
+            System.out.printf("%s requires arguments: cloud", ConfigureUsersMain.class.getSimpleName());
+            System.out.printf("%s requires arguments: cloud catalog-name", ConfigureUsersMain.class.getSimpleName());
             throw new IllegalArgumentException();
         }
         var    userProvider     = new FileUserProvider();
         var    propertyProvider = new FilePropertyProvider();
+        String polarisDomain;
+        String jupyterDomain;
+        switch (cloud) {
+            case "aws":
+                polarisDomain = propertyProvider.getValue(AWS_POLARIS_DOMAIN_NAME);
+                jupyterDomain = propertyProvider.getValue(AWS_JUPYTER_DOMAIN_NAME);
+                break;
+            case "azure":
+                polarisDomain = propertyProvider.getValue(AZURE_POLARIS_DOMAIN_NAME);
+                jupyterDomain = propertyProvider.getValue(AZURE_JUPYTER_DOMAIN_NAME, null);
+                break;
+            case "gcp":
+                polarisDomain = propertyProvider.getValue(GCP_POLARIS_DOMAIN_NAME);
+                jupyterDomain = propertyProvider.getValue(GCP_JUPYTER_DOMAIN_NAME, null);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown cloud: " + cloud);
+        }
+
         propertyProvider.setValue(POLARIS_ENDPOINT, polarisDomain);
         var app = new ConfigureUsersMain(userProvider, propertyProvider);
 
-        if (jupyterDomain == null) {
+        if (jupyterDomain != null) {
             try {
-                app.configurePolarisUsers(catalogName);
+                app.configureOidcUsers(jupyterDomain);
+                Thread.sleep(1000L); // yuck! But KeyClaok appears to asynchronously register users
             } catch (Exception e) {
-                logger.error("Failed to configure Polaris users {}: {}",
-                        userProvider.getUserNames(), e.getMessage(), e);
-                throw new RuntimeException(e);
-            }
-        } else {
-            try {
-                app.configureUsers(jupyterDomain, catalogName);
-            } catch (Exception e) {
-                logger.error("Failed to configure Keycloak users {}: {}",
+                logger.error("Failed to configure OIDC users {}: {}",
                         userProvider.getUserNames(), e.getMessage(), e);
                 throw new RuntimeException(e);
             }
         }
+        try {
+            if ( catalogName == null ) {
+                app.configurePolarisUsers();
+            } else {
+                app.configurePolarisUsers(catalogName);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to configure Polaris users {}: {}",
+                    userProvider.getUserNames(), e.getMessage(), e);
+            throw new RuntimeException(e);
+        }
+
     }
 
 

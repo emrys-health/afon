@@ -54,7 +54,7 @@ public class SparkTestWriter extends SparkChecker {
 
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
-        parseAndExecute(args, new SparkTestWriter(properties));
+        parseAndExecute(args, new SparkTestWriter(properties), properties);
     }
 
 }

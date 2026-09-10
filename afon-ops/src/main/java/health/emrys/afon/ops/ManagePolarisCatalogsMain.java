@@ -12,7 +12,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperty.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class ManagePolarisCatalogsMain {
@@ -25,114 +25,141 @@ public class ManagePolarisCatalogsMain {
 
     private final PolarisCatalogManager catalogManager;
     private final AfonCatalogs afonCatalogs;
+    private final String polarisDomain;
 
     public ManagePolarisCatalogsMain(AfonPropertyProvider properties) {
         this.catalogManager = new PolarisCatalogManager(properties);
         this.afonCatalogs = new AfonCatalogs(properties);
+        this.polarisDomain = properties.getValue(POLARIS_ENDPOINT);
     }
 
     public void createAllCatalogs() throws IncorrectConfigException, IOException {
+        logger.info("Creating all catalogs for domain {}", polarisDomain);
         catalogManager.configureAllCatalogs();
     }
 
     public void createCatalog(String catalogName) throws IncorrectConfigException, IOException {
+        logger.info("Creating catalog {} for domain {}", catalogName, polarisDomain);
         catalogManager.configureCatalogs(catalogName);
     }
 
     public void deleteAllCatalogs() throws IOException, ParseException {
+        logger.info("Deleting all catalogs for domain {}", polarisDomain);
         for (AfonCatalog id : afonCatalogs.base()) {
             deleteCatalog(id.toString());
         }
     }
 
     public void deleteCatalog(String catalogName) throws IOException, ParseException {
+        logger.info("Deleting catalog {} for domain {}", catalogName, polarisDomain);
         catalogManager.deleteCatalog(catalogName);
     }
 
     public void deleteNamespace(String catalogName, String namespace) throws IOException {
+        logger.info("Deleting namespace {} for catalog {} and domain {}", namespace, catalogName, polarisDomain);
         catalogManager.deleteNamespace(catalogName, namespace);
     }
 
     public void deleteTable(String catalogName, String namespace, String tableName) throws IOException {
+        logger.info("Deleting table {}.{} for catalog {} and domain {}", namespace, tableName, catalogName, polarisDomain);
         catalogManager.deleteTable(catalogName, namespace, tableName);
+    }
+
+    private void recreateAllCatalogs() throws IOException, ParseException, IncorrectConfigException {
+        logger.info("Recreating all catalogs for domain {}", polarisDomain);
+        deleteAllCatalogs();
+        createAllCatalogs();
     }
 
     public static void main(String[] args) {
         String action;
-        String domainName;
+        String cloud;
         String catalogName = null;
         String namespace   = null;
         String tableName   = null;
+
         if (args.length == 2) {
-            action     = args[0];
-            domainName = args[1];
+            action  = args[0];
+            cloud  = args[1];
         } else if (args.length == 3) {
-            action      = args[0];
-            domainName  = args[1];
-            catalogName = args[2].toLowerCase();
+            action  = args[0];
+            cloud  = args[1];
+            catalogName = args[2];
         } else if (args.length == 4) {
-            action      = args[0];
-            domainName  = args[1];
-            catalogName = args[2].toLowerCase();
-            namespace   = args[3];
+            action  = args[0];
+            cloud  = args[1];
+            catalogName = args[2];
+            namespace  = args[3];
         } else if (args.length == 5) {
-            action      = args[0];
-            domainName  = args[1];
-            catalogName = args[2].toLowerCase();
-            namespace   = args[3];
-            tableName   = args[4];
+            action  = args[0];
+            cloud  = args[1];
+            catalogName = args[2];
+            namespace  = args[3];
+            tableName = args[4];
         } else {
             String usage = String.format("""
                     
                     Invalid arguments: '%s'
                     usage:  %s supports the following args options:
-                            [delete|create|recreate] polaris-domain-name
-                            [delete|create] polaris-domain-name catalog-name
-                            [delete] polaris-domain-name catalog-name [namespace] [table-name]
+                            [delete|create|recreate] cloud
+                            [delete|create] cloud catalog-name
+                            [delete] cloud catalog-name [namespace] [table-name]
                     """, String.join(" ", args), ManagePolarisCatalogsMain.class.getSimpleName());
             logger.warn(usage);
             return;
         }
 
         var properties = new FilePropertyProvider();
-        properties.setValue(POLARIS_ENDPOINT, domainName);
+        String polarisDomain = getPolarisDomain(cloud, properties);
+        properties.setValue(POLARIS_ENDPOINT, polarisDomain);
+
         ManagePolarisCatalogsMain app = new ManagePolarisCatalogsMain(properties);
         try {
             if (action.equals(DELETE)) {
                 if (catalogName == null) {
-                    logger.info("Deleting all catalogs for domain {}", domainName);
                     app.deleteAllCatalogs();
                 } else {
-                    logger.info("Deleting catalog {} for domain {}", catalogName, domainName);
                     app.deleteCatalog(catalogName);
                 }
                 if (namespace != null && tableName == null) {
-                    logger.info("Deleting namespace {} for catalog {} and domain {}", namespace, catalogName, domainName);
                     app.deleteNamespace(catalogName, namespace);
                 }
                 if (namespace != null && tableName != null) {
-                    logger.info("Deleting table {}.{} for catalog {} and domain {}", namespace, tableName, catalogName, domainName);
                     app.deleteTable(catalogName, namespace, tableName);
                 }
             }
             if (action.equals(CREATE)) {
                 if (catalogName == null) {
-                    logger.info("Creating all catalogs for domain {}", domainName);
                     app.createAllCatalogs();
                 } else {
-                    logger.info("Creating catalog {} for domain {}", catalogName, domainName);
                     app.createCatalog(catalogName);
                 }
             }
             if (action.equals(RECREATE)) {
-                logger.info("Deleting and recreating all catalogs for domain {}", domainName);
-                app.deleteAllCatalogs();
-                app.createAllCatalogs();
+                app.recreateAllCatalogs();
             }
         } catch (Exception e) {
             logger.warn("Failed exec of {} with args {}", ManagePolarisCatalogsMain.class.getSimpleName(), List.of(args));
             throw new RuntimeException(e);
         }
+    }
+
+    private static String getPolarisDomain(String cloud, FilePropertyProvider properties) {
+        String polarisDomain;
+        switch (cloud) {
+            case "aws":
+                polarisDomain = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
+                break;
+            case "azure":
+                polarisDomain = properties.getValue(AZURE_POLARIS_DOMAIN_NAME);
+                break;
+            case "gcp":
+                polarisDomain = properties.getValue(GCP_POLARIS_DOMAIN_NAME);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown cloud: " + cloud);
+        }
+        return polarisDomain;
     }
 
 }

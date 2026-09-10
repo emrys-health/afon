@@ -296,17 +296,16 @@ public class StepActions {
         }
     }
     
-    void createSingleCatalogsFor(String domainName,
-                                        AfonCatalog catalog) throws Exception {
-        createSingleCatalogsFor(domainName, catalog, new Properties());
+    void createSingleCatalogsFor(AfonCloud cloud,
+                                 AfonCatalog catalog) throws Exception {
+        createSingleCatalogsFor(cloud, catalog, new Properties());
     }
 
-    void createSingleCatalogsFor(String domainName,
+    void createSingleCatalogsFor(AfonCloud cloud,
                                  AfonCatalog catalog,
                                  Properties properties) throws Exception {
-        properties.put(POLARIS_ENDPOINT.getName(), domainName);
         executeMainOf(ManagePolarisCatalogsMain.class,
-                      new String[] {ManagePolarisCatalogsMain.CREATE, catalog.name()},
+                      new String[] {ManagePolarisCatalogsMain.CREATE, cloud.toString(), catalog.name()},
                       properties);
     }
 
