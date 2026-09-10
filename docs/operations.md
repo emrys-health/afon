@@ -181,12 +181,11 @@ It will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
 
 ### Creating catalogs and registering tables in Polaris
 
-When a Polaris stack deploy, is it empty.  So, for example for `AWS` and domain `emryspolaris.click`, 
-to create the catalogs:
+When a Polaris stack deploy, is it empty.  So, for example for `aws` cloud, to create the catalogs:
 ```shell
-./afon.sh -a exec -ec ops.ManagePolarisCatalogsMain -ea "create emryspolaris.click"
+./afon.sh -a exec -ec ops.ManagePolarisCatalogsMain -ea "create aws"
 ```
-and to register tables, something like:
+and to register tables on catalog `aws`, something like:
 ```shell
-./afon.sh -a exec -ec ops.RegisterPolarisTableMain -ea "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click <user_polaris_id> <user_polaris_secret>"
+./afon.sh -a exec -ec ops.RegisterPolarisTableMain -ea "aws aws acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json <user_polaris_id> <user_polaris_secret>"
 ```

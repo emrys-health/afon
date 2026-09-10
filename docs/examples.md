@@ -55,12 +55,12 @@ df_joined = (
 df_joined.show()
 ```
 
-### Write and read an Iceberg table via Spark
+### Write and read an Iceberg table via Spark AWS
 
 **Write:**
 
 ```shell
-./afon.sh -a exec -ec ops.spark.SparkTestWriter -ea "azure_external <polaris_id> <polaris_secret> emryspolaris.click namespaceph"
+./afon.sh -a exec -ec ops.spark.SparkTestWriter -ea "azure_external aws <polaris_id> <polaris_secret> namespaceph"
 ```
 
 This creates a namespace, creates an Iceberg table, and writes three rows ("apple", "banana", "cherry").
@@ -68,7 +68,7 @@ This creates a namespace, creates an Iceberg table, and writes three rows ("appl
 **Read:**
 
 ```shell
-./afon.sh -a exec -ec ops.spark.SparkTestReader -ea "azure_external <polaris_id> <polaris_secret> emryspolaris.click namespaceph"
+./afon.sh -a exec -ec ops.spark.SparkTestReader -ea "azure_external aws <polaris_id> <polaris_secret> namespaceph"
 ```
 
 ### Create sample patient data

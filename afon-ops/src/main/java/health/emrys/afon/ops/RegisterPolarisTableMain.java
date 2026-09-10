@@ -51,20 +51,19 @@ public class RegisterPolarisTableMain {
                     
                     Invalid arguments: '%s'
                     usage:  %s supports the following args options:
-                            catalog namespace table metadata
+                            cloud catalog namespace table metadata [polaris-id] [polaris-secret]
                     """, String.join(" ", args), RegisterPolarisTableMain.class.getSimpleName());
             logger.warn(usage);
             return;
         }
         var properties = new FilePropertyProvider();
-        String catalog = new AfonCatalogs(properties).get(args[0]).toString();
-        String namespace = args[1];
-        String table = args[2];
-        String metadata = args[3];
-
-        if (args.length > 4) {
-            properties.setValue(POLARIS_ENDPOINT, args[4]);
-        }
+        String cloud = args[0];
+        String catalog = new AfonCatalogs(properties).get(args[1]).toString();
+        String namespace = args[2];
+        String table = args[3];
+        String metadata = args[4];
+        String polarisDomain = getPolarisDomain(cloud, properties);
+        properties.setValue(POLARIS_ENDPOINT, polarisDomain);
         if (args.length > 5) {
             String polarisId = args[5];
             String polarisSecret = args[6];
@@ -76,6 +75,24 @@ public class RegisterPolarisTableMain {
         PolarisTableRegister register = new PolarisTableRegister(clientFactory().createClient(properties));
         RegisterPolarisTableMain app  = new RegisterPolarisTableMain(register);
         app.createNamespaceAndTable(catalog, namespace, table, metadata);
+    }
+
+    private static String getPolarisDomain(String cloud, FilePropertyProvider properties) {
+        String polarisDomain;
+        switch (cloud) {
+            case "aws":
+                polarisDomain = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
+                break;
+            case "azure":
+                polarisDomain = properties.getValue(AZURE_POLARIS_DOMAIN_NAME);
+                break;
+            case "gcp":
+                polarisDomain = properties.getValue(GCP_POLARIS_DOMAIN_NAME);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown cloud: " + cloud);
+        }
+        return polarisDomain;
     }
 
 
