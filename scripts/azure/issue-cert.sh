@@ -19,10 +19,25 @@ require_key_vault() {
     exit 1
   fi
   if az keyvault show --name $AZURE_KEY_VAULT_NAME -o none 2>/dev/null; then
-    :
+    echo "- Using Key Vault $AZURE_KEY_VAULT_NAME"
   else
     echo "- Key Vault $AZURE_KEY_VAULT_NAME does not exist, creating"
     "$AFON_ROOT/scripts/azure/keyvault.sh" create || exit 1
+  fi
+}
+
+# Grants the given Key Vault role to the signed-in principal, at vault scope, if not already held.
+# Requested here rather than at vault-creation time (keyvault.sh), since which role is actually
+# needed depends on the issuer - acme never needs Key Vault Certificates Officer.
+grant_vault_role() {
+  ROLE="$1"
+  PRINCIPAL_ID="$(az ad signed-in-user show --query id -o tsv)"
+  VAULT_SCOPE="$(az keyvault show --name $AZURE_KEY_VAULT_NAME --query id -o tsv)"
+  if [ -n "$(az role assignment list --assignee $PRINCIPAL_ID --role "$ROLE" --scope "$VAULT_SCOPE" --query "[].id" -o tsv)" ]; then
+    echo "- Role $ROLE already assigned on $AZURE_KEY_VAULT_NAME, skipping"
+  else
+    echo "- Granting $ROLE on $AZURE_KEY_VAULT_NAME to $PRINCIPAL_ID"
+    az role assignment create  --role "$ROLE" --assignee $PRINCIPAL_ID --scope "$VAULT_SCOPE" || exit 1
   fi
 }
 
@@ -34,6 +49,8 @@ store_cert() {
   KEBAB_DOMAIN_NAME="${AZURE_POLARIS_DOMAIN_NAME//./-}"
   AZURE_TLS_CRT_NAME="${KEBAB_DOMAIN_NAME}-tls-crt"
   AZURE_TLS_KEY_NAME="${KEBAB_DOMAIN_NAME}-tls-key"
+
+  grant_vault_role "Key Vault Secrets Officer"
 
   echo "- Caching $AZURE_POLARIS_DOMAIN_NAME cert in Key Vault $AZURE_KEY_VAULT_NAME"
   az keyvault secret set --vault-name $AZURE_KEY_VAULT_NAME --name "$AZURE_TLS_CRT_NAME" \
@@ -60,13 +77,12 @@ install_acme() {
   fi
 }
 
-# Issues (or renews, idempotently) the domain's cert directly against Let's Encrypt via DNS01.
-# Free, but subject to letsencrypt's 90-day validity and usage rate limits.
-issue_via_acme() {
-  install_acme
-
-  # DNS Zone role, needed by acme.sh's dns_azure hook to create/delete the
-  # _acme-challenge TXT record on our behalf.
+# Needed only for acme's DNS-01 challenge: acme.sh's dns_azure hook creates/deletes the
+# _acme-challenge TXT record in the DNS zone to prove domain ownership to Let's Encrypt. The
+# digicert/globalsign path never touches Azure DNS - validation happens through the CA's own
+# integration with Key Vault instead - so it never needs this role. Granted to APP_ID (not the
+# deployer) since that's who acme.sh authenticates as below, via AZUREDNS_*.
+grant_dns_zone_role() {
   DNS_ZONE_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Network/dnsZones/$AZURE_POLARIS_DOMAIN_NAME"
   if [ -n "$(az role assignment list --assignee $AZURE_APP_ID --role "DNS Zone Contributor" --scope "$DNS_ZONE_SCOPE" --query "[].id" -o tsv)" ]; then
     echo "- Role DNS Zone Contributor already assigned on $AZURE_POLARIS_DOMAIN_NAME, skipping"
@@ -74,6 +90,13 @@ issue_via_acme() {
     echo "- Granting DNS Zone Contributor on $AZURE_POLARIS_DOMAIN_NAME to $AZURE_APP_ID"
     az role assignment create  --role "DNS Zone Contributor" --assignee $AZURE_APP_ID --scope "$DNS_ZONE_SCOPE" || exit 1
   fi
+}
+
+# Issues (or renews, idempotently) the domain's cert directly against Let's Encrypt via DNS01.
+# Free, but subject to letsencrypt's 90-day validity and usage rate limits.
+issue_via_acme() {
+  install_acme
+  grant_dns_zone_role
 
   # acme.sh's dns_azure hook reads these specific variable names to authenticate as the service
   # principal above when it creates/deletes the _acme-challenge TXT record.
@@ -114,6 +137,8 @@ issue_via_keyvault_ca() {
     echo "- AZURE_CA_ID/AZURE_CA_PASSWORD are blank - set them in secret-azure.properties (from your $PROVIDER account) first"
     exit 1
   fi
+
+  grant_vault_role "Key Vault Certificates Officer"
 
   if az keyvault certificate issuer show --vault-name $AZURE_KEY_VAULT_NAME --issuer-name "$ISSUER_NAME" -o none 2>/dev/null; then
     echo "- Issuer $ISSUER_NAME already registered, skipping"

@@ -18,6 +18,22 @@ elif [ -z "${APP_ID:-}" ] || [ -z "${APP_SP_ID:-}" ]; then
   exit 1
 fi
 
+## Resource Providers
+
+echo "- Registering resource provides"
+
+AZURE_RESOURCE_PROVIDERS="Microsoft.Authorization Microsoft.Storage Microsoft.Network Microsoft.ManagedIdentity Microsoft.ContainerService Microsoft.Compute Microsoft.KeyVault"
+
+for ns in $AZURE_RESOURCE_PROVIDERS; do
+  STATE="$(az provider show --namespace "$ns" --query registrationState -o tsv 2>/dev/null)"
+  if [ "$STATE" = "Registered" ]; then
+    echo "-- $ns already registered, skipping"
+  else
+    echo "-- Registering $ns (was: ${STATE:-NotFound}), waiting for it to complete..."
+    az provider register --namespace "$ns" --wait || exit 1
+  fi
+done
+
 # Resource Group
 
 echo "- Creating resource group"
@@ -43,15 +59,6 @@ fi
 # Storage
 
 echo "- Creating storage"
-
-## Storage Resource Provider
-
-if [ "$(az provider show --namespace Microsoft.Storage --query registrationState -o tsv)" = "Registered" ]; then
-  echo "- Resource provider 'Microsoft.Storage' already registered, skipping"
-else
-  echo "- Registering resource provider 'Microsoft.Storage'"
-  az provider register --namespace Microsoft.Storage --wait || exit 1
-fi
 
 ## Storage Account
 
