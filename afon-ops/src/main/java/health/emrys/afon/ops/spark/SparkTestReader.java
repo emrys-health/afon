@@ -33,7 +33,7 @@ public class SparkTestReader extends SparkChecker {
 
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
-        parseAndExecute(args, new SparkTestReader(properties));
+        parseAndExecute(args, new SparkTestReader(properties), properties);
     }
 
 }

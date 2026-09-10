@@ -1,8 +1,6 @@
 package health.emrys.afon.polaris.config;
 
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -32,6 +30,8 @@ public class PolarisUserManager {
     public static final String DEFAULT_CATALOG_ROLE_NAME = "emrysrole4";
     public static final Set<CatalogPrivilege> DEFAULT_CATALOG_PRIVILEGES =
             Set.of(NAMESPACE_CREATE, NAMESPACE_FULL_METADATA, TABLE_CREATE, TABLE_READ_DATA, TABLE_WRITE_DATA);
+    private final AfonCatalogs afonCatalogs;
+
     public static final String principalRoleName(String catalogRoleName){
         return String.format("%sPrincipal", catalogRoleName);
     }
@@ -49,6 +49,7 @@ public class PolarisUserManager {
 
     public PolarisUserManager(AfonPropertyProvider properties, String catalogRoleName, Set<CatalogPrivilege> privileges) {
         PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties);
+        this.afonCatalogs = new AfonCatalogs(properties);
         this.configurer = new CatalogConfigurer(client);
         this.accessToken = client.getAccessToken();
         this.clientId = client.getClientId();
@@ -69,6 +70,14 @@ public class PolarisUserManager {
 
     public Set<CatalogPrivilege> getPrivileges() {
         return privileges;
+    }
+
+    public List<HttpResponse> configureUsers(AfonUserProvider userProvider) throws IncorrectConfigException, IOException {
+        List<HttpResponse> responses = new ArrayList<>();
+        for ( AfonCatalog catalog : afonCatalogs.all() ){
+            responses.addAll(configureUsers(catalog.toString(),  userProvider));
+        }
+        return responses;
     }
 
     public List<HttpResponse> configureUsers(String catalogName, AfonUserProvider userProvider) throws IncorrectConfigException, IOException {

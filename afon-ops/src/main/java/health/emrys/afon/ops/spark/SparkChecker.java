@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 
+import static health.emrys.afon.config.AfonProperty.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
 abstract public class SparkChecker {
@@ -24,26 +25,39 @@ abstract public class SparkChecker {
         this.properties = properties;
     }
 
-    public static void parseAndExecute(String[] args, SparkChecker app) {
+    public static void parseAndExecute(String[] args, SparkChecker app, AfonPropertyProvider properties) {
         try {
             SparkSession spark     = null;
             String       warehouse = null;
             String       namespace = EXTERNAL_NAMESPACE;
             if (args.length >= 4) {
                 warehouse = args[0];
-                String polarisId     = args[1];
-                String polarisSecret = args[2];
-                String polarisHost   = args[3];
+                String cloud = args[1];
+                String polarisId     = args[2];
+                String polarisSecret = args[3];
                 if (args.length > 4) {
                     namespace = args[4];
                 }
-                spark = app.sparkSessionUsing(polarisHost, polarisId, polarisSecret, warehouse);
+                spark = app.sparkSessionUsing(polarisHostFor(cloud, properties), polarisId, polarisSecret, warehouse);
             }
             app.doCheck(spark, warehouse, namespace);
             logger.info("Finished without error");
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
             throw new RuntimeException(e);
+        }
+    }
+
+    private static String polarisHostFor(String cloud, AfonPropertyProvider properties) {
+        switch (cloud) {
+            case "aws":
+                return properties.getValue(AWS_POLARIS_DOMAIN_NAME);
+            case "azure":
+                return properties.getValue(AZURE_POLARIS_DOMAIN_NAME);
+            case "gcp":
+                return properties.getValue(GCP_POLARIS_DOMAIN_NAME);
+            default:
+                throw new IllegalArgumentException("Unknown cloud: " + cloud);
         }
     }
 
