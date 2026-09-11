@@ -23,6 +23,7 @@
       <outputDirectory>/</outputDirectory>
       <includes>
         <include>LICENSE.txt</include>
+        <include>release_notes.md</include>
       </includes>
     </fileSet>
     <fileSet>
@@ -37,18 +38,9 @@
       <directory>../scripts</directory>
       <outputDirectory>/scripts</outputDirectory>
       <includes>
-        <include>aws/account.sh</include>
-        <include>aws/create.sh</include>
-        <include>aws/destroy.sh</include>
-        <include>aws/login.sh</include>
-        <include>azure/account.sh</include>
-        <include>azure/create.sh</include>
-        <include>azure/destroy.sh</include>
-        <include>azure/login.sh</include>
-        <include>gcp/account.sh</include>
-        <include>gcp/create.sh</include>
-        <include>gcp/destroy.sh</include>
-        <include>gcp/login.sh</include>
+        <include>aws/**</include>
+        <include>azure/**</include>
+        <include>gcp/**</include>
         <include>config/**</include>
       </includes>
       <fileMode>0755</fileMode>
