@@ -109,13 +109,13 @@ public class NetworkConfig {
         whitelist.addAll(allowedDomains);
         whitelist.add(AllowedDomain.create(MASTER + "-svc"));
 
-        Map<String, Object> manifest = sparkManifest(DRIVER_LABELS,
-                                                     "spark-driver",
-                                                     whitelist);
+//        Map<String, Object> manifest = sparkManifest(DRIVER_LABELS,
+//                                                     "spark-driver",
+//                                                     whitelist);
 
-//        Map<String, Object> manifest = connectionManifest(
-//            USER_POD_LABELS,
-//            allowedDomains);
+        Map<String, Object> manifest = connectionManifest(
+            USER_POD_LABELS,
+            List.of());
         System.out.println(format("echo '%s' | kubectl apply -f -", toJson(manifest)));
     }
 
@@ -250,10 +250,7 @@ public class NetworkConfig {
                                      List<AllowedDomain> allowedDomains,
                                      List<ITerraformDependable> dependsOn
     ) {
-        if (allowedDomains.isEmpty()) {
-            return;
-        }
-        Map<String, Object> manifest = connectionManifest(labels, allowedDomains);
+        Map<String, Object> manifest = connectionManifest(labels, List.of());
         createWhitelistFor(dependsOn, manifest, "jupyterNetworkPolicy");
     }
 
@@ -282,14 +279,19 @@ public class NetworkConfig {
     private static @NonNull Map<String, Object> connectionManifest(Map<String, String> labels,
                                                                    List<AllowedDomain> allowedDomains
     ) {
-        Map<String, Object> dnsVisibility = dnsConfigFor(allowedDomains);
-        Map<String, Object> domainEgress = Map.of(
-            "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList(),
-            "toPorts", List.of(Map.of(
-                "ports", ALLOWED_PORTS.stream()
-                                      .map(port -> Map.of("port", port, "protocol", "TCP"))
-                                      .toList()))
-        );
+        List<Map<String, Object>> allowedEgress = new ArrayList<>();
+        if (!allowedDomains.isEmpty()) {
+            Map<String, Object> dnsVisibility = dnsConfigFor(allowedDomains);
+            allowedEgress.add(dnsVisibility);
+            Map<String, Object> domainEgress = Map.of(
+                "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList(),
+                "toPorts", List.of(Map.of(
+                    "ports", ALLOWED_PORTS.stream()
+                                          .map(port -> Map.of("port", port, "protocol", "TCP"))
+                                          .toList()))
+            );
+            allowedEgress.add(domainEgress);
+        }
         // Egress to emrys-master-svc, the Spark master (spark://emrys-master-svc:7077).
         // Named rather than listed among the whitelisted domains because a cluster-local name is
         // not something toFQDNs can express: Cilium's DNS proxy turns an answer into a CIDR
@@ -300,7 +302,7 @@ public class NetworkConfig {
         // above: every port the master listens on (7077, 6066, 8080) is reachable.
         Map<String, Object> sparkMasterEgress = Map.of(
             "toEndpoints", List.of(Map.of("matchLabels", SPARK_MASTER_LABELS)));
-        List<Map<String, Object>> allowedEgress = List.of(dnsVisibility, domainEgress, sparkMasterEgress);
+        allowedEgress.add(sparkMasterEgress);
         return manifestUsing(labels, DOMAIN_POLICY_NAME, allowedEgress);
     }
 
