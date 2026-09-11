@@ -15,21 +15,8 @@ public class PolarisCredentials {
     public PolarisCredentials(AfonCloud cloud, AfonPropertyProvider properties) {
         this.cloud = cloud;
         this.properties = properties;
-        this.properties.setValue(POLARIS_ENDPOINT, polarisDomainName(cloud));
+        this.properties.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, properties).getEndpoint());
         this.accessToken = clientFactory.createClient(this.properties).getAccessToken();
-    }
-
-    private String polarisDomainName(AfonCloud cloud) {
-        switch ( cloud ) {
-            case AWS:
-                return properties.getValue(AWS_POLARIS_DOMAIN_NAME);
-            case AZURE:
-                return properties.getValue(AZURE_POLARIS_DOMAIN_NAME);
-            case GCP:
-                return properties.getValue(GCP_POLARIS_DOMAIN_NAME);
-            default:
-                throw new RuntimeException("Unsupported cloud "+cloud);
-        }
     }
 
     public String getAccessToken() {

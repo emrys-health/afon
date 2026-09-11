@@ -1,18 +1,16 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.AfonCatalog;
-import health.emrys.afon.config.AfonCatalogs;
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.PolarisCatalogManager;
+import health.emrys.afon.polaris.config.PolarisEndpoint;
 import org.apache.hc.core5.http.ParseException;
 import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class ManagePolarisCatalogsMain {
@@ -73,26 +71,26 @@ public class ManagePolarisCatalogsMain {
 
     public static void main(String[] args) {
         String action;
-        String cloud;
+        String cloudName;
         String catalogName = null;
         String namespace   = null;
         String tableName   = null;
 
         if (args.length == 2) {
             action  = args[0];
-            cloud  = args[1];
+            cloudName  = args[1];
         } else if (args.length == 3) {
             action  = args[0];
-            cloud  = args[1];
+            cloudName  = args[1];
             catalogName = args[2];
         } else if (args.length == 4) {
             action  = args[0];
-            cloud  = args[1];
+            cloudName  = args[1];
             catalogName = args[2];
             namespace  = args[3];
         } else if (args.length == 5) {
             action  = args[0];
-            cloud  = args[1];
+            cloudName  = args[1];
             catalogName = args[2];
             namespace  = args[3];
             tableName = args[4];
@@ -108,10 +106,9 @@ public class ManagePolarisCatalogsMain {
             logger.warn(usage);
             return;
         }
-
+        AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
         var properties = new FilePropertyProvider();
-        String polarisDomain = getPolarisDomain(cloud, properties);
-        properties.setValue(POLARIS_ENDPOINT, polarisDomain);
+        properties.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, properties).getEndpoint());
 
         ManagePolarisCatalogsMain app = new ManagePolarisCatalogsMain(properties);
         try {
@@ -142,24 +139,6 @@ public class ManagePolarisCatalogsMain {
             logger.warn("Failed exec of {} with args {}", ManagePolarisCatalogsMain.class.getSimpleName(), List.of(args));
             throw new RuntimeException(e);
         }
-    }
-
-    private static String getPolarisDomain(String cloud, FilePropertyProvider properties) {
-        String polarisDomain;
-        switch (cloud) {
-            case "aws":
-                polarisDomain = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
-                break;
-            case "azure":
-                polarisDomain = properties.getValue(AZURE_POLARIS_DOMAIN_NAME);
-                break;
-            case "gcp":
-                polarisDomain = properties.getValue(GCP_POLARIS_DOMAIN_NAME);
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown cloud: " + cloud);
-        }
-        return polarisDomain;
     }
 
 }

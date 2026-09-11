@@ -2,6 +2,7 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
+import health.emrys.afon.polaris.config.PolarisEndpoint;
 import health.emrys.afon.polaris.config.PolarisUserManager;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
@@ -63,43 +64,26 @@ public class ConfigureUsersMain {
 
     public static void main(String[] args) {
 
-        String cloud;
+        String cloudName;
         String catalogName = null;
 
         if (args.length == 1) {
-            cloud  = args[0];
+            cloudName  = args[0];
         } else if (args.length == 2) {
-            cloud  = args[0];
+            cloudName  = args[0];
             catalogName = args[1];
         } else {
             System.out.printf("%s requires arguments: cloud", ConfigureUsersMain.class.getSimpleName());
             System.out.printf("%s requires arguments: cloud catalog-name", ConfigureUsersMain.class.getSimpleName());
             throw new IllegalArgumentException();
         }
+        AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
         var    userProvider     = new FileUserProvider();
         var    propertyProvider = new FilePropertyProvider();
-        String polarisDomain;
-        String jupyterDomain;
-        switch (cloud) {
-            case "aws":
-                polarisDomain = propertyProvider.getValue(AWS_POLARIS_DOMAIN_NAME);
-                jupyterDomain = propertyProvider.getValue(AWS_JUPYTER_DOMAIN_NAME);
-                break;
-            case "azure":
-                polarisDomain = propertyProvider.getValue(AZURE_POLARIS_DOMAIN_NAME);
-                jupyterDomain = propertyProvider.getValue(AZURE_JUPYTER_DOMAIN_NAME, null);
-                break;
-            case "gcp":
-                polarisDomain = propertyProvider.getValue(GCP_POLARIS_DOMAIN_NAME);
-                jupyterDomain = propertyProvider.getValue(GCP_JUPYTER_DOMAIN_NAME, null);
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown cloud: " + cloud);
-        }
-
-        propertyProvider.setValue(POLARIS_ENDPOINT, polarisDomain);
+        propertyProvider.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, propertyProvider).getEndpoint());
         var app = new ConfigureUsersMain(userProvider, propertyProvider);
 
+        String jupyterDomain = jupyterDomain(cloud, propertyProvider);
         if (jupyterDomain != null) {
             try {
                 app.configureOidcUsers(jupyterDomain);
@@ -121,7 +105,24 @@ public class ConfigureUsersMain {
                     userProvider.getUserNames(), e.getMessage(), e);
             throw new RuntimeException(e);
         }
+    }
 
+    private static String jupyterDomain(AfonCloud cloud, FilePropertyProvider propertyProvider) {
+        String jupyterDomain;
+        switch (cloud) {
+            case AWS:
+                jupyterDomain = propertyProvider.getValue(AWS_JUPYTER_DOMAIN_NAME);
+                break;
+            case AZURE:
+                jupyterDomain = propertyProvider.getValue(AZURE_JUPYTER_DOMAIN_NAME, null);
+                break;
+            case GCP:
+                jupyterDomain = propertyProvider.getValue(GCP_JUPYTER_DOMAIN_NAME, null);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown cloud: " + cloud);
+        }
+        return jupyterDomain;
     }
 
 
