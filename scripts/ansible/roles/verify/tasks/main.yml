@@ -21,7 +21,7 @@
   check_mode: false
 
 - name: Verify the aws tooling as {{ github_runner_user }}
-  when: install_awscli | bool
+  when: install_cloud_tools | bool and install_awscli | bool
   become: true
   become_user: "{{ github_runner_user }}"
   ansible.builtin.command: "{{ item }}"
@@ -31,7 +31,7 @@
   check_mode: false
 
 - name: Verify the azure tooling as {{ github_runner_user }}
-  when: install_azurecli | bool
+  when: install_cloud_tools | bool and install_azurecli | bool
   become: true
   become_user: "{{ github_runner_user }}"
   ansible.builtin.command: "{{ item }}"
@@ -41,7 +41,7 @@
   check_mode: false
 
 - name: Verify the gcloud tooling as {{ github_runner_user }}
-  when: install_gcloud | bool
+  when: install_cloud_tools | bool and install_gcloud | bool
   become: true
   become_user: "{{ github_runner_user }}"
   ansible.builtin.command: "{{ item }}"
