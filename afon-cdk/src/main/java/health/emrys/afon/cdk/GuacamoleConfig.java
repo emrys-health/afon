@@ -3,47 +3,22 @@ package health.emrys.afon.cdk;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMap;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpec;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecSelector;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplate;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpec;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerPort;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainer;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainerVolumeMount;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeConfigMap;
-import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeEmptyDir;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1Metadata;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1Spec;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1Timeouts;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplate;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpec;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecContainer;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecContainerEnv;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecContainerVolumeMount;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecInitContainer;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecInitContainerVolumeMount;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecVolume;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecVolumeConfigMap;
-import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecVolumeEmptyDir;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
+import com.hashicorp.cdktf.providers.kubernetes.job_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.function.Function;
 
 import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
-import static health.emrys.afon.cdk.CdkUtils.withAppKubernetesIoName;
 import static health.emrys.afon.cdk.CdkHelper.envVar;
+import static health.emrys.afon.cdk.CdkUtils.withAppKubernetesIoName;
 
 /**
  * Deploys Apache Guacamole as a clientless remote desktop gateway so that the GUI of the
@@ -77,7 +52,17 @@ public class GuacamoleConfig {
     public record Session(String username, String password, int vncPort) {}
 
     /** Connection details for the shared Postgres that backs Guacamole in transparent-SSO mode. */
-    public record DbConfig(String host, int port, String database, String user, String password) {}
+    public record DbConfig(String host, int port, String database, String user, String password) {
+
+        public static DbConfig create(AfonPropertyProvider properties) {
+            return new DbConfig(properties.getValue(AfonProperty.POLARIS_DB_HOST),
+                                5432,
+                                "guacamole",
+                                properties.getValue(AfonProperty.KEYCLOAK_DB_USERNAME),
+                                properties.getValue(AfonProperty.KEYCLOAK_DB_PASSWORD));
+        }
+
+    }
 
     private static final String PROVISION_CM = "guacamole-db-provision";
     private static final String DB_INIT_JOB  = "guacamole-db-init";
@@ -394,16 +379,21 @@ public class GuacamoleConfig {
                                                                                   .build()))
                 .build();
 
-        String script = String.join("\n",
-            "set -e",
-            "until pg_isready -h \"$PGHOST\" -p \"$PGPORT\" -U \"$PGUSER\"; do echo 'waiting for postgres'; sleep 2; done",
-            "psql -d postgres -tAc \"SELECT 1 FROM pg_database WHERE datname='$GUAC_DB'\" | grep -q 1 \\",
-            "  || psql -d postgres -c \"CREATE DATABASE \\\"$GUAC_DB\\\"\"",
-            "if [ \"$(psql -d \"$GUAC_DB\" -tAc \"SELECT to_regclass('public.guacamole_connection')\")\" != 'guacamole_connection' ]; then",
-            "  psql -d \"$GUAC_DB\" -v ON_ERROR_STOP=1 -f /sql/001-schema.sql",
-            "fi",
-            "psql -d \"$GUAC_DB\" -v ON_ERROR_STOP=1 -f /provision/provision.sql",
-            "echo 'guacamole db init complete'");
+        String script = """
+                        set -e
+                        until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do echo 'waiting for postgres'; sleep 2; done
+                        psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$GUAC_DB'" | grep -q 1 \\
+                        psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$GUAC_DB'" | grep -q 1 \\
+                          || psql -d postgres -c "CREATE DATABASE \\"$GUAC_DB\\""
+                        if [ "$(psql -d "$GUAC_DB" -tAc "SELECT to_regclass('public.guacamole_connection')")" != 'guacamole_connection' ]; then
+                          psql -d "$GUAC_DB" -v ON_ERROR_STOP=1 -f /sql/001-schema.sql
+                        fi
+                        psql -d "$GUAC_DB" -v ON_ERROR_STOP=1 -f /provision/provision.sql
+                        
+                        psql -d postgres -tAc "DELETE FROM guacamole_entity WHERE name = 'guacadmin' AND type = 'USER'"
+                        
+                        echo 'guacamole db init complete'
+                        """;
 
         JobV1SpecTemplateSpecContainer dbInit = JobV1SpecTemplateSpecContainer
                 .builder()
@@ -476,6 +466,7 @@ public class GuacamoleConfig {
             String host = hostResolver.apply(s);
             sb.append("BEGIN;\n")
               .append("DELETE FROM guacamole_connection WHERE connection_name = '").append(conn).append("';\n")
+//              .append("DELETE FROM guacamole_entity WHERE name = 'guacadmin' AND type = 'USER';\n")
               .append("DO $do$\n")
               .append("DECLARE eid integer; cid integer;\n")
               .append("BEGIN\n")
