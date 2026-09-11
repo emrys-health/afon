@@ -1,5 +1,6 @@
 package health.emrys.afon.config;
 
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.regex.Pattern;
@@ -19,7 +20,7 @@ public class CloudConfigTest {
         return domain != null && RFC_1123_DOMAIN.matcher(domain).matches();
     }
 
-    private FilePropertyProvider properties = new FilePropertyProvider();
+    private AfonPropertyProvider properties = new OpsPropertyProvider();
 
     @Test
     public void testWhitelistedAreValidDomainNames() {

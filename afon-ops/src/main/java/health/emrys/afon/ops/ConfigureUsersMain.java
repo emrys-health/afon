@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.*;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
 import health.emrys.afon.polaris.config.PolarisUserManager;
@@ -79,7 +80,7 @@ public class ConfigureUsersMain {
         }
         AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
         var    userProvider     = new FileUserProvider();
-        var    propertyProvider = new FilePropertyProvider();
+        var    propertyProvider = new OpsPropertyProvider();
         propertyProvider.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, propertyProvider).getEndpoint());
         var app = new ConfigureUsersMain(userProvider, propertyProvider);
 
@@ -107,7 +108,7 @@ public class ConfigureUsersMain {
         }
     }
 
-    private static String jupyterDomain(AfonCloud cloud, FilePropertyProvider propertyProvider) {
+    private static String jupyterDomain(AfonCloud cloud, AfonPropertyProvider propertyProvider) {
         String jupyterDomain;
         switch (cloud) {
             case AWS:
