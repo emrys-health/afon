@@ -20,11 +20,6 @@ import static java.lang.String.format;
  *
  * <ol>
  *   <li>Run kubectl port-forward pod/spark-connector-0-driver 15002:15002</li>
- *   <li>The GCS connector ({@code com.google.cloud.bigdataoss:gcs-connector}) is on the driver's
- *       classpath. This is <em>not</em> the same artifact as {@code com.google.cloud:google-cloud-storage},
- *       which is what the {@code spark_jars} image installs; without the connector there is no
- *       {@code GoogleHadoopFileSystem} and the read fails with "No FileSystem for scheme gs"
- *       before any network call is made. See {@code scripts/docker/spark-connect/Dockerfile}.</li>
  *   <li>The GCS settings are passed as <em>read options</em>, not as {@code spark.hadoop.*} builder
  *       configs. Over Spark Connect the builder's configs are applied to the remote session at
  *       runtime, but the server's Hadoop {@code Configuration} was built from its own
