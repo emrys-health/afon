@@ -15,6 +15,7 @@ import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
+import java.util.Map;
 
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
@@ -33,6 +34,25 @@ public class AwsPolarisStack extends AbstractCloudStack {
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
         cloudProvider = new AwsCloudProvider(this, id.toString(), properties);
+        cloudProvider.configureHelm();
+        this.addOverride(
+            "terraform.required_providers.aws", Map.of(
+                "source", "hashicorp/aws",
+                "version", "6.27.0"   // 👈 Pin exact version
+                                                      ));
+        this.addOverride(
+            "terraform.required_providers.helm", Map.of(
+                "source", "hashicorp/helm",
+                "version", "3.2.0"   // 👈 Pin exact version
+                                                       ));
+        this.addOverride(
+            "terraform.required_providers.kubernetes", Map.of(
+                "source", "hashicorp/kubernetes",
+                // 3.2.1 fixes "Unexpected Identity Change" errors when a resource takes
+                // extended time to become ready (as happened when an EKS token expired
+                // mid-rollout of oauth2-proxy). Do not downgrade below 3.2.1.
+                "version", "3.2.1"   // 👈 Pin exact version
+                                                             ));
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties) {
             protected Service configurePolarisService(Deployment polarisDeployment) {
                 return null; // no longer using an external service
