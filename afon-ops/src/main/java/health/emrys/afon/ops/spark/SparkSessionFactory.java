@@ -26,7 +26,7 @@ public class SparkSessionFactory {
         PolarisCredentials credentials = new PolarisCredentials(cloud, properties);
         return new SparkSessionFactory(
                 properties,
-                credentials.getPolarisHost(),
+                credentials.getPolarisEndpoint(),
                 credentials.getPolarisId(),
                 credentials.getPolarisSecret(),
                 warehouseNames
