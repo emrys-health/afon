@@ -232,7 +232,12 @@ public class StepOperations {
     }
 
     private long dnsWaitTimeout() {
-        return parseDuration(properties.getValue(DNS_WAIT_TIMEOUT, "20m")).toMillis();
+        String defaultValue = "20m";
+        String value = properties.getValue(DNS_WAIT_TIMEOUT, defaultValue);
+        if ( value.isBlank() ){ // allow for blank value
+            value = defaultValue;
+        }
+        return parseDuration(value).toMillis();
     }
 
     public Step checkAwsSparkWritingTo(AfonCloud cloud) {
