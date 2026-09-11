@@ -1,7 +1,9 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.polaris.config.PolarisEndpoint;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisTableRegister;
 import org.apache.hc.core5.http.HttpResponse;
@@ -57,13 +59,12 @@ public class RegisterPolarisTableMain {
             return;
         }
         var properties = new FilePropertyProvider();
-        String cloud = args[0];
+        AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
         String catalog = new AfonCatalogs(properties).get(args[1]).toString();
         String namespace = args[2];
         String table = args[3];
         String metadata = args[4];
-        String polarisDomain = getPolarisDomain(cloud, properties);
-        properties.setValue(POLARIS_ENDPOINT, polarisDomain);
+        properties.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, properties).getEndpoint());
         if (args.length > 5) {
             String polarisId = args[5];
             String polarisSecret = args[6];
@@ -76,24 +77,5 @@ public class RegisterPolarisTableMain {
         RegisterPolarisTableMain app  = new RegisterPolarisTableMain(register);
         app.createNamespaceAndTable(catalog, namespace, table, metadata);
     }
-
-    private static String getPolarisDomain(String cloud, FilePropertyProvider properties) {
-        String polarisDomain;
-        switch (cloud) {
-            case "aws":
-                polarisDomain = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
-                break;
-            case "azure":
-                polarisDomain = properties.getValue(AZURE_POLARIS_DOMAIN_NAME);
-                break;
-            case "gcp":
-                polarisDomain = properties.getValue(GCP_POLARIS_DOMAIN_NAME);
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown cloud: " + cloud);
-        }
-        return polarisDomain;
-    }
-
 
 }
