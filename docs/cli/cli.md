@@ -106,22 +106,22 @@ Steps executed:
 1. `clean_aws` — destroy any existing AWS stack
 2. `aws_spark` — deploy Polaris + Spark to AWS via CDKTF + OpenTofu
 3. `wait_on_emryspolaris` — wait for DNS to propagate
-4. `all_catalogs_in_emryspolaris` — configure all catalogs in Polaris
-5. `aws_spark_talks_to_aws` — smoke test: Spark writes and reads via Polaris
+4. `create_all_catalogs_for_cloud_aws` — create all catalogs in AWS Polaris
+5. `aws_spark_talks_to_cloud_aws` — smoke test: Spark writes and reads via Polaris
 
 ### Setup Azure Polaris only
 
 ```shell
 afon-cli.sh setup-azure-polaris-stack
 ```
-Steps: `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `all_catalogs_in_emryspolarisazure`
+Steps: `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `create_all_catalogs_for_cloud_azure`
 
 ### Setup GCP Polaris only
 
 ```shell
 afon-cli.sh setup-gcp-polaris-stack
 ```
-Steps: `clean_gcp` → `gcp_polaris` → `wait_on_emryspolarisgcp` → `all_catalogs_in_emryspolarisgcp`
+Steps: `clean_gcp` → `gcp_polaris` → `wait_on_emryspolarisgcp` → `create_all_catalogs_for_cloud_gcp`
 
 ### Deploy cross-cloud external catalogs (AWS + Azure)
 
@@ -131,7 +131,7 @@ To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate 
 afon-cli.sh deploy-external-catalogs
 ```
 
-Steps: `clean_aws` → `aws_spark` → `wait_on_emryspolaris` → `all_catalogs_in_emryspolaris` → `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `emryspolarisazure_purge_azure` → `foreign_catalog_in_emryspolarisazure` → `external_azure_in_emryspolarisazure` → `aws_spark_talks_to_azure_external`
+Steps: `clean_aws → aws_full → wait_on_emryspolaris_then_wait_on_emrysoauth → create_all_catalogs_for_aws → aws_spark_talks_to_aws → clean_azure → azure_polaris → wait_on_emryspolarisazure_then_wait_on_emrysoauth → delete_table_azure.namespaceph.test_table_for_cloud_azure → create_external_catalog_azure_for_cloud_azure → aws_spark_talks_to_catalog_azure_external`
 
 ### Resume a failed stack deployment from a specific step
 
