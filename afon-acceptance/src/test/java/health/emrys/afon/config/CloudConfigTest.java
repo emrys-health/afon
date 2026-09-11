@@ -10,6 +10,9 @@ import static health.emrys.afon.config.ConfigUtils.afonCloud;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * TODO Move this to an acceptance test based on the specific cloud?
+ */
 public class CloudConfigTest {
     private static final Pattern RFC_1123_DOMAIN = Pattern.compile(
         "^(?=.{1,253}\\.?$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)*"
