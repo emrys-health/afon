@@ -5,6 +5,10 @@ import health.emrys.afon.config.AfonPropertyProvider;
 
 import static health.emrys.afon.config.AfonProperty.*;
 
+/**
+ * The Polaris endpoint is cloud-specific and held in different config properties.
+ * This utility class retrieves the correct endpoint based on the {@link AfonCloud}.
+ */
 public class PolarisEndpoint {
 
     private final AfonCloud cloud;
