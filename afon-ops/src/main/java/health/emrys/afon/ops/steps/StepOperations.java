@@ -11,7 +11,6 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
-import health.emrys.afon.ops.config.OpsDefaults;
 import health.emrys.afon.ops.spark.SparkChecker;
 import health.emrys.afon.ops.spark.SparkTestReader;
 import health.emrys.afon.ops.spark.SparkTestWriter;
@@ -39,10 +38,16 @@ public class StepOperations {
 
     private final AfonPropertyProvider properties;
     private final AfonCatalogs afonCatalogs;
+    private final String polarisNamespace;
+    private final String polarisNamespaceExternal;
+    private final String polarisTableName;
 
     public StepOperations(StepActions actions, AfonPropertyProvider properties) {
         this.actions = actions;
         this.properties = properties;
+        this.polarisNamespace = properties.getValue(POLARIS_NAMESPACE);
+        this.polarisNamespaceExternal = properties.getValue(POLARIS_NAMESPACE_EXTERNAL);
+        this.polarisTableName = properties.getValue(POLARIS_TABLE_NAME);
         this.afonCatalogs = new AfonCatalogs(properties);
     }
 
@@ -125,10 +130,11 @@ public class StepOperations {
 
     private @NonNull Step deleteExternalPolarisTableFor(AfonCloud cloud, AfonCatalog catalog
     ) {
-        return deletePolarisTable(cloud, catalog, OpsDefaults.EXTERNAL_NAMESPACE, OpsDefaults.TEST_TABLE);
+        return deletePolarisTable(cloud, catalog, polarisNamespaceExternal, polarisTableName);
     }
 
-    private @NonNull Step deletePolarisTable(AfonCloud cloud, AfonCatalog catalog,
+    private @NonNull Step deletePolarisTable(AfonCloud cloud,
+                                             AfonCatalog catalog,
                                              String namespace,
                                              String tableName
     ) {
@@ -225,11 +231,11 @@ public class StepOperations {
     public Step checkAwsSparkWritingTo(AfonCloud cloud) {
         switch (cloud) {
             case AWS:
-                return awsSparkWritingTo(afonCatalogs.aws(), OpsDefaults.EXTERNAL_NAMESPACE);
+                return awsSparkWritingTo(afonCatalogs.aws(), polarisNamespaceExternal);
             case AZURE:
-                return awsSparkWritingTo(afonCatalogs.azure(), OpsDefaults.EXTERNAL_NAMESPACE);
+                return awsSparkWritingTo(afonCatalogs.azure(), polarisNamespaceExternal);
             case GCP:
-                return awsSparkWritingTo(afonCatalogs.gcp(), OpsDefaults.EXTERNAL_NAMESPACE);
+                return awsSparkWritingTo(afonCatalogs.gcp(), polarisNamespaceExternal);
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
@@ -237,17 +243,17 @@ public class StepOperations {
 
     private Step awsSparkWritingTo(AfonCatalog catalog, String namespace) {
         return sparkTestUsing("Spark writing table",
-                AWS, catalog, namespace, OpsDefaults.TEST_TABLE, SparkTestWriter.class);
+                AWS, catalog, namespace, polarisTableName, SparkTestWriter.class);
     }
 
     public @NonNull Step checkAwsSparkDeferringToAzurePolarisHostingExternalCatalog() {
         return sparkTestUsing(format("Spark defers to %s writing table", AZURE),
-                AWS, afonCatalogs.azureExternal(), OpsDefaults.EXTERNAL_NAMESPACE, OpsDefaults.TEST_TABLE, SparkTestWriter.class);
+                AWS, afonCatalogs.azureExternal(), polarisNamespaceExternal, polarisTableName, SparkTestWriter.class);
     }
 
     public @NonNull Step checkAwsSparkReadingUsing(AfonCatalog catalog) {
         return sparkTestUsing("Spark reading table",
-                AWS, catalog, OpsDefaults.ACCEPTANCE_TEST_NAMESPACE, OpsDefaults.TEST_TABLE, SparkTestReader.class);
+                AWS, catalog, polarisNamespace, polarisTableName, SparkTestReader.class);
     }
 
     private @NonNull Step sparkTestUsing(String description,
@@ -317,8 +323,8 @@ public class StepOperations {
                                  CATALOG_NAMESPACE = '%s'
                                  REPLACE_INVALID_CHARACTERS = TRUE;
                             """,
-                        OpsDefaults.TEST_TABLE,
-                        OpsDefaults.EXTERNAL_NAMESPACE),
+                        polarisTableName,
+                        polarisNamespaceExternal),
                     "SELECT COUNT(*) FROM my_gcp_table_id"
                 });
             }
@@ -373,7 +379,7 @@ public class StepOperations {
                               );
                             """, properties.getValue(AZURE_STORAGE_ACCOUNT),
                             properties.getValue(AZURE_BUCKET_NAME),
-                            OpsDefaults.ACCEPTANCE_TEST_NAMESPACE,
+                            polarisNamespace,
                             properties.getValue(AZURE_TENANT_ID)),
                     """
                     USE DATABASE SNOWFLAKE_LEARNING_DB;
@@ -402,7 +408,7 @@ public class StepOperations {
     public Step deleteAwsPolarisCatalogAndRecreateFor(AfonCloud cloud) {
         switch (cloud) {
             case AZURE:
-                return deletePolarisTable(AWS, afonCatalogs.azure(), OpsDefaults.ACCEPTANCE_TEST_NAMESPACE, OpsDefaults.TEST_TABLE)
+                return deletePolarisTable(AWS, afonCatalogs.azure(), polarisNamespace, polarisTableName)
                     .andThen(createCatalogFor(AWS, afonCatalogs.azure()));
             case AWS, GCP:
             default:
@@ -415,10 +421,10 @@ public class StepOperations {
             case AZURE:
                 String glob = format(
                     "%s/%s*metadata.json",
-                    OpsDefaults.ACCEPTANCE_TEST_NAMESPACE,
+                    polarisNamespace,
                     SNOWFLAKE_OUT_DIR);
                 String json = actions.azureFirstFile(properties, glob, true); // firstFileInLatestDirectoryMatching(glob);
-                return registerTableInAwsPolaris(afonCatalogs.azure(), OpsDefaults.TEST_TABLE, json);
+                return registerTableInAwsPolaris(afonCatalogs.azure(), polarisNamespace, polarisTableName, json);
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -426,7 +432,9 @@ public class StepOperations {
     }
 
     private Step registerTableInAwsPolaris(AfonCatalog catalog,
-                                           String tableName, String metadata
+                                           String namespace,
+                                           String tableName,
+                                           String metadata
     ) {
         return new Step(
             format("register_table_%s_in_aws_polaris", tableName),
@@ -434,6 +442,7 @@ public class StepOperations {
             () -> {
                 actions.registerTable(AWS,
                         catalog,
+                        namespace,
                         tableName,
                         metadata
                 );

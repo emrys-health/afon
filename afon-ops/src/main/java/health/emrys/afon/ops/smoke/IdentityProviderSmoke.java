@@ -1,6 +1,10 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.*;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.slf4j.Logger;
@@ -33,7 +37,7 @@ public class IdentityProviderSmoke {
 
     public static void main(String[] args) {
         var app = new IdentityProviderSmoke();
-        var properties = new FilePropertyProvider();
+        var properties = new OpsPropertyProvider();
         IdentityProvider provider = new KeyCloakProvider(properties);
         if (args.length == 1) {
             String username = args[0];

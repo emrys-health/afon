@@ -1,6 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.spark.connect.SparkConnect;
 import health.emrys.afon.spark.connect.SparkConnectUsingOIDC;
 
@@ -32,7 +32,7 @@ public class SparkConnectSmoke {
             return;
         }
         var app = new SparkConnectSmoke();
-        var properties = new FilePropertyProvider();
+        var properties = new OpsPropertyProvider();
         String polarisEndpoint = args[0];
         properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
         try {

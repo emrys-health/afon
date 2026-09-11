@@ -2,7 +2,7 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisTableRegister;
@@ -58,7 +58,7 @@ public class RegisterPolarisTableMain {
             logger.warn(usage);
             return;
         }
-        var properties = new FilePropertyProvider();
+        var properties = new OpsPropertyProvider();
         AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
         String catalog = new AfonCatalogs(properties).get(args[1]).toString();
         String namespace = args[2];
