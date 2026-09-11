@@ -12,6 +12,7 @@ public enum AfonProperty {
 
     ENV_NAME("ENV_NAME"),
     CLUSTER_NAME("CLUSTER_NAME"),
+    DNS_WAIT_TIMEOUT("DNS_WAIT_TIMEOUT"),
 
     // AWS
     AWS_REGION("AWS_REGION"),
