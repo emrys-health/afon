@@ -2,9 +2,9 @@ package health.emrys.afon.ops.config;
 
 public class OpsDefaults {
     /**
-     * 'Magic' namespace that is used for acceptance tests and ops
+     *  Default namespace that is used for acceptance tests and ops
      */
-    public static final String ACCEPTANCE_TEST_NAMESPACE = "acceptancetests";
-    public static final String EXTERNAL_NAMESPACE = "namespaceph";
-    public static final String TEST_TABLE = "test_table";
+    public static final String POLARIS_NAMESPACE = "acceptancetests";
+    public static final String POLARIS_NAMESPACE_EXTERNAL = "namespaceph";
+    public static final String POLARIS_TABLE_NAME = "test_table";
 }

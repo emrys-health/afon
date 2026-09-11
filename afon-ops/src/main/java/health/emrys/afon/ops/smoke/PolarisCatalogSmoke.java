@@ -1,7 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonProperty;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisCatalogManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +24,7 @@ public class PolarisCatalogSmoke {
     private static final Logger logger = LoggerFactory.getLogger(PolarisCatalogSmoke.class);
 
     public static void main(String[] args) {
-        var properties = new FilePropertyProvider();
+        var properties = new OpsPropertyProvider();
         PolarisCatalogManager catalogManager = new PolarisCatalogManager(properties);
         try {
             if (args.length == 0) {

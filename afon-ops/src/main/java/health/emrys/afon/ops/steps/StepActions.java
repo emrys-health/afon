@@ -37,7 +37,7 @@ import java.util.*;
 import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
-import static health.emrys.afon.ops.config.OpsDefaults.ACCEPTANCE_TEST_NAMESPACE;
+import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -159,7 +159,7 @@ public class StepActions {
     }
 
     /**
-     * Registers table in {@link OpsDefaults#ACCEPTANCE_TEST_NAMESPACE}
+     * Registers table in {@link OpsDefaults#POLARIS_NAMESPACE}
      * @param cloud
      * @param catalog
      * @param tableName
@@ -173,7 +173,7 @@ public class StepActions {
         executeMainOf(RegisterPolarisTableMain.class,
                 new String[]{cloud.toString(),
                         catalog.toString(),
-                        ACCEPTANCE_TEST_NAMESPACE,
+                        POLARIS_NAMESPACE,
                         tableName,
                         metadata});
     }

@@ -1,7 +1,7 @@
 package health.emrys.afon.ops.spark;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -55,7 +55,7 @@ public class SparkTestWriter extends SparkChecker {
     }
 
     public static void main(String[] args) {
-        var properties = new FilePropertyProvider();
+        var properties = new OpsPropertyProvider();
         parseAndExecute(new SparkTestWriter(properties), properties, args);
     }
 

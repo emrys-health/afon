@@ -3,12 +3,13 @@ package health.emrys.afon.acceptance
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import health.emrys.afon.acceptance.SparkHelper.{namespace, spark}
 import health.emrys.afon.config.AfonProperty.{OIDC_DOMAIN_NAME, POLARIS_ENDPOINT, POLARIS_ID, POLARIS_SECRET}
-import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, FilePropertyProvider}
+import health.emrys.afon.config.{AfonPropertyProvider, AfonUser}
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
 import PolarisCatalog.METADATA_KEY
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.users.TestUsers
 import health.emrys.afon.ops.ConfigureUsersMain
+import health.emrys.afon.ops.config.OpsPropertyProvider
 import health.emrys.afon.polaris.config.PolarisCatalogManager
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.KeyCloakProvider
@@ -142,7 +143,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val keyCloakProvider = new KeyCloakProvider("localhost", UserName, UserPassword)
       assert(keyCloakProvider.getToken(KEYCLOAK_REALM) != null)
 
-      val userProperties: AfonPropertyProvider = new FilePropertyProvider()
+      val userProperties: AfonPropertyProvider = new OpsPropertyProvider()
       userProperties.setValue(OIDC_DOMAIN_NAME, ContainerHelper.KEYCLOAK_HOSTNAME)
       userProperties.setValue(POLARIS_ENDPOINT, properties.getValue(POLARIS_ENDPOINT))
       userProperties.setValue(POLARIS_ID, UserName)

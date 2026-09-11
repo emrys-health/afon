@@ -1,6 +1,10 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.config.*;
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.PolarisCatalogManager;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
@@ -107,7 +111,7 @@ public class ManagePolarisCatalogsMain {
             return;
         }
         AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
-        var properties = new FilePropertyProvider();
+        var properties = new OpsPropertyProvider();
         properties.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, properties).getEndpoint());
 
         ManagePolarisCatalogsMain app = new ManagePolarisCatalogsMain(properties);
