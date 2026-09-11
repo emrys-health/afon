@@ -1,10 +1,10 @@
 package health.emrys.afon.config;
 
-import org.junit.Ignore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junitpioneer.jupiter.ClearEnvironmentVariable;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -21,7 +21,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+// ConfigUtils.envOrProperty prefers each AFON_* env var over its afon.* system property, so every
+// one is cleared here for the duration of every test: afon.sh and the workflow both export several
+// of these for real (e.g. AFON_HOME, AFON_LOGGING_CONSOLE), which would otherwise silently win over
+// the system properties withProperties/homeOnly below set, and the test would exercise the real
+// environment instead of its fixture.
 @ExtendWith(MockitoExtension.class)
+@ClearEnvironmentVariable(key = AFON_HOME_ENV)
+@ClearEnvironmentVariable(key = AFON_CDKTF_ENV)
+@ClearEnvironmentVariable(key = AFON_CLOUD_ENV)
+@ClearEnvironmentVariable(key = AFON_LOGGING_ENV)
+@ClearEnvironmentVariable(key = AFON_LOGGING_CONSOLE_ENV)
 public class AfonEnvPrinterTest {
 
     @Mock
@@ -158,7 +168,7 @@ public class AfonEnvPrinterTest {
                 () -> assertThat(printEnv()).contains("cloud active: no afon.cloud property found"));
     }
 
-    @Ignore("this fails for no good reason if we export AFON_LOGGING_CONSOLE=INFO")
+    @Test
     public void printsLoggingLevels() throws Exception {
         Files.createDirectories(tempDir.resolve("home"));
         Map<String, String> props = homeOnly(tempDir.resolve("home").toString());

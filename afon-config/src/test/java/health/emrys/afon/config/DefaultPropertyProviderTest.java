@@ -1,6 +1,7 @@
 package health.emrys.afon.config;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ClearEnvironmentVariable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,8 +12,11 @@ public class DefaultPropertyProviderTest {
     }
 
     @Test
+    @ClearEnvironmentVariable(key = ConfigUtils.AFON_HOME_ENV)
     public void fallsBackToConstantWhenNotConfigured() {
-        // redirect from the real $AFON_HOME/config so this doesn't depend on the local env config
+        // redirect from the real $AFON_HOME/config so this doesn't depend on the local env config.
+        // AFON_HOME as an env var (set by afon.sh and by the workflow) takes precedence over the
+        // system property in ConfigUtils.envOrProperty, so it must be cleared here too.
         System.setProperty(ConfigUtils.AFON_HOME_PROPERTY, "src/test/resources/empty");
         try {
             AfonPropertyProvider provider = new DefaultPropertyProvider(TestDefaults.class);
