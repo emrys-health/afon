@@ -16,7 +16,7 @@ import static java.lang.String.format;
  * (anonymously readable) Google Cloud Storage bucket over Spark Connect. As with the S3 version,
  * the read succeeding is the failure condition.
  *
- * <p>Four things have to line up for this to work:
+ * <p>Things have to line up for this to work:
  *
  * <ol>
  *   <li>Run kubectl port-forward pod/spark-connector-0-driver 15002:15002</li>
