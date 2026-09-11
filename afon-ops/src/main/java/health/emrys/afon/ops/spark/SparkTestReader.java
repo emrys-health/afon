@@ -18,12 +18,12 @@ public class SparkTestReader extends SparkChecker {
     }
 
     @Override
-    protected void doCheck(SparkSession spark, String warehouse, String namespace) {
+    protected void doCheck(SparkSession spark, String catalogName, String namespace, String tableName) {
         spark.conf().set("spark.sql.parquet.enableVectorizedReader", "false");
         spark.conf().set("spark.sql.iceberg.vectorization.enabled", "false");
-        String fqn = tableFQN(warehouse, namespace);
-        logger.info("Reading from: {}", fqn);
-        Dataset<Row> table = spark.table(fqn);
+        String tableFQN = tableFQN(catalogName, namespace, tableName);
+        logger.info("Reading from: {}", tableFQN);
+        Dataset<Row> table = spark.table(tableFQN);
         table.show();
         // these blow up with:
         // java.lang.IllegalStateException: Invalid ADLS Credentials for storage-account afonstorageaccount.dfs.core.windows.net: empty
@@ -33,7 +33,7 @@ public class SparkTestReader extends SparkChecker {
 
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
-        parseAndExecute(args, new SparkTestReader(properties), properties);
+        parseAndExecute(new SparkTestReader(properties), properties, args);
     }
 
 }
