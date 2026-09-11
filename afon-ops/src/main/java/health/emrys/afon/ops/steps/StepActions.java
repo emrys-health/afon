@@ -36,6 +36,7 @@ import java.util.*;
 import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
+import static health.emrys.afon.ops.steps.DurationUtils.formatDuration;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -338,22 +339,23 @@ public class StepActions {
         return original;
     }
 
-    public Step waitOnDNS(String domain) {
+    public Step waitOnDNS(String domain, long timeout) {
         return new Step(
                 stepNameWaitOn(domain),
                 "wait on DNS for domain " + domain,
                 () -> {
+                    boolean resolved      = false;
                     boolean stopResolving = false;
                     long    start         = System.currentTimeMillis();
-                    int     timeout       = 1_200_000;
                     logger.info("Checking DNS for {}", domain);
                     while (!stopResolving) {
                         long elapsed = System.currentTimeMillis() - start;
-                        logger.info("Waiting on DNS for domain {}: time elapsed {}s (until timeout of {}s)", domain, elapsed/1000, timeout/1000);
+                        logger.info("Waiting on DNS for domain {} (until timeout of {}): time elapsed {}", domain, formatDuration(timeout), formatDuration(elapsed));
                         if (!(elapsed < timeout)) break;
                         try {
                             InetAddress[] addresses = InetAddress.getAllByName(domain);
-                            stopResolving = addresses != null && addresses.length > 0;
+                            resolved = addresses != null && addresses.length > 0;
+                            stopResolving = resolved;
                             if (!stopResolving) {
                                 stopResolving = isWaitingInterrupted(timeout);
                             }
@@ -361,15 +363,19 @@ public class StepActions {
                             stopResolving = isWaitingInterrupted(timeout);
                         }
                     }
+                    if (!resolved) {
+                        logger.warn("Timed out waiting on DNS for domain {} after {}", domain, formatDuration(timeout));
+                    }
                 });
     }
+
 
     @NonNull String stepNameWaitOn(String domain) {
         return "wait_on_" + (domain.isBlank() ? "domain" : domain.substring(0, domain.indexOf('.')));
     }
 
-    private boolean isWaitingInterrupted(int timeout) {
-        int pauseMs = 15_000;
+    private boolean isWaitingInterrupted(long timeout) {
+        long pauseMs = 15_000;
         logger.debug("Waiting {}s until timeout of {}s", pauseMs / 1000, timeout / 1000);
         try {
             Thread.sleep(pauseMs);

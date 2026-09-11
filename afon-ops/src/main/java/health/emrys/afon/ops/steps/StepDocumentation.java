@@ -82,15 +82,16 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    public Step waitOnDNS(String domain) {
+    public Step waitOnDNS(String domain, long timeout) {
         return new Step(stepNameWaitOn(domain), "Wait on DNS", () -> {
             out.println(format("""
-                                   Wait on DNS for domain %s. On a Unix system, running:
-                                   ```shell
-                                   dig A %s +short
-                                   ```
-                                   will show you the IP address when the DNS servers have updated.
-                                   """, domain, domain));
+                           Wait on DNS for domain until timeout of %s.
+                           On a Unix system, running:
+                           ```shell
+                           dig A %s +short
+                           ```
+                           will show you the IP address when the DNS servers have updated.
+                           """, DurationUtils.formatDuration(timeout), domain));
             out.flush();
         });
     }

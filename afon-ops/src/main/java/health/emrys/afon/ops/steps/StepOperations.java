@@ -25,6 +25,7 @@ import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.DELETE;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.RECREATE;
+import static health.emrys.afon.ops.steps.DurationUtils.parseDuration;
 import static java.lang.String.format;
 
 public class StepOperations {
@@ -212,20 +213,26 @@ public class StepOperations {
     }
 
     private Step waitForPolaris(AfonCloud cloud) {
+        long timeout = dnsWaitTimeout();
         switch (cloud) {
             case AWS:
-                return actions.waitOnDNS(properties.getValue(AWS_POLARIS_DOMAIN_NAME));
+                return actions.waitOnDNS(properties.getValue(AWS_POLARIS_DOMAIN_NAME), timeout);
             case AZURE:
-                return actions.waitOnDNS(properties.getValue(AZURE_POLARIS_DOMAIN_NAME));
+                return actions.waitOnDNS(properties.getValue(AZURE_POLARIS_DOMAIN_NAME), timeout);
             case GCP:
-                return actions.waitOnDNS(properties.getValue(GCP_POLARIS_DOMAIN_NAME));
+                return actions.waitOnDNS(properties.getValue(GCP_POLARIS_DOMAIN_NAME), timeout);
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
     }
 
     private Step waitForKeyCloak() {
-        return actions.waitOnDNS(properties.getValue(OIDC_DOMAIN_NAME));
+        long timeout = dnsWaitTimeout();
+        return actions.waitOnDNS(properties.getValue(OIDC_DOMAIN_NAME), timeout);
+    }
+
+    private long dnsWaitTimeout() {
+        return parseDuration(properties.getValue(DNS_WAIT_TIMEOUT, "20m")).toMillis();
     }
 
     public Step checkAwsSparkWritingTo(AfonCloud cloud) {
