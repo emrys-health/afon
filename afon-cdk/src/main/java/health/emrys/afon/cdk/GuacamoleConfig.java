@@ -55,11 +55,11 @@ public class GuacamoleConfig {
     public record DbConfig(String host, int port, String database, String user, String password) {
 
         public static DbConfig create(AfonPropertyProvider properties) {
-            return new DbConfig(properties.getValue(AfonProperty.POLARIS_DB_HOST),
+            return new DbConfig(properties.getValue(AfonProperty.GUACAMOLE_DB_HOST),
                                 5432,
                                 "guacamole",
-                                properties.getValue(AfonProperty.KEYCLOAK_DB_USERNAME),
-                                properties.getValue(AfonProperty.KEYCLOAK_DB_PASSWORD));
+                                properties.getValue(AfonProperty.GUACAMOLE_DB_USERNAME),
+                                properties.getValue(AfonProperty.GUACAMOLE_DB_PASSWORD));
         }
 
     }
@@ -383,15 +383,11 @@ public class GuacamoleConfig {
                         set -e
                         until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do echo 'waiting for postgres'; sleep 2; done
                         psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$GUAC_DB'" | grep -q 1 \\
-                        psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$GUAC_DB'" | grep -q 1 \\
                           || psql -d postgres -c "CREATE DATABASE \\"$GUAC_DB\\""
                         if [ "$(psql -d "$GUAC_DB" -tAc "SELECT to_regclass('public.guacamole_connection')")" != 'guacamole_connection' ]; then
                           psql -d "$GUAC_DB" -v ON_ERROR_STOP=1 -f /sql/001-schema.sql
                         fi
                         psql -d "$GUAC_DB" -v ON_ERROR_STOP=1 -f /provision/provision.sql
-                        
-                        psql -d postgres -tAc "DELETE FROM guacamole_entity WHERE name = 'guacadmin' AND type = 'USER'"
-                        
                         echo 'guacamole db init complete'
                         """;
 
@@ -460,6 +456,11 @@ public class GuacamoleConfig {
                                                String vncPassword,
                                                List<Session> sessions) {
         StringBuilder sb = new StringBuilder();
+        sb.append("""
+                  BEGIN;
+                  DELETE FROM guacamole_entity WHERE name = 'guacadmin' AND type = 'USER';
+                  COMMIT;
+                  """);
         for (Session s : sessions) {
             String user = s.username();
             String conn = "vnc-" + user;
