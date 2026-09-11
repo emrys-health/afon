@@ -152,7 +152,7 @@ public abstract class JupyterHubConfig {
     private final   String                        jupyterPassword;
     private final   List<GuacamoleConfig.Session> sessions;
     private final   AfonUserProvider              userProvider = new FileUserProvider();
-    protected final   AfonPropertyProvider        properties;
+    protected final AfonPropertyProvider        properties;
 
     public JupyterHubConfig(
         TerraformStack stack,
@@ -298,12 +298,7 @@ public abstract class JupyterHubConfig {
         // guacamole-auth-jdbc (backed by the shared RDS Postgres) serves each user their own
         // connection. A one-shot Job creates the DB/schema and provisions one VNC connection per user,
         // each targeting that user's own VNC Service (a different host per user).
-        GuacamoleConfig.DbConfig guacamoleDb = new GuacamoleConfig.DbConfig(
-            properties.getValue(AfonProperty.POLARIS_DB_HOST),
-            5432,
-            "guacamole",
-            properties.getValue(AfonProperty.KEYCLOAK_DB_USERNAME),
-            properties.getValue(AfonProperty.KEYCLOAK_DB_PASSWORD));
+        GuacamoleConfig.DbConfig guacamoleDb = GuacamoleConfig.DbConfig.create(properties);
         new GuacamoleConfig(
             stack,
             guacamoleDeps,

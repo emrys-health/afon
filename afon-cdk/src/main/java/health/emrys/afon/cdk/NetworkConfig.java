@@ -101,18 +101,18 @@ public class NetworkConfig {
     private final TerraformStack      tfStack;
     private final List<AllowedDomain> allowedDomains;
 
+    /**
+     * For debugging purposes only.
+     */
     public static void main(String[] args) {
-
         List<AllowedDomain> allowedDomains = getAllowedDomainsFrom(new FilePropertyProvider());
 
         List<AllowedDomain> whitelist = new ArrayList<>();
         whitelist.addAll(allowedDomains);
-        whitelist.add(AllowedDomain.create(MASTER + "-svc"));
-
+//        whitelist.add(AllowedDomain.create(MASTER + "-svc"));
 //        Map<String, Object> manifest = sparkManifest(DRIVER_LABELS,
 //                                                     "spark-driver",
 //                                                     whitelist);
-
         Map<String, Object> manifest = connectionManifest(
             USER_POD_LABELS,
             List.of());
