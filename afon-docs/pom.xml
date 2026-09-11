@@ -4,7 +4,7 @@
     <parent>
         <groupId>health.emrys.afon</groupId>
         <artifactId>afon</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0-beta-3</version>
     </parent>
 
     <artifactId>afon-docs</artifactId>
