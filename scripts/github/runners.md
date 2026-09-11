@@ -2,7 +2,7 @@
 
 ## Linux runners
 
-ec2-35-177-168-204.eu-west-2.compute.amazonaws.com
+ec2-18-134-198-0.eu-west-2.compute.amazonaws.com
 
 Install the runner and the tools the acceptance tests workflow needs with the ansible playbook in
 [../ansible](../ansible/README.md) — keep its `inventory.ini` in step with the hosts listed above:
@@ -23,7 +23,7 @@ RUNNER_TOKEN=<token from the runners page> ./runner.sh configure
 
 ## Disk layout
 
-Each runner has two EBS volumes: a **root volume** (`/dev/sda1`, currently 20 GB — `xvda`/`/` on
+Each runner has two EBS volumes: a **root volume** (`/dev/sda1`, currently 60 GB — `xvda`/`/` on
 the instance) for the OS and installed packages (JDK, npm, cloud CLIs, apt), and a **data volume**
 (currently 60 GB, mounted at `/data`) that the `lvm` role bind-mounts `~/.m2` and `~/actions-runner`
 onto, and that Docker/containerd are configured to use as their data root — see the `lvm` role's
