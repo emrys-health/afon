@@ -29,20 +29,20 @@ import static java.lang.String.format;
 public class GeneratePySparkContextMain {
 
     static final  Logger logger = org.slf4j.LoggerFactory.getLogger(GeneratePySparkContextMain.class);
+    private final String polarisEndpoint;
     private final String polarisId;
     private final String polarisSecret;
-    private final String polarisHost;
 
     private final SparkWarehouseConfig polarisConfig;
     private final AfonCatalogs afonCatalogs;
 
     public GeneratePySparkContextMain(AfonCloud cloud, AfonPropertyProvider properties) {
         PolarisCredentials credentials = new PolarisCredentials(cloud, properties);
-        polarisId     = credentials.getPolarisId();
+        polarisEndpoint = credentials.getPolarisEndpoint();
+        polarisId = credentials.getPolarisId();
         polarisSecret = credentials.getPolarisSecret();
-        polarisHost   = credentials.getPolarisHost();
         polarisConfig = SparkWarehouseConfigFactory.getFactory()
-                        .createConfig(properties, polarisHost, polarisId, polarisSecret);
+                .createConfig(properties, polarisEndpoint, polarisId, polarisSecret);
         afonCatalogs = new AfonCatalogs(properties);
     }
 
@@ -116,7 +116,7 @@ public class GeneratePySparkContextMain {
                 OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
               )
               ENABLED = TRUE;
-            """, polarisHost,  polarisId, polarisSecret));
+            """, polarisEndpoint,  polarisId, polarisSecret));
         System.out.println(format("""
                                   CREATE OR REPLACE ICEBERG TABLE my_iceberg_table
                                     CATALOG = 'polaris_aws'
@@ -162,7 +162,7 @@ public class GeneratePySparkContextMain {
                                              REPLACE_INVALID_CHARACTERS = TRUE;
             
             select * from %s;
-            """, catalogName, polarisHost, catalog,
+            """, catalogName, polarisEndpoint, catalog,
             polarisId, polarisSecret,
             tableName, catalogName, catalogTable, tableName);
     }
@@ -250,9 +250,9 @@ public class GeneratePySparkContextMain {
             logger.warn(usage);
             return;
         }
-        AfonCloud polarisCloud = AfonCloud.valueOf(args[0].toUpperCase());
+        AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
         var properties = new FilePropertyProvider();
-        new GeneratePySparkContextMain(polarisCloud, properties).generatePySparkCode();
+        new GeneratePySparkContextMain(cloud, properties).generatePySparkCode();
     }
 
 
