@@ -38,6 +38,8 @@ import com.hashicorp.cdktf.providers.aws.route_table_association.RouteTableAssoc
 import com.hashicorp.cdktf.providers.aws.secretsmanager_secret.SecretsmanagerSecret;
 import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
@@ -86,6 +88,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     final         Resource                   newKubeConfig;
     final         Release                    lbRelease;
     final         Vpc                        vpc;
+    private       HelmProvider               helmProvider;
 
     AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
         super(scope, id);
@@ -940,6 +943,31 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     public Release getLbRelease() {
         return lbRelease;
+    }
+
+    /**
+     * Every AWS stack ends up with {@code helm_release} resources (cilium, hubble-ui,
+     * metrics-server and the LB controller release above are all created in this
+     * constructor), so a {@code helm} provider is required in every stack that builds an
+     * {@link AwsCloudProvider} — not just the ones that install further Helm charts of
+     * their own. Without it, Terraform falls back to an unconfigured default provider that
+     * tries the local kubeconfig, which fails against a freshly created EKS cluster.
+     * Mirrors {@code configureK8s()}'s memoization so repeated calls are safe.
+     */
+    public synchronized HelmProvider configureHelm() {
+        if (helmProvider == null) {
+            HelmProviderKubernetes kubernetes = HelmProviderKubernetes
+                .builder()
+                .host(getClusterEndpoint())
+                .clusterCaCertificate(Fn.base64decode(getBase64CertData()))
+                .token(getToken())
+                .build();
+            helmProvider = HelmProvider.Builder
+                .create(this, "helm")
+                .kubernetes(kubernetes)
+                .build();
+        }
+        return helmProvider;
     }
 
     @Override

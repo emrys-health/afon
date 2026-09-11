@@ -2,7 +2,6 @@ package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.*;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
-import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
@@ -19,7 +18,6 @@ import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
@@ -64,34 +62,10 @@ public class AwsJupyterStack extends AwsPolarisStack {
         network.networkPolicies(SPARK_CONNECTOR_NAME, dependables);
         loadBalancers = List.of(); // Jupyter is now exposed via ALB ingress, not a raw LoadBalancer Service
 
-        HelmProviderKubernetes kubernetes = HelmProviderKubernetes
-            .builder()
-            .host(cloudProvider.getClusterEndpoint())
-            .clusterCaCertificate(Fn.base64decode(cloudProvider.getBase64CertData()))
-            .token(cloudProvider.getToken())
-            .build();
-        helmProvider = HelmProvider.Builder
-            .create(this, "helm")
-            .kubernetes(kubernetes)
-            .build();
-        this.addOverride(
-            "terraform.required_providers.aws", Map.of(
-                "source", "hashicorp/aws",
-                "version", "6.27.0"   // 👈 Pin exact version
-                                                      ));
-        this.addOverride(
-            "terraform.required_providers.helm", Map.of(
-                "source", "hashicorp/helm",
-                "version", "3.2.0"   // 👈 Pin exact version
-                                                       ));
-        this.addOverride(
-            "terraform.required_providers.kubernetes", Map.of(
-                "source", "hashicorp/kubernetes",
-                // 3.2.1 fixes "Unexpected Identity Change" errors when a resource takes
-                // extended time to become ready (as happened when an EKS token expired
-                // mid-rollout of oauth2-proxy). Do not downgrade below 3.2.1.
-                "version", "3.2.1"   // 👈 Pin exact version
-                                                             ));
+        // Provider is already configured (and required-provider versions pinned) by
+        // AwsPolarisStack's constructor; configureHelm() is memoized, so this just
+        // returns the existing instance for subclasses (eg AwsTrinoStack) that need it.
+        helmProvider = cloudProvider.configureHelm();
 
         csiSecretsDriver(dependables);
 
