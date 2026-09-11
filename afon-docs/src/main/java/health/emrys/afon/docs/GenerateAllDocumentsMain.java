@@ -1,13 +1,13 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 
 public class GenerateAllDocumentsMain {
     private final AfonPropertyProvider properties;
 
     public GenerateAllDocumentsMain() {
-        this.properties = new FilePropertyProvider();
+        this.properties = new OpsPropertyProvider();
     }
 
     private void generateDocuments() {
