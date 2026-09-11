@@ -8,7 +8,7 @@ usage(){
   echo "remote-dir  : destination dir, relative to the root folder.  Defaults to '/'."
   echo ""
   echo "examples:"
-  echo "  $0  afon-distribution/target/afon-distribution-<version>-cli.zip"
+  echo "  $0  afon-distribution/target/afon-<version>-cli.zip"
   echo ""
   echo "Requires rclone configured with a remote named '$REMOTE', defaulting to `drive`."
   echo "Override the remote name via the `GDRIVE_REMOTE` env variable."
