@@ -6,14 +6,14 @@ import health.emrys.afon.cdk.azure.AzureCleanupHelper;
 import health.emrys.afon.cdk.gcp.GcpCleanupHelper;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.slf4j.Logger;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
 
-import static health.emrys.afon.config.ConfigUtils.*;
+import static health.emrys.afon.config.ConfigUtils.afonHome;
 
 /**
  * Generate the CleanupHelper script for the given cloud.
@@ -61,7 +61,7 @@ public class GenerateCleanupScriptMain {
             return;
         }
         AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
-        var properties = new FilePropertyProvider();
+        var properties = new OpsPropertyProvider();
         new GenerateCleanupScriptMain(properties).generateCleanupScript(cloud);
     }
 

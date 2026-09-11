@@ -22,6 +22,7 @@
       <outputDirectory>/</outputDirectory>
       <includes>
         <include>LICENSE.txt</include>
+        <include>release_notes.md</include>
       </includes>
     </fileSet>
     <fileSet>

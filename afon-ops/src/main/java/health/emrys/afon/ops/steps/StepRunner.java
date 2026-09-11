@@ -1,6 +1,6 @@
 package health.emrys.afon.ops.steps;
 
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -12,7 +12,7 @@ public class StepRunner {
     private final StepOperations operations;
 
     public StepRunner() {
-        this.operations = new StepOperations(new StepActions(), new FilePropertyProvider());
+        this.operations = new StepOperations(new StepActions(), new OpsPropertyProvider());
     }
 
     /**

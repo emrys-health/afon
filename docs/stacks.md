@@ -39,22 +39,22 @@ Steps executed:
 - `clean_aws` — destroy any existing AWS stack
 - `aws_full` — deploy AWS full stack
 - `wait_on_emryspolaris_then_wait_on_emrysoauth` — wait for DNS to propagate
-- `create_all_catalogs_for_emryspolaris` — configure all catalogs in Polaris
-- `emryspolaris_spark_talks_to_aws` — smoke test: Spark writes and reads via Polaris
+- `create_all_catalogs_for_cloud_aws` — configure all catalogs in Polaris
+- `aws_spark_talks_to_catalog_aws` — smoke test: Spark writes and reads via Polaris
 
 ### Setup Azure Polaris only
 
 ```shell
 ./afon.sh -a exec -ec ops.SetupAzurePolarisStackMain  
 ```
-Steps: `clean_azure → azure_polaris → wait_on_emryspolarisazure_then_wait_on_emrysoauth → create_all_catalogs_for_emryspolarisazure`
+Steps: `clean_azure → azure_polaris → wait_on_emryspolarisazure_then_wait_on_emrysoauth → create_all_catalogs_for_cloud_azure`
 
 ### Setup GCP Polaris only
 
 ```shell
 ./afon.sh -a exec -ec ops.SetupGcpPolarisStackMain  
 ```
-Steps: `clean_gcp → gcp_polaris → wait_on_emryspolarisgcp_then_wait_on_emrysoauth → create_all_catalogs_for_emryspolarisgcp`
+Steps: `clean_gcp → gcp_polaris → wait_on_emryspolarisgcp_then_wait_on_emrysoauth → create_all_catalogs_for_cloud_gcp`
 
 ### Setup cross-cloud external catalogs (AWS + Azure)
 
@@ -65,7 +65,7 @@ To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate 
 ```
 
 Steps:
-`clean_aws → aws_full → wait_on_emryspolaris_then_wait_on_emrysoauth → create_all_catalogs_for_emryspolaris → emryspolaris_spark_talks_to_aws → clean_azure → azure_polaris → wait_on_emryspolarisazure_then_wait_on_emrysoauth → azure_delete_table_namespaceph.test_table_for_emryspolarisazure → azure_create_external_catalog_for_emryspolarisazure → emryspolaris_spark_talks_to_azure_external`
+`clean_aws → aws_full → wait_on_emryspolaris_then_wait_on_emrysoauth → create_all_catalogs_for_aws → aws_spark_talks_to_aws → clean_azure → azure_polaris → wait_on_emryspolarisazure_then_wait_on_emrysoauth → delete_table_azure.namespaceph.test_table_for_cloud_azure → create_external_catalog_azure_for_cloud_azure → aws_spark_talks_to_catalog_azure_external`
 
 ### Resume a failed stack deployment from a specific step
 

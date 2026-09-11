@@ -13,7 +13,6 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
-import health.emrys.afon.ops.config.OpsDefaults;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -37,7 +36,6 @@ import java.util.*;
 import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
-import static health.emrys.afon.ops.config.OpsDefaults.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -45,7 +43,6 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class StepActions {
 
     private static final Logger logger = getLogger(StepActions.class);
-    static final String TERRAFORM_STATE_FILE_PATTERN = "terraform.";
 
     @NonNull Path deleteStack(AfonCloud cloud) throws IOException {
         Path stackDir = stackDir(cloud);
@@ -159,21 +156,22 @@ public class StepActions {
     }
 
     /**
-     * Registers table in {@link OpsDefaults#ACCEPTANCE_TEST_NAMESPACE}
      * @param cloud
      * @param catalog
+     * @param namespace
      * @param tableName
      * @param metadata
      * @throws Exception
      */
     public void registerTable(AfonCloud cloud,
                               AfonCatalog catalog,
+                              String namespace,
                               String tableName,
                               String metadata) throws Exception {
         executeMainOf(RegisterPolarisTableMain.class,
                 new String[]{cloud.toString(),
                         catalog.toString(),
-                        ACCEPTANCE_TEST_NAMESPACE,
+                        namespace,
                         tableName,
                         metadata});
     }

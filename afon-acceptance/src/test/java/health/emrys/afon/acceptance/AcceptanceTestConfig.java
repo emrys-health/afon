@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.*;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.catalogs.AwsPolarisCatalog;
 import health.emrys.afon.polaris.catalogs.AzurePolarisCatalog;
 import health.emrys.afon.polaris.catalogs.GcpPolarisCatalog;
@@ -10,7 +11,7 @@ import health.emrys.afon.polaris.config.PolarisCatalogManager;
 import java.util.HashMap;
 import java.util.Map;
 
-import static health.emrys.afon.config.AfonCloud.*;
+import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.ConfigUtils.afonCloud;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
@@ -22,7 +23,7 @@ public class AcceptanceTestConfig {
     public static final AcceptanceTestConfig instance;
 
     static {
-        instance = new AcceptanceTestConfig(new FilePropertyProvider());
+        instance = new AcceptanceTestConfig(new OpsPropertyProvider());
     }
 
     private final AfonPropertyProvider properties;

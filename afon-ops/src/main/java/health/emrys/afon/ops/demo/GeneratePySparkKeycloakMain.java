@@ -3,7 +3,7 @@ package health.emrys.afon.ops.demo;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -116,7 +116,7 @@ public class GeneratePySparkKeycloakMain {
         }
         String polarisHost = args[0];
         logger.info("Using {} as the Polaris host");
-        var properties = new FilePropertyProvider();
+        var properties = new OpsPropertyProvider();
         properties.setValue(POLARIS_ENDPOINT, polarisHost);
         new GeneratePySparkKeycloakMain(properties).generateAndSavePySparkCode();
     }
