@@ -47,7 +47,7 @@
         <!-- OFF keeps the console quiet and logs to the file only. -->
         <afon.logging.console>OFF</afon.logging.console>
         <afon.exec>-Dafon.home=${afon.home} -Dafon.cloud=${afon.cloud} -Dafon.logging=${afon.logging} -Dafon.logging.console=${afon.logging.console} -Dslf4j.provider=ch.qos.logback.classic.spi.LogbackServiceProvider</afon.exec>
-        <afon.jvm>--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-modules=jdk.incubator.vector --add-opens=java.base/java.nio=ALL-UNNAMED --enable-preview</afon.jvm>
+        <afon.jvm>--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-modules=jdk.incubator.vector --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --enable-preview</afon.jvm>
         <!-- compilation and encoding -->
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -174,6 +174,11 @@
                 <version>4.3.0</version>
             </dependency>
             <dependency>
+                <groupId>org.junit-pioneer</groupId>
+                <artifactId>junit-pioneer</artifactId>
+                <version>2.3.0</version>
+            </dependency>
+            <dependency>
                 <groupId>com.github.vertical-blank</groupId>
                 <artifactId>sql-formatter</artifactId>
                 <version>2.0.4</version>
@@ -223,6 +228,11 @@
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit-pioneer</groupId>
+            <artifactId>junit-pioneer</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
