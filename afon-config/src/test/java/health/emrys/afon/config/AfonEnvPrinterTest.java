@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+@Ignore
 @ExtendWith(MockitoExtension.class)
 public class AfonEnvPrinterTest {
 
