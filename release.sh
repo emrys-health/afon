@@ -28,6 +28,7 @@ $MVN --batch-mode release:prepare -P$PROFILES -DreleaseVersion=$VERSION -Dtag=$T
 $MVN release:perform -P$PROFILES
 
 echo "Release $TAG ($QUALIFIER) completed."
+echo "Push tag: git push --tags"
 MAVEN_DEPLOY_SKIP=$(mvn help:evaluate -Dexpression=maven.deploy.skip -q -DforceStdout)
 if [ "$MAVEN_DEPLOY_SKIP" == "true" ]; then
   echo "Maven deploy has been skipped"
