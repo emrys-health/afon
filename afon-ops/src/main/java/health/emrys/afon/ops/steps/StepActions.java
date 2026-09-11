@@ -13,7 +13,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
-import health.emrys.afon.ops.spark.SparkChecker;
+import health.emrys.afon.ops.config.OpsDefaults;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -37,7 +37,7 @@ import java.util.*;
 import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
-import static health.emrys.afon.ops.spark.SparkChecker.ACCEPTANCE_TEST_NAMESPACE;
+import static health.emrys.afon.ops.config.OpsDefaults.ACCEPTANCE_TEST_NAMESPACE;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -159,7 +159,7 @@ public class StepActions {
     }
 
     /**
-     * Registers table in {@link SparkChecker#ACCEPTANCE_TEST_NAMESPACE}
+     * Registers table in {@link OpsDefaults#ACCEPTANCE_TEST_NAMESPACE}
      * @param cloud
      * @param catalog
      * @param tableName
