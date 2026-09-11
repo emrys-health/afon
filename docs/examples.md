@@ -57,19 +57,20 @@ df_joined.show()
 
 ### Write and read an Iceberg table via Spark AWS
 
-**Write:**
+To test writing and reading to and from an Iceberg table via Spark on `aws` for catalog `azure_external`:
 
 ```shell
-./afon.sh -a exec -ec ops.spark.SparkTestWriter -ea "azure_external aws <polaris_id> <polaris_secret> namespaceph"
+./afon.sh -a exec -ec ops.spark.SparkTestWriter -ea "aws azure_external test_namespace test_table"
 ```
-
-This creates a namespace, creates an Iceberg table, and writes three rows ("apple", "banana", "cherry").
-
-**Read:**
+This creates a test namespace and table, and writes three rows ("apple", "banana", "cherry"). 
 
 ```shell
-./afon.sh -a exec -ec ops.spark.SparkTestReader -ea "azure_external aws <polaris_id> <polaris_secret> namespaceph"
+./afon.sh -a exec -ec ops.spark.SparkTestReader -ea "aws azure_external test_namespace test_table"
 ```
+This reads the test table created.
+
+**NOTE:**  Both `SparkTestWriter` and `SparkTestReader` accept as optional args the user Polaris credential (id and secret).
+If missing, the properties `USER_POLARIS_ID` and `USER_POLARIS_SECRET` are used.
 
 ### Create sample patient data
 

@@ -16,12 +16,21 @@ grant_vault_role() {
   ROLE="$1"
   PRINCIPAL_ID="$(az ad signed-in-user show --query id -o tsv)"
   VAULT_SCOPE="$(az keyvault show --name $AZURE_KEY_VAULT_NAME --query id -o tsv)"
-  if [ -n "$(az role assignment list --assignee $PRINCIPAL_ID --role "$ROLE" --scope "$VAULT_SCOPE" --query "[].id" -o tsv)" ]; then
+  if [ -n "$(az role assignment list --assignee-object-id $PRINCIPAL_ID --role "$ROLE" --scope "$VAULT_SCOPE" --query "[].id" -o tsv)" ]; then
     return
   fi
 
   echo "- Granting $ROLE on $AZURE_KEY_VAULT_NAME to $PRINCIPAL_ID"
-  az role assignment create  --role "$ROLE" --assignee $PRINCIPAL_ID --scope "$VAULT_SCOPE" || exit 1
+  # A just-activated PIM role (or a just-updated ABAC condition) can take a short while to
+  # propagate to Microsoft.Authorization itself, so the create call can fail with
+  # AuthorizationFailed even though the grant is otherwise correct - retry rather than aborting.
+  for i in $(seq 1 12); do
+    az role assignment create --role "$ROLE" --assignee-object-id $PRINCIPAL_ID \
+      --assignee-principal-type User --scope "$VAULT_SCOPE" -o none && break
+    [ "$i" -eq 12 ] && { echo "- Failed to grant $ROLE after repeated retries"; exit 1; }
+    echo "- Grant not accepted yet (propagation?), retrying in 10s..."
+    sleep 10
+  done
 
   echo "- Waiting for the grant to propagate..."
   for i in $(seq 1 12); do

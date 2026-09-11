@@ -58,6 +58,6 @@ object PatientDataMain {
   }
 
   private def initSpark(properties: AfonPropertyProvider): SparkSession = {
-    SparkSessionFactory.localSparkClusterPolaris(AfonCloud.AWS, properties)  // AWS for argument's sake...
+    SparkSessionFactory.createSparkSession(AfonCloud.AWS, properties)  // AWS for argument's sake...
   }
 }

@@ -90,6 +90,23 @@ AZURE_TLS_CRT_NAME="${KEBAB_DOMAIN_NAME}-tls-crt"
 AZURE_TLS_KEY_NAME="${KEBAB_DOMAIN_NAME}-tls-key"
 ```
 
+### DNS validation (`acme` only)
+
+Role granted **to the app's service principal** (`APP_SP_ID`), by the **deployer**:
+
+- **DNS Zone Contributor** - DNS zone scope.
+  Needed by `acme.sh`'s `dns_azure` hook to create/delete the `_acme-challenge` TXT record that
+  proves domain ownership to Let's Encrypt. Not needed by `digicert`/`globalsign` - validation
+  happens through the CA's own integration with Key Vault instead, never touching Azure DNS.
+
+**NOTE on envs using a condition-restricted `User Access Administrator`**: 
+the ABAC condition only allows assigning whatever roles were explicitly listed when it was set up. 
+If `DNS Zone Contributor`'s role ID isn't in that list, `az role assignment create` fails with
+`AuthorizationFailed ... has an authorization with ABAC condition that is not fulfilled`, even
+though the deployer holds `User Access Administrator` and the grant otherwise looks fine - a
+distinct error from a plain `Forbidden`. Ask the admin to add **DNS Zone Contributor** role ID
+to the condition, alongside the storage/AKS role IDs already there.
+
 ### Restoring the certs
 
 If admin does not allow `write` access to the Key Vault, `issue-cert.sh`

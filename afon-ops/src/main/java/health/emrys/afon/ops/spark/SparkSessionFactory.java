@@ -16,18 +16,23 @@ public class SparkSessionFactory {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(SparkSessionFactory.class);
 
-    public static SparkSession localSparkClusterPolaris(AfonCloud cloud, AfonPropertyProvider properties) throws IOException {
-        PolarisCredentials credentials = new PolarisCredentials(cloud, properties);
+    public static SparkSession createSparkSession(AfonCloud cloud, AfonPropertyProvider properties) throws IOException {
         String[] warehouseNames = new AfonCatalogs(properties).all().stream()
                 .map(Object::toString).toArray(String[]::new);
+        return createSparkSession(cloud, properties, warehouseNames);
+    }
+
+    public static SparkSession createSparkSession(AfonCloud cloud, AfonPropertyProvider properties, String[] warehouseNames) throws IOException {
+        PolarisCredentials credentials = new PolarisCredentials(cloud, properties);
         return new SparkSessionFactory(
-                properties, credentials.getPolarisHost(), credentials.getPolarisId(),
+                properties,
+                credentials.getPolarisHost(),
+                credentials.getPolarisId(),
                 credentials.getPolarisSecret(),
                 warehouseNames
         ).createSparkSession();
     }
 
-    private final SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
     private final AfonPropertyProvider properties;
     private final String polarisHost;
     private final String polarisId;
@@ -42,14 +47,13 @@ public class SparkSessionFactory {
         this.warehouseNames = warehouseNames;
     }
 
-    public SparkSession createSparkSession() throws IOException {
+    SparkSession createSparkSession() throws IOException {
         logger.info("SparkSession polarisHost = {}, polarisId = {}, polarisSecret = {}, warehouseNames = {}",
                 polarisHost, polarisId, polarisSecret, warehouseNames);
-        SparkWarehouseConfig sparkWarehouse = sparkFactory.createConfig(properties, polarisHost, polarisId, polarisSecret);
+        SparkWarehouseConfig sparkWarehouse = SparkWarehouseConfigFactory.getFactory()
+                .createConfig(properties, polarisHost, polarisId, polarisSecret);
         SparkContext.getOrCreate(sparkWarehouse.sparkConf(4, warehouseNames));
-        return SparkSession
-            .builder()
-            .getOrCreate();
+        return SparkSession.builder().getOrCreate();
     }
 
 }

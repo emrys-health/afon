@@ -26,35 +26,37 @@ public class SparkTestWriter extends SparkChecker {
         super(properties);
     }
 
-    public void doCheck(SparkSession spark, String warehouse, String namespace) {
-        String namespaceSql = format("CREATE NAMESPACE IF NOT EXISTS %s.%s", warehouse, namespace);
+
+    public void doCheck(SparkSession spark, String catalogName, String namespace, String tableName) {
+        String namespaceSql = format("CREATE NAMESPACE IF NOT EXISTS %s", namespaceFQN(catalogName, namespace));
         logger.info("Executing: {}", namespaceSql);
         spark.sql(namespaceSql);
+
         List<Row> rows = Arrays.asList(
-            RowFactory.create("apple"),
-            RowFactory.create("banana"),
-            RowFactory.create("cherry")
-                                      );
+                RowFactory.create("apple"),
+                RowFactory.create("banana"),
+                RowFactory.create("cherry")
+        );
 
         StructType schema = new StructType(new StructField[]{
             new StructField("value", DataTypes.StringType, false, Metadata.empty())
         });
-        String fqn = tableFQN(warehouse, namespace);
-        logger.info("Writing to: {}", fqn);
+        String tableFQN = tableFQN(catalogName, namespace, tableName);
+        logger.info("Writing to: {}", tableFQN);
         Dataset<Row> df = spark.createDataFrame(rows, schema);
 
-        String createTableSql = format("CREATE TABLE IF NOT EXISTS %s (value String) USING iceberg ", fqn);
+        String createTableSql = format("CREATE TABLE IF NOT EXISTS %s (value String) USING iceberg ", tableFQN);
         logger.info("Executing: {}", createTableSql);
         spark.sql(createTableSql);
 
         df.write()
           .mode("overwrite")   // or "append"
-          .saveAsTable(fqn);
+          .saveAsTable(tableFQN);
     }
 
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
-        parseAndExecute(args, new SparkTestWriter(properties), properties);
+        parseAndExecute(new SparkTestWriter(properties), properties, args);
     }
 
 }
