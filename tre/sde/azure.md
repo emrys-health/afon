@@ -25,22 +25,6 @@ and executes the Azure CLI commands.
 If you don't have the local admin rights, you'll to ask the local admin to run `azure/create-admin.sh` and 
 provide you with `APP_ID` and `APP_SECRET`.
 
-## Creating an Azure env from scratch
-
-The following `az` cli commands are required:
-```shell
-# admin
-az ad app create  --display-name "$APP_NAME"  --sign-in-audience "AzureADMultipleOrgs"
-az ad sp create --id $APP_ID
-az ad app credential reset --id $APP_ID
-# non-admin
-az group create  --name $AZURE_RESOURCE_GROUP   --location $AZURE_REGION 
-az network dns zone create  --resource-group $AZURE_RESOURCE_GROUP  --name $AZURE_POLARIS_DOMAIN_NAME
-az storage account create  --name $AZURE_STORAGE_ACCOUNT  --resource-group $AZURE_RESOURCE_GROUP  --location $AZURE_REGION  --sku Standard_LRS  --kind StorageV2 --enable-hierarchical-namespace false 
-az storage container create  --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME  --auth-mode login
-az role assignment create  --role "Storage Blob Data Contributor" --assignee $APP_ID --scope "$BUCKET_SCOPE"
-```
-
 ## Updating an Azure env partially configured 
 
 Both `azure/create-admin.sh` and `azure/create.sh` are idempotent, so they check if any of the required
@@ -50,6 +34,11 @@ elements are already configured and skip the step if so.
 
 Refer to [roles and permissions](../../scripts/azure/roles.md) document for a detailed breakdown the roles and permissions
 required to set up the Azure env.
+
+To check what roles are assigned to your identity:
+```shell
+./afon.sh -a script --script-path azure/roles.sh
+```
 
 ## An end-to-end example
 
@@ -104,7 +93,19 @@ Finally, to create the env:
 ./afon.sh -a script --script-path azure/create.sh
 ```
 
-To destroy env:
+Once the env is created, you can issue a TLS certificate for the Polaris domain name and store it in the Azure Key Vault.  
+
+Set in `afon-azure.properties`
+```shell
+AZURE_KEY_VAULT_NAME=${ENV_NAME}-afon-key-vault
+```
+and run
+```shell
+./afon.sh -a script --script-path azure/issue-cert.sh
+```
+**NOTE:**  Although technically not indispensable, it is highly advisable to issue and store the TLS cert in the Key Vault. If the cert is not found in the Key Vault or the Key Vault is not defined, a new cert will be issued by ACME, but there is a stringent limit of how many free certs can be issued in a week. 
+
+Finally, to destroy the env:
 ```shell
 ./afon.sh -a script --script-path azure/destroy.sh
 ```
