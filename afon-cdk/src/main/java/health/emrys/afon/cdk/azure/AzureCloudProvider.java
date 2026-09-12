@@ -366,6 +366,14 @@ public class AzureCloudProvider extends AbstractCloudProvider {
             .nodeCount(Integer.parseInt(nodePoolConfig.getOrDefault("nodeCount", "3")))
             .vmSize(nodePoolConfig.getOrDefault("vmSize", "Standard_D2s_v3"))
             .vnetSubnetId(nodeSubnet.getId())
+            // Declared explicitly to match Azure's own applied defaults; left unset,
+            // this block is not computed and every plan diffs it away as removed.
+            .upgradeSettings(KubernetesClusterDefaultNodePoolUpgradeSettings
+                                 .builder()
+                                 .maxSurge("10%")
+                                 .drainTimeoutInMinutes(0)
+                                 .nodeSoakDurationInMinutes(0)
+                                 .build())
             .build();
 
         KubernetesClusterNetworkProfile networkProfile = KubernetesClusterNetworkProfile

@@ -323,7 +323,7 @@ exec_tofu(){
     # it may have already been set by caller
     TOFU_ACTION=${ACTION#tofu-}
   fi
-  if [ "$TOFU_ACTION" != "state" ]; then
+  if [[ ! "$TOFU_ACTION" =~ ^(state|plan)$ ]]; then
     TOFU_ARGS="$TOFU_ARGS -auto-approve"
   fi
   TOFU_CMD="tofu -chdir=$TOFU_DIR $TOFU_ACTION $TOFU_ARGS"
