@@ -12,28 +12,26 @@ import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonCloud.AZURE;
 
 /**
- * Deploy AWS full stack with Azure Polaris
+ * Deploy AWS Full and Azure Polaris stacks
  */
-public class DeployAwsFullStackWithAzurePolarisMain implements StepsProvider {
+public class DeployAwsFullStackAndAzurePolarisStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(List.of(
-                stepOperations.deleteStack(AWS),
+                stepOperations.deleteStackIn(AWS),
                 stepOperations.deployFullStackIn(AWS),
-                stepOperations.waitForPolarisIn(AWS)
-        ));
+                stepOperations.waitForPolarisAndKeycloakIn(AWS)));
         steps.addAll(List.of(
-            stepOperations.deleteStack(AZURE),
-            stepOperations.deployPolarisIn(AZURE),
-            stepOperations.waitForPolarisIn(AZURE)
-                ));
+            stepOperations.deleteStackIn(AZURE),
+            stepOperations.deployPolarisStackIn(AZURE),
+            stepOperations.waitForPolarisAndKeycloakIn(AZURE)));
         return steps;
     }
 
     public static void main(String[] args) {
-        new StepRunner().runUsing(new DeployAwsFullStackWithAzurePolarisMain(), args);
+        new StepRunner().runUsing(new DeployAwsFullStackAndAzurePolarisStackMain(), args);
     }
 
 }

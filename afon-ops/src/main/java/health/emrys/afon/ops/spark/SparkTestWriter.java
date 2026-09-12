@@ -18,7 +18,7 @@ import java.util.List;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
-public class SparkTestWriter extends SparkChecker {
+public class SparkTestWriter extends SparkRunner {
 
     private static final Logger logger = getLogger(SparkTestWriter.class);
 
@@ -27,7 +27,7 @@ public class SparkTestWriter extends SparkChecker {
     }
 
 
-    public void doCheck(SparkSession spark, String catalogName, String namespace, String tableName) {
+    public void doRun(SparkSession spark, String catalogName, String namespace, String tableName) {
         String namespaceSql = format("CREATE NAMESPACE IF NOT EXISTS %s", namespaceFQN(catalogName, namespace));
         logger.info("Executing: {}", namespaceSql);
         spark.sql(namespaceSql);

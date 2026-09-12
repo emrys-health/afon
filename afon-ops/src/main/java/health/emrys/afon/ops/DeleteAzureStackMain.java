@@ -13,9 +13,7 @@ public class DeleteAzureStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
-        return List.of(
-            stepOperations.deleteStack(AZURE)
-                      );
+        return List.of(stepOperations.deleteStackIn(AZURE));
     }
 
     public static void main(String[] args) {

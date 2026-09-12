@@ -8,11 +8,11 @@ public class StepsUtils {
 
     public static List<Step> setupFullStackStepsUsing(StepOperations stepOperations, AfonCloud cloud) {
         return List.of(
-                    stepOperations.deleteStack(cloud),
+                    stepOperations.deleteStackIn(cloud),
                     stepOperations.deployFullStackIn(cloud),
-                    stepOperations.waitForPolarisIn(cloud),
+                    stepOperations.waitForPolarisAndKeycloakIn(cloud),
                     stepOperations.createAllCatalogsFor(cloud),
-                    stepOperations.checkAwsSparkWritingTo(cloud)
+                    stepOperations.runAwsSparkWritingTo(cloud)
                 );
     }
 }

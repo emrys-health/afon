@@ -14,9 +14,9 @@ public class DeployGcpPolarisStackMain implements StepsProvider {
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            stepOperations.deleteStack(GCP),
-            stepOperations.deployPolarisIn(GCP),
-            stepOperations.waitForPolarisIn(GCP));
+            stepOperations.deleteStackIn(GCP),
+            stepOperations.deployPolarisStackIn(GCP),
+            stepOperations.waitForPolarisAndKeycloakIn(GCP));
     }
 
     public static void main(String[] args) {

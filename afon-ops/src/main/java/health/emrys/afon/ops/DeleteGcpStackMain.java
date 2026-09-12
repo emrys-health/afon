@@ -13,9 +13,7 @@ public class DeleteGcpStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
-        return List.of(
-            stepOperations.deleteStack(GCP)
-                      );
+        return List.of(stepOperations.deleteStackIn(GCP));
     }
 
     public static void main(String[] args) {

@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk.gcp;
 
 import health.emrys.afon.cdk.CleanupHelper;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 
@@ -13,11 +14,11 @@ public class GcpCleanupHelper extends CleanupHelper {
     }
 
     public String cleanupCommands() {
-        return """
+        return String.format("""
                #!/bin/bash
                PROJECT_ID="afon-core"
                VPC_NAME="gke-private-vpc"
-               REGION="europe-west2"
+               REGION="%s"
                
                echo "Attempting to wipe all resources associated with $VPC_NAME..."
                
@@ -80,7 +81,7 @@ public class GcpCleanupHelper extends CleanupHelper {
                gcloud compute networks delete $VPC_NAME --project=$PROJECT_ID --quiet
                
                echo "Cleanup complete."
-               """;
+               """, properties.getValue(AfonProperty.GCP_REGION));
     }
 
     public static void main(String[] args) {

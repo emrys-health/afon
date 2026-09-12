@@ -19,12 +19,10 @@ public class DeploySnowflakeWritingAzureViaAwsMain implements StepsProvider {
         List<Step> steps = new ArrayList<>();
         steps.addAll(setupFullStackStepsUsing(stepOperations, AWS));
         steps.addAll(List.of(
-                        stepOperations.snowflakeWritesTo(AZURE),
-                        stepOperations.deleteAwsPolarisCatalogAndRecreateFor(AZURE),
-                        stepOperations.registerMostRecentSnowflakeTableInAws(AZURE),
-                        stepOperations.checkAwsSparkReadingUsing(stepOperations.afonCatalogs().azure())
-                )
-        );
+                stepOperations.snowflakeWritingTo(AZURE),
+                stepOperations.deleteAndRecreateAwsPolarisCatalogFor(AZURE),
+                stepOperations.registerMostRecentSnowflakeTableInAws(AZURE),
+                stepOperations.runAwsSparkReadingFrom(stepOperations.afonCatalogs().azure())));
         return steps;
     }
 

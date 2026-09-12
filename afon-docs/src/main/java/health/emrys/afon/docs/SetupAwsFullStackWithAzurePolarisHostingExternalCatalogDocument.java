@@ -17,7 +17,7 @@ public class SetupAwsFullStackWithAzurePolarisHostingExternalCatalogDocument ext
     @Override
     public String getSupplementaryIntro() {
         return """
-            Deploy AWS full stack with Azure Polaris.
+            Deploy AWS full stack with Azure Polaris hosting an external catalog
             """;
     }
 

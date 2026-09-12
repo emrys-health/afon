@@ -14,9 +14,9 @@ public class DeployAwsPolarisStackMain implements StepsProvider {
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            stepOperations.deleteStack(AWS),
-            stepOperations.deployPolarisIn(AWS),
-            stepOperations.waitForPolarisIn(AWS));
+            stepOperations.deleteStackIn(AWS),
+            stepOperations.deployPolarisStackIn(AWS),
+            stepOperations.waitForPolarisAndKeycloakIn(AWS));
     }
 
     public static void main(String[] args) {

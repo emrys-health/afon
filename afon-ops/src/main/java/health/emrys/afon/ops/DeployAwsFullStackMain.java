@@ -14,9 +14,9 @@ public class DeployAwsFullStackMain implements StepsProvider {
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            stepOperations.deleteStack(AWS),
+            stepOperations.deleteStackIn(AWS),
             stepOperations.deployFullStackIn(AWS),
-            stepOperations.waitForPolarisIn(AWS));
+            stepOperations.waitForPolarisAndKeycloakIn(AWS));
     }
 
     public static void main(String[] args) {

@@ -21,7 +21,7 @@ public class DeployAzurePolarisStackDocument extends AbstractDocument {
     @Override
     protected String getSupplementaryIntro() {
         return """
-                Creates an Azure environment with a Polaris instance populated with the test catalogs
+                Deploy an Azure Polaris stack
                 """;
     }
 

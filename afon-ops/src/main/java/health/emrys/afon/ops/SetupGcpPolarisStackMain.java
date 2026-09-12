@@ -14,11 +14,10 @@ public class SetupGcpPolarisStackMain implements StepsProvider {
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            stepOperations.deleteStack(GCP),
-            stepOperations.deployPolarisIn(GCP),
-            stepOperations.waitForPolarisIn(GCP),
-            stepOperations.createAllCatalogsFor(GCP)
-                      );
+            stepOperations.deleteStackIn(GCP),
+            stepOperations.deployPolarisStackIn(GCP),
+            stepOperations.waitForPolarisAndKeycloakIn(GCP),
+            stepOperations.createAllCatalogsFor(GCP));
     }
 
     public static void main(String[] args) {

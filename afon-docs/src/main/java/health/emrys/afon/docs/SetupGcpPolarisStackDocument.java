@@ -23,7 +23,7 @@ public class SetupGcpPolarisStackDocument extends AbstractDocument {
     @Override
     public String getSupplementaryIntro() {
         return """
-                Setup a GCP environment with a Polaris instance populated with the test catalogs
+                Setup a GCP Polaris stack populated with the test catalogs
                 """;
     }
 

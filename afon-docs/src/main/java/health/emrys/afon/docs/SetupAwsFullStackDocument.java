@@ -22,12 +22,11 @@ public class SetupAwsFullStackDocument extends AbstractDocument {
 
     @Override
     public String getSupplementaryIntro() {
-        return "Setup the AWS full stack (Jupyter, Polaris, Spark etc).";
+        return "Setup the AWS Full stack (Jupyter, Polaris, Spark etc)";
     }
 
     public String getFurtherNotes() {
-        String polarisDomainName =
-            properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
+        String polarisDomainName = properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
         return String.format(
             """
             # Troubleshooting
