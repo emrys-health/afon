@@ -37,7 +37,7 @@ required to set up the Azure env.
 
 To check what roles are assigned to your identity:
 ```shell
-./afon.sh -a script --script-path azure/roles.sh
+./afon.sh -a script -sp azure/roles.sh
 ```
 
 ## An end-to-end example
@@ -53,9 +53,9 @@ Per SDE policy, the `create-admin.sh` must be run by a local admin, who'll then 
 - APP_SP_ID
 - APP_SECRET
 
-First run:
+First run, to init the env `tvs`:
 ```shell
-./afon.sh -a config-init --config-env tvs
+./afon.sh -a config-init -e tvs
 ```
 The config properties will be initialised in `~/.afon/config-tvs`.
 
@@ -66,7 +66,10 @@ ENV_NAME=tvs
 Set in `afon-azure.properties`
 ```shell
 AZURE_SUBSCRIPTION=<SUBSCRIPTION>
+AZURE_POLARIS_DOMAIN_NAME=<POLARIS_DOMAIN_NAME>
 ```
+where the Polaris domain name can be something like: `${ENV_NAME}polarisazure.click`.
+
 Set in `secret-azure.properties`
 ```shell
 AZURE_TENANT_ID=<TENANT>
@@ -77,23 +80,23 @@ AZURE_SP_ID=<APP_SP_ID>
 
 After all properties are set, switch to using env `tvs`:
 ```shell
-./afon.sh -a config-switch --config-env tvs
+./afon.sh -a config-switch -e tvs
 ```
-This simply creates a symlink `~/.afon/config` to `~/.afon/config-tvs`.
+This simply creates a symlink `~/.afon/config` to `~/.afon/config-tvs`.   Thereafter, you don't need to specify the env any more.
 
 Next, login: 
 ```shell
-./afon.sh -a script --script-path azure/login.sh 
-./afon.sh -a script --script-path azure/account.sh
+./afon.sh -a script -sp azure/login.sh 
+./afon.sh -a script -sp azure/account.sh
 ```
 The `login.sh` logs in the user with the given `$AZURE_TENANT_ID`, while `account.sh` sets the `$AZURE_SUBSCRIPTION`.
 
 Finally, to create the env:
 ```shell
-./afon.sh -a script --script-path azure/create.sh
+./afon.sh -a script -sp azure/create.sh
 ```
 
-Once the env is created, you can issue a TLS certificate for the Polaris domain name and store it in the Azure Key Vault.  
+Once the env is created, you can issue a TLS certificate for the Polaris domain name and store it in the Azure Key Vault (AKV)
 
 Set in `afon-azure.properties`
 ```shell
@@ -101,12 +104,17 @@ AZURE_KEY_VAULT_NAME=${ENV_NAME}-afon-key-vault
 ```
 and run
 ```shell
-./afon.sh -a script --script-path azure/issue-cert.sh
+./afon.sh -a script -sp azure/issue-cert.sh
 ```
-**NOTE:**  Although technically not indispensable, it is highly advisable to issue and store the TLS cert in the Key Vault. If the cert is not found in the Key Vault or the Key Vault is not defined, a new cert will be issued by ACME, but there is a stringent limit of how many free certs can be issued in a week. 
+You can check if the certs have been stored in the AKV:
+```shell
+./afon.sh -a script -sp azure/keyvault.sh -sa list
+```
+
+**NOTE:**  Although technically not mandatory, it is highly advisable to issue and store the TLS cert in the AKV. If the cert is not found in the vault or the vault is not defined, a new cert will be issued by ACME, but there is a stringent limit of how many free certs can be issued in a week. 
 
 Finally, to destroy the env:
 ```shell
-./afon.sh -a script --script-path azure/destroy.sh
+./afon.sh -a script -sp azure/destroy.sh
 ```
 Following this, `destroy-admin.sh` must be run by a local admin.
