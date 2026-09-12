@@ -1,4 +1,4 @@
-package health.emrys.afon.ops.spark;
+package health.emrys.afon.ops.smoke;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -36,9 +36,9 @@ import static java.lang.String.format;
  *       chain and stall on EC2 instance metadata that a Kubernetes-hosted driver cannot reach.</li>
  * </ol>
  */
-public class SmokeSparkConnectRead {
+public class SparkConnectS3ReadSmoke {
 
-    private static final Logger logger = LoggerFactory.getLogger(SmokeSparkConnectRead.class);
+    private static final Logger logger = LoggerFactory.getLogger(SparkConnectS3ReadSmoke.class);
 
     private static final String REMOTE   = "sc://localhost:15002";
     private static final String REGION   = "eu-north-1";
@@ -71,6 +71,6 @@ public class SmokeSparkConnectRead {
     }
 
     public static void main(final String[] args) {
-        new SmokeSparkConnectRead().readText();
+        new SparkConnectS3ReadSmoke().readText();
     }
 }
