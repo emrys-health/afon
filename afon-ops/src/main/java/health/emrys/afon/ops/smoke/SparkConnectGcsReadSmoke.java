@@ -1,4 +1,4 @@
-package health.emrys.afon.ops.spark;
+package health.emrys.afon.ops.smoke;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -12,7 +12,7 @@ import java.util.Map;
 import static java.lang.String.format;
 
 /**
- * The GCS counterpart of {@link SmokeSparkConnectRead}: reads a text file from a public
+ * The GCS counterpart of {@link SparkConnectS3ReadSmoke}: reads a text file from a public
  * (anonymously readable) Google Cloud Storage bucket over Spark Connect. As with the S3 version,
  * the read succeeding is the failure condition.
  *
@@ -38,9 +38,9 @@ import static java.lang.String.format;
  * concept, and GCS is served from a single global endpoint, so there is no region for the client to
  * go looking for on the instance metadata service.
  */
-public class SmokeSparkConnectGcsRead {
+public class SparkConnectGcsReadSmoke {
 
-    private static final Logger logger = LoggerFactory.getLogger(SmokeSparkConnectGcsRead.class);
+    private static final Logger logger = LoggerFactory.getLogger(SparkConnectGcsReadSmoke.class);
 
     private static final String REMOTE = "sc://localhost:15002";
     private static final String PATH   = "gs://dataflow-samples/shakespeare/kinglear.txt";
@@ -97,6 +97,6 @@ public class SmokeSparkConnectGcsRead {
     }
 
     public static void main(final String[] args) {
-        new SmokeSparkConnectGcsRead().readText();
+        new SparkConnectGcsReadSmoke().readText();
     }
 }
