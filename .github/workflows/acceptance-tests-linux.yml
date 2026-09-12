@@ -48,8 +48,9 @@ env:
 
 jobs:
   acceptance:
-    # only allow manual trigger until runner issues are sorted
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    # manual trigger, or a push to main (see the path filter on the push trigger above).
+    # pull_request and schedule stay gated out for now.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 120
     defaults:
