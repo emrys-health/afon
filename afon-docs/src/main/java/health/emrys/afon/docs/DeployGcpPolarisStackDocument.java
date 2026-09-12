@@ -23,7 +23,7 @@ public class DeployGcpPolarisStackDocument extends AbstractDocument {
     @Override
     public String getSupplementaryIntro() {
         return """
-                Creates a GCP environment with a Polaris instance populated with the test catalogs
+                Deploys a GCP Polaris stack
                 """;
     }
 
@@ -50,14 +50,8 @@ public class DeployGcpPolarisStackDocument extends AbstractDocument {
             │ Error: Error waiting for Deleting Network: The subnetwork resource 'projects/afon-core/regions/europe-west2/subnetworks/gke-private-subnet' is already being used by 'projects/afon-core/zones/europe-west2-a/instanceGroups/gke-spark-cluster-default-pool-XXX'
             ```
             then, for that XXX, run:
-            ```tofu
+            ```shell
             gcloud compute instance-groups managed delete gke-spark-cluster-default-pool-XXX --zone europe-west2-a --project afon-core --quiet
-            ```
-            
-            Cleanup the cluster with:
-            ```
-            gcloud container clusters list
-            gcloud container clusters delete %s --region=europe-west2
             ```
             
             ### Problems destroying the stack?

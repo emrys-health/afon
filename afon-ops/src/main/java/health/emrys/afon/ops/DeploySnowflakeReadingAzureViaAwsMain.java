@@ -18,7 +18,7 @@ public class DeploySnowflakeReadingAzureViaAwsMain implements StepsProvider {
     public List<Step> stepsUsing(StepOperations stepOperations) {
         List<Step> steps = new ArrayList<>();
         steps.addAll(setupFullStackStepsUsing(stepOperations, AWS));
-        steps.add(stepOperations.checkAwsSparkWritingTo(AZURE));
+        steps.add(stepOperations.runAwsSparkWritingTo(AZURE));
         steps.add(stepOperations.snowflakeReadingViaAwsPolaris(stepOperations.afonCatalogs().azure()));
         return steps;
     }

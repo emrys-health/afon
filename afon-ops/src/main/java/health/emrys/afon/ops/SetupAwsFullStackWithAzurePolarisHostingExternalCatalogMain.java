@@ -24,13 +24,13 @@ public class SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain impleme
         List<Step> steps = new ArrayList<>();
         steps.addAll(setupFullStackStepsUsing(stepOperations, AWS));
         steps.addAll(List.of(
-            stepOperations.deleteStack(AZURE),
-            stepOperations.deployPolarisIn(AZURE),
-            stepOperations.waitForPolarisIn(AZURE),
-            stepOperations.deleteExternalCatalogIn(AZURE),
+            stepOperations.deleteStackIn(AZURE),
+            stepOperations.deployPolarisStackIn(AZURE),
+            stepOperations.waitForPolarisAndKeycloakIn(AZURE),
+            // TODO: why not delete whole external catalog rather than the single table?
+            stepOperations.deleteExternalPolarisTableFor(AZURE),
             stepOperations.createExternalCatalogFor(AZURE),
-            stepOperations.checkAwsSparkDeferringToAzurePolarisHostingExternalCatalog()
-                ));
+            stepOperations.runAwsSparkDeferringToAzurePolarisHostingExternalCatalog()));
         return steps;
     }
 

@@ -21,7 +21,7 @@ public class DeployAwsPolarisStackDocument extends AbstractDocument {
     @Override
     protected String getSupplementaryIntro() {
         return """
-                Creates an AWS environment with a Polaris instance populated with the test catalogs
+                Deploys an AWS Polaris stack
                 """;
     }
 

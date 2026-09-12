@@ -10,20 +10,20 @@ import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.spark.SparkSessionFactory.createSparkSession;
 import static org.slf4j.LoggerFactory.getLogger;
 
-abstract public class SparkChecker {
-    private static final Logger logger = getLogger(SparkChecker.class);
+abstract public class SparkRunner {
+    private static final Logger logger = getLogger(SparkRunner.class);
 
     private AfonPropertyProvider properties;
 
-    protected SparkChecker(AfonPropertyProvider properties) {
+    protected SparkRunner(AfonPropertyProvider properties) {
         this.properties = properties;
     }
 
-    public static void parseAndExecute(SparkChecker app, AfonPropertyProvider properties, String[] args) {
+    public static void parseAndExecute(SparkRunner app, AfonPropertyProvider properties, String[] args) {
         try {
             if (args.length < 4) {
                 System.out.printf("""
-                    SparkChecker requires at least 4 arguments:
+                    SparkRunner requires at least 4 arguments:
                         cloud catalog-name namespace table-name [polaris-id] [polaris-secret]
                     args: %s    
                     """, String.join(" ", args));
@@ -46,7 +46,7 @@ abstract public class SparkChecker {
             properties.setValue(POLARIS_ID, polarisId);
             properties.setValue(POLARIS_SECRET, polarisSecret);
             SparkSession spark = createSparkSession(cloud, properties, new String[]{catalogName});
-            app.doCheck(spark, catalogName, namespace, tableName);
+            app.doRun(spark, catalogName, namespace, tableName);
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);
             throw new RuntimeException(e);
@@ -61,7 +61,7 @@ abstract public class SparkChecker {
         return catalogName + "." + namespace + "." + tableName;
     }
 
-    protected abstract void doCheck(SparkSession spark, String catalogName, String namespace, String tableName);
+    protected abstract void doRun(SparkSession spark, String catalogName, String namespace, String tableName);
 
 
 }

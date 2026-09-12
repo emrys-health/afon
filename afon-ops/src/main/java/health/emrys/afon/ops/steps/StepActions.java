@@ -11,8 +11,10 @@ import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
+import health.emrys.afon.ops.spark.SparkRunner;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -36,6 +38,7 @@ import java.util.*;
 import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
+import static health.emrys.afon.ops.ManagePolarisCatalogsMain.*;
 import static health.emrys.afon.ops.steps.DurationUtils.formatDuration;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
@@ -65,23 +68,27 @@ public class StepActions {
 
     private void tofuDestroy(Path tofuDir) {
         try {
-            logger.info("Stopping {} if it's running already...", tofuDir);
+            logger.info("Executing tofu destroy in dir {}", tofuDir);
             run("tofu", tofuDir, "init");
             if (run("tofu", tofuDir, "destroy", "--auto-approve") != 0) {
-                String msg = String.format("""
-                Failed to destroy %s. Your environment may be in an unstable state.
+                String message = String.format("""
+                TOFU_DIR=%s
+                Failed to run:
+                    tofu -chdir=$TOFU_DIR destroy
+                Your environment may be in an unstable state.
                 It may be that something irrelevant (like a Helm chart) is blocking the destroy.
                 If so, remove it with something like:
-                    tofu state rm 'helm_release.prometheusRelease'
-                and tofu destroy again.
+                    tofu -chdir=$TOFU_DIR state rm 'helm_release.prometheusRelease'
+                and run again:
+                    tofu -chdir=$TOFU_DIR destroy
                 
-                If you're sure nothing in the environment is still running, delete directory %s
-                """, tofuDir, tofuDir);
-                logger.error(msg);
-                throw new RuntimeException(msg);
+                If you're sure nothing in the environment is still running, delete directory $TOFU_DIR
+                """, tofuDir);
+                logger.error(message);
+                throw new RuntimeException(message);
             }
         } catch (Exception e) {
-            logger.error("Failed to call tofu destroy in " + tofuDir, e);
+            logger.error("Failed to execute tofu destroy in dir {}", tofuDir, e);
         }
     }
 
@@ -156,32 +163,11 @@ public class StepActions {
         }
     }
 
-    /**
-     * @param cloud
-     * @param catalog
-     * @param namespace
-     * @param tableName
-     * @param metadata
-     * @throws Exception
-     */
-    public void registerTable(AfonCloud cloud,
-                              AfonCatalog catalog,
-                              String namespace,
-                              String tableName,
-                              String metadata) throws Exception {
-        executeMainOf(RegisterPolarisTableMain.class,
-                new String[]{cloud.toString(),
-                        catalog.toString(),
-                        namespace,
-                        tableName,
-                        metadata});
-    }
-
     private void executeMainOf(Class mainClass, String[] args) throws Exception {
         executeMainOf(mainClass, args, new Properties());
     }
 
-    void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
+    protected void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
         logger.info("Running {} with arguments {} and overrides {}",
                  mainClass.getName(),
                  String.join(" ", args),
@@ -198,6 +184,34 @@ public class StepActions {
         } finally {
             restoreSystemProperties(overrides, original);
         }
+    }
+
+    private @NonNull Properties setSystemProperties(Properties properties) {
+        Properties original = new Properties();
+        properties.keySet().forEach(mapKey -> {
+            String key        = mapKey.toString();
+            String property   = System.getProperty(key);
+            if (property != null) {
+                original.put(key, property);
+            }
+            String value = properties.getProperty(key);
+            logger.info("Setting system property {} = {}", key, value);
+            System.setProperty(key, value);
+        });
+        return original;
+    }
+
+    private void restoreSystemProperties(Properties properties, Properties original) {
+        properties.keySet().forEach(mapKey -> {
+            String key   = mapKey.toString();
+            String value = original.getProperty(key);
+            logger.info("Restoring system property {} = {}", key, value);
+            if (value != null) {
+                System.setProperty(key, value);
+            }  else {
+                System.clearProperty(key);
+            }
+        });
     }
 
     /**
@@ -261,6 +275,67 @@ public class StepActions {
         return p.exitValue();
     }
 
+    public void createAllCatalogsFor(AfonCloud cloud) {
+        try {
+            executeMainOf(ManagePolarisCatalogsMain.class,
+                    new String[]{RECREATE, cloud.toString()});
+        } catch (Exception e) {
+            logger.error(
+                    """
+                    Failed to delete and recreate all catalogs in Polaris for cloud `%s`.
+                    It may be because the certificates are not yet ready. 
+                    The hint is an error message such as:
+                    
+                    PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException:
+                    unable to find valid certification path to requested target
+                    
+                    If this is the case, try re-running this step.                         
+                    """, cloud, e);
+        }
+    }
+
+    public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
+        executeMainOf(ManagePolarisCatalogsMain.class,
+                new String[]{CREATE, cloud.toString(), catalog.name()});
+    }
+
+    public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog, Properties properties) throws Exception {
+        executeMainOf(ManagePolarisCatalogsMain.class,
+                new String[]{CREATE, cloud.toString(), catalog.name()}, properties);
+    }
+
+    public void configureUsersFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
+        executeMainOf(ConfigureUsersMain.class,
+                new String[]{cloud.toString(), catalog.toString()});
+    }
+
+    public void deleteCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
+        executeMainOf(ManagePolarisCatalogsMain.class,
+                new String[]{DELETE, cloud.toString(), catalog.name()});
+    }
+
+    public void deleteNamespaceFor(AfonCloud cloud, AfonCatalog catalog, String namespace) throws Exception {
+        executeMainOf(
+                ManagePolarisCatalogsMain.class,
+                new String[]{DELETE, cloud.toString(), catalog.name(), namespace});
+    }
+
+    public void deleteTableFor(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName) throws Exception {
+        executeMainOf(
+                ManagePolarisCatalogsMain.class,
+                new String[]{DELETE, cloud.toString(), catalog.name(), namespace, tableName});
+    }
+
+    public void registerTable(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, String metadata) throws Exception {
+        executeMainOf(RegisterPolarisTableMain.class,
+                new String[]{cloud.toString(), catalog.toString(), namespace, tableName, metadata});
+    }
+
+    public void runSpark(Class<? extends SparkRunner> sparkRunner, AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName) throws Exception {
+        executeMainOf(sparkRunner,
+                new String[]{cloud.toString(), catalog.toString(), namespace, tableName});
+    }
+
     @NonNull String azureFirstFile(AfonPropertyProvider properties, String glob, boolean descendingOrder) {
         logger.info("Querying Azure for {}", glob);
         AzureReader reader = new AzureReader(properties);
@@ -296,47 +371,6 @@ public class StepActions {
             }
             conn.commit();
         }
-    }
-    
-    void createSingleCatalogsFor(AfonCloud cloud,
-                                 AfonCatalog catalog) throws Exception {
-        createSingleCatalogsFor(cloud, catalog, new Properties());
-    }
-
-    void createSingleCatalogsFor(AfonCloud cloud,
-                                 AfonCatalog catalog,
-                                 Properties properties) throws Exception {
-        executeMainOf(ManagePolarisCatalogsMain.class,
-                      new String[] {ManagePolarisCatalogsMain.CREATE, cloud.toString(), catalog.name()},
-                      properties);
-    }
-
-    private void restoreSystemProperties(Properties properties, Properties original) {
-        properties.keySet().forEach(mapKey -> {
-            String key   = mapKey.toString();
-            String value = original.getProperty(key);
-            logger.info("Restoring system property {} = {}", key, value);
-            if (value != null) {
-                System.setProperty(key, value);
-            }  else {
-                System.clearProperty(key);
-            }
-        });
-    }
-
-    private @NonNull Properties setSystemProperties(Properties properties) {
-        Properties original = new Properties();
-        properties.keySet().forEach(mapKey -> {
-            String key        = mapKey.toString();
-            String property   = System.getProperty(key);
-            if (property != null) {
-                original.put(key, property);
-            }
-            String value = properties.getProperty(key);
-            logger.info("Setting system property {} = {}", key, value);
-            System.setProperty(key, value);
-        });
-        return original;
     }
 
     public Step waitOnDNS(String domain, long timeout) {

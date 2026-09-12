@@ -14,9 +14,9 @@ public class DeployAzurePolarisStackMain implements StepsProvider {
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            stepOperations.deleteStack(AZURE),
-            stepOperations.deployPolarisIn(AZURE),
-            stepOperations.waitForPolarisIn(AZURE));
+            stepOperations.deleteStackIn(AZURE),
+            stepOperations.deployPolarisStackIn(AZURE),
+            stepOperations.waitForPolarisAndKeycloakIn(AZURE));
     }
 
     public static void main(String[] args) {

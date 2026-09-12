@@ -204,7 +204,7 @@ jobs:
             if [ -n "$FROM_STEP" ]; then
               echo "::warning::from_step is ignored by delete"
             fi
-            ./afon.sh -a exec --exec-class ops.DeleteAwsFullStackMain \
+            ./afon.sh -a exec --exec-class ops.DeleteAwsStackMain \
                --logging-console INFO
           else
             if [ -n "$FROM_STEP" ]; then

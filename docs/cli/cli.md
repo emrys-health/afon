@@ -103,8 +103,8 @@ afon-cli.sh setup-aws-full-stack
 ```
 Steps executed:
 
-1. `clean_aws` — destroy any existing AWS stack
-2. `aws_spark` — deploy Polaris + Spark to AWS via CDKTF + OpenTofu
+1. `delete_aws_stack` — delete any existing AWS stack
+2. `deploy_aws_full_stack` — deploy AWS full stack
 3. `wait_on_emryspolaris` — wait for DNS to propagate
 4. `create_all_catalogs_for_cloud_aws` — create all catalogs in AWS Polaris
 5. `aws_spark_talks_to_cloud_aws` — smoke test: Spark writes and reads via Polaris
@@ -114,40 +114,40 @@ Steps executed:
 ```shell
 afon-cli.sh setup-azure-polaris-stack
 ```
-Steps: `clean_azure` → `azure_polaris` → `wait_on_emryspolarisazure` → `create_all_catalogs_for_cloud_azure`
+Steps: `delete_azure_stack` → `deploy_azure_polaris_stack` → `wait_on_emryspolarisazure_then_wait_on_emrysoauth` → `create_all_catalogs_for_cloud_azure`
 
 ### Setup GCP Polaris only
 
 ```shell
 afon-cli.sh setup-gcp-polaris-stack
 ```
-Steps: `clean_gcp` → `gcp_polaris` → `wait_on_emryspolarisgcp` → `create_all_catalogs_for_cloud_gcp`
+Steps: `delete_gcp_stack` → `deploy_gcp_polaris_stack` → `wait_on_emryspolarisgcp_then_wait_on_emrysoauth` → `create_all_catalogs_for_cloud_gcp`
 
-### Deploy cross-cloud external catalogs (AWS + Azure)
+### Setup cross-cloud external catalogs (AWS + Azure)
 
 To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate to Azure Polaris for cross-cloud querying.
 
 ```shell
-afon-cli.sh deploy-external-catalogs
+afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog
 ```
 
-Steps: `clean_aws → aws_full → wait_on_emryspolaris_then_wait_on_emrysoauth → create_all_catalogs_for_aws → aws_spark_talks_to_aws → clean_azure → azure_polaris → wait_on_emryspolarisazure_then_wait_on_emrysoauth → delete_table_azure.namespaceph.test_table_for_cloud_azure → create_external_catalog_azure_for_cloud_azure → aws_spark_talks_to_catalog_azure_external`
+Steps: `delete_aws_stack → deploy_aws_full_stack → wait_on_emryspolaris_then_wait_on_emrysoauth → create_all_catalogs_for_cloud_aws → aws_spark_talks_to_catalog_aws → delete_azure_stack → deploy_azure_polaris_stack → wait_on_emryspolarisazure_then_wait_on_emrysoauth → delete_table_azure.namespaceph.test_table_for_cloud_azure → create_external_catalog_azure_for_cloud_azure → aws_spark_talks_to_catalog_azure_external`
 
 ### Resume a failed stack deployment from a specific step
 
 If a deployment fails partway through, you can resume from a specific step, e.g.:
 
 ```shell
-afon-cli.sh deploy-external-catalogs "azure_polaris"
+afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog "deploy_azure_polaris_stack"
 ```
 
 ### Teardown a deployed stack
 
 The stack teardown can be done via replacing `deploy` with `delete` in the command, eg:
 ```shell
-afon-cli.sh delete-aws-full-stack
-afon-cli.sh delete-azure-polaris-stack
-afon-cli.sh delete-gcp-polaris-stack
+afon-cli.sh delete-aws-stack
+afon-cli.sh delete-azure-stack
+afon-cli.sh delete-gcp-stack
 ```
 
 The `delete` commands are equivalent to running `tofu destroy` on the appropriate `$AFON_CDKTF` dir.

@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-public class SparkTestReader extends SparkChecker {
+public class SparkTestReader extends SparkRunner {
 
     private static final Logger logger = getLogger(SparkTestWriter.class);
 
@@ -18,7 +18,7 @@ public class SparkTestReader extends SparkChecker {
     }
 
     @Override
-    protected void doCheck(SparkSession spark, String catalogName, String namespace, String tableName) {
+    protected void doRun(SparkSession spark, String catalogName, String namespace, String tableName) {
         spark.conf().set("spark.sql.parquet.enableVectorizedReader", "false");
         spark.conf().set("spark.sql.iceberg.vectorization.enabled", "false");
         String tableFQN = tableFQN(catalogName, namespace, tableName);

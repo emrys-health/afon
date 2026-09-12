@@ -50,6 +50,9 @@ public class AzureCleanupHelper extends CleanupHelper {
                 %s
                 # clean group that lingers after destroying the AKS cluster
                 %s
+                
+                # If all else fails, destroy the Kubernetes cluster directly in the 
+                # [Azure console](https://portal.azure.com/#view/Microsoft_Azure_KubernetesFleet/KubernetesHub.MenuView/~/clusters)
                 """,
                 deleteDnsRecordCommand(polarisDomainName),
                 deleteDnsRecordCommand(jupyterDomainName),
