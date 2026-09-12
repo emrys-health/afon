@@ -1,14 +1,14 @@
 package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
-import health.emrys.afon.ops.config.OpsDefaults
+import health.emrys.afon.config.AfonProperty.POLARIS_NAMESPACE
 import health.emrys.afon.polaris.catalogs.AwsForbiddenPolarisCatalog
 import health.emrys.afon.spark.{CatalogWarehouse, KeyCloakSparkWarehouseConfigForTesting}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 
 object SparkHelper {
-  val namespace = OpsDefaults.POLARIS_NAMESPACE
+  val namespace = instance.getProperties.getValue(POLARIS_NAMESPACE)
 
   // Triggers creation of the Polaris principal/roles/grants exercised by the access specs.
   val principal = PolarisHelper.principal
