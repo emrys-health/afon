@@ -29,6 +29,7 @@ public class AfonCatalogs {
 
     private @NonNull List<AfonCatalog> createCatalogs() {
         String csv = properties.getValue(CATALOG_NAMES_CSV, DEFAULT_CATALOG_NAMES_CSV);
+        if (csv.isBlank()) csv = DEFAULT_CATALOG_NAMES_CSV;
         return Arrays.stream(csv.split(","))
                 .map(String::trim)
                 .filter(name -> !name.isEmpty())

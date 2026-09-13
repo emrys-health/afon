@@ -32,6 +32,14 @@ public class AfonCatalogsTest {
     }
 
     @Test
+    public void defaultsToFullBuiltInCatalogSetWhenPropertyBlank() {
+        AfonPropertyProvider blank = new ConstantsPropertyProvider();
+        blank.setValue(AfonProperty.CATALOG_NAMES_CSV, "");
+        assertThat(namesOf(new AfonCatalogs(blank).all()))
+                .containsExactly(AfonCatalogs.DEFAULT_CATALOG_NAMES_CSV.split(","));
+    }
+
+    @Test
     public void restrictsToConfiguredCatalogsWhenPropertySet() {
         assertThat(namesOf(configuredCatalogs.all()))
                 .containsExactly("aws", "gcp_forbidden", "azure_external");
