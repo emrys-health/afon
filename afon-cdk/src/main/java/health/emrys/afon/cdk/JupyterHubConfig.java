@@ -64,15 +64,14 @@ import static org.slf4j.LoggerFactory.getLogger;
  */
 public abstract class JupyterHubConfig {
 
-    private static final Logger logger    = getLogger(JupyterHubConfig.class);
+    private static final Logger logger = getLogger(JupyterHubConfig.class);
 
     private static final String HUB_IMAGE = "jupyterhub/k8s-hub:3.3.8";
-    private static final String PROXY_IMAGE      = "jupyterhub/configurable-http-proxy:4.6.1";
+    private static final String PROXY_IMAGE = "jupyterhub/configurable-http-proxy:4.6.1";
     /**
      * Same multi-VNC notebook image the single-pod {@link JupyterConfig} uses.
      */
-    private static final String SINGLEUSER_IMAGE =
-        "ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi_pkg";
+    private static final String PYSPARK_NOTEBOOK_IMAGE = "ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi_pkg";
 
     private static final int HUB_PORT        = 8081;
     private static final int PROXY_PUBLIC    = 8000;
@@ -542,7 +541,7 @@ public abstract class JupyterHubConfig {
                """.formatted(
             PROXY_API_SVC, PROXY_API,
             HUB_SVC, HUB_PORT,
-            SINGLEUSER_IMAGE, SINGLEUSER_PORT,
+            PYSPARK_NOTEBOOK_IMAGE, SINGLEUSER_PORT,
             HUB_BASE_URL, GUACAMOLE_USER,
             issuer, jupyterDomain(),
             pythonSetOf(userProvider.getUsers().stream().map(AfonUser::email).toList()),

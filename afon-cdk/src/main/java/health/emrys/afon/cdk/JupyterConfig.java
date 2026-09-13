@@ -20,6 +20,7 @@ import static health.emrys.afon.cdk.CdkHelper.envVar;
 import static health.emrys.afon.cdk.CdkHelper.JUPYTER_SERVICE_NAME;
 
 public abstract class JupyterConfig {
+    public static final String PYSPARK_NOTEBOOK_IMAGE = "ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi_pkg";
     /**
      * One in-pod X session per entry. Each session pairs a Guacamole login (used to
      * authenticate against the Guacamole web UI) with the VNC port serving that
@@ -57,7 +58,7 @@ public abstract class JupyterConfig {
         DeploymentSpecTemplateSpecContainer jupyterContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("jupyter")
-            .image("ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi_pkg")
+            .image(PYSPARK_NOTEBOOK_IMAGE)
             .env(List.of(
                      // Disable Jupyter's built-in auth so oauth2-proxy is the sole gate.
                      // NOTEBOOK_ARGS is read by start-notebook.sh and forwarded to the server,
