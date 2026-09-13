@@ -34,10 +34,10 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
     private final String oauth2ServerUri;
 
     KeyCloakSparkWarehouseConfig(AfonPropertyProvider properties) {
-        super(properties.getValue(USER_POLARIS_ID),
-                properties.getValue(USER_POLARIS_SECRET),
-                properties.getValue(POLARIS_ENDPOINT),
+        super(properties.getValue(POLARIS_ENDPOINT),
                 protocolFor(properties.getValue(POLARIS_ENDPOINT)),
+                properties.getValue(USER_POLARIS_ID),
+                properties.getValue(USER_POLARIS_SECRET),
                 new AfonCatalogs(properties)
         );
         this.oauth2ServerUri = kcUriFor(properties.getValue(OIDC_DOMAIN_NAME));

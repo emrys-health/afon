@@ -27,7 +27,7 @@ public class KeyCloakSparkWarehouseConfigForTesting extends KeyCloakSparkWarehou
     protected void configure(SparkConf sparkConf, String[] catalogNames) {
         super.configure(sparkConf, catalogNames);
         for  (CatalogWarehouse catalogWarehouse : catalogWarehouses) {
-            configureWith(sparkConfigs(catalogWarehouse.warehouse(), catalogWarehouse.catalog()), sparkConf);
+            configureWith(sparkConf, sparkConfigs(catalogWarehouse.warehouse(), catalogWarehouse.catalog()));
         }
     }
 

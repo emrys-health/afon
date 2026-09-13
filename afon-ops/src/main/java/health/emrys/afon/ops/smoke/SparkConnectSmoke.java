@@ -1,47 +1,87 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
-import health.emrys.afon.spark.connect.SparkConnect;
+import health.emrys.afon.polaris.config.PolarisCredentials;
+import health.emrys.afon.spark.connect.SparkConnectClient;
 import health.emrys.afon.spark.connect.SparkConnectUsingOIDC;
+import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 
 /**
+ * You need have some data in Polaris to run this, eg:
+ * ./afon.sh -a exec -ec ops.spark.SparkTestWriter -ea "aws aws test_namespace test_table a,b,c" -lc INFO
+ *
  * First run:
  * kubectl port-forward pod/spark-connector-0-driver 15002:15002
+ * Then run:
+ * ./afon.sh -a exec -ec ops.smoke.SparkConnectSmoke -ea "aws" -lc INFO
  *
- * You may need to register some data in Polaris to run this.
- * If so, try running something like:
- * health.emrys.afon.ops.RegisterPolarisTableMain with args "AWS acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json emryspolaris.click"
+ * Using {@code spark.sql("SELECT * FROM tableFQN").show()}
+ * instead of {@code spark.read().table(tableFQN).show()}
+ * so that we can show the actual query in Spark Connect's log:
+ * kubectl logs -f  spark-connector-0-driver | grep SELECT
+ * Otherwise, we'd need to grep "scan-report"
  */
 public class SparkConnectSmoke {
 
-    public void smokeTest(SparkConnect connect) {
-        connect.talkToSparkConnect();
+    private static final Logger logger = LoggerFactory.getLogger(SparkConnectSmoke.class);
+    public static final String TEST_WAREHOUSE = "test_warehouse";
+    public static final String TEST_NAMESPACE = "test_namespace";
+    public static final String TEST_TABLE = "test_table";
+
+    public void smokeTest(SparkConnectClient client, AfonCatalog catalog) {
+        SparkSession spark = client.sparkSession(TEST_WAREHOUSE, catalog.toString());
+        String tableFQN = String.format("%s.%s.%s", TEST_WAREHOUSE, TEST_NAMESPACE, TEST_TABLE);
+        logger.info("Reading table {}", tableFQN);
+        spark.sql(String.format("SELECT * FROM %s", tableFQN)).show();
     }
 
-    public void smokeTestAllWarehouses(SparkConnect connect) {
-        connect.talkToSparkConnectAllWarehouses();
+    public void smokeTestAllWarehouses(SparkConnectClient client, AfonCatalog catalog) {
+        SparkSession spark = client.sparkSessionAllWarehouses("federatedCatalogName");
+        String tableFQN = String.format("%s.%s.%s", catalog, TEST_NAMESPACE, TEST_TABLE);
+        logger.info("Reading table {}", tableFQN);
+        spark.sql(String.format("SELECT * FROM %s", tableFQN)).show();
     }
 
     public static void main(String[] args) {
         if (args.length == 0) {
-            System.out.printf("%s requires argument: polaris-endpoint", SparkConnectSmoke.class.getSimpleName());
+            System.out.printf("%s requires argument: cloud", SparkConnectSmoke.class.getSimpleName());
             return;
         }
-        var app = new SparkConnectSmoke();
+        AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
         var properties = new OpsPropertyProvider();
-        String polarisEndpoint = args[0];
-        properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
+        var afonCatalogs = new AfonCatalogs(properties);
+        var app = new SparkConnectSmoke();
+        properties.setValue(POLARIS_ENDPOINT, new PolarisCredentials(cloud, properties).getPolarisEndpoint());
         try {
-            app.smokeTest(new SparkConnect(properties));
-            app.smokeTest(new SparkConnectUsingOIDC(properties));
-            app.smokeTestAllWarehouses(new SparkConnect(properties));
-            app.smokeTestAllWarehouses(new SparkConnectUsingOIDC(properties));
+            AfonCatalog catalog = catalogFor(cloud, afonCatalogs);
+            app.smokeTest(new SparkConnectClient(properties), catalog);
+            app.smokeTest(new SparkConnectUsingOIDC(properties), catalog);
+            app.smokeTestAllWarehouses(new SparkConnectClient(properties), catalog);
+            app.smokeTestAllWarehouses(new SparkConnectUsingOIDC(properties), catalog);
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private static AfonCatalog catalogFor(AfonCloud cloud, AfonCatalogs catalogs) {
+        switch (cloud) {
+            case AWS:
+                return catalogs.aws();
+            case AZURE:
+                return catalogs.azure();
+            case GCP:
+                return catalogs.gcp();
+            default:
+                throw new IllegalArgumentException("Unknown cloud: " + cloud);
         }
     }
 

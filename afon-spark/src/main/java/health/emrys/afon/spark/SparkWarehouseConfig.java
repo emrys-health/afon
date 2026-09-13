@@ -18,29 +18,22 @@ import static org.apache.iceberg.CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
 
 public class SparkWarehouseConfig {
 
-    public static final String SPARK_IMAGE = "ph1ll1phenry/spark_jars_cp:4.0.1";
-
     private static final Logger logger = LoggerFactory.getLogger(SparkWarehouseConfig.class);
 
     private final String SPARK_SESSION_EXTENSIONS = StaticSQLConf$.MODULE$.SPARK_SESSION_EXTENSIONS().key();
     private final String WAREHOUSE_PATH           = StaticSQLConf$.MODULE$.WAREHOUSE_PATH().key();
 
+    private final String host;
+    private final String protocol;
     private final String clientId;
     private final String clientSecret;
-    private final String host;
-    private final String polarisProtocol;
     private final AfonCatalogs afonCatalogs;
 
-    SparkWarehouseConfig(
-        String clientId,
-        String clientSecret,
-        String host,
-        String polarisProtocol,
-        AfonCatalogs afonCatalogs) {
-        this.clientId        = clientId;
-        this.clientSecret    = clientSecret;
-        this.host            = host;
-        this.polarisProtocol = polarisProtocol;
+    SparkWarehouseConfig(String host, String protocol, String clientId, String clientSecret, AfonCatalogs afonCatalogs) {
+        this.host = host;
+        this.protocol = protocol;
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
         this.afonCatalogs = afonCatalogs;
     }
 
@@ -60,7 +53,7 @@ public class SparkWarehouseConfig {
         String tmpDir = Files.createTempDirectory("SparkForTesting").toString();
         SparkConf sparkConf = new SparkConf()
             .setMaster(format("local[%d]", cores))
-            .setAppName("Tests")
+            .setAppName(this.getClass().getSimpleName())
             .setSparkHome(tmpDir)
             .set(WAREHOUSE_PATH, tmpDir);
         configure(sparkConf, catalogNames);
@@ -71,17 +64,17 @@ public class SparkWarehouseConfig {
     protected void configure(SparkConf sparkConf, String[] catalogNames) {
         for (String catalogName : catalogNames) {
             logger.info("Configuring Spark context for catalog {}", catalogName);
-            configureWith(sparkConfigs(catalogName), sparkConf);
+            configureWith(sparkConf, sparkConfigs(catalogName));
         }
 
-        configureWith(sparkConfigStatics(), sparkConf);
+        configureWith(sparkConf, sparkConfigStatics());
     }
 
-    public static void configureWith(Map<String, String> sparkProperties, SparkConf sparkConf) {
+    public static void configureWith(SparkConf sparkConf, Map<String, String> config) {
         StringBuffer sb = new StringBuffer();
-        sparkProperties.entrySet().forEach(x -> sb.append(format("\n%-80s %50s", x.getKey(), x.getValue())));
+        config.entrySet().forEach(x -> sb.append(format("\n%-80s %50s", x.getKey(), x.getValue())));
         logger.info(sb.toString());
-        sparkProperties.entrySet().stream().forEach(entry -> {
+        config.entrySet().stream().forEach(entry -> {
             sparkConf.set(entry.getKey(), entry.getValue());
         });
     }
@@ -106,28 +99,27 @@ public class SparkWarehouseConfig {
     }
 
     public Map<String, String> sparkConfigs(String sparkCatalog, String catalogName) {
-        Map conf = new HashMap<String, String>();
-        conf.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
-        conf.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
-        conf.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
-        conf.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
-        conf.put(format("spark.sql.catalog.%s.scope", sparkCatalog), OAUTH_SCOPE);
-        conf.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
-        conf.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", polarisProtocol,
-                                                                          host));
-        conf.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), catalogName); // this is the Polaris catalog name
-        return Map.copyOf(conf);
+        Map config = new HashMap<String, String>();
+        config.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
+        config.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
+        config.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
+        config.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
+        config.put(format("spark.sql.catalog.%s.scope", sparkCatalog), OAUTH_SCOPE);
+        config.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
+        config.put(format("spark.sql.catalog.%s.uri", sparkCatalog), format("%s://%s/api/catalog", protocol, host));
+        config.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), catalogName); // this is the Polaris catalog name
+        return Map.copyOf(config);
     }
 
     public Map<String, String> sparkConfigStatics() {
-        Map conf = new HashMap<String, String>();
-        conf.put(SPARK_SESSION_EXTENSIONS, "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        conf.put("spark.driver.allowMultipleContexts", "true");
-        conf.put("spark.sql.iceberg.planning.preserve-data-grouping", "true");
-        conf.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        conf.put("spark.sql.sources.bucketing.enabled", "true");
-        conf.put("spark.sql.sources.v2.bucketing.enabled", "true");
-        return conf;
+        Map config = new HashMap<String, String>();
+        config.put(SPARK_SESSION_EXTENSIONS, "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
+        config.put("spark.driver.allowMultipleContexts", "true");
+        config.put("spark.sql.iceberg.planning.preserve-data-grouping", "true");
+        config.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
+        config.put("spark.sql.sources.bucketing.enabled", "true");
+        config.put("spark.sql.sources.v2.bucketing.enabled", "true");
+        return config;
     }
 
     public String getClientId() {
