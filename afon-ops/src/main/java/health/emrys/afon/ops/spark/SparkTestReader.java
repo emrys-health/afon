@@ -7,8 +7,17 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 
+import java.util.List;
+
 import static org.slf4j.LoggerFactory.getLogger;
 
+/**
+ * Reads a list of values from a test table that have been previously written with {@link SparkTestWriter}.
+ *
+ * Eg, on cloud "azure" and catalog "azure":
+ *
+ * ./afon.sh -a exec -ec ops.spark.SparkTestReader -ea "azure azure test_namespace test_table [values-csv]" -lc INFO
+ */
 public class SparkTestReader extends SparkRunner {
 
     private static final Logger logger = getLogger(SparkTestWriter.class);
@@ -18,17 +27,16 @@ public class SparkTestReader extends SparkRunner {
     }
 
     @Override
-    protected void doRun(SparkSession spark, String catalogName, String namespace, String tableName) {
+    protected void doRun(SparkSession spark, String catalogName, String namespace, String tableName, List<String> values) {
         spark.conf().set("spark.sql.parquet.enableVectorizedReader", "false");
         spark.conf().set("spark.sql.iceberg.vectorization.enabled", "false");
         String tableFQN = tableFQN(catalogName, namespace, tableName);
-        logger.info("Reading from: {}", tableFQN);
+        logger.info("Reading from table {}", tableFQN);
         Dataset<Row> table = spark.table(tableFQN);
         table.show();
-        // these blow up with:
-        // java.lang.IllegalStateException: Invalid ADLS Credentials for storage-account afonstorageaccount.dfs.core.windows.net: empty
-//        spark.sql(format("SELECT * FROM %s.snapshots", fqn)).show();
-//        spark.sql(format("SELECT file_path FROM %s.files", fqn)).show();
+        List<Row> rows = table.collectAsList();
+        List<String> read = rows.stream().map(r -> r.getAs("value").toString()).toList();
+        logger.info("Read values {}, expected {}", read, values);
     }
 
     public static void main(String[] args) {

@@ -6,6 +6,8 @@ import org.apache.spark.sql.SparkSession;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
+import java.util.List;
+
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.spark.SparkSessionFactory.createSparkSession;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -24,7 +26,8 @@ abstract public class SparkRunner {
             if (args.length < 4) {
                 System.out.printf("""
                     SparkRunner requires at least 4 arguments:
-                        cloud catalog-name namespace table-name [polaris-id] [polaris-secret]
+                        cloud catalog-name namespace table-name [values-csv] [polaris-id] [polaris-secret]
+                    values-csv: csv list of values to read and write
                     args: %s    
                     """, String.join(" ", args));
                 return;
@@ -33,11 +36,17 @@ abstract public class SparkRunner {
             String catalogName = args[1];
             String namespace = args[2];
             String tableName = args[3];
+            String values;
+            if (args.length == 5) {
+                values = args[4];
+            } else {
+                values = "apple,banana,orange";
+            }
             String polarisId;
             String polarisSecret;
-            if (args.length == 6) {
-                polarisId = args[4];
-                polarisSecret = args[5];
+            if (args.length == 7) {
+                polarisId = args[5];
+                polarisSecret = args[6];
             } else {
                 polarisId = properties.getValue(USER_POLARIS_ID);
                 polarisSecret = properties.getValue(USER_POLARIS_SECRET);
@@ -46,7 +55,7 @@ abstract public class SparkRunner {
             properties.setValue(POLARIS_ID, polarisId);
             properties.setValue(POLARIS_SECRET, polarisSecret);
             SparkSession spark = createSparkSession(cloud, properties, new String[]{catalogName});
-            app.doRun(spark, catalogName, namespace, tableName);
+            app.doRun(spark, catalogName, namespace, tableName, List.of(values.split(",")));
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);
             throw new RuntimeException(e);
@@ -61,7 +70,7 @@ abstract public class SparkRunner {
         return catalogName + "." + namespace + "." + tableName;
     }
 
-    protected abstract void doRun(SparkSession spark, String catalogName, String namespace, String tableName);
+    protected abstract void doRun(SparkSession spark, String catalogName, String namespace, String tableName, List<String> values);
 
 
 }

@@ -12,12 +12,17 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.slf4j.Logger;
 
-import java.util.Arrays;
 import java.util.List;
 
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
+/**
+ * Write a list of values to a test table.
+ * Eg, on cloud "azure" and catalog "azure":
+ *
+ * ./afon.sh -a exec -ec ops.spark.SparkTestWriter -ea "azure azure test_namespace test_table a,b,c" -lc INFO
+ */
 public class SparkTestWriter extends SparkRunner {
 
     private static final Logger logger = getLogger(SparkTestWriter.class);
@@ -26,29 +31,26 @@ public class SparkTestWriter extends SparkRunner {
         super(properties);
     }
 
-
-    public void doRun(SparkSession spark, String catalogName, String namespace, String tableName) {
-        String namespaceSql = format("CREATE NAMESPACE IF NOT EXISTS %s", namespaceFQN(catalogName, namespace));
+    public void doRun(SparkSession spark, String catalogName, String namespace, String tableName, List<String> values) {
+        String namespaceFQN = namespaceFQN(catalogName, namespace);
+        logger.info("Creating namespace {}", namespaceFQN);
+        String namespaceSql = format("CREATE NAMESPACE IF NOT EXISTS %s", namespaceFQN);
         logger.info("Executing: {}", namespaceSql);
         spark.sql(namespaceSql);
 
-        List<Row> rows = Arrays.asList(
-                RowFactory.create("apple"),
-                RowFactory.create("banana"),
-                RowFactory.create("cherry")
-        );
-
-        StructType schema = new StructType(new StructField[]{
-            new StructField("value", DataTypes.StringType, false, Metadata.empty())
-        });
         String tableFQN = tableFQN(catalogName, namespace, tableName);
-        logger.info("Writing to: {}", tableFQN);
-        Dataset<Row> df = spark.createDataFrame(rows, schema);
-
+        logger.info("Creating table {}", tableFQN);
         String createTableSql = format("CREATE TABLE IF NOT EXISTS %s (value String) USING iceberg ", tableFQN);
         logger.info("Executing: {}", createTableSql);
         spark.sql(createTableSql);
 
+        logger.info("Writing to table {}", tableFQN);
+        StructType schema = new StructType(new StructField[]{
+                new StructField("value", DataTypes.StringType, false, Metadata.empty())
+        });
+        List<Row> rows = values.stream().map(v -> RowFactory.create(v)).toList();
+        logger.info("Write values {}", values);
+        Dataset<Row> df = spark.createDataFrame(rows, schema);
         df.write()
           .mode("overwrite")   // or "append"
           .saveAsTable(tableFQN);
