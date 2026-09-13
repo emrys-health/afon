@@ -33,7 +33,7 @@ import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.*;
-import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
+import static health.emrys.afon.cdk.SparkWorkloads.SPARK_IMAGE;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;

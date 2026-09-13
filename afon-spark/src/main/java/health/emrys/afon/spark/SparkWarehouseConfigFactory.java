@@ -10,9 +10,8 @@ public class SparkWarehouseConfigFactory {
         return new SparkWarehouseConfigFactory();
     }
 
-    public SparkWarehouseConfig createConfig(
-            AfonPropertyProvider properties, String endpoint, String clientId,
-            String clientSecret) {
+    public SparkWarehouseConfig createConfig(AfonPropertyProvider properties,
+                                             String endpoint, String clientId, String clientSecret) {
         properties.setValue(POLARIS_ENDPOINT, endpoint);
         properties.setValue(POLARIS_ID, clientId);
         properties.setValue(POLARIS_SECRET, clientSecret);

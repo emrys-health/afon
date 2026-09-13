@@ -19,10 +19,8 @@ import java.util.Map;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.cdk.CdkUtils.*;
-import static health.emrys.afon.cdk.JupyterHubConfig.USER_POD_LABELS;
 import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
 import static health.emrys.afon.config.AfonProperty.USER_POLARIS_SECRET;
-import static health.emrys.afon.spark.SparkWarehouseConfig.SPARK_IMAGE;
 import static java.lang.String.format;
 
 /**
@@ -33,6 +31,7 @@ import static java.lang.String.format;
  * manifests leaves it idle, which is why both the AWS and Azure stacks must call {@link #deploy}.
  */
 public class SparkWorkloads {
+    public static final String SPARK_IMAGE = "ph1ll1phenry/spark_jars_cp:4.0.1";
     public static final String MASTER = "emrys-master";
     public static final Map<String, String> MASTER_LABELS = Map.of(
         "spark-role", "master");
@@ -89,7 +88,7 @@ public class SparkWorkloads {
             )
         );
 
-        String                     sparkClusterJson       = toJson(sparkClusterManifest);
+        String sparkClusterJson = toJson(sparkClusterManifest);
         List<LocalExecProvisioner> allClusterProvisioners = new ArrayList<>();
         allClusterProvisioners.addAll(uponCreateRun("echo '" + sparkClusterJson + "' | kubectl apply -f -"));
         allClusterProvisioners.addAll(uponDestroyRun(
