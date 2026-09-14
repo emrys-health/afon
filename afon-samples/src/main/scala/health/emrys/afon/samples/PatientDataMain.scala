@@ -3,8 +3,8 @@ package health.emrys.afon.samples
 import health.emrys.afon.config.AfonCloud._
 import health.emrys.afon.config.{AfonCloud, AfonPropertyProvider, FilePropertyProvider}
 import health.emrys.afon.samples.SampleData.{occupancyDataset, patientDataset}
-import health.emrys.afon.ops.spark.SparkSessionFactory
 import health.emrys.afon.polaris.config.PolarisCatalogManager
+import health.emrys.afon.spark.SparkClient
 import org.apache.spark.sql.SparkSession
 
 import java.lang.String.format
@@ -58,6 +58,6 @@ object PatientDataMain {
   }
 
   private def initSpark(properties: AfonPropertyProvider): SparkSession = {
-    SparkSessionFactory.createSparkSession(AfonCloud.AWS, properties)  // AWS for argument's sake...
+    new SparkClient(AWS, properties).sparkSessionAllWarehouses() // AWS for argument's sake...
   }
 }

@@ -20,7 +20,7 @@ import static health.emrys.afon.config.AfonProperty.SPARK_CONNECT_URL;
  * {@code sc://} connection string (see {@link #DEFAULT_SPARK_CONNECT_URL}, configurable via
  * {@link AfonProperty#SPARK_CONNECT_URL}).
  *
- * Unlike {@code SparkRunner}, which builds a full, in-process {@link SparkSession},
+ * Unlike {@code SparkClient}, which builds a full, in-process {@link SparkSession},
  * {@link SparkConnectClient} starts no local Spark runtime at all: {@link #sparkSession}
  * and {@link #sparkSessionAllWarehouses} just build a remote-mode {@link SparkSession} that
  * forwards queries to the already-running server, which owns the actual driver/executors,
