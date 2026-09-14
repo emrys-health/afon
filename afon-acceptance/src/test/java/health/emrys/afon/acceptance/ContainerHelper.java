@@ -33,7 +33,9 @@ import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.*;
-import static health.emrys.afon.cdk.SparkWorkloads.SPARK_IMAGE;
+import static health.emrys.afon.cdk.DockerImages.KEYCLOAK_IMAGE;
+import static health.emrys.afon.cdk.DockerImages.POLARIS_IMAGE;
+import static health.emrys.afon.cdk.DockerImages.SPARK_IMAGE;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -156,7 +158,7 @@ public class ContainerHelper {
         if (polaris == null) {
             String polarisId = properties.getValue(POLARIS_ID);
             String polarisSecret = properties.getValue(POLARIS_SECRET);
-            polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
+            polaris = new GenericContainer<>(POLARIS_IMAGE)
                     // Same network as KeyCloak so Polaris can reach it via the KEYCLOAK_ALIAS host name.
                     .withNetwork(network)
                     // Declare the ports so the HTTP wait strategy can resolve them (the fixed bindings

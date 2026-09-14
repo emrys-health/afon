@@ -31,7 +31,6 @@ import static java.lang.String.format;
  * manifests leaves it idle, which is why both the AWS and Azure stacks must call {@link #deploy}.
  */
 public class SparkWorkloads {
-    public static final String SPARK_IMAGE = "ph1ll1phenry/spark_jars_cp:4.0.1";
     public static final String MASTER = "emrys-master";
     public static final Map<String, String> MASTER_LABELS = Map.of(
         "spark-role", "master");
@@ -79,7 +78,7 @@ public class SparkWorkloads {
                     )
                 ),
                 "sparkConf", Map.of(
-                    "spark.kubernetes.container.image", SPARK_IMAGE,
+                    "spark.kubernetes.container.image", DockerImages.SPARK_IMAGE,
                     "spark.master.ui.title", "Prod Spark Cluster",
                     "spark.master.rest.enabled", "true",
                     "spark.master.rest.host", "0.0.0.0",
@@ -174,7 +173,7 @@ public class SparkWorkloads {
      */
     private Map<String, String> sparkConfig(String polarisDomainName) {
         var first = Map.of(
-            "spark.kubernetes.container.image", SPARK_IMAGE,
+            "spark.kubernetes.container.image", DockerImages.SPARK_IMAGE,
             "spark.master.ui.title", "Prod Spark Cluster",
             "spark.master.rest.enabled", "true",
             "spark.master.rest.host", "0.0.0.0",
