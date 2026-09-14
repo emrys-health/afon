@@ -32,8 +32,8 @@ public class PolarisConstants {
                             -jar /deployments/quarkus-run.jar""", DEBUG_PORT).replaceAll("\\s+", " ").trim();
 
     // NOTE: polaris and polaris-admin-tool versions must be kept in sync
-    public static final String POLARIS_IMAGE_NAME = "apache/polaris:1.5.0";
-    public static final String POLARIS_ADMIN_TOOL_IMAGE_NAME = "apache/polaris-admin-tool:1.5.0";
+    public static final String POLARIS_IMAGE_NAME = "apache/polaris:1.6.0";
+    public static final String POLARIS_ADMIN_TOOL_IMAGE_NAME = "apache/polaris-admin-tool:1.6.0";
     public static final String POLARIS_INTERNAL_SERVICE_NAME = "polaris-internal";
 
     /**
