@@ -138,7 +138,7 @@ public class PolarisConfig extends Construct {
         JobV1SpecTemplateSpecInitContainer dbCreate = JobV1SpecTemplateSpecInitContainer
                 .builder()
                 .name("db-create")
-                .image("postgres:16-alpine")
+                .image(DockerImages.POSTGRES_ALPINE_IMAGE)
                 .command(List.of("sh", "-c", createDbScript))
                 .env(List.of(
                         initJobEnv("PGHOST", host),
@@ -166,7 +166,7 @@ public class PolarisConfig extends Construct {
         JobV1SpecTemplateSpecContainer bootstrap = JobV1SpecTemplateSpecContainer
                 .builder()
                 .name("bootstrap")
-                .image(POLARIS_ADMIN_TOOL_IMAGE_NAME)
+                .image(DockerImages.POLARIS_ADMIN_TOOL_IMAGE)
                 .command(List.of("sh", "-c", bootstrapScript))
                 .env(List.of(
                         jobEnv("POLARIS_PERSISTENCE_TYPE", "relational-jdbc"),
@@ -357,7 +357,7 @@ public class PolarisConfig extends Construct {
         DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("polaris")
-            .image(POLARIS_IMAGE_NAME)
+            .image(DockerImages.POLARIS_IMAGE)
             .command(commands)
             .volumeMount(mounts)
             .readinessProbe(readinessProbe)

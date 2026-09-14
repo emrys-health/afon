@@ -18,7 +18,6 @@ public class KeyCloakConfigurer {
 
     public static final String HTTP = "http";
     public static final int    KEYCLOAK_PORT  = 8080;
-    public static final String KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak:26.6.3";
     /**
      * KeyCloak's env var names (Quarkus config), which map to
      * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME} and {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD}.
