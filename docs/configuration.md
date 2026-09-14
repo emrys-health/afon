@@ -2,24 +2,35 @@
 
 ## Config dir
 
-All configuration is read from the config dir, assumed to be a child dir named `config` in the Afon home dir, 
+All configuration is read from the config dir, assumed to be a child dir named `config` in the Afon home dir,
 which by default points to `$HOME/.afon`.  The default config dir is then `$HOME/.afon/config`.
 
-The Afon home can be overridden by the `--home <afon-home>` option of `afon.sh`.   
-In your IDE, you can override via the `-Dafon.home=<afon-home>` system property.
+## Config Env
+
+Afon supports different envs for configuration, eg to allow for an `dev` and a `stg` env.  
 
 ### Command config-init
-Whichever Afon home you decide to use, you can initialise the config files by running:
+You can initialise the config files for a given env by running:
 
 ```shell
-./afon.sh -a config-init
+./afon.sh -a config-init --config-env <env>
 ```
-This copies empty config files from templates to the config dir.  
+This copies config files from templates to the `config-<env>` dir and creates a symlink `config -> config-<env>`.  
 
 **NOTE**: The config-init command will create a new config dir, if not found, but it also can work with an existing config dir.
 However, in case of an existing config dir, any existing files will not be overwritten and will need to be removed manually.
 
-Once initialised, the config values need to be completed.
+Once initialised, the config values need to be filled in.
+
+### Command config-switch
+
+You can switch between config envs using the `config-switch` action:
+```shell
+./afon.sh -a config-switch --config-env {dev|stg} # config symlink for <env> 
+```
+This will create or move the symlink `config -> config-<env>`.
+
+**NOTE**: If you're using multiple config envs, the config dir must be a symlink and not a dir.  
 
 ### Command config-validate 
 
@@ -38,24 +49,12 @@ The recommended workaround is to init without specifying the cloud and to valida
 
 You can also import or export the config files as a zip: 
 ```shell
-./afon.sh -a config-{import|export} --config-zip <path-to-config-zip>
+./afon.sh -a config-{import|export} --config-zip <path-to-config-zip> --config-env <env>
 ```
 This can be useful when sharing a pre-defined configuration.
 
-**NOTE**: The config-import command assumes that the config dir does not exist and is created in the process.  
+**NOTE**: The config-import command assumes that the `config-<env>` dir does not exist and is created in the process.  
 If a config dir is already present, it will stop.
-
-### Command config-switch
-
-To support multiple config envs, say a `dev` and a `stg` env, you can use the `config-switch` action:
-```shell
-./afon.sh -a config-switch --config-env {dev|stg} # config symlink for <env> 
-```
-This will create or move the symlink `<afon-home>/config` pointing to `<afon-home>/config-<env>`.  
-
-**NOTE**: If you're using multiple config envs, the config dir must be a symlink and not a dir.  
-Create config env dirs `<afon-home>/config-<env>` and ensure there is no config dir.   
-The config-switch action will remove any existing symlink.
 
 ### Command config-status
 

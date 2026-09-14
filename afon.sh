@@ -159,36 +159,7 @@ exec_cdktf_status(){
 exec_config(){
   CONFIG_ACTION=${ACTION#config-}
   case $CONFIG_ACTION in
-    import)
-        if [ -z "$CONFIG_ZIP" ]; then
-          echo "Action $ACTION requires option --config-zip"
-          usage; exit 0
-        fi
-        if [ -d $CONFIG_DIR ]; then
-          echo "$CONFIG_DIR already exists.  Remove and retry."
-          exit 0
-        fi
-        if [ -f $CONFIG_ZIP ]; then
-          mkdir -p $CONFIG_DIR
-          unzip -jqu $CONFIG_ZIP -d $CONFIG_DIR
-          echo "Imported $CONFIG_ZIP to $CONFIG_DIR."
-        else
-          echo "File $CONFIG_ZIP not found."
-        fi
-      ;;
-    export)
-      if [ -z "$CONFIG_ZIP" ]; then
-        echo "Action $ACTION requires option --config-zip"
-        usage; exit 0
-      fi
-      if [ -d $CONFIG_DIR ]; then
-        zip -jr $CONFIG_ZIP $CONFIG_DIR
-        echo "Exported $CONFIG_DIR to $CONFIG_ZIP."
-      else
-        echo "Dir $CONFIG_DIR not found."
-      fi
-      ;;
-    init|validate|renames)
+    init|import|export|validate|renames)
       SCRIPT_PATH="config/$CONFIG_ACTION.sh"
       exec_script
       ;;
