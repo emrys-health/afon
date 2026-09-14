@@ -3,7 +3,6 @@ package health.emrys.afon.polaris.config;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
@@ -23,54 +22,45 @@ public class PolarisCatalogManager {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogManager.class);
 
-    private static final Map<String, Function<AfonPropertyProvider, PolarisCatalog>>
-            CLOUD_TO_CATALOG = Map.of(
-            "aws", AwsPolarisCatalog::new,
-            "azure", AzurePolarisCatalog::new,
-            "azure_external", AzureExternalPolarisCatalog::new,
-            "gcp", GcpPolarisCatalog::new,
-            "gcp_external", GcpExternalPolarisCatalog::new);
-
-    private static PolarisCatalog[] catalogs(AfonPropertyProvider properties) {
-        List<PolarisCatalog> catalogs = new ArrayList<>();
-        switch ( ConfigUtils.afonCloud() ){
-            case "aws":
-                catalogs.add(new AwsPolarisCatalog(properties));
-                catalogs.add(new AwsForbiddenPolarisCatalog(properties));
-                catalogs.add(new GlueAwsPolarisCatalog(properties));
-                break;
-            case "azure":
-                catalogs.add(new AzurePolarisCatalog(properties));
-                catalogs.add(new AzureExternalPolarisCatalog(properties));
-                break;
-            case "gcp":
-                catalogs.add(new GcpPolarisCatalog(properties));
-                break;
-            default:
-                catalogs.add(new AwsPolarisCatalog(properties));
-                catalogs.add(new AwsForbiddenPolarisCatalog(properties));
-                catalogs.add(new GlueAwsPolarisCatalog(properties));
-                catalogs.add(new AzurePolarisCatalog(properties));
-                catalogs.add(new AzureExternalPolarisCatalog(properties));
-                catalogs.add(new GcpPolarisCatalog(properties));
-        }
-        return catalogs.toArray(PolarisCatalog[]::new);
-    }
+    /**
+     * Factories keyed by {@link AfonCatalog#toString()}'s canonical name, so the catalogs actually
+     * configured always match whatever {@link AfonCatalogs} resolves to - the built-in default set,
+     * or a user-supplied {@code CATALOG_NAMES_CSV} - rather than a separately maintained list.
+     */
+    private static final Map<String, Function<AfonPropertyProvider, PolarisCatalog>> CATALOG_FACTORIES = Map.ofEntries(
+            Map.entry("aws", AwsPolarisCatalog::new),
+            Map.entry("aws_forbidden", AwsForbiddenPolarisCatalog::new),
+            Map.entry("aws_trino", AwsTrinoPolarisCatalog::new),
+            Map.entry("aws_external", AwsExternalPolarisCatalog::new),
+            Map.entry("azure", AzurePolarisCatalog::new),
+            Map.entry("azure_external", AzureExternalPolarisCatalog::new),
+            Map.entry("azure_forbidden", AzureForbiddenPolarisCatalog::new),
+            Map.entry("gcp", GcpPolarisCatalog::new),
+            Map.entry("gcp_external", GcpExternalPolarisCatalog::new),
+            Map.entry("gcp_forbidden", GcpForbiddenPolarisCatalog::new));
 
     private final AfonPropertyProvider properties;
     private final AfonCatalogs afonCatalogs;
-    private final PolarisCatalog[] catalogs;
     private final CatalogConfigurer configurer;
 
     public PolarisCatalogManager(AfonPropertyProvider properties) {
         this.properties = properties;
         this.afonCatalogs = new AfonCatalogs(properties);
         this.configurer = new CatalogConfigurer(PolarisRestClientFactory.clientFactory().createClient(properties));
-        this.catalogs = catalogs(properties);
+    }
+
+    /**
+     * Built lazily (only when actually configuring every catalog) since resolving every
+     * {@link AfonCatalog} requires properties for every cloud - eagerly building this in the
+     * constructor would break any cloud-scoped run (eg {@code afon.cloud=aws}) that only loads
+     * that cloud's properties.
+     */
+    private PolarisCatalog[] catalogs() {
+        return afonCatalogs.all().stream().map(this::catalogOf).toArray(PolarisCatalog[]::new);
     }
 
     public List<HttpResponse> configureAllCatalogs() throws IncorrectConfigException, IOException {
-        return configureCatalogs(catalogs);
+        return configureCatalogs(catalogs());
     }
 
     public List<HttpResponse> configureCatalogs(String... catalogNames) throws IOException, IncorrectConfigException {
@@ -89,12 +79,15 @@ public class PolarisCatalogManager {
     }
 
     private PolarisCatalog[] catalogsOf(String... names) {
-        return Arrays.stream(names).map(name -> catalogOf(name)).toArray(PolarisCatalog[]::new);
+        return Arrays.stream(names).map(afonCatalogs::get).map(this::catalogOf).toArray(PolarisCatalog[]::new);
     }
 
-    private PolarisCatalog catalogOf(String name) {
-        AfonCatalog catalog = afonCatalogs.get(name);
-        return CLOUD_TO_CATALOG.get(catalog.toString()).apply(properties);
+    private PolarisCatalog catalogOf(AfonCatalog catalog) {
+        Function<AfonPropertyProvider, PolarisCatalog> factory = CATALOG_FACTORIES.get(catalog.toString());
+        if (factory == null) {
+            throw new IllegalArgumentException("No PolarisCatalog implementation registered for catalog '" + catalog + "'");
+        }
+        return factory.apply(properties);
     }
 
     private List<String> catalogNames(PolarisCatalog... catalogs) {

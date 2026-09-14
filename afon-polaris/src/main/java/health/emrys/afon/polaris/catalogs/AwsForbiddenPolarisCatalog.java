@@ -10,7 +10,7 @@ public class AwsForbiddenPolarisCatalog extends AwsPolarisCatalog {
     private final String bucketUrl;
     private final String roleArn;
     private final String region;
-    public static final String AWS_POLARIS_FORBIDDEN = "aws_polaris_forbidden";
+    public static final String AWS_FORBIDDEN = "aws_forbidden";
 
     public AwsForbiddenPolarisCatalog(AfonPropertyProvider properties) {
         super(properties);
@@ -36,6 +36,6 @@ public class AwsForbiddenPolarisCatalog extends AwsPolarisCatalog {
     }
 
     public String catalogName() {
-        return AWS_POLARIS_FORBIDDEN;
+        return AWS_FORBIDDEN;
     }
 }

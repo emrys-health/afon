@@ -19,7 +19,7 @@ public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     public GcpExternalPolarisCatalog(AfonPropertyProvider properties) {
         super(properties);
-        this.bucketUrl      = gsBucketUrl(properties.getValue(GCP_BUCKET_NAME));
+        this.bucketUrl      = gsBucketUrl(properties.getValue(GCP_BUCKET_NAME_EXTERNAL));
         this.serviceAccount = properties.getValue(GCP_SERVICE_ACCOUNT);
         this.endpoint       = "https://" + properties.getValue(GCP_POLARIS_DOMAIN_NAME);
     }

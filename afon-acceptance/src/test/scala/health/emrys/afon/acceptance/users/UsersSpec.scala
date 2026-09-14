@@ -4,11 +4,13 @@ import health.emrys.afon.acceptance.SparkHelper.{CatalogName1, CatalogName2, spa
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, Users}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
-import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, AfonUserProvider}
+import health.emrys.afon.config.AfonProperty.{USER_POLARIS_ID, USER_POLARIS_SECRET}
+import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, AfonUserAcl, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.polaris.catalogs.{AwsForbiddenPolarisCatalog, AwsPolarisCatalog, PolarisCatalog}
+import health.emrys.afon.spark.{CatalogWarehouse, KeyCloakSparkWarehouseConfigForTesting}
 import org.apache.hc.core5.http.HttpResponse
-import org.apache.iceberg.exceptions.ForbiddenException
+import org.apache.iceberg.exceptions.{ForbiddenException, NotAuthorizedException, RESTException}
 import org.scalatest.GivenWhenThen
 
 import java.util
@@ -29,20 +31,65 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
       assert(ContainerHelper.instance.startKeyCloak(AcceptanceTestConfig.instance.getProperties) != null)
       assert(ContainerHelper.instance.startPolaris(AcceptanceTestConfig.instance.getProperties) != null)
 
-      When(s"we configure the ${catalogName} with a catalog that looks like:\n$catalog")
-      configureUsersInKeyCloakAndPolaris(catalogName, TestUsers())
-      val sql = s"CREATE NAMESPACE IF NOT EXISTS ${catalogName}.test_namespace"
-      When(s"we create a namespace with SQL '$sql'")
-      thenUserIsNotAllowedToExecute(sql)
+      // Deliberately withholds authorisation (unlike the shared TestUsers(), which other tests in
+      // this file rely on always authorising) so userX genuinely gets no catalog-role grant here.
+      When(s"we configure the ${catalogName} with a catalog that looks like:\n$catalog, withholding access from ${TestUsers.UserName}")
+      configureUsersInKeyCloakAndPolaris(catalogName, unauthorisedTestUser())
+
+      // Runs as userX specifically, not the shared will-authenticated spark session - will is a
+      // real onboarded user authorised for "all" catalogs (see users-acl.csv), so it would pass.
+      val userCatalog = s"${catalogName}_as_${TestUsers.UserName}"
+      registerCatalogAsTestUser(userCatalog, catalogName)
+      val sql = s"CREATE NAMESPACE IF NOT EXISTS ${userCatalog}.test_namespace"
+      When(s"${TestUsers.UserName} tries to create a namespace with SQL '$sql'")
+      thenUserIsNotAllowedToExecute(sql, TestUsers.UserName)
     }
   }
 
-  private def thenUserIsNotAllowedToExecute(sql: String) = {
+  private def thenUserIsNotAllowedToExecute(sql: String, user: String = sparkUser) = {
 
-    Then(s"$sparkUser is not allowed to use this catalog")
-    intercept[ForbiddenException] {
+    Then(s"$user is not allowed to use this catalog")
+    // Polaris returns ForbiddenException (403) when a principal has some role but lacks the
+    // needed privilege, and NotAuthorizedException (401, with an empty body) when it has no
+    // catalog role resolved on the catalog at all - both mean "access denied" here.
+    val exception = intercept[RESTException] {
       spark.sql(sql)
     }
+    assert(
+      exception.isInstanceOf[ForbiddenException] || exception.isInstanceOf[NotAuthorizedException],
+      s"Expected ForbiddenException or NotAuthorizedException but got ${exception.getClass.getName}: ${exception.getMessage}"
+    )
+  }
+
+  /** An AfonUserProvider for TestUsers.User that never authorises, unlike the shared TestUsers(). */
+  private def unauthorisedTestUser(): AfonUserProvider = new AfonUserProvider() {
+    override def getUsers: util.List[AfonUser] = util.List.of(TestUsers.User)
+    override def getUserNames: util.List[String] = util.List.of(TestUsers.User.username())
+    override def getUser(username: String): AfonUser = TestUsers.User
+    override def getUserAcls: util.List[AfonUserAcl] = util.List.of()
+    override def isAuthorised(username: String, catalogName: String): Boolean = false
+  }
+
+  /**
+   * Registers sparkCatalog on the shared Spark session pointing at warehouse, authenticated as
+   * TestUsers.User (userX) via KeyCloak - rather than the shared session's will credentials -
+   * so subsequent queries against sparkCatalog reflect userX's own grants only.
+   */
+  private def registerCatalogAsTestUser(sparkCatalog: String, warehouse: String): Unit = {
+    val properties = AcceptanceTestConfig.instance.getProperties
+    val originalId = properties.getValue(USER_POLARIS_ID)
+    val originalSecret = properties.getValue(USER_POLARIS_SECRET)
+    val configs =
+      try {
+        properties.setValue(USER_POLARIS_ID, TestUsers.UserName)
+        properties.setValue(USER_POLARIS_SECRET, TestUsers.UserPassword)
+        new KeyCloakSparkWarehouseConfigForTesting(properties, Array.empty[CatalogWarehouse])
+          .sparkConfigs(sparkCatalog, warehouse)
+      } finally {
+        properties.setValue(USER_POLARIS_ID, originalId)
+        properties.setValue(USER_POLARIS_SECRET, originalSecret)
+      }
+    configs.asScala.foreach { case (k, v) => spark.conf.set(k, v) }
   }
 
   "Granting catalog privileges" should {

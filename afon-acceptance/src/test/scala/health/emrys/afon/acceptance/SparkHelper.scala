@@ -25,7 +25,7 @@ object SparkHelper {
       instance.getProperties,
       Array(
         new CatalogWarehouse(
-          AwsForbiddenPolarisCatalog.AWS_POLARIS_FORBIDDEN,
+          AwsForbiddenPolarisCatalog.AWS_FORBIDDEN,
           "forbidden"
         ),
         new CatalogWarehouse(CatalogName1, CatalogName1),
