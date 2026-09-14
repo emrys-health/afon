@@ -2,6 +2,7 @@ package health.emrys.afon.ops.spark;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.spark.SparkClient;
 import org.apache.spark.sql.SparkSession;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -9,7 +10,6 @@ import org.slf4j.Logger;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.ops.spark.SparkSessionFactory.createSparkSession;
 import static org.slf4j.LoggerFactory.getLogger;
 
 abstract public class SparkRunner {
@@ -54,7 +54,7 @@ abstract public class SparkRunner {
             // Using the user credentials for Polaris
             properties.setValue(POLARIS_ID, polarisId);
             properties.setValue(POLARIS_SECRET, polarisSecret);
-            SparkSession spark = createSparkSession(cloud, properties, new String[]{catalogName});
+            SparkSession spark = new SparkClient(cloud, properties).sparkSession(catalogName);
             app.doRun(spark, catalogName, namespace, tableName, List.of(values.split(",")));
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);

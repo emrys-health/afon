@@ -54,7 +54,7 @@ Spark connects to Polaris via the Iceberg REST catalog protocol. `SparkWarehouse
 - OAuth2 credentials (`client_id` / `client_secret`)
 - Warehouse names for each cloud catalog
 
-`SparkSessionFactory` creates a `SparkSession` configured to talk to a Polaris instance.
+`SparkClient` creates a `SparkSession` configured to talk to a Polaris instance.
 
 In the deployed environment, Spark runs as a Spark Connect server in Kubernetes. Jupyter notebooks connect to it via the Spark Connect protocol (`sc://spark-connector-0-driver-svc:15002`).
 
@@ -62,7 +62,7 @@ In the deployed environment, Spark runs as a Spark Connect server in Kubernetes.
 
 Runtime properties are loaded via the `AfonPropertyProvider`.   
 
-All known properties are defined as `AfonProperty` enum, which property knows its own name and can extract its value from a `Properties` object.  
+All known properties are defined as `AfonProperty` enum, in which each property knows its own name and can extract its value from a `Properties` object.  
 
 The `FilePropertyProvider` loads the properties from the properties files in the config dir.
 The config dir is defined relative to the `afon.home` system property. If this is not set, it will default to the top-level dir of the afon-core project.  System properties can override any property value.
