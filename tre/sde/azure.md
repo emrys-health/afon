@@ -82,12 +82,12 @@ After all properties are set, switch to using env `xyz`:
 ```
 This simply creates a symlink `~/.afon/config` to `~/.afon/config-xyz`.   Thereafter, you don't need to specify the env any more.
 
-Next, login and check account:
+Next, login and set account subscription:
 ```shell
 ./afon.sh -a script -sp azure/login.sh 
 ./afon.sh -a script -sp azure/account.sh
 ```
-The `login.sh` logs in the user with the given `$AZURE_TENANT_ID`, while `account.sh` sets the `$AZURE_SUBSCRIPTION`.
+The `login.sh` logs in the user with the given `$AZURE_TENANT_ID`, while `account.sh` sets account to the `$AZURE_SUBSCRIPTION`.
 
 Finally, to create the env:
 ```shell
