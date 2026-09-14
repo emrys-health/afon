@@ -159,7 +159,15 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
   }
 
   private def createAwsForbiddenPolarisCatalog() = {
-    val catalog: PolarisCatalog = new AwsForbiddenPolarisCatalog(AcceptanceTestConfig.instance.getProperties)
+    val catalog: PolarisCatalog = new AwsForbiddenPolarisCatalog(AcceptanceTestConfig.instance.getProperties) {
+      // Distinct from the "aws_forbidden" catalog AwsAccessForbiddenSpec owns (via AcceptanceTestConfig),
+      // which points at a different bucket (AWS_S3_BUCKET_NAME_FORBIDDEN vs
+      // AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS here). Sharing the name let Spark's REST catalog
+      // plugin cache whichever spec's storage location was configured first, for the life of the
+      // shared SparkSession - a non-deterministic collision when both specs run together. This test
+      // only exercises Polaris-level authorisation, not S3/IAM, so the bucket itself doesn't matter.
+      override def catalogName(): String = "users_spec_forbidden"
+    }
     AcceptanceTestConfig.instance.getCatalogManager.configureCatalogs(catalog)
     catalog
   }
