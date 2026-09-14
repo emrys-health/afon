@@ -60,6 +60,10 @@
         <hadoop.version>3.3.4</hadoop.version>
         <httpclient5-fluent.version>5.5</httpclient5-fluent.version>
         <polaris.version>1.6.0</polaris.version>
+        <!-- Kept in sync with the AWS SDK version pulled transitively by org.apache.polaris:polaris-core.
+             Importing the BOM here (rather than per-module) ensures every software.amazon.awssdk
+             artifact in the whole build - direct or transitive - resolves to one consistent version. -->
+        <aws.java.sdk.version>2.44.7</aws.java.sdk.version>
         <scala.version>2.13.18</scala.version>
         <scala.compat.version>2.13</scala.compat.version>
         <spark.compat.version>4.0</spark.compat.version>
@@ -88,6 +92,13 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws.java.sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>org.scala-lang</groupId>
                 <artifactId>scala-library</artifactId>
