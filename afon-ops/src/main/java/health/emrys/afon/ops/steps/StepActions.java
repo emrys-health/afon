@@ -50,9 +50,13 @@ public class StepActions {
 
     @NonNull Path deleteStack(AfonCloud cloud) throws IOException {
         Path stackDir = stackDir(cloud);
-        tofuDestroy(stackDir);
-        deletePath(stackDir);
-        deleteTfStateFiles(cloud);
+        try {
+            tofuDestroy(stackDir);
+            deletePath(stackDir);
+            deleteTfStateFiles(cloud);
+        } catch (ManagedProcessException e) {
+            throw new RuntimeException(e);
+        }
         return stackDir;
     }
 
@@ -66,12 +70,11 @@ public class StepActions {
         return stackDir;
     }
 
-    private void tofuDestroy(Path tofuDir) {
-        try {
-            logger.info("Executing tofu destroy in dir {}", tofuDir);
-            run("tofu", tofuDir, "init");
-            if (run("tofu", tofuDir, "destroy", "--auto-approve") != 0) {
-                String message = String.format("""
+    private void tofuDestroy(Path tofuDir) throws ManagedProcessException {
+        logger.info("Executing tofu destroy in dir {}", tofuDir);
+        run("tofu", tofuDir, "init");
+        if (run("tofu", tofuDir, "destroy", "--auto-approve") != 0) {
+            String message = String.format("""
                 TOFU_DIR=%s
                 Failed to run:
                     tofu -chdir=$TOFU_DIR destroy
@@ -84,11 +87,8 @@ public class StepActions {
                 
                 If you're sure nothing in the environment is still running, delete directory $TOFU_DIR
                 """, tofuDir);
-                logger.error(message);
-                throw new RuntimeException(message);
-            }
-        } catch (Exception e) {
-            logger.error("Failed to execute tofu destroy in dir {}", tofuDir, e);
+            logger.error(message);
+            throw new ManagedProcessException(message);
         }
     }
 
