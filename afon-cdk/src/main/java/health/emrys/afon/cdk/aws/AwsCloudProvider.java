@@ -3,13 +3,16 @@ package health.emrys.afon.cdk.aws;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.TerraformOutput;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.providers.aws.data_aws_eip.DataAwsEip;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
 import com.hashicorp.cdktf.providers.aws.data_aws_lb.DataAwsLb;
 import com.hashicorp.cdktf.providers.aws.data_aws_lb.DataAwsLbConfig;
+import com.hashicorp.cdktf.providers.aws.eip.Eip;
 import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntry;
 import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntryConfig;
 import com.hashicorp.cdktf.providers.aws.eks_access_policy_association.EksAccessPolicyAssociation;
@@ -28,6 +31,7 @@ import com.hashicorp.cdktf.providers.aws.iam_role.IamRoleConfig;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachment;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachmentConfig;
 import com.hashicorp.cdktf.providers.aws.internet_gateway.InternetGateway;
+import com.hashicorp.cdktf.providers.aws.nat_gateway.NatGateway;
 import com.hashicorp.cdktf.providers.aws.provider.AwsProvider;
 import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
 import com.hashicorp.cdktf.providers.aws.route53_record.Route53RecordAlias;
@@ -65,6 +69,7 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
+import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
 
@@ -83,6 +88,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     private final EksCluster                 cluster;
     private final List<ITerraformDependable> eksDependOn;
     private final List<String>               subnetIds;
+    private final List<String>               privateSubnetIds;
+    private final String                     egressIp;
     final         DataAwsEksClusterAuth      eksAuthData;
     final         IamRole                    loadBalancerRole;
     final         Resource                   newKubeConfig;
@@ -183,6 +190,101 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
         subnetIds = List.of(publicSubnet1.getId(), publicSubnet2.getId());
 
+        // --- 2b. Single-IP egress ---
+        // Everything the cluster sends to the internet has to arrive from one address a
+        // third party can put on an allow-list, so the nodes live in private subnets whose
+        // default route is a NAT gateway holding a single Elastic IP.
+        //
+        // AWS_EGRESS_IP pins that address to an Elastic IP already allocated in this
+        // account, which is what makes the address survive a destroy/apply cycle. Left
+        // unset, a fresh EIP is allocated and reported as the `egressIp` output - note that
+        // a `tofu destroy` then releases it, and the next apply gets a different address.
+        final String configuredEgressIp = properties.getValue(AWS_EGRESS_IP, "").trim();
+        final String natAllocationId;
+        if (configuredEgressIp.isEmpty()) {
+            final Eip natEip = Eip.Builder
+                .create(this, "natEip")
+                .domain("vpc")
+                // AWS documents that an EIP used by a VPC resource needs the internet
+                // gateway in place first.
+                .dependsOn(List.of(igw))
+                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                .tags(Map.of("Name", componentNames.getEgressIpName())).build();
+            natAllocationId = natEip.getAllocationId();
+            egressIp        = natEip.getPublicIp();
+        } else {
+            // The address is owned outside this stack: look it up rather than manage it, so
+            // a destroy cannot release an IP that is still on somebody's allow-list.
+            final DataAwsEip givenEip = DataAwsEip.Builder
+                .create(this, "natEip")
+                .publicIp(configuredEgressIp).build();
+            // aws_eip's `id` is the allocation id; the data source exposes no separate one.
+            natAllocationId = givenEip.getId();
+            egressIp        = givenEip.getPublicIp();
+        }
+
+        final Subnet privateSubnet1 = Subnet.Builder
+            .create(this, "privateSubnet1")
+            .vpcId(vpc.getId())
+            .cidrBlock("10.0.11.0/24")
+            .availabilityZone(region + "a")
+            .mapPublicIpOnLaunch(false)
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", "cdktf-eks-private-1-" + clusterName)).build();
+
+        final Subnet privateSubnet2 = Subnet.Builder
+            .create(this, "privateSubnet2")
+            .vpcId(vpc.getId())
+            .cidrBlock("10.0.12.0/24")
+            .availabilityZone(region + "b")
+            .mapPublicIpOnLaunch(false)
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", "cdktf-eks-private-2-" + clusterName)).build();
+
+        // The NAT gateway itself must sit in a *public* subnet - it is the only thing in
+        // the VPC that still talks to the internet gateway directly.
+        final NatGateway natGateway = NatGateway.Builder
+            .create(this, "natGateway")
+            .allocationId(natAllocationId)
+            .subnetId(publicSubnet1.getId())
+            .dependsOn(List.of(igw, subnet1Association))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", "cdktf-eks-nat-" + clusterName)).build();
+
+        final RouteTableRoute natRoute = RouteTableRoute
+            .builder()
+            .cidrBlock("0.0.0.0/0")
+            .natGatewayId(natGateway.getId()).build();
+
+        final RouteTable privateRouteTable = RouteTable.Builder
+            .create(this, "privateRouteTable")
+            .vpcId(vpc.getId())
+            .route(List.of(natRoute))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", "cdktf-eks-private-rt-" + clusterName)).build();
+
+        final RouteTableAssociation privateSubnet1Association = RouteTableAssociation.Builder
+            .create(this, "privateSubnet1Association")
+            .subnetId(privateSubnet1.getId())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .routeTableId(privateRouteTable.getId()).build();
+
+        final RouteTableAssociation privateSubnet2Association = RouteTableAssociation.Builder
+            .create(this, "privateSubnet2Association")
+            .subnetId(privateSubnet2.getId())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .routeTableId(privateRouteTable.getId()).build();
+
+        privateSubnetIds = List.of(privateSubnet1.getId(), privateSubnet2.getId());
+
+        // Reported so the address can be handed to whoever maintains the allow-list, and
+        // fed back into AWS_EGRESS_IP to keep it across rebuilds.
+        TerraformOutput.Builder
+            .create(this, "egressIp")
+            .value(egressIp)
+            .description("Public IP all outbound cluster traffic is seen to come from")
+            .build();
+
         // --- 3. EKS Cluster IAM Role (Same as before) ---
 
         final String eksAssumeRolePolicy = """
@@ -211,7 +313,11 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                     componentNames.getClusterRoleName())))
             .role(eksClusterRole.getName()).build();
 
-        final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
+        // Control-plane ENIs are placed across both tiers; the public ones keep the
+        // cluster endpoint reachable, the private ones sit alongside the nodes.
+        final List<String> allSubnetIds = new ArrayList<>(subnetIds);
+        allSubnetIds.addAll(privateSubnetIds);
+        final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(allSubnetIds).build();
 
         cluster = EksCluster.Builder
             .create(this, "eksCluster")
@@ -377,14 +483,19 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .create(this, "eksNodeGroup")
             .clusterName(cluster.getName())
             .nodeGroupName("default-ng")
-            .subnetIds(subnetIds)
+            // Private subnets only: a node in a public subnet gets its own public IP and
+            // would egress from that instead of the NAT gateway's single address.
+            .subnetIds(privateSubnetIds)
             .nodeRoleArn(nodeGroupRole.getArn())
             .instanceTypes(List.of("r6i.large"))
             .scalingConfig(scalingConfig)
             .diskSize(50)
+            // The route-table associations, not just the subnets: a node whose default
+            // route is not yet the NAT gateway cannot pull images or register with EKS.
             .dependsOn(List.of(
                 newKubeConfig, cluster, eksAuthData,
-                publicSubnet1, publicSubnet2))
+                privateSubnet1, privateSubnet2,
+                privateSubnet1Association, privateSubnet2Association))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .tags(Map.of("Name", componentNames.getNodeGroupRoleName())).build();
 
@@ -434,6 +545,12 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 createValue("bpf.masquerade", "true"),
                 createValue("enableIPv4Masquerade", "true"),
                 createValue("ipv4NativeRoutingCIDR", vpc.getCidrBlock()),
+                // ENI IPAM picks the subnet for each pod ENI itself, preferring whichever
+                // subnet in the node's AZ has the most free addresses. Unfiltered it can
+                // land pods in a public subnet, where they have neither a public IP nor a
+                // NAT route and so no egress at all - pin it to the private subnets.
+                createValue("eni.subnetIDsFilter[0]", privateSubnetIds.get(0)),
+                createValue("eni.subnetIDsFilter[1]", privateSubnetIds.get(1)),
 
                 // FQDN-based network policy (L7 DNS): toEndpoints/toFQDNs rules need
                 // the DNS proxy, which is gated by the cilium-config key
@@ -994,8 +1111,25 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     }
 
 
+    /**
+     * The public subnets. These are for internet-facing load balancers only - workloads
+     * run in {@link #getPrivateSubnetIds()} so that their egress goes via the NAT gateway.
+     */
     public List<String> getSubnetIds() {
         return new ArrayList<>(subnetIds);
+    }
+
+    /**
+     * The subnets the nodes run in, whose default route is the NAT gateway holding the
+     * single egress IP.
+     */
+    public List<String> getPrivateSubnetIds() {
+        return new ArrayList<>(privateSubnetIds);
+    }
+
+    /** Public IP that all outbound traffic from the cluster appears to come from. */
+    public String getEgressIp() {
+        return egressIp;
     }
 
     @Override

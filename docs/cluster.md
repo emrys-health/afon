@@ -150,6 +150,40 @@ It allows network policies to be set at this level.
 It's thanks to Cilium that we can limit network traffic out of the cluster and stop exfiltration.
 The network constraint code currently lives in AwsFullStack.java
 
+#### Egress IP (AWS)
+
+All outbound traffic from the AWS cluster leaves from a single public IP, so that a third party can
+put the cluster on an allow-list.  The nodes run in private subnets (`10.0.11.0/24`, `10.0.12.0/24`)
+whose default route is a NAT gateway holding one Elastic IP; the public subnets (`10.0.1.0/24`,
+`10.0.2.0/24`) are left to the internet-facing load balancers and the NAT gateway itself.
+
+Because Cilium runs in ENI IPAM mode, pods get real VPC addresses on ENIs that the Cilium operator
+creates, and it chooses their subnet.  `eni.subnetIDsFilter` therefore pins ENI allocation to the
+private subnets - without it a pod can land in a public subnet, where it has neither a public IP nor
+a NAT route and so no egress at all.
+
+By default a new Elastic IP is allocated on apply and reported as the `egressIp` Terraform output:
+
+```shell
+tofu output egressIp
+```
+
+That IP is released again by `tofu destroy`, so the next deployment gets a different address.  To
+keep one address across rebuilds, allocate an Elastic IP outside the stack:
+
+```shell
+aws ec2 allocate-address --domain vpc
+```
+
+and set it in `afon-aws.properties`:
+
+```properties
+AWS_EGRESS_IP=<the allocated IP>
+```
+
+The stack then looks that address up rather than managing it, so a destroy leaves it allocated (and
+still on the allow-list) for the next apply.
+
 ## Logging & Monitoring
 
 Currently, we use an external Grafana and tunneling into the cluster.

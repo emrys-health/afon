@@ -35,6 +35,10 @@ public class AwsComponentNames {
         return "cdktf-eks-vpc-" + cluster;
     }
 
+    public String getEgressIpName() {
+        return "cdktf-eks-egress-ip-" + cluster;
+    }
+
     public String getSecret() {
         return "cdktf-app-config-secret-" + cluster;
     }

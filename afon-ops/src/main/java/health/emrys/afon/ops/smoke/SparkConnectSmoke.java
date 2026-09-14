@@ -34,7 +34,7 @@ public class SparkConnectSmoke {
 
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectSmoke.class);
     public static final String TEST_WAREHOUSE = "test_warehouse";
-    public static final String TEST_NAMESPACE = "test_namespace";
+    public static final String TEST_NAMESPACE = "namespaceph";
     public static final String TEST_TABLE = "test_table";
 
     public void smokeTest(SparkConnectClient client, AfonCatalog catalog) {
