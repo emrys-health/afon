@@ -1,5 +1,6 @@
 package health.emrys.afon.polaris.catalogs;
 
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum;
 import org.apache.polaris.core.admin.model.*;
@@ -14,7 +15,8 @@ import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 /**
  * A one-off catalog shape (bespoke Glue/SigV4 connection) registered explicitly in
  * PolarisCatalogManager under the "glue" type, rather than being reducible to the generic
- * "internal"/"external" shapes.
+ * "internal"/"external" shapes. Built purely from its {@link AfonCatalog} definition, same as the
+ * generic shapes; only the Glue role ARN and region are fixed per-cloud constants.
  */
 public class GlueAwsPolarisCatalog extends PolarisCatalog {
 
@@ -22,13 +24,14 @@ public class GlueAwsPolarisCatalog extends PolarisCatalog {
     private final String roleArn;
     private final String region;
     private final String catalogName;
+    private final boolean adminGrants;
 
-    public GlueAwsPolarisCatalog(AfonPropertyProvider properties) {
-        // Reuses aws_external's configured bucket (see catalogs-aws.properties), as this always has.
-        this.bucketUrl = s3BucketUrl(properties.getCatalogProperty("AWS_BUCKET_NAME", "aws_external"));
+    public GlueAwsPolarisCatalog(AfonCatalog catalog, AfonPropertyProvider properties) {
+        this.bucketUrl = s3BucketUrl(catalog.bucketName());
         this.roleArn = properties.getValue(AWS_GLUE_ROLE_ARN);
         this.region  = properties.getValue(AWS_REGION);
-        this.catalogName = properties.getValue(AWS_GLUE_CATALOG_NAME);
+        this.catalogName = catalog.toString();
+        this.adminGrants = catalog.adminGrants();
     }
 
     protected @NonNull CatalogProperties catalogProperties() {
@@ -88,6 +91,11 @@ public class GlueAwsPolarisCatalog extends PolarisCatalog {
     @Override
     public String catalogName() {
         return catalogName;
+    }
+
+    @Override
+    public boolean adminGrants() {
+        return adminGrants;
     }
 
     @Override

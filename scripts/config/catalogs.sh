@@ -18,7 +18,9 @@ fi
 #
 # This migrates that into <CLOUD>_CATALOG_NAMES plus per-id AfonCatalog properties
 # (<CLOUD>_CATALOG_NAME_<id>/_TYPE_<id>/_BUCKET_NAME_<id>/_ADMIN_GRANTS_<id>) in
-# catalogs-<cloud>.properties, for every cloud with catalogs configured.
+# catalogs-<cloud>.properties, for every cloud with catalogs configured. Also migrates AWS's
+# Glue-backed catalog (the now-retired AWS_GLUE_CATALOG_NAME, never part of CATALOG_NAMES_CSV) into
+# an "aws_glue" catalog id, if one was configured.
 #
 # Safe to run more than once: a cloud already migrated (its catalogs-<cloud>.properties already
 # defines <CLOUD>_CATALOG_NAMES) is left untouched. Every file this script actually changes is
@@ -65,6 +67,15 @@ resolve_value() {
   )
 }
 
+# Reads a property's literal value straight out of a file (last definition wins), or "" if absent
+# or the file is missing. Unlike resolve_value, does no `${VAR}` interpolation - only safe to use
+# on catalogs-<cloud>.properties after this script has already written it with resolved values.
+get_prop() {
+  local FILE="$1" KEY="$2"
+  [ -f "$FILE" ] || return 0
+  sed -n "s/^${KEY}=//p" "$FILE" | tail -1
+}
+
 # Removes a property's line from a file in place, if present.
 remove_prop() {
   local FILE="$1" KEY="$2"
@@ -73,13 +84,16 @@ remove_prop() {
   fi
 }
 
-# The pre-refactor AfonProperty each catalog id's bucket used to be configured under.
+# The pre-refactor AfonProperty each catalog id's bucket used to be configured under. aws_glue
+# never had its own bucket property - GlueAwsPolarisCatalog always hardcoded a reuse of
+# aws_external's bucket - so it shares AWS_S3_BUCKET_NAME_EXTERNAL with aws_external here too.
 old_bucket_property_of() {
   case "$1" in
     aws)             echo "AWS_S3_BUCKET_NAME" ;;
     aws_trino)       echo "AWS_S3_BUCKET_NAME_TRINO" ;;
     aws_external)    echo "AWS_S3_BUCKET_NAME_EXTERNAL" ;;
     aws_forbidden)   echo "AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS" ;;
+    aws_glue)        echo "AWS_S3_BUCKET_NAME_EXTERNAL" ;;
     azure)           echo "AZURE_BUCKET_NAME" ;;
     azure_external)  echo "AZURE_BUCKET_NAME_EXTERNAL" ;;
     azure_forbidden) echo "AZURE_BUCKET_NAME_FORBIDDEN" ;;
@@ -89,8 +103,29 @@ old_bucket_property_of() {
   esac
 }
 
+# The pre-refactor property whose non-blank value signals "this catalog was actually configured" -
+# same as its bucket property for every id except aws_glue, which reused aws_external's bucket
+# regardless of whether Glue itself was ever set up, so its own signal is the (also now-retired)
+# AWS_GLUE_CATALOG_NAME instead.
+signal_property_of() {
+  case "$1" in
+    aws_glue) echo "AWS_GLUE_CATALOG_NAME" ;;
+    *)        old_bucket_property_of "$1" ;;
+  esac
+}
+
+# The pre-refactor property holding this catalog's real/display name - unset (ie use the id itself,
+# matching every other catalog) except aws_glue, which kept a separately-configured, already-
+# registered Polaris catalog name that migration must preserve rather than renaming to "aws_glue".
+old_name_property_of() {
+  case "$1" in
+    aws_glue) echo "AWS_GLUE_CATALOG_NAME" ;;
+  esac
+}
+
 type_of_id() {
   case "$1" in
+    aws_glue)   echo "glue" ;;
     *_external) echo "external" ;;
     *)          echo "internal" ;;
   esac
@@ -105,10 +140,11 @@ admin_grants_of_id() {
 
 # Every catalog id a pre-refactor config could possibly have had for a given cloud - the old
 # AfonCatalog.Variant suffix parsing (BASE/FORBIDDEN/TRINO/EXTERNAL) had no way to define anything
-# beyond these, so this list is exhaustive.
+# beyond these, plus aws_glue (always a separate, manually-wired special case, never part of
+# CATALOG_NAMES_CSV) - so this list is exhaustive.
 candidate_ids_of_cloud() {
   case "$1" in
-    aws)   echo "aws aws_trino aws_external aws_forbidden" ;;
+    aws)   echo "aws aws_trino aws_external aws_forbidden aws_glue" ;;
     azure) echo "azure azure_external azure_forbidden" ;;
     gcp)   echo "gcp gcp_external gcp_forbidden" ;;
   esac
@@ -140,13 +176,14 @@ for CLOUD in aws azure gcp; do
   fi
 
   # A candidate id is migrated if it was actually active pre-refactor (named in CATALOG_NAMES_CSV,
-  # or in the old default set) OR its old bucket property already has a real value - eg AWS's
+  # or in the old default set) OR its own signal property already has a real value - eg AWS's
   # "external" catalog was never in the old default set (unlike Azure/GCP's), so an install that
   # configured AWS_S3_BUCKET_NAME_EXTERNAL without ever adding "aws_external" to CATALOG_NAMES_CSV
-  # would otherwise silently lose that bucket.
+  # would otherwise silently lose that bucket. aws_glue was never in CATALOG_NAMES_CSV at all, so
+  # its signal property (AWS_GLUE_CATALOG_NAME) is the only thing that can activate it.
   CLOUD_IDS=()
   for ID in $(candidate_ids_of_cloud "$CLOUD"); do
-    VALUE="$(resolve_value "$CLOUD" "$(old_bucket_property_of "$ID")")"
+    VALUE="$(resolve_value "$CLOUD" "$(signal_property_of "$ID")")"
     if csv_contains "$ID" || [ -n "$VALUE" ]; then
       CLOUD_IDS+=("$ID")
     fi
@@ -174,10 +211,15 @@ for CLOUD in aws azure gcp; do
     echo "# See catalogs.properties for the format."
     echo "${CLOUD_UPPER}_CATALOG_NAMES=$NAMES_CSV"
     for ID in "${CLOUD_IDS[@]}"; do
-      OLD_KEY="$(old_bucket_property_of "$ID")"
-      VALUE="$(resolve_value "$CLOUD" "$OLD_KEY")"
+      VALUE="$(resolve_value "$CLOUD" "$(old_bucket_property_of "$ID")")"
+      NAME_KEY="$(old_name_property_of "$ID")"
+      if [ -n "$NAME_KEY" ]; then
+        NAME="$(resolve_value "$CLOUD" "$NAME_KEY")"
+      else
+        NAME="$ID"
+      fi
       echo ""
-      echo "${CLOUD_UPPER}_CATALOG_NAME_${ID}=${ID}"
+      echo "${CLOUD_UPPER}_CATALOG_NAME_${ID}=${NAME}"
       echo "${CLOUD_UPPER}_CATALOG_TYPE_${ID}=$(type_of_id "$ID")"
       echo "${CLOUD_UPPER}_BUCKET_NAME_${ID}=${VALUE}"
       echo "${CLOUD_UPPER}_ADMIN_GRANTS_${ID}=$(admin_grants_of_id "$ID")"
@@ -186,6 +228,8 @@ for CLOUD in aws azure gcp; do
 
   for ID in "${CLOUD_IDS[@]}"; do
     remove_prop "$AFON_CLOUD_PROPS" "$(old_bucket_property_of "$ID")"
+    NAME_KEY="$(old_name_property_of "$ID")"
+    [ -n "$NAME_KEY" ] && remove_prop "$AFON_CLOUD_PROPS" "$NAME_KEY"
   done
 
   finish_backup "$AFON_CLOUD_PROPS"
@@ -196,26 +240,25 @@ for CLOUD in aws azure gcp; do
   fi
 done
 
-# AWS_S3_BUCKET_NAME_FORBIDDEN (used only by AcceptanceTestConfig's own "aws_forbidden" test
-# catalog - distinct from the "aws_forbidden" catalog id above) keeps its name but moves file,
-# since it's no longer a typed AfonProperty entry.
+# AWS_S3_BUCKET_NAME_FORBIDDEN (AcceptanceTestConfig's own "aws_forbidden" test catalog) is retired
+# entirely: AcceptanceTestConfig now just reuses afonCatalogs.awsForbidden()'s own bucket
+# (AWS_BUCKET_NAME_aws_forbidden in catalogs-aws.properties, already migrated above), protected by
+# an explicit IAM Deny statement rather than by being a separate, never-whitelisted bucket - so this
+# is just dropped here rather than moved anywhere.
 AWS_PROPS="$CONFIG_DIR/afon-aws.properties"
-CATALOGS_AWS_PROPS="$CONFIG_DIR/catalogs-aws.properties"
 if [ -f "$AWS_PROPS" ] && grep -q "^AWS_S3_BUCKET_NAME_FORBIDDEN=" "$AWS_PROPS"; then
-  VALUE="$(resolve_value aws AWS_S3_BUCKET_NAME_FORBIDDEN)"
-  echo "- Moving AWS_S3_BUCKET_NAME_FORBIDDEN to catalogs-aws.properties"
+  OLD_VALUE="$(resolve_value aws AWS_S3_BUCKET_NAME_FORBIDDEN)"
+  NEW_VALUE="$(get_prop "$CONFIG_DIR/catalogs-aws.properties" AWS_BUCKET_NAME_aws_forbidden)"
+  echo "- Removing obsolete AWS_S3_BUCKET_NAME_FORBIDDEN from afon-aws.properties"
+  if [ -n "$OLD_VALUE" ] && [ "$OLD_VALUE" != "$NEW_VALUE" ]; then
+    echo "  WARNING: its value ('$OLD_VALUE') differs from aws_forbidden's own bucket"
+    echo "  ('$NEW_VALUE') - the acceptance tests will now use the latter. Either update the IAM"
+    echo "  Deny statement to target it, or point AWS_BUCKET_NAME_aws_forbidden at '$OLD_VALUE'"
+    echo "  instead if you'd rather keep using that bucket."
+  fi
   start_backup "$AWS_PROPS"
-  start_backup "$CATALOGS_AWS_PROPS"
-  {
-    echo ""
-    echo "# Used only by AcceptanceTestConfig for its own \"aws_forbidden\" test catalog - distinct from"
-    echo "# AWS_BUCKET_NAME_aws_forbidden above so the two don't collide if both are configured in the"
-    echo "# same test run."
-    echo "AWS_S3_BUCKET_NAME_FORBIDDEN=${VALUE}"
-  } >> "$CATALOGS_AWS_PROPS"
   remove_prop "$AWS_PROPS" AWS_S3_BUCKET_NAME_FORBIDDEN
   finish_backup "$AWS_PROPS"
-  finish_backup "$CATALOGS_AWS_PROPS"
 fi
 
 AFON_PROPS="$CONFIG_DIR/afon.properties"

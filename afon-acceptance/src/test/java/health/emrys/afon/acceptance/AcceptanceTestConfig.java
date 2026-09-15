@@ -59,13 +59,10 @@ public class AcceptanceTestConfig {
 
     private void addAwsCatalogs() {
         polarisCatalogs.put(afonCatalogs.aws(), new AwsPolarisCatalog(afonCatalogs.aws(), this.properties));
-        // A distinct bucket from afonCatalogs.awsForbidden()'s (AWS_BUCKET_NAME_aws_forbidden in
-        // catalogs-aws.properties), so this test-harness catalog and PolarisCatalogManager's own
-        // "aws_forbidden" catalog don't collide if both are exercised in the same run.
-        AfonCatalog awsForbiddenForTests = AfonCatalog.adHoc(
-                afonCatalogs.awsForbidden().toString(), AWS, "internal",
-                properties.getProperties().getProperty("AWS_S3_BUCKET_NAME_FORBIDDEN"), false);
-        polarisCatalogs.put(afonCatalogs.awsForbidden(), new AwsPolarisCatalog(awsForbiddenForTests, this.properties));
+        // Its bucket (AWS_BUCKET_NAME_aws_forbidden in catalogs-aws.properties) is whitelisted like
+        // any other catalog's by scripts/aws/create.sh; actual denial comes from an explicit IAM
+        // Deny statement on that bucket (Deny always overrides Allow), not from omitting it here.
+        polarisCatalogs.put(afonCatalogs.awsForbidden(), new AwsPolarisCatalog(afonCatalogs.awsForbidden(), this.properties));
         polarisCatalogs.put(afonCatalogs.awsTrino(), new AwsPolarisCatalog(afonCatalogs.awsTrino(), this.properties));
     }
 

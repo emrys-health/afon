@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 import static health.emrys.afon.polaris.config.PolarisRestClient.failuresOf;
 
@@ -48,9 +47,10 @@ public class PolarisCatalogManager {
     /**
      * Any other catalog type (eg the Glue-backed one) isn't reducible to the generic
      * "internal"/"external" shapes, so keeps a hand-written {@link PolarisCatalog} subclass
-     * registered explicitly here, keyed by its {@link AfonCatalog#type()}.
+     * registered explicitly here, keyed by its {@link AfonCatalog#type()}. Built purely from its
+     * {@link AfonCatalog} definition too, same as the generic shapes above.
      */
-    private static final Map<String, Function<AfonPropertyProvider, PolarisCatalog>> CUSTOM_CATALOG_FACTORIES = Map.of(
+    private static final Map<String, CatalogFactory> CUSTOM_CATALOG_FACTORIES = Map.of(
             "glue", GlueAwsPolarisCatalog::new);
 
     private final AfonPropertyProvider properties;
@@ -105,12 +105,12 @@ public class PolarisCatalogManager {
     }
 
     private PolarisCatalog customCatalogOf(AfonCatalog catalog) {
-        Function<AfonPropertyProvider, PolarisCatalog> factory = CUSTOM_CATALOG_FACTORIES.get(catalog.type());
+        CatalogFactory factory = CUSTOM_CATALOG_FACTORIES.get(catalog.type());
         if (factory == null) {
             throw new IllegalArgumentException("No PolarisCatalog factory registered for catalog type '"
                     + catalog.type() + "' (catalog '" + catalog.id() + "')");
         }
-        return factory.apply(properties);
+        return factory.create(catalog, properties);
     }
 
     private List<String> catalogNames(PolarisCatalog... catalogs) {
