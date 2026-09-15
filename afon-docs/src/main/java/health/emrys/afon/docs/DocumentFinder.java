@@ -48,8 +48,8 @@ public class DocumentFinder {
         String filter;
         if (cloudPropertySet()) {
             // for a given cloud, filter the documents with the cloud value in the name
-            // but exclude the "Via" and the "With", which are cross-cloud
-            filter = String.format("^(?!.*%s)(?!.*%s).*%s.*$", "Via", "With", capitalise(cloudPropertyValue()));
+            // but exclude the "And", "Via" and the "With", which are cross-cloud
+            filter = String.format("^(?!.*%s)(?!.*%s)(?!.*%s).*%s.*$", "And", "Via", "With", capitalise(cloudPropertyValue()));
         } else {
             filter = ".*";
         }
