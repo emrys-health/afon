@@ -36,7 +36,6 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.*;
 
-import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.*;
@@ -379,12 +378,7 @@ public class StepActions {
 
     public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
         executeMainOf(ManagePolarisCatalogsMain.class,
-                new String[]{CREATE, cloud.toString(), catalog.name()});
-    }
-
-    public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog, Properties properties) throws Exception {
-        executeMainOf(ManagePolarisCatalogsMain.class,
-                new String[]{CREATE, cloud.toString(), catalog.name()}, properties);
+                new String[]{CREATE, cloud.toString(), catalog.toString()});
     }
 
     public void configureOidcUsersFor(AfonCloud cloud) throws Exception {
@@ -399,19 +393,19 @@ public class StepActions {
 
     public void deleteCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
         executeMainOf(ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.name()});
+                new String[]{DELETE, cloud.toString(), catalog.toString()});
     }
 
     public void deleteNamespaceFor(AfonCloud cloud, AfonCatalog catalog, String namespace) throws Exception {
         executeMainOf(
                 ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.name(), namespace});
+                new String[]{DELETE, cloud.toString(), catalog.toString(), namespace});
     }
 
     public void deleteTableFor(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName) throws Exception {
         executeMainOf(
                 ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.name(), namespace, tableName});
+                new String[]{DELETE, cloud.toString(), catalog.toString(), namespace, tableName});
     }
 
     public void registerTable(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, String metadata) throws Exception {
@@ -440,7 +434,7 @@ public class StepActions {
         logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
         return format(
                 "abfss://%s@%s.dfs.core.windows.net/%s",
-                properties.getValue(AZURE_BUCKET_NAME),
+                properties.getCatalogProperty("AZURE_BUCKET_NAME", "azure"),
                 properties.getValue(AZURE_STORAGE_ACCOUNT),
                 latest.getName());
     }

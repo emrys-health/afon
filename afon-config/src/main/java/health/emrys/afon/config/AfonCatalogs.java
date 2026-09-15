@@ -4,56 +4,90 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.*;
 
-import static health.emrys.afon.config.AfonProperty.CATALOG_NAMES_CSV;
-
 /**
- * The configured set of {@link AfonCatalog}s, created from {@link AfonProperty#CATALOG_NAMES_CSV}.
- * Defaults to {@link #DEFAULT_CATALOG_NAMES_CSV} (the full built-in catalog set) when unset.
+ * The configured set of {@link AfonCatalog}s, assembled per cloud from its
+ * {@code <CLOUD>_CATALOG_NAMES} property (eg {@link AfonProperty#AWS_CATALOG_NAMES}) and, for
+ * each id in that list, the matching {@code <CLOUD>_CATALOG_NAME_<id>},
+ * {@code <CLOUD>_CATALOG_TYPE_<id>}, {@code <CLOUD>_BUCKET_NAME_<id>} and
+ * {@code <CLOUD>_ADMIN_GRANTS_<id>} properties - conventionally defined in
+ * {@code catalogs-<cloud>.properties}. A cloud with no {@code <CLOUD>_CATALOG_NAMES} configured
+ * (eg because that cloud's properties weren't loaded for a cloud-scoped run) simply contributes
+ * no catalogs.
  */
 public class AfonCatalogs {
 
-    public static final String DEFAULT_CATALOG_NAMES_CSV =
-        "aws,aws_forbidden,aws_trino,azure,azure_external,azure_forbidden,gcp,gcp_external,gcp_forbidden";
-
-    private final AfonPropertyProvider properties;
     private final List<AfonCatalog> catalogs;
 
     public AfonCatalogs(AfonPropertyProvider properties) {
-        this.properties = properties;
-        this.catalogs = createCatalogs();
+        this.catalogs = createCatalogs(properties);
     }
 
     public List<AfonCatalog> all() {
         return catalogs;
     }
 
-    private @NonNull List<AfonCatalog> createCatalogs() {
-        String csv = properties.getValue(CATALOG_NAMES_CSV, DEFAULT_CATALOG_NAMES_CSV);
-        if (csv.isBlank()) csv = DEFAULT_CATALOG_NAMES_CSV;
+    private static @NonNull List<AfonCatalog> createCatalogs(AfonPropertyProvider properties) {
+        Properties raw = properties.getProperties();
+        List<AfonCatalog> catalogs = new ArrayList<>();
+        for (AfonCloud cloud : AfonCloud.values()) {
+            catalogs.addAll(catalogsFor(cloud, raw));
+        }
+        return List.copyOf(catalogs);
+    }
+
+    private static List<AfonCatalog> catalogsFor(AfonCloud cloud, Properties raw) {
+        String csv = raw.getProperty(namesProperty(cloud));
+        if (csv == null || csv.isBlank()) {
+            return List.of();
+        }
         return Arrays.stream(csv.split(","))
                 .map(String::trim)
-                .filter(name -> !name.isEmpty())
-                .map(AfonCatalog::of)
+                .filter(id -> !id.isEmpty())
+                .map(id -> catalogOf(cloud, id, raw))
                 .toList();
     }
 
+    private static AfonCatalog catalogOf(AfonCloud cloud, String id, Properties raw) {
+        String prefix = prefix(cloud);
+        String name = raw.getProperty(prefix + "_CATALOG_NAME_" + id, id);
+        String type = raw.getProperty(prefix + "_CATALOG_TYPE_" + id);
+        if (type == null) {
+            throw new IllegalArgumentException(
+                    "Catalog '" + id + "' is missing " + prefix + "_CATALOG_TYPE_" + id);
+        }
+        String bucketName = raw.getProperty(prefix + "_BUCKET_NAME_" + id);
+        boolean adminGrants = Boolean.parseBoolean(raw.getProperty(prefix + "_ADMIN_GRANTS_" + id, "true"));
+        return new AfonCatalog(id, cloud, name, type, bucketName, adminGrants);
+    }
+
+    private static String namesProperty(AfonCloud cloud) {
+        return prefix(cloud) + "_CATALOG_NAMES";
+    }
+
+    private static String prefix(AfonCloud cloud) {
+        return cloud.toString().toUpperCase();
+    }
+
     /**
-     * @param name a catalog's canonical name (case-insensitive), e.g. {@code "aws_forbidden"}.
-     * @throws NoSuchElementException if no active catalog matches {@code name}.
+     * @param id a catalog's id (case-insensitive), e.g. {@code "aws_forbidden"}.
+     * @throws NoSuchElementException if no active catalog matches {@code id}.
      */
-    public AfonCatalog get(String name) {
+    public AfonCatalog get(String id) {
         return all().stream()
-                     .filter(c -> c.toString().equalsIgnoreCase(name))
+                     .filter(c -> c.id().equalsIgnoreCase(id))
                      .findFirst()
-                     .orElseThrow(() -> new NoSuchElementException("Unknown Afon catalog: " + name));
+                     .orElseThrow(() -> new NoSuchElementException("Unknown Afon catalog: " + id));
     }
 
     public List<AfonCatalog> byCloud(AfonCloud cloud) {
         return all().stream().filter(c -> c.cloud() == cloud).toList();
     }
 
+    /**
+     * The "primary" catalog per cloud - the one whose id is the cloud's own name (eg {@code "aws"}).
+     */
     public List<AfonCatalog> base() {
-        return all().stream().filter(c -> c.variant() == AfonCatalog.Variant.BASE).toList();
+        return all().stream().filter(c -> c.id().equalsIgnoreCase(c.cloud().toString())).toList();
     }
 
     public AfonCatalog aws() {

@@ -18,7 +18,6 @@ import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.steps.DurationUtils.parseDuration;
@@ -201,11 +200,7 @@ public class StepOperations {
     public Step createExternalCatalogFor(AfonCloud cloud) {
         switch (cloud) {
             case AZURE:
-                // TODO: why not use afonCatalogs.azureExternal() instead of using overrides?
-                Properties properties = new Properties();
-                properties.setProperty(AZURE_BUCKET_NAME.getName(),
-                        this.properties.getValue(AZURE_BUCKET_NAME_EXTERNAL));
-                return createExternalCatalogFor(AZURE, afonCatalogs.azure(), properties);
+                return createCatalogFor(AZURE, afonCatalogs.azureExternal());
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -216,12 +211,6 @@ public class StepOperations {
         return new Step(format("create_catalog_%s_for_cloud_%s", catalog, cloud),
             format("create Polaris catalog `%s` for cloud `%s`", catalog, cloud),
             () -> actions.createCatalogFor(cloud, catalog));
-    }
-
-    private @NonNull Step createExternalCatalogFor(AfonCloud cloud, AfonCatalog catalog, Properties properties) {
-        return new Step(format("create_external_catalog_%s_for_cloud_%s", catalog, cloud),
-            format("create external Polaris catalog `%s` for cloud `%s`", catalog, cloud),
-            () -> actions.createCatalogFor(cloud, catalog, properties));
     }
 
     private @NonNull Step deleteCatalogFor(AfonCloud cloud, AfonCatalog catalog) {

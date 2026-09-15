@@ -3,72 +3,75 @@ package health.emrys.afon.config;
 import java.util.Objects;
 
 /**
- * A catalog supported by Afon: a cloud plus an optional variant (forbidden/trino/external).
+ * A catalog supported by Afon: an id (used to look it up and to key its per-catalog
+ * configuration, eg {@code "aws_forbidden"}), the cloud it belongs to, its actual Polaris-facing
+ * name (usually the same as its id, but can diverge - eg for a Glue-backed catalog whose name is
+ * a pre-existing Glue Data Catalog name), a type that determines which Java code builds it
+ * ({@code "internal"}/{@code "external"} are generic; anything else is an explicitly registered
+ * custom factory), and the bucket name / admin-grants flag the generic types need.
  * Instances are resolved through {@link AfonCatalogs} rather than constructed directly, so the
- * active set of catalogs is runtime-configurable.
+ * active set of catalogs is entirely configuration-driven.
  */
 public final class AfonCatalog {
 
-    public enum Variant {
-        BASE, FORBIDDEN, TRINO, EXTERNAL
-    }
-
-    private final String name;
+    private final String id;
     private final AfonCloud cloud;
-    private final Variant variant;
+    private final String name;
+    private final String type;
+    private final String bucketName;
+    private final boolean adminGrants;
 
-    private AfonCatalog(String name, AfonCloud cloud, Variant variant) {
-        this.name = name;
+    AfonCatalog(String id, AfonCloud cloud, String name, String type, String bucketName, boolean adminGrants) {
+        this.id = id;
         this.cloud = cloud;
-        this.variant = variant;
+        this.name = name;
+        this.type = type;
+        this.bucketName = bucketName;
+        this.adminGrants = adminGrants;
     }
 
     /**
-     * Parses a canonical catalog name (e.g. {@code "aws_forbidden"}) into an {@link AfonCatalog},
-     * deriving its {@link AfonCloud} from the leading token and its {@link Variant} from the suffix.
+     * Builds an ad hoc {@link AfonCatalog} not sourced from {@link AfonCatalogs} - eg for a test
+     * that needs a one-off catalog outside the configured set. Its name equals its id.
      */
-    public static AfonCatalog of(String canonicalName) {
-        String name = canonicalName.toLowerCase();
-        Variant variant = Variant.BASE;
-        String cloudToken = name;
-        for (Variant candidate : Variant.values()) {
-            String suffix = "_" + candidate.name().toLowerCase();
-            if (candidate != Variant.BASE && name.endsWith(suffix)) {
-                variant = candidate;
-                cloudToken = name.substring(0, name.length() - suffix.length());
-                break;
-            }
-        }
-        AfonCloud cloud = parseCloud(cloudToken, name);
-        return new AfonCatalog(name, cloud, variant);
+    public static AfonCatalog adHoc(String id, AfonCloud cloud, String type, String bucketName, boolean adminGrants) {
+        return new AfonCatalog(id, cloud, id, type, bucketName, adminGrants);
     }
 
-    private static AfonCloud parseCloud(String cloudToken, String name) {
-        for (AfonCloud candidate : AfonCloud.values()) {
-            if (candidate.toString().equalsIgnoreCase(cloudToken)) {
-                return candidate;
-            }
-        }
-        throw new IllegalArgumentException("Cannot determine cloud for Afon catalog '" + name + "'");
+    /**
+     * The identifier used to look this catalog up (see {@link AfonCatalogs#get}) and to key its
+     * {@code <CLOUD>_..._<id>} configuration, eg {@code "aws_forbidden"}.
+     */
+    public String id() {
+        return id;
     }
 
     public AfonCloud cloud() {
         return cloud;
     }
 
-    public Variant variant() {
-        return variant;
-    }
-
     /**
-     * Matches the old {@code AfonCatalog} enum's {@code name()} (upper-case identifier).
+     * The type that determines which Java code builds this catalog: {@code "internal"} and
+     * {@code "external"} are built generically from {@link #bucketName()}/{@link #adminGrants()};
+     * any other value must be registered as an explicit custom factory.
      */
-    public String name() {
-        return name.toUpperCase();
+    public String type() {
+        return type;
+    }
+
+    public String bucketName() {
+        return bucketName;
     }
 
     /**
-     * Matches the old {@code AfonCatalog} enum's {@code toString()} (canonical lower-case value).
+     * Whether admin grants are allowed on this catalog. Defaults to {@code true} when unset.
+     */
+    public boolean adminGrants() {
+        return adminGrants;
+    }
+
+    /**
+     * The catalog's actual Polaris-facing name. Usually equal to {@link #id()}, but can diverge.
      */
     @Override
     public String toString() {
@@ -79,11 +82,11 @@ public final class AfonCatalog {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof AfonCatalog other)) return false;
-        return name.equals(other.name);
+        return id.equals(other.id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name);
+        return Objects.hash(id);
     }
 }

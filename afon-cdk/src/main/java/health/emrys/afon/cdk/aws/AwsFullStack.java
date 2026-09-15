@@ -150,7 +150,8 @@ public class AwsFullStack extends AwsTrinoStack {
      * ships Loki 3.x) configured to push chunks and the index to S3. The
      * bucket, region, and IAM credentials are read from the
      * {@link AfonPropertyProvider} passed to the {@link AwsFullStack}
-     * constructor (keys {@code AWS_S3_BUCKET_NAME}, {@code AWS_REGION},
+     * constructor (keys {@code AWS_BUCKET_NAME_aws} (the "aws" catalog's bucket,
+     * see catalogs-aws.properties), {@code AWS_REGION},
      * {@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY}).
      *
      * <p>The companion log shipper is installed by
@@ -202,7 +203,7 @@ public class AwsFullStack extends AwsTrinoStack {
      * SingleBinary is mutually exclusive with the scalable/microservices modes.
      */
     static String lokiValues(AfonPropertyProvider properties) {
-        String bucket    = properties.getValue(AfonProperty.AWS_S3_BUCKET_NAME);
+        String bucket    = properties.getCatalogProperty("AWS_BUCKET_NAME", "aws");
         String region    = properties.getValue(AfonProperty.AWS_REGION);
         String accessKey = properties.getValue(AfonProperty.AWS_ACCESS_KEY_ID);
         String secretKey = properties.getValue(AfonProperty.AWS_SECRET_ACCESS_KEY);
