@@ -23,12 +23,26 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
   val properties = AcceptanceTestConfig.instance.getProperties
   val catalogManager = AcceptanceTestConfig.instance.getCatalogManager
+  val afonCatalogs = AcceptanceTestConfig.instance.afonCatalogs()
 
-  "An external table" should {
-    val glueCatalogDef    = AcceptanceTestConfig.instance.afonCatalogs().get("aws_glue")
-    val glueCatalogName   = glueCatalogDef.toString()
-    val externalBucket    = glueCatalogDef.bucketName()
-    val glueCatalog       = new GlueAwsPolarisCatalog(glueCatalogDef, properties)
+  // catalogs-aws.properties documents "aws_glue" as omittable when AWS_GLUE_ROLE_ARN isn't
+  // available, so its absence is a supported config, not a misconfiguration - check for it with
+  // a plain list scan (rather than the throwing AfonCatalogs.get) so a spec-registration-time
+  // lookup failure doesn't abort the whole suite (ScalaTest can't recover once that happens,
+  // unlike a failure/cancellation inside a running test).
+  private val GlueCatalogId = "aws_glue"
+  private val glueConfigured = afonCatalogs.all().asScala.exists(_.id().equalsIgnoreCase(GlueCatalogId))
+
+  if (glueConfigured) {
+
+    // "glue" is a one-off type registered explicitly in PolarisCatalogManager (see
+    // GlueAwsPolarisCatalog), rather than one of the generic internal/external shapes
+    // AcceptanceTestConfig pre-registers - so it's built directly here from its AfonCatalog.
+    val afonCatalog       = afonCatalogs.get(GlueCatalogId)
+    val glueCatalog       = new GlueAwsPolarisCatalog(afonCatalog, properties)
+    val glueCatalogName   = glueCatalog.catalogName()
+    // GlueAwsPolarisCatalog reuses aws_external's configured bucket (see catalogs-aws.properties).
+    val externalBucket    = properties.getCatalogProperty("AWS_BUCKET_NAME", "aws_external")
     val grantCatalogAdmin = new GrantCatalogAdmin(this, glueCatalog, Some(glueCatalog.catalogName()))
     val createCatalogRole = new CreateCatalogRole(this, glueCatalog, Some(glueCatalog.catalogName))
     // Suffixed by ENV_NAME: the underlying Glue table is a real, shared, account-wide resource
@@ -81,6 +95,16 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
           |aws s3 cp OUTPUT_LOCATION_FROM_ABOVE -
           |""".stripMargin)
     }
+
+  } else {
+
+    "An external table" should {
+      s"be skipped: '$GlueCatalogId' is not configured" in {
+        cancel(s"'$GlueCatalogId' is not in AWS_CATALOG_NAMES - add it (with AWS_GLUE_ROLE_ARN) to " +
+          "catalogs-aws.properties/afon-aws.properties to run this spec.")
+      }
+    }
+
   }
 
 }
