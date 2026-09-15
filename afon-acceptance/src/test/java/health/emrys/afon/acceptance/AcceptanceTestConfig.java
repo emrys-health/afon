@@ -12,7 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
-import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.AfonProperty.OIDC_DOMAIN_NAME;
 import static health.emrys.afon.config.ConfigUtils.afonCloud;
 
 public class AcceptanceTestConfig {

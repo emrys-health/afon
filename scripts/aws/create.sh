@@ -69,6 +69,13 @@ for ID in "${CATALOG_IDS[@]}"; do
     }"
 done
 
+# Used only by AcceptanceTestConfig's own "aws_forbidden" test catalog (see catalogs-aws.properties) -
+# created, but deliberately NOT added to the whitelist below, so tests can verify Polaris denies
+# access to it.
+if [ -n "${AWS_S3_BUCKET_NAME_FORBIDDEN:-}" ]; then
+  create_bucket_if_absent "$AWS_S3_BUCKET_NAME_FORBIDDEN"
+fi
+
 if aws iam get-role --role-name S3ReadWriteRole >/dev/null 2>&1; then
   echo "- Role S3ReadWriteRole already exists, skipping"
 else
