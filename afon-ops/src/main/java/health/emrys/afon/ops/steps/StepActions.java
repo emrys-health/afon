@@ -291,7 +291,7 @@ public class StepActions {
         } catch (Exception e) {
             logger.error(
                     """
-                    Failed to delete and recreate all catalogs in Polaris for cloud `%s`.
+                    Failed to delete and recreate all catalogs in Polaris for cloud `{}`.
                     It may be because the certificates are not yet ready. 
                     The hint is an error message such as:
                     
