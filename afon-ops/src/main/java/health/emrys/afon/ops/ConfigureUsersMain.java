@@ -87,6 +87,9 @@ public class ConfigureUsersMain {
      * has a Jupyter domain - cloud-scoped, meant to run once per cloud, and before any catalog
      * exists: this is what creates the KeyCloak realm and each user's confidential client (e.g.
      * "root"), which catalog creation itself authenticates as once Polaris defers OAuth to KeyCloak.
+     * With one argument (cloud), configures OIDC users, the Jupyter browser client if the cloud has
+     * a Jupyter domain, and Polaris users on every catalog - all cloud-scoped, meant to run once per
+     * cloud.
      * With two arguments (cloud, catalog-name), configures Polaris users for that single catalog -
      * catalog-scoped, meant to run once per catalog, e.g. to pick up a catalog created after the
      * cloud was last configured.
