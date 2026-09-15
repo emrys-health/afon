@@ -16,6 +16,16 @@ bucket_of() {
   fi
 }
 
+# Reads AWS_ADMIN_GRANTS_<id>, echoing "true" if unset (matching AfonCatalogs' own default).
+admin_grants_of() {
+  local VAR="AWS_ADMIN_GRANTS_$1"
+  if [ -n "${!VAR+x}" ]; then
+    echo "${!VAR}"
+  else
+    echo "true"
+  fi
+}
+
 create_bucket_if_absent() {
   local BUCKET="$1"
   if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
@@ -26,8 +36,12 @@ create_bucket_if_absent() {
   fi
 }
 
-# Creates every catalog's bucket (from AWS_CATALOG_NAMES) and builds the matching IAM whitelist
-# statements, so a new catalog needs no change here - only an entry in catalogs-aws.properties.
+# Creates every catalog's bucket (from AWS_CATALOG_NAMES); every catalog with
+# AWS_ADMIN_GRANTS_<id>=true also gets an IAM whitelist entry, so a new catalog needs no change
+# here - only an entry in catalogs-aws.properties. aws_forbidden's bucket is still created, but
+# excluded from the whitelist (matching azure/create.sh and gcp/create.sh's own grant loops) -
+# a separate, explicit IAM Deny statement is what actually protects it, so this exclusion is
+# redundant-but-safe defense in depth alongside that Deny, not a substitute for it.
 STATEMENTS=""
 for ID in "${CATALOG_IDS[@]}"; do
   BUCKET="$(bucket_of "$ID")"
@@ -35,6 +49,9 @@ for ID in "${CATALOG_IDS[@]}"; do
     continue
   fi
   create_bucket_if_absent "$BUCKET"
+  if [ "$(admin_grants_of "$ID")" != "true" ]; then
+    continue
+  fi
   SID=$(sid_of "$ID")
   if [ -n "$STATEMENTS" ]; then STATEMENTS="$STATEMENTS,"; fi
   STATEMENTS="$STATEMENTS
@@ -51,13 +68,6 @@ for ID in "${CATALOG_IDS[@]}"; do
       \"Resource\": \"arn:aws:s3:::$BUCKET/*\"
     }"
 done
-
-# Used only by AcceptanceTestConfig's own "aws_forbidden" test catalog (see catalogs-aws.properties) -
-# created, but deliberately NOT added to the whitelist below, so tests can verify Polaris denies
-# access to it.
-if [ -n "${AWS_S3_BUCKET_NAME_FORBIDDEN:-}" ]; then
-  create_bucket_if_absent "$AWS_S3_BUCKET_NAME_FORBIDDEN"
-fi
 
 if aws iam get-role --role-name S3ReadWriteRole >/dev/null 2>&1; then
   echo "- Role S3ReadWriteRole already exists, skipping"
