@@ -128,6 +128,12 @@ public class StepOperations {
                 () -> actions.createAllCatalogsFor(cloud));
     }
 
+    public Step configureOidcUsersFor(AfonCloud cloud) {
+        return new Step(format("configure_oidc_users_for_cloud_%s", cloud),
+                format("configure OIDC users and Jupyter client for cloud `%s`", cloud),
+                () -> actions.configureOidcUsersFor(cloud));
+    }
+
 
     public Step createExternalCatalogFor(AfonCloud cloud) {
         switch (cloud) {
@@ -225,7 +231,7 @@ public class StepOperations {
         return new Step(format("%s_spark_talks_to_catalog_%s", cloud, catalog),
                 format("%s `%s.%s.%s` on cloud `%s`", description, catalog, namespace, tableName, cloud),
             () -> {
-                actions.configureUsersFor(cloud, catalog);
+                actions.configurePolarisUsersFor(cloud, catalog);
                 actions.runSpark(sparkRunner, cloud, catalog, namespace, tableName);
             });
     }

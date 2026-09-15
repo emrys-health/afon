@@ -136,8 +136,8 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       When(s"we onboard a user '$User' for catalog ${catalog.catalogName()}' in Polaris")
       val configureUsers = new ConfigureUsersMain(TestUsers(), properties)
       configureUsers.configurePolarisUsers(catalog.catalogName())
-      And("configure OAuth users for Jupyter domain")
-      configureUsers.configureOidcUsers("NotUsed.com")
+      And("configure OIDC users")
+      configureUsers.configureOidcUsers()
 
       Then(s"we can get a token from KeyCloak for user '$UserName' in Realm '$KEYCLOAK_REALM'")
       val keyCloakProvider = new KeyCloakProvider("localhost", UserName, UserPassword)

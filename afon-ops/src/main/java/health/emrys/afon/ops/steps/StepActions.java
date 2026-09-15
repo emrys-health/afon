@@ -304,7 +304,12 @@ public class StepActions {
                 new String[]{CREATE, cloud.toString(), catalog.name()}, properties);
     }
 
-    public void configureUsersFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
+    public void configureOidcUsersFor(AfonCloud cloud) throws Exception {
+        executeMainOf(ConfigureUsersMain.class,
+                new String[]{cloud.toString()});
+    }
+
+    public void configurePolarisUsersFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
         executeMainOf(ConfigureUsersMain.class,
                 new String[]{cloud.toString(), catalog.toString()});
     }

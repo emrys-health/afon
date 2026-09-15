@@ -34,19 +34,35 @@ public class ConfigureUsersMain {
         this.polarisUsers     = new PolarisUserManager(propertyProvider);
     }
 
-    public List<HttpResponse> configureOidcUsers(String jupyterDomain) throws IOException {
-        logger.info("Configuring OIDC users for jupyter domain {}", jupyterDomain);
+    /**
+     * Provisions the realm and each configured user's account/confidential client. Independent of
+     * any Jupyter domain, so this runs regardless of whether browser (Jupyter) access is configured
+     * for the cloud - headless clients (Spark, Trino) only need this.
+     */
+    public List<HttpResponse> configureOidcUsers() throws IOException {
+        logger.info("Configuring OIDC users");
         List<HttpResponse> responses = new ArrayList<>();
-        responses.addAll(identityProvider.registerBrowserClient(
-                propertyProvider.getValue(OAUTH2_CLIENT_ID),
-                propertyProvider.getValue(OAUTH2_CLIENT_SECRET),
-                KeyCloakProvider.callbackURIs(jupyterDomain)));
         String adminToken = identityProvider.adminToken();
         responses.add(identityProvider.createRealm(adminToken, KEYCLOAK_REALM));
         for (AfonUser user : userProvider.getUsers()) {
             responses.add(identityProvider.createUser(adminToken, KEYCLOAK_REALM, user));
             responses.add(identityProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
         }
+        return responses;
+    }
+
+    /**
+     * Registers the browser client used for interactive (Jupyter) logins, and configures MFA on the
+     * realm's browser flow. Requires {@link #configureOidcUsers()} to have already created the realm
+     * and the users who must be able to pass through the MFA flow.
+     */
+    public List<HttpResponse> configureJupyterClient(String jupyterDomain) throws IOException {
+        logger.info("Configuring browser client for jupyter domain {}", jupyterDomain);
+        List<HttpResponse> responses = new ArrayList<>();
+        responses.addAll(identityProvider.registerBrowserClient(
+                propertyProvider.getValue(OAUTH2_CLIENT_ID),
+                propertyProvider.getValue(OAUTH2_CLIENT_SECRET),
+                KeyCloakProvider.callbackURIs(jupyterDomain)));
         // Last, so that the realm is only bound to its MFA flows once the users who must pass through
         // them exist.
         responses.addAll(identityProvider.configureMfa());
@@ -63,48 +79,66 @@ public class ConfigureUsersMain {
         return polarisUsers.configureUsers(catalogName, userProvider);
     }
 
+    /**
+     * With one argument (cloud), configures OIDC users, the Jupyter browser client if the cloud has
+     * a Jupyter domain, and Polaris users on every catalog - all cloud-scoped, meant to run once per
+     * cloud.
+     * With two arguments (cloud, catalog-name), configures Polaris users for that single catalog -
+     * catalog-scoped, meant to run once per catalog, e.g. to pick up a catalog created after the
+     * cloud was last configured.
+     */
     public static void main(String[] args) {
 
-        String cloudName;
-        String catalogName = null;
-
-        if (args.length == 1) {
-            cloudName  = args[0];
-        } else if (args.length == 2) {
-            cloudName  = args[0];
-            catalogName = args[1];
-        } else {
+        if (args.length != 1 && args.length != 2) {
             System.out.printf("%s requires arguments: cloud", ConfigureUsersMain.class.getSimpleName());
             System.out.printf("%s requires arguments: cloud catalog-name", ConfigureUsersMain.class.getSimpleName());
             throw new IllegalArgumentException();
         }
+        String cloudName   = args[0];
+        String catalogName = args.length == 2 ? args[1] : null;
+
         AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
         var    userProvider     = new FileUserProvider();
         var    propertyProvider = new OpsPropertyProvider();
         propertyProvider.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, propertyProvider).getEndpoint());
         var app = new ConfigureUsersMain(userProvider, propertyProvider);
 
-        String jupyterDomain = jupyterDomain(cloud, propertyProvider);
-        if (jupyterDomain != null) {
+        if (catalogName == null) {
             try {
-                app.configureOidcUsers(jupyterDomain);
+                app.configureOidcUsers();
                 Thread.sleep(1000L); // yuck! But KeyCloak appears to asynchronously register users
             } catch (Exception e) {
                 logger.error("Failed to configure OIDC users {}: {}",
                         userProvider.getUserNames(), e.getMessage(), e);
                 throw new RuntimeException(e);
             }
-        }
-        try {
-            if ( catalogName == null ) {
-                app.configurePolarisUsers();
-            } else {
-                app.configurePolarisUsers(catalogName);
+
+            String jupyterDomain = jupyterDomain(cloud, propertyProvider);
+            if (jupyterDomain != null) {
+                try {
+                    app.configureJupyterClient(jupyterDomain);
+                } catch (Exception e) {
+                    logger.error("Failed to configure Jupyter client for jupyter domain {}: {}",
+                            jupyterDomain, e.getMessage(), e);
+                    throw new RuntimeException(e);
+                }
             }
-        } catch (Exception e) {
-            logger.error("Failed to configure Polaris users {}: {}",
-                    userProvider.getUserNames(), e.getMessage(), e);
-            throw new RuntimeException(e);
+
+            try {
+                app.configurePolarisUsers();
+            } catch (Exception e) {
+                logger.error("Failed to configure Polaris users {}: {}",
+                        userProvider.getUserNames(), e.getMessage(), e);
+                throw new RuntimeException(e);
+            }
+        } else {
+            try {
+                app.configurePolarisUsers(catalogName);
+            } catch (Exception e) {
+                logger.error("Failed to configure Polaris users {}: {}",
+                        userProvider.getUserNames(), e.getMessage(), e);
+                throw new RuntimeException(e);
+            }
         }
     }
 

@@ -12,6 +12,7 @@ public class StepsUtils {
                     stepOperations.deployFullStackIn(cloud),
                     stepOperations.waitForPolarisAndKeycloakIn(cloud),
                     stepOperations.createAllCatalogsFor(cloud),
+                    stepOperations.configureOidcUsersFor(cloud),
                     stepOperations.runAwsSparkWritingTo(cloud)
                 );
     }
