@@ -61,13 +61,22 @@ public class StepActions {
     }
 
     private @NonNull Path stackDir(AfonCloud cloud) throws IOException {
+        checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
         Path stackDir = Path.of(ConfigUtils.stackDir(cloud));
         logger.info("Using stack dir {}", stackDir);
         if (!Files.exists(stackDir)){
-            stackDir.toFile().mkdirs();
+            Files.createDirectories(stackDir);
             logger.info("Created new stack dir {}, as it did not exist.", stackDir);
         }
         return stackDir;
+    }
+
+    private void checkNotBrokenSymlink(Path path) throws IOException {
+        if (Files.isSymbolicLink(path) && !Files.exists(path)) {
+            throw new IOException(String.format(
+                "%s is a symlink pointing to %s, which does not exist. Fix or recreate the symlink target.",
+                path, Files.readSymbolicLink(path)));
+        }
     }
 
     private void tofuDestroy(Path tofuDir) throws ManagedProcessException {
