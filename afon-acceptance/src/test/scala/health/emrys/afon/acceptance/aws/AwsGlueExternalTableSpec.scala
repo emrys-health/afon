@@ -4,7 +4,8 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, External}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
-import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_BUCKET_NAME_EXTERNAL, AWS_GLUE_CATALOG_NAME}
+import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_BUCKET_NAME_EXTERNAL, AWS_GLUE_CATALOG_NAME, ENV_NAME}
+import health.emrys.afon.config.FilePropertyProvider
 import health.emrys.afon.polaris.catalogs.GlueAwsPolarisCatalog
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
@@ -25,7 +26,10 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
     val glueCatalog       = new GlueAwsPolarisCatalog(properties)
     val grantCatalogAdmin = new GrantCatalogAdmin(this, glueCatalog, Some(glueCatalog.catalogName()))
     val createCatalogRole = new CreateCatalogRole(this, glueCatalog, Some(glueCatalog.catalogName))
-    val tableName         = "DatumAccTest2"
+    // Suffixed by ENV_NAME: the underlying Glue table is a real, shared, account-wide resource
+    // (not scoped per Afon environment), so each environment needs its own distinctly-named table
+    // to avoid colliding on the same database.table with a different expected S3 location.
+    val tableName         = s"DatumAccTest2_${properties.getValue(ENV_NAME)}"
     val sparkNamespace    = "ph_glue_iceberg_db"
     val awsRegion         = properties.getValue(AWS_REGION)
 
@@ -111,10 +115,13 @@ object AwsGlueExternalTableSpec {
     dbName, tblName, bucket, dbName, region
   )
 
-  def main(args: Array[String]): Unit = println(glueCmdLine(
-    "ph_glue_iceberg_db",
-    "DatumAccTest2",
-    "eu-west-2",
-    "emrys-afon-bucket-2",
-  ))
+  def main(args: Array[String]): Unit = {
+    val properties = new FilePropertyProvider()
+    println(glueCmdLine(
+      "ph_glue_iceberg_db",
+      s"DatumAccTest2_${properties.getValue(ENV_NAME)}",
+      properties.getValue(AWS_REGION),
+      properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL),
+    ))
+  }
 }
