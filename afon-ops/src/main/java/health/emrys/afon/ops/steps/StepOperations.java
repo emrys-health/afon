@@ -130,10 +130,17 @@ public class StepOperations {
 
     public Step configureOidcUsersFor(AfonCloud cloud) {
         return new Step(format("configure_oidc_users_for_cloud_%s", cloud),
-                format("configure OIDC users and Jupyter client for cloud `%s`", cloud),
+                format("configure OIDC users for cloud `%s`", cloud),
                 () -> actions.configureOidcUsersFor(cloud));
     }
 
+    private @NonNull Step configurePolarisUsers(AfonCloud cloud, AfonCatalog catalog) {
+        return new Step(format("configure_polaris_users_on_catalog_%s_for_cloud_%s", catalog, cloud),
+                format("configure Polaris users on catalog `%s` for cloud `%s`", catalog, cloud),
+                () -> {
+                    actions.configurePolarisUsersFor(cloud, catalog);
+                });
+    }
 
     public Step createExternalCatalogFor(AfonCloud cloud) {
         switch (cloud) {
@@ -213,25 +220,32 @@ public class StepOperations {
     }
 
     private Step awsSparkWritingTo(AfonCatalog catalog, String namespace) {
-        return runSpark("Spark writing table",
-                AWS, catalog, namespace, polarisTableName, SparkTestWriter.class);
+        AfonCloud cloud = AWS;
+        return configurePolarisUsers(cloud, catalog)
+                .andThen(runSpark("Spark writing table",
+                        cloud, catalog, namespace, polarisTableName, SparkTestWriter.class));
     }
 
     public @NonNull Step runAwsSparkDeferringToAzurePolarisHostingExternalCatalog() {
-        return runSpark(format("Spark defers to %s writing table", AZURE),
-                AWS, afonCatalogs.azureExternal(), polarisNamespaceExternal, polarisTableName, SparkTestWriter.class);
+        AfonCloud cloud = AWS;
+        AfonCatalog catalog = afonCatalogs.azureExternal();
+        return configurePolarisUsers(cloud, catalog)
+                .andThen(runSpark(format("Spark defers to %s writing table", AZURE),
+                        cloud, catalog, polarisNamespaceExternal, polarisTableName, SparkTestWriter.class));
     }
 
+
     public @NonNull Step runAwsSparkReadingFrom(AfonCatalog catalog) {
-        return runSpark("Spark reading table",
-                AWS, catalog, polarisNamespace, polarisTableName, SparkTestReader.class);
+        AfonCloud cloud = AWS;
+        return configurePolarisUsers(cloud, catalog)
+                .andThen(runSpark("Spark reading table",
+                        cloud, catalog, polarisNamespace, polarisTableName, SparkTestReader.class));
     }
 
     private @NonNull Step runSpark(String description, AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, Class<? extends SparkRunner> sparkRunner) {
         return new Step(format("%s_spark_talks_to_catalog_%s", cloud, catalog),
                 format("%s `%s.%s.%s` on cloud `%s`", description, catalog, namespace, tableName, cloud),
             () -> {
-                actions.configurePolarisUsersFor(cloud, catalog);
                 actions.runSpark(sparkRunner, cloud, catalog, namespace, tableName);
             });
     }
