@@ -26,21 +26,29 @@ ASSIGNEE_ID=$APP_SP_ID
 STORAGE_BUCKET_ROLE="Storage Blob Data Contributor"
 STORAGE_ACCOUNT_ROLE="Storage Blob Delegator"
 
-BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET_NAME"
-if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
-  echo "- Deleting role assignment '$STORAGE_BUCKET_ROLE' for bucket '$AZURE_BUCKET_NAME'"
-  az role assignment delete --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$BUCKET_SCOPE"
-else
-  echo "- No role assignment '$STORAGE_BUCKET_ROLE' for bucket '$AZURE_BUCKET_NAME', skipping"
-fi
+# Reads AZURE_BUCKET_NAME_<id>, echoing "" instead of erroring under `set -u` if a catalog (eg a
+# custom type with no bucket of its own) never defined one.
+bucket_of() {
+  local VAR="AZURE_BUCKET_NAME_$1"
+  if [ -n "${!VAR+x}" ]; then
+    echo "${!VAR}"
+  fi
+}
 
-EXTERNAL_BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET_NAME_EXTERNAL"
-if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$EXTERNAL_BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
-  echo "- Deleting role assignment '$STORAGE_BUCKET_ROLE' for bucket '$AZURE_BUCKET_NAME_EXTERNAL'"
-  az role assignment delete --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$EXTERNAL_BUCKET_SCOPE"
-else
-  echo "- No role assignment '$STORAGE_BUCKET_ROLE' for bucket '$AZURE_BUCKET_NAME_EXTERNAL', skipping"
-fi
+IFS=',' read -ra CATALOG_IDS <<< "$AZURE_CATALOG_NAMES"
+for ID in "${CATALOG_IDS[@]}"; do
+  BUCKET="$(bucket_of "$ID")"
+  if [ -z "$BUCKET" ]; then
+    continue
+  fi
+  BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$BUCKET"
+  if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
+    echo "- Deleting role assignment '$STORAGE_BUCKET_ROLE' for bucket '$BUCKET'"
+    az role assignment delete --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$BUCKET_SCOPE"
+  else
+    echo "- No role assignment '$STORAGE_BUCKET_ROLE' for bucket '$BUCKET', skipping"
+  fi
+done
 
 STORAGE_ACCOUNT_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT"
 if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_ACCOUNT_ROLE" --scope "$STORAGE_ACCOUNT_SCOPE" --query "[].id" -o tsv)" ]; then
@@ -55,26 +63,18 @@ fi
 echo "- Deleting storage"
 
 if az storage account show --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP -o none 2>/dev/null; then
-  if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME --auth-mode login --query exists -o tsv)" = "true" ]; then
-    echo "- Deleting bucket '$AZURE_BUCKET_NAME'"
-    az storage container delete --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME
-  else
-    echo "- Bucket '$AZURE_BUCKET_NAME' does not exist, skipping"
-  fi
-
-  if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_EXTERNAL --query exists -o tsv)" = "true" ]; then
-    echo "- Deleting bucket '$AZURE_BUCKET_NAME_EXTERNAL'"
-    az storage container delete --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_EXTERNAL
-  else
-    echo "- Bucket '$AZURE_BUCKET_NAME_EXTERNAL' does not exist, skipping"
-  fi
-
-  if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_FORBIDDEN --query exists -o tsv)" = "true" ]; then
-    echo "- Deleting bucket '$AZURE_BUCKET_NAME_FORBIDDEN'"
-    az storage container delete --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_FORBIDDEN
-  else
-    echo "= Bucket '$AZURE_BUCKET_NAME_FORBIDDEN' does not exist, skipping"
-  fi
+  for ID in "${CATALOG_IDS[@]}"; do
+    BUCKET="$(bucket_of "$ID")"
+    if [ -z "$BUCKET" ]; then
+      continue
+    fi
+    if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $BUCKET --auth-mode login --query exists -o tsv)" = "true" ]; then
+      echo "- Deleting bucket '$BUCKET'"
+      az storage container delete --account-name $AZURE_STORAGE_ACCOUNT --name $BUCKET
+    else
+      echo "- Bucket '$BUCKET' does not exist, skipping"
+    fi
+  done
 
   echo "- Deleting account '$AZURE_STORAGE_ACCOUNT'"
   az storage account delete --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP --yes

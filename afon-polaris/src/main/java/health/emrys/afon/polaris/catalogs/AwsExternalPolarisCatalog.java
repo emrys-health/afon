@@ -1,23 +1,32 @@
 package health.emrys.afon.polaris.catalogs;
 
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperty.AWS_REGION;
+import static health.emrys.afon.config.AfonProperty.AWS_S3_ROLE_ARN;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 
 public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
+    private final String catalogName;
     private final String bucketUrl;
     private final String roleArn;
     private final String region;
     private final String endpoint;
 
-    public AwsExternalPolarisCatalog(AfonPropertyProvider properties) {
+    /**
+     * Builds any "external"-typed AWS catalog purely from its {@link AfonCatalog} definition;
+     * credentials, region and domain are fixed per cloud and read here directly.
+     */
+    public AwsExternalPolarisCatalog(AfonCatalog catalog, AfonPropertyProvider properties) {
         super(properties);
-        this.bucketUrl = s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL));
+        this.catalogName = catalog.toString();
+        this.bucketUrl = s3BucketUrl(catalog.bucketName());
         this.roleArn = properties.getValue(AWS_S3_ROLE_ARN);
         this.region = properties.getValue(AWS_REGION);
         this.endpoint = "https://" + properties.getValue(AWS_POLARIS_DOMAIN_NAME);
@@ -50,6 +59,6 @@ public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
 
     @Override
     public String catalogName() {
-        return "aws_external";
+        return catalogName;
     }
 }

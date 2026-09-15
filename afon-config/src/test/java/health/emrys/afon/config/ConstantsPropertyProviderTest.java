@@ -15,7 +15,7 @@ public class ConstantsPropertyProviderTest {
     }
 
     static class Constants2 {
-        public static final String GCP_BUCKET_NAME = "dev-bucket";
+        public static final String GCP_REGION = "dev-region";
         public static final String NON_AFON_PROPERTY = "any";
         public String instanceField = "not static"; // not static, must be ignored
     }
@@ -26,7 +26,7 @@ public class ConstantsPropertyProviderTest {
         Properties properties = provider.getProperties();
         assertThat(properties.getProperty("CLUSTER_NAME")).isEqualTo(Constants1.CLUSTER_NAME.toString());
         assertThat(properties.getProperty("AWS_REGION")).isEqualTo(Constants1.AWS_REGION.toString());
-        assertThat(properties.getProperty("GCP_BUCKET_NAME")).isEqualTo(Constants2.GCP_BUCKET_NAME.toString());
+        assertThat(properties.getProperty("GCP_REGION")).isEqualTo(Constants2.GCP_REGION.toString());
         assertThat(properties.getProperty("HIDDEN")).isNull();
         assertThat(properties.getProperty("instanceField")).isNull();
         assertThat(properties.getProperty("NON_AFON_PROPERTY")).isNull();

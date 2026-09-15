@@ -14,9 +14,6 @@ import java.util.Map;
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.ConfigUtils.afonCloud;
-import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
-import static health.emrys.afon.polaris.catalogs.AzureUtils.abfssBucketUrl;
-import static health.emrys.afon.polaris.catalogs.GcpUtils.gsBucketUrl;
 
 public class AcceptanceTestConfig {
 
@@ -61,61 +58,25 @@ public class AcceptanceTestConfig {
     }
 
     private void addAwsCatalogs() {
-        polarisCatalogs.put(afonCatalogs.aws(), new AwsPolarisCatalog(this.properties));
-        polarisCatalogs.put(afonCatalogs.awsForbidden(), new AwsPolarisCatalog(this.properties) {
-            @Override
-            public String bucketUri() {
-                return s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_FORBIDDEN));
-            }
-
-            @Override
-            public String catalogName() {
-                return afonCatalogs.awsForbidden().toString();
-            }
-        });
-        polarisCatalogs.put(afonCatalogs.awsTrino(), new AwsPolarisCatalog(this.properties) {
-            @Override
-            public String bucketUri() {
-                return s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_TRINO));
-            }
-
-            @Override
-            public String catalogName() {
-                return afonCatalogs.awsTrino().toString();
-            }
-        });
+        polarisCatalogs.put(afonCatalogs.aws(), new AwsPolarisCatalog(afonCatalogs.aws(), this.properties));
+        // A distinct bucket from afonCatalogs.awsForbidden()'s (AWS_BUCKET_NAME_aws_forbidden in
+        // catalogs-aws.properties), so this test-harness catalog and PolarisCatalogManager's own
+        // "aws_forbidden" catalog don't collide if both are exercised in the same run.
+        AfonCatalog awsForbiddenForTests = AfonCatalog.adHoc(
+                afonCatalogs.awsForbidden().toString(), AWS, "internal",
+                properties.getProperties().getProperty("AWS_S3_BUCKET_NAME_FORBIDDEN"), false);
+        polarisCatalogs.put(afonCatalogs.awsForbidden(), new AwsPolarisCatalog(awsForbiddenForTests, this.properties));
+        polarisCatalogs.put(afonCatalogs.awsTrino(), new AwsPolarisCatalog(afonCatalogs.awsTrino(), this.properties));
     }
 
     private void addAzureCatalogs() {
-        polarisCatalogs.put(afonCatalogs.azure(), new AzurePolarisCatalog(this.properties));
-        polarisCatalogs.put(afonCatalogs.azureForbidden(), new AzurePolarisCatalog(this.properties) {
-            @Override
-            public String bucketUri() {
-                return abfssBucketUrl(
-                        properties.getValue(AZURE_BUCKET_NAME_FORBIDDEN),
-                        properties.getValue(AZURE_STORAGE_ACCOUNT));
-            }
-
-            @Override
-            public String catalogName() {
-                return afonCatalogs.azureForbidden().toString();
-            }
-        });
+        polarisCatalogs.put(afonCatalogs.azure(), new AzurePolarisCatalog(afonCatalogs.azure(), this.properties));
+        polarisCatalogs.put(afonCatalogs.azureForbidden(), new AzurePolarisCatalog(afonCatalogs.azureForbidden(), this.properties));
     }
 
     private void addGcpCatalogs() {
-        polarisCatalogs.put(afonCatalogs.gcp(), new GcpPolarisCatalog(this.properties));
-        polarisCatalogs.put(afonCatalogs.gcpForbidden(), new GcpPolarisCatalog(this.properties) {
-            @Override
-            public String bucketUri() {
-                return gsBucketUrl(properties.getValue(GCP_BUCKET_NAME_FORBIDDEN));
-            }
-
-            @Override
-            public String catalogName() {
-                return afonCatalogs.gcpForbidden().toString();
-            }
-        });
+        polarisCatalogs.put(afonCatalogs.gcp(), new GcpPolarisCatalog(afonCatalogs.gcp(), this.properties));
+        polarisCatalogs.put(afonCatalogs.gcpForbidden(), new GcpPolarisCatalog(afonCatalogs.gcpForbidden(), this.properties));
     }
 
     private static void startContainers(AfonPropertyProvider properties) {

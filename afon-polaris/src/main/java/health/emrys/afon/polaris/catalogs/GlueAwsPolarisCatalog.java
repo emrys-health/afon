@@ -11,7 +11,12 @@ import java.util.Map;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AwsUtils.s3BucketUrl;
 
-public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
+/**
+ * A one-off catalog shape (bespoke Glue/SigV4 connection) registered explicitly in
+ * PolarisCatalogManager under the "glue" type, rather than being reducible to the generic
+ * "internal"/"external" shapes.
+ */
+public class GlueAwsPolarisCatalog extends PolarisCatalog {
 
     private final String bucketUrl;
     private final String roleArn;
@@ -19,8 +24,8 @@ public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
     private final String catalogName;
 
     public GlueAwsPolarisCatalog(AfonPropertyProvider properties) {
-        super(properties);
-        this.bucketUrl = s3BucketUrl(properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL));
+        // Reuses aws_external's configured bucket (see catalogs-aws.properties), as this always has.
+        this.bucketUrl = s3BucketUrl(properties.getCatalogProperty("AWS_BUCKET_NAME", "aws_external"));
         this.roleArn = properties.getValue(AWS_GLUE_ROLE_ARN);
         this.region  = properties.getValue(AWS_REGION);
         this.catalogName = properties.getValue(AWS_GLUE_CATALOG_NAME);
@@ -83,5 +88,10 @@ public class GlueAwsPolarisCatalog extends AwsPolarisCatalog {
     @Override
     public String catalogName() {
         return catalogName;
+    }
+
+    @Override
+    protected StorageConfigInfo storageConfigInfo() {
+        return AwsUtils.createS3StorageConfigInfo(roleArn, bucketUrl, region);
     }
 }

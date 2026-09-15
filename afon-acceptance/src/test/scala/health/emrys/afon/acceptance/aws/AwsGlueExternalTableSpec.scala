@@ -4,7 +4,7 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, External}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
-import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_BUCKET_NAME_EXTERNAL, AWS_GLUE_CATALOG_NAME, ENV_NAME}
+import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_GLUE_CATALOG_NAME, ENV_NAME}
 import health.emrys.afon.config.FilePropertyProvider
 import health.emrys.afon.polaris.catalogs.GlueAwsPolarisCatalog
 import org.apache.spark.sql.SparkSession
@@ -22,7 +22,8 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
   "An external table" should {
     val glueCatalogName   = properties.getValue(AWS_GLUE_CATALOG_NAME)
-    val externalBucket    = properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL)
+    // GlueAwsPolarisCatalog reuses aws_external's configured bucket (see catalogs-aws.properties).
+    val externalBucket    = properties.getCatalogProperty("AWS_BUCKET_NAME", "aws_external")
     val glueCatalog       = new GlueAwsPolarisCatalog(properties)
     val grantCatalogAdmin = new GrantCatalogAdmin(this, glueCatalog, Some(glueCatalog.catalogName()))
     val createCatalogRole = new CreateCatalogRole(this, glueCatalog, Some(glueCatalog.catalogName))
@@ -121,7 +122,7 @@ object AwsGlueExternalTableSpec {
       "ph_glue_iceberg_db",
       s"DatumAccTest2_${properties.getValue(ENV_NAME)}",
       properties.getValue(AWS_REGION),
-      properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL),
+      "emrys2-afon-bucket-2",
     ))
   }
 }

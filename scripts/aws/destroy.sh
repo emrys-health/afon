@@ -28,15 +28,38 @@ else
   echo "- Role S3ReadWriteRole does not exist, skipping"
 fi
 
-for BUCKET in $AWS_S3_BUCKET_NAME_EXTERNAL $AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS $AWS_S3_BUCKET_NAME_TRINO $AWS_S3_BUCKET_NAME $AWS_S3_BUCKET_NAME_FORBIDDEN; do
-  if aws s3api head-bucket --bucket $BUCKET 2>/dev/null; then
+delete_bucket_if_present() {
+  local BUCKET="$1"
+  if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
     echo "- Emptying and deleting bucket $BUCKET"
     aws s3 rm s3://$BUCKET --recursive
-    aws s3api delete-bucket --bucket $BUCKET
+    aws s3api delete-bucket --bucket "$BUCKET"
   else
     echo "- Bucket $BUCKET does not exist, skipping"
   fi
+}
+
+# Reads AWS_BUCKET_NAME_<id>, echoing "" instead of erroring under `set -u` if that catalog (eg a
+# custom type with no bucket of its own) never defined one.
+bucket_of() {
+  local VAR="AWS_BUCKET_NAME_$1"
+  if [ -n "${!VAR+x}" ]; then
+    echo "${!VAR}"
+  fi
+}
+
+IFS=',' read -ra CATALOG_IDS <<< "$AWS_CATALOG_NAMES"
+for ID in "${CATALOG_IDS[@]}"; do
+  BUCKET="$(bucket_of "$ID")"
+  if [ -n "$BUCKET" ]; then
+    delete_bucket_if_present "$BUCKET"
+  fi
 done
+
+# See create.sh - AcceptanceTestConfig's own "aws_forbidden" test bucket, outside AWS_CATALOG_NAMES.
+if [ -n "${AWS_S3_BUCKET_NAME_FORBIDDEN:-}" ]; then
+  delete_bucket_if_present "$AWS_S3_BUCKET_NAME_FORBIDDEN"
+fi
 
 if aws iam get-policy --policy-arn arn:aws:iam::$AWS_ACCOUNT_ID:policy/AfonBucketWhiteList >/dev/null 2>&1; then
   echo "- Deleting policy AfonBucketWhiteList"

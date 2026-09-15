@@ -2,6 +2,7 @@ package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -22,22 +23,35 @@ public class PolarisCatalogManager {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogManager.class);
 
+    @FunctionalInterface
+    private interface CatalogFactory {
+        PolarisCatalog create(AfonCatalog catalog, AfonPropertyProvider properties);
+    }
+
     /**
-     * Factories keyed by {@link AfonCatalog#toString()}'s canonical name, so the catalogs actually
-     * configured always match whatever {@link AfonCatalogs} resolves to - the built-in default set,
-     * or a user-supplied {@code CATALOG_NAMES_CSV} - rather than a separately maintained list.
+     * The two generic catalog "types": every {@code internal}/{@code external} catalog is built
+     * purely from its {@link AfonCatalog} definition (see {@link AfonCatalogs}), so adding one
+     * needs no code change - only configuration (a catalog id in {@code <CLOUD>_CATALOG_NAMES}
+     * plus its {@code <CLOUD>_CATALOG_TYPE_<id>}/{@code <CLOUD>_BUCKET_NAME_<id>}/
+     * {@code <CLOUD>_ADMIN_GRANTS_<id>}, conventionally in {@code catalogs-<cloud>.properties}).
      */
-    private static final Map<String, Function<AfonPropertyProvider, PolarisCatalog>> CATALOG_FACTORIES = Map.ofEntries(
-            Map.entry("aws", AwsPolarisCatalog::new),
-            Map.entry("aws_forbidden", AwsForbiddenPolarisCatalog::new),
-            Map.entry("aws_trino", AwsTrinoPolarisCatalog::new),
-            Map.entry("aws_external", AwsExternalPolarisCatalog::new),
-            Map.entry("azure", AzurePolarisCatalog::new),
-            Map.entry("azure_external", AzureExternalPolarisCatalog::new),
-            Map.entry("azure_forbidden", AzureForbiddenPolarisCatalog::new),
-            Map.entry("gcp", GcpPolarisCatalog::new),
-            Map.entry("gcp_external", GcpExternalPolarisCatalog::new),
-            Map.entry("gcp_forbidden", GcpForbiddenPolarisCatalog::new));
+    private static final Map<AfonCloud, CatalogFactory> INTERNAL_CATALOG_FACTORIES = Map.of(
+            AfonCloud.AWS, AwsPolarisCatalog::new,
+            AfonCloud.AZURE, AzurePolarisCatalog::new,
+            AfonCloud.GCP, GcpPolarisCatalog::new);
+
+    private static final Map<AfonCloud, CatalogFactory> EXTERNAL_CATALOG_FACTORIES = Map.of(
+            AfonCloud.AWS, AwsExternalPolarisCatalog::new,
+            AfonCloud.AZURE, AzureExternalPolarisCatalog::new,
+            AfonCloud.GCP, GcpExternalPolarisCatalog::new);
+
+    /**
+     * Any other catalog type (eg the Glue-backed one) isn't reducible to the generic
+     * "internal"/"external" shapes, so keeps a hand-written {@link PolarisCatalog} subclass
+     * registered explicitly here, keyed by its {@link AfonCatalog#type()}.
+     */
+    private static final Map<String, Function<AfonPropertyProvider, PolarisCatalog>> CUSTOM_CATALOG_FACTORIES = Map.of(
+            "glue", GlueAwsPolarisCatalog::new);
 
     private final AfonPropertyProvider properties;
     private final AfonCatalogs afonCatalogs;
@@ -83,9 +97,18 @@ public class PolarisCatalogManager {
     }
 
     private PolarisCatalog catalogOf(AfonCatalog catalog) {
-        Function<AfonPropertyProvider, PolarisCatalog> factory = CATALOG_FACTORIES.get(catalog.toString());
+        return switch (catalog.type()) {
+            case "internal" -> INTERNAL_CATALOG_FACTORIES.get(catalog.cloud()).create(catalog, properties);
+            case "external" -> EXTERNAL_CATALOG_FACTORIES.get(catalog.cloud()).create(catalog, properties);
+            default -> customCatalogOf(catalog);
+        };
+    }
+
+    private PolarisCatalog customCatalogOf(AfonCatalog catalog) {
+        Function<AfonPropertyProvider, PolarisCatalog> factory = CUSTOM_CATALOG_FACTORIES.get(catalog.type());
         if (factory == null) {
-            throw new IllegalArgumentException("No PolarisCatalog implementation registered for catalog '" + catalog + "'");
+            throw new IllegalArgumentException("No PolarisCatalog factory registered for catalog type '"
+                    + catalog.type() + "' (catalog '" + catalog.id() + "')");
         }
         return factory.apply(properties);
     }
