@@ -56,6 +56,11 @@ for ID in "${CATALOG_IDS[@]}"; do
   fi
 done
 
+# See create.sh - AcceptanceTestConfig's own "aws_forbidden" test bucket, outside AWS_CATALOG_NAMES.
+if [ -n "${AWS_S3_BUCKET_NAME_FORBIDDEN:-}" ]; then
+  delete_bucket_if_present "$AWS_S3_BUCKET_NAME_FORBIDDEN"
+fi
+
 if aws iam get-policy --policy-arn arn:aws:iam::$AWS_ACCOUNT_ID:policy/AfonBucketWhiteList >/dev/null 2>&1; then
   echo "- Deleting policy AfonBucketWhiteList"
   aws iam delete-policy --policy-arn arn:aws:iam::$AWS_ACCOUNT_ID:policy/AfonBucketWhiteList
