@@ -716,7 +716,7 @@ def csv_to_dataframe(rows: list[dict]) -> pd.DataFrame:
         if col in inttype_conversions:
             df[col] = df[col].astype(int)
         if col in floattype_conversions:
-            df[col] = df[col].map(lambda x: float(x) if x is not '' else None)
+            df[col] = df[col].map(lambda x: float(x) if x != '' else None)
     return df
 
 
