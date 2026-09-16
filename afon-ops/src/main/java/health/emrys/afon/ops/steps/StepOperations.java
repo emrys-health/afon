@@ -1,14 +1,12 @@
 package health.emrys.afon.ops.steps;
 
+import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.aws.AwsFullStack;
 import health.emrys.afon.cdk.aws.AwsPolarisStack;
 import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
-import health.emrys.afon.config.AfonCatalog;
-import health.emrys.afon.config.AfonCatalogs;
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.*;
 import health.emrys.afon.ops.snowflake.SnowflakeStatements;
 import health.emrys.afon.ops.spark.SparkRunner;
 import health.emrys.afon.ops.spark.SparkTestReader;
@@ -16,6 +14,9 @@ import health.emrys.afon.ops.spark.SparkTestWriter;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonCloud.*;
@@ -60,7 +61,11 @@ public class StepOperations {
             case AWS:
                 return new Step("deploy_aws_full_stack",
                         "deploy full stack in AWS",
-                        () -> actions.startStack(AwsFullStack.class, AWS));
+                        () -> {
+                            checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN,
+                                    AWS_JUPYTER_CERT_ARN,AWS_POLARIS_CERT_ARN);
+                            actions.startStack(AwsFullStack.class, AWS);
+                        });
             case AZURE:
                 return new Step("deploy_azure_full_stack",
                         "deploy full stack in Azure",
@@ -71,12 +76,50 @@ public class StepOperations {
         }
     }
 
+    /**
+     * Fails fast, before the slow {@code tofu apply} even starts, if any configured ACM
+     * certificate isn't actually {@code ISSUED}. Without this, a stale/dead cert (e.g. one
+     * stuck at {@code VALIDATION_TIMED_OUT}) only surfaces ~20 minutes into the apply, buried
+     * in a generic "Load Balancer is not ready yet" error from the ALB controller endlessly
+     * retrying {@code CreateListener} against a certificate AWS will never accept. Re-issue a
+     * failing one with {@code scripts/aws/issue-cert.sh}.
+     */
+    void checkAwsCertificatesIssued(AfonProperty... arns) throws ManagedProcessException {
+        String region = properties.getValue(AWS_REGION);
+
+        List<String> problems = new ArrayList<>();
+        for (AfonProperty property : arns) {
+            String arn = properties.getValue(property);
+            if (arn == null || arn.isBlank()) {
+                return;
+            }
+            String status = describeCertificateStatus(arn, region);
+            if (!"ISSUED".equals(status)) {
+                problems.add(format("%s is %s, not ISSUED", property, status));
+            }
+        }
+        if (!problems.isEmpty()) {
+            throw new ManagedProcessException(
+                "ACM certificate(s) not ready for use - re-issue with scripts/aws/issue-cert.sh, "
+              + "update the property, then retry:\n" + String.join("\n", problems));
+        }
+    }
+
+    private String describeCertificateStatus(String certArn, String region) throws ManagedProcessException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        actions.awsDescribeCertificate(certArn, region, out);
+        return out.toString().trim();
+    }
+
     public Step deployPolarisStackIn(AfonCloud cloud) {
         switch (cloud) {
             case AWS:
                 return new Step("deploy_aws_polaris_stack",
                         "deploy Polaris stack in AWS",
-                        () -> actions.startStack(AwsPolarisStack.class, AWS));
+                        () -> {
+                            checkAwsCertificatesIssued(AWS_POLARIS_CERT_ARN);
+                            actions.startStack(AwsPolarisStack.class, AWS);
+                        });
             case AZURE:
                 return new Step("deploy_azure_polaris_stack",
                         "deploy Polaris stack in Azure",
@@ -128,6 +171,19 @@ public class StepOperations {
                 () -> actions.createAllCatalogsFor(cloud));
     }
 
+    public Step configureOidcUsersFor(AfonCloud cloud) {
+        return new Step(format("configure_oidc_users_for_cloud_%s", cloud),
+                format("configure OIDC users for cloud `%s`", cloud),
+                () -> actions.configureOidcUsersFor(cloud));
+    }
+
+    private @NonNull Step configurePolarisUsers(AfonCloud cloud, AfonCatalog catalog) {
+        return new Step(format("configure_polaris_users_on_catalog_%s_for_cloud_%s", catalog, cloud),
+                format("configure Polaris users on catalog `%s` for cloud `%s`", catalog, cloud),
+                () -> {
+                    actions.configurePolarisUsersFor(cloud, catalog);
+                });
+    }
 
     public Step createExternalCatalogFor(AfonCloud cloud) {
         switch (cloud) {
@@ -207,25 +263,32 @@ public class StepOperations {
     }
 
     private Step awsSparkWritingTo(AfonCatalog catalog, String namespace) {
-        return runSpark("Spark writing table",
-                AWS, catalog, namespace, polarisTableName, SparkTestWriter.class);
+        AfonCloud cloud = AWS;
+        return configurePolarisUsers(cloud, catalog)
+                .andThen(runSpark("Spark writing table",
+                        cloud, catalog, namespace, polarisTableName, SparkTestWriter.class));
     }
 
     public @NonNull Step runAwsSparkDeferringToAzurePolarisHostingExternalCatalog() {
-        return runSpark(format("Spark defers to %s writing table", AZURE),
-                AWS, afonCatalogs.azureExternal(), polarisNamespaceExternal, polarisTableName, SparkTestWriter.class);
+        AfonCloud cloud = AWS;
+        AfonCatalog catalog = afonCatalogs.azureExternal();
+        return configurePolarisUsers(cloud, catalog)
+                .andThen(runSpark(format("Spark defers to %s writing table", AZURE),
+                        cloud, catalog, polarisNamespaceExternal, polarisTableName, SparkTestWriter.class));
     }
 
+
     public @NonNull Step runAwsSparkReadingFrom(AfonCatalog catalog) {
-        return runSpark("Spark reading table",
-                AWS, catalog, polarisNamespace, polarisTableName, SparkTestReader.class);
+        AfonCloud cloud = AWS;
+        return configurePolarisUsers(cloud, catalog)
+                .andThen(runSpark("Spark reading table",
+                        cloud, catalog, polarisNamespace, polarisTableName, SparkTestReader.class));
     }
 
     private @NonNull Step runSpark(String description, AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, Class<? extends SparkRunner> sparkRunner) {
         return new Step(format("%s_spark_talks_to_catalog_%s", cloud, catalog),
                 format("%s `%s.%s.%s` on cloud `%s`", description, catalog, namespace, tableName, cloud),
             () -> {
-                actions.configureUsersFor(cloud, catalog);
                 actions.runSpark(sparkRunner, cloud, catalog, namespace, tableName);
             });
     }

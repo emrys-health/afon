@@ -144,7 +144,7 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
 
   private def configureUsersInKeyCloakAndPolaris(catalogName: String, testUsers: AfonUserProvider): Unit = {
     val toTest = new ConfigureUsersMain(testUsers, AcceptanceTestConfig.instance.getProperties)
-    val oidc: util.List[HttpResponse] = toTest.configureOidcUsers(ContainerHelper.KEYCLOAK_HOSTNAME)
+    val oidc: util.List[HttpResponse] = toTest.configureOidcUsers()
     checkForFailures(oidc)
     val polaris: util.List[HttpResponse] = toTest.configurePolarisUsers(catalogName)
     checkForFailures(polaris)
