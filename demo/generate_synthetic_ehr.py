@@ -33,6 +33,8 @@ import random
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+import fastparquet as fp
+import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Reference terminology
@@ -686,13 +688,37 @@ def flatten_medication_request(r: dict) -> dict:
     }
 
 
+datetype_conversion = ['birth_date', 'deceased_datetime','onset_datetime','recorded_date','effective_datetime','authored_on']
+
+inttype_conversions = ['egfr_positive','ecog','died']
+
+floattype_conversions = ['age','value','frailty','albumin','frequency','period_days','propensity','p0','p1','y0','y1','y_obs','progression_days']
+
+
+def csv_to_dataframe(rows: list[dict]) -> pd.DataFrame:
+    df = pd.DataFrame(rows)
+    for col in df:
+        if col in datetype_conversion:
+            df[col] = pd.to_datetime(df[col])
+        if col in inttype_conversions:
+            df[col] = df[col].astype(int)
+        if col in floattype_conversions:
+            df[col] = df[col].map(lambda x: float(x) if x is not '' else None)
+    return df
+
+
+
+
 def write_table(path: Path, rows: list[dict]) -> None:
+    print(f"writing out {path}")
     if not rows:
         return
-    with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(rows)
+    df = csv_to_dataframe(rows)
+    fp.write(path,df)
+    # with path.open("w", newline="") as f:
+    #     writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+    #     writer.writeheader()
+    #     writer.writerows(rows)
     print(f"Wrote {path}  ({len(rows)} rows)")
 
 
