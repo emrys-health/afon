@@ -17,7 +17,9 @@ public class SetupAwsPolarisStackMain implements StepsProvider {
             stepOperations.deleteStackIn(AWS),
             stepOperations.deployPolarisStackIn(AWS),
             stepOperations.waitForPolarisAndKeycloakIn(AWS),
+            stepOperations.configureOidcUsersFor(AWS),
             stepOperations.createAllCatalogsFor(AWS),
+            stepOperations.configurePolarisUsersOnAllCatalogsFor(AWS),
             stepOperations.setupComplete(AWS));
     }
 
