@@ -17,7 +17,9 @@ public class SetupAzurePolarisStackMain implements StepsProvider {
             stepOperations.deleteStackIn(AZURE),
             stepOperations.deployPolarisStackIn(AZURE),
             stepOperations.waitForPolarisAndKeycloakIn(AZURE),
+            stepOperations.configureOidcUsersFor(AZURE),
             stepOperations.createAllCatalogsFor(AZURE),
+            stepOperations.configurePolarisUsersOnAllCatalogsFor(AZURE),
             stepOperations.setupComplete(AZURE));
     }
 

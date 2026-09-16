@@ -17,7 +17,9 @@ public class SetupGcpPolarisStackMain implements StepsProvider {
             stepOperations.deleteStackIn(GCP),
             stepOperations.deployPolarisStackIn(GCP),
             stepOperations.waitForPolarisAndKeycloakIn(GCP),
+            stepOperations.configureOidcUsersFor(GCP),
             stepOperations.createAllCatalogsFor(GCP),
+            stepOperations.configurePolarisUsersOnAllCatalogsFor(GCP),
             stepOperations.setupComplete(GCP));
     }
 
