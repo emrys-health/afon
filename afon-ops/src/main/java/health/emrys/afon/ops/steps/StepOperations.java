@@ -17,7 +17,7 @@ import org.slf4j.Logger;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
+
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.steps.DurationUtils.parseDuration;
