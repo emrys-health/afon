@@ -96,6 +96,7 @@ public class ConfigureUsersMain {
         if (args.length != 1 && args.length != 2) {
             System.out.printf("%s requires arguments: cloud", ConfigureUsersMain.class.getSimpleName());
             System.out.printf("%s requires arguments: cloud catalog-name", ConfigureUsersMain.class.getSimpleName());
+            System.out.printf("   use catalog-name='all' to populate all catalogs for cloud");
             throw new IllegalArgumentException();
         }
         String cloudName   = args[0];
@@ -129,7 +130,13 @@ public class ConfigureUsersMain {
             }
         } else {
             try {
-                app.configurePolarisUsers(catalogName);
+                if ( catalogName.equalsIgnoreCase("all") ){
+                   for ( AfonCatalog catalog : new AfonCatalogs(propertyProvider).all() ){
+                     app.configurePolarisUsers(catalog.toString());
+                   }
+                } else {
+                    app.configurePolarisUsers(catalogName);
+                }
             } catch (Exception e) {
                 logger.error("Failed to configure Polaris users {}: {}",
                         userProvider.getUserNames(), e.getMessage(), e);
