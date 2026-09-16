@@ -751,19 +751,36 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
         // The explicit helm uninstall --no-hooks pre-empts Terraform's own Helm destroy,
         // which fails when webhooks/finalizers interfere. Helm treats "release not found" as success.
+        //
+        // Order matters, and Terraform runs destroy provisioners in the order declared here.
+        // The finalizer strips come LAST, after the controller is not just uninstalled but
+        // actually gone: a live controller re-adds `ingress.k8s.aws/resources` within a
+        // reconcile of the patch, and once it has been uninstalled nothing is left to remove
+        // that finalizer - the kubernetes provider then polls its own delete until it times
+        // out with "Ingress (default/polaris-ingress) still exists".
         List<LocalExecProvisioner> onLbcDestroy = uponDestroyRun(
+            // Webhooks first: with no controller endpoints behind them they reject every
+            // ingress and targetgroupbinding write, including the patches below.
             "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer" +
                 " | xargs -r kubectl delete --ignore-not-found=true",
             "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer |" +
                 " xargs -r kubectl delete --ignore-not-found=true",
+            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
+                "|| true",
+            "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true",
+            // helm uninstall returns as soon as the Deployment is deleted; its pod lives on
+            // for its grace period and keeps reconciling. Wait it out before stripping.
+            "kubectl -n kube-system wait --for=delete pod" +
+                " -l app.kubernetes.io/name=aws-load-balancer-controller --timeout=180s" +
+                " 2>/dev/null || true",
             "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
                 "while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p " +
                 "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
-            "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}'" +
-                " --type=merge 2>/dev/null || true",
-            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
-                "|| true",
-            "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true");
+            // Every ingress, not just polaris-ingress: keycloak's and jupyter's carry the same
+            // finalizer, and any one of them left holding it stalls its own delete.
+            "kubectl get ingress -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
+                "while read NS NAME; do kubectl patch ingress \"$NAME\" -n \"$NS\" -p " +
+                "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done");
         Resource.Builder
             .create(this, "lbc-destroy-cleanup")
             .dependsOn(List.of(ingress, lbRelease))
@@ -1042,6 +1059,13 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         return IngressV1.Builder
             .create(this, constructId)
             .provider(kubernetesProvider)
+            // The controller normally removes its own `ingress.k8s.aws/resources` finalizer
+            // when it sees the deletion, but by this point in the destroy it has been
+            // uninstalled (see lbc-destroy-cleanup), so nothing would ever remove it and the
+            // provider polls its delete until it times out. Terraform runs a resource's
+            // destroy provisioners immediately before destroying it, so this strips the
+            // finalizer whatever order the ingresses and the controller come apart in.
+            .provisioners(uponDestroyRun(finalizeIngress(ingressName, "default")))
             // The ALB (and thus the ingress' status.loadBalancer.hostname that the Route53
             // alias record reads) is only provisioned once the AWS Load Balancer Controller
             // is running. Without this dependency the ingress can be created before the
