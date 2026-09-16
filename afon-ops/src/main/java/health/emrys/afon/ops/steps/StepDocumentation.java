@@ -57,6 +57,20 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
+    void awsDescribeCertificate(String certArn, String region, OutputStream stdOut) throws ManagedProcessException {
+        PrintWriter writer = new PrintWriter(stdOut);
+        writer.println("ISSUED");
+        writer.flush();
+        out.println(format("""
+                   If the cert is not issued, run:
+                   ```shell
+                   aws acm describe-certificate --certificate-arn %s --region %s --queryCertificate.Status --output text
+                   ```
+                   """, certArn, region));
+        out.flush();
+    }
+
+    @Override
     public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
         String fullArgs = afonArgumentsToRun(mainClass, args, overrides, "exec");
         run("./afon.sh", null, fullArgs);

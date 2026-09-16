@@ -33,6 +33,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.*;
 
 import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET_NAME;
@@ -114,6 +115,11 @@ public class StepActions {
         }
     }
 
+    void awsDescribeCertificate(String certArn, String region, OutputStream out) throws ManagedProcessException {
+        run("aws", null, out, "acm", "describe-certificate", "--certificate-arn", certArn,
+                "--region", region, "--query", "Certificate.Status", "--output", "text");
+    }
+
     void startStack(Class stackClass, AfonCloud cloud) throws Exception {
         executeMainOf(stackClass, new String[]{});
         startManagedStack(cloud);
@@ -142,16 +148,68 @@ public class StepActions {
         tofuApply(stackDir, bootstrapTargets);
     }
 
+    private static final int      TOFU_APPLY_MAX_ATTEMPTS = 3;
+    private static final Duration TOFU_APPLY_RETRY_DELAY  = Duration.ofSeconds(30);
+
     private void tofuApply(Path tofuDir, List<String> bootstrapTargets) throws ManagedProcessException, IOException {
         ensureKubeConfigExists();
-        run("tofu", tofuDir, "init");
+        if (run("tofu", tofuDir, "init") != 0) {
+            throw new ManagedProcessException(format("tofu init failed in %s", tofuDir));
+        }
         if (!bootstrapTargets.isEmpty()) {
             List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
             phaseOne.addAll(bootstrapTargets);
             logger.info("Bootstrapping EKS before the full apply: {}", phaseOne);
-            run("tofu", tofuDir, phaseOne.toArray(new String[0]));
+            applyWithRetry(tofuDir, System.out, phaseOne.toArray(new String[0]));
         }
-        run("tofu", tofuDir, OutputStream.nullOutputStream(), "apply", "--auto-approve", "-parallelism=5");
+        applyWithRetry(tofuDir, OutputStream.nullOutputStream(), "apply", "--auto-approve", "-parallelism=5");
+    }
+
+    /**
+     * Retries a {@code tofu apply} invocation on failure. Applying a brand-new cluster hits
+     * conditions that are transient but can exceed a single attempt's patience: the EKS API
+     * endpoint's public DNS record can lag behind the cluster reaching ACTIVE, and the AWS
+     * Load Balancer Controller can take longer than the kubernetes provider's
+     * {@code wait_for_load_balancer} timeout to provision a brand-new ALB. Retrying is safe
+     * here because {@code tofu apply} re-plans against current state each time: Terraform
+     * records an ingress's ID in state as soon as it's created in-cluster, before waiting on
+     * its load-balancer status, so a retry re-reads the existing resource rather than
+     * double-creating it.
+     */
+    private void applyWithRetry(Path tofuDir, OutputStream stdOut, String... args) throws ManagedProcessException {
+        for (int attempt = 1; attempt <= TOFU_APPLY_MAX_ATTEMPTS; attempt++) {
+            try {
+                int exitCode = run("tofu", tofuDir, stdOut, args);
+                if (exitCode == 0) {
+                    return;
+                }
+                retryOrThrow(args, attempt, new ManagedProcessException(String.format(
+                    "tofu %s exited with %d", String.join(" ", args), exitCode)));
+            } catch (ManagedProcessException e) {
+                // ManagedProcess.waitForExit() throws on a non-zero exit code rather than
+                // returning it, so a failed `tofu apply` surfaces here, not via the exitCode
+                // check above.
+                retryOrThrow(args, attempt, e);
+            }
+        }
+    }
+
+    private void retryOrThrow(String[] args, int attempt, ManagedProcessException failure) throws ManagedProcessException {
+        if (attempt == TOFU_APPLY_MAX_ATTEMPTS) {
+            throw failure;
+        }
+        logger.warn("tofu {} failed on attempt {}/{}, retrying in {}",
+                 String.join(" ", args), attempt, TOFU_APPLY_MAX_ATTEMPTS, TOFU_APPLY_RETRY_DELAY, failure);
+        sleepUninterruptibly(TOFU_APPLY_RETRY_DELAY);
+    }
+
+    private void sleepUninterruptibly(Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
     }
 
     /**

@@ -1,14 +1,12 @@
 package health.emrys.afon.ops.steps;
 
+import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.aws.AwsFullStack;
 import health.emrys.afon.cdk.aws.AwsPolarisStack;
 import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
-import health.emrys.afon.config.AfonCatalog;
-import health.emrys.afon.config.AfonCatalogs;
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.*;
 import health.emrys.afon.ops.snowflake.SnowflakeStatements;
 import health.emrys.afon.ops.spark.SparkRunner;
 import health.emrys.afon.ops.spark.SparkTestReader;
@@ -16,6 +14,9 @@ import health.emrys.afon.ops.spark.SparkTestWriter;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import static health.emrys.afon.config.AfonCloud.*;
@@ -60,7 +61,11 @@ public class StepOperations {
             case AWS:
                 return new Step("deploy_aws_full_stack",
                         "deploy full stack in AWS",
-                        () -> actions.startStack(AwsFullStack.class, AWS));
+                        () -> {
+                            checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN,
+                                    AWS_JUPYTER_CERT_ARN,AWS_POLARIS_CERT_ARN);
+                            actions.startStack(AwsFullStack.class, AWS);
+                        });
             case AZURE:
                 return new Step("deploy_azure_full_stack",
                         "deploy full stack in Azure",
@@ -71,12 +76,50 @@ public class StepOperations {
         }
     }
 
+    /**
+     * Fails fast, before the slow {@code tofu apply} even starts, if any configured ACM
+     * certificate isn't actually {@code ISSUED}. Without this, a stale/dead cert (e.g. one
+     * stuck at {@code VALIDATION_TIMED_OUT}) only surfaces ~20 minutes into the apply, buried
+     * in a generic "Load Balancer is not ready yet" error from the ALB controller endlessly
+     * retrying {@code CreateListener} against a certificate AWS will never accept. Re-issue a
+     * failing one with {@code scripts/aws/issue-cert.sh}.
+     */
+    void checkAwsCertificatesIssued(AfonProperty... arns) throws ManagedProcessException {
+        String region = properties.getValue(AWS_REGION);
+
+        List<String> problems = new ArrayList<>();
+        for (AfonProperty property : arns) {
+            String arn = properties.getValue(property);
+            if (arn == null || arn.isBlank()) {
+                return;
+            }
+            String status = describeCertificateStatus(arn, region);
+            if (!"ISSUED".equals(status)) {
+                problems.add(format("%s is %s, not ISSUED", property, status));
+            }
+        }
+        if (!problems.isEmpty()) {
+            throw new ManagedProcessException(
+                "ACM certificate(s) not ready for use - re-issue with scripts/aws/issue-cert.sh, "
+              + "update the property, then retry:\n" + String.join("\n", problems));
+        }
+    }
+
+    private String describeCertificateStatus(String certArn, String region) throws ManagedProcessException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        actions.awsDescribeCertificate(certArn, region, out);
+        return out.toString().trim();
+    }
+
     public Step deployPolarisStackIn(AfonCloud cloud) {
         switch (cloud) {
             case AWS:
                 return new Step("deploy_aws_polaris_stack",
                         "deploy Polaris stack in AWS",
-                        () -> actions.startStack(AwsPolarisStack.class, AWS));
+                        () -> {
+                            checkAwsCertificatesIssued(AWS_POLARIS_CERT_ARN);
+                            actions.startStack(AwsPolarisStack.class, AWS);
+                        });
             case AZURE:
                 return new Step("deploy_azure_polaris_stack",
                         "deploy Polaris stack in Azure",

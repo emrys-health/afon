@@ -40,10 +40,12 @@ import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
@@ -72,6 +74,18 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     private static final Logger log = LoggerFactory.getLogger(AwsCloudProvider.class);
 
+    /**
+     * Create timeout for a {@code kubernetes_ingress_v1}'s {@code wait_for_load_balancer} wait
+     * (provider default is ~20m). A normal ALB provisions in a few minutes even the first time
+     * in a fresh account (which pays a one-time cost to create the
+     * AWSServiceRoleForElasticLoadBalancing service-linked role); anything past that usually
+     * means the LB controller is stuck (crash, missing IAM permissions, bad subnet tags), not
+     * just slow. Failing sooner lets StepActions' apply-retry get more attempts in the same
+     * overall time budget. A plain constant for now; promote to an AfonProperty if it needs to
+     * be tunable per environment.
+     */
+    static final String INGRESS_LOAD_BALANCER_TIMEOUT = "5m";
+
     private final AwsCleanupHelper           cleanupHelper;
     private final AwsComponentNames          componentNames;
     private final String                     polarisDomainName;
@@ -89,6 +103,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     final         Release                    lbRelease;
     final         Vpc                        vpc;
     private       HelmProvider               helmProvider;
+    private       KubernetesProvider         k8sProvider;
 
     AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
         super(scope, id);
@@ -938,6 +953,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                            .preventDestroy(false)
                            .build())
             .waitForLoadBalancer(true)
+            .timeouts(IngressV1Timeouts.builder().create(INGRESS_LOAD_BALANCER_TIMEOUT).build())
             .build();
     }
 
@@ -960,7 +976,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 .builder()
                 .host(getClusterEndpoint())
                 .clusterCaCertificate(Fn.base64decode(getBase64CertData()))
-                .token(getToken())
+                .exec(eksTokenExecForHelm())
                 .build();
             helmProvider = HelmProvider.Builder
                 .create(this, "helm")
@@ -968,6 +984,45 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 .build();
         }
         return helmProvider;
+    }
+
+    /**
+     * Uses {@code aws eks get-token} instead of the static token from {@code eksAuthData} so
+     * the provider fetches a fresh, short-lived credential on every operation. The static
+     * token (via {@link #getToken()}) is read once during the apply graph and expires after
+     * ~15 minutes; a full-create apply of a brand-new cluster (EKS control plane + node group
+     * + Helm releases) routinely takes longer than that, so late resources such as
+     * {@code kubernetes_ingress_v1} would fail with "Unauthorized" once it went stale.
+     */
+    @Override
+    public synchronized KubernetesProvider configureK8s() {
+        if (k8sProvider == null) {
+            k8sProvider = KubernetesProvider.Builder
+                .create(this, "kubernetes")
+                .host(getClusterEndpoint())
+                .clusterCaCertificate(Fn.base64decode(getBase64CertData()))
+                .exec(List.of(KubernetesProviderExec
+                                  .builder()
+                                  .apiVersion("client.authentication.k8s.io/v1beta1")
+                                  .command("aws")
+                                  .args(eksTokenArgs())
+                                  .build()))
+                .build();
+        }
+        return k8sProvider;
+    }
+
+    private HelmProviderKubernetesExec eksTokenExecForHelm() {
+        return HelmProviderKubernetesExec
+            .builder()
+            .apiVersion("client.authentication.k8s.io/v1beta1")
+            .command("aws")
+            .args(eksTokenArgs())
+            .build();
+    }
+
+    private List<String> eksTokenArgs() {
+        return List.of("eks", "get-token", "--cluster-name", clusterName, "--region", region);
     }
 
     @Override
@@ -1013,6 +1068,12 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         return cluster.getEndpoint();
     }
 
+    /**
+     * No longer used by {@link #configureK8s()}/{@link #configureHelm()}, which now use the
+     * {@code aws eks get-token} exec plugin instead of this static token. Kept for
+     * {@link AwsHelmStack}, an experimental, unwired stack that still builds its own
+     * Helm provider directly from this value.
+     */
     @Override
     public String getToken() {
         return eksAuthData.getToken();
