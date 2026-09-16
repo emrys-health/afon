@@ -22,11 +22,13 @@ public class DeployAwsFullStackAndAzurePolarisStackMain implements StepsProvider
         steps.addAll(List.of(
                 stepOperations.deleteStackIn(AWS),
                 stepOperations.deployFullStackIn(AWS),
-                stepOperations.waitForPolarisAndKeycloakIn(AWS)));
+                stepOperations.waitForPolarisAndKeycloakIn(AWS),
+                stepOperations.deployComplete(AWS)));
         steps.addAll(List.of(
-            stepOperations.deleteStackIn(AZURE),
-            stepOperations.deployPolarisStackIn(AZURE),
-            stepOperations.waitForPolarisAndKeycloakIn(AZURE)));
+                stepOperations.deleteStackIn(AZURE),
+                stepOperations.deployPolarisStackIn(AZURE),
+                stepOperations.waitForPolarisAndKeycloakIn(AZURE),
+                stepOperations.deployComplete(AZURE)));
         return steps;
     }
 

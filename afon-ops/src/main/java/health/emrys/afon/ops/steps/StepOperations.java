@@ -353,5 +353,22 @@ public class StepOperations {
                 () -> actions.registerTable(AWS, catalog, namespace, tableName, metadata));
     }
 
+    public Step deleteComplete(AfonCloud cloud) {
+        return new Step(format("delete_complete_for_cloud_%s", cloud.name()),
+                format("Delete complete for cloud %s", cloud.name()),
+                ()-> logger.info(format("Delete complete for %s", cloud)));
+    }
+
+    public Step deployComplete(AfonCloud cloud) {
+        return new Step(format("deploy_complete_for_cloud_%s", cloud.name()),
+                format("Deploy complete for cloud %s", cloud.name()),
+                ()-> logger.info(format("Deploy complete for %s", cloud)));
+    }
+
+    public Step setupComplete(AfonCloud cloud) {
+        return new Step(format("setup_complete_for_cloud_%s", cloud.name()),
+        format("Setup complete for cloud %s", cloud.name()),
+                ()-> logger.info(format("Setup complete for cloud %s", cloud)));
+    }
 
 }
