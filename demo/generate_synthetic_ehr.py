@@ -20,15 +20,15 @@ medication_requests.csv. Tables are linked via patient_id / condition_id.
 
 Usage:
     python generate_synthetic_ehr.py --patients 800 --site aws \
-        --unmeasured-confounding none --output ./output/aws --seed 1
+        --unmeasured-confounding none --output target/aws --seed 1
 
 
 Examples:
 
-python generate_synthetic_ehr.py --patients 800 --site westmids --seed 1 --output output/westmids 
-python generate_synthetic_ehr.py --patients 800 --site tvs --seed 2 --output output/tvs
-python generate_synthetic_ehr.py --patients 800 --site wessex --seed 3 --output output/wessex
-python generate_synthetic_ehr.py --patients 800 --site eastern --seed 4 --output output/eastern
+python generate_synthetic_ehr.py --patients 800 --site westmids --seed 1 --output target/westmids
+python generate_synthetic_ehr.py --patients 800 --site tvs --seed 2 --output target/tvs
+python generate_synthetic_ehr.py --patients 800 --site wessex --seed 3 --output target/wessex
+python generate_synthetic_ehr.py --patients 800 --site eastern --seed 4 --output target/eastern
 
 """
 
@@ -760,7 +760,7 @@ def true_effects(truth_rows: list[dict]) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate synthetic FHIR NSCLC EHR data.")
     parser.add_argument("--patients", type=int, default=20, help="Number of patients (default 20)")
-    parser.add_argument("--output", type=Path, default=Path("output"), help="Output directory")
+    parser.add_argument("--output", type=Path, default=Path("target"), help="Output directory")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
     parser.add_argument(
         "--site", choices=sorted(SITES), default="default",
