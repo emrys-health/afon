@@ -32,6 +32,7 @@ public class SparkDemoMaker extends SparkRunner {
             Dataset<Row> df       = spark.read().parquet(values.get(0));
             String       tableFQN = createTable(spark, catalogName, namespace, tableName, df);
             df.show();
+            df.printSchema();
             df.write()
               .mode("overwrite")   // or "append"
               .saveAsTable(tableFQN);
