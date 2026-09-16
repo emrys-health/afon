@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 
 import java.util.List;
 
-import static health.emrys.afon.ops.spark.TableUtils.registerTable;
+import static health.emrys.afon.ops.spark.TableUtils.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class SparkDemoMaker extends SparkRunner {
@@ -28,8 +28,9 @@ public class SparkDemoMaker extends SparkRunner {
         } else {
             String dir = values.get(0);
             logger.info("About to read parquet {}", dir);
-            String       tableFQN = registerTable(spark, catalogName, namespace, tableName);
+            createNamespace(spark, catalogName, namespace);
             Dataset<Row> df       = spark.read().parquet(values.get(0));
+            String       tableFQN = createTable(spark, catalogName, namespace, tableName, df);
             df.show();
             df.write()
               .mode("overwrite")   // or "append"
