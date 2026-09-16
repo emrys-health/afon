@@ -1096,6 +1096,13 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         return IngressV1.Builder
             .create(this, constructId)
             .provider(kubernetesProvider)
+            // The controller normally removes its own `ingress.k8s.aws/resources` finalizer
+            // when it sees the deletion, but by this point in the destroy it has been
+            // uninstalled (see lbc-destroy-cleanup), so nothing would ever remove it and the
+            // provider polls its delete until it times out. Terraform runs a resource's
+            // destroy provisioners immediately before destroying it, so this strips the
+            // finalizer whatever order the ingresses and the controller come apart in.
+            .provisioners(uponDestroyRun(finalizeIngress(ingressName, "default")))
             // The ALB (and thus the ingress' status.loadBalancer.hostname that the Route53
             // alias record reads) is only provisioned once the AWS Load Balancer Controller
             // is running. Without this dependency the ingress can be created before the
