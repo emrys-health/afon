@@ -177,6 +177,19 @@ public class StepOperations {
                 () -> actions.configureOidcUsersFor(cloud));
     }
 
+    /**
+     * Configures Polaris users on every catalog, for every user - must run after
+     * {@link #createAllCatalogsFor} (the catalogs must exist) and after {@link #configureOidcUsersFor}
+     * (once Polaris defers OAuth to KeyCloak, this authenticates as a KeyCloak confidential client
+     * that only that step creates).
+     */
+    public Step configurePolarisUsersOnAllCatalogsFor(AfonCloud cloud) {
+        return afonCatalogs.all().stream()
+            .map(catalog -> configurePolarisUsers(cloud, catalog))
+            .reduce(Step::andThen)
+            .orElse(Step.NoOp);
+    }
+
     private @NonNull Step configurePolarisUsers(AfonCloud cloud, AfonCatalog catalog) {
         return new Step(format("configure_polaris_users_on_catalog_%s_for_cloud_%s", catalog, cloud),
                 format("configure Polaris users on catalog `%s` for cloud `%s`", catalog, cloud),
