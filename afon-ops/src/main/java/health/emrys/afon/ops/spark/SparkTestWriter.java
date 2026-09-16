@@ -10,10 +10,12 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.util.List;
 
+import static health.emrys.afon.ops.spark.TableUtils.registerTable;
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -32,17 +34,7 @@ public class SparkTestWriter extends SparkRunner {
     }
 
     public void doRun(SparkSession spark, String catalogName, String namespace, String tableName, List<String> values) {
-        String namespaceFQN = namespaceFQN(catalogName, namespace);
-        logger.info("Creating namespace {}", namespaceFQN);
-        String namespaceSql = format("CREATE NAMESPACE IF NOT EXISTS %s", namespaceFQN);
-        logger.info("Executing: {}", namespaceSql);
-        spark.sql(namespaceSql);
-
-        String tableFQN = tableFQN(catalogName, namespace, tableName);
-        logger.info("Creating table {}", tableFQN);
-        String createTableSql = format("CREATE TABLE IF NOT EXISTS %s (value String) USING iceberg ", tableFQN);
-        logger.info("Executing: {}", createTableSql);
-        spark.sql(createTableSql);
+        String tableFQN = registerTable(spark, catalogName, namespace, tableName);
 
         logger.info("Writing to table {}", tableFQN);
         StructType schema = new StructType(new StructField[]{
