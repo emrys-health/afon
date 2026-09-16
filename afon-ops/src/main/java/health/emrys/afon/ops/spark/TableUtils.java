@@ -27,7 +27,9 @@ public class TableUtils {
                                        Dataset<Row> df) {
         String tableFQN = tableFQN(catalogName, namespace, tableName);
         logger.info("Creating table {}", tableFQN);
-        String[] types = Arrays.stream(df.dtypes()).map(x -> x._1 + " " + x._2.replace("Type", "")).toArray(String[]::new);
+        String[] types = Arrays.stream(df.dtypes()).map(x -> x._1 + " " +
+            x._2.replace("Type", "").replace("NTZ", "")
+        ).toArray(String[]::new);
         String createTableSql = format("CREATE TABLE IF NOT EXISTS %s (%s) USING iceberg ", tableFQN, String.join(", ", types));
         logger.info("Executing: {}", createTableSql);
         spark.sql(createTableSql);
