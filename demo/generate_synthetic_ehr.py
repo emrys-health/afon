@@ -87,17 +87,21 @@ SITES = {
         "treat_offset": 0.0, "outcome_offset": 0.0, "never_smoker_prev": 0.22,
         "stage_weights": [0.10, 0.10, 0.15, 0.20, 0.45],
     },
-    "aws": {
+    "wessex": {
         "treat_offset": -0.5, "outcome_offset": -0.2, "never_smoker_prev": 0.20,
         "stage_weights": [0.12, 0.12, 0.16, 0.20, 0.40],
     },
-    "azure": {
+    "tvs": {
         "treat_offset": 0.0, "outcome_offset": 0.0, "never_smoker_prev": 0.30,
         "stage_weights": [0.10, 0.10, 0.15, 0.20, 0.45],
     },
-    "gcp": {
+    "westmids": {
         "treat_offset": 0.7, "outcome_offset": 0.3, "never_smoker_prev": 0.15,
         "stage_weights": [0.06, 0.08, 0.14, 0.22, 0.50],
+    },
+        "eastern": {
+        "treat_offset": 0.3, "outcome_offset": 0.1, "never_smoker_prev": 0.19,
+        "stage_weights": [0.06, 0.09, 0.15, 0.23, 0.52],
     },
 }
 
