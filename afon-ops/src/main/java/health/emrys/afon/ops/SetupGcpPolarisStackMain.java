@@ -17,7 +17,8 @@ public class SetupGcpPolarisStackMain implements StepsProvider {
             stepOperations.deleteStackIn(GCP),
             stepOperations.deployPolarisStackIn(GCP),
             stepOperations.waitForPolarisAndKeycloakIn(GCP),
-            stepOperations.createAllCatalogsFor(GCP));
+            stepOperations.createAllCatalogsFor(GCP),
+            stepOperations.setupComplete(GCP));
     }
 
     public static void main(String[] args) {

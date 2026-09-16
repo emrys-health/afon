@@ -11,6 +11,7 @@ public class StepsUtils {
                     stepOperations.deleteStackIn(cloud),
                     stepOperations.deployFullStackIn(cloud),
                     stepOperations.waitForPolarisAndKeycloakIn(cloud),
+                    stepOperations.deployComplete(cloud),
                     // configureOidcUsersFor(cloud) must precede createAllCatalogsFor(cloud):
                     // once Polaris defers to KeyCloak for OAuth, catalog creation authenticates as
                     // "root" confidential client that only this step creates - reversed, catalog creation
@@ -18,10 +19,11 @@ public class StepsUtils {
                     // Normally only surfaces on a fresh KeyCloak database.
                     stepOperations.configureOidcUsersFor(cloud),
                     stepOperations.createAllCatalogsFor(cloud),
-                    // configurePolarisUsersOnAllCatalogsFor(cloud) must follow createAllCatalogsFor:
+                    // configurePolarisUsersOnAllCatalogsFor(cloud) must follow createAllCatalogsFor(cloud):
                     // it configures users on every catalog, which must exist first.
                     stepOperations.configurePolarisUsersOnAllCatalogsFor(cloud),
-                    stepOperations.runAwsSparkWritingTo(cloud)
+                    stepOperations.runAwsSparkWritingTo(cloud),
+                    stepOperations.setupComplete(cloud)
                 );
     }
 }
