@@ -21,6 +21,15 @@ medication_requests.csv. Tables are linked via patient_id / condition_id.
 Usage:
     python generate_synthetic_ehr.py --patients 800 --site aws \
         --unmeasured-confounding none --output ./output/aws --seed 1
+
+
+Examples:
+
+python generate_synthetic_ehr.py --patients 800 --site westmids --seed 1 --output output/westmids 
+python generate_synthetic_ehr.py --patients 800 --site tvs --seed 2 --output output/tvs
+python generate_synthetic_ehr.py --patients 800 --site wessex --seed 3 --output output/wessex
+python generate_synthetic_ehr.py --patients 800 --site eastern --seed 4 --output output/eastern
+
 """
 
 from __future__ import annotations
@@ -781,12 +790,12 @@ def main() -> None:
             elif rt == "MedicationRequest":
                 medication_requests.append(flatten_medication_request(r))
 
-    write_table(args.output / "patients.csv", patients)
-    write_table(args.output / "conditions.csv", conditions)
-    write_table(args.output / "observations.csv", observations)
-    write_table(args.output / "medication_requests.csv", medication_requests)
+    write_table(args.output / "patients.parq", patients)
+    write_table(args.output / "conditions.parq", conditions)
+    write_table(args.output / "observations.parq", observations)
+    write_table(args.output / "medication_requests.parq", medication_requests)
 
-    write_table(args.output / "ground_truth.csv", truth_rows)
+    write_table(args.output / "ground_truth.parq", truth_rows)
     meta = {
         "site": args.site,
         "site_config": SITES[args.site],
