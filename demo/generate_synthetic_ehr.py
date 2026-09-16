@@ -19,12 +19,13 @@ type: patients.csv, conditions.csv, observations.csv,
 medication_requests.csv. Tables are linked via patient_id / condition_id.
 
 Usage:
-    python generate_synthetic_ehr.py --patients 800 --site aws \
-        --unmeasured-confounding none --output target/aws --seed 1
+    python generate_synthetic_ehr.py --patients 800 --site emrys \
+        --unmeasured-confounding none --output target/emrys --seed 1
 
 
 Examples:
 
+python generate_synthetic_ehr.py --patients 800 --site emrys --seed 0 --output target/emrys
 python generate_synthetic_ehr.py --patients 800 --site westmids --seed 1 --output target/westmids
 python generate_synthetic_ehr.py --patients 800 --site tvs --seed 2 --output target/tvs
 python generate_synthetic_ehr.py --patients 800 --site wessex --seed 3 --output target/wessex
@@ -87,6 +88,10 @@ SITES = {
         "treat_offset": 0.0, "outcome_offset": 0.0, "never_smoker_prev": 0.22,
         "stage_weights": [0.10, 0.10, 0.15, 0.20, 0.45],
     },
+    "emrys": {
+        "treat_offset": 0.1, "outcome_offset": -0.1, "never_smoker_prev": 0.17,
+        "stage_weights": [0.08, 0.09, 0.18, 0.25, 0.48],
+    },
     "wessex": {
         "treat_offset": -0.5, "outcome_offset": -0.2, "never_smoker_prev": 0.20,
         "stage_weights": [0.12, 0.12, 0.16, 0.20, 0.40],
@@ -99,7 +104,7 @@ SITES = {
         "treat_offset": 0.7, "outcome_offset": 0.3, "never_smoker_prev": 0.15,
         "stage_weights": [0.06, 0.08, 0.14, 0.22, 0.50],
     },
-        "eastern": {
+    "eastern": {
         "treat_offset": 0.3, "outcome_offset": 0.1, "never_smoker_prev": 0.19,
         "stage_weights": [0.06, 0.09, 0.15, 0.23, 0.52],
     },
