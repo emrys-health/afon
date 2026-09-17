@@ -1,0 +1,48 @@
+name: Issue assignee check
+
+# Checks that any issue referenced at the start of a commit message (eg "[#203] ...") is
+# assigned to whoever pushed it, to catch a wrong issue number before it's easy to miss in
+# review.
+#
+# This is advisory, not blocking: this repo's plan does not support branch protection /
+# required status checks, so a failure here shows as a red X on the commit/PR but does not
+# reject the push. See the .githooks/commit-msg hook for a check that runs before the commit
+# even happens.
+on:
+  push:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  check-issue-assignee:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check referenced issues are assigned to the pusher
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          COMMITS_JSON: ${{ toJson(github.event.commits) }}
+          PUSHER: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          FAILED=0
+          COUNT=$(echo "$COMMITS_JSON" | jq 'length')
+          for i in $(seq 0 $((COUNT - 1))); do
+            MESSAGE=$(echo "$COMMITS_JSON" | jq -r ".[$i].message")
+            SHA=$(echo "$COMMITS_JSON" | jq -r ".[$i].id")
+            FIRST_LINE=$(printf '%s\n' "$MESSAGE" | head -n1)
+            ISSUE=$(printf '%s' "$FIRST_LINE" | grep -oE '^\[#?[0-9]+\]' | grep -oE '[0-9]+' || true)
+            if [ -z "$ISSUE" ]; then
+              continue
+            fi
+            ASSIGNEES=$(gh issue view "$ISSUE" --json assignees --jq '.assignees[].login' 2>/dev/null || true)
+            if ! printf '%s\n' "$ASSIGNEES" | grep -qix "$PUSHER"; then
+              echo "::error::Commit $SHA references issue #$ISSUE, which is not assigned to @$PUSHER (assignees: ${ASSIGNEES:-none})."
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
