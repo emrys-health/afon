@@ -105,61 +105,34 @@ exec_cli(){
 exec_cdktf(){
   CDKTF_ACTION=${ACTION#cdktf-}
   case $CDKTF_ACTION in
-    init)
-      exec_cdktf_init
-      ;;
     switch)
-      exec_cdktf_switch
+      # Already run if --cdktf-env triggered the global switch above.
+      [ -n "$CDKTF_SWITCHED" ] || exec_cdktf_switch
       ;;
-    status)
-      exec_cdktf_status
+    init|status)
+      SCRIPT_PATH="cdktf/$CDKTF_ACTION.sh"
+      exec_script
       ;;
+    *)
+      echo "Cdktf action not supported: $CDKTF_ACTION"
+      usage; exit 0
   esac
 }
 
-exec_cdktf_init(){
-  INIT_DIR=
-  if [ -n "$CDKTF_ENV" ]; then
-    INIT_DIR="$CDKTF_DIR-$CDKTF_ENV"
-  else
-    INIT_DIR="$CDKTF_DIR_DIR"
-  fi
-  mkdir -p $INIT_DIR
-}
-
 exec_cdktf_switch(){
-  if [ -z "$CDKTF_ENV" ]; then
-    echo "Action cdktf-switch requires option --cdktf-env"
-    usage; exit 0
-  fi
-  CDKTF_ENV_DIR="$CDKTF_DIR-$CDKTF_ENV"
-  if [ -L "$CDKTF_DIR" ]; then
-    rm $CDKTF_DIR
-  elif [ -d "$CDKTF_DIR" ]; then
-    echo "$CDKTF_DIR is not a symlink. Moving $CDKTF_DIR to $CDKTF_ENV_DIR"
-    echo "NOTE:  You may have used option --env instead of narrower --cdktf-env."
-    mv $CDKTF_DIR $CDKTF_ENV_DIR
-  fi
-  ln -s $CDKTF_ENV_DIR $CDKTF_DIR
-  echo "Switched to cdktf env $CDKTF_ENV"
-}
-
-exec_cdktf_status(){
-  if [ -d $CDKTF_DIR ]; then
-    if [ -f "$CDKTF_DIR/manifest.json" ]; then
-      cat $CDKTF_DIR/manifest.json
-    fi
-    ls -lt $CDKTF_DIR
-    ls -lt $CDKTF_DIR/*
-  else
-    echo "$CDKTF_DIR not found."
-  fi
+  SCRIPT_PATH="cdktf/switch.sh"
+  exec_script
+  CDKTF_SWITCHED=true
 }
 
 exec_config(){
   CONFIG_ACTION=${ACTION#config-}
   case $CONFIG_ACTION in
-    init|import|export|validate|renames|status|switch)
+    switch)
+      # Already run if --config-env triggered the global switch above.
+      [ -n "$CONFIG_SWITCHED" ] || exec_config_switch
+      ;;
+    init|import|export|validate|renames|status)
       SCRIPT_PATH="config/$CONFIG_ACTION.sh"
       exec_script
       ;;
@@ -172,6 +145,7 @@ exec_config(){
 exec_config_switch(){
   SCRIPT_PATH="config/switch.sh"
   exec_script
+  CONFIG_SWITCHED=true
 }
 
 exec_docs(){
@@ -377,11 +351,13 @@ BUILD_GOALS=
 BUILD_PROFILES=
 CDKTF_DIR=
 CDKTF_ENV=
+CDKTF_SWITCHED=
 CLI_ARGS=
 CLI_COMMAND=
 CLI_DIR=
 CLOUD=
 CONFIG_ENV=
+CONFIG_SWITCHED=
 CONFIG_ZIP=
 DOCS_DIR=
 ENV=

@@ -41,6 +41,7 @@
         <include>aws/**</include>
         <include>azure/**</include>
         <include>gcp/**</include>
+        <include>cdktf/**</include>
         <include>config/**</include>
       </includes>
       <fileMode>0755</fileMode>
