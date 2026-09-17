@@ -3,6 +3,7 @@ package health.emrys.afon.ops.steps;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
@@ -106,6 +107,24 @@ public class StepDocumentation extends StepActions {
                        """, DurationUtils.formatDuration(timeout), domain));
             out.flush();
         });
+    }
+
+    @Override
+    @NonNull Path stackDir(AfonCloud cloud) throws IOException {
+        Path stackDir = Path.of(ConfigUtils.stackDir(cloud));
+        out.println(format("""
+                   Stack dir `%s` for cloud `%s`.
+                   """, stackDir, cloud));
+        out.flush();
+        return stackDir;
+    }
+
+    @Override
+    void checkNotBrokenSymlink(Path path) throws IOException {
+        out.println(format("""
+                   Check path `%s` is not a broken symlink.
+                   """, path));
+        out.flush();
     }
 
     @Override

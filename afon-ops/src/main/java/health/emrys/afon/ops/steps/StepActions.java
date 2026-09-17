@@ -61,7 +61,7 @@ public class StepActions {
         return stackDir;
     }
 
-    private @NonNull Path stackDir(AfonCloud cloud) throws IOException {
+    @NonNull Path stackDir(AfonCloud cloud) throws IOException {
         checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
         Path stackDir = Path.of(ConfigUtils.stackDir(cloud));
         logger.info("Using stack dir {}", stackDir);
@@ -72,7 +72,7 @@ public class StepActions {
         return stackDir;
     }
 
-    private void checkNotBrokenSymlink(Path path) throws IOException {
+    void checkNotBrokenSymlink(Path path) throws IOException {
         if (Files.isSymbolicLink(path) && !Files.exists(path)) {
             throw new IOException(String.format(
                 "%s is a symlink pointing to %s, which does not exist. Fix or recreate the symlink target.",
