@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Checks that the issue referenced at the start of a commit message (eg "[#203] ...") is
+# assigned to the committer on GitHub, to catch pasting the wrong issue number before it lands
+# in history.
+#
+# Enable with: git config core.hooksPath .githooks
+#
+# Requires the GitHub CLI (gh), authenticated (gh auth login).  If gh is missing, not
+# authenticated, or the lookup fails (eg offline, issue not found), the check is skipped with a
+# warning rather than blocking the commit - this is a helpful nudge, not a hard gate.  It only
+# blocks when it can positively confirm the issue is not assigned to you.
+set -uo pipefail
+
+MSG_FILE="$1"
+FIRST_LINE="$(head -n1 "$MSG_FILE")"
+
+ISSUE="$(printf '%s' "$FIRST_LINE" | grep -oE '^\[#?[0-9]+\]' | grep -oE '[0-9]+')"
+if [ -z "$ISSUE" ]; then
+  exit 0
+fi
+
+warn_skip() {
+  echo "commit-msg: $1 - skipping issue-assignee check for #$ISSUE." >&2
+  exit 0
+}
+
+command -v gh >/dev/null 2>&1 || warn_skip "gh CLI not found"
+gh auth status >/dev/null 2>&1 || warn_skip "gh not authenticated"
+
+ME="$(gh api user --jq .login 2>/dev/null)"
+[ -n "$ME" ] || warn_skip "could not determine your GitHub login"
+
+ASSIGNEES="$(gh issue view "$ISSUE" --json assignees --jq '.assignees[].login' 2>/dev/null)"
+GH_STATUS=$?
+if [ "$GH_STATUS" -ne 0 ]; then
+  warn_skip "could not look up issue #$ISSUE"
+fi
+
+if ! printf '%s\n' "$ASSIGNEES" | grep -qix "$ME"; then
+  echo "commit-msg: issue #$ISSUE is not assigned to you ($ME)." >&2
+  if [ -n "$ASSIGNEES" ]; then
+    echo "commit-msg: current assignee(s): $(printf '%s' "$ASSIGNEES" | tr '\n' ' ')" >&2
+  else
+    echo "commit-msg: issue #$ISSUE has no assignees." >&2
+  fi
+  echo "commit-msg: fix the issue reference, or assign yourself with: gh issue edit $ISSUE --add-assignee @me" >&2
+  exit 1
+fi
+
+exit 0
