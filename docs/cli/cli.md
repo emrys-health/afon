@@ -79,6 +79,24 @@ AFON_LOGGING_CONSOLE=INFO afon-cli.sh <command>
 deploy a stack plus configure the Polaris catalogs) you must take care not move your `$AFON_CDKTF` until the teardown of 
 the stack, other `tofu` will not know the information to destroy the stack.
 
+## Shorthand commands
+
+Every script under `config/`, `cdktf/`, `aws/`, `azure/` and `gcp/` (the ones runnable via
+[`afon-cli-scripts.sh`](configuration.md)) also has a shorthand `afon-cli.sh` command, so you don't need to switch
+between the two entry points.  The command name is the script's path, cloud/dir first and `/` replaced by `-`, eg:
+
+```shell
+afon-cli.sh config-switch --config-env dev      # same as: afon-cli-scripts.sh config/switch.sh --config-env dev
+afon-cli.sh cdktf-status                        # same as: afon-cli-scripts.sh cdktf/status.sh
+afon-cli.sh aws-login                           # same as: afon-cli-scripts.sh aws/login.sh
+```
+
+They accept the same `--flag`s as `afon.sh` itself — `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--config-zip`,
+`--env`/`-e`, `--logging`/`-l`, `--logging-console`/`-lc` — translated under the hood into the `AFON_*` env vars
+`afon-cli-scripts.sh` and the scripts expect; any other args are forwarded as-is to the script (eg
+`afon-cli.sh azure-create true` to pass `AS_ADMIN=true`).  Run
+`afon-cli.sh help` to see the full list alongside the `*-stack` commands.
+
 ## Stack deployment
 
 To deploy a stack, using the CLI command, we run the corresponding command:
