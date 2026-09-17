@@ -1,32 +1,40 @@
 #!/usr/bin/env bash
-# Delete pods matching a given status (phase or reason) on the current kubectl context/cluster.
+# List, or delete, pods matching a given status (phase or reason) on the current kubectl
+# context/cluster.
 #
 # Usage:
-#   ./delete-pods-by-status.sh <status> [namespace]
+#   ./pods.sh [list|delete] <status> [namespace]
 #
+#   list|delete Action to take on the matching pods.  Defaults to list.
 #   <status>    Pod phase or reason to match, e.g. Failed, Evicted, Error,
 #               Completed, Pending, CrashLoopBackOff, Unknown, ImagePullBackOff.
 #   [namespace] Namespace to restrict to. Omit (or pass "all") to search
 #               across all namespaces.
 #
 # Env vars:
-#   DRY_RUN=1   Print what would be deleted without deleting anything.
+#   DRY_RUN=1   For the delete action, print what would be deleted without deleting anything.
 #   CONTEXT=... kubectl context to use (defaults to current context).
 #
 # Examples:
-#   ./delete-pods-by-status.sh Evicted
-#   ./delete-pods-by-status.sh Failed kube-system
-#   DRY_RUN=1 ./delete-pods-by-status.sh CrashLoopBackOff all
+#   ./pods.sh Evicted
+#   ./pods.sh list Failed kube-system
+#   ./pods.sh delete Evicted
+#   DRY_RUN=1 ./pods.sh delete CrashLoopBackOff all
 
 set -euo pipefail
 
+ACTION="list"
+if [[ "${1:-}" == "list" || "${1:-}" == "delete" ]]; then
+  ACTION="$1"
+  shift
+fi
 STATUS="${1:-}"
 NAMESPACE="${2:-all}"
 
 if [[ -z "$STATUS" ]]; then
-  echo "Usage: $0 <status> [namespace]" >&2
-  echo "  e.g. $0 Evicted" >&2
-  echo "       $0 Failed kube-system" >&2
+  echo "Usage: ${BASH_SOURCE[0]} [list|delete] <status> [namespace]" >&2
+  echo "  e.g. ${BASH_SOURCE[0]} Evicted" >&2
+  echo "       ${BASH_SOURCE[0]} delete Failed kube-system" >&2
   exit 1
 fi
 
@@ -67,6 +75,10 @@ fi
 COUNT=$(echo "$MATCHES" | wc -l | tr -d ' ')
 echo "Found $COUNT pod(s) matching '$STATUS':"
 echo "$MATCHES" | sed 's/^/  /'
+
+if [[ "$ACTION" == "list" ]]; then
+  exit 0
+fi
 
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
   echo "DRY_RUN=1 set, not deleting."

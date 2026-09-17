@@ -1,7 +1,7 @@
 source $AFON_ROOT/scripts/config/afon-source.sh azure
 
 usage(){
-  echo "Usage: $0"
+  echo "Usage: ${BASH_SOURCE[0]}"
 }
 
 ACTION="status"
