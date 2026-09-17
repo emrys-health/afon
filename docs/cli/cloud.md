@@ -2,8 +2,8 @@
 
 **NOTE:** every `afon-cli-scripts.sh <path>/<script>.sh` command below also has a shorthand `afon-cli.sh` command,
 so you don't need to switch between the two entry points — see [Shorthand commands](cli.md#shorthand-commands).
-Eg `afon-cli-scripts.sh aws/login.sh` is the same as `afon-cli.sh aws-login`; any `--flag`s (`--cloud`, `--config-env`,
-`--cdktf-env`, `--config-zip`, `--env`, `--logging`, `--logging-console`) work the same way on the shorthand.
+Eg `afon-cli-scripts.sh aws/login.sh` is the same as `afon-cli.sh aws-login`; both accept the same `--home`, `--cdktf`,
+`--cloud`, `--config-env`, `--cdktf-env`, `--config-zip`, `--env` flags (or the equivalent `AFON_*` env var).
 
 ## Authentication
 

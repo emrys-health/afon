@@ -51,8 +51,6 @@ public class ScriptMain {
                 case "--cdktf-env" -> env.put("AFON_CDKTF_ENV", value(args, ++i, arg));
                 case "--config-zip" -> env.put("AFON_CONFIG_ZIP", value(args, ++i, arg));
                 case "--env", "-e" -> env.put("AFON_ENV", value(args, ++i, arg));
-                case "--logging", "-l" -> env.put("AFON_LOGGING", value(args, ++i, arg));
-                case "--logging-console", "-lc" -> env.put("AFON_LOGGING_CONSOLE", value(args, ++i, arg));
                 default -> scriptArgs.add(arg);
             }
         }

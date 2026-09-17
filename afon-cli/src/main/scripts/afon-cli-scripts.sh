@@ -3,20 +3,62 @@
 set -euo pipefail
 
 usage(){
-  echo "Usage: $0 <script-path> [script-args...]"
+  echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>]"
+  echo "          [--config-env <env>] [--cdktf-env <env>] [--config-zip <zip>] [--env|-e <env>]"
+  echo "          <script-path> [script-args...]"
   echo "          <script-path> is relative to the scripts dir, eg 'config/switch.sh'."
-  echo "options, settable only via env variables:"
-  echo "  AFON_CLI_DIR:     the cli distribution dir. Defaults to '$AFON_HOME/cli'"
-  echo "  AFON_HOME:        the afon home dir.  Defaults to '$HOME/.afon'."
-  echo "  AFON_CLOUD:       the cloud to target.  One of aws|azure|gcp."
-  echo "  AFON_CDKTF:       the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
-  echo "  AFON_CDKTF_ENV:   the cdktf env name.  If set, switches AFON_CDKTF to 'AFON_CDKTF-<env>' before running the script."
-  echo "  AFON_CONFIG_ENV:  the config env name.  If set, switches AFON_HOME/config to 'config-<env>' before running the script."
-  echo "  AFON_CONFIG_ZIP:  the config zip path, as used by config/import.sh, config/export.sh."
-  echo "  AFON_ENV:         sets both AFON_CDKTF_ENV and AFON_CONFIG_ENV.  Overrides them if also set."
+  echo "options, settable via the flags above or the equivalent AFON_* env var (a flag wins over its env var):"
+  echo "  --home / AFON_HOME:             the afon home dir.  Defaults to '$HOME/.afon'."
+  echo "  --cdktf / AFON_CDKTF:           the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
+  echo "  --cloud / AFON_CLOUD:           the cloud to target.  One of aws|azure|gcp."
+  echo "  --cdktf-env / AFON_CDKTF_ENV:   the cdktf env name.  If set, switches AFON_CDKTF to 'AFON_CDKTF-<env>' before running the script."
+  echo "  --config-env / AFON_CONFIG_ENV: the config env name.  If set, switches AFON_HOME/config to 'config-<env>' before running the script."
+  echo "  --config-zip / AFON_CONFIG_ZIP: the config zip path, as used by config/import.sh, config/export.sh."
+  echo "  --env / AFON_ENV:               sets both --cdktf-env and --config-env.  Overrides them if also set."
+  echo "  AFON_CLI_DIR (env only):        the cli distribution dir. Defaults to 'AFON_HOME/cli'."
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AFON_HOME="${AFON_HOME:-}"
+AFON_CLI_DIR="${AFON_CLI_DIR:-}"
+AFON_CLOUD="${AFON_CLOUD:-}"
+AFON_CDKTF="${AFON_CDKTF:-}"
+AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
+AFON_CONFIG_ENV="${AFON_CONFIG_ENV:-}"
+AFON_CONFIG_ZIP="${AFON_CONFIG_ZIP:-}"
+AFON_ENV="${AFON_ENV:-}"
+
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --home)
+      AFON_HOME="$2"; shift 2 ;;
+    --cdktf)
+      AFON_CDKTF="$2"; shift 2 ;;
+    --cloud|-c)
+      AFON_CLOUD="$2"; shift 2 ;;
+    --config-env)
+      AFON_CONFIG_ENV="$2"; shift 2 ;;
+    --cdktf-env)
+      AFON_CDKTF_ENV="$2"; shift 2 ;;
+    --config-zip)
+      AFON_CONFIG_ZIP="$2"; shift 2 ;;
+    --env|-e)
+      AFON_ENV="$2"; shift 2 ;;
+    --help|-h)
+      usage; exit 0 ;;
+    *)
+      ARGS+=("$1"); shift ;;
+  esac
+done
+# macOS ships bash 3.2, which throws "unbound variable" expanding "${ARGS[@]}" under set -u
+# when ARGS is empty (fixed in bash 4.4+), so guard the expansion instead of using it directly.
+if [ ${#ARGS[@]} -gt 0 ]; then
+  set -- "${ARGS[@]}"
+else
+  set --
+fi
+
 AFON_HOME="${AFON_HOME:-$HOME/.afon}"
 AFON_CLI_DIR="${AFON_CLI_DIR:-"$AFON_HOME/cli"}"
 if [ -z "$AFON_CLI_DIR" ]; then
@@ -25,13 +67,7 @@ if [ -z "$AFON_CLI_DIR" ]; then
 else
   AFON_ROOT="$AFON_CLI_DIR"
 fi
-
-AFON_CLOUD="${AFON_CLOUD:-}"
 AFON_CDKTF="${AFON_CDKTF:-$AFON_HOME/cdktf}"
-AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
-AFON_CONFIG_ENV="${AFON_CONFIG_ENV:-}"
-AFON_CONFIG_ZIP="${AFON_CONFIG_ZIP:-}"
-AFON_ENV="${AFON_ENV:-}"
 
 if [ -n "$AFON_ENV" ]; then
   echo "Using env=$AFON_ENV"
@@ -80,4 +116,3 @@ ALREADY_RUN=
 [ "$ACTION" == "config-switch" ] && [ -n "$CONFIG_SWITCHED" ] && ALREADY_RUN=true
 [ "$ACTION" == "cdktf-switch" ] && [ -n "$CDKTF_SWITCHED" ] && ALREADY_RUN=true
 [ -n "$ALREADY_RUN" ] || source $AFON_SCRIPT "$@"
-
