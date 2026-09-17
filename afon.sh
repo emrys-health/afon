@@ -159,46 +159,19 @@ exec_cdktf_status(){
 exec_config(){
   CONFIG_ACTION=${ACTION#config-}
   case $CONFIG_ACTION in
-    init|import|export|validate|renames)
+    init|import|export|validate|renames|status|switch)
       SCRIPT_PATH="config/$CONFIG_ACTION.sh"
       exec_script
       ;;
-    switch)
-      exec_config_switch
-      ;;
-    status)
-      exec_config_status
-      ;;
+    *)
+      echo "Config action not supported: $CONFIG_ACTION"
+      usage; exit 0
   esac
 }
 
 exec_config_switch(){
-  if [ -z "$CONFIG_ENV" ]; then
-    echo "Action config-switch requires option --config-env"
-    usage; exit 0
-  fi
-  CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
-  if [ -L "$CONFIG_DIR" ]; then
-    rm $CONFIG_DIR
-  elif [ -d "$CONFIG_DIR" ]; then
-    echo "$CONFIG_DIR is not a symlink. Moving $CONFIG_DIR to $CONFIG_ENV_DIR"
-    echo "NOTE:  You may have used option --env instead of narrower --config-env."
-    mv $CONFIG_DIR $CONFIG_ENV_DIR
-  fi
-  ln -s $CONFIG_ENV_DIR $CONFIG_DIR
-  echo "Switched to config env $CONFIG_ENV"
-}
-
-exec_config_status(){
-  if [ -d $CONFIG_DIR ]; then
-    if [ -f "$CONFIG_DIR/afon.md" ]; then
-      cat $CONFIG_DIR/afon.md
-    fi
-    ls -lt $CONFIG_DIR
-    ls -lt $CONFIG_DIR/*
-  else
-    echo "$CONFIG_DIR not found."
-  fi
+  SCRIPT_PATH="config/switch.sh"
+  exec_script
 }
 
 exec_docs(){
@@ -269,8 +242,7 @@ exec_script(){
     usage; exit 0
   fi
   echo "Executing $SCRIPT_PATH $SCRIPT_ARGS"
-  cd $AFON_ROOT/scripts
-  source $SCRIPT_PATH $SCRIPT_ARGS
+  source $AFON_ROOT/scripts/$SCRIPT_PATH $SCRIPT_ARGS
 }
 
 capitaliseFirst(){
@@ -506,6 +478,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "Using AFON_ROOT=$AFON_ROOT"
+
 AFON_HOME="${AFON_HOME:-}"
 if [ -n "$AFON_HOME" ]; then
   HOME_DIR="$AFON_HOME"
@@ -601,8 +576,6 @@ if [ -n "$BUILD_PROFILES" ]; then
   MVN_PROFILES="-P$BUILD_PROFILES"
 fi
 
-AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-echo "Using AFON_ROOT=$AFON_ROOT"
 MVN_CMD="mvn"
 if [ -n "$MVN_QUIET" ]; then
   MVN_CMD="$MVN_CMD -q"
