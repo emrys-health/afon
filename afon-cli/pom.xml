@@ -103,6 +103,7 @@
                                         </artifactItem>
                                     </artifactItems>
                                     <outputDirectory>${afon.cli.dir}</outputDirectory>
+                                    <overWriteIfNewer>true</overWriteIfNewer>
                                     <stripVersion>true</stripVersion>
                                 </configuration>
                             </execution>
@@ -113,18 +114,43 @@
                         <artifactId>maven-resources-plugin</artifactId>
                         <executions>
                             <execution>
-                                <id>export-cli-script</id>
+                                <id>export-cli-scripts</id>
                                 <phase>package</phase>
                                 <goals>
                                     <goal>copy-resources</goal>
                                 </goals>
                                 <configuration>
                                     <outputDirectory>${afon.cli.dir}</outputDirectory>
+                                    <changeDetection>content</changeDetection>
                                     <resources>
                                         <resource>
                                             <directory>${project.basedir}/src/main/scripts</directory>
                                             <includes>
                                                 <include>afon-cli.sh</include>
+                                                <include>afon-cli-scripts.sh</include>
+                                            </includes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>export-scripts</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${afon.cli.dir}/scripts</outputDirectory>
+                                    <changeDetection>content</changeDetection>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}/../scripts</directory>
+                                            <includes>
+                                                <include>aws/*</include>
+                                                <include>azure/*</include>
+                                                <include>gcp/*</include>
+                                                <include>cdktf/*</include>
+                                                <include>config/*</include>
                                             </includes>
                                         </resource>
                                     </resources>
