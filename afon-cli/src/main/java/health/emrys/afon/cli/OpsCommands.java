@@ -75,10 +75,23 @@ class OpsCommands {
     }
 
     Set<String> names(String cloud) {
-        if (cloud != null || !cloud.isBlank()){
+        if (cloud != null && !cloud.isBlank()){
             return commandNames.stream().filter(c -> c.contains(cloud)).collect(Collectors.toSet());
         }
         return commandNames;
+    }
+
+    /**
+     * Commands under a given prefix, eg {@code namesWithPrefix("azure")} returns
+     * {@code azure-account}, {@code azure-create}, etc. - every command that is either exactly
+     * {@code prefix} or starts with {@code prefix + "-"}.
+     */
+    Set<String> namesWithPrefix(String prefix) {
+        String lowerPrefix = prefix.toLowerCase();
+        String dashPrefix = lowerPrefix + "-";
+        return commandNames.stream()
+            .filter(name -> name.equals(lowerPrefix) || name.startsWith(dashPrefix))
+            .collect(Collectors.toCollection(TreeSet::new));
     }
 
     private static String kebabCase(String simpleName) {

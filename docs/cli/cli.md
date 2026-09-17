@@ -60,6 +60,15 @@ afon-cli.sh help
 
 The commands are the (kebab-named) versions of the executable Java classes named `*Main` found in package `health.emrys.afon.ops` (in module `afon-ops`).
 
+To see just the commands under a given prefix (eg every `config-*` [shorthand command](#script-commands)), pass it
+followed by `-h`/`--help`:
+```shell
+afon-cli.sh config -h
+```
+This works because `config` isn't itself a command, only a shared prefix — if the prefix has no matching commands,
+this reports that instead. It does not apply to a real command name (eg `afon-cli.sh config-status -h` runs
+`config-status` with `-h` forwarded to it as a plain arg, rather than listing commands).
+
 The script accepts the following options, either as a `--flag` (placed anywhere before the command, eg
 `afon-cli.sh --cloud aws deploy-aws-full-stack`) or as the equivalent `AFON_*` env var — a flag wins if both are given:
 

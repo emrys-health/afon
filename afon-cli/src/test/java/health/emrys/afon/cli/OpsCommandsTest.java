@@ -41,4 +41,31 @@ class OpsCommandsTest {
         assertThat(opsCommands.names("gcp")).contains("deploy-gcp-polaris-stack", "delete-gcp-stack");
     }
 
+    @Test
+    void namesReturnsAllNamesForNullOrBlankCloud() {
+        assertThat(opsCommands.names((String) null)).isEqualTo(opsCommands.names());
+        assertThat(opsCommands.names("")).isEqualTo(opsCommands.names());
+    }
+
+    @Test
+    void namesWithPrefixListsOnlyCommandsUnderThatPrefix() {
+        Set<String> configNames = opsCommands.namesWithPrefix("config");
+        assertThat(configNames).contains("config-switch", "config-status", "config-init");
+        assertThat(configNames).allMatch(name -> name.equals("config") || name.startsWith("config-"));
+        // "configure-users" starts with the raw letters "config" but not with "config-" (no
+        // hyphen right after), so it's excluded here even though names("config") (a looser
+        // contains-match) would include it.
+        assertThat(configNames).doesNotContain("configure-users", "aws-login");
+    }
+
+    @Test
+    void namesWithPrefixIsCaseInsensitive() {
+        assertThat(opsCommands.namesWithPrefix("CONFIG")).contains("config-switch");
+    }
+
+    @Test
+    void namesWithPrefixReturnsEmptySetForUnknownPrefix() {
+        assertThat(opsCommands.namesWithPrefix("nonexistent")).isEmpty();
+    }
+
 }
