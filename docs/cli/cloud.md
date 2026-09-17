@@ -1,22 +1,23 @@
 # Cloud infrastructure 
 
-**NOTE:** every `afon-cli-scripts.sh <path>/<script>.sh` command below also has a shorthand `afon-cli.sh` command,
-so you don't need to switch between the two entry points — see [Shorthand commands](cli.md#shorthand-commands).
-Eg `afon-cli-scripts.sh aws/login.sh` is the same as `afon-cli.sh aws-login`; both accept the same `--home`, `--cdktf`,
-`--cloud`, `--config-env`, `--cdktf-env`, `--config-zip`, `--env` flags (or the equivalent `AFON_*` env var).
+**NOTE:** every command below is a shorthand `afon-cli.sh` command for `afon-cli-scripts.sh <dir>/<name>.sh` 
+— see [Shorthand commands](cli.md#shorthand-commands).
+Eg `afon-cli.sh aws-login` is a shorthand for `afon-cli-scripts.sh aws/login.sh`; 
+both accept the same `--home`, `--cdktf`, `--cloud`, `--config-env`, `--cdktf-env`, `--config-zip`, `--env` flags 
+(or the equivalent `AFON_*` env var).
 
 ## Authentication
 
 **IMPORTANT:** Ensure you have done a login with the cloud cli before executing the create or destroy scripts.
 
 ```shell
-$AFON_CLI_DIR/afon-cli-scripts.sh <cloud>/login.sh 
+$AFON_CLI_DIR/afon-cli.sh <cloud>-login.sh 
 ```
 where cloud is one of `{aws|azure|gcp}`.
 
 To show the account used by the cloud cli, once logged in:
 ```shell
-$AFON_CLI_DIR/afon-cli-scripts.sh <cloud>/account.sh 
+$AFON_CLI_DIR/afon-cli.sh <cloud>-account.sh 
 ```
 where cloud is one of `{aws|azure|gcp}`.
 
@@ -26,7 +27,7 @@ To create the cloud infrastructure, which includes storage buckets, IAM roles, s
 run the cloud create scripts:
 
 ```shell
-$AFON_CLI_DIR/afon-cli-scripts.sh <cloud>/create.sh 
+$AFON_CLI_DIR/afon-cli.sh <cloud>-create.sh 
 ```
 where cloud is one of `{aws|azure|gcp}`.
 
@@ -34,7 +35,7 @@ where cloud is one of `{aws|azure|gcp}`.
 
 To destroy the cloud infrastructure
 ```shell
-$AFON_CLI_DIR/afon-cli-scripts.sh <cloud>/destroy.sh 
+$AFON_CLI_DIR/afon-cli.sh <cloud>-destroy.sh 
 ```
 where cloud is one of `{aws|azure|gcp}`.
 

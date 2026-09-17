@@ -17,7 +17,7 @@ name: AWS Stack (Linux)
 #     and is different from $AFON_HOME which lives in the GitHub workspace.
 #
 # The $AFON_HOME/config files are reconstructed from the same base64 repository secrets the
-# acceptance workflow uses; `scripts/github/secrets.sh push` publishes them.
+# acceptance workflow uses; `./afon.sh -a github-secrets -sa push` publishes them.
 on:
   workflow_dispatch:
     inputs:

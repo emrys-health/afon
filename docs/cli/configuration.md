@@ -20,18 +20,17 @@ $AFON_CLI_DIR/afon-cli-scripts.sh config/init.sh
 ```
 This copies empty config files from templates to the config dir.  
 
-**NOTE**: The script `config/init.sh` will create a new config dir, if not found, but it also can work with an existing config dir.
-However, in case of an existing config dir, any existing files will not be overwritten and will need to be removed manually.
+**NOTE**: The script `config/init.sh` will create a new config dir, if not found, but it also can work with an existing config dir. However, in case of an existing config dir, any existing files will not be overwritten and will need to be removed manually.
 
 Once initialised, the config values need to be completed.
 
-To init a named config env (see [Switching config env](#switching-config-env)), pass `--config-env`:
+To init a named config env (see [Switching env](#switching-env)), pass `--config-env`:
 
 ```shell
 $AFON_CLI_DIR/afon-cli-scripts.sh --config-env <env> config/init.sh
 ```
 
-### Switching config env
+### Switching env
 
 If you maintain config for more than one env (eg `dev`, `prod`), each is kept in its own `$AFON_HOME/config-<env>` dir
 and switched in via a symlink at `$AFON_HOME/config`.  `--config-env` is global: whenever it's set, the switch is

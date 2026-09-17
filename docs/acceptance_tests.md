@@ -88,13 +88,16 @@ config file, named after the file:
 base64 is used so that multi-line values such as `SNOWFLAKE_PRIVATE_KEY` and
 `GOOGLE_APPLICATION_CREDENTIALS` survive the round trip byte for byte.
 
-Publish them from a local config dir with [scripts/github/secrets.sh](../scripts/github/secrets.sh),
+Publish them from a local config dir using action `github-secrets`:
+```shell
+./afon.sh -a github-secrets
+```
 which needs the `gh` CLI authenticated with the `repo` scope:
 
 ```shell
-./scripts/github/secrets.sh push --dry-run # reports what would be published
-./scripts/github/secrets.sh push           # publishes all config files, overwriting existing secrets
-./scripts/github/secrets.sh list           # lists the secrets set on the repo
+./afon.sh -a github-secrets -sa "push --dry-run" # reports what would be published
+./afon.sh -a github-secrets -sa push           # publishes all config files, overwriting existing secrets
+./afon.sh -a github-secrets -sa list           # lists the secrets set on the repo
 ```
 
 The workflow writes the config into `$GITHUB_WORKSPACE/.afon/config` rather than the runner's home, so

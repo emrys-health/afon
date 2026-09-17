@@ -126,7 +126,7 @@ Requires ssh access to the runner.
 
 The workflows require the config to be uploaded to GitHub secrets:
 ```shell
-./scripts/github/secrets.sh push 
+./afon.sh -a github-secrets -sa push
 ```
 This pushes the content of each config files to a separate GitHub secret.
 
