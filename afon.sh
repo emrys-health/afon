@@ -15,18 +15,16 @@ usage (){
   echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>] [--exec-type|-et <types>]"
   echo "          [--script-path|-sp <path>] [--script-args|-sa <args>]"
   echo "          [--setup-os <os>] [--setup-output <file>]"
-  echo "          [--tofu-args|-ta <args>]"
-  echo "actions:  ansible|build|config-*|deploy|docs|exec|setup|tofu-*"
-  echo "          ansible:    : executes the ansible playbook."
-  echo "          build       : executes the mvn build."
-  echo "          cli         : executes the cli commands."
-  echo "          cdktf-*     : executes the cdktf commands.  One of init|switch|status."
-  echo "          config-*    : executes the config commands.  One of import|export|init|validate|switch|status."
-  echo "          docs-export : export the docs (both generated and static) to <docs-dir>."
-  echo "          exec        : executes the jvm classes from ops (see the docs for details)."
-  echo "          script      : executes the scripts."
-  echo "          setup-*     : sets up the local env for the given os and <cloud> option.  One of local|show"
-  echo "          tofu-*      : executes the tofu commands.  One of apply|destroy|state."
+  echo "actions:  ansible|build|deploy|docs|exec|setup|script|<dir>-<name>"
+  echo "          ansible:      : executes the ansible playbook."
+  echo "          build         : executes the mvn build."
+  echo "          cli           : executes the cli commands."
+  echo "          docs-export   : export the docs (both generated and static) to <docs-dir>."
+  echo "          exec          : executes the jvm classes from ops (see the docs for details)."
+  echo "          setup-*       : sets up the local env for the given os and <cloud> option.  One of local|show"
+  echo "          script        : executes the scripts."
+  echo "          <dir>-<name>  : executes scripts/<dir>/<name>.sh directly, for any script under scripts/."
+  echo "                          eg cdktf-status, config-switch, aws-login, azure-account"
   echo "help:             the help flag.  Prints usage."
   echo "home:             the afon home dir.  Defaults to '$HOME/.afon'."
   echo "                  Also settable via env variable 'AFON_HOME'."
@@ -59,10 +57,9 @@ usage (){
   echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
   echo "exec-type:        the exec type.  One of ops|samples.  Defaults to 'ops'."
   echo "script-path:      the path of the script the run."
-  echo "script-args:      the script args (must be quoted if more than one arg)"
+  echo "script-args:      the script args (must be quoted if more than one arg).  Also used for tofu-* actions."
   echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
-  echo "tofu-args:        the tofu args."
 }
 
 check_acceptance(){
@@ -102,50 +99,47 @@ exec_cli(){
   eval "$CLI"
 }
 
-exec_cdktf(){
-  CDKTF_ACTION=${ACTION#cdktf-}
-  case $CDKTF_ACTION in
-    switch)
-      # Already run if --cdktf-env triggered the global switch above.
-      [ -n "$CDKTF_SWITCHED" ] || exec_cdktf_switch
-      ;;
-    init|status)
-      SCRIPT_PATH="cdktf/$CDKTF_ACTION.sh"
-      exec_script
-      ;;
-    *)
-      echo "Cdktf action not supported: $CDKTF_ACTION"
-      usage; exit 0
-  esac
-}
-
 exec_cdktf_switch(){
   SCRIPT_PATH="cdktf/switch.sh"
   exec_script
   CDKTF_SWITCHED=true
 }
 
-exec_config(){
-  CONFIG_ACTION=${ACTION#config-}
-  case $CONFIG_ACTION in
-    switch)
-      # Already run if --config-env triggered the global switch above.
-      [ -n "$CONFIG_SWITCHED" ] || exec_config_switch
-      ;;
-    init|import|export|validate|renames|status)
-      SCRIPT_PATH="config/$CONFIG_ACTION.sh"
-      exec_script
-      ;;
-    *)
-      echo "Config action not supported: $CONFIG_ACTION"
-      usage; exit 0
-  esac
-}
-
 exec_config_switch(){
   SCRIPT_PATH="config/switch.sh"
   exec_script
   CONFIG_SWITCHED=true
+}
+
+resolve_script_path(){
+  # $1 is a "<dir>-<name>" action, eg "aws-create" or "cdktf-status".  Scripts named with
+  # underscores (eg aws/create_federated_permissions.sh) are still found: hyphens in the
+  # action are tried first as-is, then converted to underscores.
+  DIR="${1%%-*}"
+  NAME="${1#*-}"
+  if [ -f "$AFON_ROOT/scripts/$DIR/$NAME.sh" ]; then
+    SCRIPT_PATH="$DIR/$NAME.sh"
+  elif [ -f "$AFON_ROOT/scripts/$DIR/${NAME//-/_}.sh" ]; then
+    SCRIPT_PATH="$DIR/${NAME//-/_}.sh"
+  else
+    echo "Action not supported: $1 (no script scripts/$DIR/$NAME.sh)"
+    usage; exit 0
+  fi
+}
+
+exec_action_script(){
+  if [ "$ACTION" == "config-switch" ]; then
+    # Already run if --config-env triggered the global switch above.
+    [ -n "$CONFIG_SWITCHED" ] || exec_config_switch
+    return
+  fi
+  if [ "$ACTION" == "cdktf-switch" ]; then
+    # Already run if --cdktf-env triggered the global switch above.
+    [ -n "$CDKTF_SWITCHED" ] || exec_cdktf_switch
+    return
+  fi
+  resolve_script_path "$ACTION"
+  exec_script
 }
 
 exec_docs(){
@@ -221,31 +215,6 @@ exec_script(){
 
 capitaliseFirst(){
   echo "$1" | awk '{print toupper(substr($0,1,1)) substr($0,2)}'
-}
-
-exec_tofu(){
-  TOFU_CLOUD=
-  if [ -n "$CLOUD" ]; then
-    TOFU_CLOUD="$CLOUD"
-  else
-    TOFU_CLOUD="aws"
-  fi
-  TOFU_DIR="$CDKTF_DIR/stacks/$TOFU_CLOUD"
-  echo "Using tofu dir $TOFU_DIR"
-  if [ ! -d "$TOFU_DIR" ]; then
-     echo "Dir $TOFU_DIR not found.  Execute deploy first."
-     usage; exit 0
-  fi
-  if [ -z "$TOFU_ACTION" ]; then
-    # it may have already been set by caller
-    TOFU_ACTION=${ACTION#tofu-}
-  fi
-  if [[ ! "$TOFU_ACTION" =~ ^(state|plan)$ ]]; then
-    TOFU_ARGS="$TOFU_ARGS -auto-approve"
-  fi
-  TOFU_CMD="tofu -chdir=$TOFU_DIR $TOFU_ACTION $TOFU_ARGS"
-  echo "Executing: $TOFU_CMD"
-  eval "$TOFU_CMD"
 }
 
 install_eksct_linux(){
@@ -379,8 +348,6 @@ SCRIPT_PATH=
 SCRIPT_ARGS=
 SETUP_OS=
 SETUP_OUTPUT=
-TOFU_ACTION=
-TOFU_ARGS=
 VERSION=
 
 while [[ $# -gt 0 ]]; do
@@ -445,8 +412,6 @@ while [[ $# -gt 0 ]]; do
       SETUP_OS="$2"; shift 2 ;;
     --setup-outout)
       SETUP_OUTPUT="$2"; shift 2 ;;
-    --tofu-args|-ta)
-      TOFU_ARGS="$2"; shift 2 ;;
     *)
       echo "Unknown option: $1" >&2;
       usage; exit 0
@@ -585,12 +550,6 @@ case $ACTION in
   cli)
     exec_cli
     ;;
-  cdktf-*)
-    exec_cdktf
-    ;;
-  config-*)
-    exec_config
-    ;;
   docs-export)
     VERSION=$(version)
     if [ -z "$DOCS_DIR" ]; then
@@ -631,8 +590,8 @@ case $ACTION in
         usage; exit 0
     esac
     ;;
-  tofu-*)
-    exec_tofu
+  *-*)
+    exec_action_script
     ;;
   *)
     echo "Unknown action: $ACTION"

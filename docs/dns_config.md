@@ -125,20 +125,20 @@ If property `AZURE_KEY_VAULT_NAME` is not found or blank, the storing of the cer
 
 To create key vault, run:
 ```shell
-scripts/azure/keyvault.sh create
+./afon.sh -a azure-keyvault -sa create
 ```
 It will pick up the name of the key vault and all the other relevant properties from config and create the key vault.
 The operation is idempotent and will show an existing key vault if already present.
 
 To issue a cert via ACME (Let's Encrypt) and store it in the key vault:
 ```shell
-scripts/azure/issue-cert.sh acme
+./afon.sh -a azure-issue-cert -sa acme
 ```
 This is a one-off operation but can be repeated (idempotently) to renew the cert.
 
 Optionally, Azure has its own CA which supports two issuers:
 ```shell
-scripts/azure/issue-cert.sh digicert|globalsign 
+./afon.sh -a azure-issue-cert -sa {digicert|globalsign}
 ```
 This is not a free service and the issuer needs to be registered.  
 Set as properties `AZURE_CA_ID/AZURE_CA_PASSWORD` in `config/secret-azure.properties` the issuer credentials.
