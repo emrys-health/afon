@@ -105,100 +105,47 @@ exec_cli(){
 exec_cdktf(){
   CDKTF_ACTION=${ACTION#cdktf-}
   case $CDKTF_ACTION in
-    init)
-      exec_cdktf_init
-      ;;
     switch)
-      exec_cdktf_switch
+      # Already run if --cdktf-env triggered the global switch above.
+      [ -n "$CDKTF_SWITCHED" ] || exec_cdktf_switch
       ;;
-    status)
-      exec_cdktf_status
+    init|status)
+      SCRIPT_PATH="cdktf/$CDKTF_ACTION.sh"
+      exec_script
       ;;
+    *)
+      echo "Cdktf action not supported: $CDKTF_ACTION"
+      usage; exit 0
   esac
 }
 
-exec_cdktf_init(){
-  INIT_DIR=
-  if [ -n "$CDKTF_ENV" ]; then
-    INIT_DIR="$CDKTF_DIR-$CDKTF_ENV"
-  else
-    INIT_DIR="$CDKTF_DIR_DIR"
-  fi
-  mkdir -p $INIT_DIR
-}
-
 exec_cdktf_switch(){
-  if [ -z "$CDKTF_ENV" ]; then
-    echo "Action cdktf-switch requires option --cdktf-env"
-    usage; exit 0
-  fi
-  CDKTF_ENV_DIR="$CDKTF_DIR-$CDKTF_ENV"
-  if [ -L "$CDKTF_DIR" ]; then
-    rm $CDKTF_DIR
-  elif [ -d "$CDKTF_DIR" ]; then
-    echo "$CDKTF_DIR is not a symlink. Moving $CDKTF_DIR to $CDKTF_ENV_DIR"
-    echo "NOTE:  You may have used option --env instead of narrower --cdktf-env."
-    mv $CDKTF_DIR $CDKTF_ENV_DIR
-  fi
-  ln -s $CDKTF_ENV_DIR $CDKTF_DIR
-  echo "Switched to cdktf env $CDKTF_ENV"
-}
-
-exec_cdktf_status(){
-  if [ -d $CDKTF_DIR ]; then
-    if [ -f "$CDKTF_DIR/manifest.json" ]; then
-      cat $CDKTF_DIR/manifest.json
-    fi
-    ls -lt $CDKTF_DIR
-    ls -lt $CDKTF_DIR/*
-  else
-    echo "$CDKTF_DIR not found."
-  fi
+  SCRIPT_PATH="cdktf/switch.sh"
+  exec_script
+  CDKTF_SWITCHED=true
 }
 
 exec_config(){
   CONFIG_ACTION=${ACTION#config-}
   case $CONFIG_ACTION in
-    init|import|export|validate|renames)
+    switch)
+      # Already run if --config-env triggered the global switch above.
+      [ -n "$CONFIG_SWITCHED" ] || exec_config_switch
+      ;;
+    init|import|export|validate|renames|status)
       SCRIPT_PATH="config/$CONFIG_ACTION.sh"
       exec_script
       ;;
-    switch)
-      exec_config_switch
-      ;;
-    status)
-      exec_config_status
-      ;;
+    *)
+      echo "Config action not supported: $CONFIG_ACTION"
+      usage; exit 0
   esac
 }
 
 exec_config_switch(){
-  if [ -z "$CONFIG_ENV" ]; then
-    echo "Action config-switch requires option --config-env"
-    usage; exit 0
-  fi
-  CONFIG_ENV_DIR="$CONFIG_DIR-$CONFIG_ENV"
-  if [ -L "$CONFIG_DIR" ]; then
-    rm $CONFIG_DIR
-  elif [ -d "$CONFIG_DIR" ]; then
-    echo "$CONFIG_DIR is not a symlink. Moving $CONFIG_DIR to $CONFIG_ENV_DIR"
-    echo "NOTE:  You may have used option --env instead of narrower --config-env."
-    mv $CONFIG_DIR $CONFIG_ENV_DIR
-  fi
-  ln -s $CONFIG_ENV_DIR $CONFIG_DIR
-  echo "Switched to config env $CONFIG_ENV"
-}
-
-exec_config_status(){
-  if [ -d $CONFIG_DIR ]; then
-    if [ -f "$CONFIG_DIR/afon.md" ]; then
-      cat $CONFIG_DIR/afon.md
-    fi
-    ls -lt $CONFIG_DIR
-    ls -lt $CONFIG_DIR/*
-  else
-    echo "$CONFIG_DIR not found."
-  fi
+  SCRIPT_PATH="config/switch.sh"
+  exec_script
+  CONFIG_SWITCHED=true
 }
 
 exec_docs(){
@@ -269,8 +216,7 @@ exec_script(){
     usage; exit 0
   fi
   echo "Executing $SCRIPT_PATH $SCRIPT_ARGS"
-  cd $AFON_ROOT/scripts
-  source $SCRIPT_PATH $SCRIPT_ARGS
+  source $AFON_ROOT/scripts/$SCRIPT_PATH $SCRIPT_ARGS
 }
 
 capitaliseFirst(){
@@ -405,11 +351,13 @@ BUILD_GOALS=
 BUILD_PROFILES=
 CDKTF_DIR=
 CDKTF_ENV=
+CDKTF_SWITCHED=
 CLI_ARGS=
 CLI_COMMAND=
 CLI_DIR=
 CLOUD=
 CONFIG_ENV=
+CONFIG_SWITCHED=
 CONFIG_ZIP=
 DOCS_DIR=
 ENV=
@@ -506,6 +454,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "Using AFON_ROOT=$AFON_ROOT"
+
 AFON_HOME="${AFON_HOME:-}"
 if [ -n "$AFON_HOME" ]; then
   HOME_DIR="$AFON_HOME"
@@ -601,8 +552,6 @@ if [ -n "$BUILD_PROFILES" ]; then
   MVN_PROFILES="-P$BUILD_PROFILES"
 fi
 
-AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-echo "Using AFON_ROOT=$AFON_ROOT"
 MVN_CMD="mvn"
 if [ -n "$MVN_QUIET" ]; then
   MVN_CMD="$MVN_CMD -q"

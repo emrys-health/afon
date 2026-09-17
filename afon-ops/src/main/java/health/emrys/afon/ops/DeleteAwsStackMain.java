@@ -13,7 +13,9 @@ public class DeleteAwsStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
-        return List.of(stepOperations.deleteStackIn(AWS));
+        return List.of(
+                stepOperations.deleteStackIn(AWS),
+                stepOperations.deleteComplete(AWS));
     }
 
     public static void main(String[] args) {

@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 
 import java.util.List;
 
+import static health.emrys.afon.ops.spark.TableUtils.tableFQN;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**

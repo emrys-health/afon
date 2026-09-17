@@ -62,14 +62,6 @@ abstract public class SparkRunner {
         }
     }
 
-    protected static @NonNull String namespaceFQN(String catalogName, String namespace) {
-        return catalogName + "." + namespace;
-    }
-
-    protected static @NonNull String tableFQN(String catalogName, String namespace, String tableName) {
-        return catalogName + "." + namespace + "." + tableName;
-    }
-
     protected abstract void doRun(SparkSession spark, String catalogName, String namespace, String tableName, List<String> values);
 
 

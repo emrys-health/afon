@@ -35,15 +35,23 @@ public class ConfigureUsersMain {
     }
 
     /**
-     * Provisions the realm and each configured user's account/confidential client. Independent of
-     * any Jupyter domain, so this runs regardless of whether browser (Jupyter) access is configured
-     * for the cloud - headless clients (Spark, Trino) only need this.
+     * Provisions the realm, the {@link AfonProperty#POLARIS_ID} bootstrap client, and each
+     * configured user's account/confidential client. Independent of any Jupyter domain, so this
+     * runs regardless of whether browser (Jupyter) access is configured for the cloud - headless
+     * clients (Spark, Trino) only need this.
      */
     public List<HttpResponse> configureOidcUsers() throws IOException {
         logger.info("Configuring OIDC users");
         List<HttpResponse> responses = new ArrayList<>();
         String adminToken = identityProvider.adminToken();
         responses.add(identityProvider.createRealm(adminToken, KEYCLOAK_REALM));
+        // POLARIS_ID/POLARIS_SECRET (e.g. "root") is not one of userProvider's human users - it's the
+        // service client that catalog creation and Spark authenticate as via client_credentials once
+        // Polaris defers OAuth to KeyCloak (KeyCloakPolarisRestClient).
+        // It doesn't exist on a fresh KeyCloak database.
+        responses.add(identityProvider.createConfidentialClient(
+                adminToken, KEYCLOAK_REALM,
+                propertyProvider.getValue(POLARIS_ID), propertyProvider.getValue(POLARIS_SECRET)));
         for (AfonUser user : userProvider.getUsers()) {
             responses.add(identityProvider.createUser(adminToken, KEYCLOAK_REALM, user));
             responses.add(identityProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
@@ -63,15 +71,10 @@ public class ConfigureUsersMain {
                 propertyProvider.getValue(OAUTH2_CLIENT_ID),
                 propertyProvider.getValue(OAUTH2_CLIENT_SECRET),
                 KeyCloakProvider.callbackURIs(jupyterDomain)));
-        // Last, so that the realm is only bound to its MFA flows once the users who must pass through
-        // them exist.
+        // configure MFA so that the realm is only bound to its MFA flows,
+        // once the users who must pass through them exist
         responses.addAll(identityProvider.configureMfa());
         return responses;
-    }
-
-    public List<HttpResponse> configurePolarisUsers() throws IncorrectConfigException, IOException {
-        logger.info("Configuring Polaris users on all catalogs");
-        return polarisUsers.configureUsers(userProvider);
     }
 
     public List<HttpResponse> configurePolarisUsers(String catalogName) throws IncorrectConfigException, IOException {
@@ -80,9 +83,10 @@ public class ConfigureUsersMain {
     }
 
     /**
-     * With one argument (cloud), configures OIDC users, the Jupyter browser client if the cloud has
-     * a Jupyter domain, and Polaris users on every catalog - all cloud-scoped, meant to run once per
-     * cloud.
+     * With one argument (cloud), configures OIDC users and the Jupyter browser client if the cloud
+     * has a Jupyter domain - cloud-scoped, meant to run once per cloud, and before any catalog
+     * exists: this is what creates the KeyCloak realm and each user's confidential client (e.g.
+     * "root"), which catalog creation itself authenticates as once Polaris defers OAuth to KeyCloak.
      * With two arguments (cloud, catalog-name), configures Polaris users for that single catalog -
      * catalog-scoped, meant to run once per catalog, e.g. to pick up a catalog created after the
      * cloud was last configured.
@@ -92,6 +96,7 @@ public class ConfigureUsersMain {
         if (args.length != 1 && args.length != 2) {
             System.out.printf("%s requires arguments: cloud", ConfigureUsersMain.class.getSimpleName());
             System.out.printf("%s requires arguments: cloud catalog-name", ConfigureUsersMain.class.getSimpleName());
+            System.out.printf("   use catalog-name='all' to populate all catalogs for cloud");
             throw new IllegalArgumentException();
         }
         String cloudName   = args[0];
@@ -123,17 +128,15 @@ public class ConfigureUsersMain {
                     throw new RuntimeException(e);
                 }
             }
-
-            try {
-                app.configurePolarisUsers();
-            } catch (Exception e) {
-                logger.error("Failed to configure Polaris users {}: {}",
-                        userProvider.getUserNames(), e.getMessage(), e);
-                throw new RuntimeException(e);
-            }
         } else {
             try {
-                app.configurePolarisUsers(catalogName);
+                if ( catalogName.equalsIgnoreCase("all") ){
+                   for ( AfonCatalog catalog : new AfonCatalogs(propertyProvider).all() ){
+                     app.configurePolarisUsers(catalog.toString());
+                   }
+                } else {
+                    app.configurePolarisUsers(catalogName);
+                }
             } catch (Exception e) {
                 logger.error("Failed to configure Polaris users {}: {}",
                         userProvider.getUserNames(), e.getMessage(), e);

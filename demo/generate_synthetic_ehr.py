@@ -19,8 +19,18 @@ type: patients.csv, conditions.csv, observations.csv,
 medication_requests.csv. Tables are linked via patient_id / condition_id.
 
 Usage:
-    python generate_synthetic_ehr.py --patients 800 --site aws \
-        --unmeasured-confounding none --output ./output/aws --seed 1
+    python generate_synthetic_ehr.py --patients 800 --site emrys \
+        --unmeasured-confounding none --output target/emrys --seed 1
+
+
+Examples:
+
+python generate_synthetic_ehr.py --patients 800 --site emrys --seed 0 --output target/emrys
+python generate_synthetic_ehr.py --patients 800 --site westmids --seed 1 --output target/westmids
+python generate_synthetic_ehr.py --patients 800 --site tvs --seed 2 --output target/tvs
+python generate_synthetic_ehr.py --patients 800 --site wessex --seed 3 --output target/wessex
+python generate_synthetic_ehr.py --patients 800 --site eastern --seed 4 --output target/eastern
+
 """
 
 from __future__ import annotations
@@ -33,6 +43,8 @@ import random
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+import fastparquet as fp
+import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Reference terminology
@@ -76,17 +88,25 @@ SITES = {
         "treat_offset": 0.0, "outcome_offset": 0.0, "never_smoker_prev": 0.22,
         "stage_weights": [0.10, 0.10, 0.15, 0.20, 0.45],
     },
-    "aws": {
+    "emrys": {
+        "treat_offset": 0.1, "outcome_offset": -0.1, "never_smoker_prev": 0.17,
+        "stage_weights": [0.08, 0.09, 0.18, 0.25, 0.48],
+    },
+    "wessex": {
         "treat_offset": -0.5, "outcome_offset": -0.2, "never_smoker_prev": 0.20,
         "stage_weights": [0.12, 0.12, 0.16, 0.20, 0.40],
     },
-    "azure": {
+    "tvs": {
         "treat_offset": 0.0, "outcome_offset": 0.0, "never_smoker_prev": 0.30,
         "stage_weights": [0.10, 0.10, 0.15, 0.20, 0.45],
     },
-    "gcp": {
+    "westmids": {
         "treat_offset": 0.7, "outcome_offset": 0.3, "never_smoker_prev": 0.15,
         "stage_weights": [0.06, 0.08, 0.14, 0.22, 0.50],
+    },
+    "eastern": {
+        "treat_offset": 0.3, "outcome_offset": 0.1, "never_smoker_prev": 0.19,
+        "stage_weights": [0.06, 0.09, 0.15, 0.23, 0.52],
     },
 }
 
@@ -686,13 +706,37 @@ def flatten_medication_request(r: dict) -> dict:
     }
 
 
+datetype_conversion = ['birth_date', 'deceased_datetime','onset_datetime','recorded_date','effective_datetime','authored_on']
+
+inttype_conversions = ['egfr_positive','ecog','died']
+
+floattype_conversions = ['age','value','frailty','albumin','frequency','period_days','propensity','p0','p1','y0','y1','y_obs','progression_days']
+
+
+def csv_to_dataframe(rows: list[dict]) -> pd.DataFrame:
+    df = pd.DataFrame(rows)
+    for col in df:
+        if col in datetype_conversion:
+            df[col] = pd.to_datetime(df[col])
+        if col in inttype_conversions:
+            df[col] = df[col].astype(int)
+        if col in floattype_conversions:
+            df[col] = df[col].map(lambda x: float(x) if x != '' else None)
+    return df
+
+
+
+
 def write_table(path: Path, rows: list[dict]) -> None:
+    print(f"writing out {path}")
     if not rows:
         return
-    with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(rows)
+    df = csv_to_dataframe(rows)
+    fp.write(path,df)
+    # with path.open("w", newline="") as f:
+    #     writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+    #     writer.writeheader()
+    #     writer.writerows(rows)
     print(f"Wrote {path}  ({len(rows)} rows)")
 
 
@@ -721,7 +765,7 @@ def true_effects(truth_rows: list[dict]) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate synthetic FHIR NSCLC EHR data.")
     parser.add_argument("--patients", type=int, default=20, help="Number of patients (default 20)")
-    parser.add_argument("--output", type=Path, default=Path("output"), help="Output directory")
+    parser.add_argument("--output", type=Path, default=Path("target"), help="Output directory")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
     parser.add_argument(
         "--site", choices=sorted(SITES), default="default",
@@ -755,12 +799,12 @@ def main() -> None:
             elif rt == "MedicationRequest":
                 medication_requests.append(flatten_medication_request(r))
 
-    write_table(args.output / "patients.csv", patients)
-    write_table(args.output / "conditions.csv", conditions)
-    write_table(args.output / "observations.csv", observations)
-    write_table(args.output / "medication_requests.csv", medication_requests)
+    write_table(args.output / "patients.parq", patients)
+    write_table(args.output / "conditions.parq", conditions)
+    write_table(args.output / "observations.parq", observations)
+    write_table(args.output / "medication_requests.parq", medication_requests)
 
-    write_table(args.output / "ground_truth.csv", truth_rows)
+    write_table(args.output / "ground_truth.parq", truth_rows)
     meta = {
         "site": args.site,
         "site_config": SITES[args.site],
