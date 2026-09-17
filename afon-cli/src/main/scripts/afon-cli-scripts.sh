@@ -44,7 +44,12 @@ while [[ $# -gt 0 ]]; do
     --env|-e)
       AFON_ENV="$2"; shift 2 ;;
     --help|-h)
-      usage; exit 0 ;;
+      # Only show this script's own usage when no script-path has been given yet; once one is
+      # in ARGS, forward -h/--help through as a plain script-arg instead of swallowing it.
+      if [ ${#ARGS[@]} -eq 0 ]; then
+        usage; exit 0
+      fi
+      ARGS+=("$1"); shift ;;
     *)
       ARGS+=("$1"); shift ;;
   esac

@@ -10,16 +10,16 @@ usage(){
   echo "          [--logging|-l <level>] [--logging-console|-lc <level>]"
   echo "          <command> [args...]"
   echo "options, settable via the flags above or the equivalent AFON_* env var (a flag wins over its env var):"
-  echo "  --home / AFON_HOME:             the afon home dir.  Defaults to '$HOME/.afon'."
-  echo "  --cdktf / AFON_CDKTF:           the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
-  echo "  --cloud / AFON_CLOUD:           the cloud to target.  One of aws|azure|gcp.  Defaults to 'ALL'."
-  echo "  --config-env / AFON_CONFIG_ENV: the config env name, for the config-* shortcut commands."
-  echo "  --cdktf-env / AFON_CDKTF_ENV:   the cdktf env name, for the cdktf-* shortcut commands."
-  echo "  --env / AFON_ENV:               sets both --cdktf-env and --config-env.  Overrides them if also set."
-  echo "  --logging / AFON_LOGGING:       the file logging level.  Defaults to 'INFO'.  The file logs are found in 'AFON_HOME/logs'."
+  echo "  --home / AFON_HOME:                       the afon home dir.  Defaults to '$HOME/.afon'."
+  echo "  --cdktf / AFON_CDKTF:                     the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
+  echo "  --cloud / AFON_CLOUD:                     the cloud to target.  One of aws|azure|gcp.  Defaults to 'ALL'."
+  echo "  --config-env / AFON_CONFIG_ENV:           the config env name, for the config-* shortcut commands."
+  echo "  --cdktf-env / AFON_CDKTF_ENV:             the cdktf env name, for the cdktf-* shortcut commands."
+  echo "  --env / AFON_ENV:                         sets both --cdktf-env and --config-env.  Overrides them if also set."
+  echo "  --logging / AFON_LOGGING:                 the file logging level.  Defaults to 'INFO'.  The file logs are found in 'AFON_HOME/logs'."
   echo "  --logging-console / AFON_LOGGING_CONSOLE: the console logging level.  Defaults to 'OFF'."
-  echo "  AFON_CLI_DIR (env only):        the cli distribution dir this script lives in.  Auto-detected."
-  echo "  AFON_ENVS (env only):           NAME=VALUE pairs of system properties passed to the CLI java process."
+  echo "  AFON_CLI_DIR (env only):                  the cli distribution dir this script lives in.  Auto-detected."
+  echo "  AFON_ENVS (env only):                     NAME=VALUE pairs of system properties passed to the CLI java process."
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -67,7 +67,13 @@ while [[ $# -gt 0 ]]; do
     --logging-console|-lc)
       AFON_LOGGING_CONSOLE="$2"; shift 2 ;;
     --help|-h)
-      usage; exit 0 ;;
+      # Only show this script's own usage when no command has been given yet; once a command
+      # (eg "azure") is in ARGS, forward -h/--help so the java side can handle it - eg to list
+      # every command under that prefix.
+      if [ ${#ARGS[@]} -eq 0 ]; then
+        usage; exit 0
+      fi
+      ARGS+=("$1"); shift ;;
     *)
       ARGS+=("$1"); shift ;;
   esac
