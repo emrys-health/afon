@@ -34,6 +34,11 @@ public class GenerateScriptMains {
         new ScriptEntry("cdktf", "CdktfStatusMain", "cdktf/status.sh"),
         new ScriptEntry("cdktf", "CdktfSwitchMain", "cdktf/switch.sh"),
 
+        new ScriptEntry("tofu", "TofuApplyMain", "tofu/apply.sh"),
+        new ScriptEntry("tofu", "TofuDestroyMain", "tofu/destroy.sh"),
+        new ScriptEntry("tofu", "TofuPlanMain", "tofu/plan.sh"),
+        new ScriptEntry("tofu", "TofuStateMain", "tofu/state.sh"),
+
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),
         new ScriptEntry("aws", "AwsCreateMain", "aws/create.sh"),
@@ -66,7 +71,16 @@ public class GenerateScriptMains {
         new ScriptEntry("gcp", "GcpDestroyMain", "gcp/destroy.sh"),
         new ScriptEntry("gcp", "GcpLoginAsServiceAccountMain", "gcp/login-as-service-account.sh"),
         new ScriptEntry("gcp", "GcpLoginMain", "gcp/login.sh"),
-        new ScriptEntry("gcp", "GcpPolarisMain", "gcp/polaris.sh")
+        new ScriptEntry("gcp", "GcpPolarisMain", "gcp/polaris.sh"),
+
+        new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
+        new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),
+
+        new ScriptEntry("jupyter", "JupyterExecuteMain", "jupyter/execute.sh"),
+
+        new ScriptEntry("kube", "KubePodsMain", "kube/pods.sh"),
+        new ScriptEntry("kube", "KubeLogsMain", "kube/logs.sh"),
+        new ScriptEntry("kube", "KubePolarisDbMain", "kube/polaris-db.sh")
     );
 
     public static void main(String[] args) throws IOException {

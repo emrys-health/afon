@@ -1,7 +1,7 @@
 source $AFON_ROOT/scripts/config/afon-source.sh azure
 
 usage(){
-  echo "Usage: $0 [principal-id]"
+  echo "Usage: ${BASH_SOURCE[0]} [principal-id]"
   echo "Shows active role assignments for the given principal (default: the signed-in deployer),"
   echo "decoding any ABAC condition's role-ID allow-list into readable role names. Only shows"
   echo "assignments that are currently active - a PIM-eligible role not yet activated won't"

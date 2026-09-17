@@ -49,7 +49,6 @@ public class ScriptMain {
                 case "--cloud", "-c" -> env.put("AFON_CLOUD", value(args, ++i, arg));
                 case "--config-env" -> env.put("AFON_CONFIG_ENV", value(args, ++i, arg));
                 case "--cdktf-env" -> env.put("AFON_CDKTF_ENV", value(args, ++i, arg));
-                case "--config-zip" -> env.put("AFON_CONFIG_ZIP", value(args, ++i, arg));
                 case "--env", "-e" -> env.put("AFON_ENV", value(args, ++i, arg));
                 default -> scriptArgs.add(arg);
             }

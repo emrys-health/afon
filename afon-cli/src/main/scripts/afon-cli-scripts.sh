@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage(){
   echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>]"
-  echo "          [--config-env <env>] [--cdktf-env <env>] [--config-zip <zip>] [--env|-e <env>]"
+  echo "          [--config-env <env>] [--cdktf-env <env>] [--env|-e <env>]"
   echo "          <script-path> [script-args...]"
   echo "          <script-path> is relative to the scripts dir, eg 'config/switch.sh'."
   echo "options, settable via the flags above or the equivalent AFON_* env var (a flag wins over its env var):"
@@ -13,9 +13,10 @@ usage(){
   echo "  --cloud / AFON_CLOUD:           the cloud to target.  One of aws|azure|gcp."
   echo "  --cdktf-env / AFON_CDKTF_ENV:   the cdktf env name.  If set, switches AFON_CDKTF to 'AFON_CDKTF-<env>' before running the script."
   echo "  --config-env / AFON_CONFIG_ENV: the config env name.  If set, switches AFON_HOME/config to 'config-<env>' before running the script."
-  echo "  --config-zip / AFON_CONFIG_ZIP: the config zip path, as used by config/import.sh, config/export.sh."
   echo "  --env / AFON_ENV:               sets both --cdktf-env and --config-env.  Overrides them if also set."
   echo "  AFON_CLI_DIR (env only):        the cli distribution dir. Defaults to 'AFON_HOME/cli'."
+  echo "options specific to a single script (eg config/export.sh's zip path) are not flags here -"
+  echo "pass them as script-args, eg: $0 config/export.sh myconfig.zip"
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,7 +26,6 @@ AFON_CLOUD="${AFON_CLOUD:-}"
 AFON_CDKTF="${AFON_CDKTF:-}"
 AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
 AFON_CONFIG_ENV="${AFON_CONFIG_ENV:-}"
-AFON_CONFIG_ZIP="${AFON_CONFIG_ZIP:-}"
 AFON_ENV="${AFON_ENV:-}"
 
 ARGS=()
@@ -41,8 +41,6 @@ while [[ $# -gt 0 ]]; do
       AFON_CONFIG_ENV="$2"; shift 2 ;;
     --cdktf-env)
       AFON_CDKTF_ENV="$2"; shift 2 ;;
-    --config-zip)
-      AFON_CONFIG_ZIP="$2"; shift 2 ;;
     --env|-e)
       AFON_ENV="$2"; shift 2 ;;
     --help|-h)
@@ -84,7 +82,6 @@ CDKTF_DIR="$AFON_CDKTF"
 CDKTF_ENV="$AFON_CDKTF_ENV"
 CONFIG_DIR="$AFON_HOME/config"
 CONFIG_ENV="$AFON_CONFIG_ENV"
-CONFIG_ZIP="$AFON_CONFIG_ZIP"
 
 cd $AFON_ROOT/scripts
 
