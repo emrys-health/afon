@@ -60,19 +60,24 @@ afon-cli.sh help
 
 The commands are the (kebab-named) versions of the executable Java classes named `*Main` found in package `health.emrys.afon.ops` (in module `afon-ops`).
 
-The script supports the following env variables:
+The script accepts the following options, either as a `--flag` (placed anywhere before the command, eg
+`afon-cli.sh --cloud aws deploy-aws-full-stack`) or as the equivalent `AFON_*` env var — a flag wins if both are given:
 
-- `AFON_HOME`: the Afon home dir, defaulting to `$HOME/.afon`.
-- `AFON_CDKTF`: the Afon cdktf dir, defaulting to `$AFON_HOME/cdktf`.
-- `AFON_CLOUD`: the cloud provider to target, one of `{aws,azure,gcp}`.  This is optional and only affects some functionality.
-- `AFON_LOGGING`: the file logging level, defaulting to `INFO`.   The file logs are found the `$AFON_HOME/logs`.
-- `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to `OFF`.
-- `AFON_ENVS`: the `NAME=VALUE` pairs of system properties passed to the CLI java process.  Can be used to override  file-based properties in config dir.
+- `--home` / `AFON_HOME`: the Afon home dir, defaulting to `$HOME/.afon`.
+- `--cdktf` / `AFON_CDKTF`: the Afon cdktf dir, defaulting to `$AFON_HOME/cdktf`.
+- `--cloud`/`-c` / `AFON_CLOUD`: the cloud provider to target, one of `{aws,azure,gcp}`.  This is optional and only affects some functionality.  Defaults to `ALL`.
+- `--config-env` / `AFON_CONFIG_ENV`: the config env name.  Applies up front, for the [shorthand commands](#shorthand-commands) below.
+- `--cdktf-env` / `AFON_CDKTF_ENV`: the cdktf env name.  Applies up front, for the [shorthand commands](#shorthand-commands) below.
+- `--config-zip` / `AFON_CONFIG_ZIP`: the config zip path, for the `config-import`/`config-export` shorthand commands.
+- `--env`/`-e` / `AFON_ENV`: sets both `--cdktf-env` and `--config-env`.  Overrides them if also set.
+- `--logging`/`-l` / `AFON_LOGGING`: the file logging level, defaulting to `INFO`.   The file logs are found the `$AFON_HOME/logs`.
+- `--logging-console`/`-lc` / `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to `OFF`.
+- `AFON_ENVS` (env only): the `NAME=VALUE` pairs of system properties passed to the CLI java process.  Can be used to override  file-based properties in config dir.
 
 For example, to run command with console logging: 
 
 ```shell
-AFON_LOGGING_CONSOLE=INFO afon-cli.sh <command>
+afon-cli.sh --logging-console INFO <command>
 ```
 
 **IMPORTANT:** the `*-stack` commands use `$AFON_CDKTF` as their `tofu` state dir, so if you deploy or setup a stack (ie 
@@ -91,10 +96,13 @@ afon-cli.sh cdktf-status                        # same as: afon-cli-scripts.sh c
 afon-cli.sh aws-login                           # same as: afon-cli-scripts.sh aws/login.sh
 ```
 
-They accept the same `--flag`s as `afon.sh` itself — `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--config-zip`,
-`--env`/`-e`, `--logging`/`-l`, `--logging-console`/`-lc` — translated under the hood into the `AFON_*` env vars
-`afon-cli-scripts.sh` and the scripts expect; any other args are forwarded as-is to the script (eg
-`afon-cli.sh azure-create true` to pass `AS_ADMIN=true`).  Run
+They accept the same `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--config-zip`, `--env`/`-e` flags described
+above — placed either before the command name (handled by `afon-cli.sh` itself) or after it (handled by the shortcut
+command directly); either way they're translated into the `AFON_*` env vars `afon-cli-scripts.sh` and the scripts
+expect.  `--logging`/`--logging-console` are not among them: `afon-cli-scripts.sh` and the scripts it runs have no use
+for a logging level, so those two are only recognized before the command name, configuring this JVM's own logging —
+after the command name they're not recognized at all and get forwarded as plain args to the script.  Any other args
+are forwarded as-is to the script (eg `afon-cli.sh azure-create true` to pass `AS_ADMIN=true`).  Run
 `afon-cli.sh help` to see the full list alongside the `*-stack` commands.
 
 ## Stack deployment
