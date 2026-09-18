@@ -42,7 +42,7 @@ public class AfonCliApplication {
             Class<?> target = opsCommands.resolve(args[0]);
             if (target == null) {
                 if (args.length > 1 && isHelp(args[1])) {
-                    printPrefixUsage(opsCommands, args[0]);
+                    printFilterUsage(opsCommands, args[0]);
                     return;
                 }
                 System.err.println("Unknown command: " + args[0]);
@@ -59,17 +59,17 @@ public class AfonCliApplication {
     }
 
     /**
-     * Handles {@code afon-cli <prefix> -h}, eg {@code afon-cli config -h}: "config" is not itself a
-     * command, but is a shared prefix of several (config-status, config-switch, ...), so list those
+     * Handles {@code afon-cli <filter> -h}, eg {@code afon-cli config -h}: "config" is not itself a
+     * command, but is a shared filter of several (config-status, config-switch, ...), so list those
      * instead of just failing with "Unknown command".
      */
-    private static void printPrefixUsage(OpsCommands opsCommands, String prefix) {
-        Set<String> matches = opsCommands.namesWithPrefix(prefix);
+    private static void printFilterUsage(OpsCommands opsCommands, String filter) {
+        Set<String> matches = opsCommands.namesWithFilter(filter);
         if (matches.isEmpty()) {
-            System.out.println("No commands found matching '" + prefix + "'.");
+            System.out.println("No commands found matching '" + filter + "'.");
             return;
         }
-        System.out.println("Commands matching '" + prefix + "':");
+        System.out.println("Commands matching '" + filter + "':");
         matches.forEach(name -> System.out.println("  " + name));
     }
 

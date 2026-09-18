@@ -48,24 +48,21 @@ class OpsCommandsTest {
     }
 
     @Test
-    void namesWithPrefixListsOnlyCommandsUnderThatPrefix() {
-        Set<String> configNames = opsCommands.namesWithPrefix("config");
-        assertThat(configNames).contains("config-switch", "config-status", "config-init");
-        assertThat(configNames).allMatch(name -> name.equals("config") || name.startsWith("config-"));
-        // "configure-users" starts with the raw letters "config" but not with "config-" (no
-        // hyphen right after), so it's excluded here even though names("config") (a looser
-        // contains-match) would include it.
-        assertThat(configNames).doesNotContain("configure-users", "aws-login");
+    void namesWithFilterListsCommandsMatchingFilter() {
+        Set<String> configNames = opsCommands.namesWithFilter("config");
+        assertThat(configNames).contains("config-switch", "config-status", "config-init", "configure-users");
+        assertThat(configNames).allMatch(name -> name.matches(opsCommands.regexFor("config")));
+        assertThat(configNames).doesNotContain("aws-login");
     }
 
     @Test
-    void namesWithPrefixIsCaseInsensitive() {
-        assertThat(opsCommands.namesWithPrefix("CONFIG")).contains("config-switch");
+    void namesWithFilterIsCaseInsensitive() {
+        assertThat(opsCommands.namesWithFilter("CONFIG")).contains("config-switch");
     }
 
     @Test
-    void namesWithPrefixReturnsEmptySetForUnknownPrefix() {
-        assertThat(opsCommands.namesWithPrefix("nonexistent")).isEmpty();
+    void namesWithFilterReturnsEmptySetForUnmatchedCommands() {
+        assertThat(opsCommands.namesWithFilter("nonexistent")).isEmpty();
     }
 
 }
