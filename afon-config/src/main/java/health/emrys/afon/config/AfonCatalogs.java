@@ -79,6 +79,24 @@ public class AfonCatalogs {
                      .orElseThrow(() -> new NoSuchElementException("Unknown Afon catalog: " + id));
     }
 
+    /**
+     * @param types catalog types (see {@link AfonCatalog#type()}), matched exactly.
+     * @return the catalogs whose type is one of {@code types}.
+     */
+    public List<AfonCatalog> allIncluding(String... types) {
+        Set<String> included = Set.copyOf(Arrays.asList(types));
+        return all().stream().filter(c -> included.contains(c.type())).toList();
+    }
+
+    /**
+     * @param types catalog types (see {@link AfonCatalog#type()}), matched exactly.
+     * @return the catalogs whose type is none of {@code types}.
+     */
+    public List<AfonCatalog> allExcluding(String... types) {
+        Set<String> excluded = Set.copyOf(Arrays.asList(types));
+        return all().stream().filter(c -> !excluded.contains(c.type())).toList();
+    }
+
     public List<AfonCatalog> byCloud(AfonCloud cloud) {
         return all().stream().filter(c -> c.cloud() == cloud).toList();
     }

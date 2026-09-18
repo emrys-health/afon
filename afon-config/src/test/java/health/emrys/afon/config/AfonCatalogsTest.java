@@ -113,6 +113,40 @@ public class AfonCatalogsTest {
     }
 
     @Test
+    public void allIncludingKeepsOnlyTheGivenTypes() {
+        assertThat(idsOf(defaultCatalogs.allIncluding("external")))
+                .containsExactlyInAnyOrder("azure_external", "gcp_external");
+        assertThat(idsOf(defaultCatalogs.allIncluding("external", "internal")))
+                .containsExactlyInAnyOrderElementsOf(idsOf(defaultCatalogs.all()));
+        assertThat(defaultCatalogs.allIncluding("glue")).isEmpty();
+        assertThat(defaultCatalogs.allIncluding()).isEmpty();
+    }
+
+    @Test
+    public void allExcludingDropsTheGivenTypes() {
+        assertThat(idsOf(defaultCatalogs.allExcluding("external")))
+                .containsExactlyInAnyOrder(
+                        "aws", "aws_forbidden", "aws_trino",
+                        "azure", "azure_forbidden",
+                        "gcp", "gcp_forbidden");
+        assertThat(defaultCatalogs.allExcluding("external", "internal")).isEmpty();
+        assertThat(idsOf(defaultCatalogs.allExcluding()))
+                .containsExactlyInAnyOrderElementsOf(idsOf(defaultCatalogs.all()));
+    }
+
+    @Test
+    public void typeFilteringSeparatesCustomTypesFromTheGenericOnes() {
+        Properties raw = defaultSetProperties();
+        raw.setProperty("AWS_CATALOG_NAMES", "aws,aws_glue");
+        raw.setProperty("AWS_CATALOG_NAME_aws_glue", "federatedCatalogName");
+        raw.setProperty("AWS_CATALOG_TYPE_aws_glue", "glue");
+        AfonCatalogs catalogs = new AfonCatalogs(providerWith(raw));
+
+        assertThat(idsOf(catalogs.allIncluding("glue"))).containsExactly("aws_glue");
+        assertThat(idsOf(catalogs.allExcluding("glue"))).doesNotContain("aws_glue").contains("aws", "azure", "gcp");
+    }
+
+    @Test
     public void getIsCaseInsensitive() {
         assertThat(defaultCatalogs.get("AWS_FORBIDDEN").id()).isEqualTo("aws_forbidden");
         assertThat(defaultCatalogs.get("aws_forbidden").id()).isEqualTo("aws_forbidden");
