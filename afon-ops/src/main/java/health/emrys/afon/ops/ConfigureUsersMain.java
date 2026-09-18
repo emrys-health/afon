@@ -134,7 +134,8 @@ public class ConfigureUsersMain {
         } else {
             try {
                 if ( catalogName.equalsIgnoreCase("all") ){
-                   for ( AfonCatalog catalog : new AfonCatalogs(propertyProvider).all() ){
+                   // Not glue: "all" never included it, and createAllCatalogs no longer creates it.
+                   for ( AfonCatalog catalog : new AfonCatalogs(propertyProvider).allExcluding("glue") ){
                      app.configurePolarisUsers(catalog.toString());
                    }
                 } else {

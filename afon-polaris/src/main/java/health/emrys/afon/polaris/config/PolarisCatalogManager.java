@@ -67,10 +67,11 @@ public class PolarisCatalogManager {
      * Built lazily (only when actually configuring every catalog) since resolving every
      * {@link AfonCatalog} requires properties for every cloud - eagerly building this in the
      * constructor would break any cloud-scoped run (eg {@code afon.cloud=aws}) that only loads
-     * that cloud's properties.
+     * that cloud's properties. Excludes glue, which was never part of "all catalogs" - it can still
+     * be configured explicitly by name.
      */
     private PolarisCatalog[] catalogs() {
-        return afonCatalogs.all().stream().map(this::catalogOf).toArray(PolarisCatalog[]::new);
+        return afonCatalogs.allExcluding("glue").stream().map(this::catalogOf).toArray(PolarisCatalog[]::new);
     }
 
     public List<HttpResponse> configureAllCatalogs() throws IncorrectConfigException, IOException {

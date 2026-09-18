@@ -183,7 +183,8 @@ public class StepOperations {
      * that only that step creates).
      */
     public Step configurePolarisUsersOnAllCatalogsFor(AfonCloud cloud) {
-        return afonCatalogs.all().stream()
+        // Not glue: it isn't created by createAllCatalogsFor, so there'd be no catalog to configure.
+        return afonCatalogs.allExcluding("glue").stream()
             .map(catalog -> configurePolarisUsers(cloud, catalog))
             .reduce(Step::andThen)
             .orElse(Step.NoOp);
