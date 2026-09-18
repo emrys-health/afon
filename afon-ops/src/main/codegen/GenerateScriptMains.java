@@ -4,12 +4,12 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Generates the {@code *Main} shortcut command classes under {@code health.emrys.afon.ops.scripts.<cloud>},
+ * Generates the {@code *Main} script command classes under {@code health.emrys.afon.ops.scripts.<cloud>},
  * one per entry in {@link #SCRIPTS} below, each delegating to {@code ScriptMain}.
  * <p>
  * Run at build time (see the {@code generate-sources} binding in afon-ops/pom.xml) as a single-file
  * source program: {@code java GenerateScriptMains.java <output-dir>}.  The generated sources are not
- * checked in - to add a shortcut for a new script, add an entry to {@link #SCRIPTS} and rebuild.
+ * checked in - to add a command for a new script, add an entry to {@link #SCRIPTS} and rebuild.
  * <p>
  * "Single-file source program" refers to JEP 330 ("Launch Single-File Source-Code Programs", JDK 11),
  * which lets {@code java} compile and run a {@code .java} file directly with no separate {@code javac}
