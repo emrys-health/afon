@@ -60,7 +60,7 @@ afon-cli.sh help
 
 The commands are the (kebab-named) versions of the executable Java classes named `*Main` found in package `health.emrys.afon.ops` (in module `afon-ops`).
 
-To see just the commands related to area of interest (eg all `config`-related [shorthand command](#script-commands)), pass it 
+To see just the commands related to area of interest (eg all `config`-related [script command](#script-commands)), pass it 
 followed by `-h`/`--help`:
 ```shell
 afon-cli.sh config -h
@@ -75,8 +75,8 @@ The script accepts the following options, either as a `--flag` (placed anywhere 
 - `--home` / `AFON_HOME`: the Afon home dir, defaulting to `$HOME/.afon`.
 - `--cdktf` / `AFON_CDKTF`: the Afon cdktf dir, defaulting to `$AFON_HOME/cdktf`.
 - `--cloud`/`-c` / `AFON_CLOUD`: the cloud provider to target, one of `{aws,azure,gcp}`.  This is optional and only affects some functionality.  Defaults to `ALL`.
-- `--config-env` / `AFON_CONFIG_ENV`: the config env name.  Applies up front, for the [shorthand commands](#shorthand-commands) below.
-- `--cdktf-env` / `AFON_CDKTF_ENV`: the cdktf env name.  Applies up front, for the [shorthand commands](#shorthand-commands) below.
+- `--config-env` / `AFON_CONFIG_ENV`: the config env name.  If set, executes the `config-switch` command immediately, before running any command.
+- `--cdktf-env` / `AFON_CDKTF_ENV`: the cdktf env name.  If set, executes the `cdktf-switch` command immediately, before running any command.
 - `--env`/`-e` / `AFON_ENV`: sets both `--cdktf-env` and `--config-env`.  Overrides them if also set.
 - `--logging`/`-l` / `AFON_LOGGING`: the file logging level, defaulting to `INFO`.   The file logs are found the `$AFON_HOME/logs`.
 - `--logging-console`/`-lc` / `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to `OFF`.
@@ -94,8 +94,8 @@ the command name they're not recognized at all and get forwarded as plain args t
 
 ## Script commands
 
-Every script under `scripts/` (the ones runnable via [`afon-cli-scripts.sh`](configuration.md)) also has a shorthand 
-`afon-cli.sh` command, so you don't need to switch between the two entry points.  
+Every script under `scripts/` (the ones runnable via [`afon-cli-scripts.sh`](configuration.md)) also has a script
+command on `afon-cli.sh`, so you don't need to switch between the two entry points.  
 The command name is the script's path relative to `scripts`, with the `/` replaced by `-` and the `.sh` removed, eg:
 
 ```shell
@@ -105,7 +105,7 @@ afon-cli.sh aws-login                           # same as: afon-cli-scripts.sh a
 ```
 
 They accept the same `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--env`/`-e` flags described above — placed
-either before the command name (handled by `afon-cli.sh` itself) or after it (handled by the shortcut command
+either before the command name (handled by `afon-cli.sh` itself) or after it (handled by the script command
 directly); either way they're translated into the `AFON_*` env vars `afon-cli-scripts.sh` and the scripts expect.
 
 Anything else is forwarded as-is to the script, positionally — eg `afon-cli.sh azure-create true` to pass

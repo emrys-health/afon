@@ -1,8 +1,8 @@
 # Cloud infrastructure 
 
-**NOTE:** every command below is a shorthand `afon-cli.sh` command for `afon-cli-scripts.sh <dir>/<name>.sh` 
-— see [Shorthand commands](cli.md#shorthand-commands).
-Eg `afon-cli.sh aws-login` is a shorthand for `afon-cli-scripts.sh aws/login.sh`; 
+**NOTE:** every command below is also a script command on `afon-cli.sh`, for `afon-cli-scripts.sh <dir>/<name>.sh` 
+— see [Script commands](cli.md#script-commands).
+Eg `afon-cli.sh aws-login` is the script command for `afon-cli-scripts.sh aws/login.sh`; 
 both accept the same `--home`, `--cdktf`, `--cloud`, `--config-env`, `--cdktf-env`, `--env` flags 
 (or the equivalent `AFON_*` env var).
 
