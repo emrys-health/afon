@@ -101,6 +101,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     final         Release                    lbRelease;
     final         Vpc                        vpc;
     private       HelmProvider               helmProvider;
+    private final List<ITerraformDependable> lbcIrsaDependables = new ArrayList<>();
 
     AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
         super(scope, id);
@@ -181,13 +182,13 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 "Name",
                 "cdktf-eks-public-rt-" + clusterName)).build();
 
-        RouteTableAssociation subnet1Association = RouteTableAssociation.Builder
+        final RouteTableAssociation subnet1Association = RouteTableAssociation.Builder
             .create(this, "subnet1Association")
             .subnetId(publicSubnet1.getId())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .routeTableId(publicRouteTable.getId()).build();
 
-        RouteTableAssociation subnet2Association = RouteTableAssociation.Builder
+        final RouteTableAssociation subnet2Association = RouteTableAssociation.Builder
             .create(this, "subnet2Association")
             .subnetId(publicSubnet2.getId())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
@@ -320,7 +321,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
 
         // ** NEW ATTACHMENT: Attach the custom secret policy to the Node Group role **
-        IamRolePolicyAttachment.Builder
+        final IamRolePolicyAttachment customSecretAttachment = IamRolePolicyAttachment.Builder
             .create(this, "customSecretPolicyAttachment")
             .policyArn(customSecretPolicy.getArn())
             .role(nodeGroupRole.getName())
@@ -341,19 +342,19 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .name(
                 "AmazonEC2ContainerRegistryReadOnly").build();
 
-        IamRolePolicyAttachment.Builder
+        final IamRolePolicyAttachment workerNodeAttachment = IamRolePolicyAttachment.Builder
             .create(this, "workerNodePolicyAttachment")
             .policyArn(workerNodePolicy.getArn())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .role(nodeGroupRole.getName()).build();
 
-        IamRolePolicyAttachment.Builder
+        final IamRolePolicyAttachment cniAttachment = IamRolePolicyAttachment.Builder
             .create(this, "cniPolicyAttachment")
             .policyArn(cniPolicy.getArn())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .role(nodeGroupRole.getName()).build();
 
-        IamRolePolicyAttachment.Builder
+        final IamRolePolicyAttachment containerRegistryAttachment = IamRolePolicyAttachment.Builder
             .create(this, "containerRegistryPolicyAttachment")
             .policyArn(containerRegistryPolicy.getArn())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
@@ -394,9 +395,20 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .instanceTypes(List.of("r6i.large"))
             .scalingConfig(scalingConfig)
             .diskSize(50)
+            // The nodes live in public subnets and reach the EKS API endpoint through the
+            // route table's internet-gateway route, and need their IAM policies to operate.
+            // Nothing else depends on those, so on destroy Terraform removes them in its
+            // first wave, while pods and Helm releases are still terminating: the kubelets
+            // lose the API server within a minute (nodes go NotReady), pods stick in
+            // Terminating, and `helm uninstall` (which waits) times out with "failed to
+            // delete release". Depending on them here keeps them until the node group,
+            // and therefore every release/resource that depends on it, is gone.
             .dependsOn(List.of(
                 newKubeConfig, cluster, eksAuthData,
-                publicSubnet1, publicSubnet2))
+                publicSubnet1, publicSubnet2,
+                subnet1Association, subnet2Association,
+                customSecretAttachment, workerNodeAttachment,
+                cniAttachment, containerRegistryAttachment))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .tags(Map.of("Name", componentNames.getNodeGroupRoleName())).build();
 
@@ -765,7 +777,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         DataAwsEksCluster clusterData        = associateOIDCProvider(scope);
         String            serviceAccountName = "aws-load-balancer-controller";
 
-        new IamRolePolicyAttachment(
+        lbcIrsaDependables.add(new IamRolePolicyAttachment(
             scope,
             "LBCPolicyAttachment",
             IamRolePolicyAttachmentConfig
@@ -773,7 +785,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 .dependsOn(List.of(loadBalancerRole))
                 .role(loadBalancerRole.getName())
                 .policyArn(clusterPolicyArn)
-                .build());
+                .build()));
 
 
         Map<String, String> labels = Map.of(
@@ -839,13 +851,17 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             // Optional: Tag the resource
             .tags(Map.of("Name", clusterName + "-oidc-provider"))
             .build();
-        new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig);
+        lbcIrsaDependables.add(new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig));
         return clusterData;
     }
 
     private Release helmInstallLoadBalancer(String serviceAccountName, IamRole loadBalancerRole) {
         ArrayList<ITerraformDependable> dependencies = new ArrayList(eksDependOn);
         dependencies.add(loadBalancerRole);
+        // The controller assumes loadBalancerRole via IRSA (OIDC provider + policy attachment) to
+        // delete its ALBs when it is uninstalled. Without these edges they are destroyed first,
+        // the controller loses its AWS permissions, and the ingresses stick in Terminating.
+        dependencies.addAll(lbcIrsaDependables);
         return Release.Builder
             .create(this, "aws-load-balancer")
             .dependsOn(dependencies)
