@@ -35,6 +35,11 @@ public class AwsFullStack extends AwsTrinoStack {
         // available for service aws-load-balancer-webhook-service" (11 of them, one per
         // Service in the chart). Same reasoning as Jupyter's and Keycloak's Services.
         dependablesAndLoadBalancers.addAll(cloudProvider.getServiceDependables());
+        // On destroy, the CRD cleanup deletes every non-spark CRD. kube-prometheus-stack's release
+        // manifest contains Prometheus/Alertmanager/ServiceMonitor/PrometheusRule objects, and Helm
+        // cannot uninstall objects whose CRD is gone ("failed to delete release"). Depending on the
+        // cleanup makes these releases be uninstalled before it runs.
+        dependablesAndLoadBalancers.add(crdCleanup);
         deployPrometheus(dependablesAndLoadBalancers, properties);
         Release loki = deployLoki(dependablesAndLoadBalancers, properties);
         deployPromtail(dependablesAndLoadBalancers, loki, properties);
