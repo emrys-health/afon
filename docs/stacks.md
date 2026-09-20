@@ -19,6 +19,8 @@ To deploy a stack, we execute the `ops.Deploy*Main` classes, e.g.:
 ./afon.sh -a exec -ec ops.DeployAzurePolarisStackMain
 ./afon.sh -a exec -ec ops.DeployGcpPolarisStackMain
 ```
+or, equivalently, via the [ops command](afon_script.md#ops-commands) shorthand: `./afon.sh -a deploy-aws-full-stack`, etc.
+
 **NOTE:** In the following, all JVM packages are intended relative to the base package `health.emrys.afon`.
 If you want, you may specify the full package or change the base package via the `--exec-package` option.
 
