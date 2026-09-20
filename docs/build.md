@@ -84,11 +84,7 @@ The docs related to the operations (in module `afon-ops`) are generated and kept
 
 They can be found in `afon-docs/target/docs`.
 
-To export all the docs (including the static) to an external dir:
-
-```shell
-./afon.sh -a docs-export --docs-dir ~/.afon/docs
-```
+The generated docs are included in the `afon-distribution`.
 
 ### CLI
 
