@@ -10,11 +10,22 @@ import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import software.constructs.Construct;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.function.Function;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
 import static health.emrys.afon.cdk.CdkHelper.envVar;
@@ -45,6 +56,19 @@ public class GuacamoleConfig {
     static final int    GUACD_PORT      = 4822;
     static final String SVC_NAME        = "guacamole-web";
     static final String CONFIG_MAP_NAME = "guacamole-config";
+    static final String GUACAMOLE_IMAGE = "guacamole/guacamole:1.5.5";
+    /**
+     * The emrys-hdrs branding extension jar (the afon-guacamole-theme module's
+     * artifact, on the synth classpath). Shipped to the pod as a ConfigMap
+     * binaryData entry, then copied into GUACAMOLE_HOME/extensions by the
+     * guacamole-home-init initContainer in both deployment modes.
+     */
+    private static final String THEME_CONFIG_MAP = "guacamole-theme";
+    private static final String THEME_JAR_NAME   = "emrys-hdrs-branding.jar";
+    private static final String THEME_VOLUME     = "guacamole-theme";
+    private static final String THEME_MOUNT      = "/tmp/guacamole-theme";
+    private static final String HOME_VOLUME      = "guacamole-home";
+    private static final String HOME_MOUNT       = "/etc/guacamole";
 
     private static final Map<String, String> LABELS = Map.of("app", "guacamole");
 
@@ -148,12 +172,16 @@ public class GuacamoleConfig {
                         "guacamole.properties", guacamoleProperties))
                 .build();
 
+        ConfigMap themeCm = buildThemeConfigMap(scope);
+
         // Assemble GUACAMOLE_HOME (a writable emptyDir) from the ConfigMap plus, in SSO mode, the
         // header-auth extension jar bundled in the guacamole image — a read-only ConfigMap mount
-        // can't host the extensions/ directory.
+        // can't host the extensions/ directory. The branding extension jar arrives the same way,
+        // from its own ConfigMap.
         StringBuilder assemble = new StringBuilder()
                 .append("set -e; mkdir -p /etc/guacamole/extensions; ")
-                .append("cp /tmp/guacamole-config/* /etc/guacamole/; ");
+                .append("cp /tmp/guacamole-config/* /etc/guacamole/; ")
+                .append("cp " + THEME_MOUNT + "/*.jar /etc/guacamole/extensions/; ");
         if (ssoUsernameHeader != null) {
             assemble.append("cp \"$(find /opt/guacamole -name 'guacamole-auth-header-*.jar' | head -1)\" ")
                     .append("/etc/guacamole/extensions/; ");
@@ -162,13 +190,12 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
                 .builder()
                 .name("guacamole-home-init")
-                .image("guacamole/guacamole:1.5.5")
+                .image(GUACAMOLE_IMAGE)
                 .command(List.of("sh", "-c", assemble.toString()))
                 .volumeMount(List.of(
-                        DeploymentSpecTemplateSpecInitContainerVolumeMount.builder()
-                                .name("guacamole-config").mountPath("/tmp/guacamole-config").readOnly(true).build(),
-                        DeploymentSpecTemplateSpecInitContainerVolumeMount.builder()
-                                .name("guacamole-home").mountPath("/etc/guacamole").build()))
+                        initVolumeMount("guacamole-config", "/tmp/guacamole-config", true),
+                        initVolumeMount(THEME_VOLUME, THEME_MOUNT, true),
+                        initVolumeMount(HOME_VOLUME, HOME_MOUNT, false)))
                 .build();
 
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
@@ -184,7 +211,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacamole")
-                .image("guacamole/guacamole:1.5.5")
+                .image(GUACAMOLE_IMAGE)
                 .env(List.of(
                         envVar("GUACD_HOSTNAME", "localhost"),
                         envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
@@ -198,8 +225,8 @@ public class GuacamoleConfig {
                                                                      .protocol("TCP")
                                                                      .build()))
                 .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
-                                                              .name("guacamole-home")
-                                                              .mountPath("/etc/guacamole")
+                                                              .name(HOME_VOLUME)
+                                                              .mountPath(HOME_MOUNT)
                                                               .build()))
                 .build();
 
@@ -210,14 +237,10 @@ public class GuacamoleConfig {
                                                                     .name(CONFIG_MAP_NAME)
                                                                     .build())
                 .build();
-        DeploymentSpecTemplateSpecVolume homeVolume = DeploymentSpecTemplateSpecVolume
-                .builder()
-                .name("guacamole-home")
-                .emptyDir(DeploymentSpecTemplateSpecVolumeEmptyDir.builder().build())
-                .build();
 
         List<ITerraformDependable> deps = new ArrayList<>(dependsOn);
         deps.add(configMap);
+        deps.add(themeCm);
 
         Deployment.Builder.create(scope, "guacamoleDeployment")
                 .dependsOn(deps)
@@ -239,7 +262,7 @@ public class GuacamoleConfig {
                                             .spec(DeploymentSpecTemplateSpec.builder()
                                                           .initContainer(List.of(initContainer))
                                                           .container(List.of(guacdContainer, guacamoleContainer))
-                                                          .volume(List.of(configVolume, homeVolume))
+                                                          .volume(List.of(configVolume, homeVolume(), themeVolume()))
                                                           .build())
                                             .build())
                                     .build())
@@ -286,6 +309,24 @@ public class GuacamoleConfig {
         jobDeps.add(provisionCm);
         JobV1 dbInit = buildDbInitJob(scope, jobDeps, db);
 
+        ConfigMap themeCm = buildThemeConfigMap(scope);
+
+        // GUACAMOLE_HOME is a writable emptyDir at /etc/guacamole, populated by an initContainer
+        // with the branding extension jar from the theme ConfigMap. The image treats that dir as a
+        // template, cp -a'ing it into ~/.guacamole at boot (guacamole-docker's start.sh), so the
+        // theme jar ends up alongside the JDBC/header jars the env vars below auto-install.
+        DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
+                .builder()
+                .name("guacamole-home-init")
+                .image(GUACAMOLE_IMAGE)
+                .command(List.of("sh", "-c",
+                        "set -e; mkdir -p /etc/guacamole/extensions; "
+                        + "cp " + THEME_MOUNT + "/*.jar /etc/guacamole/extensions/;"))
+                .volumeMount(List.of(
+                        initVolumeMount(THEME_VOLUME, THEME_MOUNT, true),
+                        initVolumeMount(HOME_VOLUME, HOME_MOUNT, false)))
+                .build();
+
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacd")
@@ -302,10 +343,13 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacamole")
-                .image("guacamole/guacamole:1.5.5")
+                .image(GUACAMOLE_IMAGE)
                 .env(List.of(
                         envVar("GUACD_HOSTNAME", "localhost"),
                         envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
+                        // The emptyDir the initContainer filled with the branding jar — copied
+                        // into ~/.guacamole at boot (see the initContainer above).
+                        envVar("GUACAMOLE_HOME", "/etc/guacamole"),
                         // Served at the default /guacamole/ context (not ROOT): JupyterHub now owns the
                         // domain root so that a bare visit auto-spawns the user's pod, then hands off to
                         // Guacamole under /guacamole/ to stream that pod's desktop.
@@ -322,10 +366,15 @@ public class GuacamoleConfig {
                                                                      .containerPort(WEB_PORT)
                                                                      .protocol("TCP")
                                                                      .build()))
+                .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
+                                                              .name(HOME_VOLUME)
+                                                              .mountPath(HOME_MOUNT)
+                                                              .build()))
                 .build();
 
         List<ITerraformDependable> deployDeps = new ArrayList<>(dependsOn);
         deployDeps.add(dbInit);
+        deployDeps.add(themeCm);
 
         Deployment.Builder.create(scope, "guacamoleDeployment")
                 .dependsOn(deployDeps)
@@ -345,7 +394,9 @@ public class GuacamoleConfig {
                                                               .labels(withAppKubernetesIoName(LABELS))
                                                               .build())
                                             .spec(DeploymentSpecTemplateSpec.builder()
+                                                          .initContainer(List.of(initContainer))
                                                           .container(List.of(guacdContainer, guacamoleContainer))
+                                                          .volume(List.of(homeVolume(), themeVolume()))
                                                           .build())
                                             .build())
                                     .build())
@@ -501,6 +552,91 @@ public class GuacamoleConfig {
         }
         sb.append("</user-mapping>\n");
         return sb.toString();
+    }
+
+    /**
+     * The emrys-hdrs theme jar as a ConfigMap {@code binaryData} entry — the jar bytes come from
+     * the afon-guacamole-theme artifact on the synth classpath (see {@link #themeJarBytes()}).
+     */
+    private static ConfigMap buildThemeConfigMap(Construct scope) {
+        return ConfigMap.Builder
+                .create(scope, "guacamoleThemeConfigMap")
+                .metadata(ConfigMapMetadata.builder()
+                                           .name(THEME_CONFIG_MAP)
+                                           .namespace("default")
+                                           .build())
+                .binaryData(Map.of(THEME_JAR_NAME,
+                                   Base64.getEncoder().encodeToString(themeJarBytes())))
+                .build();
+    }
+
+    private static DeploymentSpecTemplateSpecVolume themeVolume() {
+        return DeploymentSpecTemplateSpecVolume.builder()
+                .name(THEME_VOLUME)
+                .configMap(DeploymentSpecTemplateSpecVolumeConfigMap.builder()
+                                                                    .name(THEME_CONFIG_MAP)
+                                                                    .build())
+                .build();
+    }
+
+    private static DeploymentSpecTemplateSpecVolume homeVolume() {
+        return DeploymentSpecTemplateSpecVolume.builder()
+                .name(HOME_VOLUME)
+                .emptyDir(DeploymentSpecTemplateSpecVolumeEmptyDir.builder().build())
+                .build();
+    }
+
+    private static DeploymentSpecTemplateSpecInitContainerVolumeMount initVolumeMount(String name,
+                                                                                      String path,
+                                                                                      boolean readOnly) {
+        return DeploymentSpecTemplateSpecInitContainerVolumeMount.builder()
+                                                                 .name(name)
+                                                                 .mountPath(path)
+                                                                 .readOnly(readOnly)
+                                                                 .build();
+    }
+
+    /**
+     * Bytes of the afon-guacamole-theme artifact. Once Maven has packaged the module, its
+     * {@code guac-manifest.json} marker resolves as a {@code jar:file:...!} URL whose path is the
+     * jar itself; when running against {@code target/classes} instead (IDE, tests) the resource
+     * tree is zipped on the fly — same result either way.
+     */
+    private static byte[] themeJarBytes() {
+        URL marker = GuacamoleConfig.class.getResource("/guac-manifest.json");
+        if (marker == null) {
+            throw new IllegalStateException(
+                "guac-manifest.json not on the classpath — build afon-guacamole-theme first");
+        }
+        try {
+            if ("jar".equals(marker.getProtocol())) {
+                String path = marker.getPath();
+                String jarPath = path.substring("file:".length(), path.indexOf('!'));
+                return Files.readAllBytes(Path.of(URLDecoder.decode(jarPath, StandardCharsets.UTF_8)));
+            }
+            return zipResourceTree(Path.of(marker.toURI()).getParent());
+        } catch (IOException | URISyntaxException e) {
+            throw new IllegalStateException("Could not read afon-guacamole-theme", e);
+        }
+    }
+
+    private static byte[] zipResourceTree(Path root) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+            Files.walk(root)
+                 .filter(Files::isRegularFile)
+                 .forEach(file -> {
+                     try {
+                         zip.putNextEntry(new ZipEntry(
+                                 root.relativize(file).toString().replace('\\', '/')));
+                         zip.write(Files.readAllBytes(file));
+                         zip.closeEntry();
+                     } catch (IOException e) {
+                         throw new UncheckedIOException(e);
+                     }
+                 });
+        }
+        return bytes.toByteArray();
     }
 
 }

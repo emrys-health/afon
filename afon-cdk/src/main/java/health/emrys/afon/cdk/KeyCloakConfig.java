@@ -1,9 +1,15 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMap;
+import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeConfigMap;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeConfigMapItems;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
@@ -12,6 +18,9 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,6 +46,17 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PO
 public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct {
     private static final String APP_NAME = "keycloak";
     private static final String SECRET_NAME = "kcsecrets";
+    /**
+     * Emrys Health login theme (HDRS palette), packaged as classpath resources
+     * under {@code keycloak-theme/emrys-hdrs/} and mounted at
+     * {@code /opt/keycloak/themes/emrys-hdrs}. The realm opts into it via
+     * {@code loginTheme} (see {@code KeyCloakProvider#createRealm}).
+     */
+    private static final String THEME_NAME      = "emrys-hdrs";
+    private static final String THEME_CONFIGMAP = "keycloak-theme";
+    private static final String THEME_MOUNT     = "/opt/keycloak/themes/" + THEME_NAME;
+    /** Classpath root the theme files are packaged under. */
+    private static final String THEME_RESOURCE_ROOT = "/keycloak-theme/" + THEME_NAME + "/login/";
     /**
      * KeyCloak's own env vars (Quarkus config), which the container requires verbatim,
      * we need to map them to {@link AfonProperty} names
@@ -110,6 +130,48 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
             envFromSecret(envName, SECRET_NAME, envName))
         );
 
+        // The emrys-hdrs login theme ships as a ConfigMap of classpath resources,
+        // mounted into the themes dir KeyCloak scans at startup. Text files ride in
+        // `data`, binaries (logos, favicon) in `binaryData`; `items` reshapes the
+        // flat keys into the theme's directory layout.
+        ConfigMap theme = ConfigMap.Builder
+            .create(scope, "keycloakTheme")
+            .metadata(ConfigMapMetadata
+                          .builder()
+                          .name(THEME_CONFIGMAP)
+                          .namespace("default")
+                          .build())
+            .data(Map.of(
+                "theme.properties", resourceText(THEME_RESOURCE_ROOT + "theme.properties"),
+                "hdrs.css",         resourceText(THEME_RESOURCE_ROOT + "resources/css/hdrs.css"),
+                "hdrs-dots.svg",    resourceText(THEME_RESOURCE_ROOT + "resources/img/hdrs-dots.svg")))
+            .binaryData(Map.of(
+                "emrys-logo-horizontal-white.png",
+                    resourceBase64(THEME_RESOURCE_ROOT + "resources/img/emrys-logo-horizontal-white.png"),
+                "hdrs-logo-horizontal-light.png",
+                    resourceBase64(THEME_RESOURCE_ROOT + "resources/img/hdrs-logo-horizontal-light.png"),
+                "favicon.ico",
+                    resourceBase64(THEME_RESOURCE_ROOT + "resources/img/favicon.ico")))
+            .build();
+
+        DeploymentSpecTemplateSpecVolume themeVolume = DeploymentSpecTemplateSpecVolume
+            .builder()
+            .name("theme")
+            .configMap(DeploymentSpecTemplateSpecVolumeConfigMap
+                           .builder()
+                           .name(THEME_CONFIGMAP)
+                           .items(List.of(
+                               themeItem("theme.properties", "login/theme.properties"),
+                               themeItem("hdrs.css", "login/resources/css/hdrs.css"),
+                               themeItem("hdrs-dots.svg", "login/resources/img/hdrs-dots.svg"),
+                               themeItem("emrys-logo-horizontal-white.png",
+                                         "login/resources/img/emrys-logo-horizontal-white.png"),
+                               themeItem("hdrs-logo-horizontal-light.png",
+                                         "login/resources/img/hdrs-logo-horizontal-light.png"),
+                               themeItem("favicon.ico", "login/resources/img/favicon.ico")))
+                           .build())
+            .build();
+
         List<String> args = List.of("start");
         DeploymentSpecTemplateSpecContainer keyCloak = DeploymentSpecTemplateSpecContainer
             .builder()
@@ -117,16 +179,23 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
             .image(KEYCLOAK_IMAGE)
             .args(args)
             .env(envs)
+            .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount
+                                     .builder()
+                                     .name("theme")
+                                     .mountPath(THEME_MOUNT)
+                                     .readOnly(true)
+                                     .build()))
             .build();
         List<ITerraformDependable> dependants = new ArrayList(cloudProvider.getDependables());
         dependants.add(kcSecrets);
+        dependants.add(theme);
         Map<String, String> labels = Map.of("app", APP_NAME);
         Deployment app = CdkUtils.deploy(
             this,
             dependants,
             labels,
             List.of(keyCloak),
-            List.of(),
+            List.of(themeVolume),
             APP_NAME);
 
         dependants.add(app);
@@ -137,6 +206,33 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         // NodePort (not ClusterIP): the AWS Load Balancer Controller uses instance targets by
         // default and requires a node port to build the ingress TargetGroup.
         nodePortService(dependants, labels, KEYCLOAK_SERVICE_NAME, List.of(SERVICE_SPEC_PORT), this);
+    }
+
+    private static DeploymentSpecTemplateSpecVolumeConfigMapItems themeItem(String key, String path) {
+        return DeploymentSpecTemplateSpecVolumeConfigMapItems
+            .builder()
+            .key(key)
+            .path(path)
+            .build();
+    }
+
+    private static String resourceText(String path) {
+        return new String(resourceBytes(path), StandardCharsets.UTF_8);
+    }
+
+    private static String resourceBase64(String path) {
+        return Base64.getEncoder().encodeToString(resourceBytes(path));
+    }
+
+    private static byte[] resourceBytes(String path) {
+        try (InputStream in = KeyCloakConfig.class.getResourceAsStream(path)) {
+            if (in == null) {
+                throw new IllegalStateException("KeyCloak theme resource not on classpath: " + path);
+            }
+            return in.readAllBytes();
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not read KeyCloak theme resource " + path, e);
+        }
     }
 
     protected abstract void configureHttpsAndDNS();

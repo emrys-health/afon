@@ -1,0 +1,53 @@
+/*
+ * Emrys Health branding in the HDRS palette:
+ *   Purple #2B197C   Mid Purple #5441A6   Yellow    #F3F76C
+ *   Cream  #EFE9E0   Mid Cream  #E1D9CE   Dark Cream #BDB3A7   Grey #535353
+ *
+ * keycloak.v2 exposes these custom properties; overriding them re-skins the
+ * login page without touching its markup. The header logo div
+ * (div.kc-logo-text, rendered from the realm's displayNameHtml) picks up
+ * --keycloak-logo-url automatically.
+ */
+:root {
+    --keycloak-logo-url: url('../img/hdrs-logo-horizontal-light.png');
+    --keycloak-bg-logo-url: url('../img/hdrs-dots.svg');
+    --keycloak-logo-height: 90px;
+    --keycloak-logo-width: 320px;
+    --keycloak-card-top-color: #F3F76C;
+}
+
+.login-pf body {
+    background-color: #2B197C;
+}
+
+/* Primary action button in HDRS purple. */
+.pf-v5-c-button.pf-m-primary {
+    background-color: #2B197C;
+}
+
+.pf-v5-c-button.pf-m-primary:hover {
+    background-color: #5441A6;
+}
+
+/* Form labels/body copy in HDRS grey; headings in purple. */
+.pf-v5-c-login__main-body {
+    color: #535353;
+}
+
+/* Small Emrys co-logo at the foot of the page — the HDRS lockup stays
+ * primary in the login card header. */
+.login-pf body::after {
+    content: "";
+    position: fixed;
+    bottom: 1.5em;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 11em;
+    height: 3.5em;
+    background-image: url('../img/emrys-logo-horizontal-white.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    opacity: 0.9;
+    pointer-events: none;
+}
