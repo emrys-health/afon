@@ -47,7 +47,7 @@ public class AfonCatalogsTest {
 
     private static Properties defaultSetProperties() {
         Properties raw = new Properties();
-        raw.setProperty("AWS_CATALOG_NAMES", "aws,aws_forbidden,aws_trino");
+        raw.setProperty("AWS_CATALOG_IDS", "aws,aws_forbidden,aws_trino");
         raw.setProperty("AWS_CATALOG_TYPE_aws", "internal");
         raw.setProperty("AWS_BUCKET_NAME_aws", "aws-bucket");
         raw.setProperty("AWS_CATALOG_TYPE_aws_forbidden", "internal");
@@ -56,7 +56,7 @@ public class AfonCatalogsTest {
         raw.setProperty("AWS_CATALOG_TYPE_aws_trino", "internal");
         raw.setProperty("AWS_BUCKET_NAME_aws_trino", "aws-bucket-trino");
 
-        raw.setProperty("AZURE_CATALOG_NAMES", "azure,azure_external,azure_forbidden");
+        raw.setProperty("AZURE_CATALOG_IDS", "azure,azure_external,azure_forbidden");
         raw.setProperty("AZURE_CATALOG_TYPE_azure", "internal");
         raw.setProperty("AZURE_BUCKET_NAME_azure", "azure-bucket");
         raw.setProperty("AZURE_CATALOG_TYPE_azure_external", "external");
@@ -65,7 +65,7 @@ public class AfonCatalogsTest {
         raw.setProperty("AZURE_BUCKET_NAME_azure_forbidden", "azure-bucket-forbidden");
         raw.setProperty("AZURE_ADMIN_GRANTS_azure_forbidden", "false");
 
-        raw.setProperty("GCP_CATALOG_NAMES", "gcp,gcp_external,gcp_forbidden");
+        raw.setProperty("GCP_CATALOG_IDS", "gcp,gcp_external,gcp_forbidden");
         raw.setProperty("GCP_CATALOG_TYPE_gcp", "internal");
         raw.setProperty("GCP_BUCKET_NAME_gcp", "gcp-bucket");
         raw.setProperty("GCP_CATALOG_TYPE_gcp_external", "external");
@@ -92,12 +92,12 @@ public class AfonCatalogsTest {
     }
 
     @Test
-    public void contributesNoCatalogsForACloudWithNoNamesConfigured() {
+    public void contributesNoCatalogsForACloudWithNoIdsConfigured() {
         Properties raw = new Properties();
-        raw.setProperty("AWS_CATALOG_NAMES", "aws");
+        raw.setProperty("AWS_CATALOG_IDS", "aws");
         raw.setProperty("AWS_CATALOG_TYPE_aws", "internal");
         raw.setProperty("AWS_BUCKET_NAME_aws", "aws-bucket");
-        // no AZURE_CATALOG_NAMES / GCP_CATALOG_NAMES at all - eg a cloud-scoped run
+        // no AZURE_CATALOG_IDS / GCP_CATALOG_IDS at all - eg a cloud-scoped run
 
         AfonCatalogs catalogs = new AfonCatalogs(providerWith(raw));
 
@@ -105,9 +105,9 @@ public class AfonCatalogsTest {
     }
 
     @Test
-    public void treatsABlankCatalogNamesListAsNoCatalogs() {
+    public void treatsABlankCatalogIdsListAsNoCatalogs() {
         Properties raw = new Properties();
-        raw.setProperty("AWS_CATALOG_NAMES", "");
+        raw.setProperty("AWS_CATALOG_IDS", "");
 
         assertThat(new AfonCatalogs(providerWith(raw)).all()).isEmpty();
     }
@@ -137,7 +137,7 @@ public class AfonCatalogsTest {
     @Test
     public void typeFilteringSeparatesCustomTypesFromTheGenericOnes() {
         Properties raw = defaultSetProperties();
-        raw.setProperty("AWS_CATALOG_NAMES", "aws,aws_glue");
+        raw.setProperty("AWS_CATALOG_IDS", "aws,aws_glue");
         raw.setProperty("AWS_CATALOG_NAME_aws_glue", "federatedCatalogName");
         raw.setProperty("AWS_CATALOG_TYPE_aws_glue", "glue");
         AfonCatalogs catalogs = new AfonCatalogs(providerWith(raw));
@@ -164,7 +164,7 @@ public class AfonCatalogsTest {
         assertThat(defaultCatalogs.aws().toString()).isEqualTo("aws");
 
         Properties raw = defaultSetProperties();
-        raw.setProperty("AWS_CATALOG_NAMES", "aws_glue");
+        raw.setProperty("AWS_CATALOG_IDS", "aws_glue");
         raw.setProperty("AWS_CATALOG_TYPE_aws_glue", "glue");
         raw.setProperty("AWS_CATALOG_NAME_aws_glue", "my-existing-glue-catalog");
         AfonCatalogs catalogs = new AfonCatalogs(providerWith(raw));
@@ -214,7 +214,7 @@ public class AfonCatalogsTest {
     @Test
     public void constructingWithMissingCatalogTypeThrows() {
         Properties raw = new Properties();
-        raw.setProperty("AWS_CATALOG_NAMES", "aws_mystery");
+        raw.setProperty("AWS_CATALOG_IDS", "aws_mystery");
         // no AWS_CATALOG_TYPE_aws_mystery
 
         assertThatThrownBy(() -> new AfonCatalogs(providerWith(raw)))

@@ -30,7 +30,7 @@ public class PolarisCatalogManager {
     /**
      * The two generic catalog "types": every {@code internal}/{@code external} catalog is built
      * purely from its {@link AfonCatalog} definition (see {@link AfonCatalogs}), so adding one
-     * needs no code change - only configuration (a catalog id in {@code <CLOUD>_CATALOG_NAMES}
+     * needs no code change - only configuration (a catalog id in {@code <CLOUD>_CATALOG_IDS}
      * plus its {@code <CLOUD>_CATALOG_TYPE_<id>}/{@code <CLOUD>_BUCKET_NAME_<id>}/
      * {@code <CLOUD>_ADMIN_GRANTS_<id>}, conventionally in {@code catalogs-<cloud>.properties}).
      */

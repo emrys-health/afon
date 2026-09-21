@@ -6,11 +6,11 @@ import java.util.*;
 
 /**
  * The configured set of {@link AfonCatalog}s, assembled per cloud from its
- * {@code <CLOUD>_CATALOG_NAMES} property (eg {@link AfonProperty#AWS_CATALOG_NAMES}) and, for
+ * {@code <CLOUD>_CATALOG_IDS} property (eg {@code AWS_CATALOG_IDS}) and, for
  * each id in that list, the matching {@code <CLOUD>_CATALOG_NAME_<id>},
  * {@code <CLOUD>_CATALOG_TYPE_<id>}, {@code <CLOUD>_BUCKET_NAME_<id>} and
  * {@code <CLOUD>_ADMIN_GRANTS_<id>} properties - conventionally defined in
- * {@code catalogs-<cloud>.properties}. A cloud with no {@code <CLOUD>_CATALOG_NAMES} configured
+ * {@code catalogs-<cloud>.properties}. A cloud with no {@code <CLOUD>_CATALOG_IDS} configured
  * (eg because that cloud's properties weren't loaded for a cloud-scoped run) simply contributes
  * no catalogs.
  */
@@ -36,7 +36,7 @@ public class AfonCatalogs {
     }
 
     private static List<AfonCatalog> catalogsFor(AfonCloud cloud, Properties raw) {
-        String csv = raw.getProperty(namesProperty(cloud));
+        String csv = raw.getProperty(idsProperty(cloud));
         if (csv == null || csv.isBlank()) {
             return List.of();
         }
@@ -60,8 +60,8 @@ public class AfonCatalogs {
         return new AfonCatalog(id, cloud, name, type, bucketName, adminGrants);
     }
 
-    private static String namesProperty(AfonCloud cloud) {
-        return prefix(cloud) + "_CATALOG_NAMES";
+    private static String idsProperty(AfonCloud cloud) {
+        return prefix(cloud) + "_CATALOG_IDS";
     }
 
     private static String prefix(AfonCloud cloud) {

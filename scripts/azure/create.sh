@@ -88,7 +88,7 @@ admin_grants_of() {
   fi
 }
 
-IFS=',' read -ra CATALOG_IDS <<< "$AZURE_CATALOG_NAMES"
+IFS=',' read -ra CATALOG_IDS <<< "$AZURE_CATALOG_IDS"
 for ID in "${CATALOG_IDS[@]}"; do
   BUCKET="$(bucket_of "$ID")"
   if [ -z "$BUCKET" ]; then

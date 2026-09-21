@@ -1,6 +1,6 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
-IFS=',' read -ra CATALOG_IDS <<< "$AWS_CATALOG_NAMES"
+IFS=',' read -ra CATALOG_IDS <<< "$AWS_CATALOG_IDS"
 
 # Derives an IAM statement Sid fragment from a catalog id, eg "aws_forbidden" -> "AwsForbidden".
 sid_of() {
@@ -36,7 +36,7 @@ create_bucket_if_absent() {
   fi
 }
 
-# Creates every catalog's bucket (from AWS_CATALOG_NAMES); every catalog with
+# Creates every catalog's bucket (from AWS_CATALOG_IDS); every catalog with
 # AWS_ADMIN_GRANTS_<id>=true also gets an IAM whitelist entry, so a new catalog needs no change
 # here - only an entry in catalogs-aws.properties. aws_forbidden's bucket is still created, but
 # excluded from the whitelist (matching azure/create.sh and gcp/create.sh's own grant loops) -

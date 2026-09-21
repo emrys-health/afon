@@ -100,7 +100,7 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
     "An external table" should {
       s"be skipped: '$GlueCatalogId' is not configured" in {
-        cancel(s"'$GlueCatalogId' is not in AWS_CATALOG_NAMES - add it (with AWS_GLUE_ROLE_ARN) to " +
+        cancel(s"'$GlueCatalogId' is not in AWS_CATALOG_IDS - add it (with AWS_GLUE_ROLE_ARN) to " +
           "catalogs-aws.properties/afon-aws.properties to run this spec.")
       }
     }

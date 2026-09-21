@@ -28,7 +28,7 @@ admin_grants_of() {
   fi
 }
 
-IFS=',' read -ra CATALOG_IDS <<< "$GCP_CATALOG_NAMES"
+IFS=',' read -ra CATALOG_IDS <<< "$GCP_CATALOG_IDS"
 
 ## Service Accounts
 

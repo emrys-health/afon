@@ -214,7 +214,7 @@ public class FilePropertyProviderTest {
     public void ensureTemplatePropertyNamesAreExactlyThoseOfAfonPropertyEnum() {
         // Deliberately excludes the "catalogs" type: catalogs.properties / catalogs-<cloud>.properties
         // hold per-catalog definitions (eg "AWS_BUCKET_NAME_aws_forbidden") keyed by whatever ids
-        // <CLOUD>_CATALOG_NAMES is configured with at runtime, so they can't be pre-enumerated in
+        // <CLOUD>_CATALOG_IDS is configured with at runtime, so they can't be pre-enumerated in
         // AfonProperty - they only ever make sense as configuration.
         Properties properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR, List.of("afon", "secret")).getProperties();
         // ensure all enum names are found and empty
