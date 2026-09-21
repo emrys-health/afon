@@ -29,7 +29,7 @@ admin_grants_of() {
   fi
 }
 
-IFS=',' read -ra CATALOG_IDS <<< "$GCP_CATALOG_NAMES"
+IFS=',' read -ra CATALOG_IDS <<< "$GCP_CATALOG_IDS"
 
 if gcloud projects get-iam-policy $PROJECT_ID --flatten="bindings[].members" --filter="bindings.role=roles/serviceusage.serviceUsageConsumer AND bindings.members=serviceAccount:$GCP_SERVICE_ACCOUNT" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
   echo "- Revoking serviceusage.serviceUsageConsumer on project $PROJECT_ID from $GCP_SERVICE_ACCOUNT"

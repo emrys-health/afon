@@ -16,14 +16,14 @@ fi
 # copied from the now-removed AfonCatalogs.DEFAULT_CATALOG_NAMES_CSV), and each catalog's bucket
 # was a fixed AfonProperty in afon-<cloud>.properties (eg AWS_S3_BUCKET_NAME_EXTERNAL).
 #
-# This migrates that into <CLOUD>_CATALOG_NAMES plus per-id AfonCatalog properties
+# This migrates that into <CLOUD>_CATALOG_IDS plus per-id AfonCatalog properties
 # (<CLOUD>_CATALOG_NAME_<id>/_TYPE_<id>/_BUCKET_NAME_<id>/_ADMIN_GRANTS_<id>) in
 # catalogs-<cloud>.properties, for every cloud with catalogs configured. Also migrates AWS's
 # Glue-backed catalog (the now-retired AWS_GLUE_CATALOG_NAME, never part of CATALOG_NAMES_CSV) into
 # an "aws_glue" catalog id, if one was configured.
 #
 # Safe to run more than once: a cloud already migrated (its catalogs-<cloud>.properties already
-# defines <CLOUD>_CATALOG_NAMES) is left untouched. Every file this script actually changes is
+# defines <CLOUD>_CATALOG_IDS) is left untouched. Every file this script actually changes is
 # backed up first (as <file>.bak); the backup is removed again if nothing turned out to change.
 
 DEFAULT_CATALOG_NAMES_CSV="aws,aws_forbidden,aws_trino,azure,azure_external,azure_forbidden,gcp,gcp_external,gcp_forbidden"
@@ -194,8 +194,10 @@ for CLOUD in aws azure gcp; do
     continue
   fi
 
-  if [ -f "$CATALOGS_CLOUD_PROPS" ] && grep -q "^${CLOUD_UPPER}_CATALOG_NAMES=" "$CATALOGS_CLOUD_PROPS"; then
-    echo "- $CATALOGS_CLOUD_PROPS already has ${CLOUD_UPPER}_CATALOG_NAMES, skipping $CLOUD (already migrated)"
+  # _CATALOG_NAMES is what <CLOUD>_CATALOG_IDS was briefly called (see renames.sh) - a config already
+  # migrated under that name must not be migrated again.
+  if [ -f "$CATALOGS_CLOUD_PROPS" ] && grep -qE "^${CLOUD_UPPER}_CATALOG_(IDS|NAMES)=" "$CATALOGS_CLOUD_PROPS"; then
+    echo "- $CATALOGS_CLOUD_PROPS already defines the $CLOUD catalog ids, skipping $CLOUD (already migrated)"
     continue
   fi
 
@@ -209,7 +211,7 @@ for CLOUD in aws azure gcp; do
 
   {
     echo "# See catalogs.properties for the format."
-    echo "${CLOUD_UPPER}_CATALOG_NAMES=$NAMES_CSV"
+    echo "${CLOUD_UPPER}_CATALOG_IDS=$NAMES_CSV"
     for ID in "${CLOUD_IDS[@]}"; do
       VALUE="$(resolve_value "$CLOUD" "$(old_bucket_property_of "$ID")")"
       NAME_KEY="$(old_name_property_of "$ID")"
