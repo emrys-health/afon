@@ -90,7 +90,7 @@ public class KubeClient implements AutoCloseable {
                 throw new TimeoutException("Command '" + String.join(" ", command) + "' in " + namespace + "/" + pod
                         + " did not complete within " + timeout);
             }
-            return new ExecResult(process.exitValue(), stdout.join(), stderr.join());
+            return new ExecResult(process.exitValue(), stdout.join(), stderr.join(), String.join(" ", command));
         } finally {
             process.destroy();
         }
