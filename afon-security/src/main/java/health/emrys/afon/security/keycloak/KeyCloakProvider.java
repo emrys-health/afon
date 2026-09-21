@@ -218,7 +218,14 @@ public class KeyCloakProvider implements IdentityProvider {
             "enabled", true,
             "accessTokenLifespan", ACCESS_TOKEN_LIFESPAN_SECONDS,
             "ssoSessionMaxLifespan", SSO_SESSION_LIFESPAN_SECONDS,
-            "ssoSessionIdleTimeout", SSO_SESSION_LIFESPAN_SECONDS
+            "ssoSessionIdleTimeout", SSO_SESSION_LIFESPAN_SECONDS,
+            // emrys-hdrs theme (HDRS palette, Emrys logo), mounted into
+            // /opt/keycloak/themes by KeyCloakConfig. KeyCloak falls back to
+            // its default theme where the theme isn't installed (eg local
+            // acceptance-test instances).
+            "loginTheme", "emrys-hdrs",
+            "displayName", "Health Data Research Service",
+            "displayNameHtml", "<div class=\"kc-logo-text\"><span>Health Data Research Service</span></div>"
         ));
         HttpResponse created = postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm);
         if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
