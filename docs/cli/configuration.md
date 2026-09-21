@@ -1,8 +1,9 @@
 # CLI Configuration
 
-`afon-cli-scripts.sh` accepts `--home`, `--cdktf`, `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--config-zip` and
-`--env`/`-e` as flags, or the equivalent `AFON_*` env var (a flag wins if both are given) — see
-`afon-cli-scripts.sh --help`.  The examples below use flags; the env var form still works exactly as before.
+`afon-cli-scripts.sh` accepts `--home`, `--cdktf`, `--cloud`/`-c`, `--config-env`, `--cdktf-env` and `--env`/`-e` as
+flags, or the equivalent `AFON_*` env var (a flag wins if both are given) — see `afon-cli-scripts.sh --help`.  The
+examples below use flags; the env var form still works exactly as before.  Options specific to a single script (eg
+the zip path `config/export.sh`/`config/import.sh` need) are not flags here — pass them as plain script args instead.
 
 ## Config dir
 
@@ -56,12 +57,14 @@ $AFON_CLI_DIR/afon-cli-scripts.sh --env <env> config/validate.sh
 
 ### Import / export config
 
-Config can be imported from, or exported to, a zip file via `--config-zip`.  For export, the path is resolved
-relative to `$AFON_HOME`; for import, pass an absolute path (or one relative to `$AFON_CLI_DIR/scripts`):
+Config can be imported from, or exported to, a zip file, passed as a plain arg to the script (not a `--flag` — the
+zip path only matters to these two scripts, so it isn't global like `--config-env`/`--cdktf-env`/`--env`).  For
+export, the path is resolved relative to `$AFON_HOME`; for import, pass an absolute path (or one relative to
+`$AFON_CLI_DIR/scripts`):
 
 ```shell
-$AFON_CLI_DIR/afon-cli-scripts.sh --config-zip <path.zip> config/export.sh
-$AFON_CLI_DIR/afon-cli-scripts.sh --config-zip <path.zip> [--config-env <env>] config/import.sh
+$AFON_CLI_DIR/afon-cli-scripts.sh config/export.sh <path.zip>
+$AFON_CLI_DIR/afon-cli-scripts.sh [--config-env <env>] config/import.sh <path.zip>
 ```
 
 ### Validate config

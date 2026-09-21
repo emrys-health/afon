@@ -4,18 +4,20 @@ set -euo pipefail
 
 usage(){
   echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>]"
-  echo "          [--config-env <env>] [--cdktf-env <env>] [--config-zip <zip>] [--env|-e <env>]"
-  echo "          <script-path> [script-args...]"
-  echo "          <script-path> is relative to the scripts dir, eg 'config/switch.sh'."
+  echo "          [--config-env <env>] [--cdktf-env <env>] [--env|-e <env>]"
+  echo "          <script-path|action> [script-args...]"
+  echo "          <script-path> is relative to the scripts dir, eg 'config/switch.sh'; a kebab-case"
+  echo "          <action> name (eg 'config-switch') is also accepted, matching afon.sh's own actions."
   echo "options, settable via the flags above or the equivalent AFON_* env var (a flag wins over its env var):"
   echo "  --home / AFON_HOME:             the afon home dir.  Defaults to '$HOME/.afon'."
   echo "  --cdktf / AFON_CDKTF:           the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
   echo "  --cloud / AFON_CLOUD:           the cloud to target.  One of aws|azure|gcp."
   echo "  --cdktf-env / AFON_CDKTF_ENV:   the cdktf env name.  If set, switches AFON_CDKTF to 'AFON_CDKTF-<env>' before running the script."
   echo "  --config-env / AFON_CONFIG_ENV: the config env name.  If set, switches AFON_HOME/config to 'config-<env>' before running the script."
-  echo "  --config-zip / AFON_CONFIG_ZIP: the config zip path, as used by config/import.sh, config/export.sh."
   echo "  --env / AFON_ENV:               sets both --cdktf-env and --config-env.  Overrides them if also set."
   echo "  AFON_CLI_DIR (env only):        the cli distribution dir. Defaults to 'AFON_HOME/cli'."
+  echo "options specific to a single script (eg config/export.sh's zip path) are not flags here -"
+  echo "pass them as script-args, eg: $0 config/export.sh myconfig.zip"
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,7 +27,6 @@ AFON_CLOUD="${AFON_CLOUD:-}"
 AFON_CDKTF="${AFON_CDKTF:-}"
 AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
 AFON_CONFIG_ENV="${AFON_CONFIG_ENV:-}"
-AFON_CONFIG_ZIP="${AFON_CONFIG_ZIP:-}"
 AFON_ENV="${AFON_ENV:-}"
 
 ARGS=()
@@ -41,12 +42,15 @@ while [[ $# -gt 0 ]]; do
       AFON_CONFIG_ENV="$2"; shift 2 ;;
     --cdktf-env)
       AFON_CDKTF_ENV="$2"; shift 2 ;;
-    --config-zip)
-      AFON_CONFIG_ZIP="$2"; shift 2 ;;
     --env|-e)
       AFON_ENV="$2"; shift 2 ;;
     --help|-h)
-      usage; exit 0 ;;
+      # Only show this script's own usage when no script-path has been given yet; once one is
+      # in ARGS, forward -h/--help through as a plain script-arg instead of swallowing it.
+      if [ ${#ARGS[@]} -eq 0 ]; then
+        usage; exit 0
+      fi
+      ARGS+=("$1"); shift ;;
     *)
       ARGS+=("$1"); shift ;;
   esac
@@ -84,19 +88,19 @@ CDKTF_DIR="$AFON_CDKTF"
 CDKTF_ENV="$AFON_CDKTF_ENV"
 CONFIG_DIR="$AFON_HOME/config"
 CONFIG_ENV="$AFON_CONFIG_ENV"
-CONFIG_ZIP="$AFON_CONFIG_ZIP"
 
 cd $AFON_ROOT/scripts
 
-# CONFIG_ENV/CDKTF_ENV are global: apply the switch up front so it takes effect for whichever
-# script or command follows, not just when the target happens to be */switch.sh.
-CONFIG_SWITCHED=
-if [ -n "$CONFIG_ENV" ]; then
+# CONFIG_ENV/CDKTF_ENV are global: if set, apply the switch commands upstream
+# so it applies to all commands, not just for the config-*/cdktf-* commands.
+# If afon-cli.sh already did this switch, skip repeating it here.
+CONFIG_SWITCHED="${AFON_CONFIG_SWITCHED:-}"
+if [ -n "$CONFIG_ENV" ] && [ -z "$CONFIG_SWITCHED" ]; then
   source config/switch.sh
   CONFIG_SWITCHED=true
 fi
-CDKTF_SWITCHED=
-if [ -n "$CDKTF_ENV" ]; then
+CDKTF_SWITCHED="${AFON_CDKTF_SWITCHED:-}"
+if [ -n "$CDKTF_ENV" ] && [ -z "$CDKTF_SWITCHED" ]; then
   source cdktf/switch.sh
   CDKTF_SWITCHED=true
 fi
@@ -107,6 +111,24 @@ if [ -z "$AFON_SCRIPT" ]; then
   usage; exit 0
 fi
 shift
+
+# Accept either a literal script path (eg "config/switch.sh") or a kebab-case "<dir>-<name>"
+# action name (eg "config-switch", matching afon.sh's own action naming), resolved the same way
+# afon.sh's resolve_script_path does: hyphens in the name are tried as-is first, then converted
+# to underscores, so eg "aws-create-federated-permissions" still finds
+# aws/create_federated_permissions.sh.
+if [ ! -f "$AFON_SCRIPT" ]; then
+  DIR="${AFON_SCRIPT%%-*}"
+  NAME="${AFON_SCRIPT#*-}"
+  if [ -f "$DIR/$NAME.sh" ]; then
+    AFON_SCRIPT="$DIR/$NAME.sh"
+  elif [ -f "$DIR/${NAME//-/_}.sh" ]; then
+    AFON_SCRIPT="$DIR/${NAME//-/_}.sh"
+  else
+    echo "Script not found: $AFON_SCRIPT (relative to $AFON_ROOT/scripts, or as a <dir>-<name> action)"
+    usage; exit 0
+  fi
+fi
 
 ACTION="${AFON_SCRIPT%.sh}"
 ACTION="${ACTION//\//-}"

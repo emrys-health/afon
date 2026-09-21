@@ -2,7 +2,7 @@ source $AFON_ROOT/scripts/config/afon-source.sh azure
 source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 usage(){
-  echo "Usage: $0 <issuer>"
+  echo "Usage: ${BASH_SOURCE[0]} <issuer>"
   echo "Issue and stores in Azure Key Vault the cert for the $AZURE_POLARIS_DOMAIN_NAME."
   echo "The supported issuers are:"
   echo " - acme via Let's Encrypt (free - default)"

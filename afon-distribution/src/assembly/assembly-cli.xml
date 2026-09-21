@@ -37,13 +37,12 @@
     <fileSet>
       <directory>../scripts</directory>
       <outputDirectory>/scripts</outputDirectory>
-      <includes>
-        <include>aws/**</include>
-        <include>azure/**</include>
-        <include>gcp/**</include>
-        <include>cdktf/**</include>
-        <include>config/**</include>
-      </includes>
+      <excludes>
+        <exclude>ansible/*</exclude>
+        <exclude>docker/*</exclude>
+        <exclude>snowflake/*</exclude>
+        <exclude>trino/*</exclude>
+      </excludes>
       <fileMode>0755</fileMode>
     </fileSet>
     <fileSet>

@@ -60,15 +60,23 @@ afon-cli.sh help
 
 The commands are the (kebab-named) versions of the executable Java classes named `*Main` found in package `health.emrys.afon.ops` (in module `afon-ops`).
 
+To see just the commands related to area of interest (eg all `config`-related [script command](#script-commands)), pass it 
+followed by `-h`/`--help`:
+```shell
+afon-cli.sh config -h
+```
+This works because `config` isn't itself a command, only a filter — if the filter has no matching commands,
+this reports that instead. It does not apply to a real command name (eg `afon-cli.sh config-status -h` runs
+`config-status` with `-h` forwarded to it as a plain arg, rather than listing commands).
+
 The script accepts the following options, either as a `--flag` (placed anywhere before the command, eg
 `afon-cli.sh --cloud aws deploy-aws-full-stack`) or as the equivalent `AFON_*` env var — a flag wins if both are given:
 
 - `--home` / `AFON_HOME`: the Afon home dir, defaulting to `$HOME/.afon`.
 - `--cdktf` / `AFON_CDKTF`: the Afon cdktf dir, defaulting to `$AFON_HOME/cdktf`.
 - `--cloud`/`-c` / `AFON_CLOUD`: the cloud provider to target, one of `{aws,azure,gcp}`.  This is optional and only affects some functionality.  Defaults to `ALL`.
-- `--config-env` / `AFON_CONFIG_ENV`: the config env name.  Applies up front, for the [shorthand commands](#shorthand-commands) below.
-- `--cdktf-env` / `AFON_CDKTF_ENV`: the cdktf env name.  Applies up front, for the [shorthand commands](#shorthand-commands) below.
-- `--config-zip` / `AFON_CONFIG_ZIP`: the config zip path, for the `config-import`/`config-export` shorthand commands.
+- `--config-env` / `AFON_CONFIG_ENV`: the config env name.  If set, executes the `config-switch` command immediately, before running any command.
+- `--cdktf-env` / `AFON_CDKTF_ENV`: the cdktf env name.  If set, executes the `cdktf-switch` command immediately, before running any command.
 - `--env`/`-e` / `AFON_ENV`: sets both `--cdktf-env` and `--config-env`.  Overrides them if also set.
 - `--logging`/`-l` / `AFON_LOGGING`: the file logging level, defaulting to `INFO`.   The file logs are found the `$AFON_HOME/logs`.
 - `--logging-console`/`-lc` / `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to `OFF`.
@@ -80,15 +88,15 @@ For example, to run command with console logging:
 afon-cli.sh --logging-console INFO <command>
 ```
 
-**IMPORTANT:** the `*-stack` commands use `$AFON_CDKTF` as their `tofu` state dir, so if you deploy or setup a stack (ie 
-deploy a stack plus configure the Polaris catalogs) you must take care not move your `$AFON_CDKTF` until the teardown of 
-the stack, other `tofu` will not know the information to destroy the stack.
+**NOTE:** The options `--logging`/`--logging-console` are not supported by `afon-cli-scripts.sh` as the scripts it runs have no use
+for a  logging level, so those two are only recognized before the command name, configuring this JVM's own logging — after
+the command name they're not recognized at all and get forwarded as plain args to the script.
 
-## Shorthand commands
+## Script commands
 
-Every script under `config/`, `cdktf/`, `aws/`, `azure/` and `gcp/` (the ones runnable via
-[`afon-cli-scripts.sh`](configuration.md)) also has a shorthand `afon-cli.sh` command, so you don't need to switch
-between the two entry points.  The command name is the script's path, cloud/dir first and `/` replaced by `-`, eg:
+Every script under `scripts/` (the ones runnable via [`afon-cli-scripts.sh`](configuration.md)) also has a script
+command on `afon-cli.sh`, so you don't need to switch between the two entry points.  
+The command name is the script's path relative to `scripts`, with the `/` replaced by `-` and the `.sh` removed, eg:
 
 ```shell
 afon-cli.sh config-switch --config-env dev      # same as: afon-cli-scripts.sh config/switch.sh --config-env dev
@@ -96,14 +104,13 @@ afon-cli.sh cdktf-status                        # same as: afon-cli-scripts.sh c
 afon-cli.sh aws-login                           # same as: afon-cli-scripts.sh aws/login.sh
 ```
 
-They accept the same `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--config-zip`, `--env`/`-e` flags described
-above — placed either before the command name (handled by `afon-cli.sh` itself) or after it (handled by the shortcut
-command directly); either way they're translated into the `AFON_*` env vars `afon-cli-scripts.sh` and the scripts
-expect.  `--logging`/`--logging-console` are not among them: `afon-cli-scripts.sh` and the scripts it runs have no use
-for a logging level, so those two are only recognized before the command name, configuring this JVM's own logging —
-after the command name they're not recognized at all and get forwarded as plain args to the script.  Any other args
-are forwarded as-is to the script (eg `afon-cli.sh azure-create true` to pass `AS_ADMIN=true`).  Run
-`afon-cli.sh help` to see the full list alongside the `*-stack` commands.
+They accept the same `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--env`/`-e` flags described above — placed
+either before the command name (handled by `afon-cli.sh` itself) or after it (handled by the script command
+directly); either way they're translated into the `AFON_*` env vars `afon-cli-scripts.sh` and the scripts expect.
+
+Anything else is forwarded as-is to the script, positionally — eg `afon-cli.sh azure-create true` to pass
+`AS_ADMIN=true`, or `afon-cli.sh config-export myconfig.zip` to pass the zip path `config/export.sh` expects.    
+Run `afon-cli.sh help` to see the full command list alongside the `*-stack` commands.
 
 ## Stack deployment
 
@@ -116,6 +123,11 @@ afon-cli.sh deploy-gcp-polaris-stack
 ```
 
 **NOTE:** To run the `delete-*-stak`, `deploy-*-stak`, `setup-*-stack` commands you need to be logged with [cloud cli](cloud.md).
+
+**IMPORTANT:** the `*-stack` commands use `$AFON_CDKTF` as their `tofu` state dir, so if you deploy or setup a stack (ie
+deploy a stack plus configure the Polaris catalogs) you must take care not move your `$AFON_CDKTF` until the teardown of
+the stack, other `tofu` will not know the information to destroy the stack.
+
 
 In the command, we use the convention that `deploy` just deploy stack (waiting for DNS to propagate) and `setup` does the deployment
 and configures the Polaris catalogs.
