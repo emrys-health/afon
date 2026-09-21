@@ -110,7 +110,7 @@ public class FilePropertyProviderTest {
             assertThat(properties.getProperty(AfonProperty.AZURE_REGION.getName()))
                     .as("azure properties are not loaded")
                     .isNull();
-            assertThat(properties.getProperty(AfonProperty.GCP_BUCKET_NAME.getName()))
+            assertThat(properties.getProperty(AfonProperty.GCP_REGION.getName()))
                     .as("gcp properties are not loaded")
                     .isNull();
         } finally {
@@ -132,7 +132,7 @@ public class FilePropertyProviderTest {
             assertThat(properties.getProperty(AfonProperty.AWS_REGION.getName()))
                     .as("aws properties are not loaded")
                     .isNull();
-            assertThat(properties.getProperty(AfonProperty.GCP_BUCKET_NAME.getName()))
+            assertThat(properties.getProperty(AfonProperty.GCP_REGION.getName()))
                     .as("gcp properties are not loaded")
                     .isNull();
         } finally {
@@ -148,7 +148,7 @@ public class FilePropertyProviderTest {
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
-            assertThat(properties.getProperty(AfonProperty.GCP_BUCKET_NAME.getName()))
+            assertThat(properties.getProperty(AfonProperty.GCP_REGION.getName()))
                     .as("gcp properties are loaded")
                     .isNotNull();
             assertThat(properties.getProperty(AfonProperty.AZURE_REGION.getName()))
@@ -212,7 +212,11 @@ public class FilePropertyProviderTest {
 
     @Test
     public void ensureTemplatePropertyNamesAreExactlyThoseOfAfonPropertyEnum() {
-        Properties properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR).getProperties();
+        // Deliberately excludes the "catalogs" type: catalogs.properties / catalogs-<cloud>.properties
+        // hold per-catalog definitions (eg "AWS_BUCKET_NAME_aws_forbidden") keyed by whatever ids
+        // <CLOUD>_CATALOG_IDS is configured with at runtime, so they can't be pre-enumerated in
+        // AfonProperty - they only ever make sense as configuration.
+        Properties properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR, List.of("afon", "secret")).getProperties();
         // ensure all enum names are found and empty
         Set<String> allNames = AfonProperty.getAllNames();
         for (String name : allNames) {

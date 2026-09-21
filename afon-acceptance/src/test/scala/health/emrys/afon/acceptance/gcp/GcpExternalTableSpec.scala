@@ -4,7 +4,8 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
-import health.emrys.afon.config.AfonProperty.{GCP_BUCKET_NAME, GOOGLE_APPLICATION_CREDENTIALS}
+import health.emrys.afon.config.AfonProperty.GOOGLE_APPLICATION_CREDENTIALS
+import health.emrys.afon.config.{AfonCatalog, AfonCloud}
 import health.emrys.afon.polaris.catalogs.{ExternalPolarisCatalog, GcpPolarisCatalog}
 import org.apache.iceberg.gcp.auth.GoogleAuthManager
 import org.apache.polaris.core.admin.model.AuthenticationParameters.AuthenticationTypeEnum
@@ -24,8 +25,8 @@ class GcpExternalTableSpec extends SpecPretifier with GivenWhenThen {
   val BUCKET                 = "emrys_afon_core_2"
 
   "An external GCP table" should {
-    properties.setValue(GCP_BUCKET_NAME, BUCKET) // bit of a hack - TODO clean me up
-    val gcpCatalog = new GcpPolarisCatalog(properties)
+    val gcpCatalogDef = AfonCatalog.adHoc("gcp_unity_test", AfonCloud.GCP, "internal", BUCKET, true)
+    val gcpCatalog = new GcpPolarisCatalog(gcpCatalogDef, properties)
 
     // this gives:
     // Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials

@@ -71,26 +71,36 @@ fi
 
 ## Storage Buckets
 
-if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME --auth-mode login --query exists -o tsv)" = "true" ]; then
-  echo "- Bucket '$AZURE_BUCKET_NAME' already exists, skipping"
-else
-  echo "- Creating bucket '$AZURE_BUCKET_NAME'"
-  az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME --auth-mode login || exit 1
-fi
+# Reads AZURE_BUCKET_NAME_<id>/AZURE_ADMIN_GRANTS_<id>, echoing "" instead of erroring under
+# `set -u` if a catalog (eg a custom type with no bucket of its own) never defined one.
+bucket_of() {
+  local VAR="AZURE_BUCKET_NAME_$1"
+  if [ -n "${!VAR+x}" ]; then
+    echo "${!VAR}"
+  fi
+}
+admin_grants_of() {
+  local VAR="AZURE_ADMIN_GRANTS_$1"
+  if [ -n "${!VAR+x}" ]; then
+    echo "${!VAR}"
+  else
+    echo "true"
+  fi
+}
 
-if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_EXTERNAL --auth-mode login --query exists -o tsv)" = "true" ]; then
-  echo "- Bucket '$AZURE_BUCKET_NAME_EXTERNAL' already exists, skipping"
-else
-  echo "- Creating bucket '$AZURE_BUCKET_NAME_EXTERNAL'"
-  az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_EXTERNAL --auth-mode login || exit 1
-fi
-
-if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_FORBIDDEN --auth-mode login --query exists -o tsv)" = "true" ]; then
-  echo "- Bucket '$AZURE_BUCKET_NAME_FORBIDDEN' already exists, skipping"
-else
-  echo "- Creating bucket '$AZURE_BUCKET_NAME_FORBIDDEN'"
-  az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $AZURE_BUCKET_NAME_FORBIDDEN --auth-mode login || exit 1
-fi
+IFS=',' read -ra CATALOG_IDS <<< "$AZURE_CATALOG_IDS"
+for ID in "${CATALOG_IDS[@]}"; do
+  BUCKET="$(bucket_of "$ID")"
+  if [ -z "$BUCKET" ]; then
+    continue
+  fi
+  if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $BUCKET --auth-mode login --query exists -o tsv)" = "true" ]; then
+    echo "- Bucket '$BUCKET' already exists, skipping"
+  else
+    echo "- Creating bucket '$BUCKET'"
+    az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $BUCKET --auth-mode login || exit 1
+  fi
+done
 
 ## Role Assignment
 
@@ -105,21 +115,21 @@ ASSIGNEE_ID="$APP_SP_ID"
 STORAGE_BUCKET_ROLE="Storage Blob Data Contributor"
 STORAGE_ACCOUNT_ROLE="Storage Blob Delegator"
 
-BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET_NAME"
-if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
-  echo "- Role '$STORAGE_BUCKET_ROLE' already assigned on '$AZURE_BUCKET_NAME', skipping"
-else
-  echo "- Assigning role '$STORAGE_BUCKET_ROLE' to bucket '$AZURE_BUCKET_NAME'"
-  az role assignment create --role "$STORAGE_BUCKET_ROLE" --assignee-object-id $ASSIGNEE_ID --assignee-principal-type ServicePrincipal --scope "$BUCKET_SCOPE" || exit 1
-fi
-
-EXTERNAL_BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$AZURE_BUCKET_NAME_EXTERNAL"
-if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$EXTERNAL_BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
-  echo "- Role '$STORAGE_BUCKET_ROLE' already assigned on '$AZURE_BUCKET_NAME_EXTERNAL', skipping"
-else
-  echo "- Assigning role '$STORAGE_BUCKET_ROLE' to bucket '$AZURE_BUCKET_NAME_EXTERNAL'"
-  az role assignment create --role "$STORAGE_BUCKET_ROLE" --assignee-object-id $ASSIGNEE_ID --assignee-principal-type ServicePrincipal --scope "$EXTERNAL_BUCKET_SCOPE" || exit 1
-fi
+# Every catalog's bucket gets this role, except those with AZURE_ADMIN_GRANTS_<id>=false (eg
+# azure_forbidden) - deliberately left without it, so it stays inaccessible to prove that guarantee.
+for ID in "${CATALOG_IDS[@]}"; do
+  BUCKET="$(bucket_of "$ID")"
+  if [ -z "$BUCKET" ] || [ "$(admin_grants_of "$ID")" != "true" ]; then
+    continue
+  fi
+  BUCKET_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT/blobServices/default/containers/$BUCKET"
+  if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_BUCKET_ROLE" --scope "$BUCKET_SCOPE" --query "[].id" -o tsv)" ]; then
+    echo "- Role '$STORAGE_BUCKET_ROLE' already assigned on '$BUCKET', skipping"
+  else
+    echo "- Assigning role '$STORAGE_BUCKET_ROLE' to bucket '$BUCKET'"
+    az role assignment create --role "$STORAGE_BUCKET_ROLE" --assignee-object-id $ASSIGNEE_ID --assignee-principal-type ServicePrincipal --scope "$BUCKET_SCOPE" || exit 1
+  fi
+done
 
 STORAGE_ACCOUNT_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT"
 if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_ACCOUNT_ROLE" --scope "$STORAGE_ACCOUNT_SCOPE" --query "[].id" -o tsv)" ]; then

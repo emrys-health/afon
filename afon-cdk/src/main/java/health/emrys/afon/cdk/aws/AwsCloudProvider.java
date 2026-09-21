@@ -40,10 +40,12 @@ import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
+import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
+import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
@@ -101,6 +103,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     final         Release                    lbRelease;
     final         Vpc                        vpc;
     private       HelmProvider               helmProvider;
+    private final List<ITerraformDependable> lbcIrsaDependables = new ArrayList<>();
+    private       KubernetesProvider         k8sProvider;
 
     AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
         super(scope, id);
@@ -181,13 +185,13 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 "Name",
                 "cdktf-eks-public-rt-" + clusterName)).build();
 
-        RouteTableAssociation subnet1Association = RouteTableAssociation.Builder
+        final RouteTableAssociation subnet1Association = RouteTableAssociation.Builder
             .create(this, "subnet1Association")
             .subnetId(publicSubnet1.getId())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .routeTableId(publicRouteTable.getId()).build();
 
-        RouteTableAssociation subnet2Association = RouteTableAssociation.Builder
+        final RouteTableAssociation subnet2Association = RouteTableAssociation.Builder
             .create(this, "subnet2Association")
             .subnetId(publicSubnet2.getId())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
@@ -320,7 +324,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
 
         // ** NEW ATTACHMENT: Attach the custom secret policy to the Node Group role **
-        IamRolePolicyAttachment.Builder
+        final IamRolePolicyAttachment customSecretAttachment = IamRolePolicyAttachment.Builder
             .create(this, "customSecretPolicyAttachment")
             .policyArn(customSecretPolicy.getArn())
             .role(nodeGroupRole.getName())
@@ -341,19 +345,19 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .name(
                 "AmazonEC2ContainerRegistryReadOnly").build();
 
-        IamRolePolicyAttachment.Builder
+        final IamRolePolicyAttachment workerNodeAttachment = IamRolePolicyAttachment.Builder
             .create(this, "workerNodePolicyAttachment")
             .policyArn(workerNodePolicy.getArn())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .role(nodeGroupRole.getName()).build();
 
-        IamRolePolicyAttachment.Builder
+        final IamRolePolicyAttachment cniAttachment = IamRolePolicyAttachment.Builder
             .create(this, "cniPolicyAttachment")
             .policyArn(cniPolicy.getArn())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .role(nodeGroupRole.getName()).build();
 
-        IamRolePolicyAttachment.Builder
+        final IamRolePolicyAttachment containerRegistryAttachment = IamRolePolicyAttachment.Builder
             .create(this, "containerRegistryPolicyAttachment")
             .policyArn(containerRegistryPolicy.getArn())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
@@ -394,9 +398,20 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .instanceTypes(List.of("r6i.large"))
             .scalingConfig(scalingConfig)
             .diskSize(50)
+            // The nodes live in public subnets and reach the EKS API endpoint through the
+            // route table's internet-gateway route, and need their IAM policies to operate.
+            // Nothing else depends on those, so on destroy Terraform removes them in its
+            // first wave, while pods and Helm releases are still terminating: the kubelets
+            // lose the API server within a minute (nodes go NotReady), pods stick in
+            // Terminating, and `helm uninstall` (which waits) times out with "failed to
+            // delete release". Depending on them here keeps them until the node group,
+            // and therefore every release/resource that depends on it, is gone.
             .dependsOn(List.of(
                 newKubeConfig, cluster, eksAuthData,
-                publicSubnet1, publicSubnet2))
+                publicSubnet1, publicSubnet2,
+                subnet1Association, subnet2Association,
+                customSecretAttachment, workerNodeAttachment,
+                cniAttachment, containerRegistryAttachment))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .tags(Map.of("Name", componentNames.getNodeGroupRoleName())).build();
 
@@ -646,19 +661,24 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
         // The explicit helm uninstall --no-hooks pre-empts Terraform's own Helm destroy,
         // which fails when webhooks/finalizers interfere. Helm treats "release not found" as success.
+        // The controller is uninstalled first, so it is gone before the ingresses are deleted.
+        // Ingress finalizers are stripped only afterwards, as a running controller re-adds them.
         List<LocalExecProvisioner> onLbcDestroy = uponDestroyRun(
             "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer" +
                 " | xargs -r kubectl delete --ignore-not-found=true",
             "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer |" +
                 " xargs -r kubectl delete --ignore-not-found=true",
+            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
+                "|| true",
+            "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true",
+            "kubectl wait --for=delete pod -l app.kubernetes.io/name=aws-load-balancer-controller " +
+                "-n kube-system --timeout=120s || true",
             "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
                 "while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p " +
                 "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
-            "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}'" +
-                " --type=merge 2>/dev/null || true",
-            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
-                "|| true",
-            "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true");
+            "kubectl get ingress -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
+                "while read NS NAME; do kubectl patch ingress \"$NAME\" -n \"$NS\" -p " +
+                "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done");
         Resource.Builder
             .create(this, "lbc-destroy-cleanup")
             .dependsOn(List.of(ingress, lbRelease))
@@ -703,7 +723,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
      * Balancer Controller provisions for the given Ingress. The ALB is located via an
      * {@code aws_lb} data source filtered on the controller's tags (rather than reading the
      * Ingress' status, which the kubernetes provider returns as null unreliably), and the
-     * ALB's own DNS name and hosted zone are used for the alias.
+     * ALB's own DNS name and hosted zone are used for the alias. The record is only created once
+     * the ALB is active, so it resolves as soon as it exists.
      *
      * @param constructId   unique CDKTF construct ID for this record
      * @param r53ZoneId     the Route 53 hosted zone ID that owns {@code domainName}
@@ -737,6 +758,22 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 "ingress.k8s.aws/resource", "LoadBalancer"))
             .dependsOn(List.of(ingress))
             .build());
+        // The ALB is found as soon as the controller creates it, but it stays in the
+        // "provisioning" state for a few minutes, during which its DNS name does not resolve.
+        // An alias record created in that window resolves to nothing, and resolvers (the
+        // VPC's, CoreDNS) cache that negative answer for the zone's SOA minimum TTL, so in-cluster
+        // clients such as oauth2-proxy keep failing to reach the domain for ~10 minutes after the
+        // ALB is actually up. Creating the record only once the ALB is active avoids that.
+        // The wait polls every 15s for up to 10 minutes, and fails the apply if the ALB never
+        // becomes active, which applyWithRetry retries.
+        Resource albActive = Resource.Builder
+            .create(this, constructId + "AlbActive")
+            .dependsOn(List.of(alb))
+            .triggers(Map.of("albArn", alb.getArn()))
+            .provisioners(uponCreateRun(
+                format("aws elbv2 wait load-balancer-available --load-balancer-arns %s --region %s",
+                       alb.getArn(), region)))
+            .build();
         return new Route53Record(
             this, constructId, Route53RecordConfig
             .builder()
@@ -744,7 +781,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .name(domainName)
             .type("A")
             .allowOverwrite(true)
-            .dependsOn(List.of(release))
+            .dependsOn(List.of(release, albActive))
             .alias(Route53RecordAlias
                        .builder()
                        .name(alb.getDnsName())
@@ -765,7 +802,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         DataAwsEksCluster clusterData        = associateOIDCProvider(scope);
         String            serviceAccountName = "aws-load-balancer-controller";
 
-        new IamRolePolicyAttachment(
+        lbcIrsaDependables.add(new IamRolePolicyAttachment(
             scope,
             "LBCPolicyAttachment",
             IamRolePolicyAttachmentConfig
@@ -773,7 +810,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 .dependsOn(List.of(loadBalancerRole))
                 .role(loadBalancerRole.getName())
                 .policyArn(clusterPolicyArn)
-                .build());
+                .build()));
 
 
         Map<String, String> labels = Map.of(
@@ -839,13 +876,17 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             // Optional: Tag the resource
             .tags(Map.of("Name", clusterName + "-oidc-provider"))
             .build();
-        new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig);
+        lbcIrsaDependables.add(new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig));
         return clusterData;
     }
 
     private Release helmInstallLoadBalancer(String serviceAccountName, IamRole loadBalancerRole) {
         ArrayList<ITerraformDependable> dependencies = new ArrayList(eksDependOn);
         dependencies.add(loadBalancerRole);
+        // The controller assumes loadBalancerRole via IRSA (OIDC provider + policy attachment) to
+        // delete its ALBs when it is uninstalled. Without these edges they are destroyed first,
+        // the controller loses its AWS permissions, and the ingresses stick in Terminating.
+        dependencies.addAll(lbcIrsaDependables);
         return Release.Builder
             .create(this, "aws-load-balancer")
             .dependsOn(dependencies)
@@ -973,7 +1014,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 .builder()
                 .host(getClusterEndpoint())
                 .clusterCaCertificate(Fn.base64decode(getBase64CertData()))
-                .token(getToken())
+                .exec(eksTokenExecForHelm())
                 .build();
             helmProvider = HelmProvider.Builder
                 .create(this, "helm")
@@ -981,6 +1022,45 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 .build();
         }
         return helmProvider;
+    }
+
+    /**
+     * Uses {@code aws eks get-token} instead of the static token from {@code eksAuthData} so
+     * the provider fetches a fresh, short-lived credential on every operation. The static
+     * token (via {@link #getToken()}) is read once during the apply graph and expires after
+     * ~15 minutes; a full-create apply of a brand-new cluster (EKS control plane + node group
+     * + Helm releases) routinely takes longer than that, so late resources such as
+     * {@code kubernetes_ingress_v1} would fail with "Unauthorized" once it went stale.
+     */
+    @Override
+    public synchronized KubernetesProvider configureK8s() {
+        if (k8sProvider == null) {
+            k8sProvider = KubernetesProvider.Builder
+                .create(this, "kubernetes")
+                .host(getClusterEndpoint())
+                .clusterCaCertificate(Fn.base64decode(getBase64CertData()))
+                .exec(List.of(KubernetesProviderExec
+                                  .builder()
+                                  .apiVersion("client.authentication.k8s.io/v1beta1")
+                                  .command("aws")
+                                  .args(eksTokenArgs())
+                                  .build()))
+                .build();
+        }
+        return k8sProvider;
+    }
+
+    private HelmProviderKubernetesExec eksTokenExecForHelm() {
+        return HelmProviderKubernetesExec
+            .builder()
+            .apiVersion("client.authentication.k8s.io/v1beta1")
+            .command("aws")
+            .args(eksTokenArgs())
+            .build();
+    }
+
+    private List<String> eksTokenArgs() {
+        return List.of("eks", "get-token", "--cluster-name", clusterName, "--region", region);
     }
 
     @Override
@@ -1026,6 +1106,12 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         return cluster.getEndpoint();
     }
 
+    /**
+     * No longer used by {@link #configureK8s()}/{@link #configureHelm()}, which now use the
+     * {@code aws eks get-token} exec plugin instead of this static token. Kept for
+     * {@link AwsHelmStack}, an experimental, unwired stack that still builds its own
+     * Helm provider directly from this value.
+     */
     @Override
     public String getToken() {
         return eksAuthData.getToken();

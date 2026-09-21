@@ -100,7 +100,9 @@ public class TrinoWorkloads {
         // LinkedHashMap so the default catalog is emitted first for readability.
         Map<String, String> catalogs = new LinkedHashMap<>();
         catalogs.put(defaultCatalog, trinoConfig.catalogProperties(defaultCatalog));
-        for (AfonCatalog catalog : afonCatalogs.all()) {
+        // Only the generic types fit the catalog generated here (Trino also requires lowercase,
+        // cloud-prefixed names); custom types such as glue were never exposed to Trino.
+        for (AfonCatalog catalog : afonCatalogs.allIncluding("internal", "external")) {
             String catalogName = catalog.toString();
             if (catalogName == defaultCatalog) {
                 continue;

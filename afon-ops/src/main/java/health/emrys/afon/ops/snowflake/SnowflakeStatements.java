@@ -60,6 +60,9 @@ public class SnowflakeStatements {
         LocalDateTime now        = LocalDateTime.now();
         DateTimeFormatter formatter  = DateTimeFormatter.ofPattern("yy_MM_dd_mm_HH_ss");
         String            formatted  = now.format(formatter);
+        // The "azure" catalog's bucket - no longer a typed AfonProperty (see AZURE_BUCKET_NAME_azure
+        // in catalogs-azure.properties), since variant bucket names only ever make sense as configuration.
+        String azureBucket = properties.getCatalogProperty("AZURE_BUCKET_NAME", "azure");
         return new String[]{
                 format(
                         """
@@ -69,10 +72,10 @@ public class SnowflakeStatements {
                                   ENABLED = TRUE
                                   STORAGE_ALLOWED_LOCATIONS = ('azure://%s.blob.core.windows.net/%s')
                                   AZURE_TENANT_ID='%s';
-                                """, properties.getValue(AZURE_BUCKET_NAME),
+                                """, azureBucket,
                         properties.getValue(AZURE_STORAGE_ACCOUNT),
                         properties.getValue(AZURE_STORAGE_ACCOUNT),
-                        properties.getValue(AZURE_BUCKET_NAME),
+                        azureBucket,
                         properties.getValue(AZURE_TENANT_ID)),
                 """
                     DROP ICEBERG TABLE IF EXISTS my_azure_iceberg_table ;
@@ -89,7 +92,7 @@ public class SnowflakeStatements {
                                     )
                                   );
                                 """, properties.getValue(AZURE_STORAGE_ACCOUNT),
-                        properties.getValue(AZURE_BUCKET_NAME),
+                        azureBucket,
                         properties.getValue(POLARIS_NAMESPACE),
                         properties.getValue(AZURE_TENANT_ID)),
                 """
