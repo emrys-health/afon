@@ -49,18 +49,35 @@ public class NetworkSmoke {
 
     public List<ExecResult> checkNetworkWith() {
         String[]         pods   = new String[]{"spark-connector-0-driver", MASTER + "-0"};
-        String           csv    = properties.getValue(ALLOWED_DOMAINS_CSV);
         List<ExecResult> errors = new ArrayList<>();
         for (String pod : pods) {
             logger.info("Checking pod {}", pod);
             try {
-                for (String domain : csv.split(",")) {
-                    BasicCurl command = new BasicCurl(client, pod, domain, true);
-                    errors.addAll(command.run());
-                }
+                errors.addAll(checkCanSeeAllowedDomains(pod));
+                errors.addAll(checkCannotSeeOtherBuckets(pod));
             } catch (Exception e) {
                 logger.error("Could not execute on pod" + pod, e);
             }
+        }
+        return errors;
+    }
+
+    private List<ExecResult> checkCannotSeeOtherBuckets(String pod) throws Exception {
+        List<ExecResult> errors = new ArrayList<>();
+        String[] providers = new String[] { "eu-west-2.amazonaws.com", "blob.core.windows.net" };
+        for (String provider : providers) {
+            BasicCurl command = new BasicCurl(client, pod, "unreachablebucket." + provider , false);
+            errors.addAll(command.run());
+        }
+        return errors;
+    }
+
+    private List<ExecResult> checkCanSeeAllowedDomains(String pod) throws Exception {
+        List<ExecResult> errors = new ArrayList<>();
+        String           csv    = properties.getValue(ALLOWED_DOMAINS_CSV);
+        for (String domain : csv.split(",")) {
+            BasicCurl command = new BasicCurl(client, pod, domain, true);
+            errors.addAll(command.run());
         }
         return errors;
     }
