@@ -3,6 +3,7 @@ package health.emrys.afon.ops.smoke;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.ops.config.OpsDefaults;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.connect.SparkConnectClient;
@@ -14,6 +15,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
+import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
+import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
 
 /**
  * You need have some data in Polaris to run this, eg:
@@ -34,19 +37,17 @@ public class SparkConnectSmoke {
 
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectSmoke.class);
     public static final String TEST_WAREHOUSE = "test_warehouse";
-    public static final String TEST_NAMESPACE = "test_namespace";
-    public static final String TEST_TABLE = "test_table";
 
     public void smokeTest(SparkConnectClient client, AfonCatalog catalog) {
         SparkSession spark = client.sparkSession(TEST_WAREHOUSE, catalog.toString());
-        String tableFQN = String.format("%s.%s.%s", TEST_WAREHOUSE, TEST_NAMESPACE, TEST_TABLE);
+        String tableFQN = String.format("%s.%s.%s", TEST_WAREHOUSE, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
         logger.info("Reading table {}", tableFQN);
         spark.sql(String.format("SELECT * FROM %s", tableFQN)).show();
     }
 
     public void smokeTestAllWarehouses(SparkConnectClient client, AfonCatalog catalog) {
         SparkSession spark = client.sparkSessionAllWarehouses("federatedCatalogName");
-        String tableFQN = String.format("%s.%s.%s", catalog, TEST_NAMESPACE, TEST_TABLE);
+        String tableFQN = String.format("%s.%s.%s", catalog, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
         logger.info("Reading table {}", tableFQN);
         spark.sql(String.format("SELECT * FROM %s", tableFQN)).show();
     }
