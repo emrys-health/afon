@@ -723,7 +723,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
      * Balancer Controller provisions for the given Ingress. The ALB is located via an
      * {@code aws_lb} data source filtered on the controller's tags (rather than reading the
      * Ingress' status, which the kubernetes provider returns as null unreliably), and the
-     * ALB's own DNS name and hosted zone are used for the alias.
+     * ALB's own DNS name and hosted zone are used for the alias. The record is only created once
+     * the ALB is active, so it resolves as soon as it exists.
      *
      * @param constructId   unique CDKTF construct ID for this record
      * @param r53ZoneId     the Route 53 hosted zone ID that owns {@code domainName}
@@ -757,6 +758,22 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 "ingress.k8s.aws/resource", "LoadBalancer"))
             .dependsOn(List.of(ingress))
             .build());
+        // The ALB is found as soon as the controller creates it, but it stays in the
+        // "provisioning" state for a few minutes, during which its DNS name does not resolve.
+        // An alias record created in that window resolves to nothing, and resolvers (the
+        // VPC's, CoreDNS) cache that negative answer for the zone's SOA minimum TTL, so in-cluster
+        // clients such as oauth2-proxy keep failing to reach the domain for ~10 minutes after the
+        // ALB is actually up. Creating the record only once the ALB is active avoids that.
+        // The wait polls every 15s for up to 10 minutes, and fails the apply if the ALB never
+        // becomes active, which applyWithRetry retries.
+        Resource albActive = Resource.Builder
+            .create(this, constructId + "AlbActive")
+            .dependsOn(List.of(alb))
+            .triggers(Map.of("albArn", alb.getArn()))
+            .provisioners(uponCreateRun(
+                format("aws elbv2 wait load-balancer-available --load-balancer-arns %s --region %s",
+                       alb.getArn(), region)))
+            .build();
         return new Route53Record(
             this, constructId, Route53RecordConfig
             .builder()
@@ -764,7 +781,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .name(domainName)
             .type("A")
             .allowOverwrite(true)
-            .dependsOn(List.of(release))
+            .dependsOn(List.of(release, albActive))
             .alias(Route53RecordAlias
                        .builder()
                        .name(alb.getDnsName())

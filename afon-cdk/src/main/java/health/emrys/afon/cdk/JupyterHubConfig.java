@@ -259,6 +259,7 @@ public abstract class JupyterHubConfig {
         hubDeps.add(hubRoleBinding);
         hubDeps.add(hubSecret);
         hubDeps.add(hubConfig);
+        hubDeps.addAll(issuerDependencies());
         deployHub(hubDeps);
 
         List<ITerraformDependable> proxyDeps = new ArrayList<>(eksDependOn);
@@ -583,6 +584,14 @@ public abstract class JupyterHubConfig {
     }
 
     protected abstract void configureHttpsAndDNS();
+
+    /**
+     * What must exist before the hub starts, because it does OIDC discovery against the issuer
+     * hostname on startup (see {@code _discover} in the hub config), eg the issuer's DNS record.
+     */
+    protected List<ITerraformDependable> issuerDependencies() {
+        return List.of();
+    }
 
     protected abstract JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps);
 
