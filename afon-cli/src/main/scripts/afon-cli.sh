@@ -6,21 +6,20 @@ set -euo pipefail
 
 usage(){
   echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>]"
-  echo "          [--config-env <env>] [--cdktf-env <env>] [--config-zip <zip>] [--env|-e <env>]"
+  echo "          [--config-env <env>] [--cdktf-env <env>] [--env|-e <env>]"
   echo "          [--logging|-l <level>] [--logging-console|-lc <level>]"
   echo "          <command> [args...]"
   echo "options, settable via the flags above or the equivalent AFON_* env var (a flag wins over its env var):"
-  echo "  --home / AFON_HOME:             the afon home dir.  Defaults to '$HOME/.afon'."
-  echo "  --cdktf / AFON_CDKTF:           the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
-  echo "  --cloud / AFON_CLOUD:           the cloud to target.  One of aws|azure|gcp.  Defaults to 'ALL'."
-  echo "  --config-env / AFON_CONFIG_ENV: the config env name, for the config-* shortcut commands."
-  echo "  --cdktf-env / AFON_CDKTF_ENV:   the cdktf env name, for the cdktf-* shortcut commands."
-  echo "  --config-zip / AFON_CONFIG_ZIP: the config zip path, for the config-import/config-export shortcut commands."
-  echo "  --env / AFON_ENV:               sets both --cdktf-env and --config-env.  Overrides them if also set."
-  echo "  --logging / AFON_LOGGING:       the file logging level.  Defaults to 'INFO'.  The file logs are found in 'AFON_HOME/logs'."
+  echo "  --home / AFON_HOME:                       the afon home dir.  Defaults to '$HOME/.afon'."
+  echo "  --cdktf / AFON_CDKTF:                     the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
+  echo "  --cloud / AFON_CLOUD:                     the cloud to target.  One of aws|azure|gcp.  Defaults to 'ALL'."
+  echo "  --config-env / AFON_CONFIG_ENV:           the config env name.  Switches AFON_HOME/config to 'config-<env>' immediately, before running any command."
+  echo "  --cdktf-env / AFON_CDKTF_ENV:             the cdktf env name.  Switches AFON_CDKTF to 'AFON_CDKTF-<env>' immediately, before running any command."
+  echo "  --env / AFON_ENV:                         sets both --cdktf-env and --config-env.  Overrides them if also set."
+  echo "  --logging / AFON_LOGGING:                 the file logging level.  Defaults to 'INFO'.  The file logs are found in 'AFON_HOME/logs'."
   echo "  --logging-console / AFON_LOGGING_CONSOLE: the console logging level.  Defaults to 'OFF'."
-  echo "  AFON_CLI_DIR (env only):        the cli distribution dir this script lives in.  Auto-detected."
-  echo "  AFON_ENVS (env only):           NAME=VALUE pairs of system properties passed to the CLI java process."
+  echo "  AFON_CLI_DIR (env only):                  the cli distribution dir this script lives in.  Auto-detected."
+  echo "  AFON_ENVS (env only):                     NAME=VALUE pairs of system properties passed to the CLI java process."
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -45,7 +44,6 @@ AFON_LOGGING="${AFON_LOGGING:-}"
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-}"
 AFON_CONFIG_ENV="${AFON_CONFIG_ENV:-}"
 AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
-AFON_CONFIG_ZIP="${AFON_CONFIG_ZIP:-}"
 AFON_ENV="${AFON_ENV:-}"
 AFON_ENVS="${AFON_ENVS:-}"
 
@@ -62,8 +60,6 @@ while [[ $# -gt 0 ]]; do
       AFON_CONFIG_ENV="$2"; shift 2 ;;
     --cdktf-env)
       AFON_CDKTF_ENV="$2"; shift 2 ;;
-    --config-zip)
-      AFON_CONFIG_ZIP="$2"; shift 2 ;;
     --env|-e)
       AFON_ENV="$2"; shift 2 ;;
     --logging|-l)
@@ -71,7 +67,13 @@ while [[ $# -gt 0 ]]; do
     --logging-console|-lc)
       AFON_LOGGING_CONSOLE="$2"; shift 2 ;;
     --help|-h)
-      usage; exit 0 ;;
+      # Only show this script's own usage when no command has been given yet; once a command
+      # (eg "azure") is in ARGS, forward -h/--help so the java side can handle it - eg to list
+      # every command under that prefix.
+      if [ ${#ARGS[@]} -eq 0 ]; then
+        usage; exit 0
+      fi
+      ARGS+=("$1"); shift ;;
     *)
       ARGS+=("$1"); shift ;;
   esac
@@ -97,9 +99,24 @@ AFON_CLOUD="${AFON_CLOUD:-ALL}"
 AFON_LOGGING="${AFON_LOGGING:-INFO}"
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-OFF}"
 
-# AFON_CONFIG_ENV/AFON_CDKTF_ENV/AFON_CONFIG_ZIP have no -D system property counterpart; export them
-# so the shortcut commands (which exec afon-cli-scripts.sh) inherit them from this process's env.
-export AFON_CONFIG_ENV AFON_CDKTF_ENV AFON_CONFIG_ZIP
+# CONFIG_ENV/CDKTF_ENV are global: if set, apply the switch commands upstream via afon-cli-scripts.sh
+# so it applies to all commands, not just for the config-*/cdktf-* commands.
+AFON_CONFIG_SWITCHED=
+if [ -n "$AFON_CONFIG_ENV" ]; then
+  "$AFON_CLI_DIR/afon-cli-scripts.sh" --home "$AFON_HOME" --config-env "$AFON_CONFIG_ENV" config-switch
+  AFON_CONFIG_SWITCHED=true
+fi
+AFON_CDKTF_SWITCHED=
+if [ -n "$AFON_CDKTF_ENV" ]; then
+  "$AFON_CLI_DIR/afon-cli-scripts.sh" --home "$AFON_HOME" --cdktf "$AFON_CDKTF" --cdktf-env "$AFON_CDKTF_ENV" cdktf-switch
+  AFON_CDKTF_SWITCHED=true
+fi
+
+# AFON_CONFIG_ENV/AFON_CDKTF_ENV have no -D system property counterpart; export them so the
+# script commands (which exec afon-cli-scripts.sh) inherit them from this process's env.
+# AFON_CONFIG_SWITCHED/AFON_CDKTF_SWITCHED are internal: they tell afon-cli-scripts.sh the
+# switch above already ran, so it doesn't redundantly repeat it for a script command.
+export AFON_CONFIG_ENV AFON_CDKTF_ENV AFON_CONFIG_SWITCHED AFON_CDKTF_SWITCHED
 
 AFON_JVM_ENVS=
 for pair in $AFON_ENVS; do

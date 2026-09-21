@@ -1,5 +1,5 @@
 CONFIG_FILES="afon.properties secret.properties"
-if [ -n "$CLOUD" ]; then
+if [ -n "$CLOUD" ] && [ "$CLOUD" != "ALL" ]; then
   echo "Config relative to cloud $CLOUD only"
   CONFIG_FILES="$CONFIG_FILES afon-$CLOUD.properties secret-$CLOUD.properties"
 else

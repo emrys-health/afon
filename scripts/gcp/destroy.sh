@@ -27,11 +27,13 @@ if gcloud iam service-accounts describe $GCP_SERVICE_ACCOUNT >/dev/null 2>&1; th
     echo "- Role iam.serviceAccountTokenCreator not granted to $BLIRC_SA on $GCP_SERVICE_ACCOUNT, skipping"
   fi
 
-  if gcloud iam service-accounts get-iam-policy $GCP_SERVICE_ACCOUNT --flatten="bindings[].members" --filter="bindings.role=roles/iam.serviceAccountTokenCreator AND bindings.members=user:phil.henry@emrys.health" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
-    echo "- Revoking iam.serviceAccountTokenCreator on $GCP_SERVICE_ACCOUNT from phil.henry@emrys.health"
-    gcloud iam service-accounts remove-iam-policy-binding $GCP_SERVICE_ACCOUNT --member="user:phil.henry@emrys.health" --role="roles/iam.serviceAccountTokenCreator"
-  else
-    echo "- Role iam.serviceAccountTokenCreator not granted to phil.henry@emrys.health on $GCP_SERVICE_ACCOUNT, skipping"
+  if [ -n "$GCP_USER_ACCOUNT" ]; then
+    if gcloud iam service-accounts get-iam-policy $GCP_SERVICE_ACCOUNT --flatten="bindings[].members" --filter="bindings.role=roles/iam.serviceAccountTokenCreator AND bindings.members=user:$GCP_USER_ACCOUNT" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
+      echo "- Revoking iam.serviceAccountTokenCreator on $GCP_SERVICE_ACCOUNT from $GCP_USER_ACCOUNT"
+      gcloud iam service-accounts remove-iam-policy-binding $GCP_SERVICE_ACCOUNT --member="user:$GCP_USER_ACCOUNT" --role="roles/iam.serviceAccountTokenCreator"
+    else
+      echo "- Role iam.serviceAccountTokenCreator not granted to $GCP_USER_ACCOUNT on $GCP_SERVICE_ACCOUNT, skipping"
+    fi
   fi
 else
   echo "- Service account $GCP_SERVICE_ACCOUNT does not exist, skipping its role bindings"

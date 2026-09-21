@@ -16,7 +16,7 @@ LOG_FILE="${2:-}"
 LOGS_ARGS="${3:-"-f"}"
 
 if [ -z "$POD_NAME" ]; then
-  echo "Usage: $0 <pod-name>" >&2
+  echo "Usage: ${BASH_SOURCE[0]} <pod-name>" >&2
   exit 1
 fi
 

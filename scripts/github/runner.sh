@@ -57,7 +57,7 @@ RUNNER_ARGS="${RUNNER_ARGS:-}"
 RUNNER_SHA256="${RUNNER_SHA256:-04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d}"
 
 if [[ -z "$ACTION" ]]; then
-  echo "Usage: $0 {install|configure|service} [start|stop|status]"
+  echo "Usage: ${BASH_SOURCE[0]} {install|configure|service} [start|stop|status]"
   exit 1
 fi
 

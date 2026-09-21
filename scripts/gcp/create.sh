@@ -18,11 +18,13 @@ else
   gcloud iam service-accounts create my-vendable-sa --display-name "Vendable Service Account" || exit 1
 fi
 
-if gcloud iam service-accounts get-iam-policy $GCP_SERVICE_ACCOUNT --flatten="bindings[].members" --filter="bindings.role=roles/iam.serviceAccountTokenCreator AND bindings.members=user:phil.henry@emrys.health" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
-  echo "- Role iam.serviceAccountTokenCreator already granted to phil.henry@emrys.health on $GCP_SERVICE_ACCOUNT, skipping"
-else
-  echo "- Granting iam.serviceAccountTokenCreator on $GCP_SERVICE_ACCOUNT to phil.henry@emrys.health"
-  gcloud iam service-accounts add-iam-policy-binding $GCP_SERVICE_ACCOUNT --member="user:phil.henry@emrys.health" --role="roles/iam.serviceAccountTokenCreator" || exit 1
+if [ -n "$GCP_USER_ACCOUNT" ]; then
+  if gcloud iam service-accounts get-iam-policy $GCP_SERVICE_ACCOUNT --flatten="bindings[].members" --filter="bindings.role=roles/iam.serviceAccountTokenCreator AND bindings.members=user:$GCP_USER_ACCOUNT" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
+    echo "- Role iam.serviceAccountTokenCreator already granted to $GCP_USER_ACCOUNT on $GCP_SERVICE_ACCOUNT, skipping"
+  else
+    echo "- Granting iam.serviceAccountTokenCreator on $GCP_SERVICE_ACCOUNT to $GCP_USER_ACCOUNT"
+    gcloud iam service-accounts add-iam-policy-binding $GCP_SERVICE_ACCOUNT --member="user:$GCP_USER_ACCOUNT" --role="roles/iam.serviceAccountTokenCreator" || exit 1
+  fi
 fi
 
 if gcloud storage buckets get-iam-policy "gs://$GCP_BUCKET_NAME" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$GCP_SERVICE_ACCOUNT" --format="value(bindings.members)" 2>/dev/null | grep -q .; then

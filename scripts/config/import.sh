@@ -4,8 +4,9 @@ if [ -n "$CONFIG_ENV" ]; then
 else
   IMPORT_DIR="$CONFIG_DIR"
 fi
+CONFIG_ZIP="${CONFIG_ZIP:-${1:-}}"
 if [ -z "$CONFIG_ZIP" ]; then
-  echo "Action $ACTION requires option --config-zip"
+  echo "Action $ACTION requires the config zip path, eg 'afon.sh -a config-import --config-zip <zip>' or 'afon-cli-scripts.sh config/import.sh <zip>'"
   usage; exit 0
 fi
 if [ -d $IMPORT_DIR ]; then

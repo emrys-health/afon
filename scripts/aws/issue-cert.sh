@@ -1,7 +1,7 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 usage(){
-  echo "Usage: $0 [all|keycloak|jupyter|polaris]"
+  echo "Usage: ${BASH_SOURCE[0]} [all|keycloak|jupyter|polaris]"
   echo "Requests a new ACM certificate (DNS validation) for the given stack's domain,"
   echo "creates the validation CNAME in its Route53 hosted zone, and waits for ACM"
   echo "to issue it. Domain and zone come from afon.properties/afon-aws.properties,"

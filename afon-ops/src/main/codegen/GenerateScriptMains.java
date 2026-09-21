@@ -4,12 +4,12 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Generates the {@code *Main} shortcut command classes under {@code health.emrys.afon.ops.scripts.<cloud>},
+ * Generates the {@code *Main} script command classes under {@code health.emrys.afon.ops.scripts.<cloud>},
  * one per entry in {@link #SCRIPTS} below, each delegating to {@code ScriptMain}.
  * <p>
  * Run at build time (see the {@code generate-sources} binding in afon-ops/pom.xml) as a single-file
  * source program: {@code java GenerateScriptMains.java <output-dir>}.  The generated sources are not
- * checked in - to add a shortcut for a new script, add an entry to {@link #SCRIPTS} and rebuild.
+ * checked in - to add a command for a new script, add an entry to {@link #SCRIPTS} and rebuild.
  * <p>
  * "Single-file source program" refers to JEP 330 ("Launch Single-File Source-Code Programs", JDK 11),
  * which lets {@code java} compile and run a {@code .java} file directly with no separate {@code javac}
@@ -33,6 +33,11 @@ public class GenerateScriptMains {
         new ScriptEntry("cdktf", "CdktfInitMain", "cdktf/init.sh"),
         new ScriptEntry("cdktf", "CdktfStatusMain", "cdktf/status.sh"),
         new ScriptEntry("cdktf", "CdktfSwitchMain", "cdktf/switch.sh"),
+
+        new ScriptEntry("tofu", "TofuApplyMain", "tofu/apply.sh"),
+        new ScriptEntry("tofu", "TofuDestroyMain", "tofu/destroy.sh"),
+        new ScriptEntry("tofu", "TofuPlanMain", "tofu/plan.sh"),
+        new ScriptEntry("tofu", "TofuStateMain", "tofu/state.sh"),
 
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),
@@ -66,7 +71,16 @@ public class GenerateScriptMains {
         new ScriptEntry("gcp", "GcpDestroyMain", "gcp/destroy.sh"),
         new ScriptEntry("gcp", "GcpLoginAsServiceAccountMain", "gcp/login-as-service-account.sh"),
         new ScriptEntry("gcp", "GcpLoginMain", "gcp/login.sh"),
-        new ScriptEntry("gcp", "GcpPolarisMain", "gcp/polaris.sh")
+        new ScriptEntry("gcp", "GcpPolarisMain", "gcp/polaris.sh"),
+
+        new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
+        new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),
+
+        new ScriptEntry("jupyter", "JupyterExecuteMain", "jupyter/execute.sh"),
+
+        new ScriptEntry("kube", "KubePodsMain", "kube/pods.sh"),
+        new ScriptEntry("kube", "KubeLogsMain", "kube/logs.sh"),
+        new ScriptEntry("kube", "KubePolarisDbMain", "kube/polaris-db.sh")
     );
 
     public static void main(String[] args) throws IOException {

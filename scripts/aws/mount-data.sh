@@ -4,8 +4,8 @@ VOLUME=
 VOLUME="${1:-}"
 if [ -z "$VOLUME" ]; then
   echo "Mount a volume as /data"
-  echo "Usage: $0 <volume>"
-  echo "  e.g. $0 /dev/xvdd"
+  echo "Usage: ${BASH_SOURCE[0]} <volume>"
+  echo "  e.g. ${BASH_SOURCE[0]} /dev/xvdd"
   echo "Check available volumes using command:"
   echo "$ lsblk
   NAME     MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS

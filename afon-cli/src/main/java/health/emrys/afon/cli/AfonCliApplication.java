@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Set;
 
 import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
 import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
@@ -40,6 +41,10 @@ public class AfonCliApplication {
             }
             Class<?> target = opsCommands.resolve(args[0]);
             if (target == null) {
+                if (args.length > 1 && isHelp(args[1])) {
+                    printFilterUsage(opsCommands, args[0]);
+                    return;
+                }
                 System.err.println("Unknown command: " + args[0]);
                 printUsage(opsCommands);
                 System.exit(1);
@@ -51,6 +56,21 @@ public class AfonCliApplication {
 
     private static boolean isHelp(String arg) {
         return "help".equalsIgnoreCase(arg) || "--help".equals(arg) || "-h".equals(arg);
+    }
+
+    /**
+     * Handles {@code afon-cli <filter> -h}, eg {@code afon-cli config -h}: "config" is not itself a
+     * command, but is a shared filter of several (config-status, config-switch, ...), so list those
+     * instead of just failing with "Unknown command".
+     */
+    private static void printFilterUsage(OpsCommands opsCommands, String filter) {
+        Set<String> matches = opsCommands.namesWithFilter(filter);
+        if (matches.isEmpty()) {
+            System.out.println("No commands found matching '" + filter + "'.");
+            return;
+        }
+        System.out.println("Commands matching '" + filter + "':");
+        matches.forEach(name -> System.out.println("  " + name));
     }
 
     private static void printUsage(OpsCommands opsCommands) {

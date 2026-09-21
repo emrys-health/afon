@@ -3,6 +3,7 @@ package health.emrys.afon.cli;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
@@ -75,10 +76,25 @@ class OpsCommands {
     }
 
     Set<String> names(String cloud) {
-        if (cloud != null || !cloud.isBlank()){
+        if (cloud != null && !cloud.isBlank()){
             return commandNames.stream().filter(c -> c.contains(cloud)).collect(Collectors.toSet());
         }
         return commandNames;
+    }
+
+    /**
+     * Commands matching a filter, eg {@code namesWithFilter("config")} returns
+     * {@code config-init}, {@code config-export}, etc. but also {@code configure-users}
+     * - every command whose name regex-matches {@code filter}.
+     */
+    Set<String> namesWithFilter(String filter) {
+        return commandNames.stream()
+            .filter(name -> name.matches(regexFor(filter)))
+            .collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    static @NonNull String regexFor(String filter) {
+        return String.format(".*%s.*", filter.toLowerCase());
     }
 
     private static String kebabCase(String simpleName) {

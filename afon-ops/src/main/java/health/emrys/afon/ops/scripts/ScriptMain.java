@@ -22,7 +22,7 @@ import static java.lang.String.format;
  * and the scripts themselves expect, and forwards whatever args are left over as positional args
  * to the script.
  * <p>
- * This is the template the generated {@code *Main} shortcut command classes under
+ * This is the template the generated {@code *Main} script command classes under
  * {@code health.emrys.afon.ops.scripts.<cloud>} delegate to (see {@code GenerateScriptMains.java}
  * and the {@code generate-sources} binding in afon-ops/pom.xml) - it deliberately has no
  * {@code main} method of its own, so it is not itself picked up as a command.
@@ -49,7 +49,6 @@ public class ScriptMain {
                 case "--cloud", "-c" -> env.put("AFON_CLOUD", value(args, ++i, arg));
                 case "--config-env" -> env.put("AFON_CONFIG_ENV", value(args, ++i, arg));
                 case "--cdktf-env" -> env.put("AFON_CDKTF_ENV", value(args, ++i, arg));
-                case "--config-zip" -> env.put("AFON_CONFIG_ZIP", value(args, ++i, arg));
                 case "--env", "-e" -> env.put("AFON_ENV", value(args, ++i, arg));
                 default -> scriptArgs.add(arg);
             }

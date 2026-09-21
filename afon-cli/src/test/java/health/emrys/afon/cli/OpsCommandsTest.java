@@ -41,4 +41,28 @@ class OpsCommandsTest {
         assertThat(opsCommands.names("gcp")).contains("deploy-gcp-polaris-stack", "delete-gcp-stack");
     }
 
+    @Test
+    void namesReturnsAllNamesForNullOrBlankCloud() {
+        assertThat(opsCommands.names((String) null)).isEqualTo(opsCommands.names());
+        assertThat(opsCommands.names("")).isEqualTo(opsCommands.names());
+    }
+
+    @Test
+    void namesWithFilterListsCommandsMatchingFilter() {
+        Set<String> configNames = opsCommands.namesWithFilter("config");
+        assertThat(configNames).contains("config-switch", "config-status", "config-init", "configure-users");
+        assertThat(configNames).allMatch(name -> name.matches(opsCommands.regexFor("config")));
+        assertThat(configNames).doesNotContain("aws-login");
+    }
+
+    @Test
+    void namesWithFilterIsCaseInsensitive() {
+        assertThat(opsCommands.namesWithFilter("CONFIG")).contains("config-switch");
+    }
+
+    @Test
+    void namesWithFilterReturnsEmptySetForUnmatchedCommands() {
+        assertThat(opsCommands.namesWithFilter("nonexistent")).isEmpty();
+    }
+
 }

@@ -17,7 +17,7 @@
 set -euo pipefail
 
 usage(){
-  echo "Usage: $0 {push|list|delete} [--home <afon-home>] [--repo <owner/repo>] [--dry-run]"
+  echo "Usage: ${BASH_SOURCE[0]} {push|list|delete} [--home <afon-home>] [--repo <owner/repo>] [--dry-run]"
   echo "actions:  push   :  writes each config file to its secret, overwriting any existing value"
   echo "          list   :  lists the secrets currently set on the repo"
   echo "          delete :  removes the config secrets from the repo"
