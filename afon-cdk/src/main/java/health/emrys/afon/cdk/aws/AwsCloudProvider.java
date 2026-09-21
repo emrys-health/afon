@@ -658,19 +658,24 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
         // The explicit helm uninstall --no-hooks pre-empts Terraform's own Helm destroy,
         // which fails when webhooks/finalizers interfere. Helm treats "release not found" as success.
+        // The controller is uninstalled first, so it is gone before the ingresses are deleted.
+        // Ingress finalizers are stripped only afterwards, as a running controller re-adds them.
         List<LocalExecProvisioner> onLbcDestroy = uponDestroyRun(
             "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer" +
                 " | xargs -r kubectl delete --ignore-not-found=true",
             "kubectl get mutatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer |" +
                 " xargs -r kubectl delete --ignore-not-found=true",
+            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
+                "|| true",
+            "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true",
+            "kubectl wait --for=delete pod -l app.kubernetes.io/name=aws-load-balancer-controller " +
+                "-n kube-system --timeout=120s || true",
             "kubectl get targetgroupbindings -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
                 "while read NS NAME; do kubectl patch targetgroupbinding \"$NAME\" -n \"$NS\" -p " +
                 "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done",
-            "kubectl patch ingress polaris-ingress -n default -p '{\"metadata\":{\"finalizers\":[]}}'" +
-                " --type=merge 2>/dev/null || true",
-            "helm uninstall aws-load-balancer-controller-chart -n kube-system --no-hooks 2>/dev/null " +
-                "|| true",
-            "kubectl delete secret sh.helm.release.v1.aws-load-balancer-controller-chart.v1 -n kube-system || true");
+            "kubectl get ingress -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
+                "while read NS NAME; do kubectl patch ingress \"$NAME\" -n \"$NS\" -p " +
+                "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done");
         Resource.Builder
             .create(this, "lbc-destroy-cleanup")
             .dependsOn(List.of(ingress, lbRelease))
