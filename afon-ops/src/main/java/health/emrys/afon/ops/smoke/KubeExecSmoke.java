@@ -4,6 +4,7 @@ import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -21,7 +22,7 @@ import java.util.Arrays;
  */
 public class KubeExecSmoke {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(KubeExecSmoke.class);
+    private static final Logger logger = LoggerFactory.getLogger(KubeExecSmoke.class);
 
     private static final String USAGE =
             "Usage: KubeExecSmoke [-n namespace] [-c container] [-t timeoutSeconds] <pod> -- <command> [args...]";
