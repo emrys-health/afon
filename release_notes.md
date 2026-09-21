@@ -1,5 +1,18 @@
 # Release Notes
 
+## 1.0-beta-4
+
+**Milestone:** [1.0-beta-4](https://github.com/emrys-health/afon-core/milestone/4)
+**Due:** 2026-09-21
+
+### Closed Issues (5)
+
+- **configuration** — [#206](https://github.com/emrys-health/afon-core/issues/206) Make GCP_USER_ACCOUNT configurable
+- **devops** — [#205](https://github.com/emrys-health/afon-core/issues/205) Add action shorthands for all script executions in afon.sh
+- **devops, configuration** — [#203](https://github.com/emrys-health/afon-core/issues/203) Support script execution in afon-cli
+- **configuration** — [#196](https://github.com/emrys-health/afon-core/issues/196) Allow configuration of OIDC users independently of Jupyter domain
+- **devops, configuration** — [#193](https://github.com/emrys-health/afon-core/issues/193) Replace Maven AWS bundle artifact with explicit artifact dependencies
+
 ## 1.0-beta-3
 
 **Milestone:** [1.0-beta-3](https://github.com/emrys-health/afon-core/milestone/1)
