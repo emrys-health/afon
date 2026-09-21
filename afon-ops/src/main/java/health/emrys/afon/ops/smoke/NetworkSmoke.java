@@ -4,6 +4,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.smoke.tasks.BasicCurl;
 import io.kubernetes.client.openapi.ApiException;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -64,9 +65,15 @@ public class NetworkSmoke {
 
     private List<ExecResult> checkCannotSeeOtherBuckets(String pod) throws Exception {
         List<ExecResult> errors = new ArrayList<>();
-        String[] providers = new String[] { "eu-west-2.amazonaws.com", "blob.core.windows.net" };
+        String[] providers = new String[] {
+            "unreachablebucket.eu-west-2.amazonaws.com",
+            "unreachablebucket.blob.core.windows.net",
+            "pypi.io",
+            "pypi.org",
+            "pypi.org",
+        };
         for (String provider : providers) {
-            BasicCurl command = new BasicCurl(client, pod, "unreachablebucket." + provider , false);
+            BasicCurl command = new BasicCurl(client, pod, provider , false);
             errors.addAll(command.run());
         }
         return errors;
@@ -82,40 +89,4 @@ public class NetworkSmoke {
         return errors;
     }
 
-}
-
-class BasicCurl {
-    static final Logger logger = LoggerFactory.getLogger(BasicCurl.class);
-
-    private final KubeClient client;
-    private final String     pod;
-    private final String     domain;
-    private final boolean    expectHttp;
-
-    BasicCurl(KubeClient client, String pod, String domain, boolean expectHttp) {
-        this.client     = client;
-        this.pod        = pod;
-        this.domain     = domain;
-        this.expectHttp = expectHttp;
-    }
-
-    public List<ExecResult> run() throws Exception {
-        ExecResult       result = curl(client, pod, domain);
-        List<ExecResult> errors = new ArrayList<>();
-        if (result.stdout().startsWith("HTTP") != expectHttp) {
-            logger.info("Unexpected response. Stdout:\n{}\nStderr:{}", result.stdout(), result.stderr());
-            errors.add(result);
-        }
-        return errors;
-    }
-
-    private @NonNull ExecResult curl(KubeClient client, String pod, String domain) throws ApiException, IOException, InterruptedException, TimeoutException {
-        logger.info("Checking domain {}", domain);
-        String     command = "curl -I --connect-timeout 3 --max-time 3 https://" + domain;
-        ExecResult result  = client.exec(pod, command.split(" "));
-        if (result.exitCode() != 0) {
-            logger.error("Problem running {} on {}", command, pod);
-        }
-        return result;
-    }
 }
