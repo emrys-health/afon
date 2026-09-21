@@ -128,4 +128,8 @@ This pushes the content of each config files to a separate GitHub secret.
 
 **NOTE:** upon any change in the config, the secrets need to be pushed again.
 
+To work with more than one [config env](configuration.md#config-env), push each one to its own GitHub environment,
+and retrieve it again on another machine, with `-sa "push --env <env>"` and `-sa "pull --env <env>"`.  See
+[acceptance tests](acceptance_tests.md#config-secrets) for details.
+
 
