@@ -73,7 +73,7 @@ public class KubeClient implements AutoCloseable {
      */
     public ExecResult exec(String namespace, String pod, String container, Duration timeout, String... command)
             throws ApiException, IOException, InterruptedException, TimeoutException {
-        logger.info("Executing {} in {}/{}{}", String.join(" ", command), namespace, pod,
+        logger.info("Executing\n{}\nin {}/{}{}", String.join(" ", command), namespace, pod,
                 container == null ? "" : " (container " + container + ")");
         Process process = new Exec(execApiClient())
                 .newExecutionBuilder(namespace, pod, command)

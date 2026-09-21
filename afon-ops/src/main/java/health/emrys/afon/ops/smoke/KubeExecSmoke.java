@@ -3,6 +3,7 @@ package health.emrys.afon.ops.smoke;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
+import org.slf4j.Logger;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -19,6 +20,8 @@ import java.util.Arrays;
  * </pre>
  */
 public class KubeExecSmoke {
+
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(KubeExecSmoke.class);
 
     private static final String USAGE =
             "Usage: KubeExecSmoke [-n namespace] [-c container] [-t timeoutSeconds] <pod> -- <command> [args...]";
@@ -65,7 +68,9 @@ public class KubeExecSmoke {
 
         int exitCode;
         try (KubeClient client = new KubeClient(new OpsPropertyProvider())) {
-            exitCode = new KubeExecSmoke(client).run(namespace, pod, container, timeout, command).exitCode();
+            ExecResult result = new KubeExecSmoke(client).run(namespace, pod, container, timeout, command);
+            logger.info("Output:\n{}\nError:\n{}", result.stdout(), result.stderr());
+            exitCode = result.exitCode();
         }
         System.exit(exitCode);
     }
