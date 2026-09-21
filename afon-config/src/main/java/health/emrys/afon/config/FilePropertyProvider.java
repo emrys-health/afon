@@ -25,6 +25,9 @@ import static org.slf4j.LoggerFactory.getLogger;
  * Cloud-specific secrets live alongside it in
  * {@code secret-<cloud>.properties} (e.g. {@code secret-aws.properties}).
  *
+ * {@link AfonCatalog} definitions live in {@code catalogs.properties}, with cloud-specific
+ * definitions alongside it in {@code catalogs-<cloud>.properties} (e.g. {@code catalogs-aws.properties}).
+ *
  * The properties files are loaded from the {@link #configDir}, which defaults to {@link ConfigUtils#configDir()}.
  *
  * When {@link ConfigUtils#cloudPropertySet()} is {@code true}, every cloud's files are loaded together,
@@ -43,7 +46,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
     /**
      * Property types
      */
-    private static final List<String> ALL_TYPES = List.of("afon", "secret");
+    private static final List<String> ALL_TYPES = List.of("afon", "secret", "catalogs");
 
     /**
      * Cloud types

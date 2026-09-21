@@ -4,7 +4,8 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
 import health.emrys.afon.acceptance.tags.{Azure, External}
-import health.emrys.afon.config.AfonProperty.{AZURE_BUCKET_NAME, AZURE_DATABRICKS_TOKEN}
+import health.emrys.afon.config.AfonProperty.AZURE_DATABRICKS_TOKEN
+import health.emrys.afon.config.{AfonCatalog, AfonCloud}
 import health.emrys.afon.polaris.catalogs.{AzurePolarisCatalog, ExternalPolarisCatalog}
 import org.apache.polaris.core.admin.model.ConnectionConfigInfo.ConnectionTypeEnum
 import org.apache.polaris.core.admin.model._
@@ -31,8 +32,9 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
   val DATABRICKS_URI         = "https://adb-7405611337270626.6.azuredatabricks.net"
 
   "An external table" should {
-    properties.setValue(AZURE_BUCKET_NAME, "unity-catalog-storage") // TODO get a proper bucket we can use for federation
-    val azureCatalog = new AzurePolarisCatalog(properties)
+    // TODO get a proper bucket we can use for federation
+    val azureCatalogDef = AfonCatalog.adHoc("azure_unity_test", AfonCloud.AZURE, "internal", "unity-catalog-storage", true)
+    val azureCatalog = new AzurePolarisCatalog(azureCatalogDef, properties)
 
     val externalCatalog: ExternalPolarisCatalog = new ExternalPolarisCatalog(properties) {
       override def catalogName(): String = FEDERATED_CATALOG_NAME

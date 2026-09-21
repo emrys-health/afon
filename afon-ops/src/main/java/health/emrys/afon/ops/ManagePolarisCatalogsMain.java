@@ -47,7 +47,9 @@ public class ManagePolarisCatalogsMain {
 
     public void deleteAllCatalogs() throws IOException, ParseException {
         logger.info("Deleting all catalogs for domain {}", polarisDomain);
-        for (AfonCatalog catalog : afonCatalogs.all()) {
+        // Not glue: deleting purges every namespace and table through Polaris first, which for the
+        // federated Glue catalog risks dropping the real Glue tables.
+        for (AfonCatalog catalog : afonCatalogs.allExcluding("glue")) {
             deleteCatalog(catalog.toString());
         }
     }

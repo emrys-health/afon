@@ -65,6 +65,16 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
     }
 
     @Override
+    protected List<ITerraformDependable> issuerDependencies() {
+        // The hub polls the issuer from the moment it starts. The keycloak hostname is the apex of
+        // its Route 53 zone, so until its record exists the lookup gets an empty (NODATA) answer, which
+        // a resolver upstream of CoreDNS (which itself only caches for 30s) keeps for about 5 minutes
+        // and serves to every pod in the cluster. So nothing that polls the issuer may start before
+        // the record exists.
+        return List.of(keycloakAliasRecord);
+    }
+
+    @Override
     protected JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps) {
         // oauth2-proxy performs OIDC discovery against the Keycloak hostname the moment it starts, so
         // it must not be created until that hostname's Route 53 record exists. Without this edge

@@ -2,6 +2,7 @@ package health.emrys.afon.polaris.config;
 
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.catalogs.*;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -14,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 import static health.emrys.afon.polaris.config.PolarisRestClient.failuresOf;
 
@@ -22,22 +22,36 @@ public class PolarisCatalogManager {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogManager.class);
 
+    @FunctionalInterface
+    private interface CatalogFactory {
+        PolarisCatalog create(AfonCatalog catalog, AfonPropertyProvider properties);
+    }
+
     /**
-     * Factories keyed by {@link AfonCatalog#toString()}'s canonical name, so the catalogs actually
-     * configured always match whatever {@link AfonCatalogs} resolves to - the built-in default set,
-     * or a user-supplied {@code CATALOG_NAMES_CSV} - rather than a separately maintained list.
+     * The two generic catalog "types": every {@code internal}/{@code external} catalog is built
+     * purely from its {@link AfonCatalog} definition (see {@link AfonCatalogs}), so adding one
+     * needs no code change - only configuration (a catalog id in {@code <CLOUD>_CATALOG_IDS}
+     * plus its {@code <CLOUD>_CATALOG_TYPE_<id>}/{@code <CLOUD>_BUCKET_NAME_<id>}/
+     * {@code <CLOUD>_ADMIN_GRANTS_<id>}, conventionally in {@code catalogs-<cloud>.properties}).
      */
-    private static final Map<String, Function<AfonPropertyProvider, PolarisCatalog>> CATALOG_FACTORIES = Map.ofEntries(
-            Map.entry("aws", AwsPolarisCatalog::new),
-            Map.entry("aws_forbidden", AwsForbiddenPolarisCatalog::new),
-            Map.entry("aws_trino", AwsTrinoPolarisCatalog::new),
-            Map.entry("aws_external", AwsExternalPolarisCatalog::new),
-            Map.entry("azure", AzurePolarisCatalog::new),
-            Map.entry("azure_external", AzureExternalPolarisCatalog::new),
-            Map.entry("azure_forbidden", AzureForbiddenPolarisCatalog::new),
-            Map.entry("gcp", GcpPolarisCatalog::new),
-            Map.entry("gcp_external", GcpExternalPolarisCatalog::new),
-            Map.entry("gcp_forbidden", GcpForbiddenPolarisCatalog::new));
+    private static final Map<AfonCloud, CatalogFactory> INTERNAL_CATALOG_FACTORIES = Map.of(
+            AfonCloud.AWS, AwsPolarisCatalog::new,
+            AfonCloud.AZURE, AzurePolarisCatalog::new,
+            AfonCloud.GCP, GcpPolarisCatalog::new);
+
+    private static final Map<AfonCloud, CatalogFactory> EXTERNAL_CATALOG_FACTORIES = Map.of(
+            AfonCloud.AWS, AwsExternalPolarisCatalog::new,
+            AfonCloud.AZURE, AzureExternalPolarisCatalog::new,
+            AfonCloud.GCP, GcpExternalPolarisCatalog::new);
+
+    /**
+     * Any other catalog type (eg the Glue-backed one) isn't reducible to the generic
+     * "internal"/"external" shapes, so keeps a hand-written {@link PolarisCatalog} subclass
+     * registered explicitly here, keyed by its {@link AfonCatalog#type()}. Built purely from its
+     * {@link AfonCatalog} definition too, same as the generic shapes above.
+     */
+    private static final Map<String, CatalogFactory> CUSTOM_CATALOG_FACTORIES = Map.of(
+            "glue", GlueAwsPolarisCatalog::new);
 
     private final AfonPropertyProvider properties;
     private final AfonCatalogs afonCatalogs;
@@ -53,10 +67,11 @@ public class PolarisCatalogManager {
      * Built lazily (only when actually configuring every catalog) since resolving every
      * {@link AfonCatalog} requires properties for every cloud - eagerly building this in the
      * constructor would break any cloud-scoped run (eg {@code afon.cloud=aws}) that only loads
-     * that cloud's properties.
+     * that cloud's properties. Excludes glue, which was never part of "all catalogs" - it can still
+     * be configured explicitly by name.
      */
     private PolarisCatalog[] catalogs() {
-        return afonCatalogs.all().stream().map(this::catalogOf).toArray(PolarisCatalog[]::new);
+        return afonCatalogs.allExcluding("glue").stream().map(this::catalogOf).toArray(PolarisCatalog[]::new);
     }
 
     public List<HttpResponse> configureAllCatalogs() throws IncorrectConfigException, IOException {
@@ -83,11 +98,20 @@ public class PolarisCatalogManager {
     }
 
     private PolarisCatalog catalogOf(AfonCatalog catalog) {
-        Function<AfonPropertyProvider, PolarisCatalog> factory = CATALOG_FACTORIES.get(catalog.toString());
+        return switch (catalog.type()) {
+            case "internal" -> INTERNAL_CATALOG_FACTORIES.get(catalog.cloud()).create(catalog, properties);
+            case "external" -> EXTERNAL_CATALOG_FACTORIES.get(catalog.cloud()).create(catalog, properties);
+            default -> customCatalogOf(catalog);
+        };
+    }
+
+    private PolarisCatalog customCatalogOf(AfonCatalog catalog) {
+        CatalogFactory factory = CUSTOM_CATALOG_FACTORIES.get(catalog.type());
         if (factory == null) {
-            throw new IllegalArgumentException("No PolarisCatalog implementation registered for catalog '" + catalog + "'");
+            throw new IllegalArgumentException("No PolarisCatalog factory registered for catalog type '"
+                    + catalog.type() + "' (catalog '" + catalog.id() + "')");
         }
-        return factory.apply(properties);
+        return factory.create(catalog, properties);
     }
 
     private List<String> catalogNames(PolarisCatalog... catalogs) {

@@ -5,6 +5,32 @@ EXTERNAL_SA="external-sa@$PROJECT_ID.iam.gserviceaccount.com"
 BLIRC_SA="blirc-600159231093-i76b@gcp-sa-biglakerestcatalog.iam.gserviceaccount.com"
 ICEBERG_BUCKET="emrys_afon_core_2"
 
+# Reads GCP_BUCKET_NAME_<id>/GCP_CATALOG_TYPE_<id>/GCP_ADMIN_GRANTS_<id>, echoing "" instead of
+# erroring under `set -u` if a catalog (eg a custom type with no bucket of its own) never defined
+# one. GCP_ADMIN_GRANTS_<id> defaults to "true" when unset, matching AfonCatalogs' own default.
+bucket_of() {
+  local VAR="GCP_BUCKET_NAME_$1"
+  if [ -n "${!VAR+x}" ]; then
+    echo "${!VAR}"
+  fi
+}
+type_of() {
+  local VAR="GCP_CATALOG_TYPE_$1"
+  if [ -n "${!VAR+x}" ]; then
+    echo "${!VAR}"
+  fi
+}
+admin_grants_of() {
+  local VAR="GCP_ADMIN_GRANTS_$1"
+  if [ -n "${!VAR+x}" ]; then
+    echo "${!VAR}"
+  else
+    echo "true"
+  fi
+}
+
+IFS=',' read -ra CATALOG_IDS <<< "$GCP_CATALOG_IDS"
+
 if gcloud projects get-iam-policy $PROJECT_ID --flatten="bindings[].members" --filter="bindings.role=roles/serviceusage.serviceUsageConsumer AND bindings.members=serviceAccount:$GCP_SERVICE_ACCOUNT" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
   echo "- Revoking serviceusage.serviceUsageConsumer on project $PROJECT_ID from $GCP_SERVICE_ACCOUNT"
   gcloud projects remove-iam-policy-binding $PROJECT_ID --member="serviceAccount:$GCP_SERVICE_ACCOUNT" --role="roles/serviceusage.serviceUsageConsumer"
@@ -39,18 +65,37 @@ else
   echo "- Service account $GCP_SERVICE_ACCOUNT does not exist, skipping its role bindings"
 fi
 
-if gcloud storage buckets describe "gs://$GCP_BUCKET_NAME" >/dev/null 2>&1; then
-  if gcloud storage buckets get-iam-policy "gs://$GCP_BUCKET_NAME" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$GCP_SERVICE_ACCOUNT" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
-    echo "- Revoking storage.objectAdmin on $GCP_BUCKET_NAME from $GCP_SERVICE_ACCOUNT"
-    gcloud storage buckets remove-iam-policy-binding "gs://$GCP_BUCKET_NAME" --member="serviceAccount:$GCP_SERVICE_ACCOUNT" --role="roles/storage.objectAdmin"
-  else
-    echo "- Role storage.objectAdmin not granted to $GCP_SERVICE_ACCOUNT on $GCP_BUCKET_NAME, skipping"
+## Storage Buckets
+
+# Every catalog's bucket is revoked and deleted, including gcp_external's - even though create.sh
+# never creates it (assumed externally-provisioned), destroy.sh has always torn it down too.
+for ID in "${CATALOG_IDS[@]}"; do
+  BUCKET="$(bucket_of "$ID")"
+  if [ -z "$BUCKET" ]; then
+    continue
   fi
-  echo "- Deleting bucket $GCP_BUCKET_NAME"
-  gcloud storage rm -r "gs://$GCP_BUCKET_NAME"
-else
-  echo "- Bucket $GCP_BUCKET_NAME does not exist, skipping"
-fi
+  if [ "$(type_of "$ID")" = "external" ]; then
+    PRINCIPAL="$EXTERNAL_SA"
+  elif [ "$(admin_grants_of "$ID")" = "true" ]; then
+    PRINCIPAL="$GCP_SERVICE_ACCOUNT"
+  else
+    PRINCIPAL=""
+  fi
+  if gcloud storage buckets describe "gs://$BUCKET" >/dev/null 2>&1; then
+    if [ -n "$PRINCIPAL" ]; then
+      if gcloud storage buckets get-iam-policy "gs://$BUCKET" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$PRINCIPAL" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
+        echo "- Revoking storage.objectAdmin on $BUCKET from $PRINCIPAL"
+        gcloud storage buckets remove-iam-policy-binding "gs://$BUCKET" --member="serviceAccount:$PRINCIPAL" --role="roles/storage.objectAdmin"
+      else
+        echo "- Role storage.objectAdmin not granted to $PRINCIPAL on $BUCKET, skipping"
+      fi
+    fi
+    echo "- Deleting bucket $BUCKET"
+    gcloud storage rm -r "gs://$BUCKET"
+  else
+    echo "- Bucket $BUCKET does not exist, skipping"
+  fi
+done
 
 if gcloud iam service-accounts describe $GCP_SERVICE_ACCOUNT >/dev/null 2>&1; then
   echo "- Deleting service account $GCP_SERVICE_ACCOUNT"
@@ -59,31 +104,11 @@ else
   echo "- Service account $GCP_SERVICE_ACCOUNT does not exist, skipping"
 fi
 
-if gcloud storage buckets describe "gs://$GCP_BUCKET_NAME_EXTERNAL" >/dev/null 2>&1; then
-  if gcloud storage buckets get-iam-policy "gs://$GCP_BUCKET_NAME_EXTERNAL" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$EXTERNAL_SA" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
-    echo "- Revoking storage.objectAdmin on $GCP_BUCKET_NAME_EXTERNAL from $EXTERNAL_SA"
-    gcloud storage buckets remove-iam-policy-binding "gs://$GCP_BUCKET_NAME_EXTERNAL" --member="serviceAccount:$EXTERNAL_SA" --role="roles/storage.objectAdmin"
-  else
-    echo "- Role storage.objectAdmin not granted to $EXTERNAL_SA on $GCP_BUCKET_NAME_EXTERNAL, skipping"
-  fi
-  echo "- Deleting bucket $GCP_BUCKET_NAME_EXTERNAL"
-  gcloud storage rm -r "gs://$GCP_BUCKET_NAME_EXTERNAL"
-else
-  echo "- Bucket $GCP_BUCKET_NAME_EXTERNAL does not exist, skipping"
-fi
-
 if gcloud iam service-accounts describe $EXTERNAL_SA >/dev/null 2>&1; then
   echo "- Deleting service account $EXTERNAL_SA"
   gcloud iam service-accounts delete $EXTERNAL_SA --quiet
 else
   echo "- Service account $EXTERNAL_SA does not exist, skipping"
-fi
-
-if gcloud storage buckets describe "gs://$GCP_BUCKET_NAME_FORBIDDEN" >/dev/null 2>&1; then
-  echo "- Deleting bucket $GCP_BUCKET_NAME_FORBIDDEN"
-  gcloud storage rm -r "gs://$GCP_BUCKET_NAME_FORBIDDEN"
-else
-  echo "- Bucket $GCP_BUCKET_NAME_FORBIDDEN does not exist, skipping"
 fi
 
 if gcloud storage buckets describe "gs://$ICEBERG_BUCKET" >/dev/null 2>&1; then
