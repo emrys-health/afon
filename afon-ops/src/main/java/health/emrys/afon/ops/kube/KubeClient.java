@@ -2,6 +2,7 @@ package health.emrys.afon.ops.kube;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import io.kubernetes.client.Exec;
+import io.kubernetes.client.PortForward;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
@@ -101,6 +102,16 @@ public class KubeClient implements AutoCloseable {
         return exec("default", pod, null, Duration.ofMinutes(5), command);
     }
 
+    /**
+     * Opens a single port-forward stream to {@code port} on the pod, like one connection through
+     * {@code kubectl port-forward}. Each stream carries one TCP connection, so open one per local connection.
+     * The caller must close the result.
+     */
+    public PortForward.PortForwardResult portForward(String namespace, String pod, int port)
+            throws ApiException, IOException {
+        return new PortForward(execApiClient()).forward(namespace, pod, List.of(port));
+    }
+
     private static CompletableFuture<String> readAsync(InputStream in) {
         return CompletableFuture.supplyAsync(() -> {
             try (in) {
@@ -112,7 +123,7 @@ public class KubeClient implements AutoCloseable {
     }
 
     /**
-     * Exec streams over a websocket, so it needs a client without the default read timeout, otherwise
+     * Exec and port-forward stream over a websocket, so it needs a client without the default read timeout, otherwise
      * any command that is quiet for longer than that is cut off. Kept separate so the other API calls
      * still time out.
      */
