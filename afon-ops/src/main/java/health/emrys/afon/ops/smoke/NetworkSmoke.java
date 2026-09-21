@@ -6,16 +6,12 @@ import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.smoke.tasks.BasicCurl;
 import io.kubernetes.client.openapi.ApiException;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 
-import static health.emrys.afon.cdk.SparkWorkloads.MASTER;
 import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 
 public class NetworkSmoke {
@@ -48,8 +44,11 @@ public class NetworkSmoke {
         }
     }
 
-    public List<ExecResult> checkNetworkWith() {
-        String[]         pods   = new String[]{"spark-connector-0-driver", MASTER + "-0"};
+    public List<ExecResult> checkNetworkWith() throws ApiException {
+        List<String> pods = client.listPods().stream().map(x -> x.getMetadata().getName()).filter(name -> {
+            return //name.contains(MASTER) ||name.contains("emrys-worker") || // don't need to worry about Spark as need the connector to upload JARS
+                name.contains("spark-connector");
+        }).toList();
         List<ExecResult> errors = new ArrayList<>();
         for (String pod : pods) {
             logger.info("Checking pod {}", pod);
