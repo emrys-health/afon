@@ -3,7 +3,7 @@ EMRYS HEALTH
 HDRS Afon – Open Source Data Fabric – Feasibility 
 SDE specification for technical tasks
 Technical specification for participating Secure Data Environments
-August 2026
+September 2026
 ```
 
 This document outlines the onboarding of participating SDEs for the Afon data fabric technical feasibility project running from July - September 2026.
@@ -54,23 +54,58 @@ We are happy to support in any stage of this task list and have developed a CLI 
 
 **Tasks**
 
-| # | Task                                                      | Outcome                                                 |
-|---|-----------------------------------------------------------|---------------------------------------------------------|
-| 1 | Setup local env                                           | A linux or macOS machine with tools to build and deploy | 
-| 2 | Provision app registration & permissions for chosen cloud | A clean cloud subscription with appropriate permissions |
-| 3 | Register a Polaris domain name for your env               | Domain name such as `<env>`polaris.click is registered   |
-| 4 | Create DNS zone and certificate                           | DNS nameservers are configured                          |
-| 5 | Generate configuration                                    | Config files created in $AFON_HOME/config               |
-| 6 | Create cloud env                                          | Script `<cloud>`/create.sh is run successfully          | 
-| 7 | Build Afon CLI locally                                    | Afon CLI built in $AFON_HOME/cli                        |
-| 8 | Deploy Afon Polaris stack to chosen cloud                 | Polaris stack deployed                                  |
+| # | Task                                                          | Outcome                                                 |
+|---|---------------------------------------------------------------|---------------------------------------------------------|
+| 1 | [Install Afon CLI locally](#install-the-afon-cli-locally)     | Afon CLI installed in `$AFON_HOME/cli`                  |
+| 2 | [Setup local env](#setup-local-env)                           | A linux or macOS machine with tools to build and deploy |
+| 3 | [Provision app registration](#provision-app-registration)     | A clean cloud subscription with appropriate permissions |
+| 4 | [Register Polaris domain name](#register-polaris-domain-name) | Domain name such as `<env>`polaris.click is registered  |
+| 5 | [Create DNS zone](#create-dns-zone)                           | DNS nameservers are configured                          |
+| 6 | [Create config](#create-config)                               | Config files created in `$AFON_HOME/config`             |
+| 7 | [Create cloud env](#create-cloud-env)                         | Action `<cloud>`-create is run successfully             |
+| 8 | [Deploy Polaris stack](#deploy-polaris-stack)                 | Polaris stack deployed                                  |
 
-**1. Setup local env**
+## Install the Afon CLI locally
 
 ```md
 As a cloud engineer
-I want to setup the local env 
-So that I build and deploy Afon on my cloud infrastrcture
+I want to install the Afon CLI locally
+So that I can deploy Polaris
+```
+
+**Acceptance criteria**
+
+```md
+Given a local system 
+When we install the Afon CLI distribution
+Then the Afon CLI is ready to use
+```
+
+**How to do it**
+
+Download from [Afon Distribution](https://drive.google.com/drive/folders/1b0YkwVXC5ERvDavpeGe9L398cgnz_Bnt) the latest `afon-<version>-cli.zip` release and unzip it to a dir of choice.  The recommended default is `$HOME/.afon/cli`.   Set env variable `AFON_CLI_DIR` pointing to chosen dir and add it to your system path.
+
+Using `bash`, in `~/.bash_profile`:
+```shell
+export AFON_CLI_DIR=$HOME/.afon/cli
+
+PATH=$AFON_CLI_DIR:$PATH
+export PATH
+```
+
+To verify the CLI is properly installed, execute to show the list of available commands:
+```shell
+afon-cli.sh
+```
+CLI docs are found in `$AFON_CLI_DIR/docs`.
+
+
+## Setup local env
+
+```md
+As a cloud engineer
+I want to set up the local env 
+So that I build and deploy Afon on my cloud infrastructure
 ```
 
 **Depends on:** Access to Linux or macOS
@@ -79,18 +114,31 @@ So that I build and deploy Afon on my cloud infrastrcture
 
 ```md
 Given a local system (linux or macos)
-When we run the following setup-local action for cloud <cloud> via the afon.sh script
-Then the Afon build env is setup locally for cloud <cloud>
+When we run the following setup-local action for cloud <cloud>
+Then the Afon build env is set up locally for cloud <cloud>
 ```
 
 **How to do it**
 
 ```shell
-./afon.sh -a setup-local -c <cloud>
+afon-cli.sh setup-local -c <cloud>
 ```
-See the [setup local env](../docs/setup_local.md) for more details.
 
-**2. Provision app registration & permissions for chosen cloud**
+The following packages are installed:
+- git
+- jdk
+- maven
+- docker
+- opentofu
+- kubernetes-cli
+- awscli eksctl
+- azure-cli kubelogin
+- google-cloud-cli
+
+Of the cloud cli packages, only the ones relative to the `<cloud>` specified are installed.
+If no `<cloud>` is specified all are installed.
+
+## Provision app registration
 
 ```md
 As a cloud engineer
@@ -102,13 +150,13 @@ So that Polaris env can be created
 
 **How to do it**
 
-``shell
+```shell
 az account management-group create --name AfonFabricGroup
 az account management-group subscription add --name AfonFabricGroup --subscription "AfonFabric"
-``
- This can also be achieved via the Azure portal.
+```
+This can also be achieved via the Azure portal.
 
-**3. Register a Polaris domain name**
+## Register Polaris domain name
 
 ```md
 As a cloud engineer
@@ -126,42 +174,38 @@ Then a Polaris domain such as `<env>polaris.click` is available.
 
 **How to do it**
 
-AWS Route53 is our recommended approach for domain purchases. A domain can also be provided by the Emrys team eg. {SDE}polaris.click
+AWS Route53 is our recommended approach for domain purchases. A domain can also be provided by the Emrys team eg `<sde>polaris<cloud>.click`.   
+
+**NOTE:** Conventionally, we assume that if `<cloud>` is not specified in the domain name, it refers to `aws`.
 
 
-**4. DNS Configuration**
+## Create DNS zone
 
 ```md
 As a cloud engineer 
 I want to create a DNS zone for the Polaris domain
 So that cloud-hosted traffic resolves correctly and can be served over HTTPS
 ```
-**Depends on:** Task 1,3
 
 **Acceptance criteria**
 
 ```md
 Given a Polaris domain name is available
 When DNS records are configured
-Then  ```shell
-dig A <domain> +short
+Then `dig A <domain> +short` resolves to the expected IP address
 ```
-```resolves to the expected IP address
 
 **How to do it**
 
-Follow the [DNS configuration](../docs/dns_config.md) documentation.
+Follow the [DNS configuration](https://github.com/emrys-health/afon-core/blob/main/docs/dns_config.md) documentation.
 
-
-**5. Configuration setup**
+## Create config
 
 ```md
 As a cloud engineer
 I want to generate the properties for our environment <env> and cloud
-So that the deployment script knows which domain, roles, storage and credentials belong to the env's chosen cloud.
+So that CLI commands know which domain, roles, storage and credentials belong to the env's chosen cloud.
 ```
-
-**Depends on:** Task 1-4
 
 **Acceptance criteria**
 
@@ -173,30 +217,37 @@ Then all the configuration properties are replaced with real, env-specific value
 
 **How to do it**
 
+Choose the name of your env, eg it could be `dev` or `stg` in your organisation:
 ```shell
-./afon.sh -a config-init
+afon-cli.sh config-init -e <env>
 ```
+This command creates a config dir `$AFON_HOME/config-<env>` and symlinks it to `$AFON_HOME/config`.
+
+Do the same for `cdktf` command to create a ckdtf dir `$AFON_HOME/cdktf-<env>` and symlink `$AFON_HOME/cdktf`.
+```shell
+afon-cli.sh cdktf-init -e <env>
+```
+The `cdktf` dir will hold all your deployment Terraform state.
 
 You can also import/export config files as a zip:
 ```shell
-./afon.sh -a config-{import|export} --config-zip <path-to-config-zip>
+afon-cli.sh config-{import|export} --config-zip <path-to-config-zip> -e <env>
 ```
+See [configuration](https://github.com/emrys-health/afon-core/blob/main/docs/configuration.md) for more details.
 
-After the config files are completed (or imported) you can validate them:
+After the config files are completed (or imported) you can validate them for a given cloud:
 ```shell
-./afon.sh -a config-validate -c <cloud>
+afon-cli.sh config-validate -c <cloud>
 ```
+**NOTE:** As of the current beta version, the config for all clouds must be present, but only the values of the cloud you are interested needs to be filled in, eg the `azure` ones.  The other cloud's config can remain with empty values.   The `-c <cloud>` allows you to validate the properties for a given cloud, eg `azure`.
 
-
-**6. Create cloud env**
+## Create cloud env
 
 ```md
 As a cloud engineer
 I want to build create a cloud env
 So that I can build and deploy Polaris
 ```
-
-**Depends on:** Task 1-5
 
 **Acceptance criteria**
 
@@ -209,42 +260,12 @@ Then the Afon env is created for cloud <cloud>
 **How to do it**
 
 ```shell
-./afon.sh -a script --script-path <cloud>/create.sh 
+afon-cli.sh <cloud>-create -e <env>
 ```
 
-See the [cloud infrastructure](../docs/cloud.md) for more details.
+See [cli cloud](https://github.com/emrys-health/afon-core/blob/main/docs/cli/cloud.md) for more details.
 
-**7. Build the Afon CLI locally**
-
-```md
-As a cloud engineer
-I want to build the Afon CLI locally
-So that I can deploy Polaris
-```
-
-**Depends on:** Task 1-6
-
-**Acceptance criteria**
-
-```md
-Given a local system 
-When we run the following build action via the afon.sh script
-Then the Afon CLI are built for the chosen cloud
-```
-
-**How to do it**
-
-```shell
-./afon.sh -a build -bp cli -c <cloud>
-```
-
-The CLI build artifacts are available in `~/.afon/cli`.
-
-```shell
-./.afon/cli/afon-cli.sh 
-```
-
-**8. Deploy the Afon Polaris stack**
+## Deploy Polaris stack
 
 ```md
 As a cloud engineer
@@ -252,12 +273,10 @@ I want to run the Afon data provider deployment against our cloud environment
 So that Polaris is are running in the Kubernetes cluster with the catalog configured, ready to receive synthetic data
 ```
 
-**Depends on:** Tasks 1-7
-
 **Acceptance criteria**
 
 ```md
-Given tasks 1-7 are completed
+Given previous tasks are completed
 When the following CLI deploy command is executed
 Then all the steps are completed successfully
 ```
@@ -276,14 +295,14 @@ Then the URL https://<CLOUD_DOMAIN_NAME> loads with a valid TLS certificate and 
 **How to do it**
 
 ```shell
-./afon.sh -a cli --cli-cmd deploy-<cloud>-polaris-stack
+afon-cli.sh deploy-<cloud>-polaris-stack
 ```
 
-## **Resourcing: technical**
+## Resourcing: technical
 
 Indicative time and the role we'd typically expect it to sit with, against each task above — based on Emrys's resourcing plan for Phase One (indicatively ~2 days total technical time per SDE) and confirmed individually with your technical lead at kickoff. We’ll work with you to support available technical leads with the build.
 
 Ideally, technical leads would become confident to deploy the data fabric in their own environment. 
 
-For those SDE that are very time constrained the minimum expected tasks on this list to complete are 2, 5 and 6. 
+For those SDE that are very time constrained the minimum expected tasks on this list to complete are 1-5. 
 
