@@ -2,50 +2,39 @@
 
 ## Afon CLI distribution
 
-The binary distribution `afon-distribution-cli` allows the use of Afon without needing access to the source codebase.
+The AFON CLI distribution allows the use of Afon without requiring access to the source codebase. 
 
-The Afon CLI distribution is a zip consisting of:
+It is packaged as a zip consisting of:
 
 - `afon-cli.jar`: a standalone executable which contains all the dependencies it requires.
 - `afon-cli.sh`: a script that executes the afon-cli.jar, setting all the runtime JVM args and env variables.
 - `afon-cli-scripts.sh`: a script that executes the cli scripts, setting the appropriate env variables.
 - `docs`: the docs relating the running of the commands.
+- `scripts`: the scripts that can be executed via both `afon-cli.sh` and `afon-cli-scripts.sh`
 - `templates`: the config templates.
 
 ## Installing Afon CLI 
 
-The `afon-distribution-cli` zip is a self-contained application that can be installed anywhere by extracting zip 
-to a given dir.  
+The CLI is a self-contained application that can be installed anywhere by extracting zip to a given dir.
 
-Assuming it has been unpacked in the dir `~/.afon/cli` and calling this dir `AFON_CLI_DIR`,
-you can add the `AFON_CLI_DIR` to the `PATH` in your shell so that it can be executed from anywhere:
+In bash, add to `~/.bash_profile` defining the location of the CLI and adding to the `PATH`:
 
 ```shell
-AFON_CLI_DIR=$HOME/.afon/cli
+export AFON_CLI_DIR=$HOME/.afon/cli
 PATH=$AFON_CLI_DIR:$PATH
 export PATH
 ```
 
-In the following, we'll assume that `afon-cli.sh` in the PATH.  Else, simply prefix it with its full path.  
+In the following, we'll assume that `afon-cli.sh` in the `PATH`.  Else, simply prefix it with its full path.  
 You don't need to be in the location of the `afon-cli.sh` file to execute it.
-
 
 ## Configuring local env
 
-On linux, the minimum list of apt packages to execute the CLI commands are:
+On linux or macOS, you can setup your local env by running:
 
-- openjdk-17-jre
-- tofu
-- kubectl
-
-In addition, according to your chosen cloud provider:
-
-- awscli eksct
-- azure-cli kubelogin
-- google-cloud-cli
-
-**NOTE:** for the `ekscli` package on linux follow the [eksctl installation](https://docs.aws.amazon.com/eks/latest/eksctl/installation.html) and
-for the `kubelogin` run `az aks install-cli` after having installed `azure-cli`.
+```shell
+afon-cli.sh setup-local
+```
 
 ## Afon CLI configuration
 
@@ -88,13 +77,12 @@ For example, to run command with console logging:
 afon-cli.sh --logging-console INFO <command>
 ```
 
-**NOTE:** The options `--logging`/`--logging-console` are not supported by `afon-cli-scripts.sh` as the scripts it runs have no use
-for a  logging level, so those two are only recognized before the command name, configuring this JVM's own logging — after
+**NOTE:** The options `--logging`/`--logging-console` are not supported by `afon-cli-scripts.sh` as the scripts it runs have no use for a  logging level, so those two are only recognized before the command name, configuring this JVM's own logging — after
 the command name they're not recognized at all and get forwarded as plain args to the script.
 
 ## Script commands
 
-Every script under `scripts/` (the ones runnable via [`afon-cli-scripts.sh`](configuration.md)) also has a script
+Every script under `scripts/` (runnable via [`afon-cli-scripts.sh`](configuration.md)) also has a script
 command on `afon-cli.sh`, so you don't need to switch between the two entry points.  
 The command name is the script's path relative to `scripts`, with the `/` replaced by `-` and the `.sh` removed, eg:
 
@@ -128,9 +116,7 @@ afon-cli.sh deploy-gcp-polaris-stack
 deploy a stack plus configure the Polaris catalogs) you must take care not move your `$AFON_CDKTF` until the teardown of
 the stack, other `tofu` will not know the information to destroy the stack.
 
-
-In the command, we use the convention that `deploy` just deploy stack (waiting for DNS to propagate) and `setup` does the deployment
-and configures the Polaris catalogs.
+In the command names, we use the convention that `deploy` just deploys the stack (waiting for DNS to propagate) and `setup` does the deployment and configures the Polaris catalogs.
 
 ### Setup AWS full stack
 
