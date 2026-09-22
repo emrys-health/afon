@@ -21,7 +21,7 @@ usage (){
   echo "          [--logging|-l <logging>] [--logging-console|-lc <console>] [--mvn-quiet]"
   echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
   echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp <profiles>]"
-  echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>] [--exec-type|-et <types>]"
+  echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>]"
   echo "          [--script-path|-sp <path>] [--script-args|-sa <args>]"
   echo "          [--setup-output <file>]"
   echo "actions:  ansible|build|exec|script|<dir>-<name>|<ops-command>"
@@ -59,12 +59,11 @@ usage (){
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
   echo "build-args:       the build args.  eg '--offline'."
   echo "build-goals:      the build goals.  Defaults to 'clean install'."
-  echo "build-profiles:   the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
-  echo "exec-class:       the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
+  echo "build-profiles:   the build profiles.  One of acceptance|cli|distribution.  Defaults to 'acceptance'."
+  echo "exec-class:       the jvm class to execute.  Can be absolute or relative to the exec package."
   echo "exec-args:        the jvm exec args (must be quoted if more than one arg)"
   echo "exec-envs:        the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
   echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
-  echo "exec-type:        the exec type.  One of ops|samples.  Defaults to 'ops'."
   echo "script-path:      the path of the script the run."
   echo "script-args:      the script args (must be quoted if more than one arg).  Also used for tofu-* actions."
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
@@ -217,11 +216,7 @@ exec_jvm(){
     MVN_ARGS="$MVN_ARGS -Dexec.envs=\"$EXEC_JVM_ENVS\""
   fi
   mvn_envs
-  if [ -z "$EXEC_TYPE" ]; then
-    echo "Action exec requires option --exec-type"
-    usage; exit 0
-  fi
-  cd $AFON_ROOT/afon-$EXEC_TYPE
+  cd $AFON_ROOT/afon-ops
   exec_mvn
 }
 
@@ -260,7 +255,6 @@ EXEC_CLASS=
 EXEC_ARGS=
 EXEC_ENVS=
 EXEC_PACKAGE=
-EXEC_TYPE=
 HELP=
 HOME_DIR=
 LOGGING=
@@ -309,8 +303,6 @@ while [[ $# -gt 0 ]]; do
       EXEC_ENVS="$2"; shift 2 ;;
     --exec-package|-ep)
       EXEC_PACKAGE="$2"; shift 2 ;;
-    --exec-type|-et)
-      EXEC_TYPE="$2"; shift 2 ;;
     --home)
       HOME_DIR="$2"; shift 2 ;;
     --help|-h)
@@ -479,12 +471,6 @@ case $ACTION in
     check_acceptance
     ;;
   exec)
-    if [ -n "$EXEC_TYPE" ]; then
-      echo "Using exec type '$EXEC_TYPE'"
-    else
-      echo "Exec type not specified.  Defaulting to 'ops'."
-      EXEC_TYPE="ops"
-    fi
     exec_jvm
     ;;
   script)
