@@ -52,7 +52,12 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
             jupyterDomain,
             JupyterMfaConfig.PROXY_SVC_NAME,
             JupyterMfaConfig.PROXY_PORT,
-            cloudProvider.getSubnetIds());
+            cloudProvider.getSubnetIds(),
+            // oauth2-proxy answers 403 on "/" - that is its sign-in page, not an error -
+            // so the ALB default health check could never pass. /ping is its own health
+            // endpoint and returns 200.
+            "/ping",
+            null);
 
         cloudProvider.configureDNS(
             "JupyterHubAliasRecord",

@@ -1,6 +1,8 @@
 package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -10,13 +12,15 @@ import health.emrys.afon.cdk.AbstractCloudStack;
 import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.List;
+import java.util.Map;
 
-import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
+import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonCloud.AWS;
 
 public class AwsPolarisStack extends AbstractCloudStack {
@@ -29,32 +33,41 @@ public class AwsPolarisStack extends AbstractCloudStack {
     public AwsPolarisStack(@NonNull Construct scope,
                            AfonCloud id,
                            AfonPropertyProvider properties) {
-        super(scope, id);
+        super(scope, id, properties);
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
         cloudProvider = new AwsCloudProvider(this, id.toString(), properties);
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties) {
-            protected Service configurePolarisService(Deployment polarisDeployment) {
+            protected Service configurePolarisService(Deployment polarisDeployment, Map<String, String> polarisLabels) {
                 return null; // no longer using an external service
             }
         };
         polarisConfig.deployPolaris(cloudProvider.getDependables());
         Service.Builder
-            .create(this, POLARIS_INTERNAL_SERVICE_NAME)
+            .create(this, POLARIS_INTERNAL)
             .metadata(ServiceMetadata
                           .builder()
-                          .name(POLARIS_INTERNAL_SERVICE_NAME)
+                          .name(POLARIS_INTERNAL)
                           .namespace("default")
                           .build())
             .dependsOn(cloudProvider.getDependables())
             .spec(ServiceSpec
                       .builder()
-                      .selector(polarisConfig.getPolarisLabels()) // Selects the Pods created by secretAppDeployment
+                      .selector(polarisConfig.polarisLabels) // Selects the Pods created by secretAppDeployment
                       .type("NodePort")
                       .internalTrafficPolicy("Cluster")
                       .clusterIps(List.of())
-                      .port(List.of(polarisConfig.getPolarisSpecPort()))
+                      .port(List.of(polarisConfig.POLARIS_PORTS, PolarisConfig.POLARIS_MGMT_PORT))
                       .build())
+            // HDRS (Patch 18): the ClusterIP is assigned by Kubernetes, not by us.
+            // Upstream declares an empty list, which reads as a CHANGE against any
+            // live Service (which has a real address) and forces replacement -
+            // recreating polaris-internal and breaking the ALB target behind the
+            // Polaris ingress. Ignoring the field lets a live cluster keep the
+            // address it was given.
+            .lifecycle(TerraformResourceLifecycle.builder()
+                                                 .ignoreChanges(List.of("spec[0].cluster_ips"))
+                                                 .build())
             .build();
         keyCloakConfig = new AwsKeyCloakConfig(this, properties, cloudProvider);
         keyCloakConfig.configureHttpsAndDNS();

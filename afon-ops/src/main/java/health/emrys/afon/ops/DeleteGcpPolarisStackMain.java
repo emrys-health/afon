@@ -7,19 +7,18 @@ import health.emrys.afon.ops.steps.StepsProvider;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonCloud.GCP;
 
-public class DeleteAwsStackMain implements StepsProvider {
+public class DeleteGcpPolarisStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
         return List.of(
-            stepOperations.deleteStack(AWS)
+            stepOperations.deleteStack(GCP)
                       );
     }
 
     public static void main(String[] args) {
-        new StepRunner().runUsing(new DeleteAwsStackMain(), args);
+        new StepRunner().runUsing(new DeleteGcpPolarisStackMain(), args);
     }
-
 }

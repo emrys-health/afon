@@ -1,26 +1,28 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeleteAzureStackMain;
+import health.emrys.afon.ops.DeleteAzurePolarisStackMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
 
-public class DeleteAzureStackDocument extends AbstractDocument {
+public class DeleteAzurePolarisStackDocument extends AbstractDocument {
 
-    public DeleteAzureStackDocument(AfonPropertyProvider properties) {
+    public DeleteAzurePolarisStackDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 
     @Override
     public String getFilename() {
-        return "delete_azure_stack.md";
+        return "delete_azure_polaris_stack.md";
     }
 
     @Override
     protected String getSupplementaryIntro() {
-        return "Deletes the Azure stack";
+        return """
+                Deletes an Azure environment with a Polaris instance
+                """;
     }
 
     @Override
@@ -39,7 +41,7 @@ public class DeleteAzureStackDocument extends AbstractDocument {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return new DeleteAzureStackMain().stepsUsing(stepOperations);
+        return new DeleteAzurePolarisStackMain().stepsUsing(stepOperations);
     }
 
 }

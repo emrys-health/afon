@@ -152,8 +152,22 @@ public class SparkWorkloads {
         return "echo '" + sparkConnectJson + "' | kubectl apply -f -";
     }
 
+    /**
+     * HDRS (Patch 23): serialise with map keys SORTED, as {@code NetworkConfig} does for the
+     * same reason (Patch 19).
+     *
+     * <p>Both manifests are built from nested {@code Map.of(...)}, whose iteration order is
+     * deliberately randomised per JVM run, so the default serialisation produces a different
+     * string on every synth even when nothing has changed. Unlike the Trino release, these
+     * strings land in {@code local-exec} provisioner commands, which Terraform does not diff -
+     * so the cost here is only that {@code cdk.tf.json} never has a stable digest, which
+     * defeats the pipeline's determinism check and hides the sites that do matter.
+     *
+     * <p>Sorting makes the output a pure function of the content.
+     */
     private static String toJson(Map<String, Object> map) {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = new ObjectMapper()
+            .configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
         try {
             return mapper.writeValueAsString(map);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {

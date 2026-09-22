@@ -1,0 +1,359 @@
+# Build afon, assemble its config, and synthesise the AWS stack to Terraform
+# JSON - everything the three jobs in tofu.yml do before they touch the state.
+#
+# ONE PLACE RATHER THAN THREE. `plan`, `manual plan` and `apply` need
+# byte-identical setup, and the point of a plan is that it predicts the apply;
+# three copies of these steps is three chances for the prediction to be made
+# under different conditions than the thing it predicts. It is also the
+# organisation's standing rule (engagement CLAUDE.md, "Actions"): a step
+# appearing twice is a defect to fix.
+#
+# WHY A SYNTH STEP EXISTS AT ALL, when the svc-* pipelines just run `terraform
+# plan` on committed HCL: afon's Terraform is not written, it is GENERATED.
+# `AwsFullStack.main` is a CDKTF app that reads ~/.afon/config and emits
+# `cdk.tf.json` plus its vendored Helm charts. So the artefact this action
+# produces is the input to every tofu command, and a change to a .java file is
+# an infrastructure change - which is precisely why a plan on a pull request is
+# worth having here. It is the only way to see what a patch does before it is
+# applied to a live cluster.
+name: Build and synthesise the afon AWS stack
+description: Build the Java, materialise ~/.afon/config from Secrets Manager, and synth cdk.tf.json. Requires AWS credentials to already be configured.
+
+inputs:
+  config-secret-id:
+    description: Secrets Manager secret holding the config file set as a JSON object of filename -> contents.
+    required: false
+    default: hdrs-poc/afon-core-ci-config
+  aws-region:
+    description: Region the secrets live in.
+    required: false
+    default: eu-west-2
+  refresh-db-password:
+    description: >-
+      Overwrite POLARIS_DB_PASSWORD and KC_DB_PASSWORD from the live RDS master
+      secret. Leave true unless deliberately reproducing an older synth.
+    required: false
+    default: "true"
+
+outputs:
+  stack-dir:
+    description: Directory holding the synthesised cdk.tf.json, to pass to `tofu -chdir=`.
+    value: ${{ steps.synth.outputs.stack-dir }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 17
+      uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+      with:
+        distribution: temurin
+        java-version: "17"
+        cache: maven
+
+    # -----------------------------------------------------------------------
+    # THE CONFIG.
+    #
+    # afon cannot synthesise without it, so this is the step that decides
+    # whether afon can have CI at all. Upstream answers the same question with
+    # `scripts/github/secrets.sh push`, which uploads each file into a GitHub
+    # Actions secret; HDRS.md rules that out because the set carries the RDS
+    # master password and the svc user's access key. Secrets Manager instead -
+    # the org's chosen secrets backend, and the same side of the trust boundary
+    # as the things the config describes.
+    #
+    # Populate it with `scripts/hdrs/ci-config.sh push`; that script is the
+    # only writer, and this is the only reader.
+    # -----------------------------------------------------------------------
+    - name: Materialise the afon config
+      id: config
+      shell: bash
+      env:
+        SECRET_ID: ${{ inputs.config-secret-id }}
+        AWS_REGION: ${{ inputs.aws-region }}
+      run: |
+        set -euo pipefail
+        umask 077
+
+        AFON_HOME="$RUNNER_TEMP/afon-home"
+        CONFIG_DIR="$AFON_HOME/config"
+        rm -rf "$CONFIG_DIR"
+        mkdir -p "$CONFIG_DIR"
+
+        if ! bundle=$(aws secretsmanager get-secret-value \
+              --secret-id "$SECRET_ID" --region "$AWS_REGION" \
+              --query SecretString --output text 2>/dev/null); then
+          echo "::error::Cannot read $SECRET_ID. Populate it with scripts/hdrs/ci-config.sh push, or check the role's secretsmanager grant in hdrsuk/infra-aws-poc (github-afon-core.tf)."
+          exit 1
+        fi
+
+        # One JSON object, filename -> contents. jq writes each value out
+        # verbatim, so multi-line properties (SNOWFLAKE_PRIVATE_KEY) survive.
+        #
+        # Process substitution rather than `... | while read`: a `while` on the
+        # right of a pipe runs in a subshell, where the `exit 1` below would
+        # end the subshell and let the step carry on with a rejected file
+        # silently skipped.
+        while IFS= read -r name; do
+          case "$name" in
+            */*|.*|"")
+              echo "::error::Refusing the config entry '$name' - a bundle key must be a plain file name."
+              exit 1
+              ;;
+          esac
+          printf '%s' "$bundle" | jq -j --arg k "$name" '.[$k]' > "$CONFIG_DIR/$name"
+          chmod 600 "$CONFIG_DIR/$name"
+          echo "Wrote $name ($(wc -c < "$CONFIG_DIR/$name") bytes)"
+        done < <(printf '%s' "$bundle" | jq -r 'keys[]')
+
+        echo "AFON_HOME=$AFON_HOME"           >> "$GITHUB_ENV"
+        echo "AFON_CDKTF=$RUNNER_TEMP/cdktf"  >> "$GITHUB_ENV"
+        echo "config-dir=$CONFIG_DIR"         >> "$GITHUB_OUTPUT"
+
+    # -----------------------------------------------------------------------
+    # THE ROTATION TRAP, CLOSED.
+    #
+    # POLARIS_DB_PASSWORD and KC_DB_PASSWORD are the SAME credential under two
+    # names - the RDS master user, whose password AWS rotates on its own
+    # schedule. HDRS.md records what happens when the static copies go stale:
+    # Polaris sat `Running` with zero restarts for three days while every
+    # database health check failed, and refreshing one key without the other
+    # simply moved the outage to Keycloak.
+    #
+    # CI holds no copy. It reads the live value on every run, so a rotation can
+    # never put this pipeline behind - and if a plan ever shows those two
+    # Secrets changing, that IS the rotation, visible for once instead of
+    # silent.
+    # -----------------------------------------------------------------------
+    - name: Refresh the database password from RDS
+      if: inputs.refresh-db-password == 'true'
+      shell: bash
+      env:
+        AWS_REGION: ${{ inputs.aws-region }}
+        CONFIG_DIR: ${{ steps.config.outputs.config-dir }}
+      run: |
+        set -euo pipefail
+
+        # Looked up rather than hardcoded: the `rds!db-<uuid>` id changes if the
+        # instance is ever replaced, and a stale id fails in a way that reads
+        # like a permissions problem.
+        secret_arn=$(aws rds describe-db-instances --region "$AWS_REGION" \
+          --query 'DBInstances[?MasterUserSecret!=null].MasterUserSecret.SecretArn | [0]' \
+          --output text)
+        if [ -z "$secret_arn" ] || [ "$secret_arn" = "None" ]; then
+          echo "::error::No RDS instance with an AWS-managed master secret in $AWS_REGION."
+          exit 1
+        fi
+
+        password=$(aws secretsmanager get-secret-value --secret-id "$secret_arn" \
+          --region "$AWS_REGION" --query SecretString --output text | jq -r '.password')
+        echo "::add-mask::$password"
+
+        f="$CONFIG_DIR/secret.properties"
+        for key in POLARIS_DB_PASSWORD KC_DB_PASSWORD; do
+          if ! grep -q "^$key=" "$f"; then
+            echo "::warning::$key is not in secret.properties - the bundle may be out of date."
+            continue
+          fi
+          # Rewritten in python rather than sed: the password is 28 characters
+          # of arbitrary noise and any of them can be a sed metacharacter. The
+          # value arrives as an environment variable, not an argument, so it
+          # never reaches the process table.
+          KEY="$key" VALUE="$password" FILE="$f" python3 -c '
+        import os
+        path, key, value = os.environ["FILE"], os.environ["KEY"], os.environ["VALUE"]
+        with open(path) as fh:
+            lines = fh.read().splitlines()
+        out = [f"{key}={value}" if line.startswith(key + "=") else line for line in lines]
+        with open(path, "w") as fh:
+            fh.write("\n".join(out) + "\n")
+        '
+          echo "Refreshed $key from $secret_arn"
+        done
+
+    # -----------------------------------------------------------------------
+    # Mask every secret value in the log BEFORE anything can print one.
+    #
+    # Not belt and braces: it is load-bearing. afon renders config values
+    # straight into non-sensitive Terraform attributes - the Trino Helm
+    # release's `values` carries USER_POLARIS_SECRET, and the Guacamole
+    # provisioning ConfigMap carries JUPYTER_VNC_PASSWORD - and Terraform
+    # prints those in full in a plan diff, because only the `kubernetes_secret`
+    # resources are marked sensitive by their provider. Without this step a
+    # routine plan writes two live passwords into a job log that every reader
+    # of this repository can open.
+    #
+    # This covers the LOG. The pull-request comment is handled separately in
+    # tofu.yml, which posts a change summary rather than the diff - a mask is
+    # applied to workflow output, not to a file being read back and posted.
+    # -----------------------------------------------------------------------
+    - name: Mask the config secrets
+      shell: bash
+      env:
+        CONFIG_DIR: ${{ steps.config.outputs.config-dir }}
+      run: |
+        set -euo pipefail
+        for f in "$CONFIG_DIR"/secret*.properties; do
+          [ -f "$f" ] || continue
+          # Values shorter than 8 characters are skipped: masking a common
+          # word like a username would redact half the log and hide nothing.
+          while IFS= read -r value; do
+            [ ${#value} -ge 8 ] && echo "::add-mask::$value"
+          done < <(sed -n 's/^[A-Za-z0-9_]*=//p' "$f")
+        done
+        echo "Masked the values in $(ls "$CONFIG_DIR"/secret*.properties | wc -l) secret file(s)."
+
+    - name: Validate the afon config
+      shell: bash
+      run: ./afon.sh -a config-validate
+
+    # `-Dexec.skip=true` is REQUIRED, not tidiness. Upstream wired document
+    # generation into the build at the 56cfb474 import, and
+    # GenerateAllDocumentsMain walks every document including
+    # DeployAwsFullStackWithAzurePolarisMain, which demands AZURE_DOMAIN_NAME.
+    # On an AWS-only config the build dies there. See HDRS.md, "Building and
+    # deploying".
+    - name: Build afon
+      shell: bash
+      run: |
+        set -euo pipefail
+        ./afon.sh -a build -p -acceptance \
+          --build-args "-B -ntp -DskipTests -Dexec.skip=true -Dstyle.color=always"
+
+    # -----------------------------------------------------------------------
+    # SYNTHESISE TWICE AND COMPARE.
+    #
+    # This is not a paranoid extra: it is a regression test for a bug class
+    # that has already cost this deployment real damage, and that no plan can
+    # show you. Java randomises the iteration order of `Map.of` and `Set.of`
+    # per JVM run by design, and upstream renders both straight into Terraform
+    # config. Before Patch 19 that meant every apply deleted and re-applied the
+    # Cilium FQDN egress policy - a window with no egress allowlist on a
+    # cluster whose whole purpose is restricting egress - and restarted
+    # Keycloak, an authentication blip, for nothing. Neither is visible in a
+    # plan as a problem; the policy is present before and after, and the
+    # Keycloak diff reads as names sliding between positions.
+    #
+    # Two synths of identical input either agree or they do not, so the check
+    # is exact. It was how Patch 19 was confirmed in the first place: two
+    # digests before the fix, one after.
+    #
+    # ⚠️ IT BLOCKS, as of Patch 23. It did not at first: when this pipeline was
+    # written the check failed on every run, because Patch 19 had fixed the two
+    # sites it knew about and three more were still open -
+    #
+    #   resource.helm_release.trino.values[0]
+    #   resource.null_resource.sparkClusterManifest  (provisioner command)
+    #   resource.null_resource.sparkConnectManifest  (provisioner command)
+    #
+    # - and a permanent red X on every pull request teaches people to ignore
+    # CI, which is worse than not having it. Patch 23 ordered all three, so the
+    # check is now stably green and can mean something. Eight consecutive
+    # synths of identical input produced one digest.
+    #
+    # A failure here is real. Something has been serialised from an unordered
+    # `Map.of`/`Set.of`; find it before applying, because applying it is what
+    # causes the churn. `helm_release.values` is a tracked Terraform attribute,
+    # so that site alone re-upgrades Trino on every apply for a document that
+    # is semantically identical; the provisioner commands are not diffed by
+    # Terraform and cost only the digest - but the digest is what this check
+    # has to work with, so they matter here too.
+    #
+    # The fix is always the same one Patch 19 established: configure the
+    # ObjectMapper with ORDER_MAP_ENTRIES_BY_KEYS rather than rewriting the
+    # maps, which handles arbitrary nesting depth in one line.
+    # -----------------------------------------------------------------------
+    - name: Synthesise the stack
+      id: synth
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        synth_into() {
+          local out="$1"
+          rm -rf "$out"
+          AFON_CDKTF="$out" ./afon.sh -a exec -t ops -c aws \
+            --exec-class cdk.aws.AwsFullStack --logging-console INFO >/dev/null
+        }
+
+        # THREE, not two, and the number was measured rather than guessed.
+        # Two synths agree by chance whenever all the unstable sites happen to
+        # land on the same ordering: sampled over 12 local synths on
+        # 2026-09-04, that is about 1.5% of runs - and the pipeline's very
+        # first CI run drew exactly that, reporting "deterministic" against a
+        # tree known to be otherwise. A third synth squares the coincidence,
+        # to roughly 0.02%, for about 25 seconds on a job that already takes
+        # five minutes.
+        #
+        # It still SAMPLES rather than proves. A future regression at a site
+        # with only two orderings would collide half the time on any pair, so
+        # a single green run is weak evidence; a run of them is strong.
+        synth_into "$AFON_CDKTF"
+        synth_into "$RUNNER_TEMP/cdktf-again"
+        synth_into "$RUNNER_TEMP/cdktf-third"
+
+        one="$AFON_CDKTF/stacks/aws/cdk.tf.json"
+        two="$RUNNER_TEMP/cdktf-again/stacks/aws/cdk.tf.json"
+        three="$RUNNER_TEMP/cdktf-third/stacks/aws/cdk.tf.json"
+        echo "stack-dir=$AFON_CDKTF/stacks/aws" >> "$GITHUB_OUTPUT"
+
+        first=$(sha256sum "$one" | cut -d' ' -f1)
+        second=$(sha256sum "$two" | cut -d' ' -f1)
+        third=$(sha256sum "$three" | cut -d' ' -f1)
+        if [ "$first" = "$second" ] && [ "$first" = "$third" ]; then
+          echo "Synth is deterministic across three runs (sha256 ${first:0:16})."
+          exit 0
+        fi
+
+        # Report against whichever pair actually differs, so the addresses
+        # listed are real rather than empty.
+        if [ "$first" = "$second" ]; then
+          two="$three"; second="$third"
+        fi
+
+        # The differing ADDRESSES, never the differing content: the content is
+        # exactly where the secrets are (the Trino values document carries
+        # USER_POLARIS_SECRET).
+        unstable=$(python3 - "$one" "$two" <<'PY'
+        import json, sys
+        a, b = (json.load(open(p)) for p in sys.argv[1:3])
+        out = []
+        def walk(x, y, path):
+            if type(x) is not type(y):
+                out.append(path); return
+            if isinstance(x, dict):
+                for k in set(x) | set(y):
+                    if k in x and k in y:
+                        walk(x[k], y[k], f"{path}.{k}")
+                    else:
+                        out.append(f"{path}.{k}")
+            elif isinstance(x, list):
+                if len(x) != len(y):
+                    out.append(path); return
+                for i, (u, v) in enumerate(zip(x, y)):
+                    walk(u, v, f"{path}[{i}]")
+            elif x != y:
+                out.append(path)
+        for key in set(a) | set(b):
+            walk(a.get(key), b.get(key), key)
+        print("\n".join(sorted(out)))
+        PY
+        )
+
+        {
+          echo "### ⚠️ The synth is not deterministic"
+          echo
+          echo "Two runs of identical input produced different config"
+          echo "(\`${first:0:16}\` vs \`${second:0:16}\`). Something is rendered from an"
+          echo "unordered \`Map.of\` or \`Set.of\` - see HDRS.md, Patch 19."
+          echo
+          echo '```'
+          echo "$unstable"
+          echo '```'
+          echo
+          echo "Anything here that is a tracked Terraform attribute will show a change on"
+          echo "every plan and be re-applied on every apply. Provisioner commands are not"
+          echo "tracked, so those churn the file only."
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        echo "::error::The synth is not deterministic - see the run summary for the sites. Something is serialised from an unordered Map.of/Set.of; sort it (ORDER_MAP_ENTRIES_BY_KEYS) before applying."
+        exit 1

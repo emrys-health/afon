@@ -74,7 +74,21 @@ public class TrinoWorkloads {
         try {
             // JSON is valid YAML, so the existing ObjectMapper produces a values document Helm
             // accepts — avoiding a YAML dependency while keeping the multi-line catalog strings.
-            String valuesYaml = new ObjectMapper().writeValueAsString(values);
+            //
+            // HDRS (Patch 23): serialise with map keys SORTED, for the reason given at length
+            // in NetworkConfig (Patch 19). `values` is built from nested Map.of(...), whose
+            // iteration order is randomised per JVM run, and helm_release.values IS a tracked
+            // Terraform attribute - so without this the Trino release shows a change on every
+            // plan and is upgraded on every apply for a document that is semantically
+            // identical. Confirmed by parsing the live state's copy alongside two fresh
+            // synths: equal as JSON, different as strings.
+            //
+            // Note this also orders `additionalCatalogs` alphabetically rather than
+            // default-catalog-first. That ordering was for readability only; a plan that is
+            // honest about whether anything changed is worth more.
+            String valuesYaml = new ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+                .writeValueAsString(values);
 
             Release.Builder.create(scope, "trino")
                            .provider(helmProvider)

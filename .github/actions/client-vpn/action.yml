@@ -1,0 +1,63 @@
+# Reach the private cluster endpoint from a GitHub-hosted runner.
+#
+# ⚠️ THIS IS THE THIRD COPY. hdrsuk/svc-audit-log and
+# hdrsuk/svc-governance-registry carry byte-identical versions, and the HDRS
+# convention (engagement CLAUDE.md, "Actions") is explicit that a step
+# appearing in two repos is a defect to fix rather than a coincidence: it
+# belongs in hdrsuk/github-actions as a composite action every repo calls by
+# tag. That repo exists and is still empty, so there is nowhere yet to call.
+#
+# Copied deliberately rather than left out, because the alternative is a
+# pipeline that cannot reach the cluster at all. It is tracked debt, not an
+# exception: the first thing to land in hdrsuk/github-actions should be this
+# action, and all three repos should then delete their copy in the same PR.
+# The cost of not doing it is concrete - this action is handed the VPN private
+# key, so a revocation or a SHA bump is now three edits that can drift apart.
+#
+# The profile is the whole credential - CA, endpoint and client key in one
+# secret - so revoking it is one job, not two halves to remember.
+#
+# The VPN is a NETWORK credential. It gets the runner to the API server and
+# decides nothing about what the runner may do there; that is the IAM role the
+# caller assumes separately. Neither works without the other.
+name: Connect to the Client VPN
+description: Materialise an OpenVPN profile from a secret and bring the tunnel up.
+
+inputs:
+  profile:
+    description: The complete OpenVPN client profile (.ovpn) - pass the VPN_OVPN_PROFILE secret.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Materialise the VPN profile
+      shell: bash
+      env:
+        OVPN: ${{ inputs.profile }}
+      run: |
+        if [ -z "$OVPN" ]; then
+          echo '::error::VPN_OVPN_PROFILE is not set - see HDRS.md, "The HDRS pipeline".'
+          exit 1
+        fi
+        umask 077
+        printf '%s\n' "$OVPN" > "$RUNNER_TEMP/client.ovpn"
+
+    # The action runs `sudo openvpn ...` and does not install it; ubuntu-latest
+    # no longer ships it, so without this the connect step fails with
+    # `sudo: openvpn: command not found` - which reads like a sudo or PATH
+    # problem rather than a missing package.
+    - name: Install OpenVPN
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq openvpn
+
+    # SHA-pinned: this action is handed the VPN private key, and a moved tag
+    # would be a new owner of it. Third-party, so also subject to the
+    # organisation's Actions allowlist (hdrsuk/github-governance) - which
+    # already carries `kota65535/github-openvpn-connect-action@*`.
+    - name: Connect
+      uses: kota65535/github-openvpn-connect-action@cd2ed8a90cc7b060dc4e001143e811b5f7ea0af5 # v3.1.0
+      with:
+        config_file: ${{ runner.temp }}/client.ovpn

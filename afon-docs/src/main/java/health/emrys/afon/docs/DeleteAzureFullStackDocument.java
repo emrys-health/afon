@@ -1,26 +1,26 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeleteAwsStackMain;
+import health.emrys.afon.ops.DeleteAzureFullStackMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
 import java.util.List;
 
-public class DeleteAwsStackDocument extends AbstractDocument {
+public class DeleteAzureFullStackDocument extends AbstractDocument {
 
-    public DeleteAwsStackDocument(AfonPropertyProvider properties) {
+    public DeleteAzureFullStackDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 
     @Override
     public String getFilename() {
-        return "delete_aws_stack.md";
+        return "delete_azure_full_stack.md";
     }
 
     @Override
     public String getSupplementaryIntro() {
-        return "Deletes the AWS stack.";
+        return "Brings down the Azure full stack (Jupyter, Polaris, Spark etc).";
     }
 
     public String getFurtherNotes() {
@@ -32,7 +32,7 @@ public class DeleteAwsStackDocument extends AbstractDocument {
             
            Generate and run cleanup script (more than once if required):
             ```shell
-           ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args aws
+           ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args azure
             ```
             """);
     }
@@ -40,7 +40,7 @@ public class DeleteAwsStackDocument extends AbstractDocument {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return new DeleteAwsStackMain().stepsUsing(stepOperations);
+        return new DeleteAzureFullStackMain().stepsUsing(stepOperations);
     }
 
 }

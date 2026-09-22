@@ -1,7 +1,7 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeleteGcpStackMain;
+import health.emrys.afon.ops.DeleteGcpPolarisStackMain;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
@@ -9,20 +9,22 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
 
-public class DeleteGcpStackDocument extends AbstractDocument {
+public class DeleteGcpPolarisStackDocument extends AbstractDocument {
 
-    public DeleteGcpStackDocument(AfonPropertyProvider properties) {
+    public DeleteGcpPolarisStackDocument(AfonPropertyProvider properties) {
         super(properties);
     }
 
     @Override
     public String getFilename() {
-        return "delete_gcp_stack.md";
+        return "delete_gcp_polaris_stack.md";
     }
 
     @Override
     public String getSupplementaryIntro() {
-        return "Deletes the GCP stack";
+        return """
+                Creates a GCP environment with a Polaris instance populated with the test catalogs
+                """;
     }
 
     @Override
@@ -71,7 +73,7 @@ public class DeleteGcpStackDocument extends AbstractDocument {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return new DeleteGcpStackMain().stepsUsing(stepOperations);
+        return new DeleteGcpPolarisStackMain().stepsUsing(stepOperations);
     }
 
 }

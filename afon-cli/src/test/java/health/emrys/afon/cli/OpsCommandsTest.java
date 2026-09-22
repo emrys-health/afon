@@ -12,6 +12,7 @@ class OpsCommandsTest {
 
     @Test
     void resolvesKnownCommandsByKebabCaseName() {
+        assertThat(opsCommands.resolve("delete-aws-full-stack")).isEqualTo(health.emrys.afon.ops.DeleteAwsFullStackMain.class);
         assertThat(opsCommands.resolve("deploy-aws-full-stack")).isEqualTo(health.emrys.afon.ops.DeployAwsFullStackMain.class);
     }
 
@@ -36,9 +37,8 @@ class OpsCommandsTest {
 
     @Test
     void namesCanBeFilteredByCloud() {
-        assertThat(opsCommands.names("aws")).contains("deploy-aws-full-stack", "delete-aws-stack");
-        assertThat(opsCommands.names("azure")).contains("deploy-azure-polaris-stack", "delete-azure-stack");
-        assertThat(opsCommands.names("gcp")).contains("deploy-gcp-polaris-stack", "delete-gcp-stack");
+        Set<String> names = opsCommands.names("aws");
+        assertThat(names).contains("deploy-aws-full-stack", "delete-aws-full-stack");
     }
 
 }

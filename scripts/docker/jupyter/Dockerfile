@@ -64,3 +64,4 @@ RUN pip install --no-cache-dir pyspark==4.0.1 grpcio\>=1.48.1 grpcio-status
 #    The VNC hook in before-notebook.d still runs, since start.sh sources it before
 #    exec'ing jupyterhub-singleuser.
 RUN pip install --no-cache-dir "jupyterhub>=4.0,<5"
+

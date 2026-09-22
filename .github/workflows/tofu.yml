@@ -1,0 +1,540 @@
+# Plan on pull request, always; apply only by hand.
+#
+# THE HDRS PIPELINE. This file is not upstream's and does not replace
+# `aws-stack-linux.yml`, which stays exactly as it is. The two answer different
+# questions and must not be confused:
+#
+#   aws-stack-linux.yml  runs ops.DeployAwsFullStackMain on Emrys's self-hosted
+#                        runner. That entry point begins with `deleteStack` -
+#                        it TEARS THE STACK DOWN and rebuilds it, roughly an
+#                        hour with Polaris and Jupyter unavailable throughout.
+#                        It is the right tool for a fresh environment and the
+#                        wrong one for a change.
+#
+#   this file            synthesises the stack and runs `tofu plan` / `tofu
+#                        apply` against the live state. Nothing is deleted,
+#                        nothing is rebuilt, and a routine change is a plan a
+#                        human read and an apply a human pressed.
+#
+# It only became possible on 2026-08-28. Before Patches 18 and 19 a full apply
+# wanted to replace two live load balancers and re-render the Cilium policy on
+# every run, so every change had to be applied surgically with `-target`; with
+# those two in, `tofu plan` reports `No changes` against the live stack and the
+# deployment is idempotent for the first time. A pipeline is only worth having
+# once that is true.
+#
+# WHY A PLAN ON A PULL REQUEST IS WORTH MORE HERE THAN ANYWHERE ELSE. afon's
+# Terraform is generated, not written: a `.java` change is an infrastructure
+# change, and until now the only way to find out what one did was to deploy it.
+# Patches 18 and 19 were BOTH found by planning and reading the output - two
+# live load balancers about to be destroyed, and a network policy being deleted
+# and re-applied on every apply. Neither is visible in review of the Java.
+#
+# APPLY IS MANUAL, ON PURPOSE, and this is the same call svc-audit-log made
+# after trying apply-on-merge and reverting it within the hour. A merge to main
+# is not the moment anyone wants a TRE's analytical environment to change. It
+# is `workflow_dispatch` only, gated by a typed CONFIRM, so applying is a
+# deliberate act with its own run log entry rather than a side effect of
+# someone else's merge. That run log is the change-control evidence.
+#
+# `manual plan` exists so an apply can be preceded by a fresh plan without
+# opening a throwaway PR. It uses the deploy role rather than the read-only
+# one: anyone who can dispatch this workflow can already dispatch `apply`, so a
+# separate role here would gate nothing real. It still passes `-lock=false`,
+# because a plan that is not about to apply should not hold the write lock.
+#
+# WHAT THIS PIPELINE DOES NOT COVER, and must not be mistaken for:
+#   - The four pieces of prerequisite state afon never creates (the
+#     `polaris_db_aws` database, the Polaris metastore bootstrap, the Keycloak
+#     `polaris` realm, and the client for the root principal). See HDRS.md.
+#     A first apply into a fresh environment still needs them, by hand, first.
+#   - The non-tofu deploy steps - catalogue creation, user onboarding, the
+#     Spark write check. Those are ops.* entry points, still operator-run.
+#   - DESTROY. There is no destroy path here and the deploy role does not hold
+#     the ec2/elb delete permissions the teardown provisioners need. End of
+#     life follows the order in POC-RUNBOOK.md, from devops-work.
+#
+# The runner reaches a PRIVATE endpoint over the Client VPN (see
+# .github/actions/client-vpn). Two credentials, neither implying the other: the
+# VPN profile is network reach, the OIDC role is authorisation. The PR `plan`
+# job's role is READ-ONLY and assumable only from a pull request; `manual plan`
+# and `apply` share the role assumable only from main. Both are defined in
+# hdrsuk/infra-aws-poc (github-afon-core.tf), which also records the accepted
+# risk that comes with planning this particular stack in CI.
+#
+# ⚠️ NO JOB IS NAMED `validate`. That name is the require-ci ruleset's required
+# check. This repository is not in that ruleset (`afon-core` is not among its
+# conditions) and this workflow is path-filtered, so if it were ever added the
+# check would never appear on a PR touching no Java and would sit on "Expected"
+# forever. `plan` informs review; nothing here gates a merge.
+name: Tofu
+
+on:
+  pull_request:
+    # Anything the synth reads. Wider than it strictly needs to be on the
+    # module list, deliberately: missing a change means reviewing an
+    # infrastructure edit with no plan, while an extra run costs build minutes
+    # that are inside the included allowance.
+    paths:
+      - "afon-cdk/**"
+      - "afon-config/**"
+      - "afon-ops/**"
+      - "afon-security/**"
+      - "afon-cluster/**"
+      - "pom.xml"
+      - "afon.sh"
+      - "settings.xml"
+      - ".github/workflows/tofu.yml"
+      - ".github/actions/**"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "plan (read-only, nothing written) or apply (changes what is running)"
+        type: choice
+        options: [plan, apply]
+        default: plan
+      confirm:
+        description: "For apply only: type APPLY to confirm. Ignored for plan."
+        type: string
+        default: ""
+      allow_destroy:
+        description: "Apply even if the plan destroys a Helm release or a DNS record. Read the plan first."
+        type: boolean
+        default: false
+
+# Least privilege by default; each job widens only what it needs.
+permissions:
+  contents: read
+
+env:
+  TOFU_VERSION: 1.12.6 # matches devops-work and the state's terraform_version
+  TF_IN_AUTOMATION: "1"
+  AWS_REGION: eu-west-2
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      pull-requests: write # to post the plan summary as a comment
+      id-token: write # mint the OIDC token traded for the read-only AWS role
+
+    # A second push to the branch makes the first plan pointless, and this job
+    # builds the whole Java reactor before it plans anything.
+    concurrency:
+      group: tofu-plan-${{ github.ref }}
+      cancel-in-progress: true
+
+    # Job-level so the steps below can branch on it: a step cannot test an
+    # `env` entry it defines itself.
+    env:
+      HAS_PLAN_ROLE: ${{ vars.AWS_PLAN_ROLE_ARN != '' }}
+
+    steps:
+      # Pinned to a full commit SHA: a tag is mutable and can be repointed at
+      # new code without the pin changing. The trailing comment is the version.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Skipped rather than failed while the role is not configured: a
+      # permanent red X on every PR trains people to ignore CI, which is worse
+      # than no plan. This is the state the repository is in until
+      # hdrsuk/infra-aws-poc's github-afon-core.tf is applied and
+      # AWS_PLAN_ROLE_ARN is set.
+      - name: note missing role
+        if: env.HAS_PLAN_ROLE != 'true'
+        run: |
+          echo "::notice::AWS_PLAN_ROLE_ARN is not set - plan skipped. See HDRS.md, 'The HDRS pipeline'."
+
+      # Federated, never a key. Read-only, and assumable only from a pull
+      # request. Configured BEFORE the build, because the synth needs the
+      # config and the config comes from Secrets Manager.
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        if: env.HAS_PLAN_ROLE == 'true'
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: synth
+        if: env.HAS_PLAN_ROLE == 'true'
+        uses: ./.github/actions/afon-synth
+
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        if: env.HAS_PLAN_ROLE == 'true'
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          # The wrapper rewrites stdout to collect outputs and is not needed
+          # here; without it the failure output is OpenTofu's own.
+          tofu_wrapper: false
+
+      # Last, so the tunnel is up for the shortest time that works. The build
+      # and the synth need the internet and Secrets Manager, not the cluster.
+      - uses: ./.github/actions/client-vpn
+        if: env.HAS_PLAN_ROLE == 'true'
+        with:
+          profile: ${{ secrets.VPN_OVPN_PROFILE }}
+
+      # -lock=false: this role cannot write to the state prefix, and a plan
+      # that took the lock would need to release it. Nothing here writes.
+      #
+      # -out, even though this plan is never applied, because the JSON form is
+      # what the summary below is built from - see the step after it for why
+      # the human-readable diff must not leave this runner.
+      - name: tofu plan
+        if: env.HAS_PLAN_ROLE == 'true'
+        working-directory: ${{ steps.synth.outputs.stack-dir }}
+        run: |
+          set -o pipefail
+          tofu init -input=false
+          tofu plan -input=false -no-color -lock=false -out=tfplan | tee plan.txt
+          tofu show -json tfplan > plan.json
+
+      # -----------------------------------------------------------------------
+      # ⚠️ THE COMMENT IS A SUMMARY, NOT THE PLAN, AND THAT IS DELIBERATE.
+      #
+      # The svc-* pipelines post their whole diff. This one cannot, because
+      # afon renders config values into Terraform attributes that no provider
+      # marks sensitive:
+      #
+      #   helm_release.trino                     values -> USER_POLARIS_SECRET
+      #   kubernetes_config_map.guacamoleProvisionCm  -> JUPYTER_VNC_PASSWORD
+      #
+      # Both were confirmed present in the live state on 2026-09-04. Only the
+      # `kubernetes_secret` resources are redacted by their provider, so a
+      # verbatim plan comment would publish two live passwords into a pull
+      # request thread, where they persist after the branch, the run and the
+      # log are gone.
+      #
+      # The addresses and the actions are what a reviewer actually needs -
+      # Patch 18 was "2 to destroy", which this shows plainly - and they carry
+      # no attribute values at all. The full diff stays in the job log, where
+      # ::add-mask:: from the synth action covers the values it knows.
+      #
+      # If a full diff is ever wanted here, the fix is upstream: put those two
+      # values in a Secret and reference them, rather than rendering them into
+      # a chart's values and a ConfigMap.
+      # -----------------------------------------------------------------------
+      - name: comment the plan summary on the PR
+        if: env.HAS_PLAN_ROLE == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PLAN_DIR: ${{ steps.synth.outputs.stack-dir }}
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = JSON.parse(fs.readFileSync(`${process.env.PLAN_DIR}/plan.json`, 'utf8'));
+
+            const changes = (plan.resource_changes || []).filter(
+              c => !(c.change.actions.length === 1 && c.change.actions[0] === 'no-op'));
+
+            const label = c => c.change.actions.join(',');
+            const destructive = changes.filter(
+              c => c.change.actions.some(a => a === 'delete'));
+
+            const counts = changes.reduce((acc, c) => {
+              acc[label(c)] = (acc[label(c)] || 0) + 1;
+              return acc;
+            }, {});
+
+            let body = '### tofu plan\n\n';
+            if (changes.length === 0) {
+              body += 'No changes. The live stack matches this branch.\n';
+            } else {
+              body += Object.entries(counts)
+                .map(([k, n]) => `- \`${k}\` x ${n}`).join('\n') + '\n\n';
+              if (destructive.length) {
+                body += `> [!WARNING]\n> ${destructive.length} resource(s) would be DESTROYED. `
+                     +  `Read the full plan in the job log before applying.\n\n`;
+              }
+              body += '<details><summary>Resources</summary>\n\n';
+              body += changes.map(c => `- \`${label(c)}\` ${c.address}`).join('\n');
+              body += '\n\n</details>\n';
+            }
+            body += '\n_Addresses and actions only - the full diff stays in the job log, '
+                 +  'because afon renders two live passwords into non-sensitive attributes. '
+                 +  'See the comment above this step in `.github/workflows/tofu.yml`._';
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+  manual-plan:
+    name: manual plan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'plan'
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      id-token: write # mint the OIDC token traded for the deploy role
+
+    # Shared with `apply` so the two queue behind each other rather than racing
+    # the same state.
+    concurrency:
+      group: tofu-manual
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: require the deploy role
+        env:
+          HAS_ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN != '' }}
+        run: |
+          if [ "$HAS_ROLE" != "true" ]; then
+            echo "::error::AWS_DEPLOY_ROLE_ARN is not set. See HDRS.md, 'The HDRS pipeline'."
+            exit 1
+          fi
+
+      # Same role `apply` uses - see the header for why reusing it here does
+      # not widen who can plan.
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: synth
+        uses: ./.github/actions/afon-synth
+
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - uses: ./.github/actions/client-vpn
+        with:
+          profile: ${{ secrets.VPN_OVPN_PROFILE }}
+
+      # -lock=false: a plan that is not about to apply should not hold the
+      # write lock, and this is never followed by an apply in the same run.
+      - name: tofu plan
+        working-directory: ${{ steps.synth.outputs.stack-dir }}
+        run: |
+          set -o pipefail
+          tofu init -input=false
+          tofu plan -input=false -no-color -lock=false -out=tfplan | tee plan.txt
+          tofu show -json tfplan > plan.json
+
+      # The counts only, for the same reason the PR comment carries no diff -
+      # a run summary is as readable, and as durable, as a comment.
+      - name: summarise
+        if: always()
+        working-directory: ${{ steps.synth.outputs.stack-dir }}
+        run: |
+          {
+            echo "### tofu plan"
+            echo
+            echo "- ref: \`${{ github.sha }}\`"
+            echo "- $(grep -E '^(Plan:|No changes)' plan.txt 2>/dev/null | head -1 || echo 'plan: not reached')"
+            echo
+            echo "Addresses and actions are in the job log. The diff is not summarised here:"
+            echo "afon renders two live passwords into non-sensitive attributes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    name: apply
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'apply'
+    timeout-minutes: 120
+
+    permissions:
+      contents: read
+      id-token: write # mint the OIDC token traded for the deploy role
+
+    # Never two applies at once. The S3 backend's native lock would refuse the
+    # second anyway, but failing there is a confusing lock error rather than a
+    # queued run. Never cancelled mid-apply: that is how state gets left behind
+    # a half-finished change.
+    concurrency:
+      group: tofu-manual
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # This repository has no second reviewer (baseline-main: 0 approvals,
+      # team of ~1) and apply is deliberately not gated by a merge someone else
+      # made, so the one guard left is a human typing the word on the button
+      # they pressed.
+      - name: confirm
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "APPLY" ]; then
+            echo "::error::Type APPLY in the confirm input to run this. Nothing has changed."
+            exit 1
+          fi
+
+      # A missing credential FAILS here, where the PR plan job merely skips.
+      # The asymmetry is the point: a plan that quietly does not run costs a
+      # review comment; an apply that quietly does not run leaves the cluster
+      # behind main with nothing red to say so.
+      - name: require the deploy role
+        env:
+          HAS_ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN != '' }}
+        run: |
+          if [ "$HAS_ROLE" != "true" ]; then
+            echo "::error::AWS_DEPLOY_ROLE_ARN is not set. See HDRS.md, 'The HDRS pipeline'."
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: synth
+        uses: ./.github/actions/afon-synth
+
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - uses: ./.github/actions/client-vpn
+        with:
+          profile: ${{ secrets.VPN_OVPN_PROFILE }}
+
+      # Several null_resource provisioners in this stack shell out to kubectl,
+      # which reads the ambient kubeconfig rather than the provider's
+      # credentials (see the note in NetworkConfig). The kubernetes and helm
+      # providers themselves do NOT need this - they take host, CA and token
+      # from data.aws_eks_cluster and data.aws_eks_cluster_auth - so this is
+      # only for those provisioners, and only matters when one is created or
+      # replaced. On a fresh runner there is no ~/.kube/config at all, and the
+      # failure reads as "no such file or directory" from kubectl.
+      # $AFON_HOME is exported into the job by the afon-synth action above.
+      - name: point kubectl at the cluster
+        run: |
+          set -euo pipefail
+          cluster=$(sed -n 's/^CLUSTER_NAME=//p' "$AFON_HOME/config/afon.properties" | tr -d '\r')
+          if [ -z "$cluster" ]; then
+            echo "::error::CLUSTER_NAME is not set in afon.properties."
+            exit 1
+          fi
+          aws eks update-kubeconfig --name "$cluster" --region "$AWS_REGION"
+
+      # Saved to a file so the thing inspected below is the thing applied. An
+      # operator may still apply from devops-work against the same state; the
+      # lock timeout turns that collision into a wait rather than a failure.
+      - name: tofu plan
+        working-directory: ${{ steps.synth.outputs.stack-dir }}
+        run: |
+          set -o pipefail
+          tofu init -input=false
+          tofu plan -input=false -no-color -lock-timeout=5m -out=tfplan | tee plan.txt
+          tofu show -json tfplan > plan.json
+
+      # -----------------------------------------------------------------------
+      # REFUSE THE TWO DESTRUCTIONS THAT ARE NOT RECOVERABLE BY RE-RUNNING.
+      #
+      # helm_release, because Cilium is this cluster's CNI. Deleting it does
+      # not degrade pod networking, it removes it, on a cluster whose whole
+      # security model is Cilium network policy - and the AWS Load Balancer
+      # Controller's removal orphans the four internal load balancers that the
+      # DNS records and the ACM certificate point at.
+      #
+      # aws_route53_record, because those three names are what the certificate
+      # covers and what every VPN user has bookmarked; recreating them means a
+      # new ALB and a propagation wait, during which the environment is simply
+      # gone.
+      #
+      # Everything else this stack manages is replaced routinely - Deployments,
+      # Services, ConfigMaps, jobs - so nothing else is guarded. A REPLACE of
+      # a Helm release counts, because a replace is a delete followed by a
+      # create, and the gap is the whole problem.
+      # -----------------------------------------------------------------------
+      - name: refuse to destroy the networking
+        working-directory: ${{ steps.synth.outputs.stack-dir }}
+        env:
+          ALLOW_DESTROY: ${{ inputs.allow_destroy }}
+        run: |
+          set -euo pipefail
+          destructive=$(jq -r '
+            [ .resource_changes[]
+              | select(.type == "helm_release" or .type == "aws_route53_record")
+              | select(any(.change.actions[]; . == "delete"))
+              | "  \(.address)  [\(.change.actions | join(","))]"
+            ] | .[]' plan.json)
+          if [ -z "$destructive" ]; then
+            exit 0
+          fi
+          echo "$destructive"
+          if [ "$ALLOW_DESTROY" = "true" ]; then
+            echo "::warning::Networking destroyed via the allow_destroy override."
+            exit 0
+          fi
+          echo "::error::This plan destroys or replaces a Helm release or a DNS record, so it was NOT applied."
+          echo "Nothing has changed. Read the plan above, and if it is genuinely intended,"
+          echo "re-run this workflow manually with allow_destroy = true."
+          exit 1
+
+      # -parallelism=5, matching StepActions.tofuApply: the default of 10
+      # overwhelms the API server on a cluster this size and produces timeouts
+      # that read as flakiness.
+      - name: tofu apply
+        working-directory: ${{ steps.synth.outputs.stack-dir }}
+        run: tofu apply -input=false -no-color -lock-timeout=5m -parallelism=5 tfplan
+
+      # -----------------------------------------------------------------------
+      # A SUCCESSFUL APPLY IS NOT ALWAYS A FINISHED CHANGE.
+      #
+      # Polaris mounts its credentials from a Secret volume and Keycloak takes
+      # its through env.valueFrom.secretKeyRef. Neither reaches a running pod,
+      # so tofu reports success while both processes keep using the old value -
+      # which is exactly how the three-day Polaris outage in HDRS.md stayed
+      # invisible. If this apply changed a Secret, the change is not live until
+      # someone restarts the pods.
+      #
+      # Deliberately NOT automated. Restarting Keycloak logs every Jupyter user
+      # out (the hub keeps no state either - see HDRS.md), and that is a
+      # decision for whoever is applying, not a side effect of a workflow.
+      # -----------------------------------------------------------------------
+      - name: flag secrets that need a restart
+        if: success()
+        working-directory: ${{ steps.synth.outputs.stack-dir }}
+        run: |
+          set -euo pipefail
+          changed=$(jq -r '
+            [ .resource_changes[]
+              | select(.type == "kubernetes_secret")
+              | select(any(.change.actions[]; . != "no-op"))
+              | .address ] | .[]' plan.json)
+          if [ -n "$changed" ]; then
+            {
+              echo "> [!IMPORTANT]"
+              echo "> This apply changed a Secret. Polaris and Keycloak will keep using the OLD"
+              echo "> value until their pods restart - tofu cannot tell you this, and a pod that"
+              echo "> is \`Running\` with 0 restarts is not evidence of health."
+              echo ">"
+              echo "> \`\`\`"
+              echo "> kubectl delete pod -n default -l app=polaris"
+              echo "> kubectl rollout restart deployment/keycloak-deployment -n default"
+              echo "> \`\`\`"
+              echo ">"
+              echo "> Restarting Keycloak logs every Jupyter user out."
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::A Secret changed - Polaris and Keycloak need a manual restart. See the run summary."
+          fi
+
+      # The outcome in the run summary, not only the log, so "was this actually
+      # applied?" is answerable at a glance later. On a health-data org this run
+      # log is the change-control evidence.
+      - name: summarise
+        if: always()
+        working-directory: ${{ steps.synth.outputs.stack-dir }}
+        run: |
+          {
+            echo "### tofu apply"
+            echo
+            echo "- commit: \`${{ github.sha }}\`"
+            echo "- result: **${{ job.status }}**"
+            echo "- $(grep -E '^(Plan:|No changes)' plan.txt 2>/dev/null | head -1 || echo 'plan: not reached')"
+          } >> "$GITHUB_STEP_SUMMARY"

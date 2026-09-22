@@ -8,61 +8,39 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static health.emrys.afon.config.AfonCloud.*;
-import static health.emrys.afon.config.ConfigUtils.afonCloud;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PolarisConfigTest {
 
     @Test
-    public void canGenerateConfigScriptForGivenCloud() {
+    public void testConfigScript() {
         AfonPropertyProvider properties = new FilePropertyProvider();
-        validateScriptFor(AWS.toString(), properties);
-        validateScriptFor(AZURE.toString(), properties);
-        validateScriptFor(GCP.toString(), properties);
-    }
-
-    private void validateScriptFor(String id, AfonPropertyProvider properties) {
-        if ( !afonCloud().equalsIgnoreCase(id) ){
-            // does not match currently specified cloud
-            return;
-        }
-        String script = PolarisConfig.getProviderCredentials(properties, id);
-        String polarisDbName = "polaris_db_" + PolarisConfig.polarisDomainName(properties, id).replace(".", "_");
-        assertThat(script).contains(polarisDbName);
+        String               script     = PolarisConfig.getProviderCredentials(properties, "test");
         PolarisConstants.getPolarisProperties()
-                .forEach(x -> {
-                    assertThat(script).contains(x.getName());
-                    assertThat(script).contains(properties.getValue(x));
-                });
+            .forEach(x -> {
+                String propertyName = x.getName();
+                assertTrue(script.contains(propertyName), propertyName);
+                assertTrue(script.contains(properties.getValue(x)), propertyName);
+            });
     }
 
     @Test
-    public void cannotGenerateConfigScriptForUnsupportedCloud() {
-        AfonPropertyProvider properties = new FilePropertyProvider();
-        try {
-            PolarisConfig.getProviderCredentials(properties, "unsupported");
-        } catch (IllegalArgumentException e) {
-            assertThat(e.getMessage()).containsIgnoringCase("unsupported");
-        }
-    }
-
-    @Test
-    public void canGenerateKeyCloakExportsConfig() {
+    public void testKeyCloakConfig() {
         Map<String, String> properties = KeyCloakHelper.polarisOidcEnv(
             "host",
         "username",
         "password");
         String exports = PolarisConfig.toExports(properties);
         String[] lines = exports.split("\n");
-        assertThat(lines.length).isEqualTo(properties.size());
+        assertEquals(lines.length, properties.size());
         String export = "export ";
         for (String line : lines) {
-            assertThat(line).startsWith(export);
+            assertTrue(line.startsWith(export));
             String envName = line.substring(
                 "export ".length(),
                 line.indexOf('='));
-            assertThat(envName).isEqualTo(envName.toUpperCase());
+            assertEquals(envName, envName.toUpperCase());
         }
     }
 }

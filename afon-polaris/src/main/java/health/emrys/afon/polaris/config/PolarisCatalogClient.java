@@ -34,13 +34,17 @@ public class PolarisCatalogClient {
 
     public PolarisCatalogClient(AfonPropertyProvider properties) {
         this.properties = properties;
+        // HDRS (Patch 4): AWS-only deployment. Upstream also configures Google,
+        // Azure, Glue and external-Azure catalogs here, and each constructor
+        // throws on that cloud's missing properties - so an AWS-only config
+        // cannot even start the loop without this cut-down.
+        //
+        // AwsForbiddenPolarisCatalog is AWS but is also left out: it is new
+        // upstream work needing AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS, a
+        // bucket infra-aws-poc does not create. Add the bucket and this entry
+        // together if the forbidden-catalog behaviour is ever wanted here.
         this.catalogs = new PolarisCatalog[]{
                 new AwsPolarisCatalog(properties),
-                new GcpPolarisCatalog(properties),
-                new AzurePolarisCatalog(properties),
-                new GlueAwsPolarisCatalog(properties),
-                new AzureExternalPolarisCatalog(properties),
-                new AwsForbiddenPolarisCatalog(properties)
         };
     }
 

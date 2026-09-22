@@ -16,7 +16,7 @@ For Kubernetes to point a domain name at a particular pod, you need to prove you
 1. Buy domain names (e.g. from AWS Route 53)
 2. Create DNS zones in each target cloud
 3. Update the domain registrar's nameservers to point at the cloud's nameservers
-4. SSL certificates (e.g. via AWS Certificate Manager or Let's Encrypt)
+4. Request SSL certificates (e.g. via AWS Certificate Manager or Let's Encrypt)
 
 ## Instructions
 
@@ -43,9 +43,9 @@ Note that it might take a few minutes to propagate.
 
 Create a DNS zone for the combination of domain name and resource group: 
 ```shell
-az network dns zone create --name $AZURE_DOMAIN_NAME --resource-group $AZURE_RESOURCE_GROUP  
+az network dns zone create --name $YOUR_DOMAIN --resource-group $AZURE_RESOURCE_GROUP  
 ```
-This will show a list of nameservers, for example:
+This will print out some JSON that contains nameservers, for example:
 ```json
 {
   "nameServers": [
@@ -61,8 +61,8 @@ Make a note of these.
 If a Kubernetes service is gone but DNS record remains, run the Azure DNS cleanup command:
 ```shell
 az network dns record-set a delete \
-  --resource-group $AZURE_RESOURCE_GROUP \
-  --zone-name $AZURE_DOMAIN_NAME \
+  --resource-group afon_resource_group \
+  --zone-name emryspolarisazure.click \
   --name "@" \
   --yes
 ```
@@ -73,9 +73,9 @@ Create a DNS zone through the GUI.  Note you might need admin rights to do this.
 
 Once it's created, you can run:
 ```shell
-$ gcloud dns managed-zones describe $GCP_DOMAIN_NAME --project=$PROJECT_ID
+$ gcloud dns managed-zones describe $YOUR_ZONE_NAME --project=$YOUR_PROJECT
 ```
-Just like for Azure, this will show a list of name servers:
+Just like for Azure, this will create a list of name servers:
 ```
 nameServers:
 - ns-cloud-c1.googledomains.com.
@@ -107,40 +107,3 @@ dig A <domain> +short
 ## Consequences
 
 Kubernetes running in the cloud that owns the DNS servers can now ask them to map a domain name to one of its pods.
-
-## TLS cert issue and store
-
-Let's Encrypt limits the number of certificates per week.   
-
-The cert should then be issued and stored in a secrets manager - which is necessarily cloud-specific.
-
-### Azure 
-
-For Azure, the secrets manager is Azure Key Vault.
-
-In `config/afon-azure.properties` add property `AZURE_KEY_VAULT_NAME=<env>-afon-key-vault`.  
-If property `AZURE_KEY_VAULT_NAME` is not found or blank, the storing of the cert is disabled.
-
-**IMPORTANT**:  the Azure key vault names must be unique **globally**.
-
-To create key vault, run:
-```shell
-scripts/azure/keyvault.sh create
-```
-It will pick up the name of the key vault and all the other relevant properties from config and create the key vault.
-The operation is idempotent and will show an existing key vault if already present.
-
-To issue a cert via ACME (Let's Encrypt) and store it in the key vault:
-```shell
-scripts/azure/issue-cert.sh acme
-```
-This is a one-off operation but can be repeated (idempotently) to renew the cert.
-
-Optionally, Azure has its own CA which supports two issuers:
-```shell
-scripts/azure/issue-cert.sh digicert|globalsign 
-```
-This is not a free service and the issuer needs to be registered.  
-Set as properties `AZURE_CA_ID/AZURE_CA_PASSWORD` in `config/secret-azure.properties` the issuer credentials.
-
-**NOTE**:  one advantage of using Azure CA is that Key Vault handles renewal on its own schedule going forward.

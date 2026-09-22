@@ -17,6 +17,7 @@ import java.util.Map;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
+import static health.emrys.afon.config.AfonProperty.AUDIT_KAFKA_BOOTSTRAP;
 
 /**
  * Cloud independent config for the K8s network.
@@ -57,8 +58,11 @@ public class NetworkConfig {
     private final TerraformStack      tfStack;
     private final List<AllowedDomain> allowedDomains;
 
+    private final AfonPropertyProvider properties;
+
     public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties) {
         this.tfStack = tfStack;
+        this.properties = properties;
         String csv = ALLOWED_DOMAINS_CSV.getValueFrom(properties.getProperties());
         allowedDomains = Arrays.stream(csv.split(",")).map(x -> AllowedDomain.exactly(x)).toList();
     }
@@ -84,13 +88,20 @@ public class NetworkConfig {
         // the notebook the ability to dial Guacamole, which nothing requires.
         List<NetworkPolicySpecEgressTo> allowedNamespacePeers = List.of(
             podEgressTo(JupyterHubConfig.HUB_LABELS));
-        List<NetworkPolicySpecEgress> egress = List.of(
+        List<NetworkPolicySpecEgress> egress = new ArrayList<>(List.of(
 //            createWebEgressPolicy(),
             createDnsEgressPolicy(),
             NetworkPolicySpecEgress.builder()
                                    .to(allowedNamespacePeers)
                                    .build(),
-            createSparkConnectorEgressPolicy(sparkConnectorName));
+            createSparkConnectorEgressPolicy(sparkConnectorName)));
+        // HDRS (Patch 17): the audit perimeter sidecar runs INSIDE the notebook pod
+        // (Patches 14-16), so it shares this policy. Without a rule for it the sensor
+        // cannot reach Kafka or the schema registry and audit events are dropped with
+        // no error anywhere - the failure mode a health-data platform can least afford.
+        // Gated on the same config as the sidecar itself: no AUDIT_KAFKA_BOOTSTRAP, no
+        // sidecar, no rule.
+        createAuditEgressPolicy().ifPresent(egress::add);
         networkPolicyFor(labels, egress);
         whitelistDomains(labels, allowedDomains, dependsOn);
     }
@@ -173,9 +184,27 @@ public class NetworkConfig {
                         .build();
     }
 
+    /**
+     * HDRS (Patch 19): serialise with map keys SORTED.
+     *
+     * <p>The manifest is built from {@code Map.of(...)}, whose iteration order is
+     * deliberately randomised per JVM run, so the default serialisation produces a
+     * different string on every synth even when nothing has changed. That string is
+     * the {@code triggers} value on {@code domainWhitelistPolicy}, so the resource
+     * was replaced on EVERY apply - deleting and re-applying the CiliumNetworkPolicy
+     * each time, which leaves a window with no FQDN egress allowlist on a cluster
+     * whose whole point is restricting egress. Confirmed by hashing two consecutive
+     * synths of identical input: same length, different digest.
+     *
+     * <p>Sorting makes the output a pure function of the content, so the trigger is
+     * stable and the policy is only re-applied when the allowlist actually changes -
+     * which is what the trigger was there to do.
+     */
     private static @NonNull String toJson(Map<String, Object> manifest) {
         try {
-            return new ObjectMapper().writeValueAsString(manifest);
+            return new ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+                .writeValueAsString(manifest);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize " + DOMAIN_POLICY_NAME, e);
         }
@@ -196,6 +225,39 @@ public class NetworkConfig {
      * {@code spark-role=driver} narrows it to the single pod serving Connect: executors carry the
      * same app name but do not listen on 15002.
      */
+    /**
+     * HDRS (Patch 17): egress to the audit platform's Kafka and schema registry, for the
+     * perimeter sidecar that Patches 14-16 put in the notebook pod. Upstream's policy allows
+     * the notebook DNS, the hub and Spark Connect and drops everything else, which includes
+     * the sensor's own path off the pod.
+     *
+     * <p>Selected by namespace label rather than name so it keeps working if the audit
+     * platform is ever deployed to a differently-named namespace, and narrowed to the two
+     * ports that carry the audit protocol - 9092 for Kafka, 8081 for the schema registry.
+     */
+    private java.util.Optional<NetworkPolicySpecEgress> createAuditEgressPolicy() {
+        String kafka = AUDIT_KAFKA_BOOTSTRAP.getValueFrom(properties.getProperties(), "");
+        if (kafka.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        List<NetworkPolicySpecEgressTo> auditPods = List.of(
+            NetworkPolicySpecEgressTo
+                .builder()
+                .namespaceSelector(NetworkPolicySpecEgressToNamespaceSelector
+                                       .builder()
+                                       .matchLabels(Map.of("app.kubernetes.io/part-of", "audit-platform"))
+                                       .build())
+                .build());
+        List<NetworkPolicySpecEgressPorts> auditPorts = List.of(
+            NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("9092").build(),
+            NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("8081").build());
+        return java.util.Optional.of(NetworkPolicySpecEgress
+                                         .builder()
+                                         .to(auditPods)
+                                         .ports(auditPorts)
+                                         .build());
+    }
+
     private static @NonNull NetworkPolicySpecEgress createSparkConnectorEgressPolicy(
         String sparkConnectorName
     ) {

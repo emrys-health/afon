@@ -4,6 +4,10 @@ import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.providers.aws.data_aws_iam_role.DataAwsIamRole;
+import com.hashicorp.cdktf.providers.aws.data_aws_iam_role.DataAwsIamRoleConfig;
+import com.hashicorp.cdktf.providers.aws.data_aws_vpc.DataAwsVpc;
+import com.hashicorp.cdktf.providers.aws.data_aws_vpc.DataAwsVpcConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
@@ -47,6 +51,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.AbstractCloudProvider;
+import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
@@ -61,8 +66,10 @@ import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
-import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
+import static health.emrys.afon.cdk.PolarisConfig.POLARIS_INTERNAL;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
+import static health.emrys.afon.config.AfonProperty.AWS_VPC_ID;
+import static health.emrys.afon.config.AfonProperty.AWS_PRIVATE_SUBNET_IDS;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
 
@@ -78,14 +85,15 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     private final String                     clusterName;
     private final String                     clusterPolicyArn;
     private final String                     polarisCertArn;
-    private final EksCluster                 cluster;
+    // HDRS (Patch 1): data-source lookups of the pre-existing cluster/network
+    // built by hdrsuk/infra-aws-poc, replacing the resources upstream created.
+    private final DataAwsEksCluster          cluster;
     private final List<ITerraformDependable> eksDependOn;
     private final List<String>               subnetIds;
     final         DataAwsEksClusterAuth      eksAuthData;
-    final         IamRole                    loadBalancerRole;
-    final         Resource                   newKubeConfig;
+    final         DataAwsIamRole             loadBalancerRole;
     final         Release                    lbRelease;
-    final         Vpc                        vpc;
+    final         DataAwsVpc                 vpc;
 
     AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
         super(scope, id);
@@ -117,275 +125,40 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .recoveryWindowInDays(0)
             .build();
 
-        vpc = Vpc.Builder
-            .create(this, "eksVpc")
-            .cidrBlock("10.0.0.0/16")
-            .enableDnsSupport(true)
-            .enableDnsHostnames(true)
-            .provisioners(uponDestroyRun(cleanupHelper.deleteSecurityGroupsCommand()))
-            .tags(Map.of("Name", componentNames.getVpcId())).build();
-
-        final InternetGateway igw = InternetGateway.Builder
-            .create(this, "vpcIgw")
-            .vpcId(vpc.getId())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-igw-" + clusterName)).build();
-
-        final Subnet publicSubnet1 = Subnet.Builder
-            .create(this, "publicSubnet1")
-            .vpcId(vpc.getId())
-            .cidrBlock("10.0.1.0/24")
-            .availabilityZone(region + "a")
-            .mapPublicIpOnLaunch(true)
-            .dependsOn(List.of(igw))
-            .provisioners(uponDestroyRun(cleanupHelper.deleteLoadBalancersCommand()))
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-public-1-" + clusterName)).build();
-
-        final Subnet publicSubnet2 = Subnet.Builder
-            .create(this, "publicSubnet2")
-            .vpcId(vpc.getId())
-            .cidrBlock("10.0.2.0/24")
-            .availabilityZone(region + "b")
-            .mapPublicIpOnLaunch(true)
-            .dependsOn(List.of(igw))
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-public-2-" + clusterName)).build();
-
-        final RouteTableRoute route = RouteTableRoute
+        // HDRS (Patch 1): everything from here to the Cilium release is a
+        // LOOKUP of infrastructure built by hdrsuk/infra-aws-poc. Upstream
+        // created a VPC (10.0.0.0/16, public subnets), an EKS cluster + node
+        // group, their IAM roles, an IRSA OIDC provider, cluster-admin for the
+        // account root, and rewrote ~/.kube/config - all removed. The subnet
+        // list is the PRIVATE subnets: every ALB/LB here is internal (Patch 7).
+        vpc = new DataAwsVpc(this, "eksVpc", DataAwsVpcConfig
             .builder()
-            .cidrBlock("0.0.0.0/0")
-            .gatewayId(igw.getId()).build();
+            .id(properties.getValue(AWS_VPC_ID))
+            .build());
 
-        final RouteTable publicRouteTable = RouteTable.Builder
-            .create(this, "publicRouteTable")
-            .vpcId(vpc.getId())
-            .route(List.of(route))
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of(
-                "Name",
-                "cdktf-eks-public-rt-" + clusterName)).build();
+        subnetIds = Arrays.stream(properties.getValue(AWS_PRIVATE_SUBNET_IDS).split(","))
+                          .map(String::trim)
+                          .collect(Collectors.toList());
 
-        RouteTableAssociation subnet1Association = RouteTableAssociation.Builder
-            .create(this, "subnet1Association")
-            .subnetId(publicSubnet1.getId())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .routeTableId(publicRouteTable.getId()).build();
-
-        RouteTableAssociation subnet2Association = RouteTableAssociation.Builder
-            .create(this, "subnet2Association")
-            .subnetId(publicSubnet2.getId())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .routeTableId(publicRouteTable.getId()).build();
-
-        subnetIds = List.of(publicSubnet1.getId(), publicSubnet2.getId());
-
-        // --- 3. EKS Cluster IAM Role (Same as before) ---
-
-        final String eksAssumeRolePolicy = """
-                                           {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole"}]}""";
-        final IamRole eksClusterRole = IamRole.Builder
-            .create(this, "eksClusterRole")
-            .name(componentNames.getClusterRoleName())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .assumeRolePolicy(eksAssumeRolePolicy).build();
-
-        final DataAwsIamPolicy eksClusterPolicy = DataAwsIamPolicy.Builder.create(this, "eksClusterPolicy")
-                                                                          .name("AmazonEKSClusterPolicy").build();
-
-        IamRolePolicyAttachment roleAttachment = IamRolePolicyAttachment.Builder
-            .create(this, "eksClusterRoleAttachment")
-            .policyArn(eksClusterPolicy.getArn())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .provisioners(uponDestroyRun(
-                format(
-                    "aws iam detach-role-policy --role-name %s --policy-arn %s",
-                    componentNames.getClusterRoleName(),
-                    clusterPolicyArn),
-                format(
-                    "aws iam detach-role-policy --role-name %s --policy-arn " +
-                        "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
-                    componentNames.getClusterRoleName())))
-            .role(eksClusterRole.getName()).build();
-
-        final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
-
-        cluster = EksCluster.Builder
+        cluster = DataAwsEksCluster.Builder
             .create(this, "eksCluster")
             .name(clusterName)
-            .roleArn(eksClusterRole.getArn())
-            .vpcConfig(vpcConfig)
-            .version("1.35")
-            .accessConfig(EksClusterAccessConfig.builder()
-                                                .authenticationMode("API_AND_CONFIG_MAP")
-                                                .bootstrapClusterCreatorAdminPermissions(true)
-                                                .build())
-            .provisioners(uponDestroyRun(NO_INSTALLATION_FINALIZERS))
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .dependsOn(List.of(roleAttachment))
-            .tags(Map.of("Name", "cdktf-eks")).build();
-
-        // Grant cluster-admin to every IAM principal in this AWS account so
-        // anyone with EKS IAM permissions can administer (and tofu-destroy) the cluster,
-        // not just the IAM identity that ran `tofu apply`.
-        final String accountRootArn = format("arn:aws:iam::%s:root", accountId);
-        final EksAccessEntry accountRootAccessEntry = new EksAccessEntry(
-            this, "accountRootAccessEntry",
-            EksAccessEntryConfig.builder()
-                                .clusterName(cluster.getName())
-                                .principalArn(accountRootArn)
-                                .type("STANDARD")
-                                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                .dependsOn(List.of(cluster))
-                                .build());
-        new EksAccessPolicyAssociation(
-            this, "accountRootClusterAdmin",
-            EksAccessPolicyAssociationConfig.builder()
-                                            .clusterName(cluster.getName())
-                                            .principalArn(accountRootArn)
-                                            .policyArn("arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy")
-                                            .accessScope(EksAccessPolicyAssociationAccessScope.builder()
-                                                                                              .type("cluster")
-                                                                                              .build())
-                                            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                            .dependsOn(List.of(accountRootAccessEntry))
-                                            .build());
+            .build();
 
         // if one depends_on this, then the cluster should be running
         eksAuthData = DataAwsEksClusterAuth.Builder
             .create(this, "eksClusterAuthData")
-            .name(cluster.getName()) // Uses the name of the EKS cluster
+            .name(clusterName)
             .build();
 
-        final String workerAssumeRolePolicy = """
-                                              {"Version":"2012-10-17",
-                                              "Statement":[{
-                                                      "Effect":"Allow",
-                                                      "Principal":{
-                                                          "Service": "ec2.amazonaws.com"
-                                                      },
-                                                      "Action":"sts:AssumeRole"
-                                                  },
-                                                  {
-                                                      "Effect":"Allow",
-                                                      "Principal":{
-                                                          "Service": "elasticloadbalancing.amazonaws.com"
-                                                      },
-                                                      "Action":"sts:AssumeRole"
-                                                  }
-                                              ] }""";
-        final IamRole nodeGroupRole = IamRole.Builder
-            .create(this, "eksNodeGroupRole")
-            .name(componentNames.getNodeGroupRoleName())
-            .assumeRolePolicy(workerAssumeRolePolicy).build();
-
-        // ** NEW STEP: Create Custom IAM Policy referencing the Secret ARN **
-        // We use String.format to insert the secret's ARN dynamically into the policy JSON.
-        // %s will be replaced by the Secret ARN
-        final String customSecretPolicyDocument = String.format(
-            """
-            {
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Effect": "Allow",
-                  "Action": "secretsmanager:GetSecretValue",
-                  "Resource": "%s"
-                }
-              ]
-            }""", applicationSecret.getArn()
-                                                               );
-
-        final IamPolicy customSecretPolicy = IamPolicy.Builder
-            .create(this, "SecretAccessPolicy")
-            .name(componentNames.getAccessPolicyName())
-            .description("Allows EKS Node Group to read the " +
-                             "specific application config secret.")
-            .policy(customSecretPolicyDocument)
-            .build();
-
-        // ** NEW ATTACHMENT: Attach the custom secret policy to the Node Group role **
-        IamRolePolicyAttachment.Builder
-            .create(this, "customSecretPolicyAttachment")
-            .policyArn(customSecretPolicy.getArn())
-            .role(nodeGroupRole.getName())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .build();
-
-        // Existing required policy attachments
-        final DataAwsIamPolicy workerNodePolicy = DataAwsIamPolicy.Builder
-            .create(this, "workerNodePolicy")
-            .name("AmazonEKSWorkerNodePolicy").build();
-        final DataAwsIamPolicy cniPolicy = DataAwsIamPolicy.Builder
-            .create(this, "cniPolicy")
-            .name("AmazonEKS_CNI_Policy").build();
-        final DataAwsIamPolicy containerRegistryPolicy = DataAwsIamPolicy.Builder
-            .create(
-                this,
-                "containerRegistryPolicy")
-            .name(
-                "AmazonEC2ContainerRegistryReadOnly").build();
-
-        IamRolePolicyAttachment.Builder
-            .create(this, "workerNodePolicyAttachment")
-            .policyArn(workerNodePolicy.getArn())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .role(nodeGroupRole.getName()).build();
-
-        IamRolePolicyAttachment.Builder
-            .create(this, "cniPolicyAttachment")
-            .policyArn(cniPolicy.getArn())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .role(nodeGroupRole.getName()).build();
-
-        IamRolePolicyAttachment.Builder
-            .create(this, "containerRegistryPolicyAttachment")
-            .policyArn(containerRegistryPolicy.getArn())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .role(nodeGroupRole.getName()).build();
-
-        // --- 5. EKS Managed Node Group Creation (Same as before) ---
-
-        final EksNodeGroupScalingConfig scalingConfig = EksNodeGroupScalingConfig
-            .builder()
-            .desiredSize(3.0)
-            .minSize(3.0)
-            .maxSize(3.0)
-            .build();
-
-        List<LocalExecProvisioner> updateKubeConfig = List.of(
-            LocalExecProvisioner
+        // Role created (with the LBC policy already attached) by infra-aws-poc
+        // under the exact name upstream used, so only this lookup changes.
+        loadBalancerRole = new DataAwsIamRole(
+            scope, "AmazonEKSLoadBalancerControllerRole",
+            DataAwsIamRoleConfig
                 .builder()
-                .when("create") // Run only when the resource is created
-                .command(format(
-                             "aws eks update-kubeconfig --name %s --region %s",
-                             clusterName,
-                             region)
-                        )
-                .type("local-exec")
-                .build()
-                                                             );
-        newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater")
-                                        .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
-                                        .provisioners(updateKubeConfig)
-                                        .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-                                        .build();
-        EksNodeGroup nodeGroup = EksNodeGroup.Builder
-            .create(this, "eksNodeGroup")
-            .clusterName(cluster.getName())
-            .nodeGroupName("default-ng")
-            .subnetIds(subnetIds)
-            .nodeRoleArn(nodeGroupRole.getArn())
-            .instanceTypes(List.of("r6i.large"))
-            .scalingConfig(scalingConfig)
-            .diskSize(50)
-            .dependsOn(List.of(
-                newKubeConfig, cluster, eksAuthData,
-                publicSubnet1, publicSubnet2))
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", componentNames.getNodeGroupRoleName())).build();
-
-
+                .name(componentNames.getLoadBalancerRoleName())
+                .build());
         String clusterEndpoint = cluster.getEndpoint();
         String apiHost         = Fn.replace(clusterEndpoint, "https://", "");
 
@@ -410,7 +183,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .name("cilium")
             .chart(ciliumChart)
             .namespace("kube-system")
-            .dependsOn(List.of(nodeGroup))
+            .dependsOn(List.of(cluster, eksAuthData))
             .provisioners(onCiliumCreation)
             // No version() — the vendored tarball is the version, and the provider reads it
             // from the chart's own Chart.yaml.
@@ -517,7 +290,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                                   ))
             .build();
 
-        eksDependOn = List.of(newKubeConfig, cluster, eksAuthData, publicSubnet1, publicSubnet2, cilium);
+        eksDependOn = List.of(cluster, eksAuthData, cilium);
 
         // Gate: block until the Cilium datapath is actually Ready (the main
         // release above is not atomic, so its completion does not imply the
@@ -598,22 +371,50 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             ))
             .build();
 
-        String trustPolicy = format(
-            """
-            ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
-            """, accountId);
-        loadBalancerRole = new IamRole(
-            scope, "AmazonEKSLoadBalancerControllerRole",
-            IamRoleConfig
-                .builder()
-                .name(componentNames.getLoadBalancerRoleName())
-                .assumeRolePolicy(trustPolicy)
-                .build());
-        IamRolePolicyAttachment.Builder
-            .create(this, "EKS-Cleanup-Policy-Attachment")
-            .policyArn(clusterPolicyArn)
-            .role(eksClusterRole.getName())
-            .build();
+        // HDRS Patch 20: Tetragon, the exec sensor the audit platform reads.
+        //
+        // ON BY DEFAULT, and the default is the decision rather than a
+        // convenience. This is the HDRS fork of afon: a TRE adopting it is
+        // adopting the audit platform with it, so collecting what a researcher
+        // ran is part of what afon *is* here, not a feature to remember to
+        // switch on. The gates on the perimeter sidecar (AUDIT_SIDECAR_IMAGE)
+        // are shaped the other way round because they need an image reference
+        // nobody can guess; this needs nothing, so it needs no excuse to be off.
+        //
+        // Set AUDIT_EXEC_SENSOR_ENABLED=false to deploy without it - a real
+        // escape hatch for a cluster owner who will not accept a privileged
+        // cluster-wide DaemonSet, and a deliberate act with a name.
+        boolean execSensorEnabled = Boolean.parseBoolean(
+            properties.getValue(AfonProperty.AUDIT_EXEC_SENSOR_ENABLED, "true"));
+        if (execSensorEnabled) {
+            // NOT a configurable value. This is afon's own singleuser pod label,
+            // from the class that stamps it - see JupyterHubConfig#singleuserSelector.
+            String execSensorSelector = JupyterHubConfig.singleuserSelector();
+            String exportDir = properties.getValue(
+                AfonProperty.AUDIT_EXEC_SENSOR_EXPORT_DIR, "/var/run/cilium/tetragon");
+            Release.Builder
+                .create(this, "tetragon")
+                .name("tetragon")
+                .chart(vendoredChart(this, "tetragonChart", "tetragon-1.7.1.tgz"))
+                .namespace("kube-system")
+                // Tetragon is independent of the CNI - it would work under Calico
+                // - but it is gated on ciliumReady anyway, because its own pods
+                // need a working datapath to schedule and report.
+                .dependsOn(List.of(ciliumReady))
+                .timeout(300)
+                .atomic(true)
+                // values rather than set: the allowlist below is a JSON document
+                // full of commas, dots and an `=`, and Helm's --set parsing would
+                // shred all three.
+                .values(List.of(tetragonValues(execSensorSelector, exportDir)))
+                .build();
+        }
+
+        // HDRS (Patch 1): the LBC role, its trust policy and the cluster-role
+        // policy attachment are all removed - infra-aws-poc creates the role
+        // (with the LBC policy already attached) under the name upstream
+        // expects, and it is looked up as a data source above.
+
         lbRelease = configureIngress(scope, loadBalancerRole);
 
         IngressV1 ingress = createHttpsIngress(
@@ -621,9 +422,16 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "polaris-ingress",
             polarisCertArn,
             this.polarisDomainName,
-                POLARIS_INTERNAL_SERVICE_NAME,
+            POLARIS_INTERNAL,
             8181,
-            subnetIds
+            subnetIds,
+            // Quarkus readiness, which includes the datasource check - the one that read
+            // DOWN for three days while nothing noticed. Served on 8182, not the API port.
+            "/q/health/ready",
+            // The port NAME, not 8182. With instance target type the controller resolves
+            // a name to that service port's NodePort (30401 here, and dynamic); a bare
+            // number is used literally against the node, where nothing is listening.
+            "management"
                                               );
 
 
@@ -667,6 +475,84 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                          .name(name)
                          .value(value)
                          .build();
+    }
+
+    /**
+     * Helm values for the Tetragon release (HDRS Patch 20).
+     *
+     * <p>Tetragon reports every process that execs on the node. What the audit platform is
+     * entitled to observe is what a researcher ran in their own workspace, and nothing else on a
+     * cluster that also runs JupyterHub, Guacamole, Polaris, Spark and Trino. Everything below is
+     * about keeping those two things the same set.
+     *
+     * @param selector  Kubernetes label selector scoping the export - always
+     *                  {@link JupyterHubConfig#singleuserSelector()}, never a configured value.
+     *                  Tetragon's {@code Filter.labels} field takes label-selector syntax.
+     * @param exportDir directory on the node the JSON export is written to; the audit platform's
+     *                  node agent mounts exactly this path.
+     */
+    static String tetragonValues(String selector, String exportDir) {
+        return String.format("""
+            # Where the JSON export is written on the node. Top-level in this
+            # chart, unlike everything under `tetragon:` below - and its default
+            # is already /var/run/cilium/tetragon, which is exactly the path the
+            # audit platform's node agent mounts and tails. Set explicitly anyway,
+            # because it is a contract between two repositories and a default that
+            # silently changes on a chart bump would break collection with nothing
+            # to read.
+            exportDirectory: "%2$s"
+
+            export:
+              # No stdout exporter, and this is not a preference.
+              #
+              # The chart's default is "stdout" (its own comment: `"" to disable`),
+              # which adds a sidecar tailing the export to the container's stdout.
+              # promtail ships every container's stdout to Loki on this cluster, so
+              # leaving the default would copy every exec event from every
+              # researcher's workspace into Loki as a side effect - a store with
+              # different retention and different access control from the audit
+              # store. The file is written either way: tetragon_configmap.yaml sets
+              # export-filename whenever tetragon.exportFilename is non-empty, and
+              # the export-logs hostPath in daemonset.yaml is unconditional.
+              mode: ""
+
+            tetragon:
+              # Non-empty is what turns the file export on at all.
+              exportFilename: tetragon.log
+
+              # Default-deny. Tetragon's export filters are an allowlist, and once
+              # any allowlist exists only what it names is exported - so this one
+              # line is the whole scope of what leaves the node.
+              #
+              # `labels` filters on POD labels in Kubernetes label-selector syntax
+              # (Filter.labels, field 9 of the events proto). Namespace alone would
+              # be wrong: afon runs in `default` beside JupyterHub, Guacamole,
+              # Polaris, Spark and Trino, whose execs are not researcher activity.
+              #
+              # PROCESS_EXEC only. The chart's default also carries PROCESS_EXIT,
+              # PROCESS_KPROBE, PROCESS_UPROBE, PROCESS_TRACEPOINT and PROCESS_LSM;
+              # the node agent parses none of them, and an event nobody reads is a
+              # file on a node growing for no reason.
+              exportAllowList: |-
+                {"event_set":["PROCESS_EXEC"],"labels":["%1$s"]}
+
+              # The chart's default denylist, restated rather than inherited,
+              # because a denylist takes precedence over the allowlist above and a
+              # reader should not have to go and look up what is being dropped
+              # silently. Health checks are noise; the three namespaces are
+              # infrastructure the allowlist would not have matched anyway.
+              exportDenyList: |-
+                {"health_check":true}
+                {"namespace":["", "cilium", "kube-system"]}
+
+              # Rotation, at the chart's own defaults. Restated because these
+              # numbers bound how much of what researchers ran sits in a file on a
+              # node between the agent's reads. The agent's follow() reopens on
+              # truncation or an inode change, so rotation is safe for it.
+              exportFileMaxSizeMB: 10
+              exportFileMaxBackups: 5
+              exportFilePerm: "600"
+            """, selector, exportDir);
     }
 
     /**
@@ -740,26 +626,14 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build());
     }
 
-    private Release configureIngress(Construct scope, IamRole loadBalancerRole) {
+    private Release configureIngress(Construct scope, DataAwsIamRole loadBalancerRole) {
         String serviceAccountName = configureServiceAccount(scope, loadBalancerRole);
 
         return helmInstallLoadBalancer(serviceAccountName, loadBalancerRole);
     }
 
-    private @NonNull String configureServiceAccount(Construct scope, IamRole loadBalancerRole) {
-        DataAwsEksCluster clusterData        = associateOIDCProvider(scope);
-        String            serviceAccountName = "aws-load-balancer-controller";
-
-        new IamRolePolicyAttachment(
-            scope,
-            "LBCPolicyAttachment",
-            IamRolePolicyAttachmentConfig
-                .builder()
-                .dependsOn(List.of(loadBalancerRole))
-                .role(loadBalancerRole.getName())
-                .policyArn(clusterPolicyArn)
-                .build());
-
+    private @NonNull String configureServiceAccount(Construct scope, DataAwsIamRole loadBalancerRole) {
+        String serviceAccountName = "aws-load-balancer-controller";
 
         Map<String, String> labels = Map.of(
             "app.kubernetes.io/component", "controller",
@@ -791,44 +665,11 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         return serviceAccountName;
     }
 
-    private @NonNull DataAwsEksCluster associateOIDCProvider(Construct scope) {
-        // 1. Fetch the EKS Cluster details to get the OIDC Issuer URL
-        DataAwsEksCluster clusterData = new DataAwsEksCluster(
-            scope, "EksClusterData",
-            DataAwsEksClusterConfig.
-                builder()
-                .dependsOn(eksDependOn)
-                .name(clusterName)
-                .build());
+    // HDRS (Patch 1): associateOIDCProvider removed - the IRSA OIDC provider
+    // already exists (created by infra-aws-poc); creating it again would
+    // fail with EntityAlreadyExists.
 
-        // Extract the OIDC Issuer URL from the cluster data
-        // The issuer is in the format: https://oidc.eks.region.amazonaws.com/id/EXAMPLED9295F773010C7C5F77A986877E...
-        String oidcIssuerUrl = clusterData.getIdentity().get(0).getOidc().get(0).getIssuer();
-
-        // 2. Create the IAM OIDC Provider resource
-        IamOpenidConnectProviderConfig providerConfig = IamOpenidConnectProviderConfig
-            .builder()
-            // The URL for the provider. Must be retrieved from the EKS cluster data.
-            .url(oidcIssuerUrl)
-
-            // This is the OIDC audience claim, required to allow Kubernetes Service
-            // Accounts to exchange their tokens for AWS IAM roles (IRSA).
-            .clientIdList(List.of("sts.amazonaws.com"))
-
-            // The thumbprint of the OIDC provider's root certificate.
-            // For EKS OIDC, the required thumbprint is well-known and consistent
-            // across AWS regions, simplifying the setup compared to custom providers.
-            // It's recommended to hardcode this known thumbprint for EKS:
-//                .thumbprintList(List.of("9e99a48a9960b14926cc7f3b02e22da2b0e791e8"))
-
-            // Optional: Tag the resource
-            .tags(Map.of("Name", clusterName + "-oidc-provider"))
-            .build();
-        new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig);
-        return clusterData;
-    }
-
-    private Release helmInstallLoadBalancer(String serviceAccountName, IamRole loadBalancerRole) {
+    private Release helmInstallLoadBalancer(String serviceAccountName, DataAwsIamRole loadBalancerRole) {
         ArrayList<ITerraformDependable> dependencies = new ArrayList(eksDependOn);
         dependencies.add(loadBalancerRole);
         return Release.Builder
@@ -856,6 +697,44 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         final String serviceName,
         final int servicePort,
         final List<String> subnetIds) {
+        return createHttpsIngress(constructId, ingressName, certArn, hostName, serviceName,
+                                  servicePort, subnetIds, null, null);
+    }
+
+    /**
+     * HDRS (Patch 20): as above, but with a real ALB health check.
+     *
+     * <p>Without {@code healthcheck-path} the controller applies the ALB default - GET
+     * {@code /} expecting 200 - and none of this stack's three backends answers that:
+     * Keycloak redirects (302), oauth2-proxy serves its sign-in page (403) and Polaris
+     * has no route there (404). Every target group therefore reported every target
+     * unhealthy from the day it was created, and traffic flowed only because an ALB
+     * fails open when nothing in a group is healthy.
+     *
+     * <p>That is not a cosmetic problem. It meant a crash-looping backend was
+     * indistinguishable from the steady state, so a dead Keycloak surfaced to users as
+     * a browser 504 with nothing anywhere recording a change; and it left target-group
+     * health useless as an alerting signal, pinned at zero healthy since day one.
+     *
+     * @param healthCheckPath path that returns 200 when the backend is well, or null to
+     *                        keep upstream's (broken) default
+     * @param healthCheckPort backend service port NAME to probe, or null for
+     *                        {@code traffic-port}. Needed where health and traffic are
+     *                        on different ports, as they are for Polaris. Use the name:
+     *                        with instance target type the controller resolves it to the
+     *                        service's NodePort, whereas a bare number is applied
+     *                        literally to the node and will not be listening.
+     */
+    public IngressV1 createHttpsIngress(
+        final String constructId,
+        final String ingressName,
+        final String certArn,
+        final String hostName,
+        final String serviceName,
+        final int servicePort,
+        final List<String> subnetIds,
+        final String healthCheckPath,
+        final String healthCheckPort) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
         String subnetIdsCSV = subnetIds.stream().collect(Collectors.joining(","));
@@ -876,12 +755,26 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             // 5. Specify that the traffic from the ALB to the EKS Pods is standard HTTP
             "alb.ingress.kubernetes.io/backend-protocol", "HTTP",
 
-            // 6. Make the ALB internet-facing
-            "alb.ingress.kubernetes.io/scheme", "internet-facing",
+            // 6. HDRS: internal, never internet-facing - reachable over the
+            // Client VPN only. Upstream sets "internet-facing" here.
+            "alb.ingress.kubernetes.io/scheme", "internal",
             "external-dns.alpha.kubernetes.io/hostname", hostName,
 
             "alb.ingress.kubernetes.io/subnets", subnetIdsCSV
                                                    );
+
+        // Ordered map: annotations are compared by key rather than position, so this is
+        // not the Patch 19 problem, but there is no reason to render them at random.
+        Map<String, String> annotations = new java.util.LinkedHashMap<>(albAnnotations);
+        if (healthCheckPath != null) {
+            annotations.put("alb.ingress.kubernetes.io/healthcheck-path", healthCheckPath);
+            // Explicit rather than inherited: the default matcher is 200, but stating it
+            // means a later upstream change to the default cannot silently widen this.
+            annotations.put("alb.ingress.kubernetes.io/success-codes", "200");
+            if (healthCheckPort != null) {
+                annotations.put("alb.ingress.kubernetes.io/healthcheck-port", healthCheckPort);
+            }
+        }
 
         var sslServicePort = IngressV1SpecRuleHttpPathBackendService
             .builder()
@@ -917,7 +810,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .builder()
             .name(ingressName)
             .namespace("default")
-            .annotations(albAnnotations)
+            .annotations(annotations)
             .build();
         return IngressV1.Builder
             .create(this, constructId)

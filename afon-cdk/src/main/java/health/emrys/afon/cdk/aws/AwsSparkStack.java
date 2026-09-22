@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk.aws;
 
+import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -68,9 +69,19 @@ public class AwsSparkStack extends AwsJupyterStack {
                                                              ))
                                                .annotations(Map.of(
                                                        "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
-                                                       "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
+                                                       // HDRS: internal - port 6066 is Spark's unauthenticated REST
+                                                               // submission API, an RCE if ever internet-facing.
+                                                               "service.beta.kubernetes.io/aws-load-balancer-internal", "true"))
                                                .build())
                       .dependsOn(lbDependencies)
+                      // HDRS (Patch 18): load_balancer_class is set by the AWS Load
+                      // Balancer Controller (service.k8s.aws/nlb), not declared here.
+                      // Leaving it undeclared reads as a change against a live Service
+                      // and forces replacement - which destroys and recreates the NLB,
+                      // giving it a new hostname and an outage until DNS reconciles.
+                      .lifecycle(TerraformResourceLifecycle.builder()
+                                                           .ignoreChanges(List.of("spec[0].load_balancer_class"))
+                                                           .build())
                       .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
                       .spec(ServiceSpec.builder()
                                        .selector(Map.of(

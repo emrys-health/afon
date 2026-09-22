@@ -36,7 +36,12 @@ public class AwsKeyCloakConfig extends KeyCloakConfig<AwsCloudProvider> {
             hostname,
             KC_SVC,
             KEYCLOAK_PORT,
-            cloudProvider.getSubnetIds());
+            cloudProvider.getSubnetIds(),
+            // Keycloak answers 302 on "/" (it redirects to the admin console), so the ALB
+            // default health check could never pass. A realm endpoint returns 200 and
+            // exercises the database, which is what actually fails.
+            "/realms/master",
+            null);
 
         aliasRecord = cloudProvider.configureDNS(
             "KeyCloakAliasRecord",

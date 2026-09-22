@@ -7,8 +7,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
 import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
@@ -31,10 +29,6 @@ import static org.slf4j.LoggerFactory.getLogger;
  * since some deployments (e.g. cross-cloud federation) need more than one cloud's properties at the same time.
  *
  * Any property will be overridden if it is provided as system property, e.g. {@code -DCLUSTER_NAME=<new-name>}.
- *
- * A property value may reference another loaded property with {@code ${OTHER_KEY}}, e.g.
- * {@code CLUSTER_NAME=${ENV_NAME}-cluster}. References are resolved after all files are loaded
- * and system property overrides are applied, so an override of {@code ENV_NAME} also flows through.
  */
 public class FilePropertyProvider implements AfonPropertyProvider {
 
@@ -49,11 +43,6 @@ public class FilePropertyProvider implements AfonPropertyProvider {
      * Cloud types
      */
     private static final List<String> ALL_CLOUDS = List.of("aws", "azure", "gcp");
-
-    /**
-     * The interpolation placeholder pattern, to match {@code ${PROPERTY_NAME}}.
-     */
-    private static final Pattern INTERPOLATION_PATTERN = Pattern.compile("\\$\\{([A-Za-z0-9_.]+)}");
 
     private final String configDir;
     private final List<String> types;
@@ -128,8 +117,6 @@ public class FilePropertyProvider implements AfonPropertyProvider {
 
     private void loadProperties() {
         types.forEach(type -> loadProperties(type));
-        overrideWithSystemProperties();
-        interpolateProperties();
     }
 
     private void loadProperties(String type) {
@@ -150,6 +137,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
                 secretKeys.addAll(props.keySet().stream().map(x -> x.toString()).toList());
             }
         }
+        overrideWithSystemProperties();
     }
 
     private @NonNull Properties loadPropertiesFromFile(String filename) throws IOException {
@@ -173,45 +161,12 @@ public class FilePropertyProvider implements AfonPropertyProvider {
      * Override properties with the value provided via system properties, if any.
      */
     private void overrideWithSystemProperties() {
-        for (String name : AfonProperty.getAllNames()) {
-            if (System.getProperty(name) != null) {
-                logger.debug("Using the system variable to define property '{}'", name);
-                properties.put(name, System.getProperty(name));
+        for (String key : AfonProperty.getAllNames()) {
+            if (System.getProperty(key) != null) {
+                logger.debug("Using the system variable to define property '{}'", key);
+                properties.put(key, System.getProperty(key));
             }
         }
-    }
-
-    /**
-     * Resolves {@code ${OTHER_NAME}} references in property values against the other loaded properties.
-     */
-    private void interpolateProperties() {
-        for (String name : properties.stringPropertyNames()) {
-            properties.setProperty(name, resolvePlaceholders(name, new LinkedHashSet<>()));
-        }
-    }
-
-    private String resolvePlaceholders(String name, Set<String> seen) {
-        String value = properties.getProperty(name);
-        if (value == null || !value.contains("${")) {
-            return value;
-        }
-        if (!seen.add(name)) {
-            throw new IllegalStateException(
-                    "Circular property reference: " + String.join(" -> ", seen) + " -> " + name);
-        }
-        Matcher matcher = INTERPOLATION_PATTERN.matcher(value);
-        StringBuilder resolved = new StringBuilder();
-        while (matcher.find()) {
-            String referencedKey = matcher.group(1);
-            if (!properties.containsKey(referencedKey)) {
-                throw new IllegalStateException(
-                        "Property '" + name + "' references undefined property '" + referencedKey + "'");
-            }
-            matcher.appendReplacement(resolved, Matcher.quoteReplacement(resolvePlaceholders(referencedKey, seen)));
-        }
-        matcher.appendTail(resolved);
-        seen.remove(name);
-        return resolved.toString();
     }
 
     /**

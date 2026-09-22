@@ -9,7 +9,7 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonCloud.AZURE;
 
-public class DeleteAzureStackMain implements StepsProvider {
+public class DeleteAzurePolarisStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
@@ -19,6 +19,6 @@ public class DeleteAzureStackMain implements StepsProvider {
     }
 
     public static void main(String[] args) {
-        new StepRunner().runUsing(new DeleteAzureStackMain(), args);
+        new StepRunner().runUsing(new DeleteAzurePolarisStackMain(), args);
     }
 }

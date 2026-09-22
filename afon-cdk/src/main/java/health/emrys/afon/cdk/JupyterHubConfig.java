@@ -5,6 +5,7 @@ import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMap;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
+import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.kubernetes.role.Role;
 import com.hashicorp.cdktf.providers.kubernetes.role.RoleMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.role.RoleRule;
@@ -95,6 +96,17 @@ public abstract class JupyterHubConfig {
     private static final String CONFIG_MAP_NAME  = "hub-config";
     private static final String CONFIG_FILE      = "jupyterhub_config.py";
     private static final String CONFIG_MOUNT     = "/etc/jupyterhub";
+    /**
+     * HDRS Patch 16. The perimeter sidecar's image references live in their own tiny
+     * ConfigMap, mounted beside the hub config and read fresh at every spawn - so the
+     * audit platform's Deploy workflow can roll the sensor version with one
+     * {@code kubectl patch}, with no rebuild, no synth, no tofu apply and no hub restart.
+     * Tofu owns the ConfigMap's existence and ignores its data for the same reason
+     * the platform's Terraform ignores the auditor's image: the version changes often
+     * and fast, and a later apply must never quietly roll it back.
+     */
+    private static final String IMAGES_CM_NAME   = "perimeter-images";
+    private static final String IMAGES_MOUNT     = CONFIG_MOUNT + "/" + IMAGES_CM_NAME;
     private static final String SECRET_NAME      = "jupyterhub-secrets";
 
     /**
@@ -122,6 +134,23 @@ public abstract class JupyterHubConfig {
      */
     private static final String SINGLEUSER_LABEL_KEY   = "afon-role";
     private static final String SINGLEUSER_LABEL_VALUE = "jupyter-singleuser";
+
+    /**
+     * The same label, as a Kubernetes label selector - for anything that has to select the pods
+     * this class stamps rather than stamp them itself.
+     *
+     * <p>Exposed rather than retyped because this string is now load-bearing in three places: the
+     * egress {@code NetworkPolicy}, the pods themselves, and the audit platform's exec sensor,
+     * which exports events only for pods matching it (HDRS Patch 20). It has been wrong once
+     * already - {@code deployJupyterHub} returned the proxy's labels rather than the notebook's,
+     * and a workspace everyone believed was default-denied was restricted by nothing. A third
+     * consumer copying the literal, or reading it from a properties file no compiler checks,
+     * would make the same failure available again and silent: a selector matching nothing installs
+     * and runs and reports on no one.
+     */
+    public static String singleuserSelector() {
+        return SINGLEUSER_LABEL_KEY + "=" + SINGLEUSER_LABEL_VALUE;
+    }
 
 
     /**
@@ -242,7 +271,13 @@ public abstract class JupyterHubConfig {
                 "hub.cookieSecret", sha256Hex("cookie-secret:" + cookieSecret),
                 "hub.cryptKey", sha256Hex("crypt-key:" + cookieSecret),
                 "oauth.clientId", oauthClientId(),
-                "oauth.clientSecret", oauthClientSecret()))
+                "oauth.clientSecret", oauthClientSecret(),
+                //  - vnc.password: the password x11vnc is started with inside each workspace pod,
+                //    and the one Guacamole presents when it connects. It reaches the pod through
+                //    the hub, which puts it in the spawned pod's environment, so it lives here
+                //    rather than in the hub ConfigMap - a ConfigMap is readable by anyone holding
+                //    get on ConfigMaps.
+                "vnc.password", jupyterPassword))
             .dependsOn(eksDependOn)
             .build();
 
@@ -256,10 +291,67 @@ public abstract class JupyterHubConfig {
             .dependsOn(eksDependOn)
             .build();
 
+        // HDRS Patch 16: the sidecar image references, patchable at runtime. Data is
+        // ignored after creation so the Deploy workflow's `kubectl patch` and a later
+        // tofu apply never fight - the same shape/version split the platform's own
+        // Terraform uses for the auditor Deployment.
+        ConfigMap perimeterImages = ConfigMap.Builder
+            .create(stack, "perimeterImagesConfigMap")
+            .metadata(ConfigMapMetadata.builder()
+                                       .name(IMAGES_CM_NAME)
+                                       .namespace("default")
+                                       .build())
+            .data(Map.of(
+                "AUDIT_SIDECAR_IMAGE", properties.getValue(AfonProperty.AUDIT_SIDECAR_IMAGE, ""),
+                "AUDIT_REDIRECT_IMAGE", properties.getValue(AfonProperty.AUDIT_REDIRECT_IMAGE, "")))
+            .lifecycle(TerraformResourceLifecycle.builder()
+                                                 .ignoreChanges(List.of("data"))
+                                                 .build())
+            .dependsOn(eksDependOn)
+            .build();
+
+        // What lets the audit platform's CI touch it: the deploy role's EKS access is
+        // scoped to the `audit` namespace, and this Role grants exactly one object in
+        // `default` on top of that - get and patch on the ConfigMap above, by name.
+        Role perimeterImagesRole = Role.Builder
+            .create(stack, "perimeterImagesRole")
+            .metadata(RoleMetadata.builder()
+                                  .name("hdrs-audit-deployer-perimeter-images")
+                                  .namespace("default")
+                                  .build())
+            .rule(List.of(RoleRule.builder()
+                                  .apiGroups(List.of(""))
+                                  .resources(List.of("configmaps"))
+                                  .resourceNames(List.of(IMAGES_CM_NAME))
+                                  .verbs(List.of("get", "patch"))
+                                  .build()))
+            .dependsOn(eksDependOn)
+            .build();
+
+        RoleBinding.Builder
+            .create(stack, "perimeterImagesRoleBinding")
+            .metadata(RoleBindingMetadata.builder()
+                                         .name("hdrs-audit-deployer-perimeter-images")
+                                         .namespace("default")
+                                         .build())
+            .roleRef(RoleBindingRoleRef.builder()
+                                       .apiGroup("rbac.authorization.k8s.io")
+                                       .kind("Role")
+                                       .name(perimeterImagesRole.getMetadata().getName())
+                                       .build())
+            .subject(List.of(RoleBindingSubject.builder()
+                                               .apiGroup("rbac.authorization.k8s.io")
+                                               .kind("Group")
+                                               .name("hdrs:audit-deployer")
+                                               .build()))
+            .dependsOn(eksDependOn)
+            .build();
+
         List<ITerraformDependable> hubDeps = new ArrayList<>(eksDependOn);
         hubDeps.add(hubRoleBinding);
         hubDeps.add(hubSecret);
         hubDeps.add(hubConfig);
+        hubDeps.add(perimeterImages);
         deployHub(hubDeps);
 
         List<ITerraformDependable> proxyDeps = new ArrayList<>(eksDependOn);
@@ -341,7 +433,10 @@ public abstract class JupyterHubConfig {
                 envFromSecret("JPY_COOKIE_SECRET", SECRET_NAME, "hub.cookieSecret"),
                 envFromSecret("JUPYTERHUB_CRYPT_KEY", SECRET_NAME, "hub.cryptKey"),
                 envFromSecret("OAUTH_CLIENT_ID", SECRET_NAME, "oauth.clientId"),
-                envFromSecret("OAUTH_CLIENT_SECRET", SECRET_NAME, "oauth.clientSecret")))
+                envFromSecret("OAUTH_CLIENT_SECRET", SECRET_NAME, "oauth.clientSecret"),
+                // Not used by the hub itself - forwarded into each spawned workspace so x11vnc and
+                // Guacamole agree on a password. See jupyterhubConfigPy().
+                envFromSecret("JUPYTER_VNC_PASSWORD", SECRET_NAME, "vnc.password")))
             .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                  .containerPort(HUB_PORT)
                                                                  .protocol("TCP")
@@ -351,6 +446,15 @@ public abstract class JupyterHubConfig {
                                      .name("config")
                                      .mountPath(CONFIG_MOUNT)
                                      .readOnly(true)
+                                     .build(),
+                                 // Patch 16: each key becomes a file; the kubelet syncs updates
+                                 // into the running pod, so a patched image ref is readable here
+                                 // with no restart.
+                                 DeploymentSpecTemplateSpecContainerVolumeMount
+                                     .builder()
+                                     .name(IMAGES_CM_NAME)
+                                     .mountPath(IMAGES_MOUNT)
+                                     .readOnly(true)
                                      .build()))
             .build();
 
@@ -359,6 +463,18 @@ public abstract class JupyterHubConfig {
             .name("config")
             .configMap(DeploymentSpecTemplateSpecVolumeConfigMap.builder()
                                                                 .name(CONFIG_MAP_NAME)
+                                                                .build())
+            .build();
+
+        DeploymentSpecTemplateSpecVolume imagesVolume = DeploymentSpecTemplateSpecVolume
+            .builder()
+            .name(IMAGES_CM_NAME)
+            .configMap(DeploymentSpecTemplateSpecVolumeConfigMap.builder()
+                                                                .name(IMAGES_CM_NAME)
+                                                                // The hub must start even if the CM is
+                                                                // absent - the config falls back to the
+                                                                // baked refs in jupyterhubConfigPy().
+                                                                .optional(true)
                                                                 .build())
             .build();
 
@@ -389,7 +505,7 @@ public abstract class JupyterHubConfig {
                                                         .builder()
                                                         .serviceAccountName(HUB_SVC)
                                                         .container(List.of(hubContainer))
-                                                        .volume(List.of(configVolume))
+                                                        .volume(List.of(configVolume, imagesVolume))
                                                         .build())
                                               .build())
                                 .build())
@@ -499,16 +615,278 @@ public abstract class JupyterHubConfig {
                c.KubeSpawner.namespace = os.environ.get('POD_NAMESPACE', 'default')
                c.KubeSpawner.image = '%5$s'
                # Re-pull on every spawn so a rebuilt image under the same tag is picked up.
-               c.KubeSpawner.image_pull_policy = 'Always'
+               # IfNotPresent, not Always. The notebook image is ~3 GB and a node carries 20 GB of
+               # ephemeral storage shared with Spark scratch, so re-pulling on every spawn pushed a
+               # node past its eviction threshold and killed the pod mid-download (observed
+               # 2026-08-24: evicted with 1.1 GiB free against a 2 GiB threshold). The cost is that
+               # a rebuilt image under the SAME tag is no longer picked up - bump the tag instead.
+               c.KubeSpawner.image_pull_policy = 'IfNotPresent'
                c.KubeSpawner.port = %6$d
-               c.KubeSpawner.start_timeout = 300
+               # A cold pull of that image took over a minute on an idle node, so 300s left no room
+               # for a retry after an eviction: the hub abandoned the spawn and deleted the pod
+               # while the pull was still running, and the user was left on a Guacamole connection
+               # with nothing behind it.
+               c.KubeSpawner.start_timeout = 600
                c.KubeSpawner.http_timeout = 120
                # One in-pod VNC session per single-user server (see start-vnc.sh in the image).
-               c.KubeSpawner.environment = {'VNC_SESSIONS': '1'}
+               # One in-pod VNC session per single-user server, and the password Guacamole will
+               # present. Both names come from start-vnc.sh in the image and are NOT free choices:
+               # it reads JUPYTER_VNC_SESSIONS (default 3) and JUPYTER_VNC_PASSWORD (default
+               # 'afon'). They were previously spelled VNC_SESSIONS and not set at all, so the
+               # script silently used its own defaults - three VNC servers instead of one, and a
+               # password that could not match the one Guacamole was provisioned with. guacd
+               # reports the resulting rejection as "Unable to connect to VNC server", which reads
+               # like the pod is unreachable; x11vnc's own log says "password check failed".
+               c.KubeSpawner.environment = {
+                   'JUPYTER_VNC_SESSIONS': '1',
+                   'JUPYTER_VNC_PASSWORD': os.environ['JUPYTER_VNC_PASSWORD'],
+               }
                # Stamp every spawned pod so the egress NetworkPolicy (NetworkConfig) selects it. The
                # per-user guacamole-user label is added on top of this by the auth_state hook below.
                c.KubeSpawner.extra_labels = {'%14$s': '%15$s'}
-               
+
+               # --- HDRS Patch 21: the four labels the audit platform's node agent reads. ---
+               # The node agent runs on the Kubernetes node and never sees this pod's environment,
+               # so the sidecar's AUDIT_* env vars are invisible to it. Tetragon puts pod_labels on
+               # every exec event, which is how the identity of a workspace reaches a sensor outside
+               # it - so these four are the whole route (svc-audit-log ADR 0031).
+               #
+               # A pod missing any of them produces NOTHING, by design and by test: the agent would
+               # rather report nothing than report an event it cannot attribute. Written as literals
+               # rather than built from a prefix so that grepping either repository for
+               # `hdrs.audit/ae-id` finds both ends of the contract.
+               #
+               # Only non-empty values are stamped, so an afon deploying without the audit platform
+               # is unchanged - the same property AUDIT_SIDECAR_IMAGE gives the sidecar.
+               _audit_labels = {
+                   'hdrs.audit/ae-id':      '%19$s',
+                   'hdrs.audit/project-id': '%20$s',
+                   'hdrs.audit/tre-id':     '%21$s',
+               }
+               c.KubeSpawner.extra_labels.update({k: v for k, v in _audit_labels.items() if v})
+
+               # `hdrs.audit/user-id` is not here: it is per-user, so it is stamped in the
+               # auth_state hook below, which is the only place the OIDC claims exist.
+               #
+               # Kubernetes label VALUES are at most 63 characters and must begin and end
+               # alphanumeric, with only `-`, `_` and `.` between. A Keycloak `sub` is a UUID and
+               # fits comfortably; another IdP's may not, and the honest failure is to refuse rather
+               # than to mangle - a truncated or rewritten `sub` is a different identifier, and an
+               # audit trail keyed on a silently altered one is worse than an absent label.
+               # ASCII explicitly, and not str.isalnum(), which is Unicode-aware: 'é'.isalnum() is
+               # True in Python and invalid in a Kubernetes label, so isalnum() would pass values
+               # the API server then rejects - turning a bad label into a pod that will not spawn.
+               _LABEL_ALNUM = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+               def _audit_label_value(value):
+                   if not value or len(value) > 63:
+                       return None
+                   if value[0] not in _LABEL_ALNUM or value[-1] not in _LABEL_ALNUM:
+                       return None
+                   if not all(ch in _LABEL_ALNUM or ch in '-_.' for ch in value):
+                       return None
+                   return value
+
+               # --- HDRS Patches 14-16: the audit platform's perimeter, beside the notebook. ---
+               # svc-audit-log's docs/afon-integration.md. Step 2 reaches the sidecar via
+               # HTTP(S)_PROXY in the workspace's environment, which the platform records as
+               # tier 1 and forgeable - a researcher can unset an environment variable. Step 3
+               # is the iptables REDIRECT that makes it tier 2, installed by an init container
+               # holding NET_ADMIN; AUDIT_REDIRECT_IMAGE is the gate between the two.
+               #
+               # An empty AUDIT_SIDECAR_IMAGE removes all of it - afon must keep deploying
+               # with no external auditor.
+               #
+               # The image refs below are baked at synth time and used only as FALLBACKS: the
+               # live values are read from files under /etc/jupyterhub/perimeter-images at every
+               # spawn (Patch 16), which the kubelet keeps in sync with the perimeter-images
+               # ConfigMap. The audit platform's Deploy workflow patches that ConfigMap, so a new
+               # sensor version reaches the next spawned workspace with no rebuild and no hub
+               # restart. Ports and the step-3 gate stay baked - they are configuration of the
+               # arrangement, not versions that roll.
+               _AUDIT_IMAGE     = '%16$s'
+               _AUDIT_REDIRECT  = '%22$s'
+               _AUDIT_TPORT     = '%23$s'
+               _AUDIT_EXCLUDED  = '%24$s'
+               _AUDIT_CELLPORT  = '%25$s'
+               # Where the cell sensor is copied to and mounted. Baked rather than
+               # configured: it is a path two containers have to agree on, not a version.
+               _AUDIT_CELLDIR   = '/opt/hdrs-audit'
+               _AUDIT_CELLVOL   = 'hdrs-cell-sensor'
+               _AUDIT_DIR       = '/etc/jupyterhub/perimeter-images'
+
+               def _audit_ref(name, fallback):
+                   try:
+                       with open(_AUDIT_DIR + '/' + name) as f:
+                           value = f.read().strip()
+                           return value or fallback
+                   except OSError:
+                       return fallback
+
+               def _audit_pre_spawn(spawner):
+                   image = _audit_ref('AUDIT_SIDECAR_IMAGE', _AUDIT_IMAGE)
+                   redirect = _audit_ref('AUDIT_REDIRECT_IMAGE', _AUDIT_REDIRECT)
+                   if not image:
+                       # No sidecar configured anywhere - afon must keep deploying with no
+                       # external auditor, so this spawns an untouched workspace.
+                       return
+                   audit_env = [
+                       {'name': 'KAFKA_BOOTSTRAP_SERVERS', 'value': '%17$s'},
+                       {'name': 'SCHEMA_REGISTRY_URL', 'value': '%18$s'},
+                       {'name': 'AE_ID', 'value': '%19$s'},
+                       # One spawn of that environment - the stretch this perimeter can speak
+                       # for. metadata.uid and NOT metadata.name: KubeSpawner derives the pod
+                       # name from the username, so it is stable across spawns and would name
+                       # the researcher rather than the spawn. The uid is fresh per pod, which
+                       # is what a session is. Downward API rather than a synth-time value,
+                       # because nothing outside Kubernetes knows it.
+                       {'name': 'AE_SESSION_ID',
+                        'valueFrom': {'fieldRef': {'fieldPath': 'metadata.uid'}}},
+                       {'name': 'PROJECT_ID', 'value': '%20$s'},
+                       {'name': 'TRE_ID', 'value': '%21$s'},
+                       {'name': 'SENSOR_ID', 'value': 'perimeter'},
+                   ]
+                   if redirect:
+                       # Step 3: TRANSPARENT_PORT turns on the mode that recovers the original
+                       # destination from conntrack, because a redirect hands over an address
+                       # and no name.
+                       audit_env.append({'name': 'TRANSPARENT_PORT', 'value': _AUDIT_TPORT})
+                   if _AUDIT_CELLPORT:
+                       # HDRS Patch 25: the cell intake. A third way into the same sensor,
+                       # beside the CONNECT proxy and the redirect - one container, one
+                       # sensor id, one heartbeat (svc-audit-log ADR 0025, ADR 0031).
+                       audit_env.append(
+                           {'name': 'CELL_INTAKE_PORT', 'value': _AUDIT_CELLPORT})
+                       # The actor, which only this event type needs: a NetworkFlow has no
+                       # user_id and the sidecar has never carried one. It comes from the
+                       # label Patch 21 already stamps, by the same Downward API route as
+                       # AE_SESSION_ID above - metadata.labels['<KEY>'] is available to a
+                       # container env fieldRef and not only to a downwardAPI volume, so
+                       # there is no new config key and no second copy of the sub.
+                       #
+                       # Reaching it this way rather than from auth_state here is also what
+                       # makes it independent of hook ORDER: the kubelet resolves the label
+                       # when it creates the pod, by which time the auth_state hook has
+                       # written it, whichever order the two hooks happen to run in.
+                       #
+                       # It is deliberately NOT taken from the posted cell. The extension
+                       # runs in the researcher's own container, so anything it asserted
+                       # about who ran a cell is something a researcher could assert about
+                       # anyone. If the label is missing the sidecar refuses to publish and
+                       # says so, rather than attributing a cell to nobody.
+                       audit_env.append({
+                           'name': 'USER_ID',
+                           'valueFrom': {'fieldRef': {
+                               'fieldPath': "metadata.labels['hdrs.audit/user-id']"}}})
+                   spawner.extra_containers = [{
+                       'name': 'workspace-perimeter',
+                       'image': image,
+                       'env': audit_env,
+                   }]
+                   cell_init = []
+                   if _AUDIT_CELLPORT:
+                       # The other half of Patch 25, and it goes in the NOTEBOOK container.
+                       #
+                       # The sensor is MOUNTED IN, not baked into the notebook image. That
+                       # image is published by hand to a third party's registry, and
+                       # image_pull_policy is IfNotPresent (a ~3 GB re-pull on every spawn
+                       # evicted pods when a node ran out of ephemeral storage), so a
+                       # rebuilt image under the same tag is not even picked up - every
+                       # sensor change would need a tag bump, a Java change and somebody
+                       # else's release. Copied out of the perimeter image instead, it
+                       # rides AUDIT_SIDECAR_IMAGE through the perimeter-images ConfigMap
+                       # and reaches the next spawned workspace like the sidecar does.
+                       #
+                       # A copy is enough because the package depends on nothing: it
+                       # imports jupyter_server, which the notebook already has, and
+                       # otherwise only the standard library. There is no index to reach
+                       # from in here.
+                       cell_init = [{
+                           'name': 'hdrs-cell-sensor',
+                           'image': image,
+                           'command': ['python', 'src/install_cell_sensor.py',
+                                       _AUDIT_CELLDIR],
+                           'volumeMounts': [{'name': _AUDIT_CELLVOL,
+                                             'mountPath': _AUDIT_CELLDIR}],
+                           # Root purely to write into a fresh emptyDir, and nothing else:
+                           # every capability is dropped. The perimeter image otherwise
+                           # runs as uid 1337, which may or may not be able to write there
+                           # depending on how the kubelet creates the volume - and the
+                           # failure mode of guessing wrong is a workspace that will not
+                           # spawn. The installer chmods what it writes to 0644/0755 so
+                           # the notebook's own uid can read it.
+                           'securityContext': {
+                               'runAsUser': 0,
+                               'capabilities': {'drop': ['ALL']},
+                           },
+                       }]
+                       # The notebook reads the same volume, and needs both variables:
+                       # PYTHONPATH so the module imports, JUPYTER_CONFIG_PATH so
+                       # jpserver_extensions enables it. Neither is optional and neither
+                       # alone does anything.
+                       #
+                       # Appended rather than set, even though both are unset in this image
+                       # today: a future image that sets either would otherwise lose it
+                       # silently, and PYTHONPATH in particular is the sort of thing a
+                       # Spark image acquires.
+                       spawner.volumes = (spawner.volumes or []) + [
+                           {'name': _AUDIT_CELLVOL, 'emptyDir': {}}]
+                       spawner.volume_mounts = (spawner.volume_mounts or []) + [
+                           {'name': _AUDIT_CELLVOL, 'mountPath': _AUDIT_CELLDIR}]
+
+                       cell_env = dict(spawner.environment or {})
+                       def _prepend(name, value):
+                           existing = cell_env.get(name)
+                           cell_env[name] = value + ':' + existing if existing else value
+                       _prepend('PYTHONPATH', _AUDIT_CELLDIR + '/lib')
+                       _prepend('JUPYTER_CONFIG_PATH', _AUDIT_CELLDIR + '/etc/jupyter')
+                       # Where the extension posts. The sidecar's AUDIT_* environment is
+                       # invisible from this container, so it has to be told. 127.0.0.1
+                       # because the two share the pod's network namespace.
+                       #
+                       # No default on the extension's side: unset, it loads, logs at ERROR
+                       # and reports nothing, rather than guessing a port and going quiet.
+                       cell_env['HDRS_AUDIT_SIDECAR_PORT'] = _AUDIT_CELLPORT
+                       spawner.environment = cell_env
+                   if redirect:
+                       # The init container is the whole of what makes this tier 2, and the
+                       # only thing in the pod holding NET_ADMIN. The sensor is excluded from
+                       # its own rules BY UID (1337, pinned in the perimeter image).
+                       #
+                       # `cell_init +` rather than an assignment: the cell sensor's init
+                       # container is set above and both have to survive. Ordering does not
+                       # matter - one writes a volume, the other writes iptables rules, and
+                       # neither reads the other's work.
+                       spawner.init_containers = cell_init + [{
+                           'name': 'perimeter-redirect',
+                           'image': redirect,
+                           'securityContext': {
+                               'runAsUser': 0,
+                               'capabilities': {'add': ['NET_ADMIN'], 'drop': ['ALL']},
+                           },
+                           'env': [
+                               {'name': 'PERIMETER_UID', 'value': '1337'},
+                               {'name': 'TRANSPARENT_PORT', 'value': _AUDIT_TPORT},
+                               {'name': 'EXCLUDED_PORTS', 'value': _AUDIT_EXCLUDED},
+                           ],
+                       }]
+                   else:
+                       # Still needed here: without a redirect there is no other init
+                       # container, and the cell sensor's would otherwise be dropped.
+                       spawner.init_containers = cell_init
+                       # Step 2 only: the CONNECT proxy, reached because the environment says
+                       # so - tier 1 and forgeable, and recorded as such.
+                       # NO_PROXY keeps the hub handshake and in-cluster services direct - and
+                       # every entry on it is a route the perimeter does not see at this tier.
+                       env = dict(spawner.environment or {})
+                       env.update({
+                           'HTTP_PROXY': 'http://127.0.0.1:3128',
+                           'HTTPS_PROXY': 'http://127.0.0.1:3128',
+                           'NO_PROXY': 'localhost,127.0.0.1,.svc,.cluster.local,%3$s',
+                           'no_proxy': 'localhost,127.0.0.1,.svc,.cluster.local,%3$s',
+                       })
+                       spawner.environment = env
+               c.KubeSpawner.pre_spawn_hook = _audit_pre_spawn
+
                # --- OIDC login against the same provider oauth2-proxy uses. JupyterHub is the OAuth
                #     client itself (not DummyAuthenticator) so it can capture each user's token via
                #     auth_state and hand it to their pod. Endpoints come from the issuer's discovery
@@ -533,16 +911,48 @@ public abstract class JupyterHubConfig {
                _GUAC_SLUGS = {%12$s}
                
                async def _on_spawn(spawner, auth_state):
+                   # Copied once, up front, and not inside the `if` below. c.KubeSpawner.extra_labels
+                   # is a single dict shared by every spawner, so mutating it in place leaks one
+                   # user's label into the next user's pod - the same hazard the environment copy
+                   # further down exists for. Previously this copy only happened when the user had a
+                   # slug, which left the audit label below writing into the shared dict.
+                   spawner.extra_labels = dict(spawner.extra_labels or {})
                    # Label the pod with the user's slug so their guac-vnc-<slug> Service selects it.
                    slug = _GUAC_SLUGS.get(spawner.user.name)
                    if slug:
-                       spawner.extra_labels = dict(spawner.extra_labels or {})
                        spawner.extra_labels['%8$s'] = slug
+                   # HDRS Patch 21: the OIDC `sub`, which is what the audit platform means by
+                   # user_id. It is the actor, and it is deliberately opaque - meaningless without
+                   # the identity provider - which is what makes putting it in cluster metadata,
+                   # readable by anyone with `get pods`, an acceptable disclosure. The e-mail on
+                   # hub.jupyter.org/username is NOT a substitute: it identifies the person to
+                   # anyone who reads it.
+                   #
+                   # Not spawner.user.name, even though username_claim is 'email' here and the two
+                   # would agree: partners run afon against their own IdPs, and the audit trail
+                   # must key on the claim the platform specified rather than on whatever afon
+                   # happens to be using as a display name.
+                   sub = _audit_label_value((auth_state or {}).get('oauth_user', {}).get('sub'))
+                   if sub:
+                       spawner.extra_labels['hdrs.audit/user-id'] = sub
+                   else:
+                       # Loudly, because the consequence is silence: the node agent drops every
+                       # exec from a pod missing this label, so the workspace looks like one where
+                       # nobody ran anything. C2 catches it eventually; this says it immediately.
+                       spawner.log.warning(
+                           'No usable OIDC sub for %%s - this workspace will produce no '
+                           'user-input logs (svc-audit-log ADR 0031).', spawner.user.name)
                    # Inject the user's OIDC token, read by the Spark Connector and Polaris.
                    if auth_state:
-                       spawner.environment['OIDC_TOKEN'] = auth_state.get('access_token', '')
+                       # HDRS: copy before writing. c.KubeSpawner.environment is a single dict
+                       # shared by every spawner, so mutating it in place leaves one user's
+                       # token visible to the next user's pod. _audit_pre_spawn copies for the
+                       # same reason.
+                       env = dict(spawner.environment or {})
+                       env['OIDC_TOKEN'] = auth_state.get('access_token', '')
                        if auth_state.get('id_token'):
-                           spawner.environment['OIDC_ID_TOKEN'] = auth_state['id_token']
+                           env['OIDC_ID_TOKEN'] = auth_state['id_token']
+                       spawner.environment = env
                c.Spawner.auth_state_hook = _on_spawn
                """.formatted(
             PROXY_API_SVC, PROXY_API,
@@ -553,7 +963,33 @@ public abstract class JupyterHubConfig {
             pythonSetOf(userProvider.getUsers().stream().map(AfonUser::email).toList()),
             pythonSlugMap(),
             URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8),
-            SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE);
+            SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE,
+            properties.getValue(AfonProperty.AUDIT_SIDECAR_IMAGE, ""),
+            properties.getValue(AfonProperty.AUDIT_KAFKA_BOOTSTRAP, ""),
+            properties.getValue(AfonProperty.AUDIT_SCHEMA_REGISTRY_URL, ""),
+            properties.getValue(AfonProperty.AUDIT_AE_ID, ""),
+            properties.getValue(AfonProperty.AUDIT_PROJECT_ID, ""),
+            // hdrs-afon, not hdrs: the default names this DEPLOYMENT of afon, and `hdrs`
+            // alone names the Organization that runs it. Emrys runs another deployment from
+            // the same framework, and an audit trail cannot be re-keyed once written.
+            properties.getValue(AfonProperty.AUDIT_TRE_ID, "hdrs-afon"),
+            properties.getValue(AfonProperty.AUDIT_REDIRECT_IMAGE, ""),
+            properties.getValue(AfonProperty.AUDIT_TRANSPARENT_PORT, "15001"),
+            // Hub API and Spark Connect. Each breaks the workspace if redirected - a
+            // single-user server that cannot reach the hub never spawns - and each is
+            // therefore a route the perimeter does not watch, named in the coverage
+            // matrix rather than left implicit.
+            properties.getValue(AfonProperty.AUDIT_EXCLUDED_PORTS, "8081 15002"),
+            // Defaulted like the transparent port, and for the same reason the comment
+            // above gives: a port two containers have to agree on is configuration of the
+            // arrangement, not a version that rolls.
+            //
+            // It was empty, as a gate against a sidecar listening for cells no extension
+            // would send. That gate is gone because the premise is: the sensor is copied
+            // out of the sidecar's own image, so wherever there is a sidecar there is a
+            // sensor. AUDIT_SIDECAR_IMAGE remains the real gate - unset, there is no
+            // sidecar, no intake and no init container.
+            properties.getValue(AfonProperty.AUDIT_CELL_INTAKE_PORT, "15003"));
     }
 
     /**

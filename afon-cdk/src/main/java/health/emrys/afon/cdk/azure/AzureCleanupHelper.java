@@ -22,12 +22,12 @@ public class AzureCleanupHelper extends CleanupHelper {
         subscription      = properties.getValue(AfonProperty.AZURE_SUBSCRIPTION);
     }
 
-    private @NonNull String deleteGroupCommand() {
+    private @NonNull String cleanGroupCommand() {
         String cleanGroup = format(
             """
-            az group delete --name %s --subscription %s
+            az group delete --name afon_resource_group_spark-cluster --subscription %s
             """,
-            resourceGroup, subscription);
+            subscription);
         return cleanGroup;
     }
 
@@ -53,7 +53,7 @@ public class AzureCleanupHelper extends CleanupHelper {
                 """,
                 deleteDnsRecordCommand(polarisDomainName),
                 deleteDnsRecordCommand(jupyterDomainName),
-                deleteGroupCommand());
+                cleanGroupCommand());
     }
 
     public static void main(String[] args) {

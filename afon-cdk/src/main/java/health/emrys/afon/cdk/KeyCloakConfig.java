@@ -98,8 +98,17 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         envs.add(envVar("KC_HOSTNAME_STRICT", "true"));
         envs.add(envVar("KC_HTTP_ENABLED", "true"));
         envs.add(envVar(KC_HOSTNAME.getName(), hostname));
-        kcProperties.stream().forEach(x -> envs.add(
-            envFromSecret(x.getName(), SECRET_NAME, x.getName()))
+        // HDRS (Patch 19, second site): iterate in a STABLE order. kcProperties is a
+        // Set.of(...), whose iteration order Java deliberately randomises per JVM run,
+        // so the rendered env list came out in a different order on every synth. That
+        // is a change as far as Terraform is concerned, so the Keycloak Deployment was
+        // updated - and its pod restarted - on every apply, for no reason at all. Same
+        // root cause as the CiliumNetworkPolicy manifest; this one costs an
+        // authentication blip each time rather than an egress-policy gap.
+        kcProperties.stream()
+                    .sorted(java.util.Comparator.comparing(AfonProperty::getName))
+                    .forEach(x -> envs.add(
+                        envFromSecret(x.getName(), SECRET_NAME, x.getName()))
         );
 
         List<String> args = List.of("start");

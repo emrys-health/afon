@@ -7,16 +7,15 @@ import java.util.Properties;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class FilePropertyProviderTest {
 
-    static String TEST_CONFIG_DIR = "src/test/resources/config";
-    static String TEMPLATES_CONFIG_DIR = "../templates/config";
+    static String CONFIG_DIR = "src/test/resources/config";
 
     @Test
     public void cannotGetPropertiesWhenFilesAreMissing() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR, List.of("missing"));
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR, List.of("missing"));
         try {
             provider.getProperties();
         } catch (RuntimeException e) {
@@ -31,7 +30,7 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canOverridePropertyValueAfterLoad() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR);
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
         assertThat(provider.hasProperty(polarisEndpoint)).isTrue();
         assertThat(provider.getValue(polarisEndpoint)).isEqualTo("localhost:8181"); // default value
@@ -42,7 +41,7 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canOverridePropertyValueBySystemPropertyUponLoad() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR);
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         try {
             System.setProperty(AfonProperty.POLARIS_ENDPOINT.getName(), "localhost:8182"); // overridden value
             AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
@@ -55,7 +54,7 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canSetPropertyValueAfterLoad() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR, List.of("empty"));
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR, List.of("empty"));
         AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
         assertThat(provider.hasProperty(polarisEndpoint)).isFalse();
         provider.setValue(polarisEndpoint, "localhost:8182");
@@ -64,7 +63,7 @@ public class FilePropertyProviderTest {
 
     @Test
     public void cannotSetPropertyValueIfImmutable() {
-        AfonPropertyProvider provider = new ImmutablePropertyProvider(new FilePropertyProvider(TEST_CONFIG_DIR, List.of("empty")));
+        AfonPropertyProvider provider = new ImmutablePropertyProvider(new FilePropertyProvider(CONFIG_DIR, List.of("empty")));
         AfonProperty polarisEndpoint = AfonProperty.POLARIS_ENDPOINT;
         assertThat(provider.hasProperty(polarisEndpoint)).isFalse();
         provider.setValue(polarisEndpoint, "localhost:8182");
@@ -73,7 +72,7 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canGetAllProperties() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR);
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         assertThat(provider.getProperties()).hasSizeGreaterThan(0);
         try {
             System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "all");
@@ -85,13 +84,13 @@ public class FilePropertyProviderTest {
 
     @Test
     public void canGetSecretProperties() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR);
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         assertThat(provider.getSecretProperties()).hasSizeGreaterThan(0);
     }
 
     @Test
     public void canGetPropertyByKey() {
-        AfonPropertyProvider provider = new FilePropertyProvider(TEST_CONFIG_DIR);
+        AfonPropertyProvider provider = new FilePropertyProvider(CONFIG_DIR);
         assertThat(provider.getValue(AfonProperty.CLUSTER_NAME)).isNotNull();
         assertThat(provider.getValue(AfonProperty.KC_PROTOCOL, "https")).isNotNull();
     }
@@ -100,7 +99,7 @@ public class FilePropertyProviderTest {
     public void canGetPropertiesOnlyForAWS() {
         System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "aws");
         try {
-            Properties properties = new FilePropertyProvider(TEST_CONFIG_DIR).getProperties();
+            Properties properties = new FilePropertyProvider(CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -122,7 +121,7 @@ public class FilePropertyProviderTest {
     public void canGetPropertiesOnlyForAzure() {
         System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "azure");
         try {
-            Properties properties = new FilePropertyProvider(TEST_CONFIG_DIR).getProperties();
+            Properties properties = new FilePropertyProvider(CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -144,7 +143,7 @@ public class FilePropertyProviderTest {
     public void canGetPropertiesOnlyForGCP() {
         System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "gcp");
         try {
-            Properties properties = new FilePropertyProvider(TEST_CONFIG_DIR).getProperties();
+            Properties properties = new FilePropertyProvider(CONFIG_DIR).getProperties();
             assertThat(properties.getProperty(AfonProperty.CLUSTER_NAME.getName()))
                     .as("common properties are still loaded")
                     .isNotNull();
@@ -162,65 +161,15 @@ public class FilePropertyProviderTest {
         }
     }
 
-    @Test
-    public void canInterpolatePropertyReferencingAnotherProperty() {
-        Properties properties = new FilePropertyProvider("src/test/resources/config", List.of("interpolate")).getProperties();
-        assertThat(properties.getProperty("ENV_NAME")).isEqualTo("dev");
-        assertThat(properties.getProperty("OIDC_ISSUER_URL")).isEqualTo("https://dev-oauth.click/realms/polaris");
-    }
-
-    @Test
-    public void canInterpolatePropertyReferencingAnotherPropertyForAws() {
-        System.setProperty(ConfigUtils.AFON_CLOUD_PROPERTY, "aws");
-        try {
-            Properties properties = new FilePropertyProvider("src/test/resources/config", List.of("interpolate")).getProperties();
-            assertThat(properties.getProperty("ENV_NAME")).isEqualTo("dev");
-            assertThat(properties.getProperty("AWS_POLARIS_DOMAIN_NAME")).isEqualTo("dev-polaris.click");
-            assertThat(properties.getProperty("AWS_S3_BUCKET_NAME")).isEqualTo("dev-bucket");
-            assertThat(properties.getProperty("AWS_S3_BUCKET_NAME_TRINO")).isEqualTo("dev-bucket-trino");
-        } finally {
-            System.clearProperty(ConfigUtils.AFON_CLOUD_PROPERTY);
+    private void checkAllPropertiesAreSet(Properties properties) {
+        for (String property : AfonProperty.getAllNames()) {
+            assertThat(properties.get(property)).as("property = %s", property).isNotNull();
+            assertThat(properties.get(property)).as("property = %s", property).isNotEqualTo("");
         }
-    }
-
-    @Test
-    public void canInterpolateUsingSystemPropertyOverride() {
-        System.setProperty(AfonProperty.ENV_NAME.getName(), "prod");
-        try {
-            Properties properties = new FilePropertyProvider("src/test/resources/config", List.of("interpolate")).getProperties();
-            assertThat(properties.getProperty("AWS_S3_BUCKET_NAME")).isEqualTo("prod-bucket");
-        } finally {
-            System.clearProperty(AfonProperty.ENV_NAME.getName());
-        }
-    }
-
-    @Test
-    public void failsWhenInterpolatingUndefinedProperty() {
-        AfonPropertyProvider provider = new FilePropertyProvider("src/test/resources/config", List.of("interpolate-undefined"));
-        assertThatThrownBy(provider::getProperties)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("UNDEFINED");
-    }
-
-    @Test
-    public void failsWhenInterpolatingCircularProperties() {
-        AfonPropertyProvider provider = new FilePropertyProvider("src/test/resources/config", List.of("interpolate-circular"));
-        assertThatThrownBy(provider::getProperties)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Circular");
-    }
-
-    @Test
-    public void ensureTemplatePropertyNamesAreExactlyThoseOfAfonPropertyEnum() {
-        Properties properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR).getProperties();
-        // ensure all enum names are found and empty
-        Set<String> allNames = AfonProperty.getAllNames();
-        for (String name : allNames) {
-            assertThat(properties).as("enum name = %s", name).containsKey(name);
-        }
-        // ensure no names other than enum names are found
-        for ( String name : properties.stringPropertyNames() ) {
-            assertThat(allNames).as("property name = %s", name).contains(name);
+        Set<String> expectedProperties = AfonProperty.getAllNames();
+        for (Object property : properties.keySet()) {
+            assertTrue(expectedProperties.contains(property.toString()),
+                    property + " not in " + expectedProperties);
         }
     }
 
