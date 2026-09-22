@@ -231,7 +231,7 @@ The `cdktf` dir will hold all your deployment Terraform state.
 
 You can also import/export config files as a zip:
 ```shell
-afon-cli.sh config-{import|export} --config-zip <path-to-config-zip> -e <env>
+afon-cli.sh config-{import|export} <path-to-config-zip> -e <env>
 ```
 See [configuration](https://github.com/emrys-health/afon-core/blob/main/docs/configuration.md) for more details.
 

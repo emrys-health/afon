@@ -1,5 +1,14 @@
+# --setup-output is only a flag on afon.sh (which sets SETUP_OUTPUT before sourcing this script);
+# afon-cli-scripts.sh/afon-cli.sh users pass it as a plain script-arg instead, eg
+# 'afon-cli.sh setup-show <output-file>' - same fallback pattern as config/export.sh's zip path.
+SETUP_OUTPUT="${SETUP_OUTPUT:-${1:-}}"
 if [ -z "$SETUP_OUTPUT" ]; then
-  SETUP_OUTPUT="$HOME_DIR/versions.md"
+  SETUP_OUTPUT="$AFON_HOME/versions.md"
+fi
+
+# CLOUD is "ALL" (afon-cli.sh's default) or empty (afon.sh's default) when no cloud is targeted.
+if [ "$CLOUD" == "ALL" ]; then
+  CLOUD=
 fi
 
 echo "## Tools setup" > $SETUP_OUTPUT
