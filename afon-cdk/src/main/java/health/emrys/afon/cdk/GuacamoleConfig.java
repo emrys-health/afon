@@ -12,11 +12,11 @@ import software.constructs.Construct;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.JarURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -598,9 +598,14 @@ public class GuacamoleConfig {
 
     /**
      * Bytes of the afon-guacamole-theme artifact. Once Maven has packaged the module, its
-     * {@code guac-manifest.json} marker resolves as a {@code jar:file:...!} URL whose path is the
-     * jar itself; when running against {@code target/classes} instead (IDE, tests) the resource
-     * tree is zipped on the fly — same result either way.
+     * {@code guac-manifest.json} marker resolves as a {@code jar:...!} URL; {@link JarURLConnection}
+     * hands back the containing jar's own URL, which is opened directly for its bytes. That URL's
+     * scheme depends on how the jar was loaded — a plain {@code file:} path when run standalone, or
+     * Spring Boot's {@code nested:} scheme when the theme jar lives inside afon-cli.jar's
+     * {@code BOOT-INF/lib} — so it must be read via {@code openStream()} rather than resolved to a
+     * filesystem {@link Path}, which only the {@code file:} case would support.
+     * When running against {@code target/classes} instead (IDE, tests) the resource tree is
+     * zipped on the fly — same result either way.
      */
     private static byte[] themeJarBytes() {
         URL marker = GuacamoleConfig.class.getResource("/guac-manifest.json");
@@ -610,9 +615,10 @@ public class GuacamoleConfig {
         }
         try {
             if ("jar".equals(marker.getProtocol())) {
-                String path = marker.getPath();
-                String jarPath = path.substring("file:".length(), path.indexOf('!'));
-                return Files.readAllBytes(Path.of(URLDecoder.decode(jarPath, StandardCharsets.UTF_8)));
+                JarURLConnection jarConnection = (JarURLConnection) marker.openConnection();
+                try (InputStream in = jarConnection.getJarFileURL().openStream()) {
+                    return in.readAllBytes();
+                }
             }
             return zipResourceTree(Path.of(marker.toURI()).getParent());
         } catch (IOException | URISyntaxException e) {
