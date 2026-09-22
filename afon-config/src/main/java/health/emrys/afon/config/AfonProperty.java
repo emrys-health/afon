@@ -14,6 +14,9 @@ public enum AfonProperty {
     CLUSTER_NAME("CLUSTER_NAME"),
     DNS_WAIT_TIMEOUT("DNS_WAIT_TIMEOUT"),
 
+    /** Selects which theme under afon-theme's {@code themes/<name>/} to deploy. Defaults to "emrys-hdrs". */
+    AFON_THEME("AFON_THEME"),
+
     // AWS
     AWS_REGION("AWS_REGION"),
     AWS_ACCOUNT_ID("AWS_ACCOUNT_ID"),
