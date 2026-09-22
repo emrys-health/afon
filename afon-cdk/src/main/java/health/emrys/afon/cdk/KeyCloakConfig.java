@@ -18,8 +18,9 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -46,17 +47,7 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PO
 public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct {
     private static final String APP_NAME = "keycloak";
     private static final String SECRET_NAME = "kcsecrets";
-    /**
-     * Emrys Health login theme (HDRS palette), packaged as classpath resources
-     * under {@code keycloak-theme/emrys-hdrs/} and mounted at
-     * {@code /opt/keycloak/themes/emrys-hdrs}. The realm opts into it via
-     * {@code loginTheme} (see {@code KeyCloakProvider#createRealm}).
-     */
-    private static final String THEME_NAME      = "emrys-hdrs";
     private static final String THEME_CONFIGMAP = "keycloak-theme";
-    private static final String THEME_MOUNT     = "/opt/keycloak/themes/" + THEME_NAME;
-    /** Classpath root the theme files are packaged under. */
-    private static final String THEME_RESOURCE_ROOT = "/keycloak-theme/" + THEME_NAME + "/login/";
     /**
      * KeyCloak's own env vars (Quarkus config), which the container requires verbatim,
      * we need to map them to {@link AfonProperty} names
@@ -82,6 +73,13 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         @NonNull T cloudProvider) {
         super(scope, APP_NAME + "_scope");
         this.cloudProvider = cloudProvider;
+
+        // Login theme, packaged as classpath resources under afon-theme's
+        // themes/<theme>/keycloak/login/ and mounted at /opt/keycloak/themes/<theme>. The realm
+        // opts into it via loginTheme (see KeyCloakProvider#createRealm).
+        String theme = properties.getValue(AFON_THEME, "emrys-hdrs");
+        String themeMount = "/opt/keycloak/themes/" + theme;
+        String themeResourcePrefix = "themes/" + theme + "/keycloak/login/";
 
         Map<AfonProperty, String> kcProperties = new LinkedHashMap<>();
         kcProperties.put(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME, ENV_KC_BOOTSTRAP_ADMIN_USERNAME);
@@ -130,28 +128,36 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
             envFromSecret(envName, SECRET_NAME, envName))
         );
 
-        // The emrys-hdrs login theme ships as a ConfigMap of classpath resources,
-        // mounted into the themes dir KeyCloak scans at startup. Text files ride in
-        // `data`, binaries (logos, favicon) in `binaryData`; `items` reshapes the
-        // flat keys into the theme's directory layout.
-        ConfigMap theme = ConfigMap.Builder
+        // The login theme ships as a ConfigMap of whatever files ThemeResources finds under the
+        // theme's keycloak/login/ subtree, mounted into the themes dir KeyCloak scans at startup.
+        // ConfigMap keys can't contain '/', so each file's relative path is flattened into a key;
+        // `items` then reshapes those flat keys back into the theme's real directory layout. Valid
+        // UTF-8 files (theme.properties, css, svg, ...) ride in `data` so they stay readable via
+        // kubectl; anything else (images, fonts, ...) rides in `binaryData`.
+        Map<String, byte[]> themeFiles = ThemeResources.list(themeResourcePrefix, "theme.properties");
+        Map<String, String> themeData = new LinkedHashMap<>();
+        Map<String, String> themeBinaryData = new LinkedHashMap<>();
+        List<DeploymentSpecTemplateSpecVolumeConfigMapItems> themeItems = new ArrayList<>();
+        themeFiles.forEach((relativePath, bytes) -> {
+            String key = relativePath.replace('/', '_');
+            String text = decodeUtf8(bytes);
+            if (text != null) {
+                themeData.put(key, text);
+            } else {
+                themeBinaryData.put(key, Base64.getEncoder().encodeToString(bytes));
+            }
+            themeItems.add(themeItem(key, "login/" + relativePath));
+        });
+
+        ConfigMap themeCm = ConfigMap.Builder
             .create(scope, "keycloakTheme")
             .metadata(ConfigMapMetadata
                           .builder()
                           .name(THEME_CONFIGMAP)
                           .namespace("default")
                           .build())
-            .data(Map.of(
-                "theme.properties", resourceText(THEME_RESOURCE_ROOT + "theme.properties"),
-                "hdrs.css",         resourceText(THEME_RESOURCE_ROOT + "resources/css/hdrs.css"),
-                "hdrs-dots.svg",    resourceText(THEME_RESOURCE_ROOT + "resources/img/hdrs-dots.svg")))
-            .binaryData(Map.of(
-                "emrys-logo-horizontal-white.png",
-                    resourceBase64(THEME_RESOURCE_ROOT + "resources/img/emrys-logo-horizontal-white.png"),
-                "hdrs-logo-horizontal-light.png",
-                    resourceBase64(THEME_RESOURCE_ROOT + "resources/img/hdrs-logo-horizontal-light.png"),
-                "favicon.ico",
-                    resourceBase64(THEME_RESOURCE_ROOT + "resources/img/favicon.ico")))
+            .data(themeData)
+            .binaryData(themeBinaryData)
             .build();
 
         DeploymentSpecTemplateSpecVolume themeVolume = DeploymentSpecTemplateSpecVolume
@@ -160,15 +166,7 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
             .configMap(DeploymentSpecTemplateSpecVolumeConfigMap
                            .builder()
                            .name(THEME_CONFIGMAP)
-                           .items(List.of(
-                               themeItem("theme.properties", "login/theme.properties"),
-                               themeItem("hdrs.css", "login/resources/css/hdrs.css"),
-                               themeItem("hdrs-dots.svg", "login/resources/img/hdrs-dots.svg"),
-                               themeItem("emrys-logo-horizontal-white.png",
-                                         "login/resources/img/emrys-logo-horizontal-white.png"),
-                               themeItem("hdrs-logo-horizontal-light.png",
-                                         "login/resources/img/hdrs-logo-horizontal-light.png"),
-                               themeItem("favicon.ico", "login/resources/img/favicon.ico")))
+                           .items(themeItems)
                            .build())
             .build();
 
@@ -182,13 +180,13 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
             .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount
                                      .builder()
                                      .name("theme")
-                                     .mountPath(THEME_MOUNT)
+                                     .mountPath(themeMount)
                                      .readOnly(true)
                                      .build()))
             .build();
         List<ITerraformDependable> dependants = new ArrayList(cloudProvider.getDependables());
         dependants.add(kcSecrets);
-        dependants.add(theme);
+        dependants.add(themeCm);
         Map<String, String> labels = Map.of("app", APP_NAME);
         Deployment app = CdkUtils.deploy(
             this,
@@ -216,22 +214,20 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
             .build();
     }
 
-    private static String resourceText(String path) {
-        return new String(resourceBytes(path), StandardCharsets.UTF_8);
-    }
-
-    private static String resourceBase64(String path) {
-        return Base64.getEncoder().encodeToString(resourceBytes(path));
-    }
-
-    private static byte[] resourceBytes(String path) {
-        try (InputStream in = KeyCloakConfig.class.getResourceAsStream(path)) {
-            if (in == null) {
-                throw new IllegalStateException("KeyCloak theme resource not on classpath: " + path);
-            }
-            return in.readAllBytes();
-        } catch (IOException e) {
-            throw new IllegalStateException("Could not read KeyCloak theme resource " + path, e);
+    /**
+     * {@code bytes} decoded as UTF-8, or {@code null} if it isn't valid UTF-8 — unlike
+     * {@code new String(bytes, UTF_8)}, which silently replaces malformed input instead of
+     * signalling it, so it can't be used to detect binary files.
+     */
+    private static String decodeUtf8(byte[] bytes) {
+        try {
+            return StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString();
+        } catch (CharacterCodingException e) {
+            return null;
         }
     }
 

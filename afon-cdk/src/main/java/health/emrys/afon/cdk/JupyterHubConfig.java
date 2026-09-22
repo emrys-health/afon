@@ -306,7 +306,8 @@ public abstract class JupyterHubConfig {
             jupyterPassword,
             sessions,
             guacamoleDb,
-            "X-Forwarded-Email");
+            "X-Forwarded-Email",
+            properties.getValue(AfonProperty.AFON_THEME, "emrys-hdrs"));
 
         // A single oauth2-proxy MFA gate fronts both Guacamole (root) and JupyterHub
         // (under /jupyter/), so users authenticate once, spawn their pod via the hub, then reach its
