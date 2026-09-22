@@ -419,15 +419,6 @@
             </modules>
         </profile>
         <profile>
-            <id>samples</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-samples</module>
-            </modules>
-        </profile>
-        <profile>
             <id>github</id>
             <distributionManagement>
                 <repository>
