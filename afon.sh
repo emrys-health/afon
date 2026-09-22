@@ -31,6 +31,8 @@ usage (){
   echo "          script        : executes the scripts."
   echo "          <dir>-<name>  : executes scripts/<dir>/<name>.sh directly, for any script under scripts/."
   echo "                          eg cdktf-status, config-switch, aws-login, azure-account"
+  echo "                          Its script args can be given as positional args instead of --script-args, eg"
+  echo "                          '-a github-secrets push --env dev'. Use '--' before any other arg starting with '-'."
   echo "          <ops-command> : executes the ops class <OpsCommand>Main, eg deploy-aws-full-stack for"
   echo "                          'exec -ec ops.DeployAwsFullStackMain'.  The other --exec-* options still apply."
   echo "                          Its exec args can be given as positional args instead of --exec-args, eg"
@@ -137,7 +139,7 @@ exec_action_script(){
   exec_script
 }
 
-ops_class_for_action(){
+find_ops_class(){
   # Prints the ops class (relative to the base package, eg "ops.DeployAwsFullStackMain") for the
   # "<kebab-name>" action $1, eg "deploy-aws-full-stack", or returns 1 if there is none.
   # Pure bash: the class is looked up in the source tree, no dependency on the cli.
@@ -163,7 +165,7 @@ resolve_ops_action(){
   # Rewrites an ops command action, eg "deploy-aws-full-stack", into the equivalent of
   # "exec -ec ops.DeployAwsFullStackMain".
   local ops_class
-  ops_class=$(ops_class_for_action "$ACTION") || return 0
+  ops_class=$(find_ops_class "$ACTION") || return 0
   EXEC_CLASS="$ops_class"
   echo "Action $ACTION is the ops command $EXEC_CLASS"
   ACTION="exec"
@@ -336,18 +338,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Positional args are only accepted by the ops commands, where they are the exec args, ie
-# "-a manage-polaris-catalogs create aws" is the same as "-a manage-polaris-catalogs -ea 'create aws'".
+# Positional args are only accepted by the ops commands and the <dir>-<name> script actions, where they are
+# the exec args or the script args, ie "-a manage-polaris-catalogs create aws" is the same as
+# "-a manage-polaris-catalogs -ea 'create aws'", and "-a github-secrets -- push --env dev" is the same as
+# "-a github-secrets -sa 'push --env dev'".  find_ops_class and find_script_path are mutually exclusive
+# (the former defers to the latter), so ACTION resolves to at most one of them.
 if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
-  if [ -z "$(ops_class_for_action "$ACTION")" ]; then
+  if [ -n "$(find_ops_class "$ACTION")" ]; then
+    if [ -n "$EXEC_ARGS" ]; then
+      echo "The ops command $ACTION takes its args either as positional args or via --exec-args, not both." >&2
+      usage; exit 0
+    fi
+    EXEC_ARGS="${POSITIONAL_ARGS[*]}"
+  elif find_script_path "$ACTION" 2>/dev/null; then
+    if [ -n "$SCRIPT_ARGS" ]; then
+      echo "The script $ACTION takes its args either as positional args or via --script-args, not both." >&2
+      usage; exit 0
+    fi
+    SCRIPT_ARGS="${POSITIONAL_ARGS[*]}"
+  else
     echo "Unknown option: ${POSITIONAL_ARGS[0]}" >&2
     usage; exit 0
   fi
-  if [ -n "$EXEC_ARGS" ]; then
-    echo "The ops command $ACTION takes its args either as positional args or via --exec-args, not both." >&2
-    usage; exit 0
-  fi
-  EXEC_ARGS="${POSITIONAL_ARGS[*]}"
 fi
 
 echo "Using AFON_ROOT=$AFON_ROOT"
