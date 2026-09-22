@@ -13,7 +13,7 @@ Afon supports different envs for configuration, eg to allow for an `dev` and a `
 You can initialise the config files for a given env by running:
 
 ```shell
-./afon.sh -a config-init --config-env <env>
+./afon.sh -a config-init -e <env>
 ```
 This copies config files from templates to the `config-<env>` dir and creates a symlink `config -> config-<env>`.  
 
@@ -26,7 +26,7 @@ Once initialised, the config values need to be filled in.
 
 You can switch between config envs using the `config-switch` action:
 ```shell
-./afon.sh -a config-switch --config-env {dev|stg} # config symlink for <env> 
+./afon.sh -a config-switch -e <env> # config symlink for <env> 
 ```
 This will create or move the symlink `config -> config-<env>`.
 
@@ -49,7 +49,7 @@ The recommended workaround is to init without specifying the cloud and to valida
 
 You can also import or export the config files as a zip: 
 ```shell
-./afon.sh -a config-{import|export} --config-zip <path-to-config-zip> --config-env <env>
+./afon.sh -a config-{import|export} <path-to-config-zip> -e <env>
 ```
 This can be useful when sharing a pre-defined configuration.
 
