@@ -75,7 +75,7 @@ public class GuacamoleConfig {
         public static DbConfig create(AfonPropertyProvider properties) {
             return new DbConfig(properties.getValue(AfonProperty.GUACAMOLE_DB_HOST),
                                 5432,
-                                "guacamole",
+                                "guacamole" + properties.getValue(AfonProperty.ENV_NAME) + properties.getValue(AfonProperty.CLUSTER_NAME),
                                 properties.getValue(AfonProperty.GUACAMOLE_DB_USERNAME),
                                 properties.getValue(AfonProperty.GUACAMOLE_DB_PASSWORD));
         }
