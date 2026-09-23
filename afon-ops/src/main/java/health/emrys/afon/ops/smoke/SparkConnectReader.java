@@ -27,7 +27,9 @@ public class SparkConnectReader {
     public static void main(String[] args) {
         AfonPropertyProvider properties = new DefaultPropertyProvider();
         properties.setValue(AfonProperty.POLARIS_ENDPOINT, "westmidspolarisazure.click");
-        new SparkConnectReader(properties).sparkLocalRead("westmids", "azure");
+        SparkConnectReader app = new SparkConnectReader(properties);
+        app.sparkLocalRead("westmids", "azure"); // this is fast
+//        app.sparkConnectRead("westmids", "azure"); // this is slow
     }
 
     public void sparkConnectRead(String warehouse, String catalogName) {
@@ -37,7 +39,7 @@ public class SparkConnectReader {
     }
 
     private static void readTable(String warehouse, SparkSession spark) {
-        String       fqn = String.format("%s.synthetic_ehr.conditions", warehouse);
+        String       fqn = String.format("%s.synthetic_ehr.observations", warehouse);
         Dataset<Row> df  = spark.read().table(fqn);
         df.show();
         logger.info("About to collect...");
