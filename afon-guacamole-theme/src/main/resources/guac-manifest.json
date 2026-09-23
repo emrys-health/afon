@@ -1,0 +1,29 @@
+{
+    "guacamoleVersion" : "1.5.0",
+    "name"             : "Emrys Health (HDRS) Branding",
+    "namespace"        : "emrys-hdrs-branding",
+
+    "smallIcon" : "images/favicon-64.png",
+    "largeIcon" : "images/favicon-144.png",
+
+    "css" : [
+        "css/hdrs.css"
+    ],
+
+    "translations" : [
+        "translations/en.json"
+    ],
+
+    "resources" : {
+        "images/emrys-logo-white.png"            : "image/png",
+        "images/emrys-logo-horizontal-white.png" : "image/png",
+        "images/emrys-logo-dark.png"             : "image/png",
+        "images/emrys-icon-white.png"            : "image/png",
+        "images/hdrs-logo-dark.png"              : "image/png",
+        "images/hdrs-logo-horizontal-light.png"  : "image/png",
+        "images/hdrs-logo-vertical-light.png"    : "image/png",
+        "images/hdrs-logo-vertical-dark.png"     : "image/png",
+        "images/hdrs-icon-light.png"             : "image/png",
+        "images/hdrs-icon-dark.png"              : "image/png"
+    }
+}

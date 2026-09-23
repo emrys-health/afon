@@ -88,6 +88,7 @@
         <module>afon-cdk</module>
         <module>afon-ops</module>
         <module>afon-docs</module>
+        <module>afon-guacamole-theme</module>
     </modules>
 
     <dependencyManagement>
@@ -415,15 +416,6 @@
             </activation>
             <modules>
                 <module>afon-distribution</module>
-            </modules>
-        </profile>
-        <profile>
-            <id>samples</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <modules>
-                <module>afon-samples</module>
             </modules>
         </profile>
         <profile>
