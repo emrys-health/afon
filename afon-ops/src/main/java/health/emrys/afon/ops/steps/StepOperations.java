@@ -15,11 +15,16 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
-import java.util.Properties;
+import java.util.Map;
+
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.ops.steps.DurationUtils.formatDuration;
 import static health.emrys.afon.ops.steps.DurationUtils.parseDuration;
 import static java.lang.String.format;
 
@@ -34,6 +39,8 @@ public class StepOperations {
     private final String polarisNamespace;
     private final String polarisNamespaceExternal;
     private final String polarisTableName;
+    private final Map<AfonCloud, Duration> deleteDurations = new EnumMap<>(AfonCloud.class);
+    private final Map<AfonCloud, Duration> deployDurations = new EnumMap<>(AfonCloud.class);
 
     public StepOperations(StepActions actions, AfonPropertyProvider properties) {
         this.actions = actions;
@@ -50,12 +57,14 @@ public class StepOperations {
 
     @NonNull
     public Step deleteStackIn(final AfonCloud cloud) {
+        logger.info(format("Deleting stack in cloud %s", cloud));
         return new Step(format("delete_%s_stack", cloud),
-                format("delete stack in %s", cloud.name()),
-                () -> actions.deleteStack(cloud));
+                format("delete stack in %s", cloud),
+                () -> timed(deleteDurations, cloud, () -> actions.deleteStack(cloud, tofuOutput())));
     }
 
     public Step deployFullStackIn(AfonCloud cloud) {
+        logger.info(format("Deploying full stack in cloud %s", cloud));
         switch (cloud) {
             case AWS:
                 return new Step("deploy_aws_full_stack",
@@ -63,16 +72,44 @@ public class StepOperations {
                         () -> {
                             checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN,
                                     AWS_JUPYTER_CERT_ARN,AWS_POLARIS_CERT_ARN);
-                            actions.startStack(AwsFullStack.class, AWS);
+                            timed(deployDurations, AWS, () -> actions.startStack(AwsFullStack.class, AWS, tofuOutput()));
                         });
             case AZURE:
                 return new Step("deploy_azure_full_stack",
                         "deploy full stack in Azure",
-                        () -> actions.startStack(AzureFullStack.class, AZURE));
+                        () -> timed(deployDurations, AZURE, () -> actions.startStack(AzureFullStack.class, AZURE, tofuOutput())));
             case GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
+    }
+
+    /**
+     * Runs the operation, recording its elapsed time for the cloud, so that it can be reported
+     * by the *Complete steps.
+     */
+    private static void timed(Map<AfonCloud, Duration> durations, AfonCloud cloud, ThrowableRunnable operation) throws Exception {
+        long start = System.nanoTime();
+        try {
+            operation.run();
+        } finally {
+            durations.put(cloud, Duration.ofNanos(System.nanoTime() - start));
+        }
+    }
+
+    /**
+     * Describes the recorded durations of the delete and deploy operations for the cloud,
+     * e.g. {@code " (delete: 3m12s, deploy: 25m4s)"}, or empty if none recorded.
+     */
+    private String elapsed(AfonCloud cloud) {
+        List<String> parts = new ArrayList<>();
+        if (deleteDurations.containsKey(cloud)) {
+            parts.add("delete: " + formatDuration(deleteDurations.get(cloud).toMillis()));
+        }
+        if (deployDurations.containsKey(cloud)) {
+            parts.add("deploy: " + formatDuration(deployDurations.get(cloud).toMillis()));
+        }
+        return parts.isEmpty() ? "" : format(" (%s)", String.join(", ", parts));
     }
 
     /**
@@ -111,22 +148,23 @@ public class StepOperations {
     }
 
     public Step deployPolarisStackIn(AfonCloud cloud) {
+        logger.info(format("Deploying Polaris stack in cloud %s", cloud));
         switch (cloud) {
             case AWS:
                 return new Step("deploy_aws_polaris_stack",
                         "deploy Polaris stack in AWS",
                         () -> {
                             checkAwsCertificatesIssued(AWS_POLARIS_CERT_ARN);
-                            actions.startStack(AwsPolarisStack.class, AWS);
+                            timed(deployDurations, AWS, () -> actions.startStack(AwsPolarisStack.class, AWS, tofuOutput()));
                         });
             case AZURE:
                 return new Step("deploy_azure_polaris_stack",
                         "deploy Polaris stack in Azure",
-                        () -> actions.startStack(AzurePolarisStack.class, AZURE));
+                        () -> timed(deployDurations, AZURE, () -> actions.startStack(AzurePolarisStack.class, AZURE, tofuOutput())));
             case GCP:
                 return new Step("deploy_gcp_polaris_stack",
                         "deploy Polaris stack in GCP",
-                        () -> actions.startStack(GcpPolarisStack.class, GCP));
+                        () -> timed(deployDurations, GCP, () -> actions.startStack(GcpPolarisStack.class, GCP, tofuOutput())));
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
@@ -162,6 +200,28 @@ public class StepOperations {
             value = defaultValue;
         }
         return parseDuration(value).toMillis();
+    }
+
+    /**
+     * Resolves the stream to which the tofu output is written from {@link AfonProperty#TOFU_OUTPUT}:
+     * "logger" (the default, also when blank) to leave it only to the {@code ch.vorburger.exec.ManagedProcess}
+     * logger, which always logs it, or "console" to also write it to {@code System.out}.
+     */
+    OutputStream tofuOutput() {
+        String defaultValue = "logger";
+        String value = properties.getValue(TOFU_OUTPUT, defaultValue);
+        if ( value.isBlank() ){ // allow for blank value
+            value = defaultValue;
+        }
+        switch (value.trim().toLowerCase()) {
+            case "console":
+                return System.out;
+            case "logger":
+                return OutputStream.nullOutputStream();
+            default:
+                throw new IllegalArgumentException(format(
+                    "Unsupported %s value '%s', must be one of 'console' or 'logger'", TOFU_OUTPUT, value));
+        }
     }
 
     public Step createAllCatalogsFor(AfonCloud cloud) {
@@ -344,21 +404,21 @@ public class StepOperations {
     }
 
     public Step deleteComplete(AfonCloud cloud) {
-        return new Step(format("delete_complete_for_cloud_%s", cloud.name()),
-                format("Delete complete for cloud %s", cloud.name()),
-                ()-> logger.info(format("Delete complete for %s", cloud)));
+        return new Step(format("delete_complete_for_cloud_%s", cloud),
+                format("Delete complete for cloud %s", cloud),
+                ()-> logger.info(format("Delete complete for %s%s", cloud, elapsed(cloud))));
     }
 
     public Step deployComplete(AfonCloud cloud) {
-        return new Step(format("deploy_complete_for_cloud_%s", cloud.name()),
-                format("Deploy complete for cloud %s", cloud.name()),
-                ()-> logger.info(format("Deploy complete for %s", cloud)));
+        return new Step(format("deploy_complete_for_cloud_%s", cloud),
+                format("Deploy complete for cloud %s", cloud),
+                ()-> logger.info(format("Deploy complete for %s%s", cloud, elapsed(cloud))));
     }
 
     public Step setupComplete(AfonCloud cloud) {
-        return new Step(format("setup_complete_for_cloud_%s", cloud.name()),
-        format("Setup complete for cloud %s", cloud.name()),
-                ()-> logger.info(format("Setup complete for cloud %s", cloud)));
+        return new Step(format("setup_complete_for_cloud_%s", cloud),
+        format("Setup complete for cloud %s", cloud),
+                ()-> logger.info(format("Setup complete for cloud %s%s", cloud, elapsed(cloud))));
     }
 
 }

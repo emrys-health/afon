@@ -77,6 +77,20 @@ If a deployment fails partway through, you can resume from a specific step, e.g.
 ./afon.sh -a exec -ec ops.SetupAwsFullStackAndAzurePolarisStackMain -ea "azure_polaris"
 ```
 
+### Tofu output and durations
+
+The `tofu` invocations (`init`, `apply`, `destroy`) run by the stack deployment and deletion steps are always logged
+via the `ch.vorburger.exec.ManagedProcess` logger. The optional property `TOFU_OUTPUT` in 
+[afon.properties](../templates/config/afon.properties) controls whether their output is also written to the console:
+
+- `logger` (default) — output is only logged
+- `console` — output is logged and also written to `System.out`
+
+The time taken to delete and deploy the stack is recorded and reported by the final step, e.g.:
+```
+Deploy complete for AWS (delete: 3m12s, deploy: 25m4s)
+```
+
 ### Deploy or delete the AWS stack from GitHub
 
 The [Stack AWS (Linux)](../.github/workflows/aws-stack-linux.yml) workflow runs `afon.sh` on the self-hosted Linux runner — ie
