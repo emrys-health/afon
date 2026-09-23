@@ -9,11 +9,11 @@
     </parent>
 
     <!--
-      No Java sources: src/main/resources IS the Guacamole extension tree
-      (guac-manifest.json + css/translations/images). The default jar packaging
-      produces the extension jar verbatim, which afon-cdk ships to the pod as a
-      ConfigMap binaryData entry (see GuacamoleConfig).
+      No Java sources: src/main/resources holds every pluggable client theme under
+      themes/<name>/{guacamole,keycloak/login}/. afon-cdk picks the active one via the
+      AFON_THEME property and ships its resources to the pod as ConfigMap entries
+      (see GuacamoleConfig, KeyCloakConfig).
     -->
-    <artifactId>afon-guacamole-theme</artifactId>
+    <artifactId>afon-theme</artifactId>
 
 </project>

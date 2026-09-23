@@ -158,7 +158,8 @@ public abstract class JupyterConfig {
             guacamoleDeps,
             "jupyter-internal",
             jupyterPassword,
-            sessions);
+            sessions,
+            properties.getValue(AfonProperty.AFON_THEME, "emrys-hdrs"));
 
         return jupyterLabels;
     }

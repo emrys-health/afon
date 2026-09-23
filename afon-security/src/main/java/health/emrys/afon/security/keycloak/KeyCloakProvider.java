@@ -16,12 +16,15 @@ import org.keycloak.models.utils.DefaultAuthenticationFlows;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
@@ -78,26 +81,37 @@ public class KeyCloakProvider implements IdentityProvider {
     private final String baseUrl;
     private final String adminUser;
     private final String adminPassword;
+    private final String loginTheme;
 
     /**
      * Create a provider using the configured properties:
      * {@link AfonProperty#OIDC_DOMAIN_NAME},
      * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME},
-     * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD}
+     * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD},
+     * {@link AfonProperty#AFON_THEME}
      * @param properties
      */
     public KeyCloakProvider(AfonPropertyProvider properties) {
         this(properties.getValue(OIDC_DOMAIN_NAME),
                 properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
-                properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD));
+                properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD),
+                properties.getValue(AFON_THEME, "emrys-hdrs"));
     }
 
     public KeyCloakProvider(String hostname,
                             String adminUser,
                             String adminPassword) {
+        this(hostname, adminUser, adminPassword, "emrys-hdrs");
+    }
+
+    public KeyCloakProvider(String hostname,
+                            String adminUser,
+                            String adminPassword,
+                            String loginTheme) {
         this.baseUrl       = KeyCloakConfigurer.urlFor(hostname, protocolFor(hostname));
         this.adminUser     = adminUser;
         this.adminPassword = adminPassword;
+        this.loginTheme    = loginTheme;
         logger.info("Using KeyCloak URL: {}, admin: {}", this.baseUrl, this.adminUser);
     }
 
@@ -213,20 +227,30 @@ public class KeyCloakProvider implements IdentityProvider {
      */
     @Override
     public HttpResponse createRealm(String adminToken, String realm) throws IOException {
-        String json = mapper.writeValueAsString(Map.of(
-            "realm", realm,
-            "enabled", true,
-            "accessTokenLifespan", ACCESS_TOKEN_LIFESPAN_SECONDS,
-            "ssoSessionMaxLifespan", SSO_SESSION_LIFESPAN_SECONDS,
-            "ssoSessionIdleTimeout", SSO_SESSION_LIFESPAN_SECONDS,
-            // emrys-hdrs theme (HDRS palette, Emrys logo), mounted into
-            // /opt/keycloak/themes by KeyCloakConfig. KeyCloak falls back to
-            // its default theme where the theme isn't installed (eg local
-            // acceptance-test instances).
-            "loginTheme", "emrys-hdrs",
-            "displayName", "Health Data Research Service",
-            "displayNameHtml", "<div class=\"kc-logo-text\"><span>Health Data Research Service</span></div>"
-        ));
+        Map<String, Object> realmConfig = new LinkedHashMap<>();
+        realmConfig.put("realm", realm);
+        realmConfig.put("enabled", true);
+        realmConfig.put("accessTokenLifespan", ACCESS_TOKEN_LIFESPAN_SECONDS);
+        realmConfig.put("ssoSessionMaxLifespan", SSO_SESSION_LIFESPAN_SECONDS);
+        realmConfig.put("ssoSessionIdleTimeout", SSO_SESSION_LIFESPAN_SECONDS);
+        // The active theme (AFON_THEME, default emrys-hdrs), mounted into
+        // /opt/keycloak/themes by KeyCloakConfig. KeyCloak falls back to
+        // its default theme where the theme isn't installed (eg local
+        // acceptance-test instances).
+        realmConfig.put("loginTheme", loginTheme);
+        // Branding text lives with the theme, in afon-theme's themes/<theme>/realm.properties, so a
+        // new theme can supply its own display name without touching this class. Left unset (falling
+        // back to KeyCloak's own default of showing the realm id) if the theme defines neither.
+        Properties branding = loadThemeProperties(loginTheme, "realm.properties");
+        String displayName = branding.getProperty("displayName");
+        if (displayName != null) {
+            realmConfig.put("displayName", displayName);
+        }
+        String displayNameHtml = branding.getProperty("displayNameHtml");
+        if (displayNameHtml != null) {
+            realmConfig.put("displayNameHtml", displayNameHtml);
+        }
+        String json = mapper.writeValueAsString(realmConfig);
         HttpResponse created = postJson(adminToken, format("%s/admin/realms", baseUrl), json, "realm " + realm);
         if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
             if (isFailure(putJson(adminToken, format("%s/admin/realms/%s", baseUrl, realm), json, "realm " + realm))) {
@@ -521,6 +545,21 @@ public class KeyCloakProvider implements IdentityProvider {
      */
     private static String pathSegment(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    /**
+     * A theme's {@code themes/<theme>/<fileName>} properties file, from afon-theme on the classpath.
+     * Empty (not an error) if the theme doesn't define one — callers fall back to their own defaults.
+     */
+    private static Properties loadThemeProperties(String theme, String fileName) throws IOException {
+        Properties properties = new Properties();
+        try (InputStream in = KeyCloakProvider.class.getResourceAsStream(
+                "/themes/" + theme + "/" + fileName)) {
+            if (in != null) {
+                properties.load(in);
+            }
+        }
+        return properties;
     }
 
     /** A flow's executions, depth-first and each carrying its nesting level, as {@link KeyCloakMfa} expects. */
