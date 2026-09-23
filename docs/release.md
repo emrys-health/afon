@@ -25,14 +25,10 @@ To release a stable version and move to the next SNAPSHOT version:
 ./release.sh 1.0 1.1-SNAPSHOT
 ```
 
-The release commits and tag are not pushed. Once the release is completed, push them with:
-```shell
-git push
-git push origin afon-<version>
-```
+The release commits and tag are pushed upon successful release.
 
-**NOTE:** For the moment, the deploy stage of the release to a Repository Manager is disabled,
-until we sort out where it will be deployed to and with which credentials.
+**NOTE:** For the moment, the `deploy` stage of the release to a Repository Manager is disabled, 
+and only the distribution CLI is uploaded to the "Afon Distribution" share drive.
 
 ## Release notes
 
