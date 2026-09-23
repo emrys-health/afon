@@ -15,6 +15,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
+/**
+ * SDEs and tables are hard coded but this demonstrates that Spark Connect is slow
+ */
 public class SparkConnectReader {
 
     private static final Logger               logger = LoggerFactory.getLogger(SparkConnectReader.class);
@@ -32,6 +35,11 @@ public class SparkConnectReader {
 //        app.sparkConnectRead("westmids", "azure"); // this is slow
     }
 
+    /**
+     * Run
+     * kubectl port-forward pod/spark-connector-0-driver 15002:15002
+     * for this.
+     */
     public void sparkConnectRead(String warehouse, String catalogName) {
         SparkConnectClient client = new SparkConnectClient(properties);
         SparkSession       spark  = client.sparkSession(warehouse, catalogName);
