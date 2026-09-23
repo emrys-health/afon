@@ -10,7 +10,10 @@ if [ -z "$CONFIG_ZIP" ]; then
   echo "Action $ACTION requires the config zip path, eg 'afon.sh -a config-export --config-zip <zip>' or 'afon-cli-scripts.sh config/export.sh <zip>'"
   usage; exit 0
 fi
-EXPORT_ZIP=$AFON_HOME/$CONFIG_ZIP
+case "$CONFIG_ZIP" in
+  /*) EXPORT_ZIP="$CONFIG_ZIP" ;;
+  *)  EXPORT_ZIP="$AFON_HOME/$CONFIG_ZIP" ;;
+esac
 if [ -d $CONFIG_DIR ]; then
   zip -jr $EXPORT_ZIP $EXPORT_DIR
   echo "Exported $EXPORT_DIR to $EXPORT_ZIP."

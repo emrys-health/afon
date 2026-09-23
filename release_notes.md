@@ -1,5 +1,19 @@
 # Release Notes
 
+## 1.0-beta-5
+
+**Milestone:** [1.0-beta-5](https://github.com/emrys-health/afon-core/milestone/5)
+**Due:** 2026-09-23
+
+### Closed Issues (6)
+
+- **devops, tech debt** — [#211](https://github.com/emrys-health/afon-core/issues/211) Drop afon-samples module
+- **enhancement** — [#210](https://github.com/emrys-health/afon-core/issues/210) Keycloak hostname doesn't resolve inside the cluster for ~10 minutes
+- **devops** — [#209](https://github.com/emrys-health/afon-core/issues/209) Add command name shorthands for ops exec *Main classes in afon.sh
+- **devops** — [#200](https://github.com/emrys-health/afon-core/issues/200) AWS tofu destroy is unable to uninstall Helm release kube-prometheus-stack
+- **security, devops** — [#197](https://github.com/emrys-health/afon-core/issues/197) Check AWS certs are issued when deploying new stack
+- **devops, testing, configuration** — [#194](https://github.com/emrys-health/afon-core/issues/194) Runtime configuration of Polaris catalogs available via AfonCatalogs
+
 ## 1.0-beta-4
 
 **Milestone:** [1.0-beta-4](https://github.com/emrys-health/afon-core/milestone/4)

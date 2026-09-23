@@ -1,0 +1,124 @@
+/*
+ * Emrys Health branding in the HDRS (Health Data Research Service) palette:
+ *   Purple      #2B197C   Mid Purple  #5441A6   Yellow    #F3F76C
+ *   Cream       #EFE9E0   Mid Cream   #E1D9CE   Dark Cream #BDB3A7
+ *   Grey        #535353
+ *
+ * The dot-grid texture echoes HDRS's dotted motif; keep it low-contrast so it
+ * reads as texture rather than pattern. Yellow is an accent only — HDRS brand
+ * rules forbid yellow text.
+ */
+
+.login-ui {
+    background-color: #2B197C;
+    background-image:
+        radial-gradient(rgba(84, 65, 166, 0.55) 1.5px, transparent 1.5px),
+        radial-gradient(rgba(243, 247, 108, 0.10) 1.5px, transparent 1.5px);
+    background-size: 30px 30px, 90px 90px;
+    background-position: 0 0, 45px 45px;
+}
+
+.login-ui .login-dialog {
+    background: #EFE9E0;
+    border: 1px solid #BDB3A7;
+    border-radius: 10px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.40);
+    padding: 2.5em;
+}
+
+/* HDRS lockup on the cream dialog (purple-on-transparent variant is the
+ * approved light-background pairing). */
+.login-ui .login-dialog .logo {
+    width: 11em;
+    height: 5em;
+    margin: 0 auto;
+    background-image: url('app/ext/emrys-hdrs-branding/images/hdrs-logo-dark.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    -moz-background-size: contain;
+    -webkit-background-size: contain;
+    -khtml-background-size: contain;
+}
+
+/* Small Emrys co-logo pinned to the foot of the login screen — the HDRS
+ * lockup stays primary inside the dialog. */
+.login-ui::after {
+    content: "";
+    position: absolute;
+    bottom: 1.5em;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 11em;
+    height: 3.5em;
+    background-image: url('app/ext/emrys-hdrs-branding/images/emrys-logo-horizontal-white.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+.login-ui .login-dialog .login-fields label {
+    color: #535353;
+    font-weight: bold;
+}
+
+.login-ui .login-dialog .login-fields input {
+    background: #FFFFFF;
+    border: 1px solid #BDB3A7;
+    border-radius: 4px;
+    color: #2B197C;
+}
+
+.login-ui .login-dialog .login-fields input:focus {
+    border-color: #2B197C;
+    box-shadow: 0 0 0 2px rgba(84, 65, 166, 0.35);
+}
+
+input[type="submit"], button, a.button {
+    background-color: #2B197C;
+    border: 1px solid #2B197C;
+    border-radius: 4px;
+    color: #EFE9E0;
+    font-weight: bold;
+}
+
+input[type="submit"]:hover, button:hover, a.button:hover {
+    background-color: #5441A6;
+    border-color: #5441A6;
+}
+
+input[type="submit"]:active, button:active, a.button:active {
+    background-color: #2B197C;
+    border-color: #F3F76C;
+}
+
+button.danger, a.button.danger {
+    background: #A6192E;
+    border: 1px solid #A6192E;
+    color: #FFFFFF;
+}
+
+button.danger:hover, a.button.danger:hover {
+    background: rgba(166, 25, 46, 0.8);
+    border-color: #A6192E;
+}
+
+/* Post-login chrome: purple header bar. */
+.header {
+    background: #2B197C;
+    border-bottom: 1px solid #1D1257;
+    color: #EFE9E0;
+}
+
+.header .logo {
+    background-image: url('app/ext/emrys-hdrs-branding/images/hdrs-logo-horizontal-light.png');
+    background-repeat: no-repeat;
+    background-position: left center;
+    background-size: contain;
+}
+
+body {
+    font-family: Roboto, "IBM Plex Sans", FreeSans, Helvetica, Arial, sans-serif;
+}

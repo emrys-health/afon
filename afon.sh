@@ -1,30 +1,44 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
+
+# Lists the kebab-case names of the ops *Main classes (eg DeployAwsFullStackMain -> deploy-aws-full-stack).
+# The ops/scripts package is excluded: it holds the script-command template, handled by the <dir>-<name> actions.
+ops_command_names(){
+  find "$OPS_JAVA_DIR" -name '*Main.java' -not -path '*/ops/scripts/*' 2>/dev/null \
+    | sed -E 's|.*/||; s|Main\.java$||; s|([a-z0-9])([A-Z])|\1-\2|g' \
+    | tr 'A-Z' 'a-z' | sort
+}
+
 usage (){
   echo "Usage: $0 [--action|-a <action>] [--help|-h]"
   echo "          [--home <afon-home>] [--cdktf <afon-cdktf>] [--env|-e <afon-env>]"
-  echo "          [--cdktf-env <cdktf-env>] [--config-env <config-env>]"
+  echo "          [--cdktf-env <cdktf-env>]"
+  echo "          [--config-env <config-env>] [--config-zip <zip>]"
   echo "          [--cloud|-c <cloud>]"
   echo "          [--logging|-l <logging>] [--logging-console|-lc <console>] [--mvn-quiet]"
   echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
   echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp <profiles>]"
-  echo "          [--cli-command|-cc <command>] [--cli-args|-ca <args>] [--cli-dir|-cd <dir>]"
-  echo "          [--config-zip <zip>]"
-  echo "          [--docs-dir|-dd <dir>]"
-  echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>] [--exec-type|-et <types>]"
+  echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>]"
   echo "          [--script-path|-sp <path>] [--script-args|-sa <args>]"
-  echo "          [--setup-os <os>] [--setup-output <file>]"
-  echo "actions:  ansible|build|deploy|docs|exec|setup|script|<dir>-<name>"
+  echo "          [--setup-output <file>]"
+  echo "actions:  ansible|build|exec|script|<dir>-<name>|<ops-command>"
   echo "          ansible:      : executes the ansible playbook."
   echo "          build         : executes the mvn build."
-  echo "          cli           : executes the cli commands."
-  echo "          docs-export   : export the docs (both generated and static) to <docs-dir>."
   echo "          exec          : executes the jvm classes from ops (see the docs for details)."
-  echo "          setup-*       : sets up the local env for the given os and <cloud> option.  One of local|show"
   echo "          script        : executes the scripts."
   echo "          <dir>-<name>  : executes scripts/<dir>/<name>.sh directly, for any script under scripts/."
   echo "                          eg cdktf-status, config-switch, aws-login, azure-account"
+  echo "                          Its script args can be given as positional args instead of --script-args, eg"
+  echo "                          '-a github-secrets push --env dev'. Use '--' before any other arg starting with '-'."
+  echo "          <ops-command> : executes the ops class <OpsCommand>Main, eg deploy-aws-full-stack for"
+  echo "                          'exec -ec ops.DeployAwsFullStackMain'.  The other --exec-* options still apply."
+  echo "                          Its exec args can be given as positional args instead of --exec-args, eg"
+  echo "                          '-a manage-polaris-catalogs create aws'. Use '--' before any other arg starting with '-'."
+  echo "                          The ops commands are:"
+  ops_command_names | sed 's/^/                          /'
   echo "help:             the help flag.  Prints usage."
   echo "home:             the afon home dir.  Defaults to '$HOME/.afon'."
   echo "                  Also settable via env variable 'AFON_HOME'."
@@ -34,6 +48,7 @@ usage (){
   echo "                  Also settable via env variable 'AFON_ENV'."
   echo "cdktf-env:        the cdktf env name.  Assumes cdktf dir 'AFON_HOME/cdktf-<env>' to symlink to 'AFON_HOME/cdktf'."
   echo "config-env:       the config env name.  Assumes config dir 'AFON_HOME/config-<env>' to symlink to 'AFON_HOME/config'."
+  echo "config-zip:       the config zip path to import/export as a zip file."
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targeted."
   echo "logging:          the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "                  Also settable via env variable 'AFON_LOGGING'."
@@ -44,21 +59,13 @@ usage (){
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
   echo "build-args:       the build args.  eg '--offline'."
   echo "build-goals:      the build goals.  Defaults to 'clean install'."
-  echo "build-profiles:   the build profiles.  One of acceptance|ops|samples.  If not specified all are active."
-  echo "cli-command:      the cli command.  Exec <cli-dir>/afon-cli.sh for list of commands."
-  echo "cli-args:         the cli args."
-  echo "cli-dir:          the cli dir.  Defaulting to 'AFON_HOME/cli'."
-  echo "                  Also settable via env variable 'AFON_CLI_DIR'."
-  echo "config-zip:       the config zip path to import/export as a zip file."
-  echo "docs-dir:         the output dir for the docs. Defaulting to 'AFON_HOME/docs'."
-  echo "exec-class:       the jvm class to execute.  Can be absolute or relative to the exec package.  Required for exec types 'ops' and 'samples'."
+  echo "build-profiles:   the build profiles.  One of acceptance|cli|distribution.  Defaults to 'acceptance'."
+  echo "exec-class:       the jvm class to execute.  Can be absolute or relative to the exec package."
   echo "exec-args:        the jvm exec args (must be quoted if more than one arg)"
   echo "exec-envs:        the jvm exec envs as key=value pairs (must be quoted if more than one pair)"
   echo "exec-package:     the jvm base package of the class to execute.  Defaults to 'health.emrys.afon'"
-  echo "exec-type:        the exec type.  One of ops|samples.  Defaults to 'ops'."
   echo "script-path:      the path of the script the run."
   echo "script-args:      the script args (must be quoted if more than one arg).  Also used for tofu-* actions."
-  echo "setup-os:         the os to setup.  One of linux|macos.  Defaults to '$(uname -a|awk '{print $NF}')'"
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
 }
 
@@ -81,24 +88,6 @@ exec_ansible(){
   ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS
 }
 
-exec_cli(){
-  if [ ! -d "$CLI_DIR" ]; then
-    echo "The cli dir is not found: $CLI_DIR"
-    usage; exit 0
-  fi
-  CLI_JAR="$CLI_DIR/afon-cli.jar"
-  CLI_SH="$CLI_DIR/afon-cli.sh"
-  if [ ! -f "$CLI_JAR" ] || [ ! -f "$CLI_SH" ]; then
-    echo "The cli artifacts are not found in $CLI_DIR"
-    echo "Build cli artifacts:"
-    echo "./afon.sh -bp cli -ba -Dafon.cli.dir=$CLI_DIR"
-    usage; exit 0
-  fi
-  CLI="$CLI_SH $CLI_COMMAND $CLI_ARGS"
-  echo "Executing: $CLI"
-  eval "$CLI"
-}
-
 exec_cdktf_switch(){
   SCRIPT_PATH="cdktf/switch.sh"
   exec_script
@@ -111,10 +100,11 @@ exec_config_switch(){
   CONFIG_SWITCHED=true
 }
 
-resolve_script_path(){
-  # $1 is a "<dir>-<name>" action, eg "aws-create" or "cdktf-status".  Scripts named with
-  # underscores (eg aws/create_federated_permissions.sh) are still found: hyphens in the
-  # action are tried first as-is, then converted to underscores.
+find_script_path(){
+  # $1 is a "<dir>-<name>" action, eg "aws-create" or "cdktf-status".  Sets SCRIPT_PATH and returns 0
+  # if the script exists, else returns 1.  Scripts named with underscores (eg
+  # aws/create_federated_permissions.sh) are still found: hyphens in the action are tried first
+  # as-is, then converted to underscores.
   DIR="${1%%-*}"
   NAME="${1#*-}"
   if [ -f "$AFON_ROOT/scripts/$DIR/$NAME.sh" ]; then
@@ -122,6 +112,12 @@ resolve_script_path(){
   elif [ -f "$AFON_ROOT/scripts/$DIR/${NAME//-/_}.sh" ]; then
     SCRIPT_PATH="$DIR/${NAME//-/_}.sh"
   else
+    return 1
+  fi
+}
+
+resolve_script_path(){
+  if ! find_script_path "$1"; then
     echo "Action not supported: $1 (no script scripts/$DIR/$NAME.sh)"
     usage; exit 0
   fi
@@ -142,12 +138,36 @@ exec_action_script(){
   exec_script
 }
 
-exec_docs(){
-  mkdir -p $DOCS_DIR
-  ARTIFACT="health.emrys:afon-docs:$VERSION:zip:docs"
-  mvn -q dependency:copy -Dartifact=$ARTIFACT -DoutputDirectory=$HOME_DIR
-  unzip -qu $HOME_DIR/afon-docs-$VERSION-docs.zip -d $DOCS_DIR
-  echo "Exported docs to $DOCS_DIR"
+find_ops_class(){
+  # Prints the ops class (relative to the base package, eg "ops.DeployAwsFullStackMain") for the
+  # "<kebab-name>" action $1, eg "deploy-aws-full-stack", or returns 1 if there is none.
+  # Pure bash: the class is looked up in the source tree, no dependency on the cli.
+  # Meant to be called in a subshell, as find_script_path sets globals.
+  [[ "$1" == *-* ]] || return 1
+  # A script scripts/<dir>/<name>.sh for the same action wins over an ops class.
+  if find_script_path "$1"; then
+    return 1
+  fi
+  local pascal="" part parts
+  IFS=- read -ra parts <<< "$1"
+  for part in "${parts[@]}"; do
+    pascal="$pascal$(capitaliseFirst "$part")"
+  done
+  local file
+  file=$(find "$OPS_JAVA_DIR" -name "${pascal}Main.java" -not -path '*/ops/scripts/*' 2>/dev/null | head -1)
+  [ -n "$file" ] || return 1
+  file="${file#"$OPS_JAVA_DIR"/}"
+  echo "ops.$(echo "${file%.java}" | tr / .)"
+}
+
+resolve_ops_action(){
+  # Rewrites an ops command action, eg "deploy-aws-full-stack", into the equivalent of
+  # "exec -ec ops.DeployAwsFullStackMain".
+  local ops_class
+  ops_class=$(find_ops_class "$ACTION") || return 0
+  EXEC_CLASS="$ops_class"
+  echo "Action $ACTION is the ops command $EXEC_CLASS"
+  ACTION="exec"
 }
 
 mvn_envs(){
@@ -196,11 +216,7 @@ exec_jvm(){
     MVN_ARGS="$MVN_ARGS -Dexec.envs=\"$EXEC_JVM_ENVS\""
   fi
   mvn_envs
-  if [ -z "$EXEC_TYPE" ]; then
-    echo "Action exec requires option --exec-type"
-    usage; exit 0
-  fi
-  cd $AFON_ROOT/afon-$EXEC_TYPE
+  cd $AFON_ROOT/afon-ops
   exec_mvn
 }
 
@@ -217,97 +233,6 @@ capitaliseFirst(){
   echo "$1" | awk '{print toupper(substr($0,1,1)) substr($0,2)}'
 }
 
-install_eksct_linux(){
-  curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" && tar -xzf eksctl_Linux_amd64.tar.gz -C /tmp && sudo mv /tmp/eksctl /usr/local/bin && rm eksctl_Linux_amd64.tar.gz
-}
-
-install_kubelogin(){
-  az aks install-cli
-}
-
-setup_local(){
-  case $SETUP_OS in
-    linux|GNU/Linux)
-      sudo apt install git openjdk-17-jdk maven docker tofu kubectl hubble
-      if [ -z "$CLOUD" ]; then
-        sudo apt install awscli
-        install_eksct_linux
-        sudo apt install azure-cli
-        sudo apt install google-cloud-cli
-      fi
-      if [ "$CLOUD" == "aws" ]; then
-        sudo apt install awscli
-        install_eksct_linux
-      fi
-      if [ "$CLOUD" == "azure" ]; then
-        sudo apt install azure-cli
-        install_kubelogin
-      fi
-      if [ "$CLOUD" == "gcp" ]; then
-        sudo apt install google-cloud-cli
-      fi
-      ;;
-    macos|arm64)
-      brew install git openjdk@17 maven docker opentofu kubernetes-cli hubble
-      if [ -z "$CLOUD" ]; then
-        brew install awscli eksctl
-        brew install azure-cli
-        brew install gcloud-cli
-      fi
-      if [ "$CLOUD" == "aws" ]; then
-        brew install awscli eksctl
-      fi
-      if [ "$CLOUD" == "azure" ]; then
-        brew install azure-cli
-        install_kubelogin
-      fi
-      if [ "$CLOUD" == "gcp" ]; then
-        brew install gcloud-cli
-      fi
-      ;;
-    *)
-      echo "Setup not supported for $SETUP_OS"
-      ;;
-  esac
-}
-
-setup_output(){
-  echo "## Tools setup" > $SETUP_OUTPUT
-  echo "### os" >> $SETUP_OUTPUT
-  uname -a >> $SETUP_OUTPUT
-  echo "### kubectl" >> $SETUP_OUTPUT
-  kubectl version --client>> $SETUP_OUTPUT
-  echo "### tofu" >> $SETUP_OUTPUT
-  tofu --version >> $SETUP_OUTPUT
-  echo "### java" >> $SETUP_OUTPUT
-  java --version >> $SETUP_OUTPUT
-  echo "### mvn" >> $SETUP_OUTPUT
-  mvn --version >> $SETUP_OUTPUT
-  if [ -z "$CLOUD" ]; then
-    echo "### aws" >> $SETUP_OUTPUT
-    aws --version >> $SETUP_OUTPUT
-    echo "### az" >> $SETUP_OUTPUT
-    az --version >> $SETUP_OUTPUT
-    kubelogin --version >> $SETUP_OUTPUT
-    echo "### gcloud" >> $SETUP_OUTPUT
-    gcloud --version >> $SETUP_OUTPUT
-  fi
-  if [ "$CLOUD" == "aws" ]; then
-    echo "### aws" >> $SETUP_OUTPUT
-    aws --version >> $SETUP_OUTPUT
-  fi
-  if [ "$CLOUD" == "azure" ]; then
-    echo "### az" >> $SETUP_OUTPUT
-    az --version >> $SETUP_OUTPUT
-    kubelogin --version >> $SETUP_OUTPUT
-  fi
-  if [ "$CLOUD" == "gcp" ]; then
-    echo "### gcloud" >> $SETUP_OUTPUT
-    gcloud --version >> $SETUP_OUTPUT
-  fi
-  echo "Setup output written to $SETUP_OUTPUT"
-}
-
 version(){
   mvn help:evaluate -Dexpression=project.version -q -DforceStdout
 }
@@ -321,20 +246,15 @@ BUILD_PROFILES=
 CDKTF_DIR=
 CDKTF_ENV=
 CDKTF_SWITCHED=
-CLI_ARGS=
-CLI_COMMAND=
-CLI_DIR=
 CLOUD=
 CONFIG_ENV=
 CONFIG_SWITCHED=
 CONFIG_ZIP=
-DOCS_DIR=
 ENV=
 EXEC_CLASS=
 EXEC_ARGS=
 EXEC_ENVS=
 EXEC_PACKAGE=
-EXEC_TYPE=
 HELP=
 HOME_DIR=
 LOGGING=
@@ -346,9 +266,8 @@ MVN_ENVS=
 MVN_QUIET=
 SCRIPT_PATH=
 SCRIPT_ARGS=
-SETUP_OS=
 SETUP_OUTPUT=
-VERSION=
+POSITIONAL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -370,18 +289,10 @@ while [[ $# -gt 0 ]]; do
       CDKTF_ENV="$2"; shift 2 ;;
     --cloud|-c)
       CLOUD="$2"; shift 2 ;;
-    --cli-args|-ca)
-      CLI_ARGS="$2"; shift 2 ;;
-    --cli-command|-cc)
-      CLI_COMMAND="$2"; shift 2 ;;
-    --cli-dir|-cd)
-      CLI_DIR="$2"; shift 2 ;;
     --config-env)
       CONFIG_ENV="$2"; shift 2 ;;
     --config-zip)
       CONFIG_ZIP="$2"; shift 2 ;;
-    --docs-dir|-dd)
-      DOCS_DIR="$2"; shift 2 ;;
     --env|-e)
       ENV="$2"; shift 2 ;;
     --exec-class|-ec)
@@ -392,8 +303,6 @@ while [[ $# -gt 0 ]]; do
       EXEC_ENVS="$2"; shift 2 ;;
     --exec-package|-ep)
       EXEC_PACKAGE="$2"; shift 2 ;;
-    --exec-type|-et)
-      EXEC_TYPE="$2"; shift 2 ;;
     --home)
       HOME_DIR="$2"; shift 2 ;;
     --help|-h)
@@ -408,18 +317,43 @@ while [[ $# -gt 0 ]]; do
       SCRIPT_PATH="$2"; shift 2 ;;
     --script-args|-sa)
       SCRIPT_ARGS="$2"; shift 2 ;;
-    --setup-os)
-      SETUP_OS="$2"; shift 2 ;;
-    --setup-outout)
+    --setup-output)
       SETUP_OUTPUT="$2"; shift 2 ;;
-    *)
+    --)
+      shift; POSITIONAL_ARGS+=("$@"); break ;;
+    -*)
       echo "Unknown option: $1" >&2;
       usage; exit 0
       ;;
+    *)
+      POSITIONAL_ARGS+=("$1"); shift ;;
   esac
 done
 
-AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Positional args are only accepted by the ops commands and the <dir>-<name> script actions, where they are
+# the exec args or the script args, ie "-a manage-polaris-catalogs create aws" is the same as
+# "-a manage-polaris-catalogs -ea 'create aws'", and "-a github-secrets -- push --env dev" is the same as
+# "-a github-secrets -sa 'push --env dev'".  find_ops_class and find_script_path are mutually exclusive
+# (the former defers to the latter), so ACTION resolves to at most one of them.
+if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
+  if [ -n "$(find_ops_class "$ACTION")" ]; then
+    if [ -n "$EXEC_ARGS" ]; then
+      echo "The ops command $ACTION takes its args either as positional args or via --exec-args, not both." >&2
+      usage; exit 0
+    fi
+    EXEC_ARGS="${POSITIONAL_ARGS[*]}"
+  elif find_script_path "$ACTION" 2>/dev/null; then
+    if [ -n "$SCRIPT_ARGS" ]; then
+      echo "The script $ACTION takes its args either as positional args or via --script-args, not both." >&2
+      usage; exit 0
+    fi
+    SCRIPT_ARGS="${POSITIONAL_ARGS[*]}"
+  else
+    echo "Unknown option: ${POSITIONAL_ARGS[0]}" >&2
+    usage; exit 0
+  fi
+fi
+
 echo "Using AFON_ROOT=$AFON_ROOT"
 
 AFON_HOME="${AFON_HOME:-}"
@@ -473,18 +407,6 @@ if [ -n "$CDKTF_ENV" ]; then
   exec_cdktf_switch
 fi
 
-AFON_CLI_DIR=${AFON_CLI_DIR:-}
-if [ -n "$AFON_CLI_DIR" ]; then
-  CLI_DIR="$AFON_CLI_DIR"
-fi
-
-if [ -n "$CLI_DIR" ]; then
-  echo "Using cli dir $CLI_DIR"
-else
-  CLI_DIR="$HOME_DIR/cli"
-  echo "Defaulting to $CLI_DIR"
-fi
-
 AFON_LOGGING="${AFON_LOGGING:-}"
 if [ -n "$AFON_LOGGING" ]; then
   LOGGING="$AFON_LOGGING"
@@ -522,6 +444,7 @@ if [ -n "$MVN_QUIET" ]; then
   MVN_CMD="$MVN_CMD -q"
 fi
 MVN_CMD="$MVN_CMD -s $AFON_ROOT/settings.xml"
+resolve_ops_action
 case $ACTION in
   ansible)
     exec_ansible
@@ -547,48 +470,11 @@ case $ACTION in
     exec_mvn
     check_acceptance
     ;;
-  cli)
-    exec_cli
-    ;;
-  docs-export)
-    VERSION=$(version)
-    if [ -z "$DOCS_DIR" ]; then
-      DOCS_DIR="$HOME_DIR/docs"
-      echo "Docs dir not specified.  Defaulting to '$DOCS_DIR'."
-    fi
-    exec_docs
-    ;;
   exec)
-    if [ -n "$EXEC_TYPE" ]; then
-      echo "Using exec type '$EXEC_TYPE'"
-    else
-      echo "Exec type not specified.  Defaulting to 'ops'."
-      EXEC_TYPE="ops"
-    fi
     exec_jvm
     ;;
   script)
     exec_script
-    ;;
-  setup-*)
-    if [ -z "$SETUP_OS" ]; then
-      SETUP_OS=$(uname -a| awk '{print $NF}')
-    fi
-    SETUP_ACTION=${ACTION#setup-}
-    case $SETUP_ACTION in
-      local)
-        setup_local
-        ;;
-      show)
-        if [ -z "$SETUP_OUTPUT" ]; then
-          SETUP_OUTPUT="$HOME_DIR/versions.md"
-        fi
-        setup_output
-        ;;
-      *)
-        echo "Setup action not supported: $SETUP_ACTION"
-        usage; exit 0
-    esac
     ;;
   *-*)
     exec_action_script
