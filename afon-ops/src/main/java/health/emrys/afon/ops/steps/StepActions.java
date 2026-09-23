@@ -50,20 +50,22 @@ public class StepActions {
 
     /**
      * Deletes the stack, allowing for a single attempt.
+     * @param outputStream the stream to which the tofu output is written
      * @throws IOException
      */
-    @NonNull Path deleteStack(AfonCloud cloud) throws IOException {
-        return deleteStack(cloud, 1);
+    @NonNull Path deleteStack(AfonCloud cloud, OutputStream outputStream) throws IOException {
+        return deleteStack(cloud, 1, outputStream);
     }
 
     /**
      * Deletes the stack, allowing a given number of retries.
+     * @param outputStream the stream to which the tofu output is written
      * @throws IOException
      */
-    @NonNull Path deleteStack(AfonCloud cloud, int maxAttempts) throws IOException {
+    @NonNull Path deleteStack(AfonCloud cloud, int maxAttempts, OutputStream outputStream) throws IOException {
         Path stackDir = stackDir(cloud);
         try {
-            tofuDestroy(stackDir, maxAttempts);
+            tofuDestroy(stackDir, maxAttempts, outputStream);
             deletePath(stackDir);
             deleteTfStateFiles(cloud);
         } catch (ManagedProcessException e) {
@@ -104,11 +106,11 @@ public class StepActions {
         }
     }
 
-    private void tofuDestroy(Path tofuDir, int maxAttempts) throws ManagedProcessException {
+    private void tofuDestroy(Path tofuDir, int maxAttempts, OutputStream outputStream) throws ManagedProcessException {
         logger.info("Executing tofu destroy in dir {}", tofuDir);
-        run("tofu", tofuDir, "init");
+        run("tofu", tofuDir, outputStream, "init");
         String[] args = List.of("destroy", "--auto-approve").toArray(new String[0]);
-        tofuWithRetry(tofuDir, OutputStream.nullOutputStream(), maxAttempts, args);
+        tofuWithRetry(tofuDir, outputStream, maxAttempts, args);
     }
 
     void deleteTfStateFiles(AfonCloud cloud) throws IOException {
@@ -131,22 +133,24 @@ public class StepActions {
 
     /**
      * Starts the stack, allowing for a single attempt.
+     * @param outputStream the stream to which the tofu output is written
      * @throws Exception
      */
-    void startStack(Class stackClass, AfonCloud cloud) throws Exception {
-        startStack(stackClass, cloud, 1);
+    void startStack(Class stackClass, AfonCloud cloud, OutputStream outputStream) throws Exception {
+        startStack(stackClass, cloud, 1, outputStream);
     }
 
     /**
      * Starts the stack, attempting for a given number of retries.
+     * @param outputStream the stream to which the tofu output is written
      * @throws Exception
      */
-    void startStack(Class stackClass, AfonCloud cloud, int maxAttempts) throws Exception {
+    void startStack(Class stackClass, AfonCloud cloud, int maxAttempts, OutputStream outputStream) throws Exception {
         executeMainOf(stackClass, new String[]{});
-        startManagedStack(cloud, maxAttempts);
+        startManagedStack(cloud, maxAttempts, outputStream);
     }
 
-    private void startManagedStack(AfonCloud cloud, int maxAttempts) throws IOException {
+    private void startManagedStack(AfonCloud cloud, int maxAttempts, OutputStream outputStream) throws IOException {
         // The kubernetes/helm providers are configured from the managed cluster's endpoint and
         // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
         // (plugin-framework) providers, those must be known at plan time, otherwise apply fails
@@ -165,21 +169,21 @@ public class StepActions {
         // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
         // Stacks without a managed cluster yield no targets and skip straight to the full apply.
         Path stackDir = stackDir(cloud);
-        tofuApply(stackDir, clusterBootstrapTargets(stackDir), maxAttempts);
+        tofuApply(stackDir, clusterBootstrapTargets(stackDir), maxAttempts, outputStream);
     }
 
-    private void tofuApply(Path tofuDir, List<String> bootstrapTargets, int maxAttempts) throws IOException {
+    private void tofuApply(Path tofuDir, List<String> bootstrapTargets, int maxAttempts, OutputStream outputStream) throws IOException {
         ensureKubeConfigExists();
-        if (run("tofu", tofuDir, "init") != 0) {
+        if (run("tofu", tofuDir, outputStream, "init") != 0) {
             throw new ManagedProcessException(format("tofu init failed in %s", tofuDir));
         }
         if (!bootstrapTargets.isEmpty()) {
             List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
             phaseOne.addAll(bootstrapTargets);
             logger.info("Bootstrapping targets before the full apply: {}", phaseOne);
-            tofuWithRetry(tofuDir, System.out, maxAttempts, phaseOne.toArray(new String[0]));
+            tofuWithRetry(tofuDir, outputStream, maxAttempts, phaseOne.toArray(new String[0]));
         }
-        tofuWithRetry(tofuDir, OutputStream.nullOutputStream(), maxAttempts, "apply", "--auto-approve", "-parallelism=5");
+        tofuWithRetry(tofuDir, outputStream, maxAttempts, "apply", "--auto-approve", "-parallelism=5");
     }
 
     /**
