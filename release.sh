@@ -41,7 +41,8 @@ $MVN --batch-mode release:prepare -P$PROFILES -DreleaseVersion=$VERSION -Dtag=$T
 $MVN release:perform -P$PROFILES
 
 echo "Release $TAG completed."
-git push --tags
+git push origin main
+git push origin $TAG
 
 MAVEN_DEPLOY_SKIP=$(mvn help:evaluate -Dexpression=maven.deploy.skip -q -DforceStdout)
 if [ "$MAVEN_DEPLOY_SKIP" == "true" ]; then
