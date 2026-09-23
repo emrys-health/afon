@@ -18,12 +18,37 @@ import java.util.*;
 
 public class CdkUtils {
 
+    /**
+     * Environment every provisioner built from here on is given, set by {@link #useKubeconfig(String)}.
+     * <p>
+     * Synth is one stack per JVM ({@code main()} builds a single stack and calls {@code app.synth()}),
+     * so a static set once at the top of that stack's construction covers every provisioner it goes on
+     * to create — including those built in shared config classes that take no cloud-specific argument.
+     * Clouds that never call {@link #useKubeconfig(String)} keep emitting no {@code environment} block
+     * at all, and so keep reading the ambient {@code ~/.kube/config} exactly as before.
+     */
+    private static volatile Map<String, String> provisionerEnvironment = Map.of();
+
+    /**
+     * Points the {@code kubectl} and {@code helm} commands in every subsequently created provisioner at
+     * {@code kubeconfigPath} by exporting {@code KUBECONFIG} into their environment, rather than letting
+     * them inherit whichever context was current when {@code tofu apply} was invoked.
+     * <p>
+     * Call this <em>before</em> creating any provisioner in the stack: the value is baked into each
+     * provisioner at synth time, so one created earlier does not pick it up retrospectively. The path
+     * is a literal, which matters on destroy — a destroy-time provisioner may reference nothing but
+     * {@code self}, and this environment is replayed from state rather than re-interpolated.
+     *
+     * @param kubeconfigPath the file the stack writes its credentials to, see
+     *                       {@code ConfigUtils.kubeconfigPath(String)}
+     */
+    public static void useKubeconfig(@NonNull String kubeconfigPath) {
+        provisionerEnvironment = Map.of("KUBECONFIG", kubeconfigPath);
+    }
+
     public static @NonNull List<LocalExecProvisioner> uponDestroyRun(String... commands) {
         return Arrays.stream(commands).map(command ->
-                                                   LocalExecProvisioner
-                                                           .builder()
-                                                           .type("local-exec")
-                                                           .when("destroy")
+                                                   provisioner("destroy")
                                                            .command(addingOrClauseIfNecessary(command))
                                                            .build()
                                           ).toList();
@@ -31,13 +56,27 @@ public class CdkUtils {
 
     public static @NonNull List<LocalExecProvisioner> uponCreateRun(String... commands) {
         return Arrays.stream(commands).map(command ->
-                                                   LocalExecProvisioner
-                                                           .builder()
-                                                           .type("local-exec")
-                                                           .when("create")
+                                                   provisioner("create")
                                                            .command(command)
                                                            .build()
                                           ).toList();
+    }
+
+    /**
+     * A {@code local-exec} builder carrying whatever {@link #useKubeconfig(String)} has configured.
+     * The environment is left unset when empty so stacks that never call it emit the same JSON as
+     * they did before.
+     */
+    private static LocalExecProvisioner.Builder provisioner(@NonNull String when) {
+        LocalExecProvisioner.Builder builder = LocalExecProvisioner
+            .builder()
+            .type("local-exec")
+            .when(when);
+        Map<String, String> environment = provisionerEnvironment;
+        if (!environment.isEmpty()) {
+            builder.environment(environment);
+        }
+        return builder;
     }
 
     private static final String addingOrClauseIfNecessary(String command) {

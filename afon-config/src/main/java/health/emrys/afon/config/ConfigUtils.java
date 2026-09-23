@@ -130,6 +130,22 @@ public class ConfigUtils {
     }
 
     /**
+     * Returns the kubeconfig this deployment owns, located at {@link #afonHome()}/kubeconfig.{@code clusterName}.
+     * <p>
+     * The {@code kubectl} and {@code helm} commands in {@code local-exec} provisioners would otherwise read
+     * the ambient {@code ~/.kube/config} and act on whatever context happened to be current — which, when more
+     * than one cluster has been deployed from this machine, need not be the cluster the stack is applying to
+     * or destroying. Giving each deployment its own file means those commands always target their own cluster,
+     * and that switching context by hand between an apply and a destroy cannot redirect them.
+     *
+     * @param clusterName the cluster the kubeconfig addresses ({@code CLUSTER_NAME})
+     * @return the kubeconfig path
+     */
+    public static @NonNull String kubeconfigPath(@NonNull String clusterName) {
+        return format("%s/kubeconfig.%s", afonHome(), clusterName);
+    }
+
+    /**
      * Checks if system property {@link #AFON_CLOUD_PROPERTY} is set.
      * @return true if property value is not null, not blank and not equal (ignoring case) to {@link #CLOUD_ALL}.
      */

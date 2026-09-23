@@ -52,6 +52,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMe
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.AbstractCloudProvider;
 import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -63,6 +64,7 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
+import static health.emrys.afon.cdk.CdkUtils.useKubeconfig;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
@@ -88,6 +90,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     private final AwsCleanupHelper           cleanupHelper;
     private final AwsComponentNames          componentNames;
+    private final String                     kubeconfigPath;
     private final String                     polarisDomainName;
     private final String                     accountId;
     private final String                     region;
@@ -112,6 +115,17 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         componentNames = new AwsComponentNames(properties);
         clusterName    = properties.getValue(AfonProperty.CLUSTER_NAME);
         polarisCertArn = properties.getValue(AfonProperty.AWS_POLARIS_CERT_ARN);
+
+        // Every kubectl/helm local-exec in this stack — here, and in the shared Polaris/Jupyter/Spark/
+        // Guacamole config classes constructed after it — runs against this file rather than the
+        // ambient ~/.kube/config. Without it they follow whatever context happened to be current when
+        // `tofu apply`/`tofu destroy` was invoked, which on a machine that has deployed more than one
+        // cluster need not be this one: the CRD sweep and finalizer patches in particular would then
+        // take apart somebody else's cluster. Set before the first provisioner below, since the value
+        // is baked into each one as it is built.
+        kubeconfigPath = ConfigUtils.kubeconfigPath(clusterName);
+        log.info("Provisioners in this stack will use KUBECONFIG={}", kubeconfigPath);
+        useKubeconfig(kubeconfigPath);
 
         this.polarisDomainName = properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
         this.accountId         = properties.getValue(AWS_ACCOUNT_ID);
@@ -372,20 +386,23 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .maxSize(3.0)
             .build();
 
-        List<LocalExecProvisioner> updateKubeConfig = List.of(
-            LocalExecProvisioner
-                .builder()
-                .when("create") // Run only when the resource is created
-                .command(format(
-                             "aws eks update-kubeconfig --name %s --region %s",
-                             clusterName,
-                             region)
-                        )
-                .type("local-exec")
-                .build()
-                                                             );
+        // Writes this cluster's credentials to the stack's own kubeconfig (see kubeconfigPath), which
+        // every provisioner here reads via KUBECONFIG. --kubeconfig is passed explicitly as well as
+        // being in the environment so the file written is unambiguous. `--alias` names the context
+        // after the cluster rather than the ARN, which keeps `kubectl config current-context` legible
+        // when a human opens the file.
+        List<LocalExecProvisioner> updateKubeConfig = uponCreateRun(
+            format("aws eks update-kubeconfig --name %s --region %s --kubeconfig %s --alias aws_%s",
+                   clusterName, region, kubeconfigPath, clusterName));
         newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater")
                                         .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
+                                        // Rewrite the file whenever it names a different cluster or a
+                                        // different endpoint — a cluster rebuilt under the same name gets
+                                        // fresh CA data, and depends_on alone would not re-run the
+                                        // provisioner, leaving every later kubectl pointed at the old one.
+                                        .triggers(Map.of(
+                                            "clusterEndpoint", cluster.getEndpoint(),
+                                            "kubeconfig", kubeconfigPath))
                                         .provisioners(updateKubeConfig)
                                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                         .build();

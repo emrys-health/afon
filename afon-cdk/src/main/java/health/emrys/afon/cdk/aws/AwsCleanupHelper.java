@@ -2,6 +2,7 @@ package health.emrys.afon.cdk.aws;
 
 import health.emrys.afon.cdk.CleanupHelper;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
@@ -108,7 +109,11 @@ public class AwsCleanupHelper extends CleanupHelper {
             # Once the EKS cluster is deleted, you can delete the subnets.
 
             unalias aws
-            
+
+            # Same kubeconfig the stack's own provisioners use, so the kubectl patches below cannot
+            # land on whichever cluster this shell's context happens to name.
+            export KUBECONFIG=%s
+
             for VPC_ID in $(%s) ; do {
                echo Destroying $VPC_ID
                echo destroying service and ingress...
@@ -191,6 +196,7 @@ public class AwsCleanupHelper extends CleanupHelper {
             aws --region %s secretsmanager  delete-secret --secret-id %s --force-delete-without-recovery
             
             """,
+            ConfigUtils.kubeconfigPath(componentNames.getCluster()),
             listVPCsCommand(),
             NO_POLARIS_FINALIZERS,
             NO_JUPYTER_FINALIZERS,
