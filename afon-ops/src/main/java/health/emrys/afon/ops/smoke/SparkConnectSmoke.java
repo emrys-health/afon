@@ -62,7 +62,6 @@ public class SparkConnectSmoke {
     }
 
     private void callSparkConnectorInCluster(AfonPropertyProvider properties, AfonCatalog catalog) {
-
         try {
             KubeClient client = new KubeClient(properties);
             try (PortForwardSmoke session = new PortForwardSmoke(
