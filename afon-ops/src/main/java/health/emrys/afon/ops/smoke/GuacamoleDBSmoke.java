@@ -32,9 +32,12 @@ public class GuacamoleDBSmoke {
         String                   url        = format("jdbc:postgresql://%s:%d/%s", db.host(), db.port(), db.database());
         String                   guacadmin  = "guacadmin";
         String                   table      = "guacamole_entity";
+        String                   sql        = format("SELECT * FROM %s WHERE name = '%s' AND type = 'USER'", table, guacadmin);
+        logger.info("Connecting to {}", db.database());
         try (Connection conn = DriverManager.getConnection(url, db.user(), db.password());
              PreparedStatement pstmt = conn.prepareStatement(
-                 String.format("SELECT * FROM %s WHERE name = '%s' AND type = 'USER'", table, guacadmin))) {
+                 sql)) {
+            logger.info("About to run: {}", sql);
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     logger.warn(format(
