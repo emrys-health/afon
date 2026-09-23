@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Publishes the afon config files to GitHub, and retrieves them again.
 #
-# ./afon.sh -a github-secrets -sa "{push|pull|list|delete} [--home <afon-home>] [--env <env>] [--repo <owner/repo>] [--force] [--no-bundle] [--dry-run]"
+# ./afon.sh -a github-secrets [--] {push|pull|list|delete} [--home <afon-home>] [--env <env>] [--repo <owner/repo>] [--force] [--no-bundle] [--dry-run]
+# (the -- is needed by afon.sh before any arg starting with -, eg: ./afon.sh -a github-secrets -- push --env dev)
 #
 # Without an env, the files in <afon-home>/config are published to the repository.
 #
@@ -33,8 +34,12 @@
 # 'pull' reads the bundle, decrypts it and writes the files back to the config dir.  It needs neither the
 # workflows nor the secrets.
 #
-# Requires the gh CLI, authenticated with a token holding the 'repo' scope, and openssl with PBKDF2 support
-# (OpenSSL 1.1.1+ or LibreSSL 3.1+).  Creating an environment requires admin access to the repo.
+# Requires a recent gh CLI, logged in (gh auth login, or GH_TOKEN) with the 'repo' scope, or for a fine-grained token
+# read and write on Secrets, Variables and Administration.  Creating the environment requires admin access to the
+# repo, and using environments in a private repo requires a paid plan.  The bundle also requires openssl with
+# PBKDF2 support (OpenSSL 1.1.1+ or LibreSSL 3.1+).  See docs/acceptance_tests.md, section gh prerequisites.
+#
+# The repo is --repo, else env variable GH_REPO, else emrys-health/afon-core.  It does not depend on the current dir.
 set -euo pipefail
 
 usage(){

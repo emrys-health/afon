@@ -17,11 +17,11 @@ name: AWS Stack (Linux)
 #     and is different from $AFON_HOME which lives in the GitHub workspace.
 #
 # The $AFON_HOME/config files are reconstructed from the same base64 repository secrets the
-# acceptance workflow uses; `./afon.sh -a github-secrets -sa push` publishes them.
+# acceptance workflow uses; `./afon.sh -a github-secrets push` publishes them.
 #
 # To act on another config env, give config_env.  The config, and the AWS_DEPLOY_* credentials if the env
 # has its own AWS account, then come from the secrets of the GitHub environment of that name (published with
-# `./afon.sh -a github-secrets -sa "push --env <env>"`), and the tofu state is kept apart per env, in
+# `./afon.sh -a github-secrets -- push --env <env>`), and the tofu state is kept apart per env, in
 # $AFON_CDKTF-<env>, so that an env never tears down another's stack.
 on:
   workflow_dispatch:
