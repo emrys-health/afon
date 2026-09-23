@@ -111,8 +111,8 @@ Pre-requisites, on top of what the acceptance workflow needs:
 - **Runner tooling**: the `aws` CLI, `tofu` and `kubectl` on the runner's PATH. Install them with
   `ansible-playbook runner-setup.yml -e install_cloud_tools=true` (see [runners](../scripts/github/runners.md)).
 - **Config secrets**: the same base64 secrets the acceptance workflow uses, published with
-  `./afon.sh -a github-secrets -sa push`.  To run against a config env other than the one behind the
-  repository secrets, publish it with `-sa "push --env <env>"` and give the workflow's `config_env` input.
+  `./afon.sh -a github-secrets push`.  To run against a config env other than the one behind the
+  repository secrets, publish it with `./afon.sh -a github-secrets -- push --env <env>` and give the workflow's `config_env` input.
   Each env then gets its own tofu state, in `$AFON_CDKTF-<env>` on the runner.
 - **AWS admin credentials**: the repository secrets `AWS_DEPLOY_ACCESS_KEY_ID` and
   `AWS_DEPLOY_SECRET_ACCESS_KEY`. These are the user admin credentials tofu and the CLI run as,

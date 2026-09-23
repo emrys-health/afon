@@ -97,15 +97,47 @@ Publish them from a local config dir using action `github-secrets`:
 ```shell
 ./afon.sh -a github-secrets
 ```
-which needs the `gh` CLI authenticated with the `repo` scope:
+which needs the `gh` CLI (see [gh prerequisites](#gh-prerequisites)):
 
 ```shell
-./afon.sh -a github-secrets -sa "push --dry-run" # reports what would be published
-./afon.sh -a github-secrets -sa push           # publishes all config files, overwriting existing secrets
-./afon.sh -a github-secrets -sa list           # lists the secrets set on the repo
+./afon.sh -a github-secrets -- push --dry-run # reports what would be published
+./afon.sh -a github-secrets push               # publishes all config files, overwriting existing secrets
+./afon.sh -a github-secrets list               # lists the secrets set on the repo
 ```
 
+The script args are given as positional args after the action.  Any that starts with `-` needs a `--` before it, as
+above, so that `afon.sh` does not take it for one of its own options.  They can also be given in one quoted string with
+`-sa`, eg `-sa "push --dry-run"`.
+
 Empty config files (eg an unused `catalogs-<cloud>.properties`) get no secret, as GitHub secrets cannot be empty.
+
+#### gh prerequisites
+
+The action drives the GitHub CLI, so it needs:
+
+- **A recent `gh` on the `PATH`**, as it uses `gh secret`, `gh variable` and `gh api`.  The `gh variable` commands are
+  the newer ones, so an old `gh` fails on the bundle (see [Retrieving the config](#retrieving-the-config)).
+- **A login**: `gh auth login`, or a `GH_TOKEN` env variable for non-interactive use.  Check it with `gh auth status`.
+  A classic token needs the `repo` scope.  A fine-grained token needs read and write on the repo permissions
+  Secrets, Variables and Administration, the latter to create the GitHub environment.  If the org enforces SAML SSO,
+  the token must also be authorized for it.
+- **Admin access to the repo**, to create the GitHub environment on the first `push --env <env>`.  Once it exists, write
+  access is enough to set its secrets and variables.
+- **A plan that supports environments** when using `--env`: GitHub environments are available for public repos, but
+  private repos need a paid plan (Pro, Team or Enterprise).  Without one, `--env` fails at the environment step,
+  whereas `push` to the repository secrets still works.
+- **`openssl` with PBKDF2 support** (OpenSSL 1.1.1+ or LibreSSL 3.1+, which includes the one that comes with macOS) and a
+  passphrase, for the bundle only.  `push --no-bundle` needs neither.
+
+The target repo does not depend on the current dir, so the action works from any dir, including the cli dir that
+`afon-cli.sh` runs from.  It is the first of: option `--repo <owner/repo>`, env variable `GH_REPO`, else
+`emrys-health/afon-core`, and is reported as `Using repo ...`.  A fork needs to give its own.
+
+The quickest check that the login, scopes and repo access are fine is the read-only action `list`:
+```shell
+./afon.sh -a github-secrets -- list --env <env>
+```
+which does not check the creation of the environment, which only happens on the first `push` to it.
 
 #### Config envs
 
@@ -115,13 +147,13 @@ there is room for only one config.  To hold several [config envs](configuration.
 of the same name, which is created if needed (this needs admin access to the repo):
 
 ```shell
-./afon.sh -a github-secrets -sa "push --env <env>"  # publishes config-<env> as secrets of environment <env>, whichever env is active
-./afon.sh -a github-secrets -sa "list --env <env>"  # lists the secrets of environment <env>
-./afon.sh -a github-secrets -sa "delete --env <env>"  # removes the secrets and the bundle
+./afon.sh -a github-secrets -- push --env <env>  # publishes config-<env> as secrets of environment <env>, whichever env is active
+./afon.sh -a github-secrets -- list --env <env>  # lists the secrets of environment <env>
+./afon.sh -a github-secrets -- delete --env <env>  # removes the secrets and the bundle
 ```
 The secrets keep the names in the table above.  The env can also be given by the global `--config-env`, `--env` or
-`AFON_ENV` of `afon.sh`, but note that these also switch the `config` symlink to that env, whereas the `--env` of
-`-sa` leaves the active env alone.
+`AFON_ENV` of `afon.sh`, but note that these also switch the `config` symlink to that env, whereas the `--env` after
+`--` is the script's own and leaves the active env alone.
 
 The workflows have a `config_env` input, which runs the job in the GitHub environment of that name.  Its
 secrets take precedence over the repository ones of the same name, so anything not published to the environment
@@ -137,10 +169,10 @@ and needs neither the workflows nor the secrets:
 
 ```shell
 export AFON_SECRETS_PASSPHRASE=...                          # or leave it unset to be prompted
-./afon.sh -a github-secrets -sa "push --env <env>"          # publishes the secrets and the bundle
-./afon.sh -a github-secrets -sa "pull --env <env>"          # writes the files to config-<env>
-./afon.sh -a github-secrets -sa "pull --env <env> --force"  # overwrites the files if the config dir is not empty
-./afon.sh -a github-secrets -sa "push --env <env> --no-bundle"  # publishes the secrets only
+./afon.sh -a github-secrets -- push --env <env>          # publishes the secrets and the bundle
+./afon.sh -a github-secrets -- pull --env <env>          # writes the files to config-<env>
+./afon.sh -a github-secrets -- pull --env <env> --force  # overwrites the files if the config dir is not empty
+./afon.sh -a github-secrets -- push --env <env> --no-bundle  # publishes the secrets only
 ```
 The bundle is a tar of the config files, encrypted with AES-256 under the passphrase (PBKDF2, 600000 iterations).
 Unlike secrets, variables can be read by anyone with read access to the repo, so **the bundle is only as safe as
