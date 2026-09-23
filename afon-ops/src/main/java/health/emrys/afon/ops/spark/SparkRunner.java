@@ -7,6 +7,9 @@ import org.apache.spark.sql.SparkSession;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
@@ -25,37 +28,48 @@ abstract public class SparkRunner {
         try {
             if (args.length < 4) {
                 System.out.printf("""
-                    SparkRunner requires at least 4 arguments:
-                        cloud catalog-name namespace table-name [values-csv] [polaris-id] [polaris-secret]
-                    values-csv: csv list of values to read and write
-                    args: %s    
-                    """, String.join(" ", args));
+                                      SparkRunner requires at least 4 arguments:
+                                          cloud catalog-name namespace table-name [values-csv] [polaris-id] [polaris-secret]
+                                      values-csv: csv list of values to read and write
+                                      args: %s    
+                                      """, String.join(" ", args));
                 return;
             }
-            AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
-            String catalogName = args[1];
-            String namespace = args[2];
-            String tableName = args[3];
-            String values;
+            AfonCloud          cloud       = AfonCloud.valueOf(args[0].toUpperCase());
+            String             catalogName = args[1];
+            String             namespace   = args[2];
+            String             tableName   = args[3];
+            String             values;
+            final List<String> lines       = new ArrayList<>();
             if (args.length == 5) {
                 values = args[4];
+                Arrays.stream(values.split(",")).forEach(lines::add);
             } else {
-                values = "apple,banana,orange";
+                Date   now     = new Date();
+                String prepend = String.format("%s %s", now, properties.getValue(CLUSTER_NAME));
+                properties
+                    .getProperties()
+                    .entrySet()
+                    .stream()
+                    .filter(x -> !properties.getSecretProperties().contains(x.getKey()))
+                    .forEach(x -> {
+                        lines.add(String.format("%s %s=%s", prepend, x.getKey(), x.getValue()));
+                    });
             }
             String polarisId;
             String polarisSecret;
             if (args.length == 7) {
-                polarisId = args[5];
+                polarisId     = args[5];
                 polarisSecret = args[6];
             } else {
-                polarisId = properties.getValue(USER_POLARIS_ID);
+                polarisId     = properties.getValue(USER_POLARIS_ID);
                 polarisSecret = properties.getValue(USER_POLARIS_SECRET);
             }
             // Using the user credentials for Polaris
             properties.setValue(POLARIS_ID, polarisId);
             properties.setValue(POLARIS_SECRET, polarisSecret);
             SparkSession spark = new SparkClient(cloud, properties).sparkSession(catalogName);
-            app.doRun(spark, catalogName, namespace, tableName, List.of(values.split(",")));
+            app.doRun(spark, catalogName, namespace, tableName, lines);
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);
             throw new RuntimeException(e);
