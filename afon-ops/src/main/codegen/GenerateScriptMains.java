@@ -73,6 +73,7 @@ public class GenerateScriptMains {
         new ScriptEntry("gcp", "GcpLoginMain", "gcp/login.sh"),
         new ScriptEntry("gcp", "GcpPolarisMain", "gcp/polaris.sh"),
 
+        new ScriptEntry("github", "GithubMilestonesMain", "github/milestones.sh"),
         new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
         new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),
 
