@@ -5,9 +5,9 @@ import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, Users}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
 import health.emrys.afon.config.AfonProperty.{USER_POLARIS_ID, USER_POLARIS_SECRET}
-import health.emrys.afon.config.{AfonPropertyProvider, AfonUser, AfonUserAcl, AfonUserProvider}
+import health.emrys.afon.config.{AfonCatalog, AfonCloud, AfonPropertyProvider, AfonUser, AfonUserAcl, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
-import health.emrys.afon.polaris.catalogs.{AwsForbiddenPolarisCatalog, AwsPolarisCatalog, PolarisCatalog}
+import health.emrys.afon.polaris.catalogs.{AwsPolarisCatalog, PolarisCatalog}
 import health.emrys.afon.spark.{CatalogWarehouse, KeyCloakSparkWarehouseConfigForTesting}
 import org.apache.hc.core5.http.HttpResponse
 import org.apache.iceberg.exceptions.{ForbiddenException, NotAuthorizedException, RESTException}
@@ -93,12 +93,15 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
   }
 
   "Granting catalog privileges" should {
-    val catalog1: PolarisCatalog = new AwsPolarisCatalog(AcceptanceTestConfig.instance.getProperties) {
-      override def catalogName(): String = CatalogName1
-    }
-    val catalog2: PolarisCatalog = new AwsPolarisCatalog(AcceptanceTestConfig.instance.getProperties) {
-      override def catalogName(): String = CatalogName2
-    }
+    // Arbitrary, unrelated test catalogs used only to test catalog-level admin grants in
+    // isolation - reusing the "aws" catalog's bucket, since the bucket itself doesn't matter here.
+    val awsBucket = AcceptanceTestConfig.instance.afonCatalogs().aws().bucketName()
+    val catalog1: PolarisCatalog = new AwsPolarisCatalog(
+      AfonCatalog.adHoc(CatalogName1, AfonCloud.AWS, "internal", awsBucket, true),
+      AcceptanceTestConfig.instance.getProperties)
+    val catalog2: PolarisCatalog = new AwsPolarisCatalog(
+      AfonCatalog.adHoc(CatalogName2, AfonCloud.AWS, "internal", awsBucket, true),
+      AcceptanceTestConfig.instance.getProperties)
 
     val catalogManager = AcceptanceTestConfig.instance.getCatalogManager
 
@@ -159,15 +162,15 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
   }
 
   private def createAwsForbiddenPolarisCatalog() = {
-    val catalog: PolarisCatalog = new AwsForbiddenPolarisCatalog(AcceptanceTestConfig.instance.getProperties) {
-      // Distinct from the "aws_forbidden" catalog AwsAccessForbiddenSpec owns (via AcceptanceTestConfig),
-      // which points at a different bucket (AWS_S3_BUCKET_NAME_FORBIDDEN vs
-      // AWS_S3_BUCKET_NAME_FORBIDDEN_BY_POLARIS here). Sharing the name let Spark's REST catalog
-      // plugin cache whichever spec's storage location was configured first, for the life of the
-      // shared SparkSession - a non-deterministic collision when both specs run together. This test
-      // only exercises Polaris-level authorisation, not S3/IAM, so the bucket itself doesn't matter.
-      override def catalogName(): String = "users_spec_forbidden"
-    }
+    // Named "users_spec_forbidden", distinct from the "aws_forbidden" catalog AwsAccessForbiddenSpec
+    // owns (via AcceptanceTestConfig, which is just afonCatalogs.awsForbidden() itself). Sharing the
+    // name would let Spark's REST catalog plugin cache whichever spec's storage location was
+    // configured first, for the life of the shared SparkSession - a non-deterministic collision when
+    // both specs run together. This test only exercises Polaris-level authorisation, not S3/IAM, so
+    // reusing afonCatalogs.awsForbidden()'s own bucket here is fine.
+    val forbiddenBucket = AcceptanceTestConfig.instance.afonCatalogs().awsForbidden().bucketName()
+    val definition = AfonCatalog.adHoc("users_spec_forbidden", AfonCloud.AWS, "internal", forbiddenBucket, false)
+    val catalog: PolarisCatalog = new AwsPolarisCatalog(definition, AcceptanceTestConfig.instance.getProperties)
     AcceptanceTestConfig.instance.getCatalogManager.configureCatalogs(catalog)
     catalog
   }

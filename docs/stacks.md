@@ -19,6 +19,8 @@ To deploy a stack, we execute the `ops.Deploy*Main` classes, e.g.:
 ./afon.sh -a exec -ec ops.DeployAzurePolarisStackMain
 ./afon.sh -a exec -ec ops.DeployGcpPolarisStackMain
 ```
+or, equivalently, via the [ops command](afon_script.md#ops-commands) shorthand: `./afon.sh -a deploy-aws-full-stack`, etc.
+
 **NOTE:** In the following, all JVM packages are intended relative to the base package `health.emrys.afon`.
 If you want, you may specify the full package or change the base package via the `--exec-package` option.
 
@@ -95,7 +97,7 @@ Pre-requisites, on top of what the acceptance workflow needs:
 - **Runner tooling**: the `aws` CLI, `tofu` and `kubectl` on the runner's PATH. Install them with
   `ansible-playbook runner-setup.yml -e install_cloud_tools=true` (see [runners](../scripts/github/runners.md)).
 - **Config secrets**: the same base64 secrets the acceptance workflow uses, published with
-  `scripts/github/secrets.sh push`.
+  `./afon.sh -a github-secrets -sa push`.
 - **AWS admin credentials**: the repository secrets `AWS_DEPLOY_ACCESS_KEY_ID` and
   `AWS_DEPLOY_SECRET_ACCESS_KEY`. These are the user admin credentials tofu and the CLI run as,
   **NOTE** the Polaris service account credentials in `secret-aws.properties` (see
@@ -129,7 +131,7 @@ The cdktf dir also holds the Terraform state files: `$AFON_CDKTF/terraform.<clou
 
 To support multiple config envs, say a `dev` and a `stg` env, you can use the `cdktf-switch` action:
 ```shell
-./afon.sh -a cdktf-switch --cdktf-env {dev|stg} # cdktf symlink for <env> 
+./afon.sh -a cdktf-switch -e {dev|stg} # cdktf symlink for <env> 
 ```
 This will create or move the symlink `$AFON_CDKTF` pointing to `$AFON_CDKTF-<env>`.
 
@@ -155,7 +157,7 @@ The stack can be brought down using tofu, which will use the locally stored tfst
 
 If tofu-destroy hangs on an instance of a managed type, rm manage type from tofu state and re-run destroy:
 ```shell
-./afon.sh -a tofu-state --tofu-args "rm helm_release.prometheusRelease" -c <cloud>
+./afon.sh -a tofu-state -sa "rm helm_release.prometheusRelease" -c <cloud>
 ```
 where `<cloud>={aws,azure,gcp}`, defaulting to `aws`.
 

@@ -2,7 +2,7 @@
 # Publishes the afon config files as GitHub repository secrets, for use by the
 # acceptance test workflow (.github/workflows/acceptance-tests-linux.yml).
 #
-# ./secrets.sh {push|list|delete} [--home <afon-home>] [--repo <owner/repo>] [--dry-run]
+# ./afon.sh -a github-secrets -sa "{push|list|delete} [--home <afon-home>] [--repo <owner/repo>] [--dry-run]"
 #
 # Each file in <afon-home>/config becomes one base64-encoded secret, named after the file:
 #   afon.properties         -> AFON_PROPERTIES
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 usage(){
-  echo "Usage: $0 {push|list|delete} [--home <afon-home>] [--repo <owner/repo>] [--dry-run]"
+  echo "Usage: ${BASH_SOURCE[0]} {push|list|delete} [--home <afon-home>] [--repo <owner/repo>] [--dry-run]"
   echo "actions:  push   :  writes each config file to its secret, overwriting any existing value"
   echo "          list   :  lists the secrets currently set on the repo"
   echo "          delete :  removes the config secrets from the repo"
@@ -101,7 +101,7 @@ echo "Using config dir $CONFIG_DIR"
 
 # All clouds are always published, so that the workflow can run the specs for any of them.
 CLOUD=
-source "$(dirname "$0")/../config/config-files.sh"
+source $AFON_ROOT/scripts/config/config-files.sh
 
 case "$ACTION" in
   push|list|delete)

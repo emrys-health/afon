@@ -29,7 +29,9 @@ public class AzureReader {
     }
 
     public AzureReader(AfonPropertyProvider properties) {
-        containerName    = properties.getValue(AfonProperty.AZURE_BUCKET_NAME);
+        // The "azure" catalog's bucket - no longer a typed AfonProperty (see AZURE_BUCKET_NAME_azure
+        // in catalogs-azure.properties), since variant bucket names only ever make sense as configuration.
+        containerName    = properties.getCatalogProperty("AZURE_BUCKET_NAME", "azure");
         connectionString = properties.getValue(AfonProperty.AZURE_CONNECTION_STRING);
     }
 

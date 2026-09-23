@@ -145,13 +145,12 @@
                                     <resources>
                                         <resource>
                                             <directory>${project.basedir}/../scripts</directory>
-                                            <includes>
-                                                <include>aws/*</include>
-                                                <include>azure/*</include>
-                                                <include>gcp/*</include>
-                                                <include>cdktf/*</include>
-                                                <include>config/*</include>
-                                            </includes>
+                                            <excludes>
+                                                <exclude>ansible/*</exclude>
+                                                <exclude>docker/*</exclude>
+                                                <exclude>snowflake/*</exclude>
+                                                <exclude>trino/*</exclude>
+                                            </excludes>
                                         </resource>
                                     </resources>
                                 </configuration>

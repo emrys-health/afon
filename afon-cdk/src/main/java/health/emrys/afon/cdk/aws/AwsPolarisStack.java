@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
+import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
@@ -14,6 +15,7 @@ import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -53,12 +55,18 @@ public class AwsPolarisStack extends AbstractCloudStack {
                 // mid-rollout of oauth2-proxy). Do not downgrade below 3.2.1.
                 "version", "3.2.1"   // 👈 Pin exact version
                                                              ));
+        // Keycloak's wiring is created first so that Polaris, which does OIDC discovery against the
+        // Keycloak hostname, can be ordered after that hostname's DNS record.
+        keyCloakConfig = new AwsKeyCloakConfig(this, properties, cloudProvider);
+        keyCloakConfig.configureHttpsAndDNS();
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties) {
             protected Service configurePolarisService(Deployment polarisDeployment) {
                 return null; // no longer using an external service
             }
         };
-        polarisConfig.deployPolaris(cloudProvider.getDependables());
+        List<ITerraformDependable> polarisDependables = new ArrayList<>(cloudProvider.getDependables());
+        polarisDependables.add(keyCloakConfig.getAliasRecord());
+        polarisConfig.deployPolaris(polarisDependables);
         Service.Builder
             .create(this, POLARIS_INTERNAL_SERVICE_NAME)
             .metadata(ServiceMetadata
@@ -76,8 +84,6 @@ public class AwsPolarisStack extends AbstractCloudStack {
                       .port(List.of(polarisConfig.getPolarisSpecPort()))
                       .build())
             .build();
-        keyCloakConfig = new AwsKeyCloakConfig(this, properties, cloudProvider);
-        keyCloakConfig.configureHttpsAndDNS();
     }
 
     /**

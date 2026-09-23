@@ -2,7 +2,6 @@ package health.emrys.afon.acceptance
 
 import health.emrys.afon.acceptance.AcceptanceTestConfig.instance
 import health.emrys.afon.config.AfonProperty.POLARIS_NAMESPACE
-import health.emrys.afon.polaris.catalogs.AwsForbiddenPolarisCatalog
 import health.emrys.afon.spark.{CatalogWarehouse, KeyCloakSparkWarehouseConfigForTesting}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
@@ -25,7 +24,7 @@ object SparkHelper {
       instance.getProperties,
       Array(
         new CatalogWarehouse(
-          AwsForbiddenPolarisCatalog.AWS_FORBIDDEN,
+          instance.afonCatalogs().awsForbidden().toString,
           "forbidden"
         ),
         new CatalogWarehouse(CatalogName1, CatalogName1),

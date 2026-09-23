@@ -10,6 +10,22 @@ To clone project:
 git clone https://github.com/emrys-health/afon-core.git
 ```
 
+## Git hooks
+
+The repo ships a `commit-msg` hook that checks the issue referenced at the start of a commit
+message (eg `[#203] ...`) is assigned to you on GitHub, to catch pasting the wrong issue number
+before it lands in history.  It requires the [GitHub CLI](https://cli.github.com/) (`gh`),
+authenticated via `gh auth login`; without it the check is skipped rather than blocking commits.
+
+Enable it once per clone:
+```shell
+git config core.hooksPath .githooks
+```
+
+A [companion GitHub Action](../.github/workflows/issue-assignee-check.yml) runs the same check
+on push, as a backstop for commits made without the hook enabled — it's advisory only (shows as
+a failing check on the commit/PR) since this repo's plan doesn't support branch protection.
+
 ## Build
 
 We assume [setup](setup_local.md) has been done. 
@@ -68,11 +84,7 @@ The docs related to the operations (in module `afon-ops`) are generated and kept
 
 They can be found in `afon-docs/target/docs`.
 
-To export all the docs (including the static) to an external dir:
-
-```shell
-./afon.sh -a docs-export --docs-dir ~/.afon/docs
-```
+The generated docs are included in the `afon-distribution`.
 
 ### CLI
 
@@ -110,7 +122,7 @@ Requires ssh access to the runner.
 
 The workflows require the config to be uploaded to GitHub secrets:
 ```shell
-./scripts/github/secrets.sh push 
+./afon.sh -a github-secrets -sa push
 ```
 This pushes the content of each config files to a separate GitHub secret.
 

@@ -6,6 +6,8 @@
 .kube
 
 logs/
+# ... except the scripts to work with the logs
+!/scripts/logs/
 *-cleanup.sh
 
 # Terraform/tofu

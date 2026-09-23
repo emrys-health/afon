@@ -36,7 +36,6 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.*;
 
-import static health.emrys.afon.config.AfonProperty.AZURE_BUCKET_NAME;
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.*;
@@ -49,19 +48,44 @@ public class StepActions {
 
     private static final Logger logger = getLogger(StepActions.class);
 
+    /**
+     * Deletes the stack, allowing for a single attempt.
+     * @throws IOException
+     */
     @NonNull Path deleteStack(AfonCloud cloud) throws IOException {
+        return deleteStack(cloud, 1);
+    }
+
+    /**
+     * Deletes the stack, allowing a given number of retries.
+     * @throws IOException
+     */
+    @NonNull Path deleteStack(AfonCloud cloud, int maxAttempts) throws IOException {
         Path stackDir = stackDir(cloud);
         try {
-            tofuDestroy(stackDir);
+            tofuDestroy(stackDir, maxAttempts);
             deletePath(stackDir);
             deleteTfStateFiles(cloud);
         } catch (ManagedProcessException e) {
+            String message = String.format("""
+                Failed to run, after %s attempt(s):
+                    tofu destroy
+                Your environment may be in an unstable state.
+                It may be that something like a Helm chart is blocking the destroy.
+                If so, remove it with something like:
+                    tofu state rm 'helm_release.prometheusRelease'
+                and run again:
+                    tofu destroy
+                
+                If you're sure nothing in the environment is still running, delete the tofu dir %s.
+                """, maxAttempts, stackDir);
+            logger.error(message, e);
             throw new RuntimeException(e);
         }
         return stackDir;
     }
 
-    private @NonNull Path stackDir(AfonCloud cloud) throws IOException {
+    @NonNull Path stackDir(AfonCloud cloud) throws IOException {
         checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
         Path stackDir = Path.of(ConfigUtils.stackDir(cloud));
         logger.info("Using stack dir {}", stackDir);
@@ -72,7 +96,7 @@ public class StepActions {
         return stackDir;
     }
 
-    private void checkNotBrokenSymlink(Path path) throws IOException {
+    void checkNotBrokenSymlink(Path path) throws IOException {
         if (Files.isSymbolicLink(path) && !Files.exists(path)) {
             throw new IOException(String.format(
                 "%s is a symlink pointing to %s, which does not exist. Fix or recreate the symlink target.",
@@ -80,26 +104,11 @@ public class StepActions {
         }
     }
 
-    private void tofuDestroy(Path tofuDir) throws ManagedProcessException {
+    private void tofuDestroy(Path tofuDir, int maxAttempts) throws ManagedProcessException {
         logger.info("Executing tofu destroy in dir {}", tofuDir);
         run("tofu", tofuDir, "init");
-        if (run("tofu", tofuDir, "destroy", "--auto-approve") != 0) {
-            String message = String.format("""
-                TOFU_DIR=%s
-                Failed to run:
-                    tofu -chdir=$TOFU_DIR destroy
-                Your environment may be in an unstable state.
-                It may be that something irrelevant (like a Helm chart) is blocking the destroy.
-                If so, remove it with something like:
-                    tofu -chdir=$TOFU_DIR state rm 'helm_release.prometheusRelease'
-                and run again:
-                    tofu -chdir=$TOFU_DIR destroy
-                
-                If you're sure nothing in the environment is still running, delete directory $TOFU_DIR
-                """, tofuDir);
-            logger.error(message);
-            throw new ManagedProcessException(message);
-        }
+        String[] args = List.of("destroy", "--auto-approve").toArray(new String[0]);
+        tofuWithRetry(tofuDir, OutputStream.nullOutputStream(), maxAttempts, args);
     }
 
     void deleteTfStateFiles(AfonCloud cloud) throws IOException {
@@ -120,12 +129,24 @@ public class StepActions {
                 "--region", region, "--query", "Certificate.Status", "--output", "text");
     }
 
+    /**
+     * Starts the stack, allowing for a single attempt.
+     * @throws Exception
+     */
     void startStack(Class stackClass, AfonCloud cloud) throws Exception {
-        executeMainOf(stackClass, new String[]{});
-        startManagedStack(cloud);
+        startStack(stackClass, cloud, 1);
     }
 
-    private void startManagedStack(AfonCloud cloud) throws ManagedProcessException, IOException {
+    /**
+     * Starts the stack, attempting for a given number of retries.
+     * @throws Exception
+     */
+    void startStack(Class stackClass, AfonCloud cloud, int maxAttempts) throws Exception {
+        executeMainOf(stackClass, new String[]{});
+        startManagedStack(cloud, maxAttempts);
+    }
+
+    private void startManagedStack(AfonCloud cloud, int maxAttempts) throws IOException {
         // The kubernetes/helm providers are configured from the managed cluster's endpoint and
         // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
         // (plugin-framework) providers, those must be known at plan time, otherwise apply fails
@@ -144,14 +165,10 @@ public class StepActions {
         // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
         // Stacks without a managed cluster yield no targets and skip straight to the full apply.
         Path stackDir = stackDir(cloud);
-        List<String> bootstrapTargets = clusterBootstrapTargets(stackDir);
-        tofuApply(stackDir, bootstrapTargets);
+        tofuApply(stackDir, clusterBootstrapTargets(stackDir), maxAttempts);
     }
 
-    private static final int      TOFU_APPLY_MAX_ATTEMPTS = 3;
-    private static final Duration TOFU_APPLY_RETRY_DELAY  = Duration.ofSeconds(30);
-
-    private void tofuApply(Path tofuDir, List<String> bootstrapTargets) throws ManagedProcessException, IOException {
+    private void tofuApply(Path tofuDir, List<String> bootstrapTargets, int maxAttempts) throws IOException {
         ensureKubeConfigExists();
         if (run("tofu", tofuDir, "init") != 0) {
             throw new ManagedProcessException(format("tofu init failed in %s", tofuDir));
@@ -159,48 +176,46 @@ public class StepActions {
         if (!bootstrapTargets.isEmpty()) {
             List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
             phaseOne.addAll(bootstrapTargets);
-            logger.info("Bootstrapping EKS before the full apply: {}", phaseOne);
-            applyWithRetry(tofuDir, System.out, phaseOne.toArray(new String[0]));
+            logger.info("Bootstrapping targets before the full apply: {}", phaseOne);
+            tofuWithRetry(tofuDir, System.out, maxAttempts, phaseOne.toArray(new String[0]));
         }
-        applyWithRetry(tofuDir, OutputStream.nullOutputStream(), "apply", "--auto-approve", "-parallelism=5");
+        tofuWithRetry(tofuDir, OutputStream.nullOutputStream(), maxAttempts, "apply", "--auto-approve", "-parallelism=5");
     }
 
     /**
-     * Retries a {@code tofu apply} invocation on failure. Applying a brand-new cluster hits
-     * conditions that are transient but can exceed a single attempt's patience: the EKS API
-     * endpoint's public DNS record can lag behind the cluster reaching ACTIVE, and the AWS
-     * Load Balancer Controller can take longer than the kubernetes provider's
-     * {@code wait_for_load_balancer} timeout to provision a brand-new ALB. Retrying is safe
-     * here because {@code tofu apply} re-plans against current state each time: Terraform
-     * records an ingress's ID in state as soon as it's created in-cluster, before waiting on
-     * its load-balancer status, so a retry re-reads the existing resource rather than
-     * double-creating it.
+     * Retries a {@code tofu} invocation on failure.
+     * Retrying is safe because {@code tofu} re-plans against current state each time.
      */
-    private void applyWithRetry(Path tofuDir, OutputStream stdOut, String... args) throws ManagedProcessException {
-        for (int attempt = 1; attempt <= TOFU_APPLY_MAX_ATTEMPTS; attempt++) {
+    private void tofuWithRetry(Path tofuDir, OutputStream outputStream, int maxAttempts, String... args) throws ManagedProcessException {
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                int exitCode = run("tofu", tofuDir, stdOut, args);
+                int exitCode = run("tofu", tofuDir, outputStream, args);
                 if (exitCode == 0) {
                     return;
                 }
-                retryOrThrow(args, attempt, new ManagedProcessException(String.format(
-                    "tofu %s exited with %d", String.join(" ", args), exitCode)));
+                throwOrRetry(args, attempt, maxAttempts, new ManagedProcessException(String.format(
+                    "tofu %s exited with code %d", String.join(" ", args), exitCode)));
             } catch (ManagedProcessException e) {
-                // ManagedProcess.waitForExit() throws on a non-zero exit code rather than
-                // returning it, so a failed `tofu apply` surfaces here, not via the exitCode
-                // check above.
-                retryOrThrow(args, attempt, e);
+                // ManagedProcess.waitForExit() throws on a non-zero exit code rather than returning it,
+                // so a failed `tofu` invocation surfaces here, not via the exitCode check above.
+                throwOrRetry(args, attempt, maxAttempts, e);
             }
         }
     }
 
-    private void retryOrThrow(String[] args, int attempt, ManagedProcessException failure) throws ManagedProcessException {
-        if (attempt == TOFU_APPLY_MAX_ATTEMPTS) {
+    /**
+     * Throws failure exception if the attempts have reached its max number allowed,
+     * else waits for 30s and carries on to the following attempt.
+     * @throws ManagedProcessException
+     */
+    private void throwOrRetry(String[] args, int attempt, int maxAttempts, ManagedProcessException failure) throws ManagedProcessException {
+        if (attempt == maxAttempts) {
             throw failure;
         }
-        logger.warn("tofu {} failed on attempt {}/{}, retrying in {}",
-                 String.join(" ", args), attempt, TOFU_APPLY_MAX_ATTEMPTS, TOFU_APPLY_RETRY_DELAY, failure);
-        sleepUninterruptibly(TOFU_APPLY_RETRY_DELAY);
+        final Duration duration = Duration.ofSeconds(30);
+        logger.warn("tofu {} failed on attempt {}/{}, retrying in {}s",
+                 String.join(" ", args), attempt, maxAttempts, duration.toSeconds(), failure);
+        sleepUninterruptibly(duration);
     }
 
     private void sleepUninterruptibly(Duration duration) {
@@ -363,12 +378,7 @@ public class StepActions {
 
     public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
         executeMainOf(ManagePolarisCatalogsMain.class,
-                new String[]{CREATE, cloud.toString(), catalog.name()});
-    }
-
-    public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog, Properties properties) throws Exception {
-        executeMainOf(ManagePolarisCatalogsMain.class,
-                new String[]{CREATE, cloud.toString(), catalog.name()}, properties);
+                new String[]{CREATE, cloud.toString(), catalog.toString()});
     }
 
     public void configureOidcUsersFor(AfonCloud cloud) throws Exception {
@@ -383,19 +393,19 @@ public class StepActions {
 
     public void deleteCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
         executeMainOf(ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.name()});
+                new String[]{DELETE, cloud.toString(), catalog.toString()});
     }
 
     public void deleteNamespaceFor(AfonCloud cloud, AfonCatalog catalog, String namespace) throws Exception {
         executeMainOf(
                 ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.name(), namespace});
+                new String[]{DELETE, cloud.toString(), catalog.toString(), namespace});
     }
 
     public void deleteTableFor(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName) throws Exception {
         executeMainOf(
                 ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.name(), namespace, tableName});
+                new String[]{DELETE, cloud.toString(), catalog.toString(), namespace, tableName});
     }
 
     public void registerTable(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, String metadata) throws Exception {
@@ -424,7 +434,7 @@ public class StepActions {
         logger.info("Latest blob was created at {}", latest.getProperties().getCreationTime());
         return format(
                 "abfss://%s@%s.dfs.core.windows.net/%s",
-                properties.getValue(AZURE_BUCKET_NAME),
+                properties.getCatalogProperty("AZURE_BUCKET_NAME", "azure"),
                 properties.getValue(AZURE_STORAGE_ACCOUNT),
                 latest.getName());
     }

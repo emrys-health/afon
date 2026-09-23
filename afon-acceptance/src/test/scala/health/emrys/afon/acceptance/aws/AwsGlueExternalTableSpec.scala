@@ -4,11 +4,15 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, External}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
-import health.emrys.afon.config.AfonProperty.{AWS_REGION, AWS_S3_BUCKET_NAME_EXTERNAL, AWS_GLUE_CATALOG_NAME, ENV_NAME}
-import health.emrys.afon.config.FilePropertyProvider
+import health.emrys.afon.config.AfonProperty.{AWS_REGION, ENV_NAME}
 import health.emrys.afon.polaris.catalogs.GlueAwsPolarisCatalog
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.glue.GlueClient
+import software.amazon.awssdk.services.glue.model._
+
+import scala.jdk.CollectionConverters._
 
 /**
  * You'll need to run `scripts/aws/create_federated_permissions.sh` first if it's not been done already.
@@ -19,11 +23,26 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
   val properties = AcceptanceTestConfig.instance.getProperties
   val catalogManager = AcceptanceTestConfig.instance.getCatalogManager
+  val afonCatalogs = AcceptanceTestConfig.instance.afonCatalogs()
 
-  "An external table" should {
-    val glueCatalogName   = properties.getValue(AWS_GLUE_CATALOG_NAME)
-    val externalBucket    = properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL)
-    val glueCatalog       = new GlueAwsPolarisCatalog(properties)
+  // catalogs-aws.properties documents "aws_glue" as omittable when AWS_GLUE_ROLE_ARN isn't
+  // available, so its absence is a supported config, not a misconfiguration - check for it with
+  // a plain list scan (rather than the throwing AfonCatalogs.get) so a spec-registration-time
+  // lookup failure doesn't abort the whole suite (ScalaTest can't recover once that happens,
+  // unlike a failure/cancellation inside a running test).
+  private val GlueCatalogId = "aws_glue"
+  private val glueConfigured = afonCatalogs.all().asScala.exists(_.id().equalsIgnoreCase(GlueCatalogId))
+
+  if (glueConfigured) {
+
+    // "glue" is a one-off type registered explicitly in PolarisCatalogManager (see
+    // GlueAwsPolarisCatalog), rather than one of the generic internal/external shapes
+    // AcceptanceTestConfig pre-registers - so it's built directly here from its AfonCatalog.
+    val afonCatalog       = afonCatalogs.get(GlueCatalogId)
+    val glueCatalog       = new GlueAwsPolarisCatalog(afonCatalog, properties)
+    val glueCatalogName   = glueCatalog.catalogName()
+    // GlueAwsPolarisCatalog reuses aws_external's configured bucket (see catalogs-aws.properties).
+    val externalBucket    = properties.getCatalogProperty("AWS_BUCKET_NAME", "aws_external")
     val grantCatalogAdmin = new GrantCatalogAdmin(this, glueCatalog, Some(glueCatalog.catalogName()))
     val createCatalogRole = new CreateCatalogRole(this, glueCatalog, Some(glueCatalog.catalogName))
     // Suffixed by ENV_NAME: the underlying Glue table is a real, shared, account-wide resource
@@ -33,11 +52,14 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
     val sparkNamespace    = "ph_glue_iceberg_db"
     val awsRegion         = properties.getValue(AWS_REGION)
 
+    "have its underlying Iceberg table created if absent" in {
+      Given(f"a bucket called $externalBucket")
+      When(f"we ensure the table $sparkNamespace.$tableName exists")
+      AwsGlueExternalTableSpec.ensureTableExists(awsRegion, sparkNamespace, tableName, externalBucket)
+      Then(f"the table exists, created now or already there from a previous run")
+    }
     "be visible to our Polaris" in {
-      Given(f"a bucket called $externalBucket and somebody has run the command:\n${AwsGlueExternalTableSpec.glueCmdLine(
-        sparkNamespace, tableName, awsRegion, externalBucket
-      )}")
-
+      Given(f"the table $sparkNamespace.$tableName exists")
       When(f"Polaris is configured with the Glue catalog '${glueCatalog.catalogName()}'")
       val response = catalogManager.createCatalogIfAbsent(glueCatalog)
       val responseCode = response.getCode
@@ -68,60 +90,84 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
           |aws athena start-query-execution \\
           |  --query-string "SELECT * FROM ${glueCatalogName}.${tableName} LIMIT 10;" \\
           |  --query-execution-context Database=${glueCatalogName} \\
-          |  --result-configuration OutputLocation=${externalBucket}/AwsAccessSpec251117511401/
+          |  --result-configuration OutputLocation=${externalBucket}/${AwsGlueExternalTableSpec.TableLocationSuffix}/
           |aws athena get-query-execution --query-execution-id QUERY_ID_FROM_ABOVE
           |aws s3 cp OUTPUT_LOCATION_FROM_ABOVE -
           |""".stripMargin)
     }
+
+  } else {
+
+    "An external table" should {
+      s"be skipped: '$GlueCatalogId' is not configured" in {
+        cancel(s"'$GlueCatalogId' is not in AWS_CATALOG_IDS - add it (with AWS_GLUE_ROLE_ARN) to " +
+          "catalogs-aws.properties/afon-aws.properties to run this spec.")
+      }
+    }
+
   }
 
 }
 
 object AwsGlueExternalTableSpec {
-  def glueCmdLine(dbName: String,
-                  tblName: String,
-                  region: String,
-                  bucket: String): String = String.format(
-    """
-      |aws glue create-table --database-name %s --table-input '
-      |   {
-      |     "Name": "%s",
-      |     "TableType": "EXTERNAL_TABLE",
-      |     "StorageDescriptor": {
-      |     "Location": "s3://%s/AwsAccessSpec251117511401/",
-      |     "Columns": [
-      |       { "Name": "id", "Type": "int" },
-      |       { "Name": "label", "Type": "string" },
-      |       { "Name": "partitionKey", "Type": "bigint" },
-      |       { "Name": "date", "Type": "date" },
-      |       { "Name": "timestamp", "Type": "timestamp" },
-      |       { "Name": "randomInt", "Type": "int" }
-      |     ],
-      |     "SerdeInfo": {
-      |      "SerializationLibrary": "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"
-      |     }
-      |     },
-      |     "Parameters": {
-      |       "iceberg.table.default.namespace": "%s"
-      |      }
-      |   }'     --open-table-format-input '
-      |   {
-      |     "IcebergInput": {
-      |       "MetadataOperation": "CREATE",
-      |       "Version": "2"
-      |     }
-      |   }'     --region %s
-      |""".stripMargin,
-    dbName, tblName, bucket, dbName, region
+
+  private val TableLocationSuffix = "AwsAccessSpec251117511401"
+
+  private val Columns = List(
+    "id" -> "int",
+    "label" -> "string",
+    "partitionKey" -> "bigint",
+    "date" -> "date",
+    "timestamp" -> "timestamp",
+    "randomInt" -> "int",
   )
 
-  def main(args: Array[String]): Unit = {
-    val properties = new FilePropertyProvider()
-    println(glueCmdLine(
-      "ph_glue_iceberg_db",
-      s"DatumAccTest2_${properties.getValue(ENV_NAME)}",
-      properties.getValue(AWS_REGION),
-      properties.getValue(AWS_S3_BUCKET_NAME_EXTERNAL),
-    ))
+  /**
+   * Creates the Iceberg-backed Glue table this spec depends on, if it doesn't already exist -
+   * previously a manual, easy-to-forget "somebody has run the command" prerequisite; now run by
+   * the spec itself so there's no separate setup step to get wrong or skip.
+   */
+  def ensureTableExists(region: String, dbName: String, tableName: String, bucket: String): Unit = {
+    val glue = GlueClient.builder().region(Region.of(region)).build()
+    try {
+      val exists =
+        try {
+          glue.getTable(GetTableRequest.builder().databaseName(dbName).name(tableName).build())
+          true
+        } catch {
+          case _: EntityNotFoundException => false
+        }
+      if (!exists) {
+        val columns = Columns.map { case (name, colType) =>
+          Column.builder().name(name).`type`(colType).build()
+        }
+        val storageDescriptor = StorageDescriptor.builder()
+          .location(s"s3://$bucket/$TableLocationSuffix/")
+          .columns(columns.asJava)
+          .serdeInfo(SerDeInfo.builder()
+            .serializationLibrary("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe")
+            .build())
+          .build()
+        val tableInput = TableInput.builder()
+          .name(tableName)
+          .tableType("EXTERNAL_TABLE")
+          .storageDescriptor(storageDescriptor)
+          .parameters(Map("iceberg.table.default.namespace" -> dbName).asJava)
+          .build()
+        val openTableFormatInput = OpenTableFormatInput.builder()
+          .icebergInput(IcebergInput.builder()
+            .metadataOperation(MetadataOperation.CREATE)
+            .version("2")
+            .build())
+          .build()
+        glue.createTable(CreateTableRequest.builder()
+          .databaseName(dbName)
+          .tableInput(tableInput)
+          .openTableFormatInput(openTableFormatInput)
+          .build())
+      }
+    } finally {
+      glue.close()
+    }
   }
 }

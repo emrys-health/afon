@@ -9,8 +9,8 @@ name: Acceptance Tests (Linux)
 #   - the $AFON_HOME/config files, reconstructed from the GitHub Secrets listed below.
 #
 # The config files are held as base64-encoded repository secrets, one per file in ~/.afon/config.
-# Use `scripts/github/secrets.sh push` to (re)publish them from a local config dir, and
-# `scripts/github/secrets.sh list` to check which ones are set.
+# Use `./afon.sh -a github-secrets -sa push` to (re)publish them from a local config dir, and
+# `./afon.sh -a github-secrets -sa list` to check which ones are set.
 on:
   workflow_dispatch:
     inputs:

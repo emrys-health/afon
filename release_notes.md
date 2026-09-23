@@ -1,5 +1,32 @@
 # Release Notes
 
+## 1.0-beta-5
+
+**Milestone:** [1.0-beta-5](https://github.com/emrys-health/afon-core/milestone/5)
+**Due:** 2026-09-23
+
+### Closed Issues (6)
+
+- **devops, tech debt** — [#211](https://github.com/emrys-health/afon-core/issues/211) Drop afon-samples module
+- **enhancement** — [#210](https://github.com/emrys-health/afon-core/issues/210) Keycloak hostname doesn't resolve inside the cluster for ~10 minutes
+- **devops** — [#209](https://github.com/emrys-health/afon-core/issues/209) Add command name shorthands for ops exec *Main classes in afon.sh
+- **devops** — [#200](https://github.com/emrys-health/afon-core/issues/200) AWS tofu destroy is unable to uninstall Helm release kube-prometheus-stack
+- **security, devops** — [#197](https://github.com/emrys-health/afon-core/issues/197) Check AWS certs are issued when deploying new stack
+- **devops, testing, configuration** — [#194](https://github.com/emrys-health/afon-core/issues/194) Runtime configuration of Polaris catalogs available via AfonCatalogs
+
+## 1.0-beta-4
+
+**Milestone:** [1.0-beta-4](https://github.com/emrys-health/afon-core/milestone/4)
+**Due:** 2026-09-21
+
+### Closed Issues (5)
+
+- **configuration** — [#206](https://github.com/emrys-health/afon-core/issues/206) Make GCP_USER_ACCOUNT configurable
+- **devops** — [#205](https://github.com/emrys-health/afon-core/issues/205) Add action shorthands for all script executions in afon.sh
+- **devops, configuration** — [#203](https://github.com/emrys-health/afon-core/issues/203) Support script execution in afon-cli
+- **configuration** — [#196](https://github.com/emrys-health/afon-core/issues/196) Allow configuration of OIDC users independently of Jupyter domain
+- **devops, configuration** — [#193](https://github.com/emrys-health/afon-core/issues/193) Replace Maven AWS bundle artifact with explicit artifact dependencies
+
 ## 1.0-beta-3
 
 **Milestone:** [1.0-beta-3](https://github.com/emrys-health/afon-core/milestone/1)
