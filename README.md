@@ -21,6 +21,10 @@ See [cli](./docs/cli.md)
 
 See [configuration](./docs/configuration.md).
 
+### Theming
+
+See [theme](./docs/theme.md).
+
 ### Cloud infrastructure
 
 See [cloud](./docs/cloud.md).
