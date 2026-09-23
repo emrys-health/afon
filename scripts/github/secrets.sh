@@ -48,7 +48,7 @@ usage(){
   echo "env:        the config env, which is also the name of the GitHub environment to hold the secrets."
   echo "            Reads or writes <afon-home>/config-<env>.  Defaults to the global config env, if set, else to"
   echo "            the repository and <afon-home>/config."
-  echo "repo:       the target repo.  Defaults to the repo of the current dir."
+  echo "repo:       the target repo.  Defaults to env variable GH_REPO, if set, else to $DEFAULT_REPO."
   echo "force:      the flag to let pull overwrite the files of a non-empty config dir."
   echo "no-bundle:  the flag to let push publish the secrets only, without the bundle and its passphrase."
   echo "dry-run:    the flag to report what would be done, without calling gh."
@@ -94,6 +94,8 @@ ensure_environment(){
   gh api --method PUT "repos/{owner}/{repo}/environments/$GH_ENV" --silent
 }
 
+# The repo whose workflows use the secrets, as in scripts/github/runner.sh.
+DEFAULT_REPO="emrys-health/afon-core"
 BUNDLE_VARIABLE="AFON_CONFIG_BUNDLE"
 # GitHub variables are limited to 48 KB.
 BUNDLE_MAX_BYTES=48000
@@ -328,10 +330,15 @@ else
 fi
 echo "Using config dir $CONFIG_DIR"
 
-# gh api resolves {owner}/{repo} from the current dir, unless GH_REPO is set.
-if [ -n "$REPO" ] ; then
-  export GH_REPO="$REPO"
+# The repo whose workflows use the secrets is always given explicitly to gh, rather than left to gh to work out
+# from the git remote of the current dir.  That fails outside a git repo, as when run via afon-cli-scripts.sh,
+# which runs from the cli dir, and would push to the wrong repo from a checkout of another one.
+# GH_REPO, which gh also honours, is exported for the gh api calls, that resolve {owner}/{repo} from it.
+if [ -z "$REPO" ] ; then
+  REPO="${GH_REPO:-$DEFAULT_REPO}"
 fi
+export GH_REPO="$REPO"
+echo "Using repo $REPO"
 
 # All clouds are always published, so that the workflows can run the specs for any of them.
 CLOUD=
