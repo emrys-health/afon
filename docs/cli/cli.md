@@ -47,7 +47,8 @@ Running the `help` command gives a list of all the available CLI commands:
 afon-cli.sh help
 ```
 
-The commands are the (kebab-named) versions of the executable Java classes named `*Main` found in package `health.emrys.afon.ops` (in module `afon-ops`).
+The commands are the (kebab-named) versions of the executable Java classes named `*Main` found in package `health.emrys.afon.ops`
+and its subpackages (in module `afon-ops`), eg `DeployAwsFullStackMain` is `deploy-aws-full-stack`.
 
 To see just the commands related to area of interest (eg all `config`-related [script command](#script-commands)), pass it 
 followed by `-h`/`--help`:

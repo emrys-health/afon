@@ -22,6 +22,18 @@ class OpsCommandsTest {
     }
 
     @Test
+    void resolvesSubpackageMainCommands() {
+        assertThat(opsCommands.resolve("generate-py-spark-context")).isNotNull();
+        assertThat(opsCommands.resolve("config-status")).isNotNull();
+    }
+
+    @Test
+    void doesNotExposeClassesNotNamedMain() {
+        assertThat(opsCommands.resolve("network-smoke")).isNull();
+        assertThat(opsCommands.resolve("spark-test-writer")).isNull();
+    }
+
+    @Test
     void returnsNullForUnknownCommand() {
         assertThat(opsCommands.resolve("unknown-command")).isNull();
     }
