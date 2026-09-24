@@ -56,6 +56,14 @@ Steps executed:
 4. `create_all_catalogs_for_cloud_aws` — create all catalogs in AWS Polaris
 5. `aws_spark_talks_to_cloud_aws` — smoke test: Spark writes and reads via Polaris
 
+### Access Polaris and Jupyter
+
+For development purposes, we've registered for `aws` domains `emryspolaris.click` and `emrysjupyter.click`.
+
+Once the AWS full stack is deployed, we can access Polaris and Jupyter via the URLs:
+- `https://emryspolaris.click`
+- `https://emrysjupyter.click/guacamole`
+
 ### Setup Azure Polaris only
 
 ```shell
@@ -216,3 +224,14 @@ afon-cli.sh deploy-snowflake-reading-azure-via-aws
 afon-cli.sh deploy-snowflake-writing-azure-via-aws
 ```
 
+## Deployment checklist
+
+- [ ] **Domain names** purchased via your domain registrar, one per cloud (e.g. `polaris.yourdomain.com`)
+- [ ] **DNS zones** created in each target cloud and nameservers configured at your domain registrar
+- [ ] **SSL certificates** requested and validated (ACM for AWS, Let's Encrypt for others)
+- [ ] **External Polaris database** provisioned for Polaris metadata storage
+- [ ] **OAuth2 provider** configured OIDC provider for Jupyter access
+- [ ] **Cloud IAM roles** created via `scripts/<cloud>/create.sh`
+- [ ] **Storage buckets** created (primary, external, and forbidden for each cloud)
+- [ ] **Configuration** properties and users values populated in `config` dir
+- [ ] **Kubernetes cluster** creation permissions confirmed

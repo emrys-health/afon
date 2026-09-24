@@ -23,6 +23,7 @@
       <outputDirectory>/</outputDirectory>
       <includes>
         <include>LICENSE.txt</include>
+        <include>README.md</include>
         <include>release_notes.md</include>
       </includes>
     </fileSet>
