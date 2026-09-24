@@ -501,7 +501,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .create(this, "eksNodeGroup")
             .clusterName(cluster.getName())
             .nodeGroupName("default-ng")
-            .subnetIds(subnetIds)
+            // Private subnets only: a node in a public subnet gets its own public IP and
+            // would egress from that instead of the NAT gateway's single address.
+            .subnetIds(privateSubnetIds)
             .nodeRoleArn(nodeGroupRole.getArn())
             .instanceTypes(List.of("r6i.large"))
             .scalingConfig(scalingConfig)
@@ -519,7 +521,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 publicSubnet1, publicSubnet2,
                 subnet1Association, subnet2Association,
                 customSecretAttachment, workerNodeAttachment,
-                cniAttachment, containerRegistryAttachment))
+                cniAttachment, containerRegistryAttachment,
+                privateSubnet1Association, privateSubnet2Association))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .tags(Map.of("Name", componentNames.getNodeGroupRoleName())).build();
 
