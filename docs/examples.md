@@ -9,7 +9,7 @@ Spark connects to Polaris, which vends short-lived cloud credentials so Spark ca
 **Generate PySpark code for Jupyter:**
 
 ```shell
-./afon.sh -a exec -ec ops.smoke.GeneratePySparkContextMain
+afon-cli.sh generate-py-spark-context
 ```
 
 This prints ready-to-run PySpark code that:

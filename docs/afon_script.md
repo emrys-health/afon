@@ -6,7 +6,7 @@ The `afon.sh` script at the top-level of the source tree acts as a front-end for
 ./afon.sh -h
 ```
 
-For access to the functionality outside the source tree, refer to [Afon CLI](cli/cli.md).
+For access to the functionality outside the source tree, refer to [Afon CLI](cli/afon_cli.md).
 
 ### Options in long form and short form
 
@@ -43,3 +43,4 @@ same action name, the script takes precedence over the ops class.  The list of o
 ```shell
 ./afon.sh -h
 ```
+

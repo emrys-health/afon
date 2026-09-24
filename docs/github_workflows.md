@@ -1,0 +1,36 @@
+## Stack AWS workflow
+
+The [Stack AWS (Linux)](../.github/workflows/aws-stack-linux.yml) workflow runs `afon.sh` on the self-hosted Linux runner — ie
+`ops.DeployAwsFullStackMain` or `ops.DeleteAwsStackMain`.
+
+Run it from the Actions tab: it is `workflow_dispatch` only, with an `action` dropdown
+(`deploy`/`delete`), a `from_step` to resume from (deploy only — blank runs every step, starting
+with the teardown; ignored by delete, which has a single step) and a `confirm` input that must
+match the chosen action. `deploy` tears the running stack down before rebuilding it; `delete` tears
+it down and leaves it down — a later `deploy` run is what brings it back.
+
+Both actions run on the *same* self-hosted runner (see the `runs-on` note in the workflow), because
+both need the tofu state described below — `delete` just as much as `deploy`, since that state is
+the only record of what there is to tear down.
+
+Pre-requisites, on top of what the acceptance workflow needs:
+
+- **Runner tooling**: the `aws` CLI, `tofu` and `kubectl` on the runner's PATH. Install them with
+  `ansible-playbook runner-setup.yml -e install_cloud_tools=true` (see [runners](../scripts/github/runners.md)).
+- **Config secrets**: the same base64 secrets the acceptance workflow uses, published with
+  `afon-cli.sh github-secrets push`.  To run against a config env other than the one behind the
+  repository secrets, publish it with `afon-cli.sh github-secrets push --env <env>` and give the workflow's `config_env` input.
+  Each env then gets its own tofu state, in `$AFON_CDKTF-<env>` on the runner.
+- **AWS admin credentials**: the repository secrets `AWS_DEPLOY_ACCESS_KEY_ID` and
+  `AWS_DEPLOY_SECRET_ACCESS_KEY`. These are the user admin credentials tofu and the CLI run as,
+  **NOTE** the Polaris service account credentials in `secret-aws.properties` (see
+  [configuration](configuration.md)). Leave them unset to use the credentials the runner already
+  has, from an EC2 instance profile or its `~/.aws/credentials`.
+- **Tofu state**: kept on the runner in `$AFON_CDKTF/<owner>/<repo>/aws`.
+
+**NOTE**: the `$AFON_CDKTF` points to `/data/afon/cdktf` and lives outside the GitHub workspace,
+which is wiped out at each checkout.   On the runner, the `$AFON_HOME` points to the workspace.
+
+The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log is uploaded as the
+`afon-stack-aws-logs-<run id>` artifact.
+

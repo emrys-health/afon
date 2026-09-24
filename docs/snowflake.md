@@ -7,19 +7,19 @@ The following commands deploy the AWS full stack, write test data to the target 
 ## Read AWS data via AWS Polaris:**
 
 ```shell
-./afon.sh -a exec -ec ops.DeploySnowflakeReadingAwsViaAwsMain  
+afon-cli.sh deploy-snowflake-reading-aws-via-aws
 ```
 
 ## Read GCP data via AWS Polaris
 
 ```shell
-./afon.sh -a exec -ec ops.DeploySnowflakeReadingGcpViaAwsMain  
+afon-cli.sh deploy-snowflake-reading-gcp-via-aws
 ```
 
 ## Read Azure data via AWS Polaris:**
 
 ```shell
-./afon.sh -a exec -ec ops.DeploySnowflakeReadingAzureViaAwsMain  
+afon-cli.sh deploy-snowflake-reading-azure-via-aws
 ```
 
 ## Write data from Snowflake to Azure blob storage
@@ -35,7 +35,7 @@ In summary:
 The deployment is automated via:
 
 ```shell
-./afon.sh -a exec -ec ops.DeploySnowflakeWritingAzureViaAwsMain  
+afon-cli.sh deploy-snowflake-writing-azure-via-aws
 ```
 
 ### Connecting to Snowflake
