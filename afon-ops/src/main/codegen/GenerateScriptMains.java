@@ -48,6 +48,7 @@ public class GenerateScriptMains {
         new ScriptEntry("aws", "AwsMountDataMain", "aws/mount-data.sh"),
         new ScriptEntry("aws", "AwsPolarisMain", "aws/polaris.sh"),
         new ScriptEntry("aws", "AwsSnowflakeMain", "aws/snowflake.sh"),
+        new ScriptEntry("aws", "AwsStackMain", "aws/stack.sh"),
         new ScriptEntry("aws", "AwsUpdateKubeConfigMain", "aws/update-kube-config.sh"),
         new ScriptEntry("aws", "AwsVpcsMain", "aws/vpcs.sh"),
 
@@ -73,6 +74,7 @@ public class GenerateScriptMains {
         new ScriptEntry("gcp", "GcpLoginMain", "gcp/login.sh"),
         new ScriptEntry("gcp", "GcpPolarisMain", "gcp/polaris.sh"),
 
+        new ScriptEntry("github", "GithubMilestonesMain", "github/milestones.sh"),
         new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
         new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),
 

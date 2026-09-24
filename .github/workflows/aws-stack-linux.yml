@@ -17,7 +17,12 @@ name: AWS Stack (Linux)
 #     and is different from $AFON_HOME which lives in the GitHub workspace.
 #
 # The $AFON_HOME/config files are reconstructed from the same base64 repository secrets the
-# acceptance workflow uses; `./afon.sh -a github-secrets -sa push` publishes them.
+# acceptance workflow uses; `./afon.sh -a github-secrets push` publishes them.
+#
+# To act on another config env, give config_env.  The config, and the AWS_DEPLOY_* credentials if the env
+# has its own AWS account, then come from the secrets of the GitHub environment of that name (published with
+# `./afon.sh -a github-secrets -- push --env <env>`), and the tofu state is kept apart per env, in
+# $AFON_CDKTF-<env>, so that an env never tears down another's stack.
 on:
   workflow_dispatch:
     inputs:
@@ -34,6 +39,10 @@ on:
         description: "deploy only: resume from this step, eg all_catalogs_in_emryspolaris (blank runs every step, starting with the teardown). Ignored by delete."
         type: string
         default: ""
+      config_env:
+        description: "Config env, ie the GitHub environment whose secrets hold the config (blank for the repository secrets)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -47,7 +56,8 @@ concurrency:
 env:
   # Keep config inside the workspace rather than the runner's home, so it is scoped to this run.
   AFON_HOME: ${{ github.workspace }}/.afon
-  AFON_CDKTF: /data/afon/cdktf
+  # One tofu state dir per config env: a deploy tears down whatever the state says is up, so envs must not share it.
+  AFON_CDKTF: /data/afon/cdktf${{ inputs.config_env && format('-{0}', inputs.config_env) || '' }}
   # Without this the JVM takes a quarter of the runner's RAM as its max heap, which is not
   # enough for javac to open the spark jars. Set explicitly so the build does not silently
   # depend on the instance size.
@@ -58,6 +68,8 @@ jobs:
     # NOTE: in case of multiple Linux runner, we need to narrow the labels to one runner.
     # The tofu state is kept on the runner, so the job must run on the same runner.
     runs-on: [self-hosted, Linux, X64]
+    # Blank means no environment, so the repository secrets.
+    environment: ${{ inputs.config_env }}
     timeout-minutes: 240
     defaults:
       run:

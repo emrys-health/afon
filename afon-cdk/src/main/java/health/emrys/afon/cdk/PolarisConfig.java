@@ -29,9 +29,12 @@ import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
@@ -62,13 +65,17 @@ public class PolarisConfig extends Construct {
 
         // Define a Kubernetes Secret
         // The data must be Base64 encoded. Each key in the secret will become a file in the volume mount.
+        Map<String, String> secretData = new HashMap<>();
+        secretData.put(POLARIS_ENV_FILE, getProviderCredentials(properties, cloudProvider.getId()));
+        String gcpCredentials = gcpCredentials(properties, cloudProvider.getId());
+        if (!gcpCredentials.isBlank()) {
+            secretData.put(GCP_CREDENTIALS_FILE, gcpCredentials);
+        }
         Secret.Builder
             .create(this, "polarisSecret")
             .dependsOn(cloudProvider.getDependables())
             .metadata(SecretMetadata.builder().name(SECRET_NAME).build())
-            .data(Map.of(
-                POLARIS_ENV_FILE, getProviderCredentials(properties, cloudProvider.getId()),
-                    GCP_CREDENTIALS_FILE, properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)))
+            .data(secretData)
             .type("Opaque")
             .build();
 
@@ -138,7 +145,7 @@ public class PolarisConfig extends Construct {
         JobV1SpecTemplateSpecInitContainer dbCreate = JobV1SpecTemplateSpecInitContainer
                 .builder()
                 .name("db-create")
-                .image("postgres:16-alpine")
+                .image(DockerImages.POSTGRES_ALPINE_IMAGE)
                 .command(List.of("sh", "-c", createDbScript))
                 .env(List.of(
                         initJobEnv("PGHOST", host),
@@ -166,7 +173,7 @@ public class PolarisConfig extends Construct {
         JobV1SpecTemplateSpecContainer bootstrap = JobV1SpecTemplateSpecContainer
                 .builder()
                 .name("bootstrap")
-                .image(POLARIS_ADMIN_TOOL_IMAGE_NAME)
+                .image(DockerImages.POLARIS_ADMIN_TOOL_IMAGE)
                 .command(List.of("sh", "-c", bootstrapScript))
                 .env(List.of(
                         jobEnv("POLARIS_PERSISTENCE_TYPE", "relational-jdbc"),
@@ -217,15 +224,35 @@ public class PolarisConfig extends Construct {
         return JobV1SpecTemplateSpecInitContainerEnv.builder().name(name).value(value).build();
     }
 
+    /**
+     * Returns the Polaris env exports for the given deployment.
+     * Only the credentials of the deployment cloud are required: those of the other clouds
+     * are exported only if present, eg to vend credentials to catalogs across clouds,
+     * so that a single-cloud deployment does not depend on the properties of other clouds.
+     */
     static String getProviderCredentials(
         AfonPropertyProvider properties,
         String deploymentId) {
-        List<String> exports = getPolarisProperties()
+        AfonCloud deploymentCloud = toCloud(deploymentId);
+        Map<String, String> env = new TreeMap<>();
+        getPolarisProperties(deploymentCloud)
+            .forEach((property, envName) -> env.put(envName, properties.getValue(property)));
+        Arrays.stream(AfonCloud.values())
+              .filter(cloud -> cloud != deploymentCloud)
+              .forEach(cloud -> getPolarisCredentialProperties(cloud).forEach((property, envName) -> {
+                  String value = properties.getValue(property, "");
+                  if (!value.isBlank()) {
+                      env.put(envName, value);
+                  }
+              }));
+        List<String> exports = env
             .entrySet()
             .stream()
-            .map(e -> format("export %s=%s", e.getValue(), properties.getValue(e.getKey())))
-            .sorted()
+            .map(e -> format("export %s=%s", e.getKey(), e.getValue()))
             .toList();
+        String gcpExport = gcpCredentials(properties, deploymentId).isBlank()
+            ? ""
+            : format("export %s='%s'", GOOGLE_APPLICATION_CREDENTIALS.getName(), SECRETS_DIR + "/" + GCP_CREDENTIALS_FILE);
 
         String kcConfig = kcExports(properties);
 
@@ -247,7 +274,7 @@ public class PolarisConfig extends Construct {
             %s
 
             %s
-            export %s='%s'
+            %s
 
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL=DEBUG
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL=DEBUG
@@ -260,9 +287,21 @@ public class PolarisConfig extends Construct {
             """,
             kcConfig,
             String.join("\n", exports),
-            GOOGLE_APPLICATION_CREDENTIALS.getName(),
-            SECRETS_DIR + "/" + GCP_CREDENTIALS_FILE
+            gcpExport
         );
+    }
+
+    /**
+     * Returns the GCP credentials, required only when deploying in GCP, else blank if absent.
+     */
+    private static String gcpCredentials(AfonPropertyProvider properties, String deploymentId) {
+        return toCloud(deploymentId) == AfonCloud.GCP
+            ? properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)
+            : properties.getValue(GOOGLE_APPLICATION_CREDENTIALS, "");
+    }
+
+    private static AfonCloud toCloud(String deploymentId) {
+        return AfonCloud.valueOf(deploymentId.toUpperCase());
     }
 
     /**
@@ -277,7 +316,7 @@ public class PolarisConfig extends Construct {
     }
 
     static String polarisDomainName(AfonPropertyProvider properties, String deploymentId) {
-        switch (AfonCloud.valueOf(deploymentId.toUpperCase())) {
+        switch (toCloud(deploymentId)) {
             case AWS:
                 return properties.getValue(AWS_POLARIS_DOMAIN_NAME);
             case AZURE:
@@ -357,7 +396,7 @@ public class PolarisConfig extends Construct {
         DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("polaris")
-            .image(POLARIS_IMAGE_NAME)
+            .image(DockerImages.POLARIS_IMAGE)
             .command(commands)
             .volumeMount(mounts)
             .readinessProbe(readinessProbe)

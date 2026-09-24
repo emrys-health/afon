@@ -3,6 +3,7 @@ package health.emrys.afon.ops.smoke;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.polaris.config.PolarisCredentials;
@@ -36,16 +37,9 @@ public class SparkConnectSmoke {
     private static final Logger logger         = LoggerFactory.getLogger(SparkConnectSmoke.class);
     public static final  String TEST_WAREHOUSE = "test_warehouse";
 
-    public void smokeTest(SparkConnectClient client, AfonCatalog catalog) {
+    public SparkSession smokeTest(SparkConnectClient client, AfonCatalog catalog) {
         SparkSession spark    = client.sparkSession(TEST_WAREHOUSE, catalog.toString());
         String       tableFQN = String.format("%s.%s.%s", TEST_WAREHOUSE, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
-        logger.info("Reading table {}", tableFQN);
-        spark.sql(String.format("SELECT * FROM %s", tableFQN)).show();
-    }
-
-    public SparkSession smokeTestAllWarehouses(SparkConnectClient client, AfonCatalog catalog) {
-        SparkSession spark    = client.sparkSessionAllWarehouses("federatedCatalogName");
-        String       tableFQN = String.format("%s.%s.%s", catalog, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
         logger.info("Reading table {}", tableFQN);
         spark.sql(String.format("SELECT * FROM %s", tableFQN)).show();
         return spark;
@@ -56,24 +50,29 @@ public class SparkConnectSmoke {
             System.out.printf("%s requires argument: cloud", SparkConnectSmoke.class.getSimpleName());
             return;
         }
-        AfonCloud cloud        = AfonCloud.valueOf(args[0].toUpperCase());
-        var       properties   = new OpsPropertyProvider();
-        var       afonCatalogs = new AfonCatalogs(properties);
-        var       app          = new SparkConnectSmoke();
-        properties.setValue(POLARIS_ENDPOINT, new PolarisCredentials(cloud, properties).getPolarisEndpoint());
+
+        AfonCloud   cloud           = AfonCloud.valueOf(args[0].toUpperCase());
+        var         properties      = new OpsPropertyProvider();
+        String      polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
+        var         afonCatalogs    = new AfonCatalogs(properties);
+        AfonCatalog catalog         = catalogFor(cloud, afonCatalogs);
+        properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
+
+        new SparkConnectSmoke().callSparkConnectorInCluster(properties, catalog);
+    }
+
+    private void callSparkConnectorInCluster(AfonPropertyProvider properties, AfonCatalog catalog) {
         try {
-            AfonCatalog catalog = catalogFor(cloud, afonCatalogs);
-            KubeClient  client  = new KubeClient(properties);
-            try (PortForwardSmoke session = new PortForwardSmoke(client,
-                                                                 "default",
-                                                                 "spark-connector-0-driver",
-                                                                 15002,
-                                                                 15002)) {
-                logger.info(String.format("Connecting to cloud %s", cloud));
-                app.smokeTest(new SparkConnectClient(properties), catalog);
-                app.smokeTest(new SparkConnectUsingOIDC(properties), catalog);
-                app.smokeTestAllWarehouses(new SparkConnectClient(properties), catalog);
-                SparkSession spark = app.smokeTestAllWarehouses(new SparkConnectUsingOIDC(properties), catalog);
+            KubeClient client = new KubeClient(properties);
+            try (PortForwardSmoke session = new PortForwardSmoke(
+                client,
+                "default",
+                "spark-connector-0-driver",
+                15002,
+                15002)) {
+                logger.info(String.format("Connecting to cloud %s", catalog.cloud()));
+                smokeTest(new SparkConnectClient(properties), catalog);
+                SparkSession spark = smokeTest(new SparkConnectUsingOIDC(properties), catalog);
                 spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
             }
         } catch (IOException e) {

@@ -6,10 +6,17 @@ import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.polaris.PolarisConstants;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 
-import static health.emrys.afon.config.ConfigUtils.afonCloud;
+import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
+import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PolarisConfigTest {
@@ -24,7 +31,7 @@ class PolarisConfigTest {
     }
 
     private void validateScriptFor(AfonCloud cloud, AfonPropertyProvider properties) {
-        if ( !afonCloud().equalsIgnoreCase(cloud.toString()) ){
+        if ( cloudPropertySet() && !cloudPropertyValue().equalsIgnoreCase(cloud.toString()) ){
             // does not match currently specified cloud
             return;
         }
@@ -32,11 +39,48 @@ class PolarisConfigTest {
         String script = PolarisConfig.getProviderCredentials(properties, deploymentId);
         String polarisDbName = "polaris_db_" + PolarisConfig.polarisDomainName(properties, deploymentId).replace(".", "_");
         assertThat(script).contains(polarisDbName);
-        PolarisConstants.getPolarisProperties()
+        PolarisConstants.getPolarisProperties(cloud)
                 .forEach((property, envName) -> {
                     assertThat(script).contains(envName);
                     assertThat(script).contains(properties.getValue(property));
                 });
+    }
+
+    @Test
+    public void canGenerateConfigScriptWithOnlyDeploymentCloudProperties(@TempDir Path configDir) throws IOException {
+        assumeTrue(!cloudPropertySet() || cloudPropertyValue().equalsIgnoreCase("azure"));
+        copyTemplates(configDir, "afon.properties", "secret.properties", "catalogs.properties",
+                      "afon-azure.properties", "secret-azure.properties");
+        AfonPropertyProvider properties = new FilePropertyProvider(configDir.toString());
+        properties.setValue(AZURE_APP_ID, "azure-app-id");
+
+        String script = PolarisConfig.getProviderCredentials(properties, "azure");
+
+        assertThat(script).contains("export AZURE_CLIENT_ID=azure-app-id");
+        assertThat(script).doesNotContain(AWS_ACCESS_KEY_ID.getName());
+        assertThat(script).doesNotContain(GOOGLE_APPLICATION_CREDENTIALS.getName());
+    }
+
+    @Test
+    public void canGenerateConfigScriptWithOtherCloudPropertiesIfPresent(@TempDir Path configDir) throws IOException {
+        assumeTrue(!cloudPropertySet());
+        copyTemplates(configDir, "afon.properties", "secret.properties", "catalogs.properties",
+                      "afon-azure.properties", "secret-azure.properties", "secret-aws.properties");
+        AfonPropertyProvider properties = new FilePropertyProvider(configDir.toString());
+        properties.setValue(AWS_ACCESS_KEY_ID, "aws-key-id");
+        properties.setValue(GOOGLE_APPLICATION_CREDENTIALS, "{}");
+
+        String script = PolarisConfig.getProviderCredentials(properties, "azure");
+
+        assertThat(script).contains("export AWS_ACCESS_KEY_ID=aws-key-id");
+        assertThat(script).doesNotContain(AWS_SECRET_ACCESS_KEY.getName()); // blank in templates
+        assertThat(script).contains("export GOOGLE_APPLICATION_CREDENTIALS=");
+    }
+
+    private static void copyTemplates(Path configDir, String... files) throws IOException {
+        for (String file : files) {
+            Files.copy(Path.of(TEMPLATES_CONFIG_DIR, file), configDir.resolve(file));
+        }
     }
 
     @Test

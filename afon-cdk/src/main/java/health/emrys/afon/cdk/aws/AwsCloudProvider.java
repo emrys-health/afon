@@ -77,6 +77,8 @@ import static java.lang.String.format;
 
 public class AwsCloudProvider extends AbstractCloudProvider {
 
+    private static final String LB_SERVICE_ACCOUNT_NAME = "aws-load-balancer-controller";
+
     private static final Logger log = LoggerFactory.getLogger(AwsCloudProvider.class);
 
     /**
@@ -924,14 +926,14 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     }
 
     private Release configureIngress(Construct scope, IamRole loadBalancerRole) {
-        String serviceAccountName = configureServiceAccount(scope, loadBalancerRole);
+        ServiceAccount serviceAccount = configureServiceAccount(scope, loadBalancerRole);
 
-        return helmInstallLoadBalancer(serviceAccountName, loadBalancerRole);
+        return helmInstallLoadBalancer(serviceAccount, loadBalancerRole);
     }
 
-    private @NonNull String configureServiceAccount(Construct scope, IamRole loadBalancerRole) {
+    private @NonNull ServiceAccount configureServiceAccount(Construct scope, IamRole loadBalancerRole) {
         DataAwsEksCluster clusterData        = associateOIDCProvider(scope);
-        String            serviceAccountName = "aws-load-balancer-controller";
+        String            serviceAccountName = LB_SERVICE_ACCOUNT_NAME;
 
         lbcIrsaDependables.add(new IamRolePolicyAttachment(
             scope,
@@ -955,7 +957,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "eks.amazonaws.com/role-arn",
             loadBalancerRole.getArn()
                                                 );
-        ServiceAccount.Builder
+        return ServiceAccount.Builder
             .create(scope, serviceAccountName)
             .metadata(ServiceAccountMetadata
                           .builder()
@@ -971,7 +973,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 NO_JUPYTER_FINALIZERS,
                 NO_KEYCLOAK_FINALIZERS))
             .build();
-        return serviceAccountName;
     }
 
     private @NonNull DataAwsEksCluster associateOIDCProvider(Construct scope) {
@@ -1011,9 +1012,14 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         return clusterData;
     }
 
-    private Release helmInstallLoadBalancer(String serviceAccountName, IamRole loadBalancerRole) {
+    private Release helmInstallLoadBalancer(ServiceAccount serviceAccount, IamRole loadBalancerRole) {
+        String serviceAccountName = LB_SERVICE_ACCOUNT_NAME;
         ArrayList<ITerraformDependable> dependencies = new ArrayList(eksDependOn);
         dependencies.add(loadBalancerRole);
+        // The chart doesn't create the service account, it's only referenced by name, so without this
+        // edge it may be destroyed first: the controller's token is then Unauthorized, it cannot remove
+        // its finalizers, and the ingresses stick in Terminating.
+        dependencies.add(serviceAccount);
         // The controller assumes loadBalancerRole via IRSA (OIDC provider + policy attachment) to
         // delete its ALBs when it is uninstalled. Without these edges they are destroyed first,
         // the controller loses its AWS permissions, and the ingresses stick in Terminating.
@@ -1165,7 +1171,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     /**
      * Uses {@code aws eks get-token} instead of the static token from {@code eksAuthData} so
      * the provider fetches a fresh, short-lived credential on every operation. The static
-     * token (via {@link #getToken()}) is read once during the apply graph and expires after
+     * token is read once during the apply graph and expires after
      * ~15 minutes; a full-create apply of a brand-new cluster (EKS control plane + node group
      * + Helm releases) routinely takes longer than that, so late resources such as
      * {@code kubernetes_ingress_v1} would fail with "Unauthorized" once it went stale.
@@ -1259,17 +1265,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     @Override
     public String getClusterEndpoint() {
         return cluster.getEndpoint();
-    }
-
-    /**
-     * No longer used by {@link #configureK8s()}/{@link #configureHelm()}, which now use the
-     * {@code aws eks get-token} exec plugin instead of this static token. Kept for
-     * {@link AwsHelmStack}, an experimental, unwired stack that still builds its own
-     * Helm provider directly from this value.
-     */
-    @Override
-    public String getToken() {
-        return eksAuthData.getToken();
     }
 
     public String getPolarisDomainName() {

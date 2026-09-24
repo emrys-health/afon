@@ -77,6 +77,20 @@ If a deployment fails partway through, you can resume from a specific step, e.g.
 ./afon.sh -a exec -ec ops.SetupAwsFullStackAndAzurePolarisStackMain -ea "azure_polaris"
 ```
 
+### Tofu output and durations
+
+The `tofu` invocations (`init`, `apply`, `destroy`) run by the stack deployment and deletion steps are always logged
+via the `ch.vorburger.exec.ManagedProcess` logger. The optional property `TOFU_OUTPUT` in 
+[afon.properties](../templates/config/afon.properties) controls whether their output is also written to the console:
+
+- `logger` (default) — output is only logged
+- `console` — output is logged and also written to `System.out`
+
+The time taken to delete and deploy the stack is recorded and reported by the final step, e.g.:
+```
+Deploy complete for AWS (delete: 3m12s, deploy: 25m4s)
+```
+
 ### Deploy or delete the AWS stack from GitHub
 
 The [Stack AWS (Linux)](../.github/workflows/aws-stack-linux.yml) workflow runs `afon.sh` on the self-hosted Linux runner — ie
@@ -97,7 +111,9 @@ Pre-requisites, on top of what the acceptance workflow needs:
 - **Runner tooling**: the `aws` CLI, `tofu` and `kubectl` on the runner's PATH. Install them with
   `ansible-playbook runner-setup.yml -e install_cloud_tools=true` (see [runners](../scripts/github/runners.md)).
 - **Config secrets**: the same base64 secrets the acceptance workflow uses, published with
-  `./afon.sh -a github-secrets -sa push`.
+  `./afon.sh -a github-secrets push`.  To run against a config env other than the one behind the
+  repository secrets, publish it with `./afon.sh -a github-secrets -- push --env <env>` and give the workflow's `config_env` input.
+  Each env then gets its own tofu state, in `$AFON_CDKTF-<env>` on the runner.
 - **AWS admin credentials**: the repository secrets `AWS_DEPLOY_ACCESS_KEY_ID` and
   `AWS_DEPLOY_SECRET_ACCESS_KEY`. These are the user admin credentials tofu and the CLI run as,
   **NOTE** the Polaris service account credentials in `secret-aws.properties` (see
@@ -116,16 +132,25 @@ The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log i
 The afon-cdk module generates the Terraform plan using the cdktf API to manage the cloud environment and delegates it to tofu to execute it.   The afon-cdk module writes to the cdktf dir, which can be set either via option `--cdktf` in `afon.sh` or via env variable `AFON_CDKTF`.  It defaults to `$AFON_HOME/cdktf`.
 
 The cdktf plan is written `$AFON_CDKTF/stacks/<cloud>` where `<cloud>={aws,azure,gcp}`.
+The cdktf dir also holds the Terraform state files: `$AFON_CDKTF/terraform.<cloud>.tfstate` where `<cloud>={aws,azure,gcp}`.
 
-Thereafter, you can run tofu apply or destroy commands via
+You can run tofu apply or destroy commands via
 ```shell
 ./afon.sh -a tofu-{apply,destroy}
 ```
-
 **NOTE:** The `ops.Deploy*Main` classes generate the plan and execute it without needing the `tofu-apply` execution.
 You may re-run the `tofu-apply` if needed.
 
-The cdktf dir also holds the Terraform state files: `$AFON_CDKTF/terraform.<cloud>.tfstate` where `<cloud>={aws,azure,gcp}`.
+To validate a stack's config without deploying it, eg that the config dir has all the properties the stack needs,
+you can synthesise just the cdktf plan of a stack, which needs no cloud login:
+```shell
+./afon.sh -a validate-stack <stack>  # eg azure-polaris or aws-full, run without <stack> to list the stacks
+```
+or, equivalently, via the CLI: `afon-cli.sh validate-stack <stack>` (see [cli](cli/cli.md#validate-a-stacks-config)).
+This fails fast, eg with `Property X not found`, if the config is incomplete.
+It overwrites the plan in `$AFON_CDKTF/stacks/<cloud>` (ie `cdk.tf.json` and `assets`), but not the state file
+`$AFON_CDKTF/terraform.<cloud>.tfstate`, as it doesn't run tofu.  To leave the plan of a running or previous deploy
+untouched, synthesise into another cdktf dir, eg `--cdktf /tmp/cdktf`.
 
 #### Command cdktf-switch
 

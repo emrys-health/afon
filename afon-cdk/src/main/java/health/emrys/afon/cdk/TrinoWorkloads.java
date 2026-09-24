@@ -34,10 +34,6 @@ public class TrinoWorkloads {
      * Chart version pinned for reproducibility; {@link #IMAGE_TAG} overrides its appVersion.
      */
     private static final String CHART_VERSION = "1.42.2";
-    /**
-     * README sanity check expects {@code select version()} to report 481.
-     */
-    private static final String IMAGE_TAG     = "481";
     private static final int    WORKERS       = 2;
     private static final int    TRINO_PORT    = 8080;
 
@@ -67,7 +63,7 @@ public class TrinoWorkloads {
                        @NonNull AfonCatalog id,
                        @NonNull List<? extends ITerraformDependable> dependsOn) {
         Map<String, Object> values = Map.of(
-            "image", Map.of("tag", IMAGE_TAG),
+            "image", Map.of("tag", DockerImages.TRINO_IMAGE_TAG),
             "server", Map.of("workers", WORKERS), // Integer type
             "service", Map.of("type", "ClusterIP", "port", TRINO_PORT),
             "additionalCatalogs", catalogFiles(id.toString()));
@@ -104,7 +100,7 @@ public class TrinoWorkloads {
         // cloud-prefixed names); custom types such as glue were never exposed to Trino.
         for (AfonCatalog catalog : afonCatalogs.allIncluding("internal", "external")) {
             String catalogName = catalog.toString();
-            if (catalogName == defaultCatalog) {
+            if (catalogName.equals(defaultCatalog)) {
                 continue;
             }
             catalogs.put(catalogName, trinoConfig.catalogProperties(catalogName));
