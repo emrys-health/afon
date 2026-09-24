@@ -219,13 +219,13 @@ Then all the configuration properties are replaced with real, env-specific value
 
 Choose the name of your env, eg it could be `dev` or `stg` in your organisation:
 ```shell
-afon-cli.sh config-init -e <env>
+afon-cli.sh config-init -e <env> -c <cloud>
 ```
 This command creates a config dir `$AFON_HOME/config-<env>` and symlinks it to `$AFON_HOME/config`.
 
 Do the same for `cdktf` command to create a ckdtf dir `$AFON_HOME/cdktf-<env>` and symlink `$AFON_HOME/cdktf`.
 ```shell
-afon-cli.sh cdktf-init -e <env>
+afon-cli.sh cdktf-init -e <env> -c <cloud>
 ```
 The `cdktf` dir will hold all your deployment Terraform state.
 
@@ -239,7 +239,6 @@ After the config files are completed (or imported) you can validate them for a g
 ```shell
 afon-cli.sh config-validate -c <cloud>
 ```
-**NOTE:** As of the current beta version, the config for all clouds must be present, but only the values of the cloud you are interested needs to be filled in, eg the `azure` ones.  The other cloud's config can remain with empty values.   The `-c <cloud>` allows you to validate the properties for a given cloud, eg `azure`.
 
 ## Create cloud env
 
