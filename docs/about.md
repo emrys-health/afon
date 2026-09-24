@@ -55,23 +55,19 @@ Open code is not open data. The licence covers the software only. It gives no on
 
 ## What Afon is not
 
-- **Not a national platform.** Afon does not replace the Federated Data Platform, which serves NHS operational needs. Afon addresses research connectivity between secure data environments.
+- **Not a national platform.** Afon does not replace the Federated Data Platform, which serves operational needs. Afon addresses research connectivity between secure data environments.
 - **Not a network to join.** Every deployment belongs to the organisation that runs it. There is no membership, no central application window and no per-query charge.
 - **Not a replacement for existing infrastructure.** Afon runs alongside what an organisation already has, and does not require anything to be switched off.
 
 ## Getting started
 
-Start with the [README](https://github.com/emrys-health/afon-core/blob/main/README.md). It links to the quickstart and to reference configurations for common NHS stack patterns.
-
-## Contributing
-
-We welcome issues, questions and contributions. See [CONTRIBUTING.md](https://github.com/emrys-health/afon-core/blob/main/CONTRIBUTING.md) for how to take part, and [SECURITY.md](https://github.com/emrys-health/afon-core/blob/main/SECURITY.md) for how to report a vulnerability privately.
+Start with the [README](./README.md). It links to the quickstart and to reference configurations for common stack patterns.
 
 ## Maintenance and support
 
 Emrys Health maintains Afon and publishes a roadmap and release notes in this repository.
 
-The software is free to use under its licence. Emrys Health provides implementation, integration with local stacks, and ongoing run and support services, starting with an initial assessment of an organisation's environment. See [SUPPORT.md](https://github.com/emrys-health/afon-core/blob/main/SUPPORT.md).
+The software is free to use under its licence. Emrys Health provides implementation, integration with local stacks, and ongoing run and support services, starting with an initial assessment of an organisation's environment. 
 
 ## Licence
 
