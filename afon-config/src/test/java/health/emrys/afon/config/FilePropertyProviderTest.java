@@ -1,13 +1,18 @@
 package health.emrys.afon.config;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 public class FilePropertyProviderTest {
 
@@ -22,6 +27,18 @@ public class FilePropertyProviderTest {
         } catch (RuntimeException e) {
             assertThat(e.getMessage()).endsWith("missing.properties (No such file or directory)");
         }
+    }
+
+    @Test
+    public void canGetCloudPropertiesWhenOtherCloudFilesAreMissing(@TempDir Path configDir) throws IOException {
+        assumeTrue(!ConfigUtils.cloudPropertySet() || ConfigUtils.cloudPropertyValue().equalsIgnoreCase("azure"));
+        Files.writeString(configDir.resolve("afon.properties"), "ENV_NAME=dev\n");
+        Files.writeString(configDir.resolve("afon-azure.properties"), "AZURE_POLARIS_DOMAIN_NAME=${ENV_NAME}polaris.azure\n");
+        AfonPropertyProvider provider = new FilePropertyProvider(configDir.toString(), List.of("afon"));
+        assertThat(provider.getValue(AfonProperty.ENV_NAME)).isEqualTo("dev");
+        assertThat(provider.getValue(AfonProperty.AZURE_POLARIS_DOMAIN_NAME)).isEqualTo("devpolaris.azure");
+        assertThat(provider.hasProperty(AfonProperty.AWS_POLARIS_DOMAIN_NAME)).isFalse();
+        assertThat(provider.hasProperty(AfonProperty.GCP_POLARIS_DOMAIN_NAME)).isFalse();
     }
 
     @Test

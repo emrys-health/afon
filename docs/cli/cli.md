@@ -119,6 +119,18 @@ the stack, other `tofu` will not know the information to destroy the stack.
 
 In the command names, we use the convention that `deploy` just deploys the stack (waiting for DNS to propagate) and `setup` does the deployment and configures the Polaris catalogs.
 
+### Validate a stack's config
+
+To validate a stack's config without deploying it, eg that the config dir has all the properties the stack needs,
+you can synthesise just the cdktf plan of a stack, which needs no cloud login:
+```shell
+afon-cli.sh validate-stack <stack>  # eg azure-polaris or aws-full, run without <stack> to list the stacks
+```
+This fails fast, eg with `Property X not found`, if the config is incomplete.
+It overwrites the plan in `$AFON_CDKTF/stacks/<cloud>` (ie `cdk.tf.json` and `assets`), but not the state file
+`$AFON_CDKTF/terraform.<cloud>.tfstate`, as it doesn't run tofu.  To leave the plan of a running or previous deploy
+untouched, synthesise into another cdktf dir, eg `afon-cli.sh --cdktf /tmp/cdktf validate-stack azure-polaris`.
+
 ### Setup AWS full stack
 
 The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
