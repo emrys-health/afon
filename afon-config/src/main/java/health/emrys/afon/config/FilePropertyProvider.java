@@ -3,6 +3,7 @@ package health.emrys.afon.config;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,8 +31,10 @@ import static org.slf4j.LoggerFactory.getLogger;
  *
  * The properties files are loaded from the {@link #configDir}, which defaults to {@link ConfigUtils#configDir()}.
  *
- * When {@link ConfigUtils#cloudPropertySet()} is {@code true}, every cloud's files are loaded together,
+ * When {@link ConfigUtils#cloudPropertySet()} is {@code false}, every cloud's files are loaded together,
  * since some deployments (e.g. cross-cloud federation) need more than one cloud's properties at the same time.
+ * The cloud-specific files are optional: a missing one is skipped, so that a deployment in one cloud
+ * need only provide the files of that cloud.
  *
  * Any property will be overridden if it is provided as system property, e.g. {@code -DCLUSTER_NAME=<new-name>}.
  *
@@ -146,8 +149,15 @@ public class FilePropertyProvider implements AfonPropertyProvider {
 
     private void loadPropertiesFromDir(String type, String dir) throws IOException {
         logger.info("Loading {} properties from {}", type, dir);
+        String commonFile = fileForCloud(type, null);
         for (String file : propertyFiles(type)) {
             String filename = String.format("%s/%s", dir, file);
+            if (!file.equals(commonFile) && !new File(filename).exists()) {
+                // cloud-specific files are optional, so that a deployment in one cloud
+                // does not depend on the properties of the other clouds
+                logger.info("Skipping missing {} properties file {}", type, filename);
+                continue;
+            }
             Properties props = loadPropertiesFromFile(filename);
             properties.putAll(props);
             if (file.startsWith("secret")) {
@@ -228,17 +238,17 @@ public class FilePropertyProvider implements AfonPropertyProvider {
     private List<String> propertyFiles(String type) {
         List<String> files = new ArrayList<>();
         // first add common properties
-        files.add(fileName(type, null));
+        files.add(fileForCloud(type, null));
         // then add cloud properties
         if (cloudPropertySet()) {
-            files.add(fileName(type, cloudPropertyValue()));
+            files.add(fileForCloud(type, cloudPropertyValue()));
         } else {
-            ALL_CLOUDS.forEach(c -> files.add(fileName(type, c)));
+            ALL_CLOUDS.forEach(c -> files.add(fileForCloud(type, c)));
         }
         return files;
     }
 
-    private static String fileName(String type, String cloud) {
+    private static String fileForCloud(String type, String cloud) {
         if (cloud != null) {
             return type + "-" + cloud.toLowerCase() + ".properties";
         } else {

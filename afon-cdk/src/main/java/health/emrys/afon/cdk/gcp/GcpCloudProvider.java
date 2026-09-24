@@ -198,11 +198,6 @@ public class GcpCloudProvider extends AbstractCloudProvider {
         return "https://" + gkeCluster.getEndpoint();
     }
 
-    @Override
-    public String getToken() {
-        throw new UnsupportedOperationException("GCP uses gke-gcloud-auth-plugin; call configureK8s()");
-    }
-
     /**
      * Uses gke-gcloud-auth-plugin instead of a static token so that credentials
      * are fetched on demand during apply without going through the OAuth2 refresh

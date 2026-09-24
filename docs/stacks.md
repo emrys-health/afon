@@ -132,16 +132,25 @@ The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log i
 The afon-cdk module generates the Terraform plan using the cdktf API to manage the cloud environment and delegates it to tofu to execute it.   The afon-cdk module writes to the cdktf dir, which can be set either via option `--cdktf` in `afon.sh` or via env variable `AFON_CDKTF`.  It defaults to `$AFON_HOME/cdktf`.
 
 The cdktf plan is written `$AFON_CDKTF/stacks/<cloud>` where `<cloud>={aws,azure,gcp}`.
+The cdktf dir also holds the Terraform state files: `$AFON_CDKTF/terraform.<cloud>.tfstate` where `<cloud>={aws,azure,gcp}`.
 
-Thereafter, you can run tofu apply or destroy commands via
+You can run tofu apply or destroy commands via
 ```shell
 ./afon.sh -a tofu-{apply,destroy}
 ```
-
 **NOTE:** The `ops.Deploy*Main` classes generate the plan and execute it without needing the `tofu-apply` execution.
 You may re-run the `tofu-apply` if needed.
 
-The cdktf dir also holds the Terraform state files: `$AFON_CDKTF/terraform.<cloud>.tfstate` where `<cloud>={aws,azure,gcp}`.
+To validate a stack's config without deploying it, eg that the config dir has all the properties the stack needs,
+you can synthesise just the cdktf plan of a stack, which needs no cloud login:
+```shell
+./afon.sh -a validate-stack <stack>  # eg azure-polaris or aws-full, run without <stack> to list the stacks
+```
+or, equivalently, via the CLI: `afon-cli.sh validate-stack <stack>` (see [cli](cli/cli.md#validate-a-stacks-config)).
+This fails fast, eg with `Property X not found`, if the config is incomplete.
+It overwrites the plan in `$AFON_CDKTF/stacks/<cloud>` (ie `cdk.tf.json` and `assets`), but not the state file
+`$AFON_CDKTF/terraform.<cloud>.tfstate`, as it doesn't run tofu.  To leave the plan of a running or previous deploy
+untouched, synthesise into another cdktf dir, eg `--cdktf /tmp/cdktf`.
 
 #### Command cdktf-switch
 

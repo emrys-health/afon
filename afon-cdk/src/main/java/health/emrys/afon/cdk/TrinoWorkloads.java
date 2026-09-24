@@ -100,7 +100,7 @@ public class TrinoWorkloads {
         // cloud-prefixed names); custom types such as glue were never exposed to Trino.
         for (AfonCatalog catalog : afonCatalogs.allIncluding("internal", "external")) {
             String catalogName = catalog.toString();
-            if (catalogName == defaultCatalog) {
+            if (catalogName.equals(defaultCatalog)) {
                 continue;
             }
             catalogs.put(catalogName, trinoConfig.catalogProperties(catalogName));

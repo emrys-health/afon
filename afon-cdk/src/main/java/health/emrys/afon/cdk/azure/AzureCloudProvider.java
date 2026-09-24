@@ -474,11 +474,6 @@ public class AzureCloudProvider extends AbstractCloudProvider {
         return aksCluster.getKubeConfig().get(0).getHost();
     }
 
-    @Override
-    protected String getToken() {
-        throw new UnsupportedOperationException("Use configureK8s()");
-    }
-
     // -------------------------------------------------------------------------
     // CloudProvider implementation
     // -------------------------------------------------------------------------
