@@ -95,17 +95,20 @@ public class PolarisRestClient {
 
     /**
      * Odd. This con sometimes receive a HTTP 503 even though the Polaris server logs HTTP 200.
+     * Hence I/O and server (5xx) errors are retried, while other failures (e.g. 401) fail immediately.
      */
     public String getAccessToken() {
         int attempt = 3;
         IOException lastException = null;
         while (attempt > 0) {
             try {
-                return accessToken();
+                String accessToken = accessToken();
+                logger.info("Access token retrieved for client {}", clientId);
+                return accessToken;
             } catch (IOException e) {
                 lastException = e;
                 logger.error(e.toString());
-                if (attempt-- > 0) {
+                if (--attempt > 0) {
                     try {
                         int millis = 5000;
                         logger.info("Sleeping {}ms before retry...",  millis);
@@ -121,11 +124,10 @@ public class PolarisRestClient {
 
     public String accessToken() throws IOException {
         String uri = tokensURI(endpoint);
-        logger.info("Access token from {}" + uri);
+        logger.info("Access token from {}", uri);
         HttpPost post = new HttpPost(uri);
         post.setHeader(CONTENT_TYPE, "application/x-www-form-urlencoded");
         post.setHeader("Polaris-Realm", "POLARIS");
-        logger.info("client id = {}, secret = {}", clientId, clientSecret);
         String body = format("grant_type=client_credentials&client_id=%s&client_secret=***REMOVED***", clientId, clientSecret);
         ClassicHttpResponse response = post(body, post);
         logOutcome(post, response);
@@ -186,12 +188,32 @@ public class PolarisRestClient {
         request.setHeader("Authorization", "Bearer " + accessToken);
     }
 
+    /**
+     * Parses the access token from a token endpoint response.
+     *
+     * @throws IOException           if the response is a server error (5xx), which may be transient
+     *                               and so is retried by {@link #getAccessToken()}
+     * @throws IllegalStateException if the response is any other failure (e.g. 401 on bad credentials)
+     *                               or carries no access token, which retrying will not fix
+     */
     protected static String parseAccessToken(ClassicHttpResponse response) throws IOException {
-        ObjectMapper        mapper                  = JsonMapper
-            .builder().enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION).build();
-        Map<String, Object> tokenResponse           = mapper.readValue(response.getEntity().getContent(), Map.class);
-        String              accessTokenFromResponse = (String) tokenResponse.get("access_token");
-        return accessTokenFromResponse;
+        if (isFailure(response)) {
+            String message = format("Failed to obtain access token, code: %s, response: %s",
+                response == null ? null : response.getCode(), contentOf(response));
+            if (response == null || response.getCode() / 100 == 5) {
+                throw new IOException(message);
+            }
+            throw new IllegalStateException(message);
+        }
+        ObjectMapper mapper = JsonMapper
+                .builder().enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION).build();
+        Map<String, Object> tokenResponse = mapper.readValue(response.getEntity().getContent(), Map.class);
+        String accessToken = (String) tokenResponse.get("access_token");
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalStateException(format("No access token in response, code: %s, response: %s",
+                    response.getCode(), tokenResponse));
+        }
+        return accessToken;
     }
 
     protected ClassicHttpResponse post(String payload,

@@ -54,8 +54,8 @@ public class PolarisUserManager {
         this.catalogRoleName = catalogRoleName;
         this.principalRoleName = principalRoleName(catalogRoleName);
         this.privileges = privileges;
-        logger.debug("Polaris access token for admin {} when calling endpoint {}: {}",
-                clientId, client.getEndpoint(), accessToken);
+        logger.debug("Polaris access token for admin {} when calling endpoint {}",
+                clientId, client.getEndpoint());
     }
 
     public String getCatalogRoleName() {

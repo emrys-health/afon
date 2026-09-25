@@ -89,7 +89,6 @@ public class CatalogConfigurer {
         this.client = client;
         this.serialiser = new PolarisSerialiser();
         this.accessToken = client.getAccessToken();
-        logger.info("Access token: {}", accessToken);
     }
 
     /**
