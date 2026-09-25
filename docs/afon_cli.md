@@ -28,6 +28,12 @@ Then to install:
 unzip afon-<version>-cli.zip -d $AFON_CLI_DIR
 ```
 
+To check the CLI is properly installed: 
+```shell
+afon-cli.sh
+```
+You can suppress the banner via the env var `SPRING_MAIN_BANNER_MODE=off`.
+
 In the following, we'll assume that `afon-cli.sh` in the `PATH`.  Else, simply prefix it with its full path.  
 You don't need to be in the location of the `afon-cli.sh` file to execute it.
 
