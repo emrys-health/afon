@@ -2,7 +2,8 @@ source $AFON_ROOT/scripts/config/afon-source.sh aws
 source $AFON_ROOT/scripts/kube/polaris-source.sh
 
 # Reports whether Polaris is up and serving on this env's AWS stack: login, VPC, EKS cluster, Polaris
-# pod, ingress load balancer, then a real HTTPS request.  No TLS secret check, as TLS ends at the ALB.
+# pod, ingress load balancer, then real HTTPS requests, anonymous and as the Polaris admin.
+# No TLS secret check, as TLS ends at the ALB.
 # See kube/polaris-source.sh for the layers and the exit codes: 0 status reported, 2 could not verify.
 
 polaris_require_domain AWS_POLARIS_DOMAIN_NAME "$AWS_POLARIS_DOMAIN_NAME"
@@ -25,4 +26,5 @@ polaris_check_nodes
 polaris_check_pod
 polaris_check_ingress hostname "load balancer"
 polaris_check_https
+polaris_check_authenticated aws
 polaris_report

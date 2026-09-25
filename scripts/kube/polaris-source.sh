@@ -8,11 +8,17 @@
 #   4. cluster credentials                    -  no such cluster: FAILED
 #   5. kubectl can reach the cluster, the Polaris pod is Running and Ready, the ingress has an
 #      address, the TLS secret is there (where TLS ends in the cluster)
-#   6. a real HTTPS request through DNS -> load balancer -> ingress -> pod
-# The kubectl layers say where a failure is (eg no nodes, so a Pending pod); the request is what
-# proves Polaris really serves.  An unauthenticated catalog API call is enough for the request, as
-# Polaris itself answers 401.  A layer that needs a cluster is skipped when there is none to ask.
-# Uses a throwaway kubeconfig, so your current kubectl context is left alone.
+#   6. a real HTTPS request through DNS -> load balancer -> ingress -> pod, without credentials
+#   7. the same as the Polaris admin: a token for the admin principal (POLARIS_ID and POLARIS_SECRET,
+#      as for show-access-token) from Keycloak, then the list of the catalogs Polaris shows it
+# The kubectl layers say where a failure is (eg no nodes, so a Pending pod); the requests are what
+# prove Polaris really serves.  A healthy Polaris answers the anonymous request 401, which shows it is
+# up and enforces authentication; only the authenticated request shows the login path working, ie
+# Keycloak issuing the token and Polaris accepting it.  A layer that needs a cluster is skipped when
+# there is none to ask, and the authenticated request when Polaris did not answer or the admin
+# credentials are not configured - each skip is a line of output, not a failure.
+# Uses a throwaway kubeconfig, so your current kubectl context is left alone.  The admin secret and
+# the token are never printed, nor put on a command line where ps would show them.
 #
 # The scripts report the status, so 'serving' and 'not serving' are both a successful run: the exit
 # code is 0 whenever the status was established and 2 when it could not be verified, so that an
@@ -20,6 +26,7 @@
 
 POLARIS_OK=true
 POLARIS_CLUSTER_UP=false
+POLARIS_ANSWERING=false # whether Polaris answered the anonymous request
 POLARIS_DIR=$(mktemp -d)
 POLARIS_KUBECONFIG="$POLARIS_DIR/kubeconfig" # not created, as some tools refuse an empty kubeconfig
 POLARIS_ERR="$POLARIS_DIR/stderr"
@@ -158,15 +165,111 @@ polaris_check_https() {
   local code
   code=$(curl -s -o /dev/null -m 15 -w "%{http_code}" "https://$POLARIS_DOMAIN/api/catalog/v1/config") || true # prints 000 when it can't connect
   case "$code" in
-    200|401)
-      echo "- Polaris answered HTTPS with HTTP $code"
+    200)
+      echo "- Polaris is up and the catalog API is serving"
+      POLARIS_ANSWERING=true
+      ;;
+    401)
+      echo "- Polaris is up and refusing an anonymous caller"
+      POLARIS_ANSWERING=true
       ;;
     000)
       polaris_failed "No HTTPS response from $POLARIS_DOMAIN (DNS or connection failed)"
       ;;
     *)
-      polaris_failed "HTTPS gave HTTP $code - reachable, but Polaris is not answering"
+      polaris_failed "HTTPS gave HTTP $code - something answered, but it is not Polaris serving (eg a load balancer with no ready pod behind it)"
       ;;
+  esac
+}
+
+# Does the authenticated request for polaris_check_authenticated, ie lists the catalogs the admin
+# principal can see, and prints one line: "OK|<message>", "SKIPPED|<why>" or "FAILED|<message>".  Meant
+# to be run in a subshell: it sources the secrets, which must not be left in the script's environment,
+# nor exported to the commands it runs later.  The admin secret and the token only ever reach curl
+# through files in $POLARIS_DIR (a 700 dir, removed at exit), as an argument would show in ps.
+polaris_authenticated_request() {
+  local cloud="$1" polaris_id secret oidc code token catalogs
+  set +u # the properties may well be unset, and are then reported as such below
+  source "$AFON_ROOT/scripts/config/secret-source.sh" "$cloud" >/dev/null 2>&1 || true
+  polaris_id="$POLARIS_ID"
+  secret="$POLARIS_SECRET"
+  oidc="$OIDC_DOMAIN_NAME"
+  if [ -z "$polaris_id" ] || [ -z "$secret" ]; then
+    echo "SKIPPED|POLARIS_ID or POLARIS_SECRET is not set"
+    return 0
+  fi
+  if [ -z "$oidc" ]; then
+    echo "SKIPPED|OIDC_DOMAIN_NAME is not set"
+    return 0
+  fi
+  printf '%s' "$secret" > "$POLARIS_DIR/client_secret"
+  code=$(curl -s -m 15 -o "$POLARIS_DIR/token_response" -w "%{http_code}" \
+              --data-urlencode "grant_type=client_credentials" \
+              --data-urlencode "client_id=$polaris_id" \
+              --data-urlencode "client_secret@$POLARIS_DIR/client_secret" \
+              "https://$oidc/realms/polaris/protocol/openid-connect/token") || true # prints 000 when it can't connect
+  rm -f "$POLARIS_DIR/client_secret"
+  case "$code" in
+    200)
+      token=$(sed -n 's/.*"access_token" *: *"\([^"]*\)".*/\1/p' "$POLARIS_DIR/token_response")
+      ;;
+    000)
+      echo "FAILED|Keycloak at $oidc did not answer the token request (DNS or connection failed)"
+      return 0
+      ;;
+    400|401)
+      echo "FAILED|Keycloak rejected the credentials of $polaris_id (HTTP $code)"
+      return 0
+      ;;
+    *)
+      echo "FAILED|Keycloak at $oidc gave HTTP $code to the token request"
+      return 0
+      ;;
+  esac
+  rm -f "$POLARIS_DIR/token_response"
+  if [ -z "$token" ]; then
+    echo "FAILED|Keycloak answered the token request for $polaris_id with HTTP 200 but no access token"
+    return 0
+  fi
+
+  printf 'Authorization: Bearer %s' "$token" > "$POLARIS_DIR/authorization"
+  code=$(curl -s -m 15 -o "$POLARIS_DIR/catalogs_response" -w "%{http_code}" -H "@$POLARIS_DIR/authorization" \
+              "https://$POLARIS_DOMAIN/api/management/v1/catalogs") || true
+  rm -f "$POLARIS_DIR/authorization"
+  case "$code" in
+    200)
+      # the names of the catalogs in the JSON reply, as a comma separated list
+      catalogs=$(grep -o '"name" *: *"[^"]*"' "$POLARIS_DIR/catalogs_response" | sed 's/.*: *"\(.*\)"/\1/' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+      if [ -n "$catalogs" ]; then
+        echo "OK|Polaris is up and the catalog API is serving: catalogs available to $polaris_id: $catalogs"
+      else
+        echo "OK|Polaris is up and the catalog API is serving: no catalogs available to $polaris_id"
+      fi
+      ;;
+    401) echo "FAILED|Polaris rejected the access token of $polaris_id (HTTP 401)" ;;
+    403) echo "FAILED|$polaris_id is not allowed to list the catalogs (HTTP 403)" ;;
+    000) echo "FAILED|No HTTPS response from $POLARIS_DOMAIN to the authenticated request (DNS or connection failed)" ;;
+    *)   echo "FAILED|The authenticated request gave HTTP $code from $POLARIS_DOMAIN" ;;
+  esac
+}
+
+# polaris_check_authenticated <cloud>, eg aws, whose secret properties hold the admin's credentials: the
+# request only a logged-in principal can make, which is what shows the login path working (Keycloak issuing
+# the token, Polaris accepting it), as opposed to polaris_check_https, which shows Polaris up and
+# enforcing authentication.  Only the API answering matters: no catalogs at all is still a success, eg
+# on a stack that is deployed but not yet set up.
+polaris_check_authenticated() {
+  if [ "$POLARIS_ANSWERING" != "true" ]; then
+    echo "- Skipping the authenticated check: Polaris did not answer"
+    return 0
+  fi
+  local result
+  result=$(polaris_authenticated_request "$1")
+  case "${result%%|*}" in
+    OK)      echo "- ${result#*|}" ;;
+    SKIPPED) echo "- Skipping the authenticated check: ${result#*|}" ;;
+    FAILED)  polaris_failed "${result#*|}" ;;
+    *)       polaris_failed "The authenticated check failed unexpectedly" ;;
   esac
 }
 

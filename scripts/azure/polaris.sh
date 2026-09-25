@@ -2,7 +2,7 @@ source $AFON_ROOT/scripts/config/afon-source.sh azure
 source $AFON_ROOT/scripts/kube/polaris-source.sh
 
 # Reports whether Polaris is up and serving on this env's Azure stack: login, AKS network, AKS cluster,
-# Polaris pod, ingress external IP, TLS secret, then a real HTTPS request.
+# Polaris pod, ingress external IP, TLS secret, then real HTTPS requests, anonymous and as the Polaris admin.
 # See kube/polaris-source.sh for the layers and the exit codes: 0 status reported, 2 could not verify.
 
 polaris_require_domain AZURE_POLARIS_DOMAIN_NAME "$AZURE_POLARIS_DOMAIN_NAME"
@@ -34,4 +34,5 @@ polaris_check_pod
 polaris_check_ingress ip "external IP"
 polaris_check_tls
 polaris_check_https
+polaris_check_authenticated azure
 polaris_report
