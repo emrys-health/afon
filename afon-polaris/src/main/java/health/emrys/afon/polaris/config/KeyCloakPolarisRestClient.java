@@ -60,7 +60,7 @@ public class KeyCloakPolarisRestClient extends PolarisRestClient {
     }
 
     @Override
-    public String accessToken() throws IOException {
+    protected String accessToken() throws IOException {
         Map<String, String> form = new LinkedHashMap<>();
         form.put("grant_type", "client_credentials");
         form.put("client_id", clientId);

@@ -122,7 +122,7 @@ public class PolarisRestClient {
         throw new RuntimeException(lastException);
     }
 
-    public String accessToken() throws IOException {
+    protected String accessToken() throws IOException {
         String uri = tokensURI(endpoint);
         logger.info("Access token from {}", uri);
         HttpPost post = new HttpPost(uri);
