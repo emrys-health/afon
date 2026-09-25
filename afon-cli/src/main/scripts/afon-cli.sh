@@ -123,7 +123,7 @@ for pair in $AFON_ENVS; do
   AFON_JVM_ENVS="$AFON_JVM_ENVS -D$pair"
 done
 AFON_JVM_ENVS="${AFON_JVM_ENVS# }"
-AFON_JVM_FLAGS="--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-modules=jdk.incubator.vector --add-opens=java.base/java.nio=ALL-UNNAMED --enable-preview"
+AFON_JVM_FLAGS="--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --enable-preview"
 
 exec java $AFON_JVM_FLAGS \
           $AFON_JVM_ENVS \
@@ -133,4 +133,5 @@ exec java $AFON_JVM_FLAGS \
     -Dafon.logging="$AFON_LOGGING" \
     -Dafon.logging.console="$AFON_LOGGING_CONSOLE" \
     -Dslf4j.provider=ch.qos.logback.classic.spi.LogbackServiceProvider \
+    -Dslf4j.internal.verbosity=WARN \
     -jar "$JAR" "$@"
