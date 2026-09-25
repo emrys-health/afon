@@ -15,14 +15,17 @@ It is packaged as a zip consisting of:
 
 ## Installing Afon CLI 
 
-The CLI is a self-contained application that can be installed anywhere by extracting zip to a given dir.
+The CLI is a self-contained application that can be installed anywhere by extracting zip to a given dir.  
 
-In bash, add to `~/.bash_profile` defining the location of the CLI and adding to the `PATH`:
-
+In bash, set in `~/.bash_profile` the location of the CLI and add it to the `PATH`:
 ```shell
 export AFON_CLI_DIR=$HOME/.afon/cli
 PATH=$AFON_CLI_DIR:$PATH
 export PATH
+```
+Then to install: 
+```shell
+unzip afon-<version>-cli.zip -d $AFON_CLI_DIR
 ```
 
 In the following, we'll assume that `afon-cli.sh` in the `PATH`.  Else, simply prefix it with its full path.  
@@ -30,7 +33,7 @@ You don't need to be in the location of the `afon-cli.sh` file to execute it.
 
 ## Configuring local env
 
-On linux or macOS, you can setup your local env by running:
+On linux or macOS, you can set up your local env by running:
 
 ```shell
 afon-cli.sh setup-local
@@ -61,9 +64,9 @@ The script accepts the following options, either as a `--flag` or as the equival
 
 ## Script commands
 
-Every script under `scripts/` (runnable via [`afon-cli-scripts.sh`](configuration.md)) also has a script
-command on `afon-cli.sh`, so you don't need to switch between the two entry points.  
-The command name is the script's `<dir>/<name>` path relative to `scripts`, with the `/` replaced by `-` and the `.sh` removed, eg:
+Every script under `scripts/` is runnable via `afon-cli.sh` as well as `afon-cli-scripts.sh`, so you don't need to switch between the two entry points.  
+
+The command name is the script's `<dir>/<name>` path relative to `scripts`, with the `/` replaced by `-` and the `.sh` removed.  So, eg:
 
 ```shell
 afon-cli.sh config-switch --config-env dev      # same as: afon-cli-scripts.sh config/switch.sh --config-env dev
@@ -71,18 +74,28 @@ afon-cli.sh cdktf-status                        # same as: afon-cli-scripts.sh c
 afon-cli.sh aws-login                           # same as: afon-cli-scripts.sh aws/login.sh
 ```
 
-They accept the same `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--env`/`-e` flags described above — placed
+The scripts accept the same `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--env`/`-e` flags described above — placed
 either before the command name (handled by `afon-cli.sh` itself) or after it (handled by the script command
 directly); either way they're translated into the `AFON_*` env vars `afon-cli-scripts.sh` and the scripts expect.
 
 Anything else is forwarded as-is to the script, positionally — eg `afon-cli.sh azure-create true` to pass
 `AS_ADMIN=true`, or `afon-cli.sh config-export myconfig.zip` to pass the zip path `config/export.sh` expects.    
-Run `afon-cli.sh help` to see the full command list alongside the `*-stack` commands.
+
+To see the full command list, run: 
+```shell
+afon-cli.sh help
+``` 
 
 ## Ops commands
 
 The commands are the (kebab-named) versions of the executable Java classes named `*Main` found in package 
-`health.emrys.afon.ops` and its subpackages (in module `afon-ops`), eg `DeployAwsFullStackMain` is `deploy-aws-full-stack`.
+`health.emrys.afon.ops` and its subpackages (in module `afon-ops`), eg:
+
+```md
+`DeployAwsFullStackMain` -> `deploy-aws-full-stack`
+`ManagePolarisCatalogsMain` -> `manage-polaris-catalogs`
+`ValidateStackMain` -> `validate-stack`
+```
 
 To see just the commands related to area of interest (eg all `config`-related [script command](#script-commands)), pass it 
 followed by `-h`/`--help`:
@@ -93,12 +106,10 @@ This works because `config` isn't itself a command, only a filter — if the fil
 this reports that instead. It does not apply to a real command name (eg `afon-cli.sh config-status -h` runs
 `config-status` with `-h` forwarded to it as a plain arg, rather than listing commands).
 
-For example, to run command with console logging: 
-
+For example, to run command with console logging:
 ```shell
 afon-cli.sh -lc INFO <command>
 ```
 
-**NOTE:** The options `--logging`/`--logging-console` are not supported by `afon-cli-scripts.sh` as the scripts it runs have no use for a  logging level, so those two are only recognised before the command name, configuring this JVM's own logging — after
-the command name they're not recognized at all and get forwarded as plain args to the script.
+**NOTE:** The options `--logging`/`-l` and `--logging-console`/`-lc` are not supported by `afon-cli-scripts.sh` as the scripts it runs have no use for a logging level, so those two are only recognised before the command name, configuring this JVM's own logging — after the command name they're not recognised at all and get forwarded as plain args to the script.
 
