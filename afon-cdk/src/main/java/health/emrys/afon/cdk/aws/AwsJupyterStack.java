@@ -7,6 +7,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
+import health.emrys.afon.cdk.CrdCleanup;
 import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.NetworkConfig;
 import health.emrys.afon.cdk.SparkConfig;
@@ -34,7 +35,6 @@ public class AwsJupyterStack extends AwsPolarisStack {
     protected final List<Service> loadBalancers;
     protected final SparkConfig   sparkOperatorConfig;
     protected final HelmProvider  helmProvider;
-    private         String        DELETE_CRDS;
     protected       Resource      crdCleanup;
 
     public AwsJupyterStack(final Construct scope,
@@ -84,30 +84,9 @@ public class AwsJupyterStack extends AwsPolarisStack {
         sparkOperatorConfig = new SparkConfig(this, "sparkop", dependables);
     }
 
-    // TODO possible improvements to cleanupCRDs strategies:
-    //  - delete only the CRDs of specific releases (monitoring.coreos.com, cilium.io) rather than
-    //    everything except spark;
-    //  - poll until the CRDs are gone (bounded) instead of a fixed 5 minutes;
-    //  - strip finalizers on the specific resources that hang (as CdkHelper.finalizeIngress does);
-    //  - have Terraform own the CRDs (e.g. a separate CRDs chart) so they get normal ordering.
     protected void unregisterCRDs(List<? extends ITerraformDependable> dependsOn) {
-        DELETE_CRDS = """
-                      echo "cleanupCRDs: deleting every CRD except the spark ones - 5 sweeps, 60s apart, as a CRD can be slow to go or held by finalizers"
-                      for i in {1..5}; do {
-                          echo "cleanupCRDs: sweep $i of 5 - listing the remaining CRDs"
-
-                          for CRD in $(kubectl get crds | awk '{print $1}' | grep -v spark) ; do {
-                           echo "cleanupCRDs: sweep $i - removing finalizers from CRD $CRD, then deleting it"
-                           timeout 30s kubectl patch crd $CRD --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' || echo "cleanupCRDs: sweep $i - could not remove finalizers from CRD $CRD (it may have no finalizers or already be gone)"
-                           timeout 30s kubectl delete crd $CRD  --force || echo "cleanupCRDs: sweep $i - could not delete CRD $CRD (a later sweep retries it)"
-                          } done &
-
-                          echo "cleanupCRDs: sweep $i of 5 started in the background, waiting 60s before the next one"
-                          sleep 60
-                      } done
-                      echo "cleanupCRDs: finished all 5 sweeps"
-                      """;
-        // Only destroy-time: this deletes every non-spark CRD in the cluster. Anything whose Helm
+        // Only destroy-time: this deletes the CRDs registered by the monitoring stack and Cilium (see
+        // CrdCleanup#command). Anything whose Helm
         // release manifest contains custom resources (kube-prometheus-stack has Prometheus,
         // Alertmanager, ServiceMonitor, PrometheusRule...) must therefore depend on this resource,
         // so that it is uninstalled first: `helm uninstall` cannot delete objects of a kind whose
@@ -117,7 +96,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
         crdCleanup = Resource.Builder
             .create(this, "cleanupCRDs")
             .dependsOn(dependsOn)
-            .provisioners(uponDestroyRun(DELETE_CRDS))
+            .provisioners(uponDestroyRun(CrdCleanup.provisionerCommand()))
             .build();
     }
 
