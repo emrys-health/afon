@@ -21,7 +21,7 @@ The following packages are installed:
 - kubernetes-cli
 - awscli eksctl
 - azure-cli kubelogin
-- google-cloud-cli
+- google-cloud-cli gke-gcloud-auth-plugin
 
 Of the cloud cli packages, only the ones relative to the `<cloud>` specified are installed.
 If no `<cloud>` is specified all are installed.

@@ -30,6 +30,7 @@ if [ -z "$CLOUD" ]; then
   kubelogin --version >> $SETUP_OUTPUT
   echo "### gcloud" >> $SETUP_OUTPUT
   gcloud --version >> $SETUP_OUTPUT
+  gke-gcloud-auth-plugin --version >> $SETUP_OUTPUT
 fi
 if [ "$CLOUD" == "aws" ]; then
   echo "### aws" >> $SETUP_OUTPUT
@@ -43,5 +44,6 @@ fi
 if [ "$CLOUD" == "gcp" ]; then
   echo "### gcloud" >> $SETUP_OUTPUT
   gcloud --version >> $SETUP_OUTPUT
+  gke-gcloud-auth-plugin --version >> $SETUP_OUTPUT
 fi
 echo "Setup output written to $SETUP_OUTPUT"
