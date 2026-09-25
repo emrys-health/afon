@@ -36,7 +36,7 @@ Afon's architecture has four layers:
 
 `PolarisRestClient` is the HTTP client for talking to Polaris REST APIs. It handles:
 
-- **Authentication** — OAuth2 client credentials flow to get an access token (with retry logic for intermittent 503s)
+- **Authentication** — OAuth2 client credentials flow to get an access token. I/O and server (5xx) errors are retried up to 3 times, 5s apart, to ride out intermittent 503s. Any other failure (e.g. 401 on bad credentials), or a response with no access token, fails immediately with the HTTP code and response body in the exception. Only the client ID is logged on retrieval, never the client secret or the token.
 - **Catalog/User management** — POST to create catalogs/users, PUT to update, DELETE to remove
 - **Namespace and table operations** — CRUD via REST endpoints
 
