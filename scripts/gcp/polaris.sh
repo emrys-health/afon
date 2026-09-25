@@ -2,7 +2,7 @@ source $AFON_ROOT/scripts/config/afon-source.sh gcp
 source $AFON_ROOT/scripts/kube/polaris-source.sh
 
 # Reports whether Polaris is up and serving on this env's GCP stack: login, GKE network, GKE cluster,
-# Polaris pod, ingress external IP, TLS secret, then a real HTTPS request.
+# Polaris pod, ingress external IP, TLS secret, then real HTTPS requests, anonymous and as the Polaris admin.
 # See kube/polaris-source.sh for the layers and the exit codes: 0 status reported, 2 could not verify.
 
 POLARIS_PROJECT="afon-core" # as deployed by GcpKubernetesStack
@@ -31,4 +31,5 @@ polaris_check_pod
 polaris_check_ingress ip "external IP"
 polaris_check_tls
 polaris_check_https
+polaris_check_authenticated gcp
 polaris_report
