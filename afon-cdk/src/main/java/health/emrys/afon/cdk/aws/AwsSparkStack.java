@@ -45,7 +45,7 @@ public class AwsSparkStack extends AwsJupyterStack {
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
         awsPolarisDomainName = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
-        new SparkWorkloads(awsPolarisDomainName, properties).deploy(this, id, eksDependOn);
+        new SparkWorkloads().deploy(this, id, eksDependOn);
         sparkExternalService(eksDependOn);
         // Cluster-level dependencies only (not the Spark LB): the monitoring releases depend on
         // this resource (see AwsFullStack), so anything more would also serialise their install

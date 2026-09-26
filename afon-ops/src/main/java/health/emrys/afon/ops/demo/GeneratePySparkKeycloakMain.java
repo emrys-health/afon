@@ -12,6 +12,8 @@ import org.slf4j.Logger;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static java.lang.String.format;
@@ -52,41 +54,9 @@ public class GeneratePySparkKeycloakMain {
     }
 
     private String pySparkTestCode() {
-        final StringBuffer python = new StringBuffer("""
-                                                     from pyspark.sql import SparkSession
-                                                     import os as os
-                                                     
-                                                     OIDC_TOKEN = os.environ["OIDC_TOKEN"]
-                                                     spark = (SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002")
-                                                     """);
-        for (AfonCatalog catalog : afonCatalogs.all()) {
-            python.append(format("# %s \n", catalog.toString()));
-            String sparkCatalog = toSparkName(catalog);
-            config.sparkConfigs(sparkCatalog, catalog.toString()).entrySet()
-                  .forEach(entry -> {
-                      String key   = entry.getKey();
-                      String value = entry.getValue();
-                      if (value.contains(config.getClientId() + ":" + config.getClientSecret())) {
-                          python.append(format(
-                              """
-                              .config("spark.sql.catalog.%s.token", OIDC_TOKEN)
-                              """, sparkCatalog, value));
-                      } else {
-                          python.append(format(
-                              """
-                              .config("%s", "%s")
-                              """, key, value));
-                      }
-                  });
-            python.append("\n");
-        }
-        python.append("""
-                      ).getOrCreate()
-                      
-                      print("Finished initializing spark session")
-                      """);
-        python.append(awsSmokeTest("AwsAccessSpec"));
-        return python.toString();
+        Map<String, String> catalogs = new LinkedHashMap<>();
+        afonCatalogs.all().forEach(catalog -> catalogs.put(toSparkName(catalog), catalog.toString()));
+        return new PySparkSessionCode(config).sessionCode(catalogs) + awsSmokeTest("AwsAccessSpec");
     }
 
     private @NonNull String toSparkName(AfonCatalog catalog) {

@@ -50,13 +50,31 @@ Afon's architecture has four layers:
 
 Spark connects to Polaris via the Iceberg REST catalog protocol. `SparkWarehouseConfig` builds the Spark configuration with:
 
-- The Polaris endpoint URI
-- OAuth2 credentials (`client_id` / `client_secret`)
+- The Polaris endpoint URI and the KeyCloak token endpoint (`oauth2-server-uri`)
+- The authentication: either OAuth2 client credentials (`client_id` / `client_secret`), or the user's OIDC token
 - Warehouse names for each cloud catalog
 
-`SparkClient` creates a `SparkSession` configured to talk to a Polaris instance.
+`SparkClient` creates a local, in-process `SparkSession` configured to talk to a Polaris instance with client credentials.
 
 In the deployed environment, Spark runs as a Spark Connect server in Kubernetes. Jupyter notebooks connect to it via the Spark Connect protocol (`sc://spark-connector-0-driver-svc:15002`).
+The Spark Connect server is shared by all users, so it registers no catalogs and holds no credentials.
+Each session declares its own catalogs, authenticating with the user's OIDC token, which JupyterHub injects into the user's pod as the `OIDC_TOKEN` environment variable:
+
+```python
+OIDC_TOKEN = os.environ["OIDC_TOKEN"]
+spark = (SparkSession.builder.remote("sc://spark-connector-0-driver-svc:15002")
+    .config("spark.sql.catalog.aws", "org.apache.iceberg.spark.SparkCatalog")
+    .config("spark.sql.catalog.aws.type", "rest")
+    .config("spark.sql.catalog.aws.uri", "https://<polaris-host>/api/catalog")
+    .config("spark.sql.catalog.aws.warehouse", "aws")
+    .config("spark.sql.catalog.aws.header.X-Iceberg-Access-Delegation", "vended-credentials")
+    .config("spark.sql.catalog.aws.oauth2-server-uri", "https://<keycloak-host>/realms/polaris/protocol/openid-connect/token")
+    .config("spark.sql.catalog.aws.scope", "openid")
+    .config("spark.sql.catalog.aws.token", OIDC_TOKEN)
+    .getOrCreate())
+```
+
+`SparkConnectClient` does the same from Java, and `GeneratePySparkContextMain` / `GeneratePySparkKeycloakMain` generate this code for all the configured catalogs.
 
 ## Properties management
 
