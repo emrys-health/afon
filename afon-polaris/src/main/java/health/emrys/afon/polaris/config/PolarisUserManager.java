@@ -22,6 +22,10 @@ import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
  * Manages Polaris users, allowing the configuration of users and their catalog roles and privileges.
  *
  * Provides default {@link #DEFAULT_CATALOG_ROLE_NAME} and {@link #DEFAULT_CATALOG_PRIVILEGES}, if not specified.
+ *
+ * <p>Each user has their own principal role (see {@link #userPrincipalRoleName}), which is granted the
+ * catalog role of only the catalogs the user is authorised for, so that a catalog authorised for one
+ * user is not visible to the others.
  */
 public class PolarisUserManager {
 
@@ -31,48 +35,64 @@ public class PolarisUserManager {
     public static final Set<CatalogPrivilege> DEFAULT_CATALOG_PRIVILEGES =
             Set.of(NAMESPACE_CREATE, NAMESPACE_FULL_METADATA, TABLE_CREATE, TABLE_READ_DATA, TABLE_WRITE_DATA);
 
-    public static final String principalRoleName(String catalogRoleName){
+    /**
+     * The principal role of a user, granted the catalog roles of the catalogs the user is authorised for.
+     */
+    public static String userPrincipalRoleName(String username) {
+        return String.format("%sPrincipal", username);
+    }
+
+    /**
+     * The principal role formerly shared by all users, which gave every user the catalogs authorised
+     * for any of them. Removed when configuring users, so that its grants don't linger.
+     */
+    static String sharedPrincipalRoleName(String catalogRoleName) {
         return String.format("%sPrincipal", catalogRoleName);
     }
+
     private final CatalogConfigurer configurer;
 
-    private final String accessToken;
     private final String clientId;
     private final String catalogRoleName;
-    private final String principalRoleName;
     private final Set<CatalogPrivilege> privileges;
+    private boolean sharedPrincipalRoleRemoved;
 
     public PolarisUserManager(AfonPropertyProvider properties) {
         this(properties, DEFAULT_CATALOG_ROLE_NAME, DEFAULT_CATALOG_PRIVILEGES);
     }
 
     public PolarisUserManager(AfonPropertyProvider properties, String catalogRoleName, Set<CatalogPrivilege> privileges) {
-        PolarisRestClient client = PolarisRestClientFactory.clientFactory().createClient(properties);
-        this.configurer = new CatalogConfigurer(client);
-        this.accessToken = client.getAccessToken();
-        this.clientId = client.getClientId();
-        this.catalogRoleName = catalogRoleName;
-        this.principalRoleName = principalRoleName(catalogRoleName);
-        this.privileges = privileges;
-        logger.debug("Polaris access token for admin {} when calling endpoint {}",
+        this(PolarisRestClientFactory.clientFactory().createClient(properties), catalogRoleName, privileges);
+    }
+
+    private PolarisUserManager(PolarisRestClient client, String catalogRoleName, Set<CatalogPrivilege> privileges) {
+        this(new CatalogConfigurer(client), client.getClientId(), catalogRoleName, privileges);
+        logger.debug("Managing Polaris users as admin {} at endpoint {}",
                 clientId, client.getEndpoint());
+    }
+
+    PolarisUserManager(CatalogConfigurer configurer, String clientId, String catalogRoleName, Set<CatalogPrivilege> privileges) {
+        this.configurer = configurer;
+        this.clientId = clientId;
+        this.catalogRoleName = catalogRoleName;
+        this.privileges = privileges;
     }
 
     public String getCatalogRoleName() {
         return catalogRoleName;
     }
 
-    public String getPrincipalRoleName() {
-        return principalRoleName;
-    }
-
     public Set<CatalogPrivilege> getPrivileges() {
         return privileges;
     }
 
+    /**
+     * Grants the catalog role of catalogName to the principal role of each user authorised for it.
+     * The catalog role is recreated first, which drops its grants to any user no longer authorised.
+     */
     public List<HttpResponse> configureUsers(String catalogName, AfonUserProvider userProvider) throws IncorrectConfigException, IOException {
+        removeSharedPrincipalRole();
         createCatalogRole(catalogName);
-        createPrincipalRole(principalRoleName);
         List<HttpResponse> responses = new ArrayList<>();
         for (AfonUser user : userProvider.getUsers()) {
             if (userProvider.isAuthorised(user.username(), catalogName)) {
@@ -89,8 +109,22 @@ public class PolarisUserManager {
         logger.info("Configuring user '{}' for catalog '{}'", principalName, catalogName);
         PrincipalWithCredentials principal = createPrincipal(principalName);
         logger.info("Admin {} created user {}", clientId, principal);
-        configurer.associatePrincipalRole(catalogName, principalRoleName, catalogRoleName);
-        return configurer.associatePrincipalRole(principalName, principalRoleName);
+        // Not recreated, unlike the catalog role: it holds the user's grants on their other catalogs.
+        String userPrincipalRoleName = userPrincipalRoleName(principalName);
+        createPrincipalRole(userPrincipalRoleName);
+        configurer.associatePrincipalRole(catalogName, userPrincipalRoleName, catalogRoleName);
+        return configurer.associatePrincipalRole(principalName, userPrincipalRoleName);
+    }
+
+    /**
+     * Deletes the principal role formerly shared by all users, once per instance. Polaris cascades the
+     * deletion to the role's grants and assignments.
+     */
+    private void removeSharedPrincipalRole() throws IOException {
+        if (!sharedPrincipalRoleRemoved) {
+            configurer.deletePrincipalRole(sharedPrincipalRoleName(catalogRoleName));
+            sharedPrincipalRoleRemoved = true;
+        }
     }
 
     public List<HttpResponse> createCatalogRole(String catalogName) throws IOException, IncorrectConfigException {

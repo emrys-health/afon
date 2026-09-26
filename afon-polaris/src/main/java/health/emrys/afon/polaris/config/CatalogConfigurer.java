@@ -7,6 +7,7 @@ import health.emrys.afon.polaris.catalogs.PolarisCatalog;
 import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
@@ -276,7 +277,7 @@ public class CatalogConfigurer {
         logger.info("Deleting principal role {}", principalRoleName);
         String uri = principalRolesURI() + "/" + principalRoleName;
         ClassicHttpResponse response = client.delete(uri, accessToken);
-        if (isFailure(response)) {
+        if (isFailure(response) && response.getCode() != HttpStatus.SC_NOT_FOUND) {
             logger.warn("Failed to delete principal role {}", principalRoleName);
         }
         return response;
@@ -287,7 +288,7 @@ public class CatalogConfigurer {
         String uri = principalRolesURI();
         String json = serialiser.principalRoleCreation(principalRoleName);
         ClassicHttpResponse response = client.post(uri, json, accessToken);
-        if (isFailure(response)) {
+        if (isFailure(response) && response.getCode() != HttpStatus.SC_CONFLICT) { // conflict: it already exists
             logger.warn("Failed to create principal role {}", principalRoleName);
         }
         return response;
