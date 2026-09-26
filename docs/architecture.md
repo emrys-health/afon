@@ -43,6 +43,8 @@ Afon's architecture has four layers:
 `CatalogConfigurer` builds on top of the `PolarisRestClient` to provide higher-level operations and the REST API URIs for creating catalogs with admin grants, configuring principal roles, and creating users.
 
 `PolarisCatalogManager` and `PolarisUserManager` build on top of the `CatalogConfigurer` to provide catalog and user specific configuration. 
+`PolarisUserManager` gives each user their own principal role (`<username>Principal`), which is granted the catalog role
+(`emrysrole4`) of only the catalogs `users-acl.csv` authorises the user for, so that no user can use a catalog authorised for another.
 
 `PolarisCatalog` is the abstract base for per-cloud catalog configuration. Each cloud has a concrete subclass (e.g. `AwsPolarisCatalog`, `GcpPolarisCatalog`, `AzurePolarisCatalog`) that knows how to generate the JSON payload for creating a catalog in that cloud, including the correct storage configuration info and bucket URI.
 
