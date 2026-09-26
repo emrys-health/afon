@@ -10,7 +10,7 @@
 #      address, the TLS secret is there (where TLS ends in the cluster)
 #   6. a real HTTPS request through DNS -> load balancer -> ingress -> pod, without credentials
 #   7. the same as the Polaris admin: a token for the admin principal (POLARIS_ID and POLARIS_SECRET,
-#      as for show-access-token) from Keycloak, then the list of the catalogs Polaris shows it
+#      as for show-oidc-token) from Keycloak, then the list of the catalogs Polaris shows it
 # The kubectl layers say where a failure is (eg no nodes, so a Pending pod); the requests are what
 # prove Polaris really serves.  A healthy Polaris answers the anonymous request 401, which shows it is
 # up and enforces authentication; only the authenticated request shows the login path working, ie
