@@ -31,5 +31,6 @@ This README simply references the main Afon document pages.
 - Jupyter: [jupyter](./docs/jupyter.md)
 - Monitoring: [monitoring](./docs/monitoring.md)
 - Operations: [operations](./docs/operations.md)
+- Smoke tests: [smoke tests](./docs/smoke_tests.md)
 - Snowflake: [snowflake](./docs/snowflake.md)
 - Examples: [examples](./docs/examples.md)

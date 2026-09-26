@@ -9,12 +9,12 @@
 # The executed notebook, with its outputs, is written to smoke/target/<notebook name>, leaving the
 # original clean.
 #
-# Reads OIDC_DOMAIN_NAME, USER_POLARIS_ID and USER_POLARIS_SECRET from $AFON_HOME/config/*.properties
-# (AFON_HOME defaults to ~/.afon), gets USER_POLARIS_ID's access token from Keycloak, port-forwards the
-# Spark Connect driver of the current kubectl context, then runs the notebook via
-# './afon.sh -a jupyter-execute'.  Only those properties are read, rather than sourcing the secrets:
-# sourcing them would also export cloud credentials that change the identity kubectl uses.
-# The secret and the token are never printed.
+# Gets USER_POLARIS_ID's OIDC access token from Keycloak with './afon.sh -a show-oidc-token <cloud> user',
+# port-forwards the Spark Connect driver of the current kubectl context, then runs the notebook via
+# './afon.sh -a jupyter-execute'.  Also reads <CLOUD>_POLARIS_DOMAIN_NAME and OIDC_DOMAIN_NAME from
+# $AFON_HOME/config/*.properties (AFON_HOME defaults to ~/.afon), for the notebook.  Only those properties
+# are read, rather than sourcing the secrets: sourcing them would also export cloud credentials that change
+# the identity kubectl uses.  The token is never printed.
 
 set -euo pipefail
 
@@ -39,27 +39,19 @@ require() {
 CLOUD_PREFIX=$(echo "$CLOUD" | tr '[:lower:]' '[:upper:]')
 POLARIS_HOST=$(prop "${CLOUD_PREFIX}_POLARIS_DOMAIN_NAME")
 OIDC_HOST=$(prop OIDC_DOMAIN_NAME)
-USER_ID=$(prop USER_POLARIS_ID)
-USER_SECRET=$(prop USER_POLARIS_SECRET)
 require "${CLOUD_PREFIX}_POLARIS_DOMAIN_NAME" "$POLARIS_HOST"
 require OIDC_DOMAIN_NAME "$OIDC_HOST"
-require USER_POLARIS_ID "$USER_ID"
-require USER_POLARIS_SECRET "$USER_SECRET"
 
-# The same password grant as KeyCloakProvider.userToken, where each user is also a confidential client.
-OIDC_TOKEN=$(curl -s -m 30 \
-  --data-urlencode "grant_type=password" \
-  --data-urlencode "client_id=$USER_ID" \
-  --data-urlencode "client_secret=$USER_SECRET" \
-  --data-urlencode "username=$USER_ID" \
-  --data-urlencode "password=$USER_SECRET" \
-  "https://$OIDC_HOST/realms/polaris/protocol/openid-connect/token" \
-  | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token', ''))" || true)
-unset USER_SECRET
+TOKEN_LINE="^Access token for user '\([^']*\)' on cloud '[^']*': "
+TOKEN_OUTPUT=$("$AFON_ROOT/afon.sh" -a show-oidc-token "$CLOUD" user 2>&1 || true)
+USER_ID=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n "s/${TOKEN_LINE}.*/\1/p" | tail -1)
+OIDC_TOKEN=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n "s/${TOKEN_LINE}//p" | tail -1)
 if [ -z "$OIDC_TOKEN" ]; then
-  echo "Keycloak at $OIDC_HOST gave no access token for $USER_ID" >&2
+  echo "show-oidc-token gave no access token for USER_POLARIS_ID:" >&2
+  printf '%s\n' "$TOKEN_OUTPUT" | tail -20 >&2
   exit 1
 fi
+unset TOKEN_OUTPUT
 echo "Got an access token for $USER_ID from $OIDC_HOST"
 
 export OIDC_TOKEN

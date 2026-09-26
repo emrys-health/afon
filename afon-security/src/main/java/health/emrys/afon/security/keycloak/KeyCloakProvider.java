@@ -147,21 +147,40 @@ public class KeyCloakProvider implements IdentityProvider {
     @Override
     public String userToken(String username, String password) throws IOException {
         logger.info("Getting token for user {}", username);
-        String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, KEYCLOAK_REALM);
-        String body = form(Map.of(
+        return polarisRealmToken("user " + username, Map.of(
             "grant_type",    "password",
             "client_id",     username,
             "client_secret", password,
             "username",      username,
             "password",      password
         ));
+    }
+
+    /**
+     * Obtains an access token for a confidential client via the client-credentials flow against the
+     * {@code polaris} realm, eg for the Polaris admin client ({@code POLARIS_ID}), which is a client but
+     * not a user. The 'polaris_principal' mapper on the client resolves the token to the Polaris principal
+     * of the same name (see {@link #createConfidentialClient}).
+     */
+    @Override
+    public String clientToken(String clientId, String clientSecret) throws IOException {
+        logger.info("Getting token for client {}", clientId);
+        return polarisRealmToken("client " + clientId, Map.of(
+            "grant_type",    "client_credentials",
+            "client_id",     clientId,
+            "client_secret", clientSecret
+        ));
+    }
+
+    private String polarisRealmToken(String description, Map<String, String> form) throws IOException {
+        String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, KEYCLOAK_REALM);
         HttpPost post = new HttpPost(uri);
         post.setHeader("Content-Type", "application/x-www-form-urlencoded");
-        post.setEntity(new StringEntity(body));
+        post.setEntity(new StringEntity(form(form)));
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             return client.execute(post, response -> {
                 if (response.getCode() != HttpStatus.SC_OK) {
-                    throw new IOException("Could not obtain token for user " + username + ": HTTP " + response.getCode());
+                    throw new IOException("Could not obtain token for " + description + ": HTTP " + response.getCode());
                 }
                 Map<?, ?> json = mapper.readValue(response.getEntity().getContent(), Map.class);
                 return (String) json.get("access_token");
