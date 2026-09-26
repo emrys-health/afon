@@ -8,7 +8,6 @@ import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.connect.SparkConnectClient;
-import health.emrys.afon.spark.connect.SparkConnectUsingOIDC;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,8 +70,7 @@ public class SparkConnectSmoke {
                 15002,
                 15002)) {
                 logger.info(String.format("Connecting to cloud %s", catalog.cloud()));
-                smokeTest(new SparkConnectClient(properties), catalog);
-                SparkSession spark = smokeTest(new SparkConnectUsingOIDC(properties), catalog);
+                SparkSession spark = smokeTest(new SparkConnectClient(properties), catalog);
                 spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
             }
         } catch (IOException e) {

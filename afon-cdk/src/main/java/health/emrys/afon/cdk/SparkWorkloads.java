@@ -5,9 +5,6 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.spark.SparkWarehouseConfig;
-import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -19,8 +16,6 @@ import java.util.Map;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.cdk.CdkUtils.*;
-import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
-import static health.emrys.afon.config.AfonProperty.USER_POLARIS_SECRET;
 import static java.lang.String.format;
 
 /**
@@ -29,6 +24,10 @@ import static java.lang.String.format;
  * is only a controller — it launches a master/workers and a driver/executors solely in response
  * to these CRs. Installing the operator (see {@link SparkConfig}) without applying these
  * manifests leaves it idle, which is why both the AWS and Azure stacks must call {@link #deploy}.
+ *
+ * <p>The Spark Connect server is shared by all users, so it registers no Iceberg catalogs and holds
+ * no Polaris credentials: each user declares their catalogs in their own session, authenticating
+ * with their own OIDC token (see {@code SparkWarehouseConfig#sparkConfigsWithToken}).
  */
 public class SparkWorkloads {
     public static final String MASTER = "emrys-master";
@@ -37,21 +36,13 @@ public class SparkWorkloads {
     public static final Map<String, String> DRIVER_LABELS = Map.of(
         "spark-role", "driver");
 
-    private final String polarisDomainName;
-    private final AfonPropertyProvider properties;
-
-    public SparkWorkloads(String polarisDomainName, AfonPropertyProvider properties) {
-        this.polarisDomainName = polarisDomainName;
-        this.properties = properties;
-    }
-
     /**
      * Applies the {@code SparkCluster} and {@code SparkApplication} manifests against the cluster
      * targeted by the active kubeconfig. Resource ids are kept stable ("sparkClusterManifest" /
      * "sparkConnectManifest") so existing stack state is preserved.
      *
      * @param scope     the CDKTF stack the null-provider resources are scoped to.
-     * @param id        the cloud the warehouse/Polaris config is derived from.
+     * @param id        the cloud the stack is deployed to.
      * @param dependsOn must include the operator-ready signal (so the CRDs exist) and the
      *                  cluster's own dependables.
      */
@@ -124,7 +115,7 @@ public class SparkWorkloads {
                     "sparkVersion", "4.0.1"
                 ),
                 "mainClass", "org.apache.spark.sql.connect.service.SparkConnectServer",
-                "sparkConf", sparkConfig(polarisDomainName),
+                "sparkConf", sparkConfig(),
                 "driverSpec", Map.of(
                     "podTemplateSpec", Map.of(
                         // app.kubernetes.io/name is the canonical label Hubble UI
@@ -171,7 +162,7 @@ public class SparkWorkloads {
      * kubectl logs -f spark-connector-0-driver  | egrep -i 'SparkSqlParser|iceberg'
      * </code>
      */
-    private Map<String, String> sparkConfig(String polarisDomainName) {
+    private Map<String, String> sparkConfig() {
         var first = Map.of(
             "spark.kubernetes.container.image", DockerImages.SPARK_IMAGE,
             "spark.master.ui.title", "Prod Spark Cluster",
@@ -200,27 +191,10 @@ public class SparkWorkloads {
 //            "spark.connect.grpc.interceptor.classes", "org.apache.spark.sql.connect.service.LoggingInterceptor", // No! this logs patient data too!
             "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
         );
-        try {
-            Map<String, String> config = sparkCloudConfig(polarisDomainName);
-            config.putAll(first);
-            config.putAll(second);
-            return config;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private @NonNull Map<String, String> sparkCloudConfig(String polarisDomainName) {
-        var config = new HashMap<String, String>();
+        Map<String, String> config = new HashMap<>();
         config.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-        config.putAll(userSparkWarehouseConfig(polarisDomainName));
+        config.putAll(first);
+        config.putAll(second);
         return config;
-    }
-
-    private Map<String, String> userSparkWarehouseConfig(String polarisDomainName) {
-        String clientId = properties.getValue(USER_POLARIS_ID);
-        String clientSecret = ***REMOVED***
-        SparkWarehouseConfig sparkWarehouseConfig = SparkWarehouseConfigFactory.getFactory().createConfig(properties, polarisDomainName, clientId, clientSecret);
-        return sparkWarehouseConfig.allSparkConfigs("federatedCatalogName"); // taken from afon.properties
     }
 }

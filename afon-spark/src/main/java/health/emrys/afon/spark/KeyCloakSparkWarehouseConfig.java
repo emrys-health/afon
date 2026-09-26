@@ -18,7 +18,7 @@ import static java.lang.String.format;
  * ({@code /api/catalog/v1/oauth/tokens} returns HTTP 501), so the Iceberg REST catalog must obtain
  * its OAuth2 token directly from KeyCloak.
  *
- * <p>This overrides {@link #sparkConfigs(String)} to add the {@code oauth2-server-uri} pointing at
+ * <p>This overrides {@link #catalogConfigs(String, String)} to add the {@code oauth2-server-uri} pointing at
  * KeyCloak and to request the {@code openid} scope - KeyCloak rejects Polaris' "PRINCIPAL_ROLE:ALL"
  * scope (and Iceberg's default "catalog") with invalid_scope. The credentials passed to the
  * superclass must identify a client KeyCloak knows about.
@@ -44,13 +44,8 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
     }
 
     @Override
-    public Map<String, String> sparkConfigs(String sparkCatalog, String catalogName) {
-        return addOauthServer(sparkCatalog, super.sparkConfigs(sparkCatalog, catalogName));
-    }
-
-    @Override
-    public Map<String, String> sparkConfigs(String sparkCatalog) {
-        return addOauthServer(sparkCatalog, super.sparkConfigs(sparkCatalog));
+    protected Map<String, String> catalogConfigs(String sparkCatalog, String catalogName) {
+        return addOauthServer(sparkCatalog, super.catalogConfigs(sparkCatalog, catalogName));
     }
 
     private @NonNull Map<String, String> addOauthServer(String sparkCatalog, Map<String, String> actual) {

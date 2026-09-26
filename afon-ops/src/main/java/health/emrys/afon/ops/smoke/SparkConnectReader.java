@@ -13,6 +13,7 @@ import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -40,7 +41,7 @@ public class SparkConnectReader {
      * kubectl port-forward pod/spark-connector-0-driver 15002:15002
      * for this.
      */
-    public void sparkConnectRead(String warehouse, String catalogName) {
+    public void sparkConnectRead(String warehouse, String catalogName) throws IOException {
         SparkConnectClient client = new SparkConnectClient(properties);
         SparkSession       spark  = client.sparkSession(warehouse, catalogName);
         readTable(warehouse, spark);
