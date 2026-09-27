@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.List;
 
-import static health.emrys.afon.polaris.config.PolarisRestClient.logIfFailure;
+import static health.emrys.afon.security.HttpResponses.logIfFailure;
 import static java.lang.String.format;
 
 public class PolarisTableRegister {

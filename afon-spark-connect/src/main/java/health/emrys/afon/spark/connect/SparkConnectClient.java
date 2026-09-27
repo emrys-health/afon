@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Map;
 
+import static health.emrys.afon.config.AfonProperty.OIDC_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonProperty.SPARK_CONNECT_URL;
 import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
@@ -62,7 +63,7 @@ public class SparkConnectClient {
     }
 
     private static String userToken(AfonPropertyProvider properties) throws IOException {
-        return new KeyCloakProvider(properties).userToken(properties.getValue(USER_POLARIS_ID),
+        return new KeyCloakProvider(properties.getValue(OIDC_DOMAIN_NAME)).userToken(properties.getValue(USER_POLARIS_ID),
                                                           properties.getValue(USER_POLARIS_SECRET));
     }
 

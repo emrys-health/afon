@@ -4,7 +4,7 @@ import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
-import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.security.HttpResponses;
 import health.emrys.afon.polaris.config.PolarisTableRegister;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
@@ -41,7 +41,7 @@ public class RegisterPolarisTableMain {
             logger.error(e.getMessage(), e);
             throw new RuntimeException(e);
         }
-        List<String> failures = PolarisRestClient.failuresOf(allResponses);
+        List<String> failures = HttpResponses.failuresOf(allResponses);
         if ( !failures.isEmpty() ){
             throw new RuntimeException("Failed to create namespace and table: " + String.join(", ", failures));
         }

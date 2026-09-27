@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import static health.emrys.afon.polaris.config.PolarisRestClient.isFailure;
+import static health.emrys.afon.security.HttpResponses.isFailure;
 import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
 /**
@@ -67,7 +67,7 @@ public class PolarisUserManager {
 
     private PolarisUserManager(PolarisRestClient client, String catalogRoleName, Set<CatalogPrivilege> privileges) {
         this(new CatalogConfigurer(client), client.getClientId(), catalogRoleName, privileges);
-        logger.debug("Managing Polaris users as admin {} at endpoint {}",
+        logger.info("Managing Polaris users as admin '{}' at endpoint '{}'",
                 clientId, client.getEndpoint());
     }
 
@@ -98,7 +98,7 @@ public class PolarisUserManager {
             if (userProvider.isAuthorised(user.username(), catalogName)) {
                 responses.add(configureUser(user.username(), catalogName));
             } else {
-                logger.warn("Admin {} failed to authorise user {} for catalog {}",
+                logger.warn("Admin '{}' failed to authorise user '{}' for catalog '{}'",
                         clientId, user.username(), catalogName);
             }
         }
@@ -107,8 +107,8 @@ public class PolarisUserManager {
 
     private HttpResponse configureUser(String principalName, String catalogName) throws IncorrectConfigException, IOException {
         logger.info("Configuring user '{}' for catalog '{}'", principalName, catalogName);
-        PrincipalWithCredentials principal = createPrincipal(principalName);
-        logger.info("Admin {} created user {}", clientId, principal);
+        createPrincipal(principalName);
+        logger.info("Admin '{}' created principal '{}'", clientId, principalName);
         // Not recreated, unlike the catalog role: it holds the user's grants on their other catalogs.
         String userPrincipalRoleName = userPrincipalRoleName(principalName);
         createPrincipalRole(userPrincipalRoleName);
@@ -143,7 +143,7 @@ public class PolarisUserManager {
         if (isFailure(response)) {
             failures.add(response);
         } else {
-            logger.info("Admin {} created role {} on catalog {}", clientId, catalogRoleName, catalogName);
+            logger.info("Admin '{}' created role '{}' on catalog '{}'", clientId, catalogRoleName, catalogName);
             failures.addAll(addPrivileges(catalogName, catalogRoleName, privileges));
         }
         return failures;
