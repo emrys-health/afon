@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import static health.emrys.afon.security.HttpResponses.isFailure;
+import static health.emrys.afon.rest.HttpResponses.isFailure;
 import static org.apache.polaris.core.admin.model.CatalogPrivilege.*;
 
 /**

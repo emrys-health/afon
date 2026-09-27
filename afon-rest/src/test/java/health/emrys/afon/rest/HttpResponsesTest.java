@@ -1,4 +1,4 @@
-package health.emrys.afon.security;
+package health.emrys.afon.rest;
 
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;

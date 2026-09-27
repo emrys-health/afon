@@ -81,6 +81,7 @@
         <module>afon-config</module>
         <module>afon-iceberg</module>
         <module>afon-polaris</module>
+        <module>afon-rest</module>
         <module>afon-security</module>
         <module>afon-spark</module>
         <module>afon-spark-connect</module>

@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static health.emrys.afon.security.HttpResponses.isFailure;
+import static health.emrys.afon.rest.HttpResponses.isFailure;
 import static java.lang.String.format;
 
 public class CatalogConfigurer {

@@ -4,7 +4,7 @@ import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
-import health.emrys.afon.security.HttpResponses;
+import health.emrys.afon.rest.HttpResponses;
 import health.emrys.afon.polaris.config.PolarisTableRegister;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
