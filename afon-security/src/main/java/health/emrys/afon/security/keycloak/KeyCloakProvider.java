@@ -1,7 +1,10 @@
 package health.emrys.afon.security.keycloak;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import health.emrys.afon.config.*;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.security.HttpResponses;
 import health.emrys.afon.security.IdentityProvider;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
@@ -19,14 +22,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.AfonProperty.AFON_THEME;
+import static health.emrys.afon.security.HttpResponses.isFailure;
+import static health.emrys.afon.security.HttpResponses.logOutcome;
+import static health.emrys.afon.security.HttpResponses.parseAccessToken;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 import static java.lang.String.format;
@@ -51,6 +53,10 @@ public class KeyCloakProvider implements IdentityProvider {
      * owns the domain root (base_url "/"), so this is "/hub/oauth_callback" rather than under /jupyter/.
      */
     public static final String JUPYTERHUB_CALLBACK   = "/hub/oauth_callback";
+    /**
+     * The default {@link AfonProperty#AFON_THEME}
+     */
+    public static final String DEFAULT_AFON_THEME = "emrys-hdrs";
 
     /**
      * The callback URIs, for the given domain, eg
@@ -79,12 +85,29 @@ public class KeyCloakProvider implements IdentityProvider {
     private final ObjectMapper mapper = new ObjectMapper();
 
     private final String baseUrl;
-    private final String adminUser;
+    private final String adminUsername;
     private final String adminPassword;
     private final String loginTheme;
 
     /**
-     * Create a provider using the configured properties:
+     * Creates a provider for token requests only ({@link #userToken}, {@link #clientToken}), which need no
+     * bootstrap admin credentials. The admin operations fail without them.
+     */
+    public KeyCloakProvider(String hostname) {
+        this(hostname, null, null);
+    }
+
+    /**
+     * Creates a provider with bootstrap admin credentials.
+     */
+    public KeyCloakProvider(String hostname,
+                            String adminUsername,
+                            String adminPassword) {
+        this(hostname, adminUsername, adminPassword, DEFAULT_AFON_THEME);
+    }
+
+    /**
+     * Creates a provider using the configured properties:
      * {@link AfonProperty#OIDC_DOMAIN_NAME},
      * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME},
      * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD},
@@ -95,24 +118,18 @@ public class KeyCloakProvider implements IdentityProvider {
         this(properties.getValue(OIDC_DOMAIN_NAME),
                 properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
                 properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD),
-                properties.getValue(AFON_THEME, "emrys-hdrs"));
+                properties.getValue(AFON_THEME, DEFAULT_AFON_THEME));
     }
 
-    public KeyCloakProvider(String hostname,
-                            String adminUser,
-                            String adminPassword) {
-        this(hostname, adminUser, adminPassword, "emrys-hdrs");
-    }
-
-    public KeyCloakProvider(String hostname,
-                            String adminUser,
+    KeyCloakProvider(String hostname,
+                            String adminUsername,
                             String adminPassword,
                             String loginTheme) {
         this.baseUrl       = KeyCloakConfigurer.urlFor(hostname, protocolFor(hostname));
-        this.adminUser     = adminUser;
+        this.adminUsername = adminUsername;
         this.adminPassword = adminPassword;
         this.loginTheme    = loginTheme;
-        logger.info("Using KeyCloak URL: {}, admin: {}", this.baseUrl, this.adminUser);
+        logger.info("Using KeyCloak URL: {}", this.baseUrl);
     }
 
 
@@ -126,16 +143,18 @@ public class KeyCloakProvider implements IdentityProvider {
      */
     @Override
     public void registerPolarisUser(AfonUser user) {
+        String keycloakRealm = KEYCLOAK_REALM;
         try {
             String adminToken = adminToken();
-            createRealm(adminToken, KEYCLOAK_REALM);
-            createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password());
-            createUser(adminToken, KEYCLOAK_REALM, user);
-            logger.info(
-                "KeyCloak realm '{}' provisioned with client user '{}' (email '{}')",
-                KEYCLOAK_REALM, user.username(), user.email());
+            createRealm(adminToken, keycloakRealm);
+            createConfidentialClient(adminToken, keycloakRealm, user.username(), user.password());
+            createUser(adminToken, keycloakRealm, user);
+            logger.info("KeyCloak realm '{}' provisioned with client user '{}' (email '{}')",
+                    keycloakRealm, user.username(), user.email());
         } catch (IOException e) {
-            throw new RuntimeException("Failed to provision KeyCloak for Polaris", e);
+            String message = String.format("Failed to provision KeyCloak realm '%s' with client user '%s' (email '%s')",
+                    keycloakRealm, user.username(), user.email());
+            throw new RuntimeException(message, e);
         }
     }
 
@@ -146,8 +165,8 @@ public class KeyCloakProvider implements IdentityProvider {
      */
     @Override
     public String userToken(String username, String password) throws IOException {
-        logger.info("Getting token for user {}", username);
-        return polarisRealmToken("user " + username, Map.of(
+        logger.info("Getting token for user '{}'", username);
+        return polarisRealmToken(Map.of(
             "grant_type",    "password",
             "client_id",     username,
             "client_secret", password,
@@ -164,27 +183,28 @@ public class KeyCloakProvider implements IdentityProvider {
      */
     @Override
     public String clientToken(String clientId, String clientSecret) throws IOException {
-        logger.info("Getting token for client {}", clientId);
-        return polarisRealmToken("client " + clientId, Map.of(
+        logger.info("Getting token for client '{}'", clientId);
+        return polarisRealmToken(Map.of(
             "grant_type",    "client_credentials",
             "client_id",     clientId,
             "client_secret", clientSecret
         ));
     }
 
-    private String polarisRealmToken(String description, Map<String, String> form) throws IOException {
+    /**
+     * @throws IOException           on an I/O error or a server error (5xx), which may be transient, so
+     *                               callers may retry (eg {@code PolarisRestClient#getAccessToken})
+     * @throws IllegalStateException on any other failure (eg 401 on bad credentials), or a response with
+     *                               no access token, which retrying will not fix
+     * @see HttpResponses#parseAccessToken
+     */
+    private String polarisRealmToken(Map<String, String> form) throws IOException {
         String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, KEYCLOAK_REALM);
         HttpPost post = new HttpPost(uri);
         post.setHeader("Content-Type", "application/x-www-form-urlencoded");
         post.setEntity(new StringEntity(form(form)));
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            return client.execute(post, response -> {
-                if (response.getCode() != HttpStatus.SC_OK) {
-                    throw new IOException("Could not obtain token for " + description + ": HTTP " + response.getCode());
-                }
-                Map<?, ?> json = mapper.readValue(response.getEntity().getContent(), Map.class);
-                return (String) json.get("access_token");
-            });
+            return client.execute(post, HttpResponses::parseAccessToken);
         }
     }
 
@@ -207,29 +227,32 @@ public class KeyCloakProvider implements IdentityProvider {
      * @param realm the realm to authenticate against.
      * @return An access token
      * @throws IOException
+     * @throws IllegalStateException if this provider has no bootstrap admin credentials, eg when created
+     *                               with {@link #KeyCloakProvider(String)} for token requests only
      */
     @Override
     public String getToken(String realm) throws IOException {
+        if (adminUsername == null || adminUsername.isBlank() || adminPassword == null || adminPassword.isBlank()) {
+            throw new IllegalStateException(format(
+                "No KeyCloak bootstrap admin credentials to authenticate against realm '%s': set "
+                    + "KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME and KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD", realm));
+        }
         String uri = format("%s/realms/%s/protocol/openid-connect/token", baseUrl, realm);
+        logger.info("Retrieving token from {}", uri);
         String body = form(Map.of(
             "grant_type", "password",
             "client_id", "admin-cli",
-            "username", adminUser,
+            "username", adminUsername,
             "password", adminPassword
         ));
         HttpPost post = new HttpPost(uri);
         post.setHeader("Content-Type", "application/x-www-form-urlencoded");
         post.setEntity(new StringEntity(body));
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            logger.info("Calling {}", uri);
             return client.execute(
                 post, response -> {
-                    logger.info("Calling {} resulted in HTTP code {}", uri, response.getCode());
-                    if (response.getCode() != HttpStatus.SC_OK) {
-                        throw new IOException("Could not obtain KeyCloak admin token: HTTP " + response.getCode());
-                    }
-                    Map<?, ?> json = mapper.readValue(response.getEntity().getContent(), Map.class);
-                    return (String) json.get("access_token");
+                    logOutcome(post, response);
+                    return parseAccessToken(response);
                 });
         }
     }
@@ -380,10 +403,6 @@ public class KeyCloakProvider implements IdentityProvider {
         String uri  = format("%s/admin/realms/%s/clients/%s/protocol-mappers/models", baseUrl, realm, uuid);
         String json = this.mapper.writeValueAsString(mapper);
         return postJson(adminToken, uri, json, "protocol mapper " + mapper.get("name") + " on " + clientId);
-    }
-
-    private boolean isFailure(HttpResponse response) {
-        return response == null || response.getCode() / 100 != 2;
     }
 
     /**
@@ -655,14 +674,15 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     private HttpResponse putJson(String adminToken, String uri, String json, String what) throws IOException {
-        logger.info("Calling PUT {} with: \n{}", uri, json);
+        // Never log the JSON: it can carry secrets, eg a user's password or a client secret.
+        logger.info("Calling PUT {} for {}", uri, what);
         HttpPut put = new HttpPut(uri);
         put.setHeader("Authorization", "Bearer " + adminToken);
         put.setHeader("Content-Type", "application/json");
         put.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             return client.execute(put, response -> {
-                logger.info("PUT {} resulted in HTTP code {}", uri, response.getCode());
+                logOutcome(put, response);
                 return response;
             });
         }
@@ -733,7 +753,8 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     private HttpResponse postJson(String adminToken, String uri, String json, String what) throws IOException {
-        logger.info("Calling {} with: \n{}", uri, json);
+        // Never log the JSON: it can carry secrets, eg a user's password or a client secret.
+        logger.info("Calling POST {} for {}", uri, what);
         HttpPost post = new HttpPost(uri);
         post.setHeader("Authorization", "Bearer " + adminToken);
         post.setHeader("Content-Type", "application/json");
@@ -742,7 +763,7 @@ public class KeyCloakProvider implements IdentityProvider {
             return client.execute(
                 post, response -> {
                     int code = response.getCode();
-                    logger.info("Calling {} resulted in HTTP code {}", uri, code);
+                    logOutcome(post, response);
                     if (code == HttpStatus.SC_CREATED) {
                         logger.info("Created KeyCloak {}", what);
                     } else if (code == HttpStatus.SC_CONFLICT) {

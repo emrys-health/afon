@@ -50,7 +50,7 @@ public class ShowOidcTokenMain {
             return;
         }
         var properties = new OpsPropertyProvider();
-        var app = new ShowOidcTokenMain(new KeyCloakProvider(properties), properties);
+        var app = new ShowOidcTokenMain(new KeyCloakProvider(properties.getValue(OIDC_DOMAIN_NAME)), properties);
         AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
         if (args.length == 2) {
             app.userToken(cloud);
