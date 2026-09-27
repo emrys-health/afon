@@ -1,4 +1,4 @@
-package health.emrys.afon.security;
+package health.emrys.afon.rest;
 
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;

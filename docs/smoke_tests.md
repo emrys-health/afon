@@ -61,11 +61,12 @@ smoke/run-oidc-notebook.sh [cloud]
 
 `cloud` defaults to `aws`, and selects the Polaris domain from `<CLOUD>_POLARIS_DOMAIN_NAME`. The script:
 
-1. gets the OIDC access token of `USER_POLARIS_ID` from Keycloak, with `./afon.sh -a show-oidc-token <cloud> user`;
-2. reads `<CLOUD>_POLARIS_DOMAIN_NAME` and `OIDC_DOMAIN_NAME` from `$AFON_HOME/config/*.properties`, for the notebook;
-3. port-forwards `pod/spark-connector-0-driver` on port 15002, via the current `kubectl` context;
-4. runs the notebook with `./afon.sh -a jupyter-execute` (see [scripts/jupyter/execute.sh](../scripts/jupyter/execute.sh));
-5. stops the port-forward, whether the run passed or failed.
+1. reads `<CLOUD>_POLARIS_DOMAIN_NAME` and `OIDC_DOMAIN_NAME` from `$AFON_HOME/config/*.properties`, for the notebook;
+2. checks that OIDC provider is serving requests, with `./afon.sh -a check-oidc`, failing fast if it is not;
+3. gets the OIDC access token of `USER_POLARIS_ID` from OIDC provider, with `./afon.sh -a show-oidc-token <cloud> user`;
+4. port-forwards `pod/spark-connector-0-driver` on port 15002, via the current `kubectl` context;
+5. runs the notebook with `./afon.sh -a jupyter-execute` (see [scripts/jupyter/execute.sh](../scripts/jupyter/execute.sh));
+6. stops the port-forward, whether the run passed or failed.
 
 The executed notebook, with its outputs, is written to `smoke/target/SparkConnectOidcTest.ipynb`, leaving the original
 clean. The script exits non-zero if any check fails. The token is never printed.
