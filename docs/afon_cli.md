@@ -63,7 +63,7 @@ The script accepts the following options, either as a `--flag` or as the equival
 - `--cloud`/`-c` / `AFON_CLOUD`: the cloud provider to target, one of `{aws,azure,gcp}`.  This is optional and only affects some functionality.  Defaults to `ALL`.
 - `--config-env` / `AFON_CONFIG_ENV`: the config env name.  If set, executes the `config-switch` command immediately, before running any command.
 - `--cdktf-env` / `AFON_CDKTF_ENV`: the cdktf env name.  If set, executes the `cdktf-switch` command immediately, before running any command.
-- `--env`/`-e` / `AFON_ENV`: sets both `--cdktf-env` and `--config-env`.  Overrides them if also set.
+- `--env`/`-e` / `AFON_ENV`: sets both `--cdktf-env` and `--config-env`.  The `--env` flag overrides both of them; the `AFON_ENV` env var only overrides their env vars, not their flags.
 - `--logging`/`-l` / `AFON_LOGGING`: the file logging level, defaulting to `INFO`.   The file logs are found the `$AFON_HOME/logs`.
 - `--logging-console`/`-lc` / `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to `OFF`.
 - `AFON_ENVS` (env only): the `NAME=VALUE` pairs of system properties passed to the CLI java process.  Can be used to override  file-based properties in config dir.

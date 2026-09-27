@@ -15,7 +15,8 @@ usage(){
   echo "  --cloud / AFON_CLOUD:                     the cloud to target.  One of aws|azure|gcp.  Defaults to 'ALL'."
   echo "  --config-env / AFON_CONFIG_ENV:           the config env name.  Switches AFON_HOME/config to 'config-<env>' immediately, before running any command."
   echo "  --cdktf-env / AFON_CDKTF_ENV:             the cdktf env name.  Switches AFON_CDKTF to 'AFON_CDKTF-<env>' immediately, before running any command."
-  echo "  --env / AFON_ENV:                         sets both --cdktf-env and --config-env.  Overrides them if also set."
+  echo "  --env / AFON_ENV:                         sets both --cdktf-env and --config-env.  The --env flag overrides both of them;"
+  echo "                                            the AFON_ENV env var only overrides their env vars, not their flags."
   echo "  --logging / AFON_LOGGING:                 the file logging level.  Defaults to 'INFO'.  The file logs are found in 'AFON_HOME/logs'."
   echo "  --logging-console / AFON_LOGGING_CONSOLE: the console logging level.  Defaults to 'OFF'."
   echo "  AFON_CLI_DIR (env only):                  the cli distribution dir this script lives in.  Auto-detected."
@@ -47,6 +48,11 @@ AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
 AFON_ENV="${AFON_ENV:-}"
 AFON_ENVS="${AFON_ENVS:-}"
 
+# Which of the env options were given as flags, which win over any env var.
+ENV_FLAG=
+CONFIG_ENV_FLAG=
+CDKTF_ENV_FLAG=
+
 ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -57,11 +63,11 @@ while [[ $# -gt 0 ]]; do
     --cloud|-c)
       AFON_CLOUD="$2"; shift 2 ;;
     --config-env)
-      AFON_CONFIG_ENV="$2"; shift 2 ;;
+      AFON_CONFIG_ENV="$2"; CONFIG_ENV_FLAG=true; shift 2 ;;
     --cdktf-env)
-      AFON_CDKTF_ENV="$2"; shift 2 ;;
+      AFON_CDKTF_ENV="$2"; CDKTF_ENV_FLAG=true; shift 2 ;;
     --env|-e)
-      AFON_ENV="$2"; shift 2 ;;
+      AFON_ENV="$2"; ENV_FLAG=true; shift 2 ;;
     --logging|-l)
       AFON_LOGGING="$2"; shift 2 ;;
     --logging-console|-lc)
@@ -87,10 +93,19 @@ else
 fi
 
 if [ -n "$AFON_ENV" ]; then
-  echo "Using env=$AFON_ENV"
-  echo "Both cdktf and config env are set to $AFON_ENV"
-  AFON_CDKTF_ENV="$AFON_ENV"
-  AFON_CONFIG_ENV="$AFON_ENV"
+  if [ -n "$ENV_FLAG" ]; then
+    # The --env flag sets both envs, overriding the --cdktf-env and --config-env flags.
+    echo "Using env=$AFON_ENV"
+    echo "Both cdktf and config env are set to $AFON_ENV"
+    AFON_CDKTF_ENV="$AFON_ENV"
+    AFON_CONFIG_ENV="$AFON_ENV"
+  else
+    # The AFON_ENV env var only sets the envs not given by the --cdktf-env and --config-env flags.
+    echo "Using env=$AFON_ENV, from AFON_ENV"
+    [ -n "$CDKTF_ENV_FLAG" ] || AFON_CDKTF_ENV="$AFON_ENV"
+    [ -n "$CONFIG_ENV_FLAG" ] || AFON_CONFIG_ENV="$AFON_ENV"
+    echo "Cdktf env is $AFON_CDKTF_ENV and config env is $AFON_CONFIG_ENV"
+  fi
 fi
 
 AFON_HOME="${AFON_HOME:-$HOME/.afon}"
