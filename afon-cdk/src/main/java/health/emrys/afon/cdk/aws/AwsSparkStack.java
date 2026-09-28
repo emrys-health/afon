@@ -84,9 +84,7 @@ public class AwsSparkStack extends AwsJupyterStack {
                                                                "spark.operator/name", "spark-kubernetes-operator",
                                                                "spark.operator/spark-cluster-name", "prod"
                                                            )))
-                                                       .annotations(Map.of(
-                                                           "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
-                                                           "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
+                                                       .annotations(annotations)
                                                        .build())
                               .dependsOn(lbDependencies)
                               .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
