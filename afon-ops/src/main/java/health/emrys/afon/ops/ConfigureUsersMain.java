@@ -25,13 +25,12 @@ public class ConfigureUsersMain {
     private final AfonUserProvider userProvider;
     private final AfonPropertyProvider propertyProvider;
     private final IdentityProvider identityProvider;
-    private final PolarisUserManager polarisUsers;
+    private PolarisUserManager polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
         this.userProvider     = userProvider;
         this.propertyProvider = propertyProvider;
         this.identityProvider = new KeyCloakProvider(propertyProvider);
-        this.polarisUsers     = new PolarisUserManager(propertyProvider);
     }
 
     /**
@@ -79,7 +78,18 @@ public class ConfigureUsersMain {
 
     public List<HttpResponse> configurePolarisUsers(String catalogName) throws IncorrectConfigException, IOException {
         logger.info("Configuring Polaris users on catalog {}", catalogName);
-        return polarisUsers.configureUsers(catalogName, userProvider);
+        return polarisUsers().configureUsers(catalogName, userProvider);
+    }
+
+    /**
+     * Created on first use, as it requires the {@link AfonProperty#POLARIS_ENDPOINT}, which configuring
+     * OIDC users doesn't, eg when setting up a KeyCloak-only stack, with no Polaris.
+     */
+    private PolarisUserManager polarisUsers() {
+        if (polarisUsers == null) {
+            polarisUsers = new PolarisUserManager(propertyProvider);
+        }
+        return polarisUsers;
     }
 
     /**
@@ -108,7 +118,6 @@ public class ConfigureUsersMain {
         AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
         var    userProvider     = new FileUserProvider();
         var    propertyProvider = new OpsPropertyProvider();
-        propertyProvider.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, propertyProvider).getEndpoint());
         var app = new ConfigureUsersMain(userProvider, propertyProvider);
 
         if (catalogName == null) {
@@ -132,6 +141,8 @@ public class ConfigureUsersMain {
                 }
             }
         } else {
+            // Only the Polaris users need the Polaris endpoint, the OIDC users don't
+            propertyProvider.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, propertyProvider).getEndpoint());
             try {
                 if ( catalogName.equalsIgnoreCase("all") ){
                    // Not glue: "all" never included it, and createAllCatalogs no longer creates it.
@@ -149,11 +160,16 @@ public class ConfigureUsersMain {
         }
     }
 
+    /**
+     * The Jupyter domain of the cloud, or {@code null} if none is configured, as not every stack
+     * deploys Jupyter, eg the Polaris-only and KeyCloak-only stacks, in which case there is no
+     * Jupyter browser client to register.
+     */
     private static String jupyterDomain(AfonCloud cloud, AfonPropertyProvider propertyProvider) {
         String jupyterDomain;
         switch (cloud) {
             case AWS:
-                jupyterDomain = propertyProvider.getValue(AWS_JUPYTER_DOMAIN_NAME);
+                jupyterDomain = propertyProvider.getValue(AWS_JUPYTER_DOMAIN_NAME, null);
                 break;
             case AZURE:
                 jupyterDomain = propertyProvider.getValue(AZURE_JUPYTER_DOMAIN_NAME, null);
