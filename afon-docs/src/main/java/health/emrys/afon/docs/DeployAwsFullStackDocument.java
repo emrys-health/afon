@@ -1,7 +1,6 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.SparkWorkloads;
-import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.DeployAwsFullStackMain;
 import health.emrys.afon.ops.steps.Step;
@@ -26,8 +25,6 @@ public class DeployAwsFullStackDocument extends AbstractDocument {
     }
 
     public String getFurtherNotes() {
-        String polarisDomainName =
-            properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
         return String.format(
             """
             # Troubleshooting
@@ -49,7 +46,7 @@ public class DeployAwsFullStackDocument extends AbstractDocument {
             ```shell
            ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args aws
             ```
-            """, new SparkWorkloads(polarisDomainName, properties).startConnectCommand());
+            """, new SparkWorkloads().startConnectCommand());
     }
 
 

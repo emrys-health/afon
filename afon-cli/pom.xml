@@ -146,11 +146,47 @@
                                         <resource>
                                             <directory>${project.basedir}/../scripts</directory>
                                             <excludes>
-                                                <exclude>ansible/*</exclude>
-                                                <exclude>docker/*</exclude>
-                                                <exclude>snowflake/*</exclude>
-                                                <exclude>trino/*</exclude>
+                                                <exclude>ansible/**</exclude>
+                                                <exclude>docker/**</exclude>
+                                                <exclude>python/.venv/**</exclude>
+                                                <exclude>snowflake/**</exclude>
+                                                <exclude>trino/**</exclude>
                                             </excludes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>export-templates</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${afon.cli.dir}/templates</outputDirectory>
+                                    <changeDetection>content</changeDetection>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}/../templates</directory>
+                                            <includes>
+                                                <include>config/**</include>
+                                            </includes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>export-docs</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${afon.cli.dir}/docs</outputDirectory>
+                                    <changeDetection>content</changeDetection>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}/../docs</directory>
                                         </resource>
                                     </resources>
                                 </configuration>

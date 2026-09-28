@@ -16,7 +16,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import static health.emrys.afon.polaris.config.PolarisRestClient.failuresOf;
+import static health.emrys.afon.rest.HttpResponses.failuresOf;
 
 public class PolarisCatalogManager {
 

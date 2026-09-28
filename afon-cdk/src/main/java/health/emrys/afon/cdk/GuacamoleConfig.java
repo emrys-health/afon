@@ -50,7 +50,6 @@ public class GuacamoleConfig {
     static final int    GUACD_PORT      = 4822;
     static final String SVC_NAME        = "guacamole-web";
     static final String CONFIG_MAP_NAME = "guacamole-config";
-    static final String GUACAMOLE_IMAGE = "guacamole/guacamole:1.5.5";
     /**
      * The active theme's branding extension jar (built from the afon-theme module's
      * {@code themes/<theme>/guacamole/} resources on the synth classpath — see {@link #themeJarBytes}).
@@ -75,7 +74,7 @@ public class GuacamoleConfig {
         public static DbConfig create(AfonPropertyProvider properties) {
             return new DbConfig(properties.getValue(AfonProperty.GUACAMOLE_DB_HOST),
                                 5432,
-                                "guacamole",
+                                "guacamole-" + properties.getValue(AfonProperty.CLUSTER_NAME),
                                 properties.getValue(AfonProperty.GUACAMOLE_DB_USERNAME),
                                 properties.getValue(AfonProperty.GUACAMOLE_DB_PASSWORD));
         }
@@ -187,7 +186,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
                 .builder()
                 .name("guacamole-home-init")
-                .image(GUACAMOLE_IMAGE)
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .command(List.of("sh", "-c", assemble.toString()))
                 .volumeMount(List.of(
                         initVolumeMount("guacamole-config", "/tmp/guacamole-config", true),
@@ -198,7 +197,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacd")
-                .image("guacamole/guacd:1.5.5")
+                .image(DockerImages.GUACD_IMAGE)
                 .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                      .containerPort(GUACD_PORT)
                                                                      .protocol("TCP")
@@ -208,7 +207,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacamole")
-                .image(GUACAMOLE_IMAGE)
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .env(List.of(
                         envVar("GUACD_HOSTNAME", "localhost"),
                         envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
@@ -316,7 +315,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
                 .builder()
                 .name("guacamole-home-init")
-                .image(GUACAMOLE_IMAGE)
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .command(List.of("sh", "-c",
                         "set -e; mkdir -p /etc/guacamole/extensions; "
                         + "cp " + THEME_MOUNT + "/*.jar /etc/guacamole/extensions/;"))
@@ -328,7 +327,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacd")
-                .image("guacamole/guacd:1.5.5")
+                .image(DockerImages.GUACD_IMAGE)
                 .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                      .containerPort(GUACD_PORT)
                                                                      .protocol("TCP")
@@ -341,7 +340,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacamole")
-                .image(GUACAMOLE_IMAGE)
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .env(List.of(
                         envVar("GUACD_HOSTNAME", "localhost"),
                         envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
@@ -420,7 +419,7 @@ public class GuacamoleConfig {
         JobV1SpecTemplateSpecInitContainer schemaGen = JobV1SpecTemplateSpecInitContainer
                 .builder()
                 .name("schema-gen")
-                .image("guacamole/guacamole:1.5.5")
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .command(List.of("sh", "-c", "/opt/guacamole/bin/initdb.sh --postgresql > /sql/001-schema.sql"))
                 .volumeMount(List.of(JobV1SpecTemplateSpecInitContainerVolumeMount.builder()
                                                                                   .name("sql")
@@ -443,7 +442,7 @@ public class GuacamoleConfig {
         JobV1SpecTemplateSpecContainer dbInit = JobV1SpecTemplateSpecContainer
                 .builder()
                 .name("db-init")
-                .image("postgres:16-alpine")
+                .image(DockerImages.POSTGRES_ALPINE_IMAGE)
                 .command(List.of("sh", "-c", script))
                 .env(List.of(
                         jobEnv("PGHOST", db.host()),

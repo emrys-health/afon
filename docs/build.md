@@ -122,10 +122,14 @@ Requires ssh access to the runner.
 
 The workflows require the config to be uploaded to GitHub secrets:
 ```shell
-./afon.sh -a github-secrets -sa push
+./afon.sh -a github-secrets push
 ```
 This pushes the content of each config files to a separate GitHub secret.
 
 **NOTE:** upon any change in the config, the secrets need to be pushed again.
+
+To work with more than one [config env](configuration.md#config-env), push each one to its own GitHub environment,
+and retrieve it again on another machine, with `-- push --env <env>` and `-- pull --env <env>`.  See
+[acceptance tests](acceptance_tests.md#config-secrets) for details.
 
 

@@ -13,6 +13,8 @@ public enum AfonProperty {
     ENV_NAME("ENV_NAME"),
     CLUSTER_NAME("CLUSTER_NAME"),
     DNS_WAIT_TIMEOUT("DNS_WAIT_TIMEOUT"),
+    /** Where the tofu output goes, one of "console" (logged and System.out) or "logger" (only logged). Defaults to "logger". */
+    TOFU_OUTPUT("TOFU_OUTPUT"),
 
     /** Selects which theme under afon-theme's {@code themes/<name>/} to deploy. Defaults to "emrys-hdrs". */
     AFON_THEME("AFON_THEME"),
@@ -32,6 +34,8 @@ public enum AfonProperty {
     AWS_JUPYTER_DNS_ZONE("AWS_JUPYTER_DNS_ZONE"),
     AWS_KEYCLOAK_CERT_ARN("AWS_KEYCLOAK_CERT_ARN"),
     AWS_KEYCLOAK_DNS_ZONE("AWS_KEYCLOAK_DNS_ZONE"),
+    /** Elastic IP that all outbound cluster traffic egresses from.  Optional: a new one is allocated when unset. */
+    AWS_EGRESS_IP("AWS_EGRESS_IP"),
 
     // GCP
     GCP_REGION("GCP_REGION"),

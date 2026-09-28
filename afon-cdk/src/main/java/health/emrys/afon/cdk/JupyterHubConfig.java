@@ -66,13 +66,6 @@ public abstract class JupyterHubConfig {
 
     private static final Logger logger = getLogger(JupyterHubConfig.class);
 
-    private static final String HUB_IMAGE = "jupyterhub/k8s-hub:3.3.8";
-    private static final String PROXY_IMAGE = "jupyterhub/configurable-http-proxy:4.6.1";
-    /**
-     * Same multi-VNC notebook image the single-pod {@link JupyterConfig} uses.
-     */
-    private static final String PYSPARK_NOTEBOOK_IMAGE = "ph1ll1phenry/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi_pkg";
-
     private static final int HUB_PORT        = 8081;
     private static final int PROXY_PUBLIC    = 8000;
     private static final int PROXY_API       = 8001;
@@ -329,7 +322,7 @@ public abstract class JupyterHubConfig {
         DeploymentSpecTemplateSpecContainer hubContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("hub")
-            .image(HUB_IMAGE)
+            .image(DockerImages.JUPYTERHUB_HUB_IMAGE)
             .command(List.of("jupyterhub"))
             .args(List.of("--config", CONFIG_MOUNT + "/" + CONFIG_FILE))
             .env(List.of(
@@ -406,7 +399,7 @@ public abstract class JupyterHubConfig {
         DeploymentSpecTemplateSpecContainer proxyContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("chp")
-            .image(PROXY_IMAGE)
+            .image(DockerImages.JUPYTERHUB_PROXY_IMAGE)
             .command(List.of("configurable-http-proxy"))
             .args(List.of(
                 "--ip=0.0.0.0",
@@ -543,7 +536,7 @@ public abstract class JupyterHubConfig {
                """.formatted(
             PROXY_API_SVC, PROXY_API,
             HUB_SVC, HUB_PORT,
-            PYSPARK_NOTEBOOK_IMAGE, SINGLEUSER_PORT,
+            DockerImages.PYSPARK_NOTEBOOK_IMAGE, SINGLEUSER_PORT,
             HUB_BASE_URL, GUACAMOLE_USER,
             issuer, jupyterDomain(),
             pythonSetOf(userProvider.getUsers().stream().map(AfonUser::email).toList()),

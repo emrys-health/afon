@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static java.lang.String.format;
@@ -29,6 +30,7 @@ import static java.lang.String.format;
 public class GeneratePySparkContextMain {
 
     static final  Logger logger = org.slf4j.LoggerFactory.getLogger(GeneratePySparkContextMain.class);
+    private static final String FEDERATED_CATALOG_NAME = "federatedCatalogName";
     private final String polarisEndpoint;
     private final String polarisId;
     private final String polarisSecret;
@@ -49,13 +51,8 @@ public class GeneratePySparkContextMain {
     public void generatePySparkCode() {
         String tableName = tableName();
         System.out.println("\u001B[32m");
+        System.out.println(new PySparkSessionCode(polarisConfig).sessionCode(sparkCatalogs()));
         System.out.println("""
-                           from pyspark.sql import SparkSession
-                           
-                           spark = SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002").getOrCreate()
-                           
-                           print("session created")
-                           
                            df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
                            print("Initialized test data")
                            """);
@@ -125,11 +122,16 @@ public class GeneratePySparkContextMain {
                                     REPLACE_INVALID_CHARACTERS = TRUE
                                   """));
         System.out.println("\u001B[0m");
-        for (AfonCatalog catalog : afonCatalogs.all()) {
-            Map<String, String> configs = polarisConfig.sparkConfigs(catalog.toString());
-            System.out.println("# " + catalog);
-            configs.forEach((key, value) -> System.out.println(format(".config('%s', '%s')", key, value)));
-        }
+    }
+
+    /**
+     * Every {@link AfonCatalogs} catalog under its own name, plus the federated Glue catalog.
+     */
+    private Map<String, String> sparkCatalogs() {
+        Map<String, String> catalogs = new LinkedHashMap<>();
+        afonCatalogs.all().forEach(catalog -> catalogs.put(catalog.toString(), catalog.toString()));
+        catalogs.put(FEDERATED_CATALOG_NAME, FEDERATED_CATALOG_NAME);
+        return catalogs;
     }
 
     private String snowflakeSql(AfonCatalog catalog, String catalogTable) {

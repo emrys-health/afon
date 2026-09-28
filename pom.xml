@@ -46,8 +46,9 @@
         <afon.logging>INFO</afon.logging>
         <!-- OFF keeps the console quiet and logs to the file only. -->
         <afon.logging.console>INFO</afon.logging.console>
-        <afon.exec>-Dafon.home=${afon.home} -Dafon.cloud=${afon.cloud} -Dafon.logging=${afon.logging} -Dafon.logging.console=${afon.logging.console} -Dslf4j.provider=ch.qos.logback.classic.spi.LogbackServiceProvider</afon.exec>
-        <afon.jvm>--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-modules=jdk.incubator.vector --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --enable-preview</afon.jvm>
+        <afon.exec>-Dafon.home=${afon.home} -Dafon.cdktf=${afon.cdktf} -Dafon.cloud=${afon.cloud} -Dafon.logging=${afon.logging} -Dafon.logging.console=${afon.logging.console} ${afon.slf4j}</afon.exec>
+        <afon.slf4j>-Dslf4j.provider=ch.qos.logback.classic.spi.LogbackServiceProvider -Dslf4j.internal.verbosity=WARN</afon.slf4j>
+        <afon.jvm>--add-exports=java.base/sun.util.calendar=ALL-UNNAMED --add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.management/sun.management=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --enable-preview</afon.jvm>
         <!-- compilation and encoding -->
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -80,6 +81,7 @@
         <module>afon-config</module>
         <module>afon-iceberg</module>
         <module>afon-polaris</module>
+        <module>afon-rest</module>
         <module>afon-security</module>
         <module>afon-spark</module>
         <module>afon-spark-connect</module>
@@ -349,8 +351,22 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.4</version>
                     <configuration>
-                        <!-- Pass the afon properties to the forked JVM -->
-                        <argLine>${afon.jvm} ${afon.exec}</argLine>
+                        <argLine>${afon.jvm} ${afon.slf4j}</argLine>
+                        <!-- By default (since surefire 3.4.0) all user properties (mvn -D...) are also
+                             promoted to system properties of the forked JVM. Any that are also set in
+                             systemPropertyVariables (or argLine) are then reported as overwritten or
+                             configured twice. Disabled, as the user properties are already interpolated
+                             into the systemPropertyVariables below, overriding the pom defaults.
+                             NB: any other user property a test needs must be added to systemPropertyVariables. -->
+                        <promoteUserPropertiesToSystemProperties>false</promoteUserPropertiesToSystemProperties>
+                        <!-- Pass the afon properties to the forked JVM as system property variables. -->
+                        <systemPropertyVariables>
+                            <afon.home>${afon.home}</afon.home>
+                            <afon.cdktf>${afon.cdktf}</afon.cdktf>
+                            <afon.cloud>${afon.cloud}</afon.cloud>
+                            <afon.logging>${afon.logging}</afon.logging>
+                            <afon.logging.console>${afon.logging.console}</afon.logging.console>
+                        </systemPropertyVariables>
                     </configuration>
                 </plugin>
                 <plugin>

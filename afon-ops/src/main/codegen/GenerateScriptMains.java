@@ -40,6 +40,7 @@ public class GenerateScriptMains {
         new ScriptEntry("tofu", "TofuStateMain", "tofu/state.sh"),
 
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
+        new ScriptEntry("aws", "AwsClusterMain", "aws/cluster.sh"),
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),
         new ScriptEntry("aws", "AwsCreateMain", "aws/create.sh"),
         new ScriptEntry("aws", "AwsDestroyMain", "aws/destroy.sh"),
@@ -73,6 +74,7 @@ public class GenerateScriptMains {
         new ScriptEntry("gcp", "GcpLoginMain", "gcp/login.sh"),
         new ScriptEntry("gcp", "GcpPolarisMain", "gcp/polaris.sh"),
 
+        new ScriptEntry("github", "GithubMilestonesMain", "github/milestones.sh"),
         new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
         new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),
 

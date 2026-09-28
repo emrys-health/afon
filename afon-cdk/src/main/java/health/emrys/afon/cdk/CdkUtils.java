@@ -79,6 +79,17 @@ public class CdkUtils {
         return builder;
     }
 
+    /**
+     * Escapes the sequences Terraform would otherwise interpret in a string ({@code ${...}}
+     * interpolation and {@code %{...}} directives) so that a shell script using parameter
+     * expansion, eg {@code ${VAR:-default}}, reaches the shell verbatim. Not applied by
+     * {@link #uponDestroyRun(String...)} itself, as some commands deliberately embed Terraform
+     * expressions.
+     */
+    public static String escapeTerraformTemplate(String script) {
+        return script.replace("${", "$${").replace("%{", "%%{");
+    }
+
     private static final String addingOrClauseIfNecessary(String command) {
         if (!(command.endsWith("\n") || command.endsWith("\r"))) {
             return command + " || echo FAILED";

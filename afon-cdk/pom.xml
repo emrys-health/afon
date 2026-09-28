@@ -17,6 +17,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>io.github.classgraph</groupId>
+            <artifactId>classgraph</artifactId>
+            <version>${classgraph.version}</version>
+        </dependency>
+        <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>afon-polaris</artifactId>
             <version>${project.version}</version>
@@ -102,5 +107,28 @@
             <version>11.0.0</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <resources>
+            <!-- charts/*.tgz are vendored binaries and must never pass through filtering. -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>versions.properties</exclude>
+                </excludes>
+            </resource>
+            <!-- versions.properties is the only resource filtered, so ${polaris.version} above
+                 is resolved into the jar as the single source of truth DockerImages reads at
+                 runtime - see DockerImages.POLARIS_IMAGE. -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>versions.properties</include>
+                </includes>
+            </resource>
+        </resources>
+    </build>
 
 </project>

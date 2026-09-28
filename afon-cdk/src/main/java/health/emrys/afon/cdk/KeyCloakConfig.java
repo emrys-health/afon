@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_IMAGE;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
 
 /**
@@ -174,7 +173,7 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         DeploymentSpecTemplateSpecContainer keyCloak = DeploymentSpecTemplateSpecContainer
             .builder()
             .name(APP_NAME)
-            .image(KEYCLOAK_IMAGE)
+            .image(DockerImages.KEYCLOAK_IMAGE)
             .args(args)
             .env(envs)
             .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount
