@@ -81,6 +81,7 @@ public class AwsSparkStack extends AwsJupyterStack {
                       .spec(ServiceSpec.builder()
                                        .selector(MASTER_LABELS)
                                        .type("LoadBalancer")
+                                       .externalTrafficPolicy("Local")
                                        .port(List.of(
                                                ServiceSpecPort.builder()
                                                               .name("web")
