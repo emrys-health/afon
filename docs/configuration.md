@@ -127,3 +127,18 @@ Afon supports two user configuration files in the config dir:
 **`users-acl.csv`** (list of users ACL, one per line):
 
 - [users-acl.csv](../templates/config/users-acl.csv)
+
+The `catalogs` field is a colon-separated list of entries, each one of:
+
+- `all`: every catalog
+- a catalog name, e.g. `aws`
+- an exclusion, a catalog name prefixed by `!`, e.g. `!aws_forbidden`
+
+Names may use the `*` wildcard, e.g. `aws_*` or `!*_forbidden`.
+A catalog is authorised if it matches an inclusion and no exclusion: exclusions win over inclusions,
+so a list of only exclusions authorises no catalog. For example:
+
+```
+will,all:!aws_forbidden:!azure_forbidden:!gcp_forbidden
+jane,all:!*_forbidden
+```
