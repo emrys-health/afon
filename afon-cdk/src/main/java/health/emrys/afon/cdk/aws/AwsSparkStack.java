@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_NAME;
 import static health.emrys.afon.cdk.SparkWorkloads.MASTER_LABELS;
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_ALLOWED_CIDRS;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DOMAIN_NAME;
 
 /**
@@ -34,29 +36,38 @@ import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DOMAIN_NAME;
  */
 public class AwsSparkStack extends AwsJupyterStack {
 
-    private final static Logger              logger = org.slf4j.LoggerFactory.getLogger(AwsSparkStack.class);
+    private final static Logger logger = org.slf4j.LoggerFactory.getLogger(AwsSparkStack.class);
 
-    protected final      String              awsPolarisDomainName;
+    protected final String awsPolarisDomainName;
 
     public AwsSparkStack(@NonNull Construct scope,
                          @NonNull AfonCloud id,
-                         AfonPropertyProvider properties) {
+                         AfonPropertyProvider properties
+    ) {
         super(scope, id, properties);
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
         awsPolarisDomainName = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
         new SparkWorkloads().deploy(this, id, eksDependOn);
-        sparkExternalService(eksDependOn);
+        sparkExternalService(eksDependOn, properties);
         // Cluster-level dependencies only (not the Spark LB): the monitoring releases depend on
         // this resource (see AwsFullStack), so anything more would also serialise their install
         // behind the Spark load balancer.
         unregisterCRDs(cloudProvider.getDependables());
     }
 
-    private Service sparkExternalService(List<ITerraformDependable> eksDependOn) {
-        String subnetIds = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
+    private Service sparkExternalService(List<ITerraformDependable> eksDependOn, AfonPropertyProvider properties) {
+        String                          subnetIds      = cloudProvider.getSubnetIds().stream().collect(Collectors.joining(","));
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
         lbDependencies.add(cloudProvider.loadBalancerRole);
+        Map<String, String> annotations = new HashMap<>(Map.of(
+            "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
+            "service.beta.kubernetes.io/aws-load-balancer-internal", "false"));
+        List<String> sourceRanges = cloudProvider.polarisInboundCidrs(properties.getValue(AWS_POLARIS_ALLOWED_CIDRS, ""));
+        if (!sourceRanges.isEmpty()) {
+            // The LB Controller turns this into the NLB's security group ingress rules.
+            annotations.put("service.beta.kubernetes.io/load-balancer-source-ranges", String.join(",", sourceRanges));
+        }
         // Creating this LoadBalancer Service fires the AWS LB Controller's
         // mutating webhook (mservice.elbv2.k8s.aws). Depend on the controller's
         // Helm release — which is installed atomically, so Terraform waits for
@@ -65,43 +76,44 @@ public class AwsSparkStack extends AwsJupyterStack {
         // service aws-load-balancer-webhook-service".
         lbDependencies.add(cloudProvider.getLbRelease());
         return Service.Builder.create(this, SPARK_SERVICE_NAME)
-                      .metadata(ServiceMetadata.builder()
-                                               .name(SPARK_SERVICE_NAME)
-                                               .labels(addMaps(MASTER_LABELS, Map.of(
-                                                              "spark-version", "4.0.1",
-                                                              "spark.operator/name", "spark-kubernetes-operator",
-                                                              "spark.operator/spark-cluster-name", "prod"
-                                                             )))
-                                               .annotations(Map.of(
-                                                       "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
-                                                       "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
+                              .metadata(ServiceMetadata.builder()
+                                                       .name(SPARK_SERVICE_NAME)
+                                                       .labels(addMaps(
+                                                           MASTER_LABELS, Map.of(
+                                                               "spark-version", "4.0.1",
+                                                               "spark.operator/name", "spark-kubernetes-operator",
+                                                               "spark.operator/spark-cluster-name", "prod"
+                                                           )))
+                                                       .annotations(Map.of(
+                                                           "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
+                                                           "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
+                                                       .build())
+                              .dependsOn(lbDependencies)
+                              .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
+                              .spec(ServiceSpec.builder()
+                                               .selector(MASTER_LABELS)
+                                               .type("LoadBalancer")
+                                               .port(List.of(
+                                                   ServiceSpecPort.builder()
+                                                                  .name("web")
+                                                                  .port(8080) // Port the load balancer listens on
+                                                                  .targetPort("web") // Port the container is listening on
+                                                                  .protocol("TCP")
+                                                                  .build(),
+                                                   ServiceSpecPort.builder()
+                                                                  .name("spark")
+                                                                  .port(7077) // Port the load balancer listens on
+                                                                  .targetPort("7077") // Port the container is listening on
+                                                                  .protocol("TCP")
+                                                                  .build(),
+                                                   ServiceSpecPort.builder()
+                                                                  .name("rest")
+                                                                  .port(6066) // Port the load balancer listens on
+                                                                  .targetPort("rest") // Port the container is listening on
+                                                                  .protocol("TCP")
+                                                                  .build()
+                                               ))
                                                .build())
-                      .dependsOn(lbDependencies)
-                      .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
-                      .spec(ServiceSpec.builder()
-                                       .selector(MASTER_LABELS)
-                                       .type("LoadBalancer")
-                                       .port(List.of(
-                                               ServiceSpecPort.builder()
-                                                              .name("web")
-                                                              .port(8080) // Port the load balancer listens on
-                                                              .targetPort("web") // Port the container is listening on
-                                                              .protocol("TCP")
-                                                              .build(),
-                                               ServiceSpecPort.builder()
-                                                              .name("spark")
-                                                              .port(7077) // Port the load balancer listens on
-                                                              .targetPort("7077") // Port the container is listening on
-                                                              .protocol("TCP")
-                                                              .build(),
-                                               ServiceSpecPort.builder()
-                                                              .name("rest")
-                                                              .port(6066) // Port the load balancer listens on
-                                                              .targetPort("rest") // Port the container is listening on
-                                                              .protocol("TCP")
-                                                              .build()
-                                                    ))
-                                       .build())
                               .build();
     }
 
