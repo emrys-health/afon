@@ -191,6 +191,13 @@ Polaris' ALB (via the `alb.ingress.kubernetes.io/inbound-cidrs` annotation).  Th
 added automatically, as pods calling Polaris by its public domain name come back in through the ALB
 from that address.
 
+Note that if this property is not defined, there are no restraints. 
+You can, however, add them manually with something like:
+```shell
+kubectl annotate ingress polaris-ingress -n default --overwrite   alb.ingress.kubernetes.io/inbound-cidrs="35.177.204.48/32"
+```
+This annotation triggers the ALB to add the constraint as it watches any change here. 
+
 This cannot be done with a Kubernetes `NetworkPolicy` `ipBlock`: the ALB terminates the client's
 connection and opens its own, so the Polaris pod only ever sees the ALB's or a node's VPC address.
 
