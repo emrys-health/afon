@@ -64,6 +64,30 @@ Once the AWS full stack is deployed, we can access Polaris and Jupyter via the U
 - `https://emryspolaris.click`
 - `https://emrysjupyter.click/guacamole`
 
+### Deploy AWS Keycloak only
+
+The AWS Keycloak stack deploys only the Keycloak server, ie the EKS cluster with Keycloak behind its HTTPS ingress
+at `OIDC_DOMAIN_NAME`, without Polaris, eg to serve as a standalone OIDC provider.
+
+```shell
+afon-cli.sh deploy-aws-keycloak-stack
+```
+Steps: `delete_aws_stack` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `deploy_complete_for_cloud_aws`
+
+It requires the Keycloak properties (`OIDC_DOMAIN_NAME`, `KEYCLOAK_*`, `AWS_KEYCLOAK_DNS_ZONE`, `AWS_KEYCLOAK_CERT_ARN`)
+and the AWS cluster properties, but none of the `AWS_POLARIS_*` properties.
+Once deployed, you can check the OIDC provider is ready with `afon-cli.sh check-oidc`.
+
+### Setup AWS Keycloak only
+
+To deploy the AWS Keycloak stack and configure it with the realm, the `POLARIS_ID` client and the users (and
+their confidential clients), plus the Jupyter browser client if `AWS_JUPYTER_DOMAIN_NAME` is set:
+
+```shell
+afon-cli.sh setup-aws-keycloak-stack
+```
+Steps: `delete_aws_stack` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `configure_oidc_users_for_cloud_aws` → `setup_complete_for_cloud_aws`
+
 ### Setup Azure Polaris only
 
 ```shell
@@ -175,7 +199,7 @@ You may need to run them multiple times for the VPC to disappear from your cloud
 To check the AWS VPC has been destroyed:
 
 ```shell
-afon-cli.sh stack-status
+afon-cli.sh aws-vpcs  # same as: afon-cli-scripts.sh aws/vpcs.sh
 ```
 
 And if all else fails, login to the [AWS VPC Console](https://eu-west-2.console.aws.amazon.com/vpcconsole/home?region=eu-west-2#vpcs:)
@@ -188,24 +212,14 @@ When Azure resource group is stuck:
 az group delete --name afon_resource_group_aks --yes --no-wait
 ```
 
-## GitOps considerations
-
-Currently, the generated Terraform can contain confidential details (secrets, credentials). 
-
-Before adopting a GitOps workflow where Terraform state is checked into Git:
-
-1. **Separate secrets** — move all sensitive values into Kubernetes secrets or a secrets manager (Vault, AWS Secrets Manager, etc.) rather than embedding them in CDKTF output
-2. **Use remote state** — store Terraform state in a remote backend (S3 + DynamoDB for AWS, Azure Storage for Azure, GCS for GCP) with encryption
-3. **CI/CD pipeline** — run `tofu plan` on PRs and `tofu apply` on merge to main
-4. **State locking** — ensure concurrent runs are prevented via state locking
-
-This is noted as a future improvement in the project.
-
 ## Summary of deployment commands
 
 ```shell
-# AWS full stack (Polaris + Spark + Jupyter)
+# AWS full stack (Keycloak + Polaris + Spark + Jupyter)
 afon-cli.sh deploy-aws-full-stack
+
+# AWS Keycloak (standalone)
+afon-cli.sh deploy-aws-keycloak-stack
 
 # Azure Polaris (standalone)
 afon-cli.sh deploy-azure-polaris-stack
@@ -230,7 +244,7 @@ afon-cli.sh deploy-snowflake-writing-azure-via-aws
 - [ ] **DNS zones** created in each target cloud and nameservers configured at your domain registrar
 - [ ] **SSL certificates** requested and validated (ACM for AWS, Let's Encrypt for others)
 - [ ] **External Polaris database** provisioned for Polaris metadata storage
-- [ ] **OAuth2 provider** configured OIDC provider for Jupyter access
+- [ ] **OIDC provider** configured OIDC provider for Jupyter access
 - [ ] **Cloud IAM roles** created via `scripts/<cloud>/create.sh`
 - [ ] **Storage buckets** created (primary, external, and forbidden for each cloud)
 - [ ] **Configuration** properties and users values populated in `config` dir

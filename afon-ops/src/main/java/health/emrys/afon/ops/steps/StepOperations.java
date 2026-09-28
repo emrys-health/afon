@@ -2,6 +2,7 @@ package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.aws.AwsFullStack;
+import health.emrys.afon.cdk.aws.AwsKeycloakStack;
 import health.emrys.afon.cdk.aws.AwsPolarisStack;
 import health.emrys.afon.cdk.azure.AzureFullStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
@@ -170,6 +171,22 @@ public class StepOperations {
         }
     }
 
+    public Step deployKeycloakStackIn(AfonCloud cloud) {
+        logger.info(format("Deploying KeyCloak stack in cloud %s", cloud));
+        switch (cloud) {
+            case AWS:
+                return new Step("deploy_aws_keycloak_stack",
+                        "deploy KeyCloak stack in AWS",
+                        () -> {
+                            checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN);
+                            timed(deployDurations, AWS, () -> actions.startStack(AwsKeycloakStack.class, AWS, tofuOutput()));
+                        });
+            case AZURE, GCP:
+            default:
+                throw new RuntimeException("Unsupported cloud " + cloud);
+        }
+    }
+
     public Step waitForPolarisAndKeycloakIn(AfonCloud cloud) {
         return waitForPolaris(cloud).andThen(waitForKeyCloak());
     }
@@ -188,7 +205,7 @@ public class StepOperations {
         }
     }
 
-    private Step waitForKeyCloak() {
+    public Step waitForKeyCloak() {
         long timeout = dnsWaitTimeout();
         return actions.waitOnDNS(properties.getValue(OIDC_DOMAIN_NAME), timeout);
     }

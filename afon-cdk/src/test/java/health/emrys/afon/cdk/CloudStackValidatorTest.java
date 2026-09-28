@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import health.emrys.afon.cdk.aws.AwsFullStack;
+import health.emrys.afon.cdk.aws.AwsKeycloakStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import org.junit.jupiter.api.Test;
@@ -17,11 +18,11 @@ class CloudStackValidatorTest {
 
     @Test
     void canFindStacksOnClasspath() {
-        assertThat(validator.stacks()).containsKeys("aws-full-stack", "azure-polaris-stack", "gcp-polaris-stack");
+        assertThat(validator.stacks()).containsKeys("aws-full-stack", "aws-keycloak-stack", "azure-polaris-stack", "gcp-polaris-stack");
         // not public, so not runnable
         assertThat(validator.stacks()).doesNotContainKey("azure-kubernetes-stack");
         assertThat(validator.stacks().values()).allMatch(AfonCloudStack.class::isAssignableFrom);
-        assertThat(validator.stackNames()).contains("aws-full", "azure-polaris", "gcp-polaris");
+        assertThat(validator.stackNames()).contains("aws-full", "aws-keycloak", "azure-polaris", "gcp-polaris");
     }
 
     @Test
@@ -30,6 +31,7 @@ class CloudStackValidatorTest {
         assertThat(validator.resolve("azure-polaris-stack")).isEqualTo(AzurePolarisStack.class);
         assertThat(validator.resolve("AzurePolarisStack")).isEqualTo(AzurePolarisStack.class);
         assertThat(validator.resolve("aws-full")).isEqualTo(AwsFullStack.class);
+        assertThat(validator.resolve("aws-keycloak")).isEqualTo(AwsKeycloakStack.class);
     }
 
     @Test
