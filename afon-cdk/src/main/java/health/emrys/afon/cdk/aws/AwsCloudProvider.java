@@ -69,10 +69,8 @@ import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
-import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
 import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
-import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
 
 public class AwsCloudProvider extends AbstractCloudProvider {
@@ -95,12 +93,10 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     private final AwsCleanupHelper           cleanupHelper;
     private final AwsComponentNames          componentNames;
-    private final String                     polarisDomainName;
     private final String                     accountId;
     private final String                     region;
     private final String                     clusterName;
     private final String                     clusterPolicyArn;
-    private final String                     polarisCertArn;
     private final EksCluster                 cluster;
     private final List<ITerraformDependable> eksDependOn;
     private final List<String>               subnetIds;
@@ -111,6 +107,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     final         Resource                   newKubeConfig;
     final         Release                    lbRelease;
     final         Vpc                        vpc;
+    private final Resource                   lbcDestroyCleanup;
     private       HelmProvider               helmProvider;
     private final List<ITerraformDependable> lbcIrsaDependables = new ArrayList<>();
     private       KubernetesProvider         k8sProvider;
@@ -120,9 +117,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         cleanupHelper = new AwsCleanupHelper(properties);
         componentNames = new AwsComponentNames(properties);
         clusterName    = properties.getValue(AfonProperty.CLUSTER_NAME);
-        polarisCertArn = properties.getValue(AfonProperty.AWS_POLARIS_CERT_ARN);
 
-        this.polarisDomainName = properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
         this.accountId         = properties.getValue(AWS_ACCOUNT_ID);
         this.region            = properties.getValue(AfonProperty.AWS_REGION);
         clusterPolicyArn       = format("arn:aws:iam::%s:policy/AWSLoadBalancerControllerIAMPolicyCurl", accountId);
@@ -763,22 +758,12 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
         lbRelease = configureIngress(scope, loadBalancerRole);
 
-        IngressV1 ingress = createHttpsIngress(
-            "polaris-https-ingress",
-            "polaris-ingress",
-            polarisCertArn,
-            this.polarisDomainName,
-                POLARIS_INTERNAL_SERVICE_NAME,
-            8181,
-            subnetIds
-                                              );
-
-
         // Destroy-time cleanup: must run before lbRelease is uninstalled so the LBC
         // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
         // The explicit helm uninstall --no-hooks pre-empts Terraform's own Helm destroy,
         // which fails when webhooks/finalizers interfere. Helm treats "release not found" as success.
-        // The controller is uninstalled first, so it is gone before the ingresses are deleted.
+        // The controller is uninstalled first, so it is gone before the ingresses are deleted:
+        // each ingress created by createHttpsIngress is added to this resource's dependencies.
         // Ingress finalizers are stripped only afterwards, as a running controller re-adds them.
         List<LocalExecProvisioner> onLbcDestroy = uponDestroyRun(
             "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer" +
@@ -796,22 +781,12 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "kubectl get ingress -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
                 "while read NS NAME; do kubectl patch ingress \"$NAME\" -n \"$NS\" -p " +
                 "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done");
-        Resource.Builder
+        lbcDestroyCleanup = Resource.Builder
             .create(this, "lbc-destroy-cleanup")
-            .dependsOn(List.of(ingress, lbRelease))
+            .dependsOn(List.of(lbRelease))
             .provisioners(onLbcDestroy)
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .build();
-
-        // 2. Create the Alias A Record
-        // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
-        // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
-        configureDNS("IngressAliasRecord",
-                     properties.getValue(AWS_POLARIS_DNS_ZONE),
-                     this.polarisDomainName,
-                     lbRelease,
-                     ingress,
-                     "polaris-ingress");
     }
 
     private static ReleaseSet createValue(String name, String value) {
@@ -1096,7 +1071,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .namespace("default")
             .annotations(albAnnotations)
             .build();
-        return IngressV1.Builder
+        IngressV1 ingress = IngressV1.Builder
             .create(this, constructId)
             .provider(kubernetesProvider)
             // The controller normally removes its own `ingress.k8s.aws/resources` finalizer
@@ -1121,6 +1096,21 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .waitForLoadBalancer(true)
             .timeouts(IngressV1Timeouts.builder().create(INGRESS_LOAD_BALANCER_TIMEOUT).build())
             .build();
+        destroyAfterLbcCleanup(ingress);
+        return ingress;
+    }
+
+    /**
+     * Makes the lbc-destroy-cleanup depend on the ingress, so that on destroy the cleanup, which
+     * uninstalls the AWS Load Balancer Controller and strips the ingress finalizers, runs before
+     * the ingress is deleted. Done for every ingress {@link #createHttpsIngress} creates, so they
+     * are all destroyed in the same order.
+     */
+    private void destroyAfterLbcCleanup(IngressV1 ingress) {
+        List<String> dependsOn = new ArrayList<>(lbcDestroyCleanup.getDependsOn());
+        // a plain reference, as the builder's dependsOn writes, not getFqn()'s "${...}" token
+        dependsOn.add(ingress.getTerraformResourceType() + "." + ingress.getFriendlyUniqueId());
+        lbcDestroyCleanup.setDependsOn(dependsOn);
     }
 
     public Release getLbRelease() {
@@ -1249,10 +1239,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     @Override
     public String getClusterEndpoint() {
         return cluster.getEndpoint();
-    }
-
-    public String getPolarisDomainName() {
-        return polarisDomainName;
     }
 
     public String getAccountId() {

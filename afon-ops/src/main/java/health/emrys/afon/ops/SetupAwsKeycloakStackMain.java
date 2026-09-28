@@ -1,0 +1,28 @@
+package health.emrys.afon.ops;
+
+import health.emrys.afon.ops.steps.Step;
+import health.emrys.afon.ops.steps.StepOperations;
+import health.emrys.afon.ops.steps.StepRunner;
+import health.emrys.afon.ops.steps.StepsProvider;
+
+import java.util.List;
+
+import static health.emrys.afon.config.AfonCloud.AWS;
+
+public class SetupAwsKeycloakStackMain implements StepsProvider {
+
+    @Override
+    public List<Step> stepsUsing(StepOperations stepOperations) {
+        return List.of(
+            stepOperations.deleteStackIn(AWS),
+            stepOperations.deployKeycloakStackIn(AWS),
+            stepOperations.waitForKeyCloak(),
+            stepOperations.configureOidcUsersFor(AWS),
+            stepOperations.setupComplete(AWS));
+    }
+
+    public static void main(String[] args) {
+        new StepRunner().runUsing(new SetupAwsKeycloakStackMain(), args);
+    }
+
+}
