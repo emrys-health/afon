@@ -36,6 +36,11 @@ public enum AfonProperty {
     AWS_KEYCLOAK_DNS_ZONE("AWS_KEYCLOAK_DNS_ZONE"),
     /** Elastic IP that all outbound cluster traffic egresses from.  Optional: a new one is allocated when unset. */
     AWS_EGRESS_IP("AWS_EGRESS_IP"),
+    /**
+     * Comma-separated CIDRs allowed to reach Polaris' ALB.  Optional: when unset the ALB is open to all.
+     * When set, the cluster's egress IP is added so in-cluster clients can still use the public domain name.
+     */
+    AWS_POLARIS_ALLOWED_CIDRS("AWS_POLARIS_ALLOWED_CIDRS"),
 
     // GCP
     GCP_REGION("GCP_REGION"),

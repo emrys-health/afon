@@ -72,6 +72,7 @@ import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
 import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
+import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_ALLOWED_CIDRS;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DNS_ZONE;
 import static java.lang.String.format;
 
@@ -772,7 +773,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             this.polarisDomainName,
                 POLARIS_INTERNAL_SERVICE_NAME,
             8181,
-            subnetIds
+            subnetIds,
+            polarisInboundCidrs(properties.getValue(AWS_POLARIS_ALLOWED_CIDRS, ""))
                                               );
 
 
@@ -828,6 +830,22 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                      lbRelease,
                      ingress,
                      "polaris-ingress");
+    }
+
+    /**
+     * The configured allow-list plus the cluster's own egress IP: pods that call Polaris by its
+     * public domain name leave through the NAT gateway and come back in through the ALB, so without
+     * it they would be locked out too. Empty (no restriction) when nothing is configured.
+     */
+    private List<String> polarisInboundCidrs(String allowedCidrsCsv) {
+        List<String> cidrs = Arrays.stream(allowedCidrsCsv.split(","))
+                                   .map(String::trim)
+                                   .filter(cidr -> !cidr.isEmpty())
+                                   .collect(Collectors.toCollection(ArrayList::new));
+        if (!cidrs.isEmpty()) {
+            cidrs.add(egressIp + "/32");
+        }
+        return cidrs;
     }
 
     private static ReleaseSet createValue(String name, String value) {
@@ -1049,11 +1067,30 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         final String serviceName,
         final int servicePort,
         final List<String> subnetIds) {
+        return createHttpsIngress(constructId, ingressName, certArn, hostName, serviceName, servicePort,
+                                  subnetIds, List.of());
+    }
+
+    /**
+     * As above but, when {@code inboundCidrs} is non-empty, the ALB's security group only admits
+     * those source ranges. The IP allow-list has to live here rather than in a NetworkPolicy: the
+     * ALB terminates the client's connection and opens its own, so pods only ever see the ALB's
+     * (or a node's) VPC address, never the caller's.
+     */
+    public IngressV1 createHttpsIngress(
+        final String constructId,
+        final String ingressName,
+        final String certArn,
+        final String hostName,
+        final String serviceName,
+        final int servicePort,
+        final List<String> subnetIds,
+        final List<String> inboundCidrs) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
         String subnetIdsCSV = subnetIds.stream().collect(Collectors.joining(","));
         log.info("subnetIDs = {}, certArn = {}, hostname = {}", subnetIdsCSV, certArn, hostName);
-        Map<String, String> albAnnotations = Map.of(
+        Map<String, String> albAnnotations = new HashMap<>(Map.of(
             // 1. Tell the LBC to create an Application Load Balancer (ALB)
             "kubernetes.io/ingress.class", "alb",
 
@@ -1074,7 +1111,10 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "external-dns.alpha.kubernetes.io/hostname", hostName,
 
             "alb.ingress.kubernetes.io/subnets", subnetIdsCSV
-                                                   );
+                                                   ));
+        if (!inboundCidrs.isEmpty()) {
+            albAnnotations.put("alb.ingress.kubernetes.io/inbound-cidrs", String.join(",", inboundCidrs));
+        }
 
         var sslServicePort = IngressV1SpecRuleHttpPathBackendService
             .builder()
