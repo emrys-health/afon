@@ -184,6 +184,23 @@ AWS_EGRESS_IP=<the allocated IP>
 The stack then looks that address up rather than managing it, so a destroy leaves it allocated (and
 still on the allow-list) for the next apply.
 
+### Restricting who can reach Polaris (AWS)
+
+Set `AWS_POLARIS_ALLOWED_CIDRS` to a comma-separated list of CIDRs to only admit those callers to
+Polaris' ALB (via the `alb.ingress.kubernetes.io/inbound-cidrs` annotation).  The egress IP above is
+added automatically, as pods calling Polaris by its public domain name come back in through the ALB
+from that address.
+
+Note that if this property is not defined, there are no restraints. 
+You can, however, add them manually with something like:
+```shell
+kubectl annotate ingress polaris-ingress -n default --overwrite   alb.ingress.kubernetes.io/inbound-cidrs="35.177.204.48/32"
+```
+This annotation triggers the ALB to add the constraint as it watches any change here. 
+
+This cannot be done with a Kubernetes `NetworkPolicy` `ipBlock`: the ALB terminates the client's
+connection and opens its own, so the Polaris pod only ever sees the ALB's or a node's VPC address.
+
 ## Logging & Monitoring
 
 Currently, we use an external Grafana and tunneling into the cluster.
