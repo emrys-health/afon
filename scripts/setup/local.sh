@@ -23,7 +23,7 @@ install_gke_auth_plugin_macos(){
 
 case $SETUP_OS in
   linux|GNU/Linux)
-    sudo apt install git openjdk-17-jdk maven docker tofu kubectl hubble
+    sudo apt install git gh openjdk-17-jdk maven docker tofu kubectl hubble
     if [ -z "$CLOUD" ]; then
       sudo apt install awscli
       install_eksct_linux
@@ -46,7 +46,7 @@ case $SETUP_OS in
     fi
     ;;
   macos|arm64)
-    brew install git openjdk@17 maven docker opentofu kubernetes-cli hubble
+    brew install git gh openjdk@17 maven docker opentofu kubernetes-cli hubble
     if [ -z "$CLOUD" ]; then
       brew install awscli eksctl
       brew install azure-cli
