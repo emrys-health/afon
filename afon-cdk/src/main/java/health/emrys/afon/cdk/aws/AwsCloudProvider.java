@@ -808,6 +808,23 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
     }
 
+    /**
+     * The configured allow-list plus the cluster's own egress IP: pods that call Polaris by its
+     * public domain name leave through the NAT gateway and come back in through the ALB, so without
+     * it they would be locked out too. Empty (no restriction) when nothing is configured.
+     */
+    public List<String> polarisInboundCidrs(String allowedCidrsCsv) {
+        List<String> cidrs = Arrays.stream(allowedCidrsCsv.split(","))
+                                   .map(String::trim)
+                                   .filter(cidr -> !cidr.isEmpty())
+                                   .collect(Collectors.toCollection(ArrayList::new));
+        if (!cidrs.isEmpty()) {
+            cidrs.add(egressIp + "/32");
+        }
+        return cidrs;
+    }
+
+
     private static ReleaseSet createValue(String name, String value) {
         return ReleaseSet.builder()
                          .name(name)
@@ -1019,6 +1036,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
     }
 
+    /** Restricts an ALB to the given comma-separated source CIDRs; absent means open to all. */
+    public static final String INBOUND_CIDRS_ANNOTATION = "alb.ingress.kubernetes.io/inbound-cidrs";
+
     public IngressV1 createHttpsIngress(
         final String constructId,
         final String ingressName,
@@ -1027,11 +1047,30 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         final String serviceName,
         final int servicePort,
         final List<String> subnetIds) {
+        return createHttpsIngress(constructId, ingressName, certArn, hostName, serviceName, servicePort,
+                                  subnetIds, List.of());
+    }
+
+    /**
+     * As above but, when {@code inboundCidrs} is non-empty, the ALB's security group only admits
+     * those source ranges. The IP allow-list has to live here rather than in a NetworkPolicy: the
+     * ALB terminates the client's connection and opens its own, so pods only ever see the ALB's
+     * (or a node's) VPC address, never the caller's.
+     */
+    public IngressV1 createHttpsIngress(
+        final String constructId,
+        final String ingressName,
+        final String certArn,
+        final String hostName,
+        final String serviceName,
+        final int servicePort,
+        final List<String> subnetIds,
+        final List<String> inboundCidrs) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
         String subnetIdsCSV = subnetIds.stream().collect(Collectors.joining(","));
         log.info("subnetIDs = {}, certArn = {}, hostname = {}", subnetIdsCSV, certArn, hostName);
-        Map<String, String> albAnnotations = Map.of(
+        Map<String, String> albAnnotations = new HashMap<>(Map.of(
             // 1. Tell the LBC to create an Application Load Balancer (ALB)
             "kubernetes.io/ingress.class", "alb",
 
@@ -1052,7 +1091,10 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "external-dns.alpha.kubernetes.io/hostname", hostName,
 
             "alb.ingress.kubernetes.io/subnets", subnetIdsCSV
-                                                   );
+                                                   ));
+        if (!inboundCidrs.isEmpty()) {
+            albAnnotations.put(INBOUND_CIDRS_ANNOTATION, String.join(",", inboundCidrs));
+        }
 
         var sslServicePort = IngressV1SpecRuleHttpPathBackendService
             .builder()

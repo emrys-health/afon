@@ -16,8 +16,11 @@ import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_ALLOWED_CIDRS;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
 import static health.emrys.afon.config.AfonCloud.AWS;
 
@@ -77,7 +80,8 @@ public class AwsPolarisStack extends AbstractAwsStack {
             polarisDomainName,
             POLARIS_INTERNAL_SERVICE_NAME,
             8181,
-            cloudProvider.getSubnetIds());
+            cloudProvider.getSubnetIds(),
+            cloudProvider.polarisInboundCidrs(properties.getValue(AWS_POLARIS_ALLOWED_CIDRS, "")));
         cloudProvider.configureDNS(
             "IngressAliasRecord",
             properties.getValue(AfonProperty.AWS_POLARIS_DNS_ZONE),
