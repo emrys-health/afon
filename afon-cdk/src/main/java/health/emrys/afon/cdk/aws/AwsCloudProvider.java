@@ -1017,6 +1017,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
     }
 
+    /** Restricts an ALB to the given comma-separated source CIDRs; absent means open to all. */
+    public static final String INBOUND_CIDRS_ANNOTATION = "alb.ingress.kubernetes.io/inbound-cidrs";
+
     public IngressV1 createHttpsIngress(
         final String constructId,
         final String ingressName,
@@ -1071,7 +1074,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "alb.ingress.kubernetes.io/subnets", subnetIdsCSV
                                                    ));
         if (!inboundCidrs.isEmpty()) {
-            albAnnotations.put("alb.ingress.kubernetes.io/inbound-cidrs", String.join(",", inboundCidrs));
+            albAnnotations.put(INBOUND_CIDRS_ANNOTATION, String.join(",", inboundCidrs));
         }
 
         var sslServicePort = IngressV1SpecRuleHttpPathBackendService
