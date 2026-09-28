@@ -4,13 +4,13 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.spark.SparkClient;
 import org.apache.spark.sql.SparkSession;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -45,16 +45,7 @@ abstract public class SparkRunner {
                 values = args[4];
                 Arrays.stream(values.split(",")).forEach(lines::add);
             } else {
-                Date   now     = new Date();
-                String prepend = String.format("%s %s", now, properties.getValue(CLUSTER_NAME));
-                properties
-                    .getProperties()
-                    .entrySet()
-                    .stream()
-                    .filter(x -> !properties.getSecretProperties().contains(x.getKey()))
-                    .forEach(x -> {
-                        lines.add(String.format("%s %s=%s", prepend, x.getKey(), x.getValue()));
-                    });
+                appendTo(lines, properties);
             }
             String polarisId;
             String polarisSecret;
@@ -74,6 +65,20 @@ abstract public class SparkRunner {
             logger.warn(e.getMessage(), e);
             throw new RuntimeException(e);
         }
+    }
+
+    static void appendTo(List<String> lines, AfonPropertyProvider properties) {
+        Date       now     = new Date();
+        String     prepend = String.format("%s %s", now, properties.getValue(CLUSTER_NAME));
+        Properties secrets = properties.getSecretProperties();
+        properties
+            .getProperties()
+            .entrySet()
+            .stream()
+            .filter(x -> !secrets.containsKey(x.getKey()))
+            .forEach(x -> {
+                lines.add(String.format("%s %s=%s", prepend, x.getKey(), x.getValue()));
+            });
     }
 
     protected abstract void doRun(SparkSession spark, String catalogName, String namespace, String tableName, List<String> values);
