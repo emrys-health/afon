@@ -1,5 +1,7 @@
 # Add one user per line using the fields:
 #username,catalogs
-#catalogs are colon-separated catalog names for which the user is authorised
+#catalogs are colon-separated catalog names for which the user is authorised:
+#  'all' authorises every catalog, a '!' prefix excludes a catalog, and '*' is a wildcard,
+#  e.g. all:!aws_forbidden or all:!*_forbidden. Exclusions win over inclusions.
 mauro,azure:azure_external
 phil,all
