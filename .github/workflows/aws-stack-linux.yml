@@ -231,7 +231,7 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
-          ./afon.sh -a script --script-path aws/vpcs.sh
+          ./afon.sh -a aws-cluster
           kubectl get pods -A
 
       - name: Upload stack logs
