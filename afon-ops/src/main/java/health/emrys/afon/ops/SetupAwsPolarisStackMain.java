@@ -1,6 +1,6 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.ops.steps.StackId;
+import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.StackStepsFactory;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;

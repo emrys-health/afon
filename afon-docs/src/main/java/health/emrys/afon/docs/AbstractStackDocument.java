@@ -3,7 +3,7 @@ package health.emrys.afon.docs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.steps.StackAction;
-import health.emrys.afon.ops.steps.StackId;
+import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.StackStepsFactory;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
@@ -44,22 +44,20 @@ public abstract class AbstractStackDocument extends AbstractDocument {
     }
 
     /**
-     * The document deleting the stack in the cloud, whichever it is, as each cloud has a single tofu state.
-     * It is run with any of the cloud's stack ids, eg {@code delete aws-full}.
+     * The document deleting every stack in the cloud, run with {@code delete <cloud>-all}, eg {@code delete aws-all}.
      */
     protected AbstractStackDocument(AfonPropertyProvider properties, AfonCloud cloud) {
         super(properties);
         List<String> stackIds = FACTORY.supportedActions().keySet().stream()
-                                       .filter(id -> id.cloud() == cloud)
+                                       .filter(id -> id.cloud() == cloud && !id.isAll())
                                        .map(StackId::toString)
                                        .toList();
         this.stepsProvider = FACTORY.deleteIn(cloud);
-        this.manageStackArgs = StackAction.DELETE + " " + stackIds.get(0);
+        this.manageStackArgs = StackAction.DELETE + " " + StackId.all(cloud);
         this.note = format(
             """
 
-            Any of the stack ids of cloud `%s` can be given, ie %s: as each cloud has a single tofu state,
-            whichever stack is deployed in the cloud is deleted.
+            To delete just one stack of cloud `%s`, give its stack id instead, ie one of %s.
             """, cloud, stackIds.stream().map(id -> "`" + id + "`").collect(Collectors.joining(", ")));
     }
 

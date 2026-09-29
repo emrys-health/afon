@@ -7,9 +7,9 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.cdk.SparkWorkloads;
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -24,7 +24,6 @@ import static health.emrys.afon.cdk.CdkUtils.addMaps;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_NAME;
 import static health.emrys.afon.cdk.SparkWorkloads.MASTER_LABELS;
-import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DOMAIN_NAME;
 
 /**
@@ -39,13 +38,13 @@ public class AwsSparkStack extends AwsJupyterStack {
     protected final      String              awsPolarisDomainName;
 
     public AwsSparkStack(@NonNull Construct scope,
-                         @NonNull AfonCloud id,
+                         @NonNull StackId stackId,
                          AfonPropertyProvider properties) {
-        super(scope, id, properties);
+        super(scope, stackId, properties);
         List<ITerraformDependable> eksDependOn = new ArrayList<>(cloudProvider.getDependables());
         eksDependOn.add(sparkOperatorConfig.operatorReady);
         awsPolarisDomainName = properties.getValue(AWS_POLARIS_DOMAIN_NAME);
-        new SparkWorkloads().deploy(this, id, eksDependOn);
+        new SparkWorkloads().deploy(this, stackId.cloud(), eksDependOn);
         sparkExternalService(eksDependOn);
         // Cluster-level dependencies only (not the Spark LB): the monitoring releases depend on
         // this resource (see AwsFullStack), so anything more would also serialise their install
@@ -109,7 +108,7 @@ public class AwsSparkStack extends AwsJupyterStack {
         try {
             logger.info("Creating AWS Spark stack");
             final App app = createApp();
-            new AwsSparkStack(app, AWS, new FilePropertyProvider());
+            new AwsSparkStack(app, StackId.of(AwsSparkStack.class), new FilePropertyProvider());
             app.synth();
         } catch (RuntimeException e) {
             logger.error(e.toString());

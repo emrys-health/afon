@@ -118,5 +118,5 @@ The afon-cdk module generates CDKTF (Cloud Development Kit for Terraform) files.
 OpenTofu then provisions the actual infrastructure — Kubernetes clusters, deployments, services, and ingress controllers.
 The Java code does not directly create cloud resources.
 
-After the CDKTF step, you can inspect the generated Terraform in `$AFON_CDKTF/stacks/<cloud>/` and run `tofu apply` or `tofu destroy` directly.
+After the CDKTF step, you can inspect the generated Terraform in `$AFON_CDKTF/stacks/<stack-id>/`, eg `aws-keycloak`, and run `tofu apply` or `tofu destroy` directly.
 

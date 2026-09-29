@@ -38,7 +38,7 @@ public class SparkWorkloads {
 
     /**
      * Applies the {@code SparkCluster} and {@code SparkApplication} manifests against the cluster
-     * targeted by the active kubeconfig. Resource ids are kept stable ("sparkClusterManifest" /
+     * targeted by the kubeconfig in {@code KUBECONFIG}, on AWS the stack's own, see {@link KubeConfigAspect}. Resource ids are kept stable ("sparkClusterManifest" /
      * "sparkConnectManifest") so existing stack state is preserved.
      *
      * @param scope     the CDKTF stack the null-provider resources are scoped to.

@@ -11,9 +11,9 @@ import health.emrys.afon.cdk.CrdCleanup;
 import health.emrys.afon.cdk.JupyterHubConfig;
 import health.emrys.afon.cdk.NetworkConfig;
 import health.emrys.afon.cdk.SparkConfig;
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -24,7 +24,6 @@ import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_ACCOUNT_NAME;
-import static health.emrys.afon.config.AfonCloud.AWS;
 
 public class AwsJupyterStack extends AwsPolarisStack {
 
@@ -38,9 +37,9 @@ public class AwsJupyterStack extends AwsPolarisStack {
     protected       Resource      crdCleanup;
 
     public AwsJupyterStack(final Construct scope,
-                           final AfonCloud id,
+                           final StackId stackId,
                            final AfonPropertyProvider properties) {
-        super(scope, id, properties);
+        super(scope, stackId, properties, true);
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
         JupyterHubConfig jupyter = new AwsJupyterHubConfig(
             this,
@@ -114,7 +113,7 @@ public class AwsJupyterStack extends AwsPolarisStack {
 
     public static void main(String[] args) {
         final App app = createApp();
-        new AwsJupyterStack(app, AWS, new FilePropertyProvider());
+        new AwsJupyterStack(app, StackId.of(AwsJupyterStack.class), new FilePropertyProvider());
         app.synth();
     }
 }

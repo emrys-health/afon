@@ -29,7 +29,7 @@ public class DeleteAzureStackDocument extends AbstractStackDocument {
             
             Generate and run cleanup script:
             ```shell
-            afon-cli.sh generate-cleanup-script azure
+            afon-cli.sh generate-cleanup-script azure-<stack-type>
             ```
             """);
     }

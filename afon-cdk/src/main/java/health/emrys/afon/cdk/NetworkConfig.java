@@ -238,9 +238,10 @@ public class NetworkConfig {
      * that resource contacts the API server during plan, before the cilium.io CRDs are
      * registered, and fails with "Failed to construct REST client".
      * <p>
-     * That kubectl reads the ambient {@code ~/.kube/config} and interpolates nothing from the
+     * That kubectl reads the kubeconfig in {@code KUBECONFIG} (on AWS the stack's own, see
+     * {@link KubeConfigAspect}, else the ambient {@code ~/.kube/config}) and interpolates nothing from the
      * stack, so Terraform sees no dependency and is free to run it first - against whichever
-     * cluster the kubeconfig still names. On a rebuild that is the *previous*, destroyed cluster,
+     * cluster the kubeconfig still names, if any. On a rebuild that is the *previous*, destroyed cluster,
      * whose DNS record is gone, and the apply dies with "dial tcp: lookup
      * &lt;id&gt;.gr7.&lt;region&gt;.eks.amazonaws.com: no such host". Hence {@code dependsOn}: it must
      * carry whatever refreshes the kubeconfig (the {@code kubeconfigUpdater} resource on AWS) and

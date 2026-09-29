@@ -11,7 +11,7 @@ import java.util.List;
 import static health.emrys.afon.config.AfonCloud.AWS;
 
 /**
- * Equivalent to {@code manage-stack delete <stack-id>} for any stack in AWS, whose steps are defined by
+ * Equivalent to {@code manage-stack delete aws-all}, deleting every stack in AWS, whose steps are defined by
  * {@link StackStepsFactory}.
  */
 public class DeleteAwsStackMain implements StepsProvider {

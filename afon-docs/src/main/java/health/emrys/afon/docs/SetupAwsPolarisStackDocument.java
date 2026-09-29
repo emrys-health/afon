@@ -31,7 +31,7 @@ public class SetupAwsPolarisStackDocument extends AbstractStackDocument {
             
             Generate and run cleanup script:
             ```shell
-            afon-cli.sh generate-cleanup-script aws
+            afon-cli.sh generate-cleanup-script aws-polaris
             ```
             """);
     }
