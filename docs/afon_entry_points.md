@@ -13,13 +13,13 @@ In particular, both entry points can execute the same commands.  The only caveat
 
 So, eg the CLI commands:
 ```shell
-afon-cli.sh setup-aws-full-stack 
+afon-cli.sh manage-stack setup aws-full
 afon-cli.sh azure-create -e <env>
 afon-cli.sh validate-stack <stack> -e <env>
 ```
 are equivalent to:
 ```shell
-./afon.sh -a setup-aws-full-stack 
+./afon.sh -a manage-stack setup aws-full
 ./afon.sh -a azure-create -e <env>
 ./afon.sh -a validate-stack <stack> -e <env>
 ```

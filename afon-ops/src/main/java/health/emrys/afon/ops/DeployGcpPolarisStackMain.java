@@ -1,5 +1,7 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.ops.steps.StackId;
+import health.emrys.afon.ops.steps.StackStepsFactory;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepRunner;
@@ -7,17 +9,16 @@ import health.emrys.afon.ops.steps.StepsProvider;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCloud.GCP;
+import static health.emrys.afon.ops.steps.StackAction.DEPLOY;
 
+/**
+ * Equivalent to {@code manage-stack deploy gcp-polaris}, whose steps are defined by {@link StackStepsFactory}.
+ */
 public class DeployGcpPolarisStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
-        return List.of(
-            stepOperations.deleteStackIn(GCP),
-            stepOperations.deployPolarisStackIn(GCP),
-            stepOperations.waitForPolarisAndKeycloakIn(GCP),
-            stepOperations.deployComplete(GCP));
+        return new StackStepsFactory().steps(DEPLOY, StackId.parse("gcp-polaris"), stepOperations);
     }
 
     public static void main(String[] args) {

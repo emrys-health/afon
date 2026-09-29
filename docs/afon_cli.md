@@ -98,7 +98,7 @@ The commands are the (kebab-named) versions of the executable Java classes named
 `health.emrys.afon.ops` and its subpackages (in module `afon-ops`), eg:
 
 ```md
-`DeployAwsFullStackMain` -> `deploy-aws-full-stack`
+`ManageStackMain` -> `manage-stack`
 `ManagePolarisCatalogsMain` -> `manage-polaris-catalogs`
 `ValidateStackMain` -> `validate-stack`
 ```

@@ -12,22 +12,49 @@ You need to have set up you [local env](setup_local.md).
 
 ## Stack deployment
 
-To deploy a stack, using the CLI command, we run the corresponding command:
+To deploy a stack, using the CLI command, we run [manage-stack](#manage-a-stack) with the `deploy` action, eg:
 
 ```shell
-afon-cli.sh deploy-aws-full-stack
-afon-cli.sh deploy-azure-polaris-stack
-afon-cli.sh deploy-gcp-polaris-stack
+afon-cli.sh manage-stack deploy aws-full
+afon-cli.sh manage-stack deploy azure-polaris
+afon-cli.sh manage-stack deploy gcp-polaris
 ```
 
-**NOTE:** To run the `delete-*-stack`, `deploy-*-stack`, `setup-*-stack` commands you need to be
-logged in with the corresponding [cloud cli](cloud.md).
+**NOTE:** To run `manage-stack` you need to be logged in with the corresponding [cloud cli](cloud.md).
 
-**IMPORTANT:** the `*-stack` commands use `$AFON_CDKTF` as their `tofu` state dir, so if you deploy or setup a stack (ie
+**IMPORTANT:** `manage-stack` uses `$AFON_CDKTF` as its `tofu` state dir, so if you deploy or setup a stack (ie
 deploy a stack plus configure the Polaris catalogs) you must take care not move your `$AFON_CDKTF` until the teardown of
 the stack, other `tofu` will not know the information to destroy the stack.
 
-In the command names, we use the convention that `deploy` just deploys the stack (waiting for DNS to propagate) and `setup` does the deployment and configures the Polaris catalogs.
+Of the actions, `deploy` just deploys the stack (waiting for DNS to propagate) and `setup` does the deployment and configures the Polaris catalogs.
+
+### Manage a stack
+
+A single command manages any stack, given an action and a stack id:
+```shell
+afon-cli.sh manage-stack <action> <stack-id> [<step>]  # run without args to list the stack ids and their actions
+```
+where:
+- `<action>` is one of `delete`, `deploy` or `setup`;
+- `<stack-id>` is `<cloud>-<stack-type>`, eg `aws-keycloak`, named as `validate-stack` lists the stacks.
+  Only the stacks that can be deployed or set up are listed: `aws-full`, `aws-keycloak`, `aws-polaris`,
+  `azure-polaris` and `gcp-polaris`;
+- `<step>`, if given, is the step from which to resume a failed run (see
+  [Resume a failed stack deployment](#resume-a-failed-stack-deployment-from-a-specific-step)).
+
+For example:
+```shell
+afon-cli.sh manage-stack setup aws-keycloak
+afon-cli.sh manage-stack deploy aws-full "wait_on_emryspolaris_then_wait_on_emrysoauth"
+afon-cli.sh manage-stack delete aws-full
+```
+With `afon.sh`, pass the same args positionally, eg `./afon.sh -a manage-stack setup aws-keycloak`.
+
+The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, still work and run the same
+steps, eg `setup-aws-keycloak-stack` is the same as `manage-stack setup aws-keycloak`, but they will be removed.
+
+**NOTE:** Each cloud has a single `tofu` state, so `delete` deletes whichever stack is deployed in the stack id's cloud,
+eg `manage-stack delete aws-keycloak` deletes an `aws-full` stack if that's the one deployed.
 
 ### Validate a stack's config
 
@@ -46,7 +73,7 @@ untouched, synthesise into another cdktf dir, eg `afon-cli.sh --cdktf /tmp/cdktf
 The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-afon-cli.sh setup-aws-full-stack
+afon-cli.sh manage-stack setup aws-full
 ```
 Steps executed:
 
@@ -70,7 +97,7 @@ The AWS Keycloak stack deploys only the Keycloak server, ie the EKS cluster with
 at `OIDC_DOMAIN_NAME`, without Polaris, eg to serve as a standalone OIDC provider.
 
 ```shell
-afon-cli.sh deploy-aws-keycloak-stack
+afon-cli.sh manage-stack deploy aws-keycloak
 ```
 Steps: `delete_aws_stack` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `deploy_complete_for_cloud_aws`
 
@@ -84,21 +111,21 @@ To deploy the AWS Keycloak stack and configure it with the realm, the `POLARIS_I
 their confidential clients), plus the Jupyter browser client if `AWS_JUPYTER_DOMAIN_NAME` is set:
 
 ```shell
-afon-cli.sh setup-aws-keycloak-stack
+afon-cli.sh manage-stack setup aws-keycloak
 ```
 Steps: `delete_aws_stack` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `configure_oidc_users_for_cloud_aws` → `setup_complete_for_cloud_aws`
 
 ### Setup Azure Polaris only
 
 ```shell
-afon-cli.sh setup-azure-polaris-stack
+afon-cli.sh manage-stack setup azure-polaris
 ```
 Steps: `delete_azure_stack` → `deploy_azure_polaris_stack` → `wait_on_emryspolarisazure_then_wait_on_emrysoauth` → `create_all_catalogs_for_cloud_azure`
 
 ### Setup GCP Polaris only
 
 ```shell
-afon-cli.sh setup-gcp-polaris-stack
+afon-cli.sh manage-stack setup gcp-polaris
 ```
 Steps: `delete_gcp_stack` → `deploy_gcp_polaris_stack` → `wait_on_emryspolarisgcp_then_wait_on_emrysoauth` → `create_all_catalogs_for_cloud_gcp`
 
@@ -114,9 +141,10 @@ Steps: `delete_aws_stack → deploy_aws_full_stack → wait_on_emryspolaris_then
 
 ### Resume a failed stack deployment from a specific step
 
-If a deployment fails partway through, you can resume from a specific step, e.g.:
+If a deployment fails partway through, you can resume from a specific step, by adding it to the command, e.g.:
 
 ```shell
+afon-cli.sh manage-stack setup aws-full "create_all_catalogs_for_cloud_aws"
 afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog "deploy_azure_polaris_stack"
 ```
 
@@ -124,12 +152,13 @@ afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog "de
 
 The stack teardown can be done via replacing `deploy` with `delete` in the command, eg:
 ```shell
-afon-cli.sh delete-aws-stack
-afon-cli.sh delete-azure-stack
-afon-cli.sh delete-gcp-stack
+afon-cli.sh manage-stack delete aws-full
+afon-cli.sh manage-stack delete azure-polaris
+afon-cli.sh manage-stack delete gcp-polaris
 ```
 
-The `delete` commands are equivalent to running `tofu destroy` on the appropriate `$AFON_CDKTF` dir.
+The `delete` action is equivalent to running `tofu destroy` on the appropriate `$AFON_CDKTF` dir.  As each cloud has
+a single `tofu` state, it deletes whichever stack is deployed in the stack id's cloud.
 
 ### The Afon cdktf dir
 
@@ -215,20 +244,23 @@ az group delete --name afon_resource_group_aks --yes --no-wait
 ## Summary of deployment commands
 
 ```shell
+# Any stack: <action>={delete|deploy|setup}, <stack-id>=<cloud>-<stack-type>, eg aws-keycloak
+afon-cli.sh manage-stack <action> <stack-id>
+
 # AWS full stack (Keycloak + Polaris + Spark + Jupyter)
-afon-cli.sh deploy-aws-full-stack
+afon-cli.sh manage-stack deploy aws-full
 
 # AWS Keycloak (standalone)
-afon-cli.sh deploy-aws-keycloak-stack
+afon-cli.sh manage-stack deploy aws-keycloak
 
 # Azure Polaris (standalone)
-afon-cli.sh deploy-azure-polaris-stack
+afon-cli.sh manage-stack deploy azure-polaris
 
 # GCP Polaris (standalone)
-afon-cli.sh deploy-gcp-polaris-stack
+afon-cli.sh manage-stack deploy gcp-polaris
 
 # Cross-cloud external catalogs (AWS + Azure federation)
-afon-cli.sh setup-aws-full-stack-with-polaris-hosting-external-catalog
+afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog
 
 # Snowflake reading cross-cloud data
 afon-cli.sh deploy-snowflake-reading-gcp-via-aws

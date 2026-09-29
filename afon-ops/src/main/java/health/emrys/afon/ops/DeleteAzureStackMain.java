@@ -1,5 +1,6 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.ops.steps.StackStepsFactory;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepRunner;
@@ -9,16 +10,19 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonCloud.AZURE;
 
+/**
+ * Equivalent to {@code manage-stack delete <stack-id>} for any stack in Azure, whose steps are defined by
+ * {@link StackStepsFactory}.
+ */
 public class DeleteAzureStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
-        return List.of(
-                stepOperations.deleteStackIn(AZURE),
-                stepOperations.deleteComplete(AZURE));
+        return new StackStepsFactory().deleteIn(AZURE).stepsUsing(stepOperations);
     }
 
     public static void main(String[] args) {
         new StepRunner().runUsing(new DeleteAzureStackMain(), args);
     }
+
 }

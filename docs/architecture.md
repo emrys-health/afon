@@ -100,13 +100,16 @@ Executables are composed of reusable steps:
 - **`StepOperations`** — factory methods that create `Step` instances for common operations (clean, deploy, wait, configure, test)
 - **`StepActions`** — low-level operations that actually execute commands (run Maven, run OpenTofu, call Polaris APIs)
 - **`StepRunner`** — executes a list of steps in order, with the ability to resume from a named step
-- **`StepsProvider`** — interface implemented by `{Delete|Deploy|Setup}*Main` classes to provide their step list
+- **`StepsProvider`** — interface providing a step list
+- **`StackStepsFactory`** — the single definition of the steps of each action (`delete`, `deploy`, `setup`) on each stack, keyed by stack id (`<cloud>-<stack-type>`, eg `aws-keycloak`), composed from `StepOperations` and run by the `manage-stack` command
 
-Each `{Delete|Deploy|Setup}*Main` class composes steps from `StepOperations`. 
+The other ops commands, eg the Snowflake and cross-cloud ones, compose their steps from `StepOperations` too, reusing
+the stacks' steps. For example, `SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain` reuses the steps setting up
+the `aws-full` stack and then adds Azure-specific steps.
 
-For example, `SetupAwsFullStackWithAzurePolarisMain` reuses all steps from `DeployAwsFullStackMain` and then adds Azure-specific steps.
-
-The corresponding `{Delete|Deploy|Setup}*Document` classes generate markdown documentation describing each step — this keeps documentation in lock-step with the actual deployment code.
+The corresponding `*Document` classes generate markdown documentation describing each step — this keeps documentation
+in lock-step with the actual deployment code.  The stack documents extend `AbstractStackDocument`, taking their steps
+from `StackStepsFactory`.
 
 ### Terraform-based deployment
 
