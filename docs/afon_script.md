@@ -24,7 +24,7 @@ Every executable ops class `<Name>Main` (in module `afon-ops`) can be run using 
 as a shorthand for the `exec` action:
 
 ```shell
-./afon.sh -a deploy-aws-full-stack     # same as: ./afon.sh -a exec -ec ops.DeployAwsFullStackMain
+./afon.sh -a manage-stack deploy aws-full   # same as: ./afon.sh -a exec -ec ops.ManageStackMain -ea "deploy aws-full"
 ./afon.sh -a manage-polaris-catalogs -ea "create aws"
 ```
 

@@ -1,5 +1,7 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.ops.steps.StackId;
+import health.emrys.afon.ops.steps.StackStepsFactory;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepRunner;
@@ -7,20 +9,16 @@ import health.emrys.afon.ops.steps.StepsProvider;
 
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCloud.AZURE;
+import static health.emrys.afon.ops.steps.StackAction.SETUP;
 
+/**
+ * Equivalent to {@code manage-stack setup azure-polaris}, whose steps are defined by {@link StackStepsFactory}.
+ */
 public class SetupAzurePolarisStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
-        return List.of(
-            stepOperations.deleteStackIn(AZURE),
-            stepOperations.deployPolarisStackIn(AZURE),
-            stepOperations.waitForPolarisAndKeycloakIn(AZURE),
-            stepOperations.configureOidcUsersFor(AZURE),
-            stepOperations.createAllCatalogsFor(AZURE),
-            stepOperations.configurePolarisUsersOnAllCatalogsFor(AZURE),
-            stepOperations.setupComplete(AZURE));
+        return new StackStepsFactory().steps(SETUP, StackId.parse("azure-polaris"), stepOperations);
     }
 
     public static void main(String[] args) {

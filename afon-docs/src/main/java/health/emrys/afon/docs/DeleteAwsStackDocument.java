@@ -1,16 +1,13 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeleteAwsStackMain;
-import health.emrys.afon.ops.steps.Step;
-import health.emrys.afon.ops.steps.StepOperations;
 
-import java.util.List;
+import static health.emrys.afon.config.AfonCloud.AWS;
 
-public class DeleteAwsStackDocument extends AbstractDocument {
+public class DeleteAwsStackDocument extends AbstractStackDocument {
 
     public DeleteAwsStackDocument(AfonPropertyProvider properties) {
-        super(properties);
+        super(properties, AWS);
     }
 
     @Override
@@ -32,15 +29,9 @@ public class DeleteAwsStackDocument extends AbstractDocument {
             
            Generate and run cleanup script (more than once if required):
             ```shell
-           ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args aws
+           afon-cli.sh generate-cleanup-script aws
             ```
             """);
-    }
-
-
-    @Override
-    public List<Step> steps(StepOperations stepOperations) {
-        return new DeleteAwsStackMain().stepsUsing(stepOperations);
     }
 
 }

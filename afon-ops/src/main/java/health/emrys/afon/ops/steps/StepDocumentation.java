@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
+import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
@@ -11,6 +12,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
@@ -21,12 +23,32 @@ public class StepDocumentation extends StepActions {
 
     private final PrintWriter out;
 
-    public static @NonNull String afonArgumentsToRun(Class clazz,
-                                                     String[] args,
-                                                     String command) {
-        return afonArgumentsToRun(clazz, args, new Properties(), command);
+    private static final String OPS_PACKAGE = "health.emrys.afon.ops";
+    private static final Pattern CAMEL_BOUNDARY = Pattern.compile("(?<=[a-z0-9])(?=[A-Z])");
+
+    /**
+     * The {@code afon-cli.sh} command running the class, without its args, or {@code null} if it has none:
+     * <ul>
+     *   <li>an ops {@code *Main} class is run by its kebab-named command, eg {@code configure-users} for
+     *       {@code ConfigureUsersMain};</li>
+     *   <li>a stack is synthesised by {@code validate-stack <stack>}, eg {@code validate-stack aws-full} for
+     *       {@code AwsFullStack}.</li>
+     * </ul>
+     */
+    public static String afonCliCommand(Class<?> clazz) {
+        String simpleName = clazz.getSimpleName();
+        if (clazz.getName().startsWith(OPS_PACKAGE + ".") && simpleName.endsWith("Main")) {
+            return kebabCase(simpleName.substring(0, simpleName.length() - "Main".length()));
+        }
+        if (AfonCloudStack.class.isAssignableFrom(clazz) && simpleName.endsWith("Stack")) {
+            return "validate-stack " + kebabCase(simpleName.substring(0, simpleName.length() - "Stack".length()));
+        }
+        return null;
     }
 
+    private static String kebabCase(String name) {
+        return CAMEL_BOUNDARY.matcher(name).replaceAll("-").toLowerCase();
+    }
 
     public static @NonNull String afonArgumentsToRun(Class clazz,
                                                      String[] args,
@@ -72,8 +94,21 @@ public class StepDocumentation extends StepActions {
 
     @Override
     public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
+        String cliCommand = afonCliCommand(mainClass);
+        if (cliCommand != null && (overrides == null || overrides.isEmpty())) {
+            run("afon-cli.sh", null, args == null ? new String[]{cliCommand} : concat(cliCommand, args));
+            return;
+        }
+        // no afon-cli.sh command runs the class, eg a SparkRunner, or passes it system property overrides
         String fullArgs = afonArgumentsToRun(mainClass, args, overrides, "exec");
         run("./afon.sh", null, fullArgs);
+    }
+
+    private static String[] concat(String first, String[] rest) {
+        String[] all = new String[rest.length + 1];
+        all[0] = first;
+        System.arraycopy(rest, 0, all, 1, rest.length);
+        return all;
     }
 
     @Override

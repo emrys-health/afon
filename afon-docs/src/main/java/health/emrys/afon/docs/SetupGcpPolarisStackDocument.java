@@ -1,18 +1,14 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.SetupGcpPolarisStackMain;
-import health.emrys.afon.ops.steps.Step;
-import health.emrys.afon.ops.steps.StepOperations;
-
-import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
+import static health.emrys.afon.ops.steps.StackAction.SETUP;
 
-public class SetupGcpPolarisStackDocument extends AbstractDocument {
+public class SetupGcpPolarisStackDocument extends AbstractStackDocument {
 
     public SetupGcpPolarisStackDocument(AfonPropertyProvider properties) {
-        super(properties);
+        super(properties, SETUP, "gcp-polaris");
     }
 
     @Override
@@ -64,16 +60,11 @@ public class SetupGcpPolarisStackDocument extends AbstractDocument {
             
             Generate and run cleanup script:
             ```shell
-            ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args gcp
+            afon-cli.sh generate-cleanup-script gcp
             ```
             """,
                 properties.getValue(CLUSTER_NAME)
         );
-    }
-
-    @Override
-    public List<Step> steps(StepOperations stepOperations) {
-        return new SetupGcpPolarisStackMain().stepsUsing(stepOperations);
     }
 
 }
