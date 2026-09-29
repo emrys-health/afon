@@ -12,6 +12,7 @@ import health.emrys.afon.ops.snowflake.SnowflakeStatements;
 import health.emrys.afon.ops.spark.SparkRunner;
 import health.emrys.afon.ops.spark.SparkTestReader;
 import health.emrys.afon.ops.spark.SparkTestWriter;
+import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -56,12 +57,38 @@ public class StepOperations {
         return afonCatalogs;
     }
 
+    /**
+     * Deletes every stack in the cloud, each having its own stack dir and tofu state.
+     */
     @NonNull
     public Step deleteStackIn(final AfonCloud cloud) {
-        logger.info(format("Deleting stack in cloud %s", cloud));
-        return new Step(format("delete_%s_stack", cloud),
-                format("delete stack in %s", cloud),
-                () -> timed(deleteDurations, cloud, () -> actions.deleteStack(cloud, tofuOutput())));
+        return deleteStacksIn(cloud, format("delete_%s_stack", cloud), StackFilter.ALL);
+    }
+
+    /**
+     * Deletes the stacks in the cloud selected by the filter, eg those conflicting with the stack to deploy.
+     */
+    @NonNull
+    public Step deleteStacksIn(final AfonCloud cloud, String stepName, StackFilter filter) {
+        logger.info(format("Deleting %s in cloud %s", filter.description(), cloud));
+        return new Step(stepName,
+                format("delete %s in %s", filter.description(), cloud),
+                () -> timed(deleteDurations, cloud, () -> actions.deleteStacksIn(cloud, filter, tofuOutput())));
+    }
+
+    /**
+     * Checks that the KeyCloak server at {@code OIDC_DOMAIN_NAME}, deployed by another stack, eg {@code aws-keycloak},
+     * answers, so that a stack using it, eg {@code aws-polaris}, fails fast rather than when Polaris cannot discover it.
+     * It asks for the discovery document of the {@code master} realm, as it always exists, unlike the Polaris realm,
+     * which the setup steps create.
+     */
+    public Step checkKeyCloakAnswers() {
+        String url = KeyCloakConfigurer.urlFor(properties.getValue(OIDC_DOMAIN_NAME), "https")
+                     + "/realms/master/.well-known/openid-configuration";
+        return new Step("check_keycloak_answers",
+                format("check KeyCloak answers at %s", url),
+                () -> actions.checkAnswers(url,
+                    "Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first, eg: afon-cli.sh manage-stack setup aws-keycloak"));
     }
 
     public Step deployFullStackIn(AfonCloud cloud) {
@@ -73,12 +100,12 @@ public class StepOperations {
                         () -> {
                             checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN,
                                     AWS_JUPYTER_CERT_ARN,AWS_POLARIS_CERT_ARN);
-                            timed(deployDurations, AWS, () -> actions.startStack(AwsFullStack.class, AWS, tofuOutput()));
+                            timed(deployDurations, AWS, () -> actions.startStack(AwsFullStack.class, tofuOutput()));
                         });
             case AZURE:
                 return new Step("deploy_azure_full_stack",
                         "deploy full stack in Azure",
-                        () -> timed(deployDurations, AZURE, () -> actions.startStack(AzureFullStack.class, AZURE, tofuOutput())));
+                        () -> timed(deployDurations, AZURE, () -> actions.startStack(AzureFullStack.class, tofuOutput())));
             case GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -156,16 +183,16 @@ public class StepOperations {
                         "deploy Polaris stack in AWS",
                         () -> {
                             checkAwsCertificatesIssued(AWS_POLARIS_CERT_ARN);
-                            timed(deployDurations, AWS, () -> actions.startStack(AwsPolarisStack.class, AWS, tofuOutput()));
+                            timed(deployDurations, AWS, () -> actions.startStack(AwsPolarisStack.class, tofuOutput()));
                         });
             case AZURE:
                 return new Step("deploy_azure_polaris_stack",
                         "deploy Polaris stack in Azure",
-                        () -> timed(deployDurations, AZURE, () -> actions.startStack(AzurePolarisStack.class, AZURE, tofuOutput())));
+                        () -> timed(deployDurations, AZURE, () -> actions.startStack(AzurePolarisStack.class, tofuOutput())));
             case GCP:
                 return new Step("deploy_gcp_polaris_stack",
                         "deploy Polaris stack in GCP",
-                        () -> timed(deployDurations, GCP, () -> actions.startStack(GcpPolarisStack.class, GCP, tofuOutput())));
+                        () -> timed(deployDurations, GCP, () -> actions.startStack(GcpPolarisStack.class, tofuOutput())));
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
@@ -179,7 +206,7 @@ public class StepOperations {
                         "deploy KeyCloak stack in AWS",
                         () -> {
                             checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN);
-                            timed(deployDurations, AWS, () -> actions.startStack(AwsKeycloakStack.class, AWS, tofuOutput()));
+                            timed(deployDurations, AWS, () -> actions.startStack(AwsKeycloakStack.class, tofuOutput()));
                         });
             case AZURE, GCP:
             default:

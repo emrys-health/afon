@@ -4,11 +4,13 @@ The [Stack AWS (Linux)](../.github/workflows/aws-stack-linux.yml) workflow runs 
 `./afon.sh -a manage-stack <action> <stack-id> [<step>]` (see [manage a stack](stacks.md#manage-a-stack)).
 
 Run it from the Actions tab: it is `workflow_dispatch` only, with an `action` dropdown
-(`deploy`/`setup`/`delete`), a `stack_id` dropdown (`aws-full`/`aws-keycloak`/`aws-polaris`, defaulting to
+(`deploy`/`setup`/`delete`), a `stack_id` dropdown (`aws-full`/`aws-keycloak`/`aws-polaris`/`aws-all`, defaulting to
 `aws-full`) and a `from_step` to resume from (blank runs every step, starting with the teardown).
-`deploy` and `setup` tear the running stack down before rebuilding it, and `setup` also configures it;
-`delete` tears it down and leaves it down — a later `deploy` or `setup` run is what brings it back.
-As each cloud has a single tofu state, `delete` tears down whichever AWS stack is up, whatever the `stack_id`.
+`deploy` and `setup` tear down the running stacks that conflict with the stack, including itself, before rebuilding it,
+and `setup` also configures it; `delete` tears it down and leaves it down — a later `deploy` or `setup` run is what
+brings it back.  `aws-keycloak` and `aws-polaris` run side by side, `aws-polaris` using the KeyCloak of `aws-keycloak`,
+while `aws-full` conflicts with both, see [stacks side by side](stacks.md#stacks-side-by-side).
+`delete` of `aws-all` tears down every AWS stack that is up; `aws-all` supports no other action.
 
 All actions run on the *same* self-hosted runner (see the `runs-on` note in the workflow), because
 all need the tofu state described below — `delete` just as much as `deploy`, since that state is

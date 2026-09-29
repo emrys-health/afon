@@ -6,9 +6,19 @@ import java.util.List;
 
 public class StepsUtils {
 
+    /**
+     * The steps setting up the full stack in the cloud, first deleting every stack in the cloud.
+     */
     public static List<Step> setupFullStackStepsUsing(StepOperations stepOperations, AfonCloud cloud) {
+        return setupFullStackStepsUsing(stepOperations, cloud, stepOperations.deleteStackIn(cloud));
+    }
+
+    /**
+     * The steps setting up the full stack in the cloud, first deleting the stacks as given.
+     */
+    public static List<Step> setupFullStackStepsUsing(StepOperations stepOperations, AfonCloud cloud, Step deleteStacks) {
         return List.of(
-                    stepOperations.deleteStackIn(cloud),
+                    deleteStacks,
                     stepOperations.deployFullStackIn(cloud),
                     stepOperations.waitForPolarisAndKeycloakIn(cloud),
                     stepOperations.deployComplete(cloud),

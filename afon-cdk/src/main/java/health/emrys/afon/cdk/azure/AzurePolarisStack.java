@@ -11,10 +11,10 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.cdk.PolarisConfig;
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -25,7 +25,6 @@ import java.util.Optional;
 
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_INGRESS_NAME;
-import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonProperty.AZURE_KEY_VAULT_NAME;
 import static java.lang.String.format;
 
@@ -41,9 +40,9 @@ public class AzurePolarisStack extends AzureKubernetesStack {
     private final        String  resourceGroup;
     private final        Service internalService;
 
-    public AzurePolarisStack(Construct scope, AfonCloud id,
+    public AzurePolarisStack(Construct scope, StackId stackId,
                              AfonPropertyProvider properties) {
-        super(scope, id, properties);
+        super(scope, stackId, properties);
         resourceGroup = properties.getValue(AfonProperty.AZURE_RESOURCE_GROUP);
 
         PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties);
@@ -134,7 +133,7 @@ public class AzurePolarisStack extends AzureKubernetesStack {
 
     public static void main(String[] args) {
         final App app = createApp();
-        new AzurePolarisStack(app, AZURE, new FilePropertyProvider());
+        new AzurePolarisStack(app, StackId.of(AzurePolarisStack.class), new FilePropertyProvider());
         app.synth();
     }
 }

@@ -41,7 +41,7 @@ public class DeployAwsFullStackDocument extends AbstractStackDocument {
             
            Generate and run cleanup script (more than once if required):
             ```shell
-           afon-cli.sh generate-cleanup-script aws
+           afon-cli.sh generate-cleanup-script aws-full
             ```
             """, new SparkWorkloads().startConnectCommand());
     }

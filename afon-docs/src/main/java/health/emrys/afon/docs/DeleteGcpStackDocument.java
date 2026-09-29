@@ -30,7 +30,7 @@ public class DeleteGcpStackDocument extends AbstractStackDocument {
             
             Generate and run cleanup script:
             ```shell
-            afon-cli.sh generate-cleanup-script gcp
+            afon-cli.sh generate-cleanup-script gcp-<stack-type>
             ```
             """,
                 properties.getValue(CLUSTER_NAME)

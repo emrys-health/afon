@@ -1,7 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.CloudStackValidator;
-import health.emrys.afon.ops.steps.StackId;
+import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.StackStepsFactory;
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +33,9 @@ class ManageStackMainTest {
     @Test
     void stackIdsAreNamedAsValidateStackNamesTheStacks() {
         assertThat(new CloudStackValidator().stackNames())
-            .containsAll(factory.supportedActions().keySet().stream().map(StackId::toString).toList());
+            .containsAll(factory.supportedActions().keySet().stream()
+                                .filter(stackId -> !stackId.isAll())
+                                .map(StackId::toString)
+                                .toList());
     }
 }

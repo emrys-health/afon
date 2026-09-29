@@ -1,7 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.ops.steps.StackAction;
-import health.emrys.afon.ops.steps.StackId;
+import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.StackStepsFactory;
 import health.emrys.afon.ops.steps.StepRunner;
 import health.emrys.afon.ops.steps.StepsProvider;
@@ -19,10 +19,12 @@ import static org.slf4j.LoggerFactory.getLogger;
  * </pre>
  * <ul>
  *   <li>{@code <action>} is one of {@code delete}, {@code deploy} or {@code setup}, see {@link StackAction};</li>
- *   <li>{@code <stack-id>} is {@code <cloud>-<stack-type>}, eg {@code aws-keycloak}, see {@link StackId};</li>
+ *   <li>{@code <stack-id>} is {@code <cloud>-<stack-type>}, eg {@code aws-keycloak}, see {@link StackId},
+ *       or {@code <cloud>-all}, eg {@code aws-all}, to delete every stack of the cloud;</li>
  *   <li>{@code <step>}, if given, is the step from which to resume, as for the other stack commands.</li>
  * </ul>
- * Each cloud has a single tofu state, so deleting any stack of a cloud deletes whichever stack is deployed there.
+ * Stacks run side by side unless they conflict, so deploying or setting up a stack first deletes the stacks it
+ * conflicts with, while deleting a stack deletes just that stack, see {@link StackStepsFactory}.
  */
 public class ManageStackMain {
 
@@ -76,11 +78,9 @@ public class ManageStackMain {
         }
         StackAction action = StackAction.of(args[0]);
         StackId stackId = StackId.parse(args[1]);
-        if (action == StackAction.DELETE) {
+        if (action == StackAction.DELETE && stackId.isAll()) {
             // printed as well as logged, as the console logging may be off, eg in the CLI
-            String warning = String.format(
-                "Deleting stack %s deletes whichever stack is deployed in cloud %s, as each cloud has a single tofu state",
-                stackId, stackId.cloud());
+            String warning = String.format("Deleting %s deletes every stack deployed in cloud %s", stackId, stackId.cloud());
             System.out.println(warning);
             logger.warn(warning);
         }

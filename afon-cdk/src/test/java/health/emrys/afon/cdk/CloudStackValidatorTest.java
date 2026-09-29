@@ -4,6 +4,7 @@ import health.emrys.afon.cdk.aws.AwsFullStack;
 import health.emrys.afon.cdk.aws.AwsKeycloakStack;
 import health.emrys.afon.cdk.azure.AzurePolarisStack;
 import health.emrys.afon.cdk.gcp.GcpPolarisStack;
+import health.emrys.afon.config.StackId;
 import org.junit.jupiter.api.Test;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
@@ -35,10 +36,17 @@ class CloudStackValidatorTest {
     }
 
     @Test
-    void canGetStackDirFromStackCloud() {
-        assertThat(validator.stackDir(AzurePolarisStack.class)).isEqualTo(stackDir(AZURE));
-        assertThat(validator.stackDir(AwsFullStack.class)).isEqualTo(stackDir(AWS));
-        assertThat(validator.stackDir(GcpPolarisStack.class)).isEqualTo(stackDir(GCP));
+    void canGetStackDirFromStackId() {
+        assertThat(validator.stackDir(AzurePolarisStack.class)).isEqualTo(stackDir(new StackId(AZURE, "polaris")));
+        assertThat(validator.stackDir(AwsFullStack.class)).isEqualTo(stackDir(new StackId(AWS, "full")));
+        assertThat(validator.stackDir(AwsKeycloakStack.class)).isEqualTo(stackDir(new StackId(AWS, "keycloak")));
+        assertThat(validator.stackDir(GcpPolarisStack.class)).isEqualTo(stackDir(new StackId(GCP, "polaris")));
+    }
+
+    @Test
+    void stackNamesAreTheStackIds() {
+        assertThat(validator.stackNames())
+            .containsExactlyElementsOf(validator.stacks().values().stream().map(stack -> StackId.of(stack).toString()).toList());
     }
 
     @Test

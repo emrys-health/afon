@@ -5,18 +5,20 @@ import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
-import static health.emrys.afon.config.ConfigUtils.tfStatePath;
+import static health.emrys.afon.config.ConfigUtils.*;
 import static java.lang.String.format;
 
 public class StepDocumentation extends StepActions {
@@ -144,13 +146,44 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    @NonNull Path stackDir(AfonCloud cloud) throws IOException {
-        Path stackDir = Path.of(ConfigUtils.stackDir(cloud));
+    @NonNull Path stackDir(StackId stackId) throws IOException {
+        Path stackDir = Path.of(ConfigUtils.stackDir(stackId));
         out.println(format("""
-                   Stack dir `%s` for cloud `%s`.
-                   """, stackDir, cloud));
+                   Stack dir `%s` for stack `%s`.
+                   """, stackDir, stackId));
         out.flush();
         return stackDir;
+    }
+
+    /**
+     * Documents a single stack, standing for each stack in the cloud selected by the filter.
+     */
+    @Override
+    List<String> stackNamesIn(AfonCloud cloud, StackFilter filter) {
+        out.println(format("""
+                   For each of the %s in cloud `%s`, ie with a stack dir `%s/%s-<stack-type>` or tofu state
+                   `%s/terraform.%s-<stack-type>.tfstate`, or the legacy stack dir `%s` or tofu state `%s`:
+                   """, filter.description(), cloud, stacksDir(), cloud, ConfigUtils.afonCkdtf(), cloud,
+                          legacyStackDir(cloud), legacyTfStatePath(cloud)));
+        out.flush();
+        return List.of(cloud + "-<stack-type>");
+    }
+
+    @Override
+    void checkAnswers(String url, String failure) {
+        out.println(format("""
+                   Check that `%s` answers with 200, eg with:
+                   ```shell
+                   curl -s -o /dev/null -w '%%{http_code}' %s
+                   ```
+                   If it doesn't: %s
+                   """, url, url, failure));
+        out.flush();
+    }
+
+    @Override
+    boolean exists(Path path) {
+        return true;
     }
 
     @Override
@@ -158,14 +191,6 @@ public class StepDocumentation extends StepActions {
         out.println(format("""
                    Check path `%s` is not a broken symlink.
                    """, path));
-        out.flush();
-    }
-
-    @Override
-    void deleteTfStateFiles(AfonCloud cloud) throws IOException {
-        out.println(format("""
-                   Delete `%s`
-                   """, tfStatePath(cloud)));
         out.flush();
     }
 

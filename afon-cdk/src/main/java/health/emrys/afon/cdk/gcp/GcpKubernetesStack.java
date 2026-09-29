@@ -8,6 +8,7 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.StackId;
 import software.constructs.Construct;
 
 import static health.emrys.afon.config.AfonCloud.GCP;
@@ -19,12 +20,12 @@ class GcpKubernetesStack extends AbstractCloudStack {
     protected final String gcpDomainName;
     private final AfonPropertyProvider properties;
 
-    public GcpKubernetesStack(final Construct scope, final AfonCloud id, AfonPropertyProvider properties) {
-        super(scope, id);
+    public GcpKubernetesStack(final Construct scope, final StackId stackId, AfonPropertyProvider properties) {
+        super(scope, stackId);
         this.gcpDomainName = properties.getValue(GCP_POLARIS_DOMAIN_NAME);
         this.properties    = properties;
         NullProvider.Builder.create(this, "null").build();
-        cloudProvider = new GcpCloudProvider(this, id.toString(), "afon-core", properties);
+        cloudProvider = new GcpCloudProvider(this, stackId.cloud().toString(), "afon-core", properties);
     }
 
     @Override
@@ -40,7 +41,7 @@ class GcpKubernetesStack extends AbstractCloudStack {
     public static void main(String[] args) {
         final App app = createApp();
         AfonPropertyProvider properties = new FilePropertyProvider();
-        new GcpKubernetesStack(app, GCP, properties);
+        new GcpKubernetesStack(app, StackId.of(GcpKubernetesStack.class), properties);
         app.synth();
     }
 

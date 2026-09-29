@@ -116,6 +116,17 @@ public class ConfigUtilsTest {
     }
 
     @Test
+    public void canRetrieveStackPathsPerStackId() {
+        StackId stackId = new StackId(AfonCloud.AWS, "keycloak");
+        assertThat(stacksDir()).isEqualTo(afonCkdtf() + "/stacks");
+        assertThat(stackDir(stackId)).isEqualTo(afonCkdtf() + "/stacks/aws-keycloak");
+        assertThat(tfStatePath(stackId)).isEqualTo(afonCkdtf() + "/terraform.aws-keycloak.tfstate");
+        assertThat(kubeConfigPath(stackId)).isEqualTo(afonCkdtf() + "/kube/aws-keycloak.config");
+        assertThat(legacyStackDir(AfonCloud.AWS)).isEqualTo(afonCkdtf() + "/stacks/aws");
+        assertThat(legacyTfStatePath(AfonCloud.AWS)).isEqualTo(afonCkdtf() + "/terraform.aws.tfstate");
+    }
+
+    @Test
     public void canOverridePropertyWithEnv() {
         assertThat(envOrProperty("env", "property")).isEqualTo("env");
         assertThat(envOrProperty(null, "property")).isEqualTo("property");
