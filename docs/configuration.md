@@ -56,6 +56,30 @@ This can be useful when sharing a pre-defined configuration.
 **NOTE**: The config-import command assumes that the `config-<env>` dir does not exist and is created in the process.  
 If a config dir is already present, it will stop.
 
+### Command aws-secrets
+
+You can store snapshots of a config env in AWS Secrets Manager under a tag, and pull them back by it:
+```shell
+./afon.sh -a aws-secrets -- push --env <env>                    # stores config-<env>, tagged with the current git commit
+./afon.sh -a aws-secrets -- push --env <env> --tag <tag>        # stores config-<env>, tagged with <tag>
+./afon.sh -a aws-secrets -- list --env <env>                    # lists the snapshots of the env
+./afon.sh -a aws-secrets -- pull --env <env> --tag <tag>        # writes the snapshot back to config-<env>
+./afon.sh -a aws-secrets -- pull --env <env> --tag <tag> --force  # overwrites the files if config-<env> is not empty
+./afon.sh -a aws-secrets -- delete --env <env> --tag <tag>      # removes the snapshot, recoverable for 30 days
+```
+The `<tag>` is free-form text without spaces, eg a release, a git tag or a name, of letters, digits and
+`/ _ + = . @ -`, as AWS allows no others.  If not given, it is the git commit hash of the current branch of the afon
+checkout, for `pull` and `delete` as well as `push`.
+
+Each snapshot is one secret `afon/<env>/<tag>` holding all the config files, empty ones included, and tagged with
+`afon:env`, `afon:tag` and `afon:git-commit`, the commit of the current branch when it was pushed.  Pushing again
+with the same tag needs `--force`, which replaces the snapshot, and `delete --force` deletes it at once, without the
+recovery window.  Add `--dry-run` to see what would be done.
+
+It needs the `aws` CLI, logged in with the `secretsmanager` permissions to create, update, tag, list, read and delete
+secrets, `git` and `jq`.  The region is `--region`, else the default of the `aws` CLI, as `pull` may run before
+there is any afon config to read it from.
+
 ### Command config-status
 
 To show the status of the current config, you can use the `config-status` action:
