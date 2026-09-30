@@ -1,6 +1,6 @@
 package health.emrys.afon.config;
 
-import health.emrys.afon.ops.config.OpsPropertyProvider;
+import org.junit.Test;
 
 import java.util.regex.Pattern;
 
@@ -15,28 +15,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class CloudConfigTest {
     private static final Pattern RFC_1123_DOMAIN = Pattern.compile(
         "^(?=.{1,253}\\.?$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)*"
-        + "[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
+            + "[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
     );
 
     private static boolean isRfc1123Domain(String domain) {
         return domain != null && RFC_1123_DOMAIN.matcher(domain).matches();
     }
 
-    private AfonPropertyProvider properties = new OpsPropertyProvider();
+    private AfonPropertyProvider properties = new FilePropertyProvider(); // MUST test real properties to prevent insecure code from being deplopyed DO NOT CHANGE!
 
-    //@Test
+    @Test
     public void testWhitelistedAreValidDomainNames() {
         for (String domain : whitelistedDomains()) {
-            assertThat(isRfc1123Domain(domain)).as("domain "+domain+" is valid").isTrue();
+            assertThat(isRfc1123Domain(domain)).as("domain " + domain + " is valid").isTrue();
         }
     }
 
-    //@Test
+    @Test
     public void testBucketNameIsWhitelisted() {
         // Base bucket names are no longer typed AfonProperty entries for any cloud (see
         // AWS_BUCKET_NAME_aws / AZURE_BUCKET_NAME_azure / GCP_BUCKET_NAME_gcp in
         // catalogs-<cloud>.properties).
-        switch ( afonCloud() ){
+        switch (afonCloud()) {
             case "aws":
                 checkPropertyIsWhitelisted("AWS_BUCKET_NAME", "aws");
                 break;
@@ -58,9 +58,9 @@ public class CloudConfigTest {
     }
 
     private void checkPropertyIsWhitelisted(String propertyName, String catalogId) {
-        String value = properties.getCatalogProperty(propertyName, catalogId);
+        String   value              = properties.getCatalogProperty(propertyName, catalogId);
         String[] whitelistedDomains = whitelistedDomains();
-        boolean found = false;
+        boolean  found              = false;
         for (String domain : whitelistedDomains) {
             found |= domain.contains(value);
         }

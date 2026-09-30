@@ -11,6 +11,7 @@ import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
@@ -24,6 +25,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,7 +42,7 @@ import java.time.Duration;
 import java.util.*;
 
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
-import static health.emrys.afon.config.ConfigUtils.tfStatePath;
+import static health.emrys.afon.config.ConfigUtils.*;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.*;
 import static health.emrys.afon.ops.steps.DurationUtils.formatDuration;
 import static java.lang.String.format;
@@ -49,23 +54,111 @@ public class StepActions {
     private static final Logger logger = getLogger(StepActions.class);
 
     /**
-     * Deletes the stack, allowing for a single attempt.
+     * Deletes the stacks in the cloud selected by the filter, allowing for a single attempt.
+     * @param outputStream the stream to which the tofu output is written
      * @throws IOException
      */
-    @NonNull Path deleteStack(AfonCloud cloud) throws IOException {
-        return deleteStack(cloud, 1);
+    void deleteStacksIn(AfonCloud cloud, StackFilter filter, OutputStream outputStream) throws IOException {
+        deleteStacksIn(cloud, filter, 1, outputStream);
     }
 
     /**
-     * Deletes the stack, allowing a given number of retries.
+     * Deletes the stacks in the cloud selected by the filter, among the stacks with a stack dir or a tofu state,
+     * allowing a given number of retries.  These include the legacy stack, whose dir and tofu state were shared by
+     * all the stacks of the cloud, named as the cloud.
+     * @param outputStream the stream to which the tofu output is written
      * @throws IOException
      */
-    @NonNull Path deleteStack(AfonCloud cloud, int maxAttempts) throws IOException {
-        Path stackDir = stackDir(cloud);
-        try {
-            tofuDestroy(stackDir, maxAttempts);
+    void deleteStacksIn(AfonCloud cloud, StackFilter filter, int maxAttempts, OutputStream outputStream) throws IOException {
+        checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
+        List<String> stackNames = stackNamesIn(cloud, filter);
+        if (stackNames.isEmpty()) {
+            logger.info("No stack to delete in cloud {}, as selected by: {}", cloud, filter.description());
+        }
+        for (String stackName : stackNames) {
+            logger.info("Deleting stack {}, as selected by: {}", stackName, filter.description());
+            if (stackName.equals(cloud.toString())) {
+                deleteStack(Path.of(legacyStackDir(cloud)), Path.of(legacyTfStatePath(cloud)), maxAttempts, outputStream);
+            } else {
+                StackId stackId = StackId.parse(stackName);
+                deleteStack(Path.of(ConfigUtils.stackDir(stackId)), Path.of(tfStatePath(stackId)), maxAttempts, outputStream);
+                // the kubeconfig of the stack's cluster, which is now gone
+                deletePath(Path.of(kubeConfigPath(stackId)));
+            }
+        }
+    }
+
+    /**
+     * Returns the names of the stacks in the cloud selected by the filter, see {@link #stackNamesIn(AfonCloud)}.
+     */
+    List<String> stackNamesIn(AfonCloud cloud, StackFilter filter) throws IOException {
+        return stackNamesIn(cloud).stream().filter(filter.selects()).toList();
+    }
+
+    /**
+     * Returns the names of the stacks in the cloud, ie of the stack dirs and tofu states found in the cdktf dir,
+     * eg {@code aws-keycloak} for {@code stacks/aws-keycloak} or {@code terraform.aws-keycloak.tfstate},
+     * and {@code aws} for the legacy {@code stacks/aws} or {@code terraform.aws.tfstate}.
+     */
+    List<String> stackNamesIn(AfonCloud cloud) throws IOException {
+        return stackNamesIn(cloud, Path.of(ConfigUtils.afonCkdtf()));
+    }
+
+    static List<String> stackNamesIn(AfonCloud cloud, Path cdktfDir) throws IOException {
+        Set<String> stackNames = new TreeSet<>();
+        Path stacksDir = cdktfDir.resolve(STACKS_DIR_NAME);
+        if (Files.isDirectory(stacksDir)) {
+            try (var dirs = Files.list(stacksDir)) {
+                dirs.filter(Files::isDirectory)
+                    .map(dir -> dir.getFileName().toString())
+                    .filter(name -> isStackNameIn(cloud, name))
+                    .forEach(stackNames::add);
+            }
+        }
+        if (Files.isDirectory(cdktfDir)) {
+            try (var files = Files.list(cdktfDir)) {
+                files.map(file -> file.getFileName().toString())
+                     .filter(name -> name.startsWith(TF_STATE_PREFIX) && name.endsWith(TF_STATE_SUFFIX))
+                     .map(name -> name.substring(TF_STATE_PREFIX.length(), name.length() - TF_STATE_SUFFIX.length()))
+                     .filter(name -> isStackNameIn(cloud, name))
+                     .forEach(stackNames::add);
+            }
+        }
+        return new ArrayList<>(stackNames);
+    }
+
+    private static final String STACKS_DIR_NAME = "stacks";
+    private static final String TF_STATE_PREFIX = "terraform.";
+    private static final String TF_STATE_SUFFIX = ".tfstate";
+
+    private static boolean isStackNameIn(AfonCloud cloud, String name) {
+        return name.equals(cloud.toString()) || name.startsWith(cloud + "-");
+    }
+
+    /**
+     * Deletes the stack by running {@code tofu destroy} in its dir, if it has a tofu state, then deleting
+     * its dir and tofu state.
+     * @throws IllegalStateException if the stack has a tofu state but no dir, as tofu cannot destroy it
+     */
+    void deleteStack(Path stackDir, Path tfState, int maxAttempts, OutputStream outputStream) throws IOException {
+        if (!exists(tfState)) {
+            logger.info("No tofu state {}, so nothing deployed from stack dir {}", tfState, stackDir);
             deletePath(stackDir);
-            deleteTfStateFiles(cloud);
+            return;
+        }
+        if (!exists(stackDir)) {
+            throw new IllegalStateException(String.format("""
+                Found tofu state %s but no stack dir %s, so tofu cannot destroy the stack.
+                Recreate the stack dir by validating the stack, ie with the same config:
+                    afon-cli.sh validate-stack <stack-id>
+                and run again.
+                If you're sure nothing of the stack is still running, delete the tofu state %s.
+                """, tfState, stackDir, tfState));
+        }
+        try {
+            tofuDestroy(stackDir, maxAttempts, outputStream);
+            deletePath(stackDir);
+            deletePath(tfState);
         } catch (ManagedProcessException e) {
             String message = String.format("""
                 Failed to run, after %s attempt(s):
@@ -82,12 +175,15 @@ public class StepActions {
             logger.error(message, e);
             throw new RuntimeException(e);
         }
-        return stackDir;
     }
 
-    @NonNull Path stackDir(AfonCloud cloud) throws IOException {
+    boolean exists(Path path) {
+        return Files.exists(path);
+    }
+
+    @NonNull Path stackDir(StackId stackId) throws IOException {
         checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
-        Path stackDir = Path.of(ConfigUtils.stackDir(cloud));
+        Path stackDir = Path.of(ConfigUtils.stackDir(stackId));
         logger.info("Using stack dir {}", stackDir);
         if (!Files.exists(stackDir)){
             Files.createDirectories(stackDir);
@@ -104,18 +200,17 @@ public class StepActions {
         }
     }
 
-    private void tofuDestroy(Path tofuDir, int maxAttempts) throws ManagedProcessException {
+    private void tofuDestroy(Path tofuDir, int maxAttempts, OutputStream outputStream) throws ManagedProcessException {
         logger.info("Executing tofu destroy in dir {}", tofuDir);
-        run("tofu", tofuDir, "init");
+        run("tofu", tofuDir, outputStream, "init");
         String[] args = List.of("destroy", "--auto-approve").toArray(new String[0]);
-        tofuWithRetry(tofuDir, OutputStream.nullOutputStream(), maxAttempts, args);
-    }
-
-    void deleteTfStateFiles(AfonCloud cloud) throws IOException {
-        deletePath(Path.of(tfStatePath(cloud)));
+        tofuWithRetry(tofuDir, outputStream, maxAttempts, args);
     }
 
     void deletePath(Path path) {
+        if (!exists(path)) {
+            return;
+        }
         logger.info("Deleting path {}", path);
         try {
             PathUtils.delete(path);
@@ -131,22 +226,25 @@ public class StepActions {
 
     /**
      * Starts the stack, allowing for a single attempt.
+     * @param outputStream the stream to which the tofu output is written
      * @throws Exception
      */
-    void startStack(Class stackClass, AfonCloud cloud) throws Exception {
-        startStack(stackClass, cloud, 1);
+    void startStack(Class<?> stackClass, OutputStream outputStream) throws Exception {
+        startStack(stackClass, 1, outputStream);
     }
 
     /**
-     * Starts the stack, attempting for a given number of retries.
+     * Starts the stack, attempting for a given number of retries, in the stack dir of its {@link StackId},
+     * named from the stack class, eg {@code aws-keycloak} for {@code AwsKeycloakStack}.
+     * @param outputStream the stream to which the tofu output is written
      * @throws Exception
      */
-    void startStack(Class stackClass, AfonCloud cloud, int maxAttempts) throws Exception {
+    void startStack(Class<?> stackClass, int maxAttempts, OutputStream outputStream) throws Exception {
         executeMainOf(stackClass, new String[]{});
-        startManagedStack(cloud, maxAttempts);
+        startManagedStack(StackId.of(stackClass), maxAttempts, outputStream);
     }
 
-    private void startManagedStack(AfonCloud cloud, int maxAttempts) throws IOException {
+    private void startManagedStack(StackId stackId, int maxAttempts, OutputStream outputStream) throws IOException {
         // The kubernetes/helm providers are configured from the managed cluster's endpoint and
         // credentials (EKS endpoint+token on AWS, the AKS kubeconfig on Azure). With the v3
         // (plugin-framework) providers, those must be known at plan time, otherwise apply fails
@@ -164,22 +262,22 @@ public class StepActions {
         // google_container_cluster resource and uses GKE's built-in CNI, so the targeted apply
         // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
         // Stacks without a managed cluster yield no targets and skip straight to the full apply.
-        Path stackDir = stackDir(cloud);
-        tofuApply(stackDir, clusterBootstrapTargets(stackDir), maxAttempts);
+        Path stackDir = stackDir(stackId);
+        tofuApply(stackDir, clusterBootstrapTargets(stackDir), maxAttempts, outputStream);
     }
 
-    private void tofuApply(Path tofuDir, List<String> bootstrapTargets, int maxAttempts) throws IOException {
+    private void tofuApply(Path tofuDir, List<String> bootstrapTargets, int maxAttempts, OutputStream outputStream) throws IOException {
         ensureKubeConfigExists();
-        if (run("tofu", tofuDir, "init") != 0) {
+        if (run("tofu", tofuDir, outputStream, "init") != 0) {
             throw new ManagedProcessException(format("tofu init failed in %s", tofuDir));
         }
         if (!bootstrapTargets.isEmpty()) {
             List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
             phaseOne.addAll(bootstrapTargets);
             logger.info("Bootstrapping targets before the full apply: {}", phaseOne);
-            tofuWithRetry(tofuDir, System.out, maxAttempts, phaseOne.toArray(new String[0]));
+            tofuWithRetry(tofuDir, outputStream, maxAttempts, phaseOne.toArray(new String[0]));
         }
-        tofuWithRetry(tofuDir, OutputStream.nullOutputStream(), maxAttempts, "apply", "--auto-approve", "-parallelism=5");
+        tofuWithRetry(tofuDir, outputStream, maxAttempts, "apply", "--auto-approve", "-parallelism=5");
     }
 
     /**
@@ -453,6 +551,30 @@ public class StepActions {
             }
             conn.commit();
         }
+    }
+
+    /**
+     * Checks that the URL answers a GET with 200, eg that a server another stack deploys is up.
+     * @param failure what to say if it doesn't, eg what to deploy first
+     * @throws IllegalStateException if it doesn't answer, or not with 200
+     */
+    void checkAnswers(String url, String failure) throws InterruptedException {
+        logger.info("Checking {} answers", url);
+        String problem;
+        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
+        try {
+            HttpResponse<Void> response = client.send(
+                HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30)).GET().build(),
+                HttpResponse.BodyHandlers.discarding());
+            if (response.statusCode() == 200) {
+                logger.info("{} answers", url);
+                return;
+            }
+            problem = "answered " + response.statusCode();
+        } catch (IOException e) {
+            problem = "cannot be reached: " + e;
+        }
+        throw new IllegalStateException(format("%s %s. %s", url, problem, failure));
     }
 
     public Step waitOnDNS(String domain, long timeout) {

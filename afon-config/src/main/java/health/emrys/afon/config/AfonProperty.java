@@ -13,6 +13,11 @@ public enum AfonProperty {
     ENV_NAME("ENV_NAME"),
     CLUSTER_NAME("CLUSTER_NAME"),
     DNS_WAIT_TIMEOUT("DNS_WAIT_TIMEOUT"),
+    /** Where the tofu output goes, one of "console" (logged and System.out) or "logger" (only logged). Defaults to "logger". */
+    TOFU_OUTPUT("TOFU_OUTPUT"),
+
+    /** Selects which theme under afon-theme's {@code themes/<name>/} to deploy. Defaults to "emrys-hdrs". */
+    AFON_THEME("AFON_THEME"),
 
     // AWS
     AWS_REGION("AWS_REGION"),
@@ -29,6 +34,9 @@ public enum AfonProperty {
     AWS_JUPYTER_DNS_ZONE("AWS_JUPYTER_DNS_ZONE"),
     AWS_KEYCLOAK_CERT_ARN("AWS_KEYCLOAK_CERT_ARN"),
     AWS_KEYCLOAK_DNS_ZONE("AWS_KEYCLOAK_DNS_ZONE"),
+    /** Elastic IP that all outbound cluster traffic egresses from.  Optional: a new one is allocated when unset. */
+    AWS_EGRESS_IP("AWS_EGRESS_IP"),
+    AWS_POLARIS_ALLOWED_CIDRS("AWS_POLARIS_ALLOWED_CIDRS"),
 
     // GCP
     GCP_REGION("GCP_REGION"),
@@ -78,10 +86,10 @@ public enum AfonProperty {
     GUACAMOLE_DB_USERNAME("GUACAMOLE_DB_USERNAME"),
     GUACAMOLE_DB_PASSWORD("GUACAMOLE_DB_PASSWORD"),
 
+    // User that clients authenticate as, from users.csv
+    USER_ID("USER_ID"),
+
     // Polaris
-    USER_POLARIS_ID("USER_POLARIS_ID"),
-    USER_POLARIS_SECRET("USER_POLARIS_SECRET"),
-    USER_POLARIS_EMAIL("USER_POLARIS_EMAIL"),
     POLARIS_ID("POLARIS_ID"),
     POLARIS_SECRET("POLARIS_SECRET"),
     POLARIS_ENDPOINT("POLARIS_ENDPOINT"),

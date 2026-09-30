@@ -1,6 +1,8 @@
 package health.emrys.afon.spark;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.FileUserProvider;
 import org.apache.spark.SparkConf;
 
 import java.util.ArrayList;
@@ -13,7 +15,13 @@ public class KeyCloakSparkWarehouseConfigForTesting extends KeyCloakSparkWarehou
 
     public KeyCloakSparkWarehouseConfigForTesting(AfonPropertyProvider properties,
                                                   CatalogWarehouse[] catalogWarehouses) {
-        super(properties);
+        this(properties, new FileUserProvider().getConfiguredUser(properties), catalogWarehouses);
+    }
+
+    public KeyCloakSparkWarehouseConfigForTesting(AfonPropertyProvider properties,
+                                                  AfonUser user,
+                                                  CatalogWarehouse[] catalogWarehouses) {
+        super(properties, user);
         this.catalogWarehouses = catalogWarehouses;
     }
 

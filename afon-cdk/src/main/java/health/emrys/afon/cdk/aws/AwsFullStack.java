@@ -14,16 +14,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
-import static health.emrys.afon.config.AfonCloud.AWS;
 
 public class AwsFullStack extends AwsTrinoStack {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsFullStack.class);
 
     public AwsFullStack(@NonNull Construct scope,
-                        @NonNull AfonCloud id,
+                        @NonNull StackId stackId,
                         AfonPropertyProvider properties) {
-        super(scope, id, properties);
+        super(scope, stackId, properties);
         List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
         dependablesAndLoadBalancers.addAll(loadBalancers);
         dependablesAndLoadBalancers.addAll(cloudProvider.getDependables());
@@ -35,7 +34,8 @@ public class AwsFullStack extends AwsTrinoStack {
         // available for service aws-load-balancer-webhook-service" (11 of them, one per
         // Service in the chart). Same reasoning as Jupyter's and Keycloak's Services.
         dependablesAndLoadBalancers.addAll(cloudProvider.getServiceDependables());
-        // On destroy, the CRD cleanup deletes every non-spark CRD. kube-prometheus-stack's release
+        // On destroy, the CRD cleanup deletes the monitoring.coreos.com, monitoring.grafana.com and
+        // cilium.io CRDs (see CrdCleanup#GROUPS). kube-prometheus-stack's release
         // manifest contains Prometheus/Alertmanager/ServiceMonitor/PrometheusRule objects, and Helm
         // cannot uninstall objects whose CRD is gone ("failed to delete release"). Depending on the
         // cleanup makes these releases be uninstalled before it runs.
@@ -105,7 +105,7 @@ public class AwsFullStack extends AwsTrinoStack {
             // in the same Grafana instance kube-prometheus-stack already ships.
             .values(List.of(
                 additionalServiceMonitorsValues(CILIUM_MONITORS),
-                grafanaLokiDatasourceValues(properties)
+                grafanaLokiDatasourceValues(lokiTenant())
                           ))
             .timeout(600)
             .atomic(true)
@@ -157,7 +157,7 @@ public class AwsFullStack extends AwsTrinoStack {
      * <p>The companion log shipper is installed by
      * {@link #deployPromtail(List, Release, AfonPropertyProvider)}; logs are queried in the same
      * Grafana that kube-prometheus-stack already deploys, wired up by
-     * {@link #grafanaLokiDatasourceValues(AfonPropertyProvider)}.
+     * {@link #grafanaLokiDatasourceValues(String)}.
      */
     private Release deployLoki(List<@NonNull ITerraformDependable> eksDependOn, AfonPropertyProvider properties) {
         return Release.Builder
@@ -188,7 +188,7 @@ public class AwsFullStack extends AwsTrinoStack {
             .name("promtail")
             .chart(vendoredChart(this, "promtailChart", "promtail-6.16.5.tgz"))
             .namespace("default")
-            .values(List.of(promtailValues(properties)))
+            .values(List.of(promtailValues(lokiTenant())))
             .timeout(600)
             .atomic(true)
             .forceUpdate(true)
@@ -211,9 +211,9 @@ public class AwsFullStack extends AwsTrinoStack {
             deploymentMode: SingleBinary
             loki:
               # Multi-tenancy on: every object key is prefixed with the tenant
-              # ID. Promtail and Grafana send CLUSTER_NAME as the tenant (see
+              # ID. Promtail and Grafana send the cluster name as the tenant (see
               # promtailValues / grafanaLokiDatasourceValues), so the S3 layout
-              # becomes <bucket>/<CLUSTER_NAME>/... instead of the auth-off
+              # becomes <bucket>/<cluster-name>/... instead of the auth-off
               # default of <bucket>/fake/...
               auth_enabled: true
               commonConfig:
@@ -289,8 +289,7 @@ public class AwsFullStack extends AwsTrinoStack {
      * {@code kubernetes-pods} scrape job; {@code action: keep} drops every
      * pod whose namespace isn't {@code default}.
      */
-    static String promtailValues(AfonPropertyProvider properties) {
-        String clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
+    static String promtailValues(String tenant) {
         return String.format("""
             config:
               clients:
@@ -303,7 +302,7 @@ public class AwsFullStack extends AwsTrinoStack {
                   - source_labels: [__meta_kubernetes_namespace]
                     action: keep
                     regex: default
-            """, clusterName);
+            """, tenant);
     }
 
     /**
@@ -311,8 +310,7 @@ public class AwsFullStack extends AwsTrinoStack {
      * kube-prometheus-stack release. {@code access: proxy} routes queries
      * through the Grafana pod, so we don't need to expose Loki externally.
      */
-    static String grafanaLokiDatasourceValues(AfonPropertyProvider properties) {
-        String clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
+    static String grafanaLokiDatasourceValues(String tenant) {
         return String.format("""
             grafana:
               additionalDataSources:
@@ -329,14 +327,21 @@ public class AwsFullStack extends AwsTrinoStack {
                     httpHeaderName1: X-Scope-OrgID
                   secureJsonData:
                     httpHeaderValue1: %s
-            """, clusterName);
+            """, tenant);
+    }
+
+    /**
+     * The Loki tenant, ie the cluster name {@code <stack-type>-<CLUSTER_NAME>}, which prefixes the logs in S3.
+     */
+    private String lokiTenant() {
+        return cloudProvider.getComponentNames().getCluster();
     }
 
     public static void main(String[] args) {
         logger.info("Creating full stack");
         final App app = createApp();
         try {
-            new AwsFullStack(app, AWS, new FilePropertyProvider());
+            new AwsFullStack(app, StackId.of(AwsFullStack.class), new FilePropertyProvider());
             app.synth();
         } catch (RuntimeException e) {
             logger.error(e.toString());

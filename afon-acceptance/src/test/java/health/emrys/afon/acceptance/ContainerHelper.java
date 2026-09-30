@@ -3,12 +3,12 @@ package health.emrys.afon.acceptance;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
-import health.emrys.afon.spark.SparkWarehouseConfig;
-import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.apache.polaris.core.config.FeatureConfiguration;
@@ -24,8 +24,6 @@ import java.io.Reader;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static health.emrys.afon.acceptance.AcceptanceTestConfig.testConfigIncludes;
 import static health.emrys.afon.config.AfonCloud.GCP;
@@ -33,7 +31,9 @@ import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.*;
-import static health.emrys.afon.cdk.SparkWorkloads.SPARK_IMAGE;
+import static health.emrys.afon.cdk.DockerImages.KEYCLOAK_IMAGE;
+import static health.emrys.afon.cdk.DockerImages.POLARIS_IMAGE;
+import static health.emrys.afon.cdk.DockerImages.SPARK_IMAGE;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -72,8 +72,7 @@ public class ContainerHelper {
         logger.info("That's all folks!");
     }
 
-    private final Network                     network      = Network.newNetwork();
-    private final SparkWarehouseConfigFactory sparkFactory = SparkWarehouseConfigFactory.getFactory();
+    private final Network network = Network.newNetwork();
 
     private GenericContainer<?> polaris;
     private GenericContainer<?> trino;
@@ -112,9 +111,7 @@ public class ContainerHelper {
                         properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
                         properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD)));
             identityProvider
-                .registerPolarisUser(AfonUserProvider.createUser(
-                            properties.getValue(USER_POLARIS_ID),
-                            properties.getValue(USER_POLARIS_SECRET)));
+                .registerPolarisUser(new FileUserProvider().getConfiguredUser(properties));
             identityProvider
                 .registerPolarisUser(AfonUserProvider.createUser(
                         properties.getValue(POLARIS_ID),
@@ -126,17 +123,10 @@ public class ContainerHelper {
     public synchronized void startSparkConnect(AfonPropertyProvider properties) {
         if (sparkConnect == null) {
             sparkConnect = new GenericContainer<>(SPARK_IMAGE);
-            SparkWarehouseConfig config = sparkFactory.createConfig(properties);
-            AfonCatalogs afonCatalogs = new AfonCatalogs(properties);
-            Stream<String> envs = afonCatalogs.all().stream().flatMap(
-                catalog ->
-                        config.sparkConfigs(catalog.toString()).entrySet().stream().map(
-                            entry -> format("-D%s=%s", entry.getKey(), entry.getValue()))
-            );
+            // Like the deployed server, it registers no catalogs: clients bring their own, with an OIDC token.
             String logging = "-Dlog4j2.logger.grpc.name=io.grpc -Dlog4j2.logger.grpc.level=DEBUG -Dlog4j2.logger" +
                 ".netty.name=io.grpc.netty -Dlog4j2.logger.netty.level=TRACE";
-            String envString = envs.collect(Collectors.joining(" "))
-                + " -Dspark.master=local[4]"
+            String envString = "-Dspark.master=local[4]"
                 + " -Dspark.connect.grpc.interceptor.classes=org.apache.spark.sql.connect.service" +
                 ".LoggingInterceptor"
                 + " " + logging;
@@ -156,7 +146,7 @@ public class ContainerHelper {
         if (polaris == null) {
             String polarisId = properties.getValue(POLARIS_ID);
             String polarisSecret = properties.getValue(POLARIS_SECRET);
-            polaris = new GenericContainer<>(POLARIS_IMAGE_NAME)
+            polaris = new GenericContainer<>(POLARIS_IMAGE)
                     // Same network as KeyCloak so Polaris can reach it via the KEYCLOAK_ALIAS host name.
                     .withNetwork(network)
                     // Declare the ports so the HTTP wait strategy can resolve them (the fixed bindings
@@ -173,10 +163,11 @@ public class ContainerHelper {
                 polaris.withEnv(envName, properties.getValue(property));
             });
             // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
+            AfonUser user = new FileUserProvider().getConfiguredUser(properties);
             polarisOidcEnv(
                     internalRealmUrl(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL),
-                    properties.getValue(USER_POLARIS_ID),
-                    properties.getValue(USER_POLARIS_SECRET)).forEach(polaris::withEnv);
+                    user.username(),
+                    user.password()).forEach(polaris::withEnv);
             Map.of(
                             "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
                             "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",

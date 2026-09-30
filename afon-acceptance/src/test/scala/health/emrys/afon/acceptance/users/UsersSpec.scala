@@ -4,7 +4,6 @@ import health.emrys.afon.acceptance.SparkHelper.{CatalogName1, CatalogName2, spa
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, Users}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
-import health.emrys.afon.config.AfonProperty.{USER_POLARIS_ID, USER_POLARIS_SECRET}
 import health.emrys.afon.config.{AfonCatalog, AfonCloud, AfonPropertyProvider, AfonUser, AfonUserAcl, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.polaris.catalogs.{AwsPolarisCatalog, PolarisCatalog}
@@ -44,6 +43,42 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
       When(s"${TestUsers.UserName} tries to create a namespace with SQL '$sql'")
       thenUserIsNotAllowedToExecute(sql, TestUsers.UserName)
     }
+
+    "not see catalogs authorised only for other users" in { // ticket 225: all users shared one principal role
+      val allowedCatalog = createAwsPolarisCatalog("users_spec_allowed", adminGrants = true)
+      val allowedName = allowedCatalog.catalogName()
+      val otherUser = AfonUserProvider.createUser("users_spec_other", "password")
+      val users = usersWithAcls(TestUsers.User -> allowedName, otherUser -> "all")
+
+      Given(s"${TestUsers.UserName} is authorised for $allowedName only, and ${otherUser.username()} for all catalogs")
+      configureUsersInKeyCloakAndPolaris(allowedName, users)
+      configureUsersInKeyCloakAndPolaris(catalogName, users)
+
+      val allowedAsUser = s"${allowedName}_as_${TestUsers.UserName}"
+      registerCatalogAsTestUser(allowedAsUser, allowedName)
+      val allowedSql = s"CREATE NAMESPACE IF NOT EXISTS ${allowedAsUser}.test_namespace"
+      When(s"${TestUsers.UserName} executes '$allowedSql'")
+      Then("there are no errors")
+      spark.sql(allowedSql)
+
+      // A Spark catalog name distinct from the first test's, so no plugin is reused from it.
+      val forbiddenAsUser = s"${catalogName}_shared_as_${TestUsers.UserName}"
+      registerCatalogAsTestUser(forbiddenAsUser, catalogName)
+      val forbiddenSql = s"CREATE NAMESPACE IF NOT EXISTS ${forbiddenAsUser}.test_namespace"
+      When(s"${TestUsers.UserName} tries to create a namespace in $catalogName, authorised only for ${otherUser.username()}, with '$forbiddenSql'")
+      thenUserIsNotAllowedToExecute(forbiddenSql, TestUsers.UserName)
+    }
+  }
+
+  /** An AfonUserProvider for the given users, each authorised per its AfonUserAcl catalogs. */
+  private def usersWithAcls(acls: (AfonUser, String)*): AfonUserProvider = new AfonUserProvider() {
+    private val userAcls = acls.map { case (user, catalogs) => new AfonUserAcl(user.username(), catalogs) }
+    override def getUsers: util.List[AfonUser] = acls.map(_._1).asJava
+    override def getUserNames: util.List[String] = acls.map(_._1.username()).asJava
+    override def getUser(username: String): AfonUser = acls.map(_._1).find(_.username() == username).orNull
+    override def getUserAcls: util.List[AfonUserAcl] = userAcls.asJava
+    override def isAuthorised(username: String, catalogName: String): Boolean =
+      userAcls.exists(acl => acl.username() == username && acl.isAuthorised(catalogName))
   }
 
   private def thenUserIsNotAllowedToExecute(sql: String, user: String = sparkUser) = {
@@ -76,19 +111,10 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
    * so subsequent queries against sparkCatalog reflect userX's own grants only.
    */
   private def registerCatalogAsTestUser(sparkCatalog: String, warehouse: String): Unit = {
-    val properties = AcceptanceTestConfig.instance.getProperties
-    val originalId = properties.getValue(USER_POLARIS_ID)
-    val originalSecret = properties.getValue(USER_POLARIS_SECRET)
     val configs =
-      try {
-        properties.setValue(USER_POLARIS_ID, TestUsers.UserName)
-        properties.setValue(USER_POLARIS_SECRET, TestUsers.UserPassword)
-        new KeyCloakSparkWarehouseConfigForTesting(properties, Array.empty[CatalogWarehouse])
-          .sparkConfigs(sparkCatalog, warehouse)
-      } finally {
-        properties.setValue(USER_POLARIS_ID, originalId)
-        properties.setValue(USER_POLARIS_SECRET, originalSecret)
-      }
+      new KeyCloakSparkWarehouseConfigForTesting(
+        AcceptanceTestConfig.instance.getProperties, TestUsers.User, Array.empty[CatalogWarehouse])
+        .sparkConfigs(sparkCatalog, warehouse)
     configs.asScala.foreach { case (k, v) => spark.conf.set(k, v) }
   }
 
@@ -168,8 +194,12 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
     // configured first, for the life of the shared SparkSession - a non-deterministic collision when
     // both specs run together. This test only exercises Polaris-level authorisation, not S3/IAM, so
     // reusing afonCatalogs.awsForbidden()'s own bucket here is fine.
+    createAwsPolarisCatalog("users_spec_forbidden", adminGrants = false)
+  }
+
+  private def createAwsPolarisCatalog(name: String, adminGrants: Boolean) = {
     val forbiddenBucket = AcceptanceTestConfig.instance.afonCatalogs().awsForbidden().bucketName()
-    val definition = AfonCatalog.adHoc("users_spec_forbidden", AfonCloud.AWS, "internal", forbiddenBucket, false)
+    val definition = AfonCatalog.adHoc(name, AfonCloud.AWS, "internal", forbiddenBucket, adminGrants)
     val catalog: PolarisCatalog = new AwsPolarisCatalog(definition, AcceptanceTestConfig.instance.getProperties)
     AcceptanceTestConfig.instance.getCatalogManager.configureCatalogs(catalog)
     catalog

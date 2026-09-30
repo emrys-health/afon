@@ -79,30 +79,38 @@ public class SparkWarehouseConfig {
         });
     }
 
-    /**
-     * Spark configs registering every {@link AfonCatalogs} catalog under its own name, plus any
-     * {@code additionalCatalogNames} (e.g. a federated catalog not part of {@link AfonCatalogs}).
-     */
-    public Map<String, String> allSparkConfigs(String... additionalCatalogNames) {
-        Map<String, String> config = new HashMap<>();
-        for (String catalogName : catalogNames()) {
-            config.putAll(sparkConfigs(catalogName));
-        }
-        for (String catalogName : additionalCatalogNames) {
-            config.putAll(sparkConfigs(catalogName));
-        }
-        return Map.copyOf(config);
-    }
-
     public Map<String, String> sparkConfigs(String sparkCatalog) {
         return sparkConfigs(sparkCatalog, sparkCatalog);
     }
 
+    /**
+     * Spark configs for a catalog authenticating with this config's client credentials. Only for
+     * Spark sessions owned by that client (e.g. local Spark); never for a shared server like
+     * Spark Connect, where it would grant every user the client's access.
+     */
     public Map<String, String> sparkConfigs(String sparkCatalog, String catalogName) {
-        Map config = new HashMap<String, String>();
+        Map<String, String> config = new HashMap<>(catalogConfigs(sparkCatalog, catalogName));
+        config.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
+        return Map.copyOf(config);
+    }
+
+    /**
+     * Spark configs for a catalog authenticating with the caller's own OIDC {@code token}, e.g. the
+     * {@code OIDC_TOKEN} injected into a data scientist's pod, so Polaris authorises that user.
+     */
+    public Map<String, String> sparkConfigsWithToken(String sparkCatalog, String catalogName, String token) {
+        Map<String, String> config = new HashMap<>(catalogConfigs(sparkCatalog, catalogName));
+        config.put(format("spark.sql.catalog.%s.token", sparkCatalog), token);
+        return Map.copyOf(config);
+    }
+
+    /**
+     * The catalog configs common to all authentication modes.
+     */
+    protected Map<String, String> catalogConfigs(String sparkCatalog, String catalogName) {
+        Map<String, String> config = new HashMap<>();
         config.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
         config.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
-        config.put(format("spark.sql.catalog.%s.credential", sparkCatalog), clientId + ":" + clientSecret);
         config.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
         config.put(format("spark.sql.catalog.%s.scope", sparkCatalog), OAUTH_SCOPE);
         config.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);

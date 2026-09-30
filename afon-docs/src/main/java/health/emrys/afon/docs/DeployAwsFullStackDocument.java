@@ -1,18 +1,14 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.cdk.SparkWorkloads;
-import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeployAwsFullStackMain;
-import health.emrys.afon.ops.steps.Step;
-import health.emrys.afon.ops.steps.StepOperations;
 
-import java.util.List;
+import static health.emrys.afon.ops.steps.StackAction.DEPLOY;
 
-public class DeployAwsFullStackDocument extends AbstractDocument {
+public class DeployAwsFullStackDocument extends AbstractStackDocument {
 
     public DeployAwsFullStackDocument(AfonPropertyProvider properties) {
-        super(properties);
+        super(properties, DEPLOY, "aws-full");
     }
 
     @Override
@@ -26,8 +22,6 @@ public class DeployAwsFullStackDocument extends AbstractDocument {
     }
 
     public String getFurtherNotes() {
-        String polarisDomainName =
-            properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
         return String.format(
             """
             # Troubleshooting
@@ -47,15 +41,9 @@ public class DeployAwsFullStackDocument extends AbstractDocument {
             
            Generate and run cleanup script (more than once if required):
             ```shell
-           ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args aws
+           afon-cli.sh generate-cleanup-script aws-full
             ```
-            """, new SparkWorkloads(polarisDomainName, properties).startConnectCommand());
-    }
-
-
-    @Override
-    public List<Step> steps(StepOperations stepOperations) {
-        return new DeployAwsFullStackMain().stepsUsing(stepOperations);
+            """, new SparkWorkloads().startConnectCommand());
     }
 
 }

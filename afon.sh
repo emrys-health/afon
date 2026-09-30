@@ -41,19 +41,19 @@ usage (){
   ops_command_names | sed 's/^/                          /'
   echo "help:             the help flag.  Prints usage."
   echo "home:             the afon home dir.  Defaults to '$HOME/.afon'."
-  echo "                  Also settable via env variable 'AFON_HOME'."
+  echo "                  Also settable via env variable 'AFON_HOME' (the flag wins over the env variable)."
   echo "cdktf:            the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
-  echo "                  Also settable via env variable 'AFON_CDKTF'."
+  echo "                  Also settable via env variable 'AFON_CDKTF' (the flag wins over the env variable)."
   echo "env:              the afon env,  Sets both cdktf-env and config-env."
-  echo "                  Also settable via env variable 'AFON_ENV'."
+  echo "                  Also settable via env variable 'AFON_ENV', which does not override the cdktf-env and config-env flags."
   echo "cdktf-env:        the cdktf env name.  Assumes cdktf dir 'AFON_HOME/cdktf-<env>' to symlink to 'AFON_HOME/cdktf'."
   echo "config-env:       the config env name.  Assumes config dir 'AFON_HOME/config-<env>' to symlink to 'AFON_HOME/config'."
   echo "config-zip:       the config zip path to import/export as a zip file."
   echo "cloud:            the cloud to target. One of aws|azure|gcp. If not specified all are targeted."
   echo "logging:          the logging level.  One of DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
-  echo "                  Also settable via env variable 'AFON_LOGGING'."
+  echo "                  Also settable via env variable 'AFON_LOGGING' (the flag wins over the env variable)."
   echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
-  echo "                  Also settable via env variable 'AFON_LOGGING_CONSOLE'."
+  echo "                  Also settable via env variable 'AFON_LOGGING_CONSOLE' (the flag wins over the env variable)."
   echo "mvn-quiet:        the flag to hush the mvn output"
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
@@ -356,8 +356,9 @@ fi
 
 echo "Using AFON_ROOT=$AFON_ROOT"
 
+# A flag always wins over its env var, as in afon-cli.sh: the env var only applies when the flag is not given.
 AFON_HOME="${AFON_HOME:-}"
-if [ -n "$AFON_HOME" ]; then
+if [ -z "$HOME_DIR" ] && [ -n "$AFON_HOME" ]; then
   HOME_DIR="$AFON_HOME"
 fi
 
@@ -366,20 +367,25 @@ if [ -n "$HOME_DIR" ]; then
 else
   HOME_DIR="$HOME/.afon"
   echo "Home dir not specified. Defaulting to $HOME_DIR"
-  AFON_HOME="$HOME_DIR"
-  echo "Setting AFON_HOME=$AFON_HOME"
 fi
+# The scripts read AFON_HOME, so it must be the dir resolved from the flag, env var or default.
+AFON_HOME="$HOME_DIR"
+echo "Setting AFON_HOME=$AFON_HOME"
 
 AFON_ENV="${AFON_ENV:-}"
-if [ -n "$AFON_ENV" ]; then
-  ENV="$AFON_ENV"
-fi
-
 if [ -n "$ENV" ]; then
+  # The --env flag sets both envs, overriding the --cdktf-env and --config-env flags.
   echo "Using env=$ENV"
   echo "Both cdktf and config env are set to $ENV"
   CDKTF_ENV="$ENV"
   CONFIG_ENV="$ENV"
+elif [ -n "$AFON_ENV" ]; then
+  # The AFON_ENV env var only sets the envs not given by the --cdktf-env and --config-env flags.
+  ENV="$AFON_ENV"
+  echo "Using env=$ENV, from AFON_ENV"
+  CDKTF_ENV="${CDKTF_ENV:-$ENV}"
+  CONFIG_ENV="${CONFIG_ENV:-$ENV}"
+  echo "Cdktf env is $CDKTF_ENV and config env is $CONFIG_ENV"
 fi
 
 CONFIG_DIR="$HOME_DIR/config"
@@ -390,7 +396,7 @@ if [ -n "$CONFIG_ENV" ]; then
 fi
 
 AFON_CDKTF="${AFON_CDKTF:-}"
-if [ -n "$AFON_CDKTF" ]; then
+if [ -z "$CDKTF_DIR" ] && [ -n "$AFON_CDKTF" ]; then
   CDKTF_DIR="$AFON_CDKTF"
 fi
 
@@ -399,16 +405,16 @@ if [ -n "$CDKTF_DIR" ]; then
 else
   CDKTF_DIR="$HOME_DIR/cdktf"
   echo "Cdktf dir not specified. Defaulting to $CDKTF_DIR"
-  AFON_CDKTF="$CDKTF_DIR"
-  echo "Setting AFON_CDKTF=$AFON_CDKTF"
 fi
+AFON_CDKTF="$CDKTF_DIR"
+echo "Setting AFON_CDKTF=$AFON_CDKTF"
 
 if [ -n "$CDKTF_ENV" ]; then
   exec_cdktf_switch
 fi
 
 AFON_LOGGING="${AFON_LOGGING:-}"
-if [ -n "$AFON_LOGGING" ]; then
+if [ -z "$LOGGING" ] && [ -n "$AFON_LOGGING" ]; then
   LOGGING="$AFON_LOGGING"
 fi
 
@@ -417,7 +423,7 @@ if [ -n "$LOGGING" ]; then
 fi
 
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-}"
-if [ -n "$AFON_LOGGING_CONSOLE" ]; then
+if [ -z "$LOGGING_CONSOLE" ] && [ -n "$AFON_LOGGING_CONSOLE" ]; then
   LOGGING_CONSOLE="$AFON_LOGGING_CONSOLE"
 fi
 

@@ -61,4 +61,14 @@ public class FileUserProviderTest {
         assertThat(provider.isAuthorised("phil", "any")).isFalse();
     }
 
+    @Test
+    public void canGetConfiguredUser() {
+        AfonPropertyProvider properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
+        properties.setValue(AfonProperty.USER_ID, "phil");
+        AfonUserProvider provider = new FileUserProvider(TEMPLATES_CONFIG_DIR);
+        AfonUser user = provider.getConfiguredUser(properties);
+        assertThat(user.username()).isEqualTo("phil");
+        assertThat(user.password()).isEqualTo("p5ssw0rd");
+    }
+
 }

@@ -36,13 +36,15 @@ Afon's architecture has four layers:
 
 `PolarisRestClient` is the HTTP client for talking to Polaris REST APIs. It handles:
 
-- **Authentication** — OAuth2 client credentials flow to get an access token (with retry logic for intermittent 503s)
+- **Authentication** — OAuth2 client credentials flow to get an access token. I/O and server (5xx) errors are retried up to 3 times, 5s apart, to ride out intermittent 503s. Any other failure (e.g. 401 on bad credentials), or a response with no access token, fails immediately with the HTTP code and response body in the exception. Only the client ID is logged on retrieval, never the client secret or the token.
 - **Catalog/User management** — POST to create catalogs/users, PUT to update, DELETE to remove
 - **Namespace and table operations** — CRUD via REST endpoints
 
 `CatalogConfigurer` builds on top of the `PolarisRestClient` to provide higher-level operations and the REST API URIs for creating catalogs with admin grants, configuring principal roles, and creating users.
 
 `PolarisCatalogManager` and `PolarisUserManager` build on top of the `CatalogConfigurer` to provide catalog and user specific configuration. 
+`PolarisUserManager` gives each user their own principal role (`<username>Principal`), which is granted the catalog role
+(`emrysrole4`) of only the catalogs `users-acl.csv` authorises the user for, so that no user can use a catalog authorised for another.
 
 `PolarisCatalog` is the abstract base for per-cloud catalog configuration. Each cloud has a concrete subclass (e.g. `AwsPolarisCatalog`, `GcpPolarisCatalog`, `AzurePolarisCatalog`) that knows how to generate the JSON payload for creating a catalog in that cloud, including the correct storage configuration info and bucket URI.
 
@@ -50,13 +52,31 @@ Afon's architecture has four layers:
 
 Spark connects to Polaris via the Iceberg REST catalog protocol. `SparkWarehouseConfig` builds the Spark configuration with:
 
-- The Polaris endpoint URI
-- OAuth2 credentials (`client_id` / `client_secret`)
+- The Polaris endpoint URI and the KeyCloak token endpoint (`oauth2-server-uri`)
+- The authentication: either OAuth2 client credentials (`client_id` / `client_secret`), or the user's OIDC token
 - Warehouse names for each cloud catalog
 
-`SparkClient` creates a `SparkSession` configured to talk to a Polaris instance.
+`SparkClient` creates a local, in-process `SparkSession` configured to talk to a Polaris instance with client credentials.
 
 In the deployed environment, Spark runs as a Spark Connect server in Kubernetes. Jupyter notebooks connect to it via the Spark Connect protocol (`sc://spark-connector-0-driver-svc:15002`).
+The Spark Connect server is shared by all users, so it registers no catalogs and holds no credentials.
+Each session declares its own catalogs, authenticating with the user's OIDC token, which JupyterHub injects into the user's pod as the `OIDC_TOKEN` environment variable:
+
+```python
+OIDC_TOKEN = os.environ["OIDC_TOKEN"]
+spark = (SparkSession.builder.remote("sc://spark-connector-0-driver-svc:15002")
+    .config("spark.sql.catalog.aws", "org.apache.iceberg.spark.SparkCatalog")
+    .config("spark.sql.catalog.aws.type", "rest")
+    .config("spark.sql.catalog.aws.uri", "https://<polaris-host>/api/catalog")
+    .config("spark.sql.catalog.aws.warehouse", "aws")
+    .config("spark.sql.catalog.aws.header.X-Iceberg-Access-Delegation", "vended-credentials")
+    .config("spark.sql.catalog.aws.oauth2-server-uri", "https://<keycloak-host>/realms/polaris/protocol/openid-connect/token")
+    .config("spark.sql.catalog.aws.scope", "openid")
+    .config("spark.sql.catalog.aws.token", OIDC_TOKEN)
+    .getOrCreate())
+```
+
+`SparkConnectClient` does the same from Java, and `GeneratePySparkContextMain` / `GeneratePySparkKeycloakMain` generate this code for all the configured catalogs.
 
 ## Properties management
 
@@ -80,13 +100,16 @@ Executables are composed of reusable steps:
 - **`StepOperations`** — factory methods that create `Step` instances for common operations (clean, deploy, wait, configure, test)
 - **`StepActions`** — low-level operations that actually execute commands (run Maven, run OpenTofu, call Polaris APIs)
 - **`StepRunner`** — executes a list of steps in order, with the ability to resume from a named step
-- **`StepsProvider`** — interface implemented by `{Delete|Deploy|Setup}*Main` classes to provide their step list
+- **`StepsProvider`** — interface providing a step list
+- **`StackStepsFactory`** — the single definition of the steps of each action (`delete`, `deploy`, `setup`) on each stack, keyed by stack id (`<cloud>-<stack-type>`, eg `aws-keycloak`), composed from `StepOperations` and run by the `manage-stack` command
 
-Each `{Delete|Deploy|Setup}*Main` class composes steps from `StepOperations`. 
+The other ops commands, eg the Snowflake and cross-cloud ones, compose their steps from `StepOperations` too, reusing
+the stacks' steps. For example, `SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain` reuses the steps setting up
+the `aws-full` stack and then adds Azure-specific steps.
 
-For example, `SetupAwsFullStackWithAzurePolarisMain` reuses all steps from `DeployAwsFullStackMain` and then adds Azure-specific steps.
-
-The corresponding `{Delete|Deploy|Setup}*Document` classes generate markdown documentation describing each step — this keeps documentation in lock-step with the actual deployment code.
+The corresponding `*Document` classes generate markdown documentation describing each step — this keeps documentation
+in lock-step with the actual deployment code.  The stack documents extend `AbstractStackDocument`, taking their steps
+from `StackStepsFactory`.
 
 ### Terraform-based deployment
 
@@ -95,5 +118,5 @@ The afon-cdk module generates CDKTF (Cloud Development Kit for Terraform) files.
 OpenTofu then provisions the actual infrastructure — Kubernetes clusters, deployments, services, and ingress controllers.
 The Java code does not directly create cloud resources.
 
-After the CDKTF step, you can inspect the generated Terraform in `$AFON_CDKTF/stacks/<cloud>/` and run `tofu apply` or `tofu destroy` directly.
+After the CDKTF step, you can inspect the generated Terraform in `$AFON_CDKTF/stacks/<stack-id>/`, eg `aws-keycloak`, and run `tofu apply` or `tofu destroy` directly.
 

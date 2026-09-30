@@ -25,6 +25,12 @@ public interface IdentityProvider {
     String userToken(String username, String password) throws IOException;
 
     /**
+     * Obtains an access token for a confidential client via the client-credentials flow, eg for the
+     * Polaris admin client, which is a client but not a user.
+     */
+    String clientToken(String clientId, String clientSecret) throws IOException;
+
+    /**
      * Authenticates against the 'master' realm as the bootstrap admin.
      *
      * @return An access token for the admin REST API.

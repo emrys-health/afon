@@ -1,32 +1,56 @@
 package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
+import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Properties;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
-import static health.emrys.afon.config.ConfigUtils.tfStatePath;
+import static health.emrys.afon.config.ConfigUtils.*;
 import static java.lang.String.format;
 
 public class StepDocumentation extends StepActions {
 
     private final PrintWriter out;
 
-    public static @NonNull String afonArgumentsToRun(Class clazz,
-                                                     String[] args,
-                                                     String command) {
-        return afonArgumentsToRun(clazz, args, new Properties(), command);
+    private static final String OPS_PACKAGE = "health.emrys.afon.ops";
+    private static final Pattern CAMEL_BOUNDARY = Pattern.compile("(?<=[a-z0-9])(?=[A-Z])");
+
+    /**
+     * The {@code afon-cli.sh} command running the class, without its args, or {@code null} if it has none:
+     * <ul>
+     *   <li>an ops {@code *Main} class is run by its kebab-named command, eg {@code configure-users} for
+     *       {@code ConfigureUsersMain};</li>
+     *   <li>a stack is synthesised by {@code validate-stack <stack>}, eg {@code validate-stack aws-full} for
+     *       {@code AwsFullStack}.</li>
+     * </ul>
+     */
+    public static String afonCliCommand(Class<?> clazz) {
+        String simpleName = clazz.getSimpleName();
+        if (clazz.getName().startsWith(OPS_PACKAGE + ".") && simpleName.endsWith("Main")) {
+            return kebabCase(simpleName.substring(0, simpleName.length() - "Main".length()));
+        }
+        if (AfonCloudStack.class.isAssignableFrom(clazz) && simpleName.endsWith("Stack")) {
+            return "validate-stack " + kebabCase(simpleName.substring(0, simpleName.length() - "Stack".length()));
+        }
+        return null;
     }
 
+    private static String kebabCase(String name) {
+        return CAMEL_BOUNDARY.matcher(name).replaceAll("-").toLowerCase();
+    }
 
     public static @NonNull String afonArgumentsToRun(Class clazz,
                                                      String[] args,
@@ -72,8 +96,21 @@ public class StepDocumentation extends StepActions {
 
     @Override
     public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
+        String cliCommand = afonCliCommand(mainClass);
+        if (cliCommand != null && (overrides == null || overrides.isEmpty())) {
+            run("afon-cli.sh", null, args == null ? new String[]{cliCommand} : concat(cliCommand, args));
+            return;
+        }
+        // no afon-cli.sh command runs the class, eg a SparkRunner, or passes it system property overrides
         String fullArgs = afonArgumentsToRun(mainClass, args, overrides, "exec");
         run("./afon.sh", null, fullArgs);
+    }
+
+    private static String[] concat(String first, String[] rest) {
+        String[] all = new String[rest.length + 1];
+        all[0] = first;
+        System.arraycopy(rest, 0, all, 1, rest.length);
+        return all;
     }
 
     @Override
@@ -109,13 +146,44 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    @NonNull Path stackDir(AfonCloud cloud) throws IOException {
-        Path stackDir = Path.of(ConfigUtils.stackDir(cloud));
+    @NonNull Path stackDir(StackId stackId) throws IOException {
+        Path stackDir = Path.of(ConfigUtils.stackDir(stackId));
         out.println(format("""
-                   Stack dir `%s` for cloud `%s`.
-                   """, stackDir, cloud));
+                   Stack dir `%s` for stack `%s`.
+                   """, stackDir, stackId));
         out.flush();
         return stackDir;
+    }
+
+    /**
+     * Documents a single stack, standing for each stack in the cloud selected by the filter.
+     */
+    @Override
+    List<String> stackNamesIn(AfonCloud cloud, StackFilter filter) {
+        out.println(format("""
+                   For each of the %s in cloud `%s`, ie with a stack dir `%s/%s-<stack-type>` or tofu state
+                   `%s/terraform.%s-<stack-type>.tfstate`, or the legacy stack dir `%s` or tofu state `%s`:
+                   """, filter.description(), cloud, stacksDir(), cloud, ConfigUtils.afonCkdtf(), cloud,
+                          legacyStackDir(cloud), legacyTfStatePath(cloud)));
+        out.flush();
+        return List.of(cloud + "-<stack-type>");
+    }
+
+    @Override
+    void checkAnswers(String url, String failure) {
+        out.println(format("""
+                   Check that `%s` answers with 200, eg with:
+                   ```shell
+                   curl -s -o /dev/null -w '%%{http_code}' %s
+                   ```
+                   If it doesn't: %s
+                   """, url, url, failure));
+        out.flush();
+    }
+
+    @Override
+    boolean exists(Path path) {
+        return true;
     }
 
     @Override
@@ -123,14 +191,6 @@ public class StepDocumentation extends StepActions {
         out.println(format("""
                    Check path `%s` is not a broken symlink.
                    """, path));
-        out.flush();
-    }
-
-    @Override
-    void deleteTfStateFiles(AfonCloud cloud) throws IOException {
-        out.println(format("""
-                   Delete `%s`
-                   """, tfStatePath(cloud)));
         out.flush();
     }
 

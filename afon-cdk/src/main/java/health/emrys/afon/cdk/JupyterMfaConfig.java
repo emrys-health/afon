@@ -96,7 +96,7 @@ public class JupyterMfaConfig {
         DeploymentSpecTemplateSpecContainer proxyContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("oauth2-proxy")
-            .image("quay.io/oauth2-proxy/oauth2-proxy:v7.6.0")
+            .image(DockerImages.OAUTH2_PROXY_IMAGE)
             .args(proxyArgs)
             .env(List.of(
                 envFromSecret("OAUTH2_PROXY_CLIENT_ID", SECRET_NAME, "client-id"),
@@ -159,7 +159,7 @@ public class JupyterMfaConfig {
         return DeploymentSpecTemplateSpecInitContainer
             .builder()
             .name("wait-for-issuer")
-            .image("curlimages/curl:8.11.1")
+            .image(DockerImages.CURL_IMAGE)
             .command(List.of("sh", "-c", script))
             .env(List.of(DeploymentSpecTemplateSpecInitContainerEnv
                              .builder()

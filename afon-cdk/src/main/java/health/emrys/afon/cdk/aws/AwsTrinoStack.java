@@ -2,10 +2,10 @@ package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import health.emrys.afon.cdk.TrinoWorkloads;
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -13,8 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AwsTrinoStack extends AwsSparkStack {
-    public AwsTrinoStack(@NonNull Construct scope, @NonNull AfonCloud id, AfonPropertyProvider properties) {
-        super(scope, id, properties);
+    public AwsTrinoStack(@NonNull Construct scope, @NonNull StackId stackId, AfonPropertyProvider properties) {
+        super(scope, stackId, properties);
         // Trino only needs the cluster reachable (not the Spark operator), so it depends on the
         // EKS dependables rather than eksDependOn.
         // The chart also creates a Service, and the AWS LB Controller's mservice.elbv2.k8s.aws
@@ -26,6 +26,6 @@ public class AwsTrinoStack extends AwsSparkStack {
         List<ITerraformDependable> dependsOn = new ArrayList<>(cloudProvider.getDependables());
         dependsOn.addAll(cloudProvider.getServiceDependables());
         new TrinoWorkloads(properties, awsPolarisDomainName)
-            .deploy(this, helmProvider, ConfigUtils.cloudToCatalog(id, new AfonCatalogs(properties)), dependsOn);
+            .deploy(this, helmProvider, ConfigUtils.cloudToCatalog(stackId.cloud(), new AfonCatalogs(properties)), dependsOn);
     }
 }

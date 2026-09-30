@@ -1,16 +1,13 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.SetupAzurePolarisStackMain;
-import health.emrys.afon.ops.steps.Step;
-import health.emrys.afon.ops.steps.StepOperations;
 
-import java.util.List;
+import static health.emrys.afon.ops.steps.StackAction.SETUP;
 
-public class SetupAzurePolarisStackDocument extends AbstractDocument {
+public class SetupAzurePolarisStackDocument extends AbstractStackDocument {
 
     public SetupAzurePolarisStackDocument(AfonPropertyProvider properties) {
-        super(properties);
+        super(properties, SETUP, "azure-polaris");
     }
 
     @Override
@@ -34,14 +31,9 @@ public class SetupAzurePolarisStackDocument extends AbstractDocument {
             
             Generate and run cleanup script:
             ```shell
-            ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args azure
+            afon-cli.sh generate-cleanup-script azure-polaris
             ```
             """);
-    }
-
-    @Override
-    public List<Step> steps(StepOperations stepOperations) {
-        return new SetupAzurePolarisStackMain().stepsUsing(stepOperations);
     }
 
 }

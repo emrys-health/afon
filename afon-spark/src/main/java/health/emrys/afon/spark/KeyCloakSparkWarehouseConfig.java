@@ -2,6 +2,7 @@ package health.emrys.afon.spark;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import org.jspecify.annotations.NonNull;
 
@@ -18,10 +19,10 @@ import static java.lang.String.format;
  * ({@code /api/catalog/v1/oauth/tokens} returns HTTP 501), so the Iceberg REST catalog must obtain
  * its OAuth2 token directly from KeyCloak.
  *
- * <p>This overrides {@link #sparkConfigs(String)} to add the {@code oauth2-server-uri} pointing at
+ * <p>This overrides {@link #catalogConfigs(String, String)} to add the {@code oauth2-server-uri} pointing at
  * KeyCloak and to request the {@code openid} scope - KeyCloak rejects Polaris' "PRINCIPAL_ROLE:ALL"
- * scope (and Iceberg's default "catalog") with invalid_scope. The credentials passed to the
- * superclass must identify a client KeyCloak knows about.
+ * scope (and Iceberg's default "catalog") with invalid_scope. The credentials are those of the given
+ * {@link AfonUser}, which KeyCloak knows as a confidential client of the same name and secret.
  */
 public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
 
@@ -33,24 +34,19 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
 
     private final String oauth2ServerUri;
 
-    KeyCloakSparkWarehouseConfig(AfonPropertyProvider properties) {
+    KeyCloakSparkWarehouseConfig(AfonPropertyProvider properties, AfonUser user) {
         super(properties.getValue(POLARIS_ENDPOINT),
                 protocolFor(properties.getValue(POLARIS_ENDPOINT)),
-                properties.getValue(USER_POLARIS_ID),
-                properties.getValue(USER_POLARIS_SECRET),
+                user.username(),
+                user.password(),
                 new AfonCatalogs(properties)
         );
         this.oauth2ServerUri = kcUriFor(properties.getValue(OIDC_DOMAIN_NAME));
     }
 
     @Override
-    public Map<String, String> sparkConfigs(String sparkCatalog, String catalogName) {
-        return addOauthServer(sparkCatalog, super.sparkConfigs(sparkCatalog, catalogName));
-    }
-
-    @Override
-    public Map<String, String> sparkConfigs(String sparkCatalog) {
-        return addOauthServer(sparkCatalog, super.sparkConfigs(sparkCatalog));
+    protected Map<String, String> catalogConfigs(String sparkCatalog, String catalogName) {
+        return addOauthServer(sparkCatalog, super.catalogConfigs(sparkCatalog, catalogName));
     }
 
     private @NonNull Map<String, String> addOauthServer(String sparkCatalog, Map<String, String> actual) {

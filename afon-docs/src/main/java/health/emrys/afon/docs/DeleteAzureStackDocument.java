@@ -1,16 +1,13 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.DeleteAzureStackMain;
-import health.emrys.afon.ops.steps.Step;
-import health.emrys.afon.ops.steps.StepOperations;
 
-import java.util.List;
+import static health.emrys.afon.config.AfonCloud.AZURE;
 
-public class DeleteAzureStackDocument extends AbstractDocument {
+public class DeleteAzureStackDocument extends AbstractStackDocument {
 
     public DeleteAzureStackDocument(AfonPropertyProvider properties) {
-        super(properties);
+        super(properties, AZURE);
     }
 
     @Override
@@ -32,14 +29,9 @@ public class DeleteAzureStackDocument extends AbstractDocument {
             
             Generate and run cleanup script:
             ```shell
-            ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args azure
+            afon-cli.sh generate-cleanup-script azure-<stack-type>
             ```
             """);
-    }
-
-    @Override
-    public List<Step> steps(StepOperations stepOperations) {
-        return new DeleteAzureStackMain().stepsUsing(stepOperations);
     }
 
 }

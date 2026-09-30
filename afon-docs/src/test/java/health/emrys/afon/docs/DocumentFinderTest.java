@@ -3,30 +3,30 @@ package health.emrys.afon.docs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class DocumentFinderTest {
+class DocumentFinderTest {
 
     private AfonPropertyProvider properties = new FilePropertyProvider("src/test/resources/config", List.of("test", "secret"));
     private DocumentFinder finder = new DocumentFinder(properties);
 
     @Test
-    public void canFindDocumentsOnlyForAws() {
+    void canFindDocumentsOnlyForAws() {
         canFindDocumentsIncludingAndExcluding("aws", new String[]{"azure", "gcp"});
     }
 
     @Test
-    public void canFindDocumentsOnlyForAzure() {
+    void canFindDocumentsOnlyForAzure() {
         canFindDocumentsIncludingAndExcluding("azure", new String[]{"aws", "gcp"});
     }
 
     @Test
-    public void canFindDocumentsOnlyForGcp() {
+    void canFindDocumentsOnlyForGcp() {
         canFindDocumentsIncludingAndExcluding("gcp", new String[]{"aws", "azure"});
     }
 
