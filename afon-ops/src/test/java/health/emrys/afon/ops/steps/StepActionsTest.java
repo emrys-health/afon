@@ -47,6 +47,16 @@ class StepActionsTest {
     }
 
     @Test
+    void onlyStacksWithTfStateAreDeployed() throws IOException {
+        createDirs("stacks/aws", "stacks/gcp", "stacks/aws-keycloak", "stacks/aws-polaris");
+        createFiles("terraform.aws-keycloak.tfstate", "terraform.gcp.tfstate");
+
+        assertThat(actions.deployedStackNames(List.of("aws", "aws-keycloak", "aws-polaris"), cdktfDir))
+            .containsExactly("aws-keycloak");
+        assertThat(actions.deployedStackNames(List.of("gcp"), cdktfDir)).containsExactly("gcp");
+    }
+
+    @Test
     void canFindNoStacksInEmptyOrMissingCdktfDir() throws IOException {
         assertThat(StepActions.stackNamesIn(AWS, cdktfDir)).isEmpty();
         assertThat(StepActions.stackNamesIn(AWS, cdktfDir.resolve("missing"))).isEmpty();

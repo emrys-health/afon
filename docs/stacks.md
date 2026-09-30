@@ -58,6 +58,8 @@ steps, eg `setup-aws-keycloak-stack` is the same as `manage-stack setup aws-keyc
 
 ### Stacks side by side
 
+**NOTE:** Only AWS has more than one stack type for now, so only AWS stacks can run side by side: Azure and GCP each have a single stack type, `azure-polaris` and `gcp-polaris`, although the same rules apply to them.
+
 Each stack has its own `tofu` state, so stacks run side by side, unless they conflict, ie they hold a common exclusive
 resource: the DNS record of a domain name, eg `OIDC_DOMAIN_NAME`, or the pinned egress IP `AWS_EGRESS_IP`, which only
 one running stack can hold.  So `deploy` and `setup` first delete the stacks deployed in the cloud that conflict with
@@ -69,13 +71,13 @@ To deploy aws-polaris, delete it first:
     afon-cli.sh manage-stack delete aws-full
 or rerun with --replace to delete it as part of this run.
 ```
+Only a deployed stack, ie with a `tofu` state, can make them fail: a conflicting stack dir without one, eg left from `validate-stack`, has nothing deployed, so they just delete it.
 The pinned egress IP `AWS_EGRESS_IP` is only held, and so only conflicts, when it is set.
 The [AWS stack workflow](github_workflows.md#stack-aws-workflow) always runs with `--replace`.
 
-`delete` deletes just the stack, while `delete <cloud>-all`, eg `delete aws-all`, deletes every stack deployed in the
-cloud.  The legacy stack of a cloud, deployed before each stack had its own `tofu` state (see
-[the Afon cdktf dir](#the-afon-cdktf-dir)), may be any stack, so it conflicts with every stack of the cloud, and
-`delete` of any stack of the cloud deletes it too.  Likewise, a stack not listed above, eg one deployed from
+`delete` deletes just the stack, while `delete <cloud>-all`, eg `delete aws-all`, deletes every stack deployed in the cloud.  The legacy stack of a cloud, deployed before each stack had its own `tofu` state (see
+[upgrading to per-stack state](#upgrading-to-per-stack-state-one-off)), may be any stack, so it conflicts with every
+stack of the cloud, and `delete` of any stack of the cloud deletes it too.  Likewise, a stack not listed above, eg one deployed from
 `validate-stack aws-jupyter` and `tofu-apply`, conflicts with every stack of the cloud.
 
 | Stack | Holds | Runs side by side with |
@@ -95,9 +97,38 @@ Their `deploy` and `setup` check first that KeyCloak answers at `OIDC_DOMAIN_NAM
 
 The `aws-full` stack deploys its own KeyCloak, so it conflicts with both `aws-keycloak` and `aws-polaris`, unless
 `AWS_KEYCLOAK_EXTERNAL=true` is set in `afon-aws.properties` (it is `false` when empty): it then uses the KeyCloak
-`aws-keycloak` deploys, like `aws-polaris`, so it runs side by side with `aws-keycloak`, and its `deploy` and `setup`
-likewise check first that KeyCloak answers.
+`aws-keycloak` deploys, like `aws-polaris`, so it runs side by side with `aws-keycloak`, and its `deploy` and `setup` likewise check first that KeyCloak answers.
 Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-keycloak` always gets a fresh one.
+
+### Upgrading to per-stack state (one-off)
+
+Stacks used to be deployed per cloud: all the stacks of a cloud shared one plan `$AFON_CDKTF/stacks/<cloud>` and one `tofu` state `$AFON_CDKTF/terraform.<cloud>.tfstate`, eg `stacks/azure` and `terraform.azure.tfstate`.  They are now deployed per stack id, each with its own plan `stacks/<stack-id>` and state `terraform.<stack-id>.tfstate`, eg `stacks/azure-polaris` and `terraform.azure-polaris.tfstate`.
+
+A stack deployed before the change, ie with a `terraform.<cloud>.tfstate`, is the *legacy stack* of its cloud.
+`manage-stack` cannot tell which stack it is, so it treats it as conflicting with every stack of the cloud.  Hence the first `deploy` or `setup` of any stack of a cloud with a legacy stack fails, before deleting anything, eg:
+```
+Cannot deploy azure-polaris, as the legacy stack azure, deployed before each stack had its own tofu state, may be any stack.
+To deploy azure-polaris, delete it first:
+    afon-cli.sh manage-stack delete azure-polaris
+or rerun with --replace to delete it as part of this run.
+```
+This is a **one-off per cloud, per cdktf dir**: once the legacy stack of a cloud is deleted, it is gone for good, and from then on every stack of the cloud has its own state.  Each cdktf env (see [cdktf-switch](#command-cdktf-switch))
+has its own legacy stacks, so it happens once in each env.  Either:
+- rerun with `--replace`, which deletes the legacy stack and then deploys the stack, eg
+  `afon-cli.sh manage-stack setup azure-polaris --replace`, or
+- delete it first, as `delete` of any stack of the cloud deletes the legacy stack too, eg
+  `afon-cli.sh manage-stack delete azure-polaris`, then deploy the stack as usual.
+
+To see whether a cdktf dir still has legacy stacks, look for `terraform.<cloud>.tfstate` files, where
+`<cloud>={aws,azure,gcp}`:
+```shell
+ls $AFON_CDKTF/*.tfstate
+```
+A legacy `stacks/<cloud>` dir without a `terraform.<cloud>.tfstate`, eg left from synthesising a stack without
+deploying it, has nothing deployed, so it doesn't make `deploy` or `setup` fail: they just delete it.
+On AWS, the stacks now also name their components from `<stack-type>-<CLUSTER_NAME>` rather than `CLUSTER_NAME`, see
+[AWS](#aws): the legacy stack keeps its old names until it is deleted, which its own plan and state take care of.
+The [AWS stack workflow](github_workflows.md#stack-aws-workflow) runs with `--replace`, so it deletes the legacy stack of its runner's cdktf dir on its first run, without failing.
 
 ### Validate a stack's config
 
@@ -218,9 +249,7 @@ eg the cleanups when it is destroyed, use it via `KUBECONFIG`, so they only ever
 whichever cluster your current kubectl context points at.  Creating the cluster also points your current kubectl context
 (`~/.kube/config`) at it, as `afon-cli.sh aws-update-kube-config <stack-type>` does, eg for the smoke tests.
 
-**NOTE:** Before each stack had its own, the stacks of a cloud shared the plan `$AFON_CDKTF/stacks/<cloud>` and state
-`$AFON_CDKTF/terraform.<cloud>.tfstate`, where `<cloud>={aws,azure,gcp}`.  A stack still deployed with these is deleted,
-like any other stack of the cloud, by the `delete`, `deploy` and `setup` actions of any stack of the cloud.
+**NOTE:** Before each stack had its own, the stacks of a cloud shared the plan `$AFON_CDKTF/stacks/<cloud>` and state `$AFON_CDKTF/terraform.<cloud>.tfstate`, where `<cloud>={aws,azure,gcp}`.  A stack still deployed with these is the legacy stack of its cloud, see [upgrading to per-stack state](#upgrading-to-per-stack-state-one-off).
 
 You can run tofu apply or destroy commands via
 ```shell
