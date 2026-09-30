@@ -20,9 +20,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
@@ -41,8 +41,12 @@ public class StepOperations {
     private final String polarisNamespace;
     private final String polarisNamespaceExternal;
     private final String polarisTableName;
-    private final Map<AfonCloud, Duration> deleteDurations = new EnumMap<>(AfonCloud.class);
-    private final Map<AfonCloud, Duration> deployDurations = new EnumMap<>(AfonCloud.class);
+    /**
+     * The durations of the delete and deploy operations, by the stack they are for, eg {@code aws-full}, or
+     * {@code <cloud>-all} for deleting every stack of the cloud.
+     */
+    private final Map<StackId, Duration> deleteDurations = new TreeMap<>();
+    private final Map<StackId, Duration> deployDurations = new TreeMap<>();
 
     public StepOperations(StepActions actions, AfonPropertyProvider properties) {
         this.actions = actions;
@@ -62,18 +66,29 @@ public class StepOperations {
      */
     @NonNull
     public Step deleteStackIn(final AfonCloud cloud) {
-        return deleteStacksIn(cloud, format("delete_%s_stack", cloud), StackFilter.ALL);
+        StackId all = StackId.all(cloud);
+        return deleteStacksIn(all, format("delete_%s_stack", stepName(all)), StackFilter.ALL);
     }
 
     /**
-     * Deletes the stacks in the cloud selected by the filter, eg those conflicting with the stack to deploy.
+     * Deletes the stacks in the cloud of the stack selected by the filter, eg those conflicting with the stack to deploy.
+     *
+     * @param stackId the stack the stacks are deleted for, eg the stack to deploy, or {@code <cloud>-all}
      */
     @NonNull
-    public Step deleteStacksIn(final AfonCloud cloud, String stepName, StackFilter filter) {
+    public Step deleteStacksIn(final StackId stackId, String stepName, StackFilter filter) {
+        AfonCloud cloud = stackId.cloud();
         logger.info(format("Deleting %s in cloud %s", filter.description(), cloud));
         return new Step(stepName,
                 format("delete %s in %s", filter.description(), cloud),
-                () -> timed(deleteDurations, cloud, () -> actions.deleteStacksIn(cloud, filter, tofuOutput())));
+                () -> timed(deleteDurations, stackId, () -> actions.deleteStacksIn(cloud, filter, tofuOutput())));
+    }
+
+    /**
+     * @return the config the steps are created with, eg which exclusive resources the stacks hold
+     */
+    public AfonPropertyProvider properties() {
+        return properties;
     }
 
     /**
@@ -100,12 +115,12 @@ public class StepOperations {
                         () -> {
                             checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN,
                                     AWS_JUPYTER_CERT_ARN,AWS_POLARIS_CERT_ARN);
-                            timed(deployDurations, AWS, () -> actions.startStack(AwsFullStack.class, tofuOutput()));
+                            timed(deployDurations, StackId.of(AwsFullStack.class), () -> actions.startStack(AwsFullStack.class, tofuOutput()));
                         });
             case AZURE:
                 return new Step("deploy_azure_full_stack",
                         "deploy full stack in Azure",
-                        () -> timed(deployDurations, AZURE, () -> actions.startStack(AzureFullStack.class, tofuOutput())));
+                        () -> timed(deployDurations, StackId.of(AzureFullStack.class), () -> actions.startStack(AzureFullStack.class, tofuOutput())));
             case GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -113,31 +128,40 @@ public class StepOperations {
     }
 
     /**
-     * Runs the operation, recording its elapsed time for the cloud, so that it can be reported
+     * Runs the operation, recording its elapsed time for the stack, so that it can be reported
      * by the *Complete steps.
      */
-    private static void timed(Map<AfonCloud, Duration> durations, AfonCloud cloud, ThrowableRunnable operation) throws Exception {
+    private static void timed(Map<StackId, Duration> durations, StackId stackId, ThrowableRunnable operation) throws Exception {
         long start = System.nanoTime();
         try {
             operation.run();
         } finally {
-            durations.put(cloud, Duration.ofNanos(System.nanoTime() - start));
+            durations.put(stackId, Duration.ofNanos(System.nanoTime() - start));
         }
     }
 
     /**
-     * Describes the recorded durations of the delete and deploy operations for the cloud,
-     * e.g. {@code " (delete: 3m12s, deploy: 25m4s)"}, or empty if none recorded.
+     * Describes the recorded durations of the delete and deploy operations for the stack,
+     * e.g. {@code " (delete: 3m12s, deploy: 25m4s)"}, or empty if none recorded.  The delete is the one for the
+     * stack, else the one deleting every stack of its cloud, eg before deploying it.
      */
-    private String elapsed(AfonCloud cloud) {
+    private String elapsed(StackId stackId) {
         List<String> parts = new ArrayList<>();
-        if (deleteDurations.containsKey(cloud)) {
-            parts.add("delete: " + formatDuration(deleteDurations.get(cloud).toMillis()));
+        Duration delete = deleteDurations.getOrDefault(stackId, deleteDurations.get(StackId.all(stackId.cloud())));
+        if (delete != null) {
+            parts.add("delete: " + formatDuration(delete.toMillis()));
         }
-        if (deployDurations.containsKey(cloud)) {
-            parts.add("deploy: " + formatDuration(deployDurations.get(cloud).toMillis()));
+        if (deployDurations.containsKey(stackId)) {
+            parts.add("deploy: " + formatDuration(deployDurations.get(stackId).toMillis()));
         }
         return parts.isEmpty() ? "" : format(" (%s)", String.join(", ", parts));
+    }
+
+    /**
+     * @return the stack id as used in step names, eg {@code aws_full} for {@code aws-full}
+     */
+    static String stepName(StackId stackId) {
+        return stackId.toString().replace('-', '_');
     }
 
     /**
@@ -183,16 +207,16 @@ public class StepOperations {
                         "deploy Polaris stack in AWS",
                         () -> {
                             checkAwsCertificatesIssued(AWS_POLARIS_CERT_ARN);
-                            timed(deployDurations, AWS, () -> actions.startStack(AwsPolarisStack.class, tofuOutput()));
+                            timed(deployDurations, StackId.of(AwsPolarisStack.class), () -> actions.startStack(AwsPolarisStack.class, tofuOutput()));
                         });
             case AZURE:
                 return new Step("deploy_azure_polaris_stack",
                         "deploy Polaris stack in Azure",
-                        () -> timed(deployDurations, AZURE, () -> actions.startStack(AzurePolarisStack.class, tofuOutput())));
+                        () -> timed(deployDurations, StackId.of(AzurePolarisStack.class), () -> actions.startStack(AzurePolarisStack.class, tofuOutput())));
             case GCP:
                 return new Step("deploy_gcp_polaris_stack",
                         "deploy Polaris stack in GCP",
-                        () -> timed(deployDurations, GCP, () -> actions.startStack(GcpPolarisStack.class, tofuOutput())));
+                        () -> timed(deployDurations, StackId.of(GcpPolarisStack.class), () -> actions.startStack(GcpPolarisStack.class, tofuOutput())));
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
@@ -206,7 +230,7 @@ public class StepOperations {
                         "deploy KeyCloak stack in AWS",
                         () -> {
                             checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN);
-                            timed(deployDurations, AWS, () -> actions.startStack(AwsKeycloakStack.class, tofuOutput()));
+                            timed(deployDurations, StackId.of(AwsKeycloakStack.class), () -> actions.startStack(AwsKeycloakStack.class, tofuOutput()));
                         });
             case AZURE, GCP:
             default:
@@ -447,22 +471,25 @@ public class StepOperations {
                 () -> actions.registerTable(AWS, catalog, namespace, tableName, metadata));
     }
 
-    public Step deleteComplete(AfonCloud cloud) {
-        return new Step(format("delete_complete_for_cloud_%s", cloud),
-                format("Delete complete for cloud %s", cloud),
-                ()-> logger.info(format("Delete complete for %s%s", cloud, elapsed(cloud))));
+    /**
+     * @param stackId the stack deleted, eg {@code aws-full}, or {@code <cloud>-all} for every stack of the cloud
+     */
+    public Step deleteComplete(StackId stackId) {
+        return new Step(format("delete_complete_for_%s", stepName(stackId)),
+                format("Delete complete for stack %s", stackId),
+                ()-> logger.info(format("Delete complete for stack %s%s", stackId, elapsed(stackId))));
     }
 
-    public Step deployComplete(AfonCloud cloud) {
-        return new Step(format("deploy_complete_for_cloud_%s", cloud),
-                format("Deploy complete for cloud %s", cloud),
-                ()-> logger.info(format("Deploy complete for %s%s", cloud, elapsed(cloud))));
+    public Step deployComplete(StackId stackId) {
+        return new Step(format("deploy_complete_for_%s", stepName(stackId)),
+                format("Deploy complete for stack %s", stackId),
+                ()-> logger.info(format("Deploy complete for stack %s%s", stackId, elapsed(stackId))));
     }
 
-    public Step setupComplete(AfonCloud cloud) {
-        return new Step(format("setup_complete_for_cloud_%s", cloud),
-        format("Setup complete for cloud %s", cloud),
-                ()-> logger.info(format("Setup complete for cloud %s%s", cloud, elapsed(cloud))));
+    public Step setupComplete(StackId stackId) {
+        return new Step(format("setup_complete_for_%s", stepName(stackId)),
+                format("Setup complete for stack %s", stackId),
+                ()-> logger.info(format("Setup complete for stack %s%s", stackId, elapsed(stackId))));
     }
 
 }

@@ -15,13 +15,15 @@ import static org.slf4j.LoggerFactory.getLogger;
 /**
  * Manages a stack, by running the steps of an action on it, as provided by {@link StackStepsFactory}:
  * <pre>
- * manage-stack &lt;action&gt; &lt;stack-id&gt; [&lt;step&gt;]
+ * manage-stack &lt;action&gt; &lt;stack-id&gt; [&lt;step&gt;] [--replace]
  * </pre>
  * <ul>
  *   <li>{@code <action>} is one of {@code delete}, {@code deploy} or {@code setup}, see {@link StackAction};</li>
  *   <li>{@code <stack-id>} is {@code <cloud>-<stack-type>}, eg {@code aws-keycloak}, see {@link StackId},
  *       or {@code <cloud>-all}, eg {@code aws-all}, to delete every stack of the cloud;</li>
- *   <li>{@code <step>}, if given, is the step from which to resume, as for the other stack commands.</li>
+ *   <li>{@code <step>}, if given, is the step from which to resume, as for the other stack commands;</li>
+ *   <li>{@code --replace}, if given, lets {@code deploy} and {@code setup} delete the other stacks conflicting with the
+ *       stack, else they fail, naming them, before deleting any.</li>
  * </ul>
  * Stacks run side by side unless they conflict, so deploying or setting up a stack first deletes the stacks it
  * conflicts with, while deleting a stack deletes just that stack, see {@link StackStepsFactory}.
@@ -29,6 +31,11 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class ManageStackMain {
 
     private static final Logger logger = getLogger(ManageStackMain.class);
+
+    /**
+     * The option letting deploy and setup delete the other stacks conflicting with the stack.
+     */
+    static final String REPLACE = "--replace";
 
     private final StackStepsFactory factory;
 
@@ -41,19 +48,27 @@ public class ManageStackMain {
      * or the action is not supported for the stack
      */
     StepsProvider stepsProviderFor(String action, String stackId) {
+        return stepsProviderFor(action, stackId, false);
+    }
+
+    /**
+     * @return the steps provider of the action on the stack, replacing the other conflicting stacks or not, or
+     * {@code null} if the action or stack is unknown, or the action is not supported for the stack
+     */
+    StepsProvider stepsProviderFor(String action, String stackId, boolean replace) {
         StackAction stackAction = StackAction.of(action);
         if (stackAction == null) {
             return null;
         }
         try {
-            return factory.stepsProviderFor(stackAction, StackId.parse(stackId));
+            return factory.stepsProviderFor(stackAction, StackId.parse(stackId), replace);
         } catch (IllegalArgumentException e) {
             return null;
         }
     }
 
     private void printUsage() {
-        System.out.println("Usage: manage-stack <action> <stack-id> [<step>], where:");
+        System.out.println("Usage: manage-stack <action> <stack-id> [<step>] [" + REPLACE + "], where:");
         System.out.println("  <action> is one of: " + Arrays.stream(StackAction.values())
                                                              .map(StackAction::toString)
                                                              .collect(Collectors.joining(", ")));
@@ -61,15 +76,19 @@ public class ManageStackMain {
         factory.supportedActions().forEach((stackId, actions) -> System.out.printf(
             "    %s: %s%n", stackId, actions.stream().map(StackAction::toString).collect(Collectors.joining(", "))));
         System.out.println("  <step>, if given, is the step from which to resume");
+        System.out.println("  " + REPLACE + ", if given, lets deploy and setup delete the other stacks conflicting with the stack,");
+        System.out.println("    else they fail, naming them, before deleting any");
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] allArgs) {
         ManageStackMain manager = new ManageStackMain(new StackStepsFactory());
+        boolean replace = Arrays.asList(allArgs).contains(REPLACE);
+        String[] args = Arrays.stream(allArgs).filter(arg -> !arg.equals(REPLACE)).toArray(String[]::new);
         if (args.length < 2) {
             manager.printUsage();
             return;
         }
-        StepsProvider stepsProvider = manager.stepsProviderFor(args[0], args[1]);
+        StepsProvider stepsProvider = manager.stepsProviderFor(args[0], args[1], replace);
         if (stepsProvider == null) {
             System.out.printf("Unsupported action '%s' on stack '%s'%n", args[0], args[1]);
             manager.printUsage();
@@ -84,7 +103,7 @@ public class ManageStackMain {
             System.out.println(warning);
             logger.warn(warning);
         }
-        logger.info("Running {} on stack {}", action, stackId);
+        logger.info("Running {} on stack {}{}", action, stackId, replace ? ", replacing the conflicting stacks" : "");
         new StepRunner().runUsing(stepsProvider, Arrays.copyOfRange(args, 2, args.length));
     }
 

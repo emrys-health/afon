@@ -13,6 +13,7 @@ import software.constructs.Construct;
 import java.util.Map;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.AfonProperty.AWS_KEYCLOAK_EXTERNAL;
 import static health.emrys.afon.config.ConfigUtils.kubeConfigPath;
 
 /**
@@ -40,6 +41,15 @@ public abstract class AbstractAwsStack extends AbstractCloudStack {
         // the stack's kubectl and helm commands only ever act on its own cluster
         Aspects.of(this).add(new KubeConfigAspect(kubeConfigPath(stackId)));
         pinProviderVersions();
+    }
+
+    /**
+     * @return whether the stacks otherwise deploying their own KeyCloak, eg {@link AwsFullStack}, use instead the one
+     * at {@code OIDC_DOMAIN_NAME} that the {@link AwsKeycloakStack} deploys, as configured by
+     * {@code AWS_KEYCLOAK_EXTERNAL}, {@code false} when unset
+     */
+    public static boolean isKeyCloakExternal(AfonPropertyProvider properties) {
+        return Boolean.parseBoolean(properties.getValue(AWS_KEYCLOAK_EXTERNAL, "false").trim());
     }
 
     /**

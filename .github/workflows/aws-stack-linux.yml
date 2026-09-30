@@ -3,8 +3,8 @@ name: AWS Stack (Linux)
 # Runs an action on an AWS stack from the self-hosted Linux runner, ie
 # `./afon.sh -a manage-stack <action> <stack-id> [<step>]` — the same command as docs/stacks.md.
 #
-# deploy and setup first delete the stacks that conflict with the stack, including itself if up, and then recreate
-# it; setup also configures it (the OIDC users and, with Polaris, the catalogs).  aws-keycloak and aws-polaris run
+# deploy and setup first delete the stacks that conflict with the stack, including itself if up (run with --replace,
+# else manage-stack refuses to delete the others), and then recreate it; setup also configures it (the OIDC users and, with Polaris, the catalogs).  aws-keycloak and aws-polaris run
 # side by side, aws-polaris using the KeyCloak of aws-keycloak, while aws-full, with its own KeyCloak, conflicts
 # with both.  delete just tears down the stack and leaves it down — a later deploy or setup is what brings it back;
 # delete aws-all tears down every AWS stack that is up.
@@ -225,8 +225,12 @@ jobs:
             echo "$ACTION of $STACK_ID resumes from step $FROM_STEP"
             ARGS+=("$FROM_STEP")
           fi
+          # --replace lets deploy and setup delete the other stacks conflicting with the stack, eg aws-keycloak for
+          # aws-full, as the workflow is meant to replace them, where manage-stack otherwise refuses to.
+          # It is passed after --, as afon.sh only passes on the options after it.
+          ARGS+=("--replace")
           # Using --logging-console INFO because a run this long is unreadable in the Actions log otherwise.
-          ./afon.sh -a manage-stack --logging-console INFO "${ARGS[@]}"
+          ./afon.sh -a manage-stack --logging-console INFO -- "${ARGS[@]}"
 
       - name: Report the cluster status
         if: always()

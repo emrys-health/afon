@@ -1,5 +1,6 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepRunner;
@@ -23,12 +24,12 @@ public class DeployAwsFullStackAndAzurePolarisStackMain implements StepsProvider
                 stepOperations.deleteStackIn(AWS),
                 stepOperations.deployFullStackIn(AWS),
                 stepOperations.waitForPolarisAndKeycloakIn(AWS),
-                stepOperations.deployComplete(AWS)));
+                stepOperations.deployComplete(new StackId(AWS, "full"))));
         steps.addAll(List.of(
                 stepOperations.deleteStackIn(AZURE),
                 stepOperations.deployPolarisStackIn(AZURE),
                 stepOperations.waitForPolarisAndKeycloakIn(AZURE),
-                stepOperations.deployComplete(AZURE)));
+                stepOperations.deployComplete(new StackId(AZURE, "polaris"))));
         return steps;
     }
 
