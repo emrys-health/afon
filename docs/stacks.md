@@ -319,11 +319,16 @@ its IAM roles and so on.  So the AWS scripts acting on a stack are given its sta
 afon-cli.sh aws-cluster keycloak             # is the EKS cluster up?
 afon-cli.sh aws-update-kube-config keycloak  # point kubectl at the EKS cluster
 ```
-Checking Polaris needs no stack type, as only one of the stacks serving Polaris runs at a time: it is found by its
-EKS cluster, unless given, eg `aws-polaris full`:
+Checking Polaris or KeyCloak needs no stack type, as only one of the stacks serving each runs at a time: it is found
+by its EKS cluster, unless given, eg `aws-polaris full` or `aws-keycloak keycloak`:
 ```shell
 afon-cli.sh aws-polaris                      # is Polaris serving?
+afon-cli.sh aws-keycloak                     # is KeyCloak serving?
 ```
+They check each layer in turn, one line each: the login, the stack's VPC and EKS cluster, its pod and ingress, then
+real HTTPS requests, anonymously and as the Polaris admin (`POLARIS_ID`).  For KeyCloak these are its master realm,
+which shows it serving, its realm `polaris`, which shows it set up, and a token for the Polaris admin.  The stacks
+serving KeyCloak are `aws-keycloak`, and `aws-full` unless `AWS_KEYCLOAK_EXTERNAL=true`.
 The IAM role names are limited to 64 chars, so `CLUSTER_NAME` must be short enough for
 `AmazonEKSLoadBalancerControllerRole<stack-type>-<CLUSTER_NAME>`, which a stack checks when it is synthesised.
 

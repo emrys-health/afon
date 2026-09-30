@@ -47,6 +47,7 @@ public class GenerateScriptMains {
         new ScriptEntry("aws", "AwsCreateMain", "aws/create.sh"),
         new ScriptEntry("aws", "AwsDestroyMain", "aws/destroy.sh"),
         new ScriptEntry("aws", "AwsIssueCertMain", "aws/issue-cert.sh"),
+        new ScriptEntry("aws", "AwsKeycloakMain", "aws/keycloak.sh"),
         new ScriptEntry("aws", "AwsLoginMain", "aws/login.sh"),
         new ScriptEntry("aws", "AwsMountDataMain", "aws/mount-data.sh"),
         new ScriptEntry("aws", "AwsPolarisMain", "aws/polaris.sh"),

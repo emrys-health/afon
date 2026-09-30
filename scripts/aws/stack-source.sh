@@ -7,7 +7,7 @@ if [ -z "$STACK_TYPE" ]; then
   echo "Requires argument <stack-type>, eg keycloak, polaris or full, for stack aws-<stack-type>"
   exit 1
 fi
-if [ -z "$CLUSTER_NAME" ]; then
+if [ -z "${CLUSTER_NAME:-}" ]; then
   echo "CLUSTER_NAME is not set, cannot name the cluster of stack aws-$STACK_TYPE"
   exit 1
 fi
