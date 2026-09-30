@@ -25,7 +25,7 @@ public class NetworkSmoke {
         this.client     = client;
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         FilePropertyProvider filePropertyProvider = new FilePropertyProvider();
         try (KubeClient client = new KubeClient(filePropertyProvider)) {
             NetworkSmoke     app    = new NetworkSmoke(filePropertyProvider, client);
@@ -41,6 +41,7 @@ public class NetworkSmoke {
             }
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
+            throw e;
         }
     }
 
