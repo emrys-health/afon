@@ -10,7 +10,7 @@
 # original clean.
 #
 # Checks Keycloak is serving requests with './afon.sh -a check-oidc', then
-# gets USER_POLARIS_ID's OIDC access token from Keycloak with './afon.sh -a show-oidc-token <cloud> user',
+# gets USER_ID's OIDC access token from Keycloak with './afon.sh -a show-oidc-token <cloud> user',
 # port-forwards the Spark Connect driver of the current kubectl context, then runs the notebook via
 # './afon.sh -a jupyter-execute'.  Also reads <CLOUD>_POLARIS_DOMAIN_NAME and OIDC_DOMAIN_NAME from
 # $AFON_HOME/config/*.properties (AFON_HOME defaults to ~/.afon), for the notebook.  Only those properties
@@ -54,7 +54,7 @@ TOKEN_OUTPUT=$("$AFON_ROOT/afon.sh" -a show-oidc-token "$CLOUD" user 2>&1 || tru
 USER_ID=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n "s/${TOKEN_LINE}.*/\1/p" | tail -1)
 OIDC_TOKEN=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n "s/${TOKEN_LINE}//p" | tail -1)
 if [ -z "$OIDC_TOKEN" ]; then
-  echo "show-oidc-token gave no access token for USER_POLARIS_ID:" >&2
+  echo "show-oidc-token gave no access token for USER_ID:" >&2
   printf '%s\n' "$TOKEN_OUTPUT" | tail -20 >&2
   exit 1
 fi

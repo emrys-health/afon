@@ -4,7 +4,6 @@ import health.emrys.afon.acceptance.SparkHelper.{CatalogName1, CatalogName2, spa
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, Users}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, SparkHelper}
-import health.emrys.afon.config.AfonProperty.{USER_POLARIS_ID, USER_POLARIS_SECRET}
 import health.emrys.afon.config.{AfonCatalog, AfonCloud, AfonPropertyProvider, AfonUser, AfonUserAcl, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.polaris.catalogs.{AwsPolarisCatalog, PolarisCatalog}
@@ -112,19 +111,10 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
    * so subsequent queries against sparkCatalog reflect userX's own grants only.
    */
   private def registerCatalogAsTestUser(sparkCatalog: String, warehouse: String): Unit = {
-    val properties = AcceptanceTestConfig.instance.getProperties
-    val originalId = properties.getValue(USER_POLARIS_ID)
-    val originalSecret = properties.getValue(USER_POLARIS_SECRET)
     val configs =
-      try {
-        properties.setValue(USER_POLARIS_ID, TestUsers.UserName)
-        properties.setValue(USER_POLARIS_SECRET, TestUsers.UserPassword)
-        new KeyCloakSparkWarehouseConfigForTesting(properties, Array.empty[CatalogWarehouse])
-          .sparkConfigs(sparkCatalog, warehouse)
-      } finally {
-        properties.setValue(USER_POLARIS_ID, originalId)
-        properties.setValue(USER_POLARIS_SECRET, originalSecret)
-      }
+      new KeyCloakSparkWarehouseConfigForTesting(
+        AcceptanceTestConfig.instance.getProperties, TestUsers.User, Array.empty[CatalogWarehouse])
+        .sparkConfigs(sparkCatalog, warehouse)
     configs.asScala.foreach { case (k, v) => spark.conf.set(k, v) }
   }
 

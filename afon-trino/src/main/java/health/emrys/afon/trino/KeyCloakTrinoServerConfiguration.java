@@ -1,6 +1,8 @@
 package health.emrys.afon.trino;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.FileUserProvider;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -12,7 +14,8 @@ import org.jspecify.annotations.NonNull;
  * <p>This overrides {@link #catalogProperties} to point the catalog at KeyCloak via
  * {@code iceberg.rest-catalog.oauth2.server-uri} and to request the {@code openid} scope - KeyCloak
  * rejects Polaris' "PRINCIPAL_ROLE:ALL" scope (and Iceberg's default "catalog") with invalid_scope.
- * The credentials supplied to the superclass must identify a client KeyCloak knows about.
+ * The credentials are those of the given {@link AfonUser}, which KeyCloak knows as a confidential
+ * client of the same name and secret.
  */
 public class KeyCloakTrinoServerConfiguration extends TrinoServerConfiguration {
 
@@ -20,10 +23,20 @@ public class KeyCloakTrinoServerConfiguration extends TrinoServerConfiguration {
 
     private final String oauth2ServerUri;
 
+    /**
+     * Authenticates as the configured user, from users.csv, named by {@code USER_ID}.
+     */
     public KeyCloakTrinoServerConfiguration(AfonPropertyProvider properties,
                                             String polarisDomainName,
                                             String oauth2ServerUri) {
-        super(properties, polarisDomainName);
+        this(properties, polarisDomainName, oauth2ServerUri, new FileUserProvider().getConfiguredUser(properties));
+    }
+
+    public KeyCloakTrinoServerConfiguration(AfonPropertyProvider properties,
+                                            String polarisDomainName,
+                                            String oauth2ServerUri,
+                                            AfonUser user) {
+        super(properties, polarisDomainName, user);
         this.oauth2ServerUri = oauth2ServerUri;
     }
 

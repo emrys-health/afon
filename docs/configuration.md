@@ -142,3 +142,27 @@ so a list of only exclusions authorises no catalog. For example:
 will,all:!aws_forbidden:!azure_forbidden:!gcp_forbidden
 jane,all:!*_forbidden
 ```
+
+The configured user, which clients authenticate as (e.g. to get its OIDC token, or to run Spark), is named by the
+`USER_ID` property in `secret.properties` and must be one of the users in `users.csv`, whose password is read from there.
+
+### Command config-user
+
+To update `secret.properties` to the current user config, if needed, and show the configured user:
+```shell
+afon-cli.sh config-user
+```
+It updates `secret.properties` from the former Polaris user config, in which the user's password and email were
+duplicated from `users.csv`:
+
+- renames `USER_POLARIS_ID` to `USER_ID`, or removes it if `USER_ID` is already set;
+- removes the no longer used `USER_POLARIS_SECRET` and `USER_POLARIS_EMAIL`, and their comments.
+
+If anything changed, `secret.properties` is first backed up as `secret.properties.bak`, and the changed lines are
+shown with their values masked.  It is safe to run more than once: an up-to-date `secret.properties` is left untouched.
+
+It then prints the `USER_ID` user's details from `users.csv` (never its password, only whether it is set) and its
+catalogs from `users-acl.csv`.  It fails if `USER_ID` is not set or is not one of the users in `users.csv`.
+
+**NOTE**: If you publish your config as GitHub secrets (see [acceptance tests](acceptance_tests.md#config-secrets)),
+republish `secret.properties` after it is updated, with `./afon.sh -a github-secrets push`.

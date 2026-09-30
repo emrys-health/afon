@@ -69,8 +69,9 @@ This creates a test namespace and table, and writes three rows ("apple", "banana
 ```
 This reads the test table created.
 
-**NOTE:**  Both `SparkTestWriter` and `SparkTestReader` accept as optional args the user Polaris credential (id and secret).
-If missing, the properties `USER_POLARIS_ID` and `USER_POLARIS_SECRET` are used.
+**NOTE:**  Both `SparkTestWriter` and `SparkTestReader` accept as optional args the credentials (username and password)
+of the user to authenticate as. If missing, the user named by property `USER_ID` is used, with its password from
+`users.csv`.
 
 ### Snowflake reads GCP table via Polaris
 
