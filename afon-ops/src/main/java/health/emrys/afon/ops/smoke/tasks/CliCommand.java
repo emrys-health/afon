@@ -19,10 +19,10 @@ abstract public class CliCommand {
     public List<ExecResult> run() throws Exception {
         List<ExecResult> results = new ArrayList<>();
         for (String command : commands) {
-            results.add(run(command));
+            results.add(run(command.split("\\s+")));
         }
         return results;
     }
 
-    abstract ExecResult run(String command) throws Exception;
+    abstract ExecResult run(String[] command) throws Exception;
 }

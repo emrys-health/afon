@@ -16,7 +16,7 @@ public class PodCommand extends CliCommand {
     }
 
     @Override
-    ExecResult run(String command) throws IOException, InterruptedException, ApiException, TimeoutException {
-        return client.exec(pod, command.split("\\s+"));
+    ExecResult run(String[] command) throws IOException, InterruptedException, ApiException, TimeoutException {
+        return client.exec(pod, command);
     }
 }
