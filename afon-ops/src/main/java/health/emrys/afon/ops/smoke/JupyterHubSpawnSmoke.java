@@ -3,6 +3,7 @@ package health.emrys.afon.ops.smoke;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
@@ -76,33 +77,45 @@ public class JupyterHubSpawnSmoke {
     /**
      * @return the name of the user's notebook pod once the hub reports their server as ready.
      */
-    public String spawn(String username, Duration timeout) throws Exception {
+    public String spawn(String email, Duration timeout) throws Exception {
         String hubPod = findHubPod();
         try (PortForwardSmoke forward = new PortForwardSmoke(client, namespace, hubPod, 0, HUB_PORT)) {
             String userUrl = "http://localhost:" + forward.localPort() + "/hub/api/users/"
-                + URLEncoder.encode(username, StandardCharsets.UTF_8);
+                + URLEncoder.encode(email, StandardCharsets.UTF_8);
 
             if (send("GET", userUrl).statusCode() == 404) {
-                logger.info("User {} not known to the hub; creating", username);
+                logger.info("User {} not known to the hub; creating", email);
                 expect(send("POST", userUrl), 201);
             }
 
             String               server  = userUrl + "/server";
             HttpResponse<String> started = send("POST", server);
             switch (started.statusCode()) {
-                case 201 -> logger.info("Server for {} started", username);
-                case 202 -> logger.info("Server for {} is spawning", username);
-                case 400 -> logger.info("Server for {} not started: {}", username, started.body());
+                case 201 -> logger.info("Server for {} started", email);
+                case 202 -> logger.info("Server for {} is spawning", email);
+                case 400 -> logger.info("Server for {} not started: {}", email, started.body());
                 default -> expect(started, 201, 202);
             }
 
-            awaitReady(userUrl, username, timeout);
+            awaitReady(userUrl, email, timeout);
         }
-        String pod = findUserPod(username)
-            .orElseThrow(() -> new IllegalStateException("Hub reports server for " + username
-                                                             + " as ready but no pod is annotated " + USERNAME_ANNOTATION + "=" + username));
-        logger.info("User {} has notebook pod {}/{}", username, namespace, pod);
+        String pod = findUserPod(email)
+            .orElseThrow(() -> new IllegalStateException("Hub reports server for " + email
+                                                             + " as ready but no pod is annotated " + USERNAME_ANNOTATION + "=" + email));
+        logger.info("User {} has notebook pod {}/{}", email, namespace, pod);
         return pod;
+    }
+
+    private static String findEmailFor(String username) throws Exception {
+        FileUserProvider users = new FileUserProvider();
+        String email = users
+            .getUsers()
+            .stream()
+            .filter(x -> x.username().equals(username))
+            .map(x -> x.email())
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("No user called " + username));
+        return email;
     }
 
     private void awaitReady(String userUrl, String username, Duration timeout) throws Exception {
@@ -174,10 +187,8 @@ public class JupyterHubSpawnSmoke {
 
     public static void main(String[] args) throws Exception {
         FilePropertyProvider properties = new FilePropertyProvider();
-
-
         try (KubeClient client = new KubeClient(properties)) {
-            String email = "will@emrys.health";
+            String email = findEmailFor(properties.getValue(USER_ID));
             CliCommand command = new DeployCommand(client,
                                                    "hub-deployment",
                                                    "hub",
@@ -189,7 +200,7 @@ public class JupyterHubSpawnSmoke {
                 String token = result.stdout().strip();
                 logger.info("JupyterHub Token: {}", token);
                 String pod = new JupyterHubSpawnSmoke(client, "default", token).spawn(email, Duration.ofMinutes(5));
-                System.out.println(pod);
+                logger.info("Pod {} running", pod);
             } else {
                 String msg = "Could not get token. Error: " + result.stderr();
                 logger.error(msg);
