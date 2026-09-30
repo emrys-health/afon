@@ -98,6 +98,10 @@ jobs:
           SECRET_AWS_PROPERTIES: ${{ secrets.SECRET_AWS_PROPERTIES }}
           SECRET_AZURE_PROPERTIES: ${{ secrets.SECRET_AZURE_PROPERTIES }}
           SECRET_GCP_PROPERTIES: ${{ secrets.SECRET_GCP_PROPERTIES }}
+          CATALOGS_PROPERTIES: ${{ secrets.CATALOGS_PROPERTIES }}
+          CATALOGS_AWS_PROPERTIES: ${{ secrets.CATALOGS_AWS_PROPERTIES }}
+          CATALOGS_AZURE_PROPERTIES: ${{ secrets.CATALOGS_AZURE_PROPERTIES }}
+          CATALOGS_GCP_PROPERTIES: ${{ secrets.CATALOGS_GCP_PROPERTIES }}
           USERS_CSV: ${{ secrets.USERS_CSV }}
           USERS_ACL_CSV: ${{ secrets.USERS_ACL_CSV }}
         run: |
@@ -120,16 +124,20 @@ jobs:
             chmod 600 "$CONFIG_DIR/$file"
             echo "Wrote $file ($(wc -c < "$CONFIG_DIR/$file") bytes)"
           }
-          write_config afon.properties         "$AFON_PROPERTIES"
-          write_config afon-aws.properties     "$AFON_AWS_PROPERTIES"
-          write_config afon-azure.properties   "$AFON_AZURE_PROPERTIES"
-          write_config afon-gcp.properties     "$AFON_GCP_PROPERTIES"
-          write_config secret.properties       "$SECRET_PROPERTIES"
-          write_config secret-aws.properties   "$SECRET_AWS_PROPERTIES"
-          write_config secret-azure.properties "$SECRET_AZURE_PROPERTIES"
-          write_config secret-gcp.properties   "$SECRET_GCP_PROPERTIES"
-          write_config users.csv               "$USERS_CSV"
-          write_config users-acl.csv           "$USERS_ACL_CSV"
+          write_config afon.properties           "$AFON_PROPERTIES"
+          write_config afon-aws.properties       "$AFON_AWS_PROPERTIES"
+          write_config afon-azure.properties     "$AFON_AZURE_PROPERTIES"
+          write_config afon-gcp.properties       "$AFON_GCP_PROPERTIES"
+          write_config secret.properties         "$SECRET_PROPERTIES"
+          write_config secret-aws.properties     "$SECRET_AWS_PROPERTIES"
+          write_config secret-azure.properties   "$SECRET_AZURE_PROPERTIES"
+          write_config secret-gcp.properties     "$SECRET_GCP_PROPERTIES"
+          write_config catalogs.properties       "$CATALOGS_PROPERTIES"
+          write_config catalogs-aws.properties   "$CATALOGS_AWS_PROPERTIES"
+          write_config catalogs-azure.properties "$CATALOGS_AZURE_PROPERTIES"
+          write_config catalogs-gcp.properties   "$CATALOGS_GCP_PROPERTIES"
+          write_config users.csv                 "$USERS_CSV"
+          write_config users-acl.csv             "$USERS_ACL_CSV"
 
       - name: Validate afon config
         run: ./afon.sh -a config-validate --home "$AFON_HOME"
