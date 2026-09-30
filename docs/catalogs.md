@@ -3,7 +3,7 @@
 To deploy Polaris to AWS and Azure, populates catalogs, and runs a Spark smoke test, run:
 
 ```shell
-./afon.sh -a exec -ec ops.SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain
+afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog
 ```
 
 It takes approximately 45 minutes.
@@ -13,13 +13,13 @@ It takes approximately 45 minutes.
 
 When a new Polaris instance starts, it has no catalogs. You can create all catalogs at once for `aws` cloud:
 ```shell
-./afon.sh -a exec -ec ops.ManagePolarisCatalogsMain -ea "create aws" -lc INFO
+afon-cli.sh manage-polaris-catalogs "create aws" -lc INFO
 ```
 This creates catalogs for `{aws,azure,gcp}` and their external/forbidden variants in a single call.
 
 To configure a single catalog, eg `azure_external`, for `azure` cloud:
 ```shell
-./afon.sh -a exec -ec ops.ManagePolarisCatalogsMain -ea "create azure azure_external" -lc INFO
+afon-cli.sh manage-polaris-catalogs "create azure azure_external" -lc INFO
 ```
 
 ### Cross-cloud querying

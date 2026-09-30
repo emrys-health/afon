@@ -61,6 +61,9 @@ finish_backup() {
 resolve_value() {
   local CLOUD="$1" KEY="$2"
   (
+    # No nounset here: a property that is not set at all (eg CATALOG_NAMES_CSV, which most configs never
+    # defined) must resolve to "", not abort the script ("!KEY: unbound variable" under `set -u`).
+    set +u
     [ -f "$CONFIG_DIR/afon.properties" ] && source "$CONFIG_DIR/afon.properties" 2>/dev/null
     [ -n "$CLOUD" ] && [ -f "$CONFIG_DIR/afon-$CLOUD.properties" ] && source "$CONFIG_DIR/afon-$CLOUD.properties" 2>/dev/null
     echo "${!KEY}"

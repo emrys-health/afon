@@ -3,6 +3,8 @@ package health.emrys.afon.spark;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import org.apache.spark.SparkContext;
 import org.apache.spark.sql.SparkSession;
@@ -21,10 +23,19 @@ public class SparkClient {
 
     private final AfonPropertyProvider properties;
     private final PolarisCredentials credentials;
+    private final AfonUser user;
 
+    /**
+     * Authenticates as the configured user, from users.csv, named by {@code USER_ID}.
+     */
     public SparkClient(AfonCloud cloud, AfonPropertyProvider properties) {
+        this(cloud, properties, new FileUserProvider().getConfiguredUser(properties));
+    }
+
+    public SparkClient(AfonCloud cloud, AfonPropertyProvider properties, AfonUser user) {
         this.properties = properties;
         this.credentials = new PolarisCredentials(cloud, properties);
+        this.user = user;
     }
 
     /**
@@ -46,12 +57,10 @@ public class SparkClient {
     }
 
     private SparkWarehouseConfig createWarehouseConfig() {
-        logger.info("SparkConfig for Polaris endpoint {} and clientId {}",
-                credentials.getPolarisEndpoint(), credentials.getPolarisId());
+        logger.info("SparkConfig for Polaris endpoint {} and user {}",
+                credentials.getPolarisEndpoint(), user.username());
         return SparkWarehouseConfigFactory.getFactory()
-                .createConfig(properties,
-                credentials.getPolarisEndpoint(), credentials.getPolarisId(),
-                credentials.getPolarisSecret());
+                .createConfig(properties, credentials.getPolarisEndpoint(), user);
     }
 
 }

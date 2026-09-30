@@ -2,6 +2,7 @@ package health.emrys.afon.config;
 
 import java.util.List;
 
+import static health.emrys.afon.config.AfonProperty.USER_ID;
 import static health.emrys.afon.config.AfonUser.UNDEFINED;
 
 public interface AfonUserProvider {
@@ -56,6 +57,14 @@ public interface AfonUserProvider {
     List<String> getUserNames();
 
     AfonUser getUser(String username);
+
+    /**
+     * The user named by {@link AfonProperty#USER_ID}, which clients (Spark, Trino, smoke tests)
+     * authenticate as, distinct from the Polaris admin client ({@link AfonProperty#POLARIS_ID}).
+     */
+    default AfonUser getConfiguredUser(AfonPropertyProvider properties) {
+        return getUser(properties.getValue(USER_ID));
+    }
 
     boolean isAuthorised(String username, String catalogName);
 }

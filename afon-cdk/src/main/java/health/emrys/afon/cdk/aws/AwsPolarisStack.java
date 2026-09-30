@@ -2,70 +2,71 @@ package health.emrys.afon.cdk.aws;
 
 import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
-import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.AbstractCloudStack;
 import health.emrys.afon.cdk.PolarisConfig;
-import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
+import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_ALLOWED_CIDRS;
 import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
-import static health.emrys.afon.config.AfonCloud.AWS;
 
-public class AwsPolarisStack extends AbstractCloudStack {
+/**
+ * Deploys Polaris, behind its HTTPS ingress and DNS record at {@code AWS_POLARIS_DOMAIN_NAME}.  Polaris uses the
+ * KeyCloak server at {@code OIDC_DOMAIN_NAME}, which the {@link AwsKeycloakStack} deploys, so that both can run side
+ * by side, while the stacks extending this one, eg {@link AwsFullStack}, deploy their own KeyCloak.
+ */
+public class AwsPolarisStack extends AbstractAwsStack {
 
     protected final PolarisConfig polarisConfig;
-    protected final AwsCloudProvider cloudProvider;
 
-    private AwsKeyCloakConfig keyCloakConfig;
+    private final String polarisDomainName;
+
+    private final AwsKeyCloakConfig keyCloakConfig;
 
     public AwsPolarisStack(@NonNull Construct scope,
-                           AfonCloud id,
+                           StackId stackId,
                            AfonPropertyProvider properties) {
-        super(scope, id);
-        NullProvider.Builder.create(this, "nullProvider")
-                            .build();
-        cloudProvider = new AwsCloudProvider(this, id.toString(), properties);
-        cloudProvider.configureHelm();
-        this.addOverride(
-            "terraform.required_providers.aws", Map.of(
-                "source", "hashicorp/aws",
-                "version", "6.27.0"   // 👈 Pin exact version
-                                                      ));
-        this.addOverride(
-            "terraform.required_providers.helm", Map.of(
-                "source", "hashicorp/helm",
-                "version", "3.2.0"   // 👈 Pin exact version
-                                                       ));
-        this.addOverride(
-            "terraform.required_providers.kubernetes", Map.of(
-                "source", "hashicorp/kubernetes",
-                // 3.2.1 fixes "Unexpected Identity Change" errors when a resource takes
-                // extended time to become ready (as happened when an EKS token expired
-                // mid-rollout of oauth2-proxy). Do not downgrade below 3.2.1.
-                "version", "3.2.1"   // 👈 Pin exact version
-                                                             ));
-        // Keycloak's wiring is created first so that Polaris, which does OIDC discovery against the
-        // Keycloak hostname, can be ordered after that hostname's DNS record.
-        keyCloakConfig = new AwsKeyCloakConfig(this, properties, cloudProvider);
-        keyCloakConfig.configureHttpsAndDNS();
+        this(scope, stackId, properties, false);
+    }
+
+    /**
+     * @param withKeyCloak whether the stack deploys its own KeyCloak, rather than using the one another stack deploys
+     */
+    protected AwsPolarisStack(@NonNull Construct scope,
+                              StackId stackId,
+                              AfonPropertyProvider properties,
+                              boolean withKeyCloak) {
+        super(scope, stackId, properties, true);
+        polarisDomainName = properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
+        configurePolarisHttpsAndDNS(properties);
+        List<ITerraformDependable> polarisDependables = new ArrayList<>(cloudProvider.getDependables());
+        if (withKeyCloak) {
+            // Keycloak's wiring is created first so that Polaris, which does OIDC discovery against the
+            // Keycloak hostname, can be ordered after that hostname's DNS record.
+            keyCloakConfig = new AwsKeyCloakConfig(this, properties, cloudProvider);
+            keyCloakConfig.configureHttpsAndDNS();
+            polarisDependables.add(keyCloakConfig.getAliasRecord());
+        } else {
+            keyCloakConfig = null;
+        }
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties) {
             protected Service configurePolarisService(Deployment polarisDeployment) {
                 return null; // no longer using an external service
             }
         };
-        List<ITerraformDependable> polarisDependables = new ArrayList<>(cloudProvider.getDependables());
-        polarisDependables.add(keyCloakConfig.getAliasRecord());
         polarisConfig.deployPolaris(polarisDependables);
         Service.Builder
             .create(this, POLARIS_INTERNAL_SERVICE_NAME)
@@ -87,26 +88,45 @@ public class AwsPolarisStack extends AbstractCloudStack {
     }
 
     /**
-     * Keycloak's AWS wiring, exposed so subclasses can depend on its DNS record (see
+     * Exposes Polaris via its HTTPS ingress, and makes it resolvable via its Route 53 record.
+     */
+    private void configurePolarisHttpsAndDNS(AfonPropertyProvider properties) {
+        IngressV1 ingress = cloudProvider.createHttpsIngress(
+            "polaris-https-ingress",
+            "polaris-ingress",
+            properties.getValue(AfonProperty.AWS_POLARIS_CERT_ARN),
+            polarisDomainName,
+            POLARIS_INTERNAL_SERVICE_NAME,
+            8181,
+            cloudProvider.getSubnetIds(),
+            cloudProvider.polarisInboundCidrs(properties.getValue(AWS_POLARIS_ALLOWED_CIDRS, "")));
+        cloudProvider.configureDNS(
+            "IngressAliasRecord",
+            properties.getValue(AfonProperty.AWS_POLARIS_DNS_ZONE),
+            polarisDomainName,
+            cloudProvider.getLbRelease(),
+            ingress,
+            "polaris-ingress");
+    }
+
+    /**
+     * Keycloak's AWS wiring, exposed so subclasses deploying their own KeyCloak can depend on its DNS record (see
      * {@link AwsKeyCloakConfig#getAliasRecord()}).
+     *
+     * @return the KeyCloak wiring, or {@code null} if the stack uses the KeyCloak another stack deploys
      */
     protected AwsKeyCloakConfig getKeyCloakConfig() {
         return keyCloakConfig;
     }
 
     @Override
-    public AfonCloud getId() {
-        return AWS;
-    }
-
-    @Override
     public String getPolarisDomainName() {
-        return cloudProvider.getPolarisDomainName();
+        return polarisDomainName;
     }
 
     public static void main(String[] args) {
         final App app = createApp();
-        new AwsPolarisStack(app, AWS, new FilePropertyProvider());
+        new AwsPolarisStack(app, StackId.of(AwsPolarisStack.class), new FilePropertyProvider());
         app.synth();
     }
 

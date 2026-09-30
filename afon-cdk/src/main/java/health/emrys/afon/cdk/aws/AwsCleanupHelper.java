@@ -3,17 +3,23 @@ package health.emrys.afon.cdk.aws;
 import health.emrys.afon.cdk.CleanupHelper;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 
 import static health.emrys.afon.cdk.CdkHelper.*;
+import static health.emrys.afon.config.AfonCloud.AWS;
 import static java.lang.String.format;
 
 public class AwsCleanupHelper extends CleanupHelper {
 
-    private AwsComponentNames componentNames;
+    private final AwsComponentNames componentNames;
 
-    public AwsCleanupHelper(AfonPropertyProvider properties) {
-        componentNames = new AwsComponentNames(properties);
+    public AwsCleanupHelper(AfonPropertyProvider properties, StackId stackId) {
+        this(new AwsComponentNames(properties, stackId));
+    }
+
+    AwsCleanupHelper(AwsComponentNames componentNames) {
+        this.componentNames = componentNames;
     }
 
     /**
@@ -206,9 +212,14 @@ public class AwsCleanupHelper extends CleanupHelper {
                      );
     }
 
+    /**
+     * Outputs the cleanup commands of the AWS stack, given the args {@code <stack-id> [<output-file>]},
+     * eg {@code aws-keycloak}, as the names of its components depend on its stack type.
+     */
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
-        outputCleanupCommands(new AwsCleanupHelper(properties).cleanupCommands(), args);
+        StackId stackId = stackIdOf(args, AWS);
+        outputCleanupCommands(new AwsCleanupHelper(properties, stackId).cleanupCommands(), args);
     }
 
 

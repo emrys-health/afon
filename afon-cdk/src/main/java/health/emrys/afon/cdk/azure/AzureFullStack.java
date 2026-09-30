@@ -7,9 +7,9 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import health.emrys.afon.cdk.*;
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.StackId;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
@@ -27,8 +27,8 @@ public class AzureFullStack extends AzurePolarisStack {
 
     private final String TLS_SECRET_NAME = "jupyter-secret";
 
-    public AzureFullStack(Construct scope, AfonCloud id, AfonPropertyProvider properties) {
-        super(scope, id, properties);
+    public AzureFullStack(Construct scope, StackId stackId, AfonPropertyProvider properties) {
+        super(scope, stackId, properties);
 
         // The Azure CNI (Cilium) data plane is not necessarily ready the moment the
         // azurerm_kubernetes_cluster resource reports "created". Gating the Spark
@@ -54,7 +54,7 @@ public class AzureFullStack extends AzurePolarisStack {
         sparkDependsOn.add(sparkOperatorConfig.operatorReady);
 
         // deploy the Spark workers and driver pointing at Azure Polaris
-        SparkWorkloads sparkDeployer = new SparkWorkloads(properties.getValue(AZURE_POLARIS_DOMAIN_NAME), properties);
+        SparkWorkloads sparkDeployer = new SparkWorkloads();
         sparkDeployer.deploy(this, AZURE, sparkDependsOn);
 
         String jupyterDomainName = properties.getValue(AZURE_JUPYTER_DOMAIN_NAME);
@@ -108,7 +108,7 @@ public class AzureFullStack extends AzurePolarisStack {
 
     public static void main(String[] args) {
         final App app = createApp();
-        new AzureFullStack(app, AZURE, new FilePropertyProvider());
+        new AzureFullStack(app, StackId.of(AzureFullStack.class), new FilePropertyProvider());
         app.synth();
     }
 

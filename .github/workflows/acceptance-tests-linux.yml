@@ -9,8 +9,11 @@ name: Acceptance Tests (Linux)
 #   - the $AFON_HOME/config files, reconstructed from the GitHub Secrets listed below.
 #
 # The config files are held as base64-encoded repository secrets, one per file in ~/.afon/config.
-# Use `./afon.sh -a github-secrets -sa push` to (re)publish them from a local config dir, and
-# `./afon.sh -a github-secrets -sa list` to check which ones are set.
+# Use `./afon.sh -a github-secrets push` to (re)publish them from a local config dir, and
+# `./afon.sh -a github-secrets list` to check which ones are set.
+# The config comes from the repository secrets or, if config_env is given, from the secrets of the GitHub
+# environment of that name, which take precedence.  Publish them with
+# `./afon.sh -a github-secrets -- push --env <env>`.
 on:
   workflow_dispatch:
     inputs:
@@ -19,6 +22,10 @@ on:
         type: choice
         options: [all, aws, azure, gcp]
         default: all
+      config_env:
+        description: "Config env, ie the GitHub environment whose secrets hold the config (blank for the repository secrets)"
+        type: string
+        default: ""
   push:
     branches: [main]
     paths:
@@ -52,6 +59,8 @@ jobs:
     # pull_request and schedule stay gated out for now.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
     runs-on: [self-hosted, Linux, X64]
+    # Blank (as on push) means no environment, so the repository secrets.
+    environment: ${{ inputs.config_env }}
     timeout-minutes: 120
     defaults:
       run:

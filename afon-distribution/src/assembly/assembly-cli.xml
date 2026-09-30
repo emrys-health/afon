@@ -23,6 +23,7 @@
       <outputDirectory>/</outputDirectory>
       <includes>
         <include>LICENSE.txt</include>
+        <include>README.md</include>
         <include>release_notes.md</include>
       </includes>
     </fileSet>
@@ -38,10 +39,11 @@
       <directory>../scripts</directory>
       <outputDirectory>/scripts</outputDirectory>
       <excludes>
-        <exclude>ansible/*</exclude>
-        <exclude>docker/*</exclude>
-        <exclude>snowflake/*</exclude>
-        <exclude>trino/*</exclude>
+        <exclude>ansible/**</exclude>
+        <exclude>docker/**</exclude>
+        <exclude>python/.venv/**</exclude>
+        <exclude>snowflake/**</exclude>
+        <exclude>trino/**</exclude>
       </excludes>
       <fileMode>0755</fileMode>
     </fileSet>
@@ -53,7 +55,7 @@
       </includes>
     </fileSet>
     <fileSet>
-      <directory>../docs/cli</directory>
+      <directory>../docs</directory>
       <outputDirectory>/docs</outputDirectory>
       <includes>
         <include>*.md</include>

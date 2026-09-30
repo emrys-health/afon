@@ -9,7 +9,7 @@ For linux and macOS bash is provided.
 To set up on a given OS, run: 
 
 ```shell
-./afon.sh -a setup-local -c <cloud>
+afon-cli.sh setup-local -c <cloud>
 ```
 
 The following packages are installed:
@@ -21,7 +21,7 @@ The following packages are installed:
 - kubernetes-cli
 - awscli eksctl
 - azure-cli kubelogin
-- google-cloud-cli
+- google-cloud-cli gke-gcloud-auth-plugin
 
 Of the cloud cli packages, only the ones relative to the `<cloud>` specified are installed.
 If no `<cloud>` is specified all are installed.
@@ -30,7 +30,7 @@ If no `<cloud>` is specified all are installed.
 
 To show what is currently installed:
 ```shell
-./afon.sh -a setup-show -c <cloud>
+afon-cli.sh setup-show -c <cloud>
 ```
 
 ## Docker 

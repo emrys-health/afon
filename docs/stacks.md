@@ -2,136 +2,231 @@
 
 ## Pre-requisites
 
-### Afon.sh 
+### Afon entry point
 
-See [afon_script](afon_script.md) for more details on options used to run deployments.
+You can choose one of the Afon [entry points](afon_entry_points.md).
 
 ### Setup Local Env
 
-See [setup local env](setup_local.md).
+You need to have set up you [local env](setup_local.md).
 
 ## Stack deployment
 
-To deploy a stack, we execute the `ops.Deploy*Main` classes, e.g.:
+To deploy a stack, using the CLI command, we run [manage-stack](#manage-a-stack) with the `deploy` action, eg:
 
 ```shell
-./afon.sh -a exec -ec ops.DeployAwsFullStackMain
-./afon.sh -a exec -ec ops.DeployAzurePolarisStackMain
-./afon.sh -a exec -ec ops.DeployGcpPolarisStackMain
+afon-cli.sh manage-stack deploy aws-full
+afon-cli.sh manage-stack deploy azure-polaris
+afon-cli.sh manage-stack deploy gcp-polaris
 ```
-or, equivalently, via the [ops command](afon_script.md#ops-commands) shorthand: `./afon.sh -a deploy-aws-full-stack`, etc.
 
-**NOTE:** In the following, all JVM packages are intended relative to the base package `health.emrys.afon`.
-If you want, you may specify the full package or change the base package via the `--exec-package` option.
+**NOTE:** To run `manage-stack` you need to be logged in with the corresponding [cloud cli](cloud.md).
 
-The credentials in the cloud-specific env properties in [config dir](configuration.md) are used by the deployed Polaris instance.
+**IMPORTANT:** `manage-stack` uses `$AFON_CDKTF` as its `tofu` state dir, so if you deploy or setup a stack (ie
+deploy a stack plus configure the Polaris catalogs) you must take care not move your `$AFON_CDKTF` until the teardown of
+the stack, other `tofu` will not know the information to destroy the stack.
 
-**NOTE:** Currently, only AWS has the full stack.
-Azure and GCP just host Polaris at the moment. There's no particular reason for this other than expediency.
+Of the actions, `deploy` just deploys the stack (waiting for DNS to propagate) and `setup` does the deployment and configures the Polaris catalogs.
+
+### Manage a stack
+
+A single command manages any stack, given an action and a stack id:
+```shell
+afon-cli.sh manage-stack <action> <stack-id> [<step>]  # run without args to list the stack ids and their actions
+```
+where:
+- `<action>` is one of `delete`, `deploy` or `setup`;
+- `<stack-id>` is `<cloud>-<stack-type>`, eg `aws-keycloak`, named as `validate-stack` lists the stacks.
+  Only the stacks that can be deployed or set up are listed: `aws-full`, `aws-keycloak`, `aws-polaris`,
+  `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
+- `<step>`, if given, is the step from which to resume a failed run (see
+  [Resume a failed stack deployment](#resume-a-failed-stack-deployment-from-a-specific-step)).
+
+For example:
+```shell
+afon-cli.sh manage-stack setup aws-keycloak
+afon-cli.sh manage-stack deploy aws-full "wait_on_emryspolaris_then_wait_on_emrysoauth"
+afon-cli.sh manage-stack delete aws-full
+```
+With `afon.sh`, pass the same args positionally, eg `./afon.sh -a manage-stack setup aws-keycloak`.
+
+The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, still work and run the same
+steps, eg `setup-aws-keycloak-stack` is the same as `manage-stack setup aws-keycloak`, but they will be removed.
+
+### Stacks side by side
+
+Each stack has its own `tofu` state, so stacks run side by side, unless they conflict, ie they hold a common exclusive
+resource: the DNS record of a domain name, eg `OIDC_DOMAIN_NAME`, or the pinned egress IP `AWS_EGRESS_IP`, which only
+one running stack can hold.  So `deploy` and `setup` first delete the stacks deployed in the cloud that conflict with
+the stack, including the stack itself.  `delete` deletes just the stack, while `delete <cloud>-all`, eg `delete aws-all`,
+deletes every stack deployed in the cloud.  The legacy stack of a cloud, deployed before each stack had its own `tofu`
+state (see [the Afon cdktf dir](#the-afon-cdktf-dir)), may be any stack, so it is deleted by any action on a stack of
+the cloud, as is a stack not listed above, eg one deployed from `validate-stack aws-jupyter` and `tofu-apply`.
+
+| Stack | Holds | Runs side by side with |
+|---|---|---|
+| `aws-keycloak` | `OIDC_DOMAIN_NAME` | `aws-polaris` |
+| `aws-polaris` | `AWS_POLARIS_DOMAIN_NAME`, `AWS_EGRESS_IP` | `aws-keycloak` |
+| `aws-full` | `OIDC_DOMAIN_NAME`, `AWS_POLARIS_DOMAIN_NAME`, `AWS_JUPYTER_DOMAIN_NAME`, `AWS_EGRESS_IP` | none |
+
+The Polaris stacks, `aws-polaris`, `azure-polaris` and `gcp-polaris`, deploy no KeyCloak of their own, but use the
+KeyCloak server at `OIDC_DOMAIN_NAME`, which `aws-keycloak` deploys, so deploy (or set up) `aws-keycloak` first, eg:
+```shell
+afon-cli.sh manage-stack setup aws-keycloak
+afon-cli.sh manage-stack setup aws-polaris
+```
+Their `deploy` and `setup` check first that KeyCloak answers at `OIDC_DOMAIN_NAME`, and fail fast if it doesn't.
+The `aws-full` stack still deploys its own KeyCloak, so it replaces both `aws-keycloak` and `aws-polaris`.
+Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-keycloak` always gets a fresh one.
+
+### Validate a stack's config
+
+To validate a stack's config without deploying it, eg that the config dir has all the properties the stack needs,
+you can synthesise just the cdktf plan of a stack, which needs no cloud login:
+```shell
+afon-cli.sh validate-stack <stack>  # eg azure-polaris or aws-full, run without <stack> to list the stacks
+```
+This fails fast, eg with `Property X not found`, if the config is incomplete.
+It overwrites the plan in `$AFON_CDKTF/stacks/<stack-id>` (ie `cdk.tf.json` and `assets`), but not the state file
+`$AFON_CDKTF/terraform.<stack-id>.tfstate`, as it doesn't run tofu.  To leave the plan of a running or previous deploy
+of the same stack untouched, synthesise into another cdktf dir, eg `afon-cli.sh --cdktf /tmp/cdktf validate-stack azure-polaris`.
 
 ### Setup AWS full stack
 
-The setup AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
+The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
 
 ```shell
-./afon.sh -a exec -ec ops.SetupAwsFullStackMain
+afon-cli.sh manage-stack setup aws-full
 ```
 Steps executed:
 
-- `delete_aws_stack` — delete any existing AWS stack
-- `deploy_aws_full_stack` — deploy AWS full stack
-- `wait_on_emryspolaris_then_wait_on_emrysoauth` — wait for DNS to propagate
-- `create_all_catalogs_for_cloud_aws` — configure all catalogs in Polaris
-- `aws_spark_talks_to_catalog_aws` — smoke test: Spark writes and reads via Polaris
+1. `delete_stacks_conflicting_with_aws_full` — delete the AWS stacks conflicting with it, ie any existing AWS stack
+2. `deploy_aws_full_stack` — deploy AWS full stack
+3. `wait_on_emryspolaris` — wait for DNS to propagate
+4. `create_all_catalogs_for_cloud_aws` — create all catalogs in AWS Polaris
+5. `aws_spark_talks_to_cloud_aws` — smoke test: Spark writes and reads via Polaris
+
+### Access Polaris and Jupyter
+
+For development purposes, we've registered for `aws` domains `emryspolaris.click` and `emrysjupyter.click`.
+
+Once the AWS full stack is deployed, we can access Polaris and Jupyter via the URLs:
+- `https://emryspolaris.click`
+- `https://emrysjupyter.click/guacamole`
+
+### Deploy AWS Keycloak only
+
+The AWS Keycloak stack deploys only the Keycloak server, ie the EKS cluster with Keycloak behind its HTTPS ingress
+at `OIDC_DOMAIN_NAME`, without Polaris, eg to serve as a standalone OIDC provider, such as for `aws-polaris`, which
+runs side by side with it.
+
+```shell
+afon-cli.sh manage-stack deploy aws-keycloak
+```
+Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `deploy_complete_for_cloud_aws`
+
+It requires the Keycloak properties (`OIDC_DOMAIN_NAME`, `KEYCLOAK_*`, `AWS_KEYCLOAK_DNS_ZONE`, `AWS_KEYCLOAK_CERT_ARN`)
+and the AWS cluster properties, but none of the `AWS_POLARIS_*` properties.
+Once deployed, you can check the OIDC provider is ready with `afon-cli.sh check-oidc`.
+
+### Setup AWS Keycloak only
+
+To deploy the AWS Keycloak stack and configure it with the realm, the `POLARIS_ID` client and the users (and
+their confidential clients), plus the Jupyter browser client if `AWS_JUPYTER_DOMAIN_NAME` is set:
+
+```shell
+afon-cli.sh manage-stack setup aws-keycloak
+```
+Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `configure_oidc_users_for_cloud_aws` → `setup_complete_for_cloud_aws`
 
 ### Setup Azure Polaris only
 
 ```shell
-./afon.sh -a exec -ec ops.SetupAzurePolarisStackMain  
+afon-cli.sh manage-stack setup azure-polaris
 ```
-Steps: `delete_azure_stack → deploy_azure_polaris_stack → wait_on_emryspolarisazure_then_wait_on_emrysoauth → create_all_catalogs_for_cloud_azure`
+Steps: `delete_azure_stack` → `deploy_azure_polaris_stack` → `wait_on_emryspolarisazure_then_wait_on_emrysoauth` → `create_all_catalogs_for_cloud_azure`
 
 ### Setup GCP Polaris only
 
 ```shell
-./afon.sh -a exec -ec ops.SetupGcpPolarisStackMain  
+afon-cli.sh manage-stack setup gcp-polaris
 ```
-Steps: `delete_gcp_stack → deploy_gcp_polaris_stack → wait_on_emryspolarisgcp_then_wait_on_emrysoauth → create_all_catalogs_for_cloud_gcp`
+Steps: `delete_gcp_stack` → `deploy_gcp_polaris_stack` → `wait_on_emryspolarisgcp_then_wait_on_emrysoauth` → `create_all_catalogs_for_cloud_gcp`
 
 ### Setup cross-cloud external catalogs (AWS + Azure)
 
 To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate to Azure Polaris for cross-cloud querying.
 
 ```shell
-./afon.sh -a exec -ec ops.SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain  
+afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog
 ```
 
-Steps:
-`delete_aws_stack → deploy_aws_full_stack → wait_on_emryspolaris_then_wait_on_emrysoauth → create_all_catalogs_for_cloud_aws → aws_spark_talks_to_catalog_aws → delete_azure_stack → deploy_azure_polaris_stack → wait_on_emryspolarisazure_then_wait_on_emrysoauth → delete_table_azure.namespaceph.test_table_for_cloud_azure → create_external_catalog_azure_for_cloud_azure → aws_spark_talks_to_catalog_azure_external`
+Steps: `delete_aws_stack → deploy_aws_full_stack → wait_on_emryspolaris_then_wait_on_emrysoauth → create_all_catalogs_for_cloud_aws → aws_spark_talks_to_catalog_aws → delete_azure_stack → deploy_azure_polaris_stack → wait_on_emryspolarisazure_then_wait_on_emrysoauth → delete_table_azure.namespaceph.test_table_for_cloud_azure → create_external_catalog_azure_for_cloud_azure → aws_spark_talks_to_catalog_azure_external`
 
 ### Resume a failed stack deployment from a specific step
 
-If a deployment fails partway through, you can resume from a specific step, e.g.:
+If a deployment fails partway through, you can resume from a specific step, by adding it to the command, e.g.:
 
 ```shell
-./afon.sh -a exec -ec ops.SetupAwsFullStackAndAzurePolarisStackMain -ea "azure_polaris"
+afon-cli.sh manage-stack setup aws-full "create_all_catalogs_for_cloud_aws"
+afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog "deploy_azure_polaris_stack"
 ```
 
-### Deploy or delete the AWS stack from GitHub
+### Teardown a deployed stack
 
-The [Stack AWS (Linux)](../.github/workflows/aws-stack-linux.yml) workflow runs `afon.sh` on the self-hosted Linux runner — ie
-`ops.DeployAwsFullStackMain` or `ops.DeleteAwsStackMain`.
+The stack teardown can be done via replacing `deploy` with `delete` in the command, eg:
+```shell
+afon-cli.sh manage-stack delete aws-full
+afon-cli.sh manage-stack delete azure-polaris
+afon-cli.sh manage-stack delete gcp-polaris
+```
 
-Run it from the Actions tab: it is `workflow_dispatch` only, with an `action` dropdown
-(`deploy`/`delete`), a `from_step` to resume from (deploy only — blank runs every step, starting
-with the teardown; ignored by delete, which has a single step) and a `confirm` input that must
-match the chosen action. `deploy` tears the running stack down before rebuilding it; `delete` tears
-it down and leaves it down — a later `deploy` run is what brings it back.
-
-Both actions run on the *same* self-hosted runner (see the `runs-on` note in the workflow), because
-both need the tofu state described below — `delete` just as much as `deploy`, since that state is
-the only record of what there is to tear down.
-
-Pre-requisites, on top of what the acceptance workflow needs:
-
-- **Runner tooling**: the `aws` CLI, `tofu` and `kubectl` on the runner's PATH. Install them with
-  `ansible-playbook runner-setup.yml -e install_cloud_tools=true` (see [runners](../scripts/github/runners.md)).
-- **Config secrets**: the same base64 secrets the acceptance workflow uses, published with
-  `./afon.sh -a github-secrets -sa push`.
-- **AWS admin credentials**: the repository secrets `AWS_DEPLOY_ACCESS_KEY_ID` and
-  `AWS_DEPLOY_SECRET_ACCESS_KEY`. These are the user admin credentials tofu and the CLI run as,
-  **NOTE** the Polaris service account credentials in `secret-aws.properties` (see
-  [configuration](configuration.md)). Leave them unset to use the credentials the runner already
-  has, from an EC2 instance profile or its `~/.aws/credentials`.
-- **Tofu state**: kept on the runner in `$AFON_CDKTF/<owner>/<repo>/aws`. 
-
-**NOTE**: the `$AFON_CDKTF` points to `/data/afon/cdktf` and lives outside the GitHub workspace,
-which is wiped out at each checkout.   On the runner, the `$AFON_HOME` points to the workspace.   
-
-The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log is uploaded as the
-`afon-stack-aws-logs-<run id>` artifact.
+The `delete` action is equivalent to running `tofu destroy` on the appropriate `$AFON_CDKTF` dir: it deletes just the
+stack, and `delete <cloud>-all` deletes every stack deployed in the cloud, see [stacks side by side](#stacks-side-by-side).
 
 ### The Afon cdktf dir
 
 The afon-cdk module generates the Terraform plan using the cdktf API to manage the cloud environment and delegates it to tofu to execute it.   The afon-cdk module writes to the cdktf dir, which can be set either via option `--cdktf` in `afon.sh` or via env variable `AFON_CDKTF`.  It defaults to `$AFON_HOME/cdktf`.
 
-The cdktf plan is written `$AFON_CDKTF/stacks/<cloud>` where `<cloud>={aws,azure,gcp}`.
+Each stack has its own cdktf plan and Terraform state, named by its stack id `<cloud>-<stack-type>`, eg `aws-keycloak`:
+the cdktf plan is written to `$AFON_CDKTF/stacks/<stack-id>` and the cdktf dir also holds the Terraform state files
+`$AFON_CDKTF/terraform.<stack-id>.tfstate`.
 
-Thereafter, you can run tofu apply or destroy commands via
+Each AWS stack also has its own kubeconfig `$AFON_CDKTF/kube/<stack-id>.config`, eg `kube/aws-keycloak.config`,
+written when its EKS cluster is created and deleted with the stack.  All the kubectl and helm commands the stack runs,
+eg the cleanups when it is destroyed, use it via `KUBECONFIG`, so they only ever act on the stack's own cluster,
+whichever cluster your current kubectl context points at.  Creating the cluster also points your current kubectl context
+(`~/.kube/config`) at it, as `afon-cli.sh aws-update-kube-config <stack-type>` does, eg for the smoke tests.
+
+**NOTE:** Before each stack had its own, the stacks of a cloud shared the plan `$AFON_CDKTF/stacks/<cloud>` and state
+`$AFON_CDKTF/terraform.<cloud>.tfstate`, where `<cloud>={aws,azure,gcp}`.  A stack still deployed with these is deleted,
+like any other stack of the cloud, by the `delete`, `deploy` and `setup` actions of any stack of the cloud.
+
+You can run tofu apply or destroy commands via
 ```shell
-./afon.sh -a tofu-{apply,destroy}
+afon-cli.sh tofu-{apply,destroy}
 ```
-
+Given a stack id as first arg, eg `afon-cli.sh tofu-plan aws-polaris`, they run in its stack dir.  Else they run in
+the dir of the only stack deployed in the cloud given by `--cloud` (default `aws`), ie the stack dir with a Terraform
+state, else the only stack dir of the cloud.
 **NOTE:** The `ops.Deploy*Main` classes generate the plan and execute it without needing the `tofu-apply` execution.
 You may re-run the `tofu-apply` if needed.
 
-The cdktf dir also holds the Terraform state files: `$AFON_CDKTF/terraform.<cloud>.tfstate` where `<cloud>={aws,azure,gcp}`.
+To validate a stack's config without deploying it, eg that the config dir has all the properties the stack needs,
+you can synthesise just the cdktf plan of a stack, which needs no cloud login:
+```shell
+afon-cli.sh validate-stack <stack>  # eg azure-polaris or aws-full, run without <stack> to list the stacks
+```
+This fails fast, eg with `Property X not found`, if the config is incomplete.
+It overwrites the plan in `$AFON_CDKTF/stacks/<stack-id>` (ie `cdk.tf.json` and `assets`), but not the state file
+`$AFON_CDKTF/terraform.<stack-id>.tfstate`, as it doesn't run tofu.  To leave the plan of a running or previous deploy
+of the same stack untouched, synthesise into another cdktf dir, eg `--cdktf /tmp/cdktf`.
 
 #### Command cdktf-switch
 
 To support multiple config envs, say a `dev` and a `stg` env, you can use the `cdktf-switch` action:
 ```shell
-./afon.sh -a cdktf-switch -e {dev|stg} # cdktf symlink for <env> 
+afon-cli.sh cdktf-switch -e {dev|stg} # cdktf symlink for <env> 
 ```
 This will create or move the symlink `$AFON_CDKTF` pointing to `$AFON_CDKTF-<env>`.
 
@@ -143,7 +238,7 @@ The cdktf-switch action will remove any existing symlink.
 
 To show the status of the current cdktf dir, you can use the `cdktf-status` action:
 ```shell
-./afon.sh -a cdktf-status
+afon-cli.sh cdktf-status
 ```
 If found, it will output the content of the file `manifest.json` in the cdktf dir, which can be used to
 provide information to the user of the cdktf content.  It will also list the files in the cdktf dir.
@@ -152,14 +247,8 @@ provide information to the user of the cdktf content.  It will also list the fil
 
 The stack can be brought down using tofu, which will use the locally stored tfstate.
 ```shell
-./afon.sh -a tofu-destroy
+afon-cli.sh tofu-destroy
 ```
-
-If tofu-destroy hangs on an instance of a managed type, rm manage type from tofu state and re-run destroy:
-```shell
-./afon.sh -a tofu-state -sa "rm helm_release.prometheusRelease" -c <cloud>
-```
-where `<cloud>={aws,azure,gcp}`, defaulting to `aws`.
 
 ## Recovery
 
@@ -167,17 +256,35 @@ If things go astray, you may leave the stack in an unstable state.
 Use the cleanup helpers to bring your environment to a clean and stable state:
 
 ```shell
-./afon.sh -a exec -ec ops.GenerateCleanupScriptMain -ea <cloud>
+afon-cli.sh generate-cleanup-script <stack-id>  # eg aws-keycloak, generating $AFON_HOME/aws-keycloak-cleanup.sh
 ```
 You can run the generated cleanup scripts.
 You may need to run them multiple times for the VPC to disappear from your cloud.
 
 ### AWS
 
+The AWS components of each stack are named from its cluster name `<stack-type>-<CLUSTER_NAME>`, eg
+`keycloak-emrys-cluster` for stack `aws-keycloak`: its EKS cluster, its VPC `cdktf-eks-vpc-<cluster-name>`, its subnets,
+its IAM roles and so on.  So the AWS scripts acting on a stack are given its stack type, eg:
+```shell
+afon-cli.sh aws-cluster keycloak             # is the EKS cluster up?
+afon-cli.sh aws-update-kube-config keycloak  # point kubectl at the EKS cluster
+```
+Checking Polaris needs no stack type, as only one of the stacks serving Polaris runs at a time: it is found by its
+EKS cluster, unless given, eg `aws-polaris full`:
+```shell
+afon-cli.sh aws-polaris                      # is Polaris serving?
+```
+The IAM role names are limited to 64 chars, so `CLUSTER_NAME` must be short enough for
+`AmazonEKSLoadBalancerControllerRole<stack-type>-<CLUSTER_NAME>`, which a stack checks when it is synthesised.
+
+**NOTE:** Before each stack had its own cluster name, the components were named from `CLUSTER_NAME` alone.
+
 To check the AWS VPC has been destroyed:
 
 ```shell
-./afon.sh -a stack-status
+afon-cli.sh aws-vpcs             # the VPCs of every stack of this env, same as: afon-cli-scripts.sh aws/vpcs.sh
+afon-cli.sh aws-vpcs <stack-type>  # the VPC of the stack of the type, eg keycloak
 ```
 
 And if all else fails, login to the [AWS VPC Console](https://eu-west-2.console.aws.amazon.com/vpcconsole/home?region=eu-west-2#vpcs:)
@@ -190,39 +297,43 @@ When Azure resource group is stuck:
 az group delete --name afon_resource_group_aks --yes --no-wait
 ```
 
-## GitOps considerations
-
-Currently, the generated Terraform can contain confidential details (secrets, credentials). 
-
-Before adopting a GitOps workflow where Terraform state is checked into Git:
-
-1. **Separate secrets** — move all sensitive values into Kubernetes secrets or a secrets manager (Vault, AWS Secrets Manager, etc.) rather than embedding them in CDKTF output
-2. **Use remote state** — store Terraform state in a remote backend (S3 + DynamoDB for AWS, Azure Storage for Azure, GCS for GCP) with encryption
-3. **CI/CD pipeline** — run `tofu plan` on PRs and `tofu apply` on merge to main
-4. **State locking** — ensure concurrent runs are prevented via state locking
-
-This is noted as a future improvement in the project.
-
 ## Summary of deployment commands
 
 ```shell
-# AWS full stack (Polaris + Spark + Jupyter)
-./afon.sh -a exec -ec ops.DeployAwsFullStackMain 
+# Any stack: <action>={delete|deploy|setup}, <stack-id>=<cloud>-<stack-type>, eg aws-keycloak
+afon-cli.sh manage-stack <action> <stack-id>
+
+# AWS full stack (Keycloak + Polaris + Spark + Jupyter)
+afon-cli.sh manage-stack deploy aws-full
+
+# AWS Keycloak (standalone)
+afon-cli.sh manage-stack deploy aws-keycloak
 
 # Azure Polaris (standalone)
-./afon.sh -a exec -ec ops.DeployAzurePolarisStackMain
+afon-cli.sh manage-stack deploy azure-polaris
 
 # GCP Polaris (standalone)
-./afon.sh -a exec -ec ops.DeployGcpPolarisStackMain 
+afon-cli.sh manage-stack deploy gcp-polaris
 
 # Cross-cloud external catalogs (AWS + Azure federation)
-./afon.sh -a exec -ec ops.DeployAwsFullStackAndAzurePolarisStackMain 
+afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog
 
 # Snowflake reading cross-cloud data
-./afon.sh -a exec -ec ops.DeploySnowflakeReadingGcpViaAwsMain 
-./afon.sh -a exec -ec ops.DeploySnowflakeReadingAzureViaAwsMain 
+afon-cli.sh deploy-snowflake-reading-gcp-via-aws
+afon-cli.sh deploy-snowflake-reading-azure-via-aws
 
 # Snowflake writing to Azure
-./afon.sh -a exec -ec ops.DeploySnowflakeWritingAzureViaAwsMain 
+afon-cli.sh deploy-snowflake-writing-azure-via-aws
 ```
 
+## Deployment checklist
+
+- [ ] **Domain names** purchased via your domain registrar, one per cloud (e.g. `polaris.yourdomain.com`)
+- [ ] **DNS zones** created in each target cloud and nameservers configured at your domain registrar
+- [ ] **SSL certificates** requested and validated (ACM for AWS, Let's Encrypt for others)
+- [ ] **External Polaris database** provisioned for Polaris metadata storage
+- [ ] **OIDC provider** configured OIDC provider for Jupyter access
+- [ ] **Cloud IAM roles** created via `scripts/<cloud>/create.sh`
+- [ ] **Storage buckets** created (primary, external, and forbidden for each cloud)
+- [ ] **Configuration** properties and users values populated in `config` dir
+- [ ] **Kubernetes cluster** creation permissions confirmed

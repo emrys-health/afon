@@ -3,13 +3,16 @@ package health.emrys.afon.cdk.aws;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.TerraformOutput;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.providers.aws.data_aws_eip.DataAwsEip;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClusterAuth;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
 import com.hashicorp.cdktf.providers.aws.data_aws_lb.DataAwsLb;
 import com.hashicorp.cdktf.providers.aws.data_aws_lb.DataAwsLbConfig;
+import com.hashicorp.cdktf.providers.aws.eip.Eip;
 import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntry;
 import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntryConfig;
 import com.hashicorp.cdktf.providers.aws.eks_access_policy_association.EksAccessPolicyAssociation;
@@ -28,6 +31,7 @@ import com.hashicorp.cdktf.providers.aws.iam_role.IamRoleConfig;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachment;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachmentConfig;
 import com.hashicorp.cdktf.providers.aws.internet_gateway.InternetGateway;
+import com.hashicorp.cdktf.providers.aws.nat_gateway.NatGateway;
 import com.hashicorp.cdktf.providers.aws.provider.AwsProvider;
 import com.hashicorp.cdktf.providers.aws.route53_record.Route53Record;
 import com.hashicorp.cdktf.providers.aws.route53_record.Route53RecordAlias;
@@ -53,11 +57,14 @@ import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.AbstractCloudProvider;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.constructs.Construct;
 
+import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -65,12 +72,13 @@ import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
-import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVICE_NAME;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
-import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_DNS_ZONE;
+import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
 import static java.lang.String.format;
 
 public class AwsCloudProvider extends AbstractCloudProvider {
+
+    private static final String LB_SERVICE_ACCOUNT_NAME = "aws-load-balancer-controller";
 
     private static final Logger log = LoggerFactory.getLogger(AwsCloudProvider.class);
 
@@ -88,32 +96,38 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     private final AwsCleanupHelper           cleanupHelper;
     private final AwsComponentNames          componentNames;
-    private final String                     polarisDomainName;
     private final String                     accountId;
     private final String                     region;
     private final String                     clusterName;
+    private final String                     kubeConfigPath;
     private final String                     clusterPolicyArn;
-    private final String                     polarisCertArn;
     private final EksCluster                 cluster;
     private final List<ITerraformDependable> eksDependOn;
     private final List<String>               subnetIds;
+    private final List<String>               privateSubnetIds;
+    private final String                     egressIp;
     final         DataAwsEksClusterAuth      eksAuthData;
     final         IamRole                    loadBalancerRole;
     final         Resource                   newKubeConfig;
     final         Release                    lbRelease;
     final         Vpc                        vpc;
+    private final Resource                   lbcDestroyCleanup;
     private       HelmProvider               helmProvider;
     private final List<ITerraformDependable> lbcIrsaDependables = new ArrayList<>();
     private       KubernetesProvider         k8sProvider;
 
-    AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
+    /**
+     * @param pinnedEgressIp whether the egress IP is pinned to {@code AWS_EGRESS_IP}, if set, else a fresh one is
+     *                       allocated, as only one running stack can hold the pinned one
+     */
+    AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties, StackId stackId,
+                     boolean pinnedEgressIp) {
         super(scope, id);
-        cleanupHelper = new AwsCleanupHelper(properties);
-        componentNames = new AwsComponentNames(properties);
-        clusterName    = properties.getValue(AfonProperty.CLUSTER_NAME);
-        polarisCertArn = properties.getValue(AfonProperty.AWS_POLARIS_CERT_ARN);
+        componentNames = new AwsComponentNames(properties, stackId);
+        cleanupHelper  = new AwsCleanupHelper(componentNames);
+        clusterName    = componentNames.getCluster();
+        kubeConfigPath = ConfigUtils.kubeConfigPath(stackId);
 
-        this.polarisDomainName = properties.getValue(AfonProperty.AWS_POLARIS_DOMAIN_NAME);
         this.accountId         = properties.getValue(AWS_ACCOUNT_ID);
         this.region            = properties.getValue(AfonProperty.AWS_REGION);
         clusterPolicyArn       = format("arn:aws:iam::%s:policy/AWSLoadBalancerControllerIAMPolicyCurl", accountId);
@@ -148,7 +162,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .create(this, "vpcIgw")
             .vpcId(vpc.getId())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-igw-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getInternetGatewayName())).build();
 
         final Subnet publicSubnet1 = Subnet.Builder
             .create(this, "publicSubnet1")
@@ -159,7 +173,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .dependsOn(List.of(igw))
             .provisioners(uponDestroyRun(cleanupHelper.deleteLoadBalancersCommand()))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-public-1-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getPublicSubnetName(1))).build();
 
         final Subnet publicSubnet2 = Subnet.Builder
             .create(this, "publicSubnet2")
@@ -169,7 +183,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .mapPublicIpOnLaunch(true)
             .dependsOn(List.of(igw))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-public-2-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getPublicSubnetName(2))).build();
 
         final RouteTableRoute route = RouteTableRoute
             .builder()
@@ -183,7 +197,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .tags(Map.of(
                 "Name",
-                "cdktf-eks-public-rt-" + clusterName)).build();
+                componentNames.getPublicRouteTableName())).build();
 
         final RouteTableAssociation subnet1Association = RouteTableAssociation.Builder
             .create(this, "subnet1Association")
@@ -198,6 +212,103 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .routeTableId(publicRouteTable.getId()).build();
 
         subnetIds = List.of(publicSubnet1.getId(), publicSubnet2.getId());
+
+        // --- 2b. Single-IP egress ---
+        // Everything the cluster sends to the internet has to arrive from one address a
+        // third party can put on an allow-list, so the nodes live in private subnets whose
+        // default route is a NAT gateway holding a single Elastic IP.
+        //
+        // AWS_EGRESS_IP pins that address to an Elastic IP already allocated in this
+        // account, which is what makes the address survive a destroy/apply cycle. Left
+        // unset, a fresh EIP is allocated and reported as the `egressIp` output - note that
+        // a `tofu destroy` then releases it, and the next apply gets a different address.
+        // Only a stack pinning its egress IP (the Polaris stacks) uses AWS_EGRESS_IP, as an EIP can only be
+        // attached to one NAT gateway, and so to one running stack: the others always get a fresh EIP.
+        final String configuredEgressIp = pinnedEgressIp ? properties.getValue(AWS_EGRESS_IP, "").trim() : "";
+        final String natAllocationId;
+        if (configuredEgressIp.isEmpty()) {
+            final Eip natEip = Eip.Builder
+                .create(this, "natEip")
+                .domain("vpc")
+                // AWS documents that an EIP used by a VPC resource needs the internet
+                // gateway in place first.
+                .dependsOn(List.of(igw))
+                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                .tags(Map.of("Name", componentNames.getEgressIpName())).build();
+            natAllocationId = natEip.getAllocationId();
+            egressIp        = natEip.getPublicIp();
+        } else {
+            // The address is owned outside this stack: look it up rather than manage it, so
+            // a destroy cannot release an IP that is still on somebody's allow-list.
+            final DataAwsEip givenEip = DataAwsEip.Builder
+                .create(this, "natEip")
+                .publicIp(configuredEgressIp).build();
+            // aws_eip's `id` is the allocation id; the data source exposes no separate one.
+            natAllocationId = givenEip.getId();
+            egressIp        = givenEip.getPublicIp();
+        }
+
+        final Subnet privateSubnet1 = Subnet.Builder
+            .create(this, "privateSubnet1")
+            .vpcId(vpc.getId())
+            .cidrBlock("10.0.11.0/24")
+            .availabilityZone(region + "a")
+            .mapPublicIpOnLaunch(false)
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", componentNames.getPrivateSubnetName(1))).build();
+
+        final Subnet privateSubnet2 = Subnet.Builder
+            .create(this, "privateSubnet2")
+            .vpcId(vpc.getId())
+            .cidrBlock("10.0.12.0/24")
+            .availabilityZone(region + "b")
+            .mapPublicIpOnLaunch(false)
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", componentNames.getPrivateSubnetName(2))).build();
+
+        // The NAT gateway itself must sit in a *public* subnet - it is the only thing in
+        // the VPC that still talks to the internet gateway directly.
+        final NatGateway natGateway = NatGateway.Builder
+            .create(this, "natGateway")
+            .allocationId(natAllocationId)
+            .subnetId(publicSubnet1.getId())
+            .dependsOn(List.of(igw, subnet1Association))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", componentNames.getNatGatewayName())).build();
+
+        final RouteTableRoute natRoute = RouteTableRoute
+            .builder()
+            .cidrBlock("0.0.0.0/0")
+            .natGatewayId(natGateway.getId()).build();
+
+        final RouteTable privateRouteTable = RouteTable.Builder
+            .create(this, "privateRouteTable")
+            .vpcId(vpc.getId())
+            .route(List.of(natRoute))
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .tags(Map.of("Name", componentNames.getPrivateRouteTableName())).build();
+
+        final RouteTableAssociation privateSubnet1Association = RouteTableAssociation.Builder
+            .create(this, "privateSubnet1Association")
+            .subnetId(privateSubnet1.getId())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .routeTableId(privateRouteTable.getId()).build();
+
+        final RouteTableAssociation privateSubnet2Association = RouteTableAssociation.Builder
+            .create(this, "privateSubnet2Association")
+            .subnetId(privateSubnet2.getId())
+            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+            .routeTableId(privateRouteTable.getId()).build();
+
+        privateSubnetIds = List.of(privateSubnet1.getId(), privateSubnet2.getId());
+
+        // Reported so the address can be handed to whoever maintains the allow-list, and
+        // fed back into AWS_EGRESS_IP to keep it across rebuilds.
+        TerraformOutput.Builder
+            .create(this, "egressIp")
+            .value(egressIp)
+            .description("Public IP all outbound cluster traffic is seen to come from")
+            .build();
 
         // --- 3. EKS Cluster IAM Role (Same as before) ---
 
@@ -227,7 +338,11 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                     componentNames.getClusterRoleName())))
             .role(eksClusterRole.getName()).build();
 
-        final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(subnetIds).build();
+        // Control-plane ENIs are placed across both tiers; the public ones keep the
+        // cluster endpoint reachable, the private ones sit alongside the nodes.
+        final List<String> allSubnetIds = new ArrayList<>(subnetIds);
+        allSubnetIds.addAll(privateSubnetIds);
+        final EksClusterVpcConfig vpcConfig = EksClusterVpcConfig.builder().subnetIds(allSubnetIds).build();
 
         cluster = EksCluster.Builder
             .create(this, "eksCluster")
@@ -372,14 +487,18 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .maxSize(3.0)
             .build();
 
+        // Writes the stack's own kubeconfig, which its kubectl and helm commands use (see KubeConfigAspect), and
+        // also updates the default kubeconfig, so that kubectl points at the newly deployed cluster, as for the
+        // smoke tools.  Given explicitly, as the KUBECONFIG set by KubeConfigAspect would otherwise take over.
         List<LocalExecProvisioner> updateKubeConfig = List.of(
             LocalExecProvisioner
                 .builder()
                 .when("create") // Run only when the resource is created
                 .command(format(
-                             "aws eks update-kubeconfig --name %s --region %s",
-                             clusterName,
-                             region)
+                             "mkdir -p %s && aws eks update-kubeconfig --name %s --region %s --kubeconfig %s" +
+                                 " && aws eks update-kubeconfig --name %s --region %s --kubeconfig $HOME/.kube/config",
+                             Path.of(kubeConfigPath).getParent(), clusterName, region, kubeConfigPath,
+                             clusterName, region)
                         )
                 .type("local-exec")
                 .build()
@@ -393,7 +512,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .create(this, "eksNodeGroup")
             .clusterName(cluster.getName())
             .nodeGroupName("default-ng")
-            .subnetIds(subnetIds)
+            // Private subnets only: a node in a public subnet gets its own public IP and
+            // would egress from that instead of the NAT gateway's single address.
+            .subnetIds(privateSubnetIds)
             .nodeRoleArn(nodeGroupRole.getArn())
             .instanceTypes(List.of("r6i.large"))
             .scalingConfig(scalingConfig)
@@ -411,7 +532,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 publicSubnet1, publicSubnet2,
                 subnet1Association, subnet2Association,
                 customSecretAttachment, workerNodeAttachment,
-                cniAttachment, containerRegistryAttachment))
+                cniAttachment, containerRegistryAttachment,
+                privateSubnet1Association, privateSubnet2Association))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .tags(Map.of("Name", componentNames.getNodeGroupRoleName())).build();
 
@@ -461,6 +583,12 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 createValue("bpf.masquerade", "true"),
                 createValue("enableIPv4Masquerade", "true"),
                 createValue("ipv4NativeRoutingCIDR", vpc.getCidrBlock()),
+                // ENI IPAM picks the subnet for each pod ENI itself, preferring whichever
+                // subnet in the node's AZ has the most free addresses. Unfiltered it can
+                // land pods in a public subnet, where they have neither a public IP nor a
+                // NAT route and so no egress at all - pin it to the private subnets.
+                createValue("eni.subnetIDsFilter[0]", privateSubnetIds.get(0)),
+                createValue("eni.subnetIDsFilter[1]", privateSubnetIds.get(1)),
 
                 // FQDN-based network policy (L7 DNS): toEndpoints/toFQDNs rules need
                 // the DNS proxy, which is gated by the cilium-config key
@@ -646,22 +774,12 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
         lbRelease = configureIngress(scope, loadBalancerRole);
 
-        IngressV1 ingress = createHttpsIngress(
-            "polaris-https-ingress",
-            "polaris-ingress",
-            polarisCertArn,
-            this.polarisDomainName,
-                POLARIS_INTERNAL_SERVICE_NAME,
-            8181,
-            subnetIds
-                                              );
-
-
         // Destroy-time cleanup: must run before lbRelease is uninstalled so the LBC
         // webhook doesn't block Helm and TargetGroupBinding finalizers can be removed.
         // The explicit helm uninstall --no-hooks pre-empts Terraform's own Helm destroy,
         // which fails when webhooks/finalizers interfere. Helm treats "release not found" as success.
-        // The controller is uninstalled first, so it is gone before the ingresses are deleted.
+        // The controller is uninstalled first, so it is gone before the ingresses are deleted:
+        // each ingress created by createHttpsIngress is added to this resource's dependencies.
         // Ingress finalizers are stripped only afterwards, as a running controller re-adds them.
         List<LocalExecProvisioner> onLbcDestroy = uponDestroyRun(
             "kubectl get validatingwebhookconfigurations -o name 2>/dev/null | grep aws-load-balancer" +
@@ -679,23 +797,30 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "kubectl get ingress -A --no-headers 2>/dev/null | awk '{print $1, $2}' | " +
                 "while read NS NAME; do kubectl patch ingress \"$NAME\" -n \"$NS\" -p " +
                 "'{\"metadata\":{\"finalizers\":[]}}' --type=merge 2>/dev/null || true; done");
-        Resource.Builder
+        lbcDestroyCleanup = Resource.Builder
             .create(this, "lbc-destroy-cleanup")
-            .dependsOn(List.of(ingress, lbRelease))
+            .dependsOn(List.of(lbRelease))
             .provisioners(onLbcDestroy)
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .build();
-
-        // 2. Create the Alias A Record
-        // An Alias record is used to point a domain name at an AWS resource (like an ELB/ALB).
-        // For the name, we use the specific subdomain (e.g., "app.mydomain.com").
-        configureDNS("IngressAliasRecord",
-                     properties.getValue(AWS_POLARIS_DNS_ZONE),
-                     this.polarisDomainName,
-                     lbRelease,
-                     ingress,
-                     "polaris-ingress");
     }
+
+    /**
+     * The configured allow-list plus the cluster's own egress IP: pods that call Polaris by its
+     * public domain name leave through the NAT gateway and come back in through the ALB, so without
+     * it they would be locked out too. Empty (no restriction) when nothing is configured.
+     */
+    public List<String> polarisInboundCidrs(String allowedCidrsCsv) {
+        List<String> cidrs = Arrays.stream(allowedCidrsCsv.split(","))
+                                   .map(String::trim)
+                                   .filter(cidr -> !cidr.isEmpty())
+                                   .collect(Collectors.toCollection(ArrayList::new));
+        if (!cidrs.isEmpty()) {
+            cidrs.add(egressIp + "/32");
+        }
+        return cidrs;
+    }
+
 
     private static ReleaseSet createValue(String name, String value) {
         return ReleaseSet.builder()
@@ -793,14 +918,14 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     }
 
     private Release configureIngress(Construct scope, IamRole loadBalancerRole) {
-        String serviceAccountName = configureServiceAccount(scope, loadBalancerRole);
+        ServiceAccount serviceAccount = configureServiceAccount(scope, loadBalancerRole);
 
-        return helmInstallLoadBalancer(serviceAccountName, loadBalancerRole);
+        return helmInstallLoadBalancer(serviceAccount, loadBalancerRole);
     }
 
-    private @NonNull String configureServiceAccount(Construct scope, IamRole loadBalancerRole) {
+    private @NonNull ServiceAccount configureServiceAccount(Construct scope, IamRole loadBalancerRole) {
         DataAwsEksCluster clusterData        = associateOIDCProvider(scope);
-        String            serviceAccountName = "aws-load-balancer-controller";
+        String            serviceAccountName = LB_SERVICE_ACCOUNT_NAME;
 
         lbcIrsaDependables.add(new IamRolePolicyAttachment(
             scope,
@@ -824,7 +949,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "eks.amazonaws.com/role-arn",
             loadBalancerRole.getArn()
                                                 );
-        ServiceAccount.Builder
+        return ServiceAccount.Builder
             .create(scope, serviceAccountName)
             .metadata(ServiceAccountMetadata
                           .builder()
@@ -840,7 +965,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 NO_JUPYTER_FINALIZERS,
                 NO_KEYCLOAK_FINALIZERS))
             .build();
-        return serviceAccountName;
     }
 
     private @NonNull DataAwsEksCluster associateOIDCProvider(Construct scope) {
@@ -874,15 +998,20 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 //                .thumbprintList(List.of("9e99a48a9960b14926cc7f3b02e22da2b0e791e8"))
 
             // Optional: Tag the resource
-            .tags(Map.of("Name", clusterName + "-oidc-provider"))
+            .tags(Map.of("Name", componentNames.getOidcProviderName()))
             .build();
         lbcIrsaDependables.add(new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig));
         return clusterData;
     }
 
-    private Release helmInstallLoadBalancer(String serviceAccountName, IamRole loadBalancerRole) {
+    private Release helmInstallLoadBalancer(ServiceAccount serviceAccount, IamRole loadBalancerRole) {
+        String serviceAccountName = LB_SERVICE_ACCOUNT_NAME;
         ArrayList<ITerraformDependable> dependencies = new ArrayList(eksDependOn);
         dependencies.add(loadBalancerRole);
+        // The chart doesn't create the service account, it's only referenced by name, so without this
+        // edge it may be destroyed first: the controller's token is then Unauthorized, it cannot remove
+        // its finalizers, and the ingresses stick in Terminating.
+        dependencies.add(serviceAccount);
         // The controller assumes loadBalancerRole via IRSA (OIDC provider + policy attachment) to
         // delete its ALBs when it is uninstalled. Without these edges they are destroyed first,
         // the controller loses its AWS permissions, and the ingresses stick in Terminating.
@@ -904,6 +1033,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
     }
 
+    /** Restricts an ALB to the given comma-separated source CIDRs; absent means open to all. */
+    public static final String INBOUND_CIDRS_ANNOTATION = "alb.ingress.kubernetes.io/inbound-cidrs";
+
     public IngressV1 createHttpsIngress(
         final String constructId,
         final String ingressName,
@@ -912,11 +1044,30 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         final String serviceName,
         final int servicePort,
         final List<String> subnetIds) {
+        return createHttpsIngress(constructId, ingressName, certArn, hostName, serviceName, servicePort,
+                                  subnetIds, List.of());
+    }
+
+    /**
+     * As above but, when {@code inboundCidrs} is non-empty, the ALB's security group only admits
+     * those source ranges. The IP allow-list has to live here rather than in a NetworkPolicy: the
+     * ALB terminates the client's connection and opens its own, so pods only ever see the ALB's
+     * (or a node's) VPC address, never the caller's.
+     */
+    public IngressV1 createHttpsIngress(
+        final String constructId,
+        final String ingressName,
+        final String certArn,
+        final String hostName,
+        final String serviceName,
+        final int servicePort,
+        final List<String> subnetIds,
+        final List<String> inboundCidrs) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
         String subnetIdsCSV = subnetIds.stream().collect(Collectors.joining(","));
         log.info("subnetIDs = {}, certArn = {}, hostname = {}", subnetIdsCSV, certArn, hostName);
-        Map<String, String> albAnnotations = Map.of(
+        Map<String, String> albAnnotations = new HashMap<>(Map.of(
             // 1. Tell the LBC to create an Application Load Balancer (ALB)
             "kubernetes.io/ingress.class", "alb",
 
@@ -937,7 +1088,10 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             "external-dns.alpha.kubernetes.io/hostname", hostName,
 
             "alb.ingress.kubernetes.io/subnets", subnetIdsCSV
-                                                   );
+                                                   ));
+        if (!inboundCidrs.isEmpty()) {
+            albAnnotations.put(INBOUND_CIDRS_ANNOTATION, String.join(",", inboundCidrs));
+        }
 
         var sslServicePort = IngressV1SpecRuleHttpPathBackendService
             .builder()
@@ -975,9 +1129,16 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .namespace("default")
             .annotations(albAnnotations)
             .build();
-        return IngressV1.Builder
+        IngressV1 ingress = IngressV1.Builder
             .create(this, constructId)
             .provider(kubernetesProvider)
+            // The controller normally removes its own `ingress.k8s.aws/resources` finalizer
+            // when it sees the deletion, but by this point in the destroy it has been
+            // uninstalled (see lbc-destroy-cleanup), so nothing would ever remove it and the
+            // provider polls its delete until it times out. Terraform runs a resource's
+            // destroy provisioners immediately before destroying it, so this strips the
+            // finalizer whatever order the ingresses and the controller come apart in.
+            .provisioners(uponDestroyRun(finalizeIngress(ingressName, "default")))
             // The ALB (and thus the ingress' status.loadBalancer.hostname that the Route53
             // alias record reads) is only provisioned once the AWS Load Balancer Controller
             // is running. Without this dependency the ingress can be created before the
@@ -993,6 +1154,21 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .waitForLoadBalancer(true)
             .timeouts(IngressV1Timeouts.builder().create(INGRESS_LOAD_BALANCER_TIMEOUT).build())
             .build();
+        destroyAfterLbcCleanup(ingress);
+        return ingress;
+    }
+
+    /**
+     * Makes the lbc-destroy-cleanup depend on the ingress, so that on destroy the cleanup, which
+     * uninstalls the AWS Load Balancer Controller and strips the ingress finalizers, runs before
+     * the ingress is deleted. Done for every ingress {@link #createHttpsIngress} creates, so they
+     * are all destroyed in the same order.
+     */
+    private void destroyAfterLbcCleanup(IngressV1 ingress) {
+        List<String> dependsOn = new ArrayList<>(lbcDestroyCleanup.getDependsOn());
+        // a plain reference, as the builder's dependsOn writes, not getFqn()'s "${...}" token
+        dependsOn.add(ingress.getTerraformResourceType() + "." + ingress.getFriendlyUniqueId());
+        lbcDestroyCleanup.setDependsOn(dependsOn);
     }
 
     public Release getLbRelease() {
@@ -1027,7 +1203,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     /**
      * Uses {@code aws eks get-token} instead of the static token from {@code eksAuthData} so
      * the provider fetches a fresh, short-lived credential on every operation. The static
-     * token (via {@link #getToken()}) is read once during the apply graph and expires after
+     * token is read once during the apply graph and expires after
      * ~15 minutes; a full-create apply of a brand-new cluster (EKS control plane + node group
      * + Helm releases) routinely takes longer than that, so late resources such as
      * {@code kubernetes_ingress_v1} would fail with "Unauthorized" once it went stale.
@@ -1059,6 +1235,13 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
     }
 
+    /**
+     * @return the names of the AWS components of the stack
+     */
+    public AwsComponentNames getComponentNames() {
+        return componentNames;
+    }
+
     private List<String> eksTokenArgs() {
         return List.of("eks", "get-token", "--cluster-name", clusterName, "--region", region);
     }
@@ -1087,8 +1270,25 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     }
 
 
+    /**
+     * The public subnets. These are for internet-facing load balancers only - workloads
+     * run in {@link #getPrivateSubnetIds()} so that their egress goes via the NAT gateway.
+     */
     public List<String> getSubnetIds() {
         return new ArrayList<>(subnetIds);
+    }
+
+    /**
+     * The subnets the nodes run in, whose default route is the NAT gateway holding the
+     * single egress IP.
+     */
+    public List<String> getPrivateSubnetIds() {
+        return new ArrayList<>(privateSubnetIds);
+    }
+
+    /** Public IP that all outbound traffic from the cluster appears to come from. */
+    public String getEgressIp() {
+        return egressIp;
     }
 
     @Override
@@ -1104,21 +1304,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     @Override
     public String getClusterEndpoint() {
         return cluster.getEndpoint();
-    }
-
-    /**
-     * No longer used by {@link #configureK8s()}/{@link #configureHelm()}, which now use the
-     * {@code aws eks get-token} exec plugin instead of this static token. Kept for
-     * {@link AwsHelmStack}, an experimental, unwired stack that still builds its own
-     * Helm provider directly from this value.
-     */
-    @Override
-    public String getToken() {
-        return eksAuthData.getToken();
-    }
-
-    public String getPolarisDomainName() {
-        return polarisDomainName;
     }
 
     public String getAccountId() {

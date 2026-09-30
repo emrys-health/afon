@@ -52,6 +52,17 @@ public class CdkHelper {
         return format("kubectl patch ingress %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
     }
 
+    /**
+     * As {@link #finalizeIngress(String)} but namespaced and tolerant of the Ingress having
+     * already gone, for use as a resource's own destroy-time provisioner.
+     */
+    public static String finalizeIngress(String service, String namespace) {
+        return format(
+            "kubectl patch ingress %s -n %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge"
+                + " 2>/dev/null || true",
+            service, namespace);
+    }
+
     private static String finalizeInstallation(String service) {
         return format("kubectl patch installation %s  -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
     }

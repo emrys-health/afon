@@ -6,6 +6,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
+import static health.emrys.afon.config.AfonCloud.AZURE;
 import static java.lang.String.format;
 
 public class AzureCleanupHelper extends CleanupHelper {
@@ -59,8 +60,13 @@ public class AzureCleanupHelper extends CleanupHelper {
                 deleteGroupCommand());
     }
 
+    /**
+     * Outputs the cleanup commands of the Azure stack, given the args {@code <stack-id> [<output-file>]},
+     * eg {@code azure-polaris}, although the names of its components don't depend on its stack type.
+     */
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();
+        stackIdOf(args, AZURE);
         outputCleanupCommands(new AzureCleanupHelper(properties).cleanupCommands(), args);
     }
 

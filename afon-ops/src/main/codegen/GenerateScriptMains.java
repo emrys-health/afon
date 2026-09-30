@@ -29,6 +29,7 @@ public class GenerateScriptMains {
         new ScriptEntry("config", "ConfigExportMain", "config/export.sh"),
         new ScriptEntry("config", "ConfigImportMain", "config/import.sh"),
         new ScriptEntry("config", "ConfigRenamesMain", "config/renames.sh"),
+        new ScriptEntry("config", "ConfigUserMain", "config/user.sh"),
 
         new ScriptEntry("cdktf", "CdktfInitMain", "cdktf/init.sh"),
         new ScriptEntry("cdktf", "CdktfStatusMain", "cdktf/status.sh"),
@@ -40,6 +41,7 @@ public class GenerateScriptMains {
         new ScriptEntry("tofu", "TofuStateMain", "tofu/state.sh"),
 
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
+        new ScriptEntry("aws", "AwsClusterMain", "aws/cluster.sh"),
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),
         new ScriptEntry("aws", "AwsCreateMain", "aws/create.sh"),
         new ScriptEntry("aws", "AwsDestroyMain", "aws/destroy.sh"),
@@ -47,6 +49,7 @@ public class GenerateScriptMains {
         new ScriptEntry("aws", "AwsLoginMain", "aws/login.sh"),
         new ScriptEntry("aws", "AwsMountDataMain", "aws/mount-data.sh"),
         new ScriptEntry("aws", "AwsPolarisMain", "aws/polaris.sh"),
+        new ScriptEntry("aws", "AwsSecretsMain", "aws/secrets.sh"),
         new ScriptEntry("aws", "AwsSnowflakeMain", "aws/snowflake.sh"),
         new ScriptEntry("aws", "AwsUpdateKubeConfigMain", "aws/update-kube-config.sh"),
         new ScriptEntry("aws", "AwsVpcsMain", "aws/vpcs.sh"),
@@ -73,6 +76,7 @@ public class GenerateScriptMains {
         new ScriptEntry("gcp", "GcpLoginMain", "gcp/login.sh"),
         new ScriptEntry("gcp", "GcpPolarisMain", "gcp/polaris.sh"),
 
+        new ScriptEntry("github", "GithubMilestonesMain", "github/milestones.sh"),
         new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
         new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),
 

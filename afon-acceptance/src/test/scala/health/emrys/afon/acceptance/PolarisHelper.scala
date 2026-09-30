@@ -7,7 +7,7 @@ import health.emrys.afon.polaris.config.PolarisUserManager
 import org.apache.polaris.core.admin.model.PrincipalWithCredentials
 
 object PolarisHelper {
-  val principalName     = instance.getProperties().getValue(AfonProperty.USER_POLARIS_ID)
+  val principalName     = instance.getProperties().getValue(AfonProperty.USER_ID)
   val principalRoleName = "myprincipalrole"
   val principal         = (new PolarisHelper).createPrincipal()
 }

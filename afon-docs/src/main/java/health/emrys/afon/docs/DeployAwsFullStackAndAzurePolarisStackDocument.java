@@ -33,10 +33,10 @@ public class DeployAwsFullStackAndAzurePolarisStackDocument extends AbstractDocu
             ### Problems destroying the stacks?
             Generate and run cleanup scripts:
             ```shell
-            ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args aws
+            afon-cli.sh generate-cleanup-script aws-full
             ```
             ```shell
-            ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args azure
+            afon-cli.sh generate-cleanup-script azure-polaris
             ```
             """);
     }

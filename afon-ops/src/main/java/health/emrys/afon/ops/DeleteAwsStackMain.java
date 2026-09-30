@@ -1,5 +1,6 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.ops.steps.StackStepsFactory;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepRunner;
@@ -9,13 +10,15 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
 
+/**
+ * Equivalent to {@code manage-stack delete aws-all}, deleting every stack in AWS, whose steps are defined by
+ * {@link StackStepsFactory}.
+ */
 public class DeleteAwsStackMain implements StepsProvider {
 
     @Override
     public List<Step> stepsUsing(StepOperations stepOperations) {
-        return List.of(
-                stepOperations.deleteStackIn(AWS),
-                stepOperations.deleteComplete(AWS));
+        return new StackStepsFactory().deleteIn(AWS).stepsUsing(stepOperations);
     }
 
     public static void main(String[] args) {

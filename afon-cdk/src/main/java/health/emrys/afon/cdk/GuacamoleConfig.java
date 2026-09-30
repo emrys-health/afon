@@ -12,13 +12,7 @@ import software.constructs.Construct;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.net.JarURLConnection;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -56,15 +50,14 @@ public class GuacamoleConfig {
     static final int    GUACD_PORT      = 4822;
     static final String SVC_NAME        = "guacamole-web";
     static final String CONFIG_MAP_NAME = "guacamole-config";
-    static final String GUACAMOLE_IMAGE = "guacamole/guacamole:1.5.5";
     /**
-     * The emrys-hdrs branding extension jar (the afon-guacamole-theme module's
-     * artifact, on the synth classpath). Shipped to the pod as a ConfigMap
-     * binaryData entry, then copied into GUACAMOLE_HOME/extensions by the
-     * guacamole-home-init initContainer in both deployment modes.
+     * The active theme's branding extension jar (built from the afon-theme module's
+     * {@code themes/<theme>/guacamole/} resources on the synth classpath — see {@link #themeJarBytes}).
+     * Shipped to the pod as a ConfigMap binaryData entry, then copied into GUACAMOLE_HOME/extensions
+     * by the guacamole-home-init initContainer in both deployment modes.
      */
     private static final String THEME_CONFIG_MAP = "guacamole-theme";
-    private static final String THEME_JAR_NAME   = "emrys-hdrs-branding.jar";
+    private static final String THEME_JAR_NAME   = "guacamole-theme.jar";
     private static final String THEME_VOLUME     = "guacamole-theme";
     private static final String THEME_MOUNT      = "/tmp/guacamole-theme";
     private static final String HOME_VOLUME      = "guacamole-home";
@@ -81,7 +74,7 @@ public class GuacamoleConfig {
         public static DbConfig create(AfonPropertyProvider properties) {
             return new DbConfig(properties.getValue(AfonProperty.GUACAMOLE_DB_HOST),
                                 5432,
-                                "guacamole",
+                                "guacamole-" + properties.getValue(AfonProperty.CLUSTER_NAME),
                                 properties.getValue(AfonProperty.GUACAMOLE_DB_USERNAME),
                                 properties.getValue(AfonProperty.GUACAMOLE_DB_PASSWORD));
         }
@@ -113,9 +106,10 @@ public class GuacamoleConfig {
                     List<ITerraformDependable> dependsOn,
                     String jupyterVncHost,
                     String jupyterVncPassword,
-                    List<Session> sessions) {
+                    List<Session> sessions,
+                    String theme) {
         // All sessions live on the same (single) Jupyter pod, just on different VNC ports.
-        this(scope, dependsOn, session -> jupyterVncHost, jupyterVncPassword, sessions);
+        this(scope, dependsOn, session -> jupyterVncHost, jupyterVncPassword, sessions, theme);
     }
 
     /**
@@ -127,8 +121,9 @@ public class GuacamoleConfig {
                     List<ITerraformDependable> dependsOn,
                     Function<Session, String> hostResolver,
                     String jupyterVncPassword,
-                    List<Session> sessions) {
-        this(scope, dependsOn, hostResolver, jupyterVncPassword, sessions, null);
+                    List<Session> sessions,
+                    String theme) {
+        this(scope, dependsOn, hostResolver, jupyterVncPassword, sessions, null, theme);
     }
 
     /**
@@ -151,7 +146,8 @@ public class GuacamoleConfig {
                     Function<Session, String> hostResolver,
                     String jupyterVncPassword,
                     List<Session> sessions,
-                    String ssoUsernameHeader) {
+                    String ssoUsernameHeader,
+                    String theme) {
 
         String guacamoleProperties = GUACAMOLE_PROPERTIES;
         if (ssoUsernameHeader != null) {
@@ -172,7 +168,7 @@ public class GuacamoleConfig {
                         "guacamole.properties", guacamoleProperties))
                 .build();
 
-        ConfigMap themeCm = buildThemeConfigMap(scope);
+        ConfigMap themeCm = buildThemeConfigMap(scope, theme);
 
         // Assemble GUACAMOLE_HOME (a writable emptyDir) from the ConfigMap plus, in SSO mode, the
         // header-auth extension jar bundled in the guacamole image — a read-only ConfigMap mount
@@ -190,7 +186,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
                 .builder()
                 .name("guacamole-home-init")
-                .image(GUACAMOLE_IMAGE)
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .command(List.of("sh", "-c", assemble.toString()))
                 .volumeMount(List.of(
                         initVolumeMount("guacamole-config", "/tmp/guacamole-config", true),
@@ -201,7 +197,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacd")
-                .image("guacamole/guacd:1.5.5")
+                .image(DockerImages.GUACD_IMAGE)
                 .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                      .containerPort(GUACD_PORT)
                                                                      .protocol("TCP")
@@ -211,7 +207,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacamole")
-                .image(GUACAMOLE_IMAGE)
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .env(List.of(
                         envVar("GUACD_HOSTNAME", "localhost"),
                         envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
@@ -294,7 +290,8 @@ public class GuacamoleConfig {
                     String vncPassword,
                     List<Session> sessions,
                     DbConfig db,
-                    String httpAuthHeader) {
+                    String httpAuthHeader,
+                    String theme) {
 
         ConfigMap provisionCm = ConfigMap.Builder
                 .create(scope, "guacamoleProvisionCm")
@@ -309,7 +306,7 @@ public class GuacamoleConfig {
         jobDeps.add(provisionCm);
         JobV1 dbInit = buildDbInitJob(scope, jobDeps, db);
 
-        ConfigMap themeCm = buildThemeConfigMap(scope);
+        ConfigMap themeCm = buildThemeConfigMap(scope, theme);
 
         // GUACAMOLE_HOME is a writable emptyDir at /etc/guacamole, populated by an initContainer
         // with the branding extension jar from the theme ConfigMap. The image treats that dir as a
@@ -318,7 +315,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
                 .builder()
                 .name("guacamole-home-init")
-                .image(GUACAMOLE_IMAGE)
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .command(List.of("sh", "-c",
                         "set -e; mkdir -p /etc/guacamole/extensions; "
                         + "cp " + THEME_MOUNT + "/*.jar /etc/guacamole/extensions/;"))
@@ -330,7 +327,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacd")
-                .image("guacamole/guacd:1.5.5")
+                .image(DockerImages.GUACD_IMAGE)
                 .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                      .containerPort(GUACD_PORT)
                                                                      .protocol("TCP")
@@ -343,7 +340,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
                 .builder()
                 .name("guacamole")
-                .image(GUACAMOLE_IMAGE)
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .env(List.of(
                         envVar("GUACD_HOSTNAME", "localhost"),
                         envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
@@ -422,7 +419,7 @@ public class GuacamoleConfig {
         JobV1SpecTemplateSpecInitContainer schemaGen = JobV1SpecTemplateSpecInitContainer
                 .builder()
                 .name("schema-gen")
-                .image("guacamole/guacamole:1.5.5")
+                .image(DockerImages.GUACAMOLE_IMAGE)
                 .command(List.of("sh", "-c", "/opt/guacamole/bin/initdb.sh --postgresql > /sql/001-schema.sql"))
                 .volumeMount(List.of(JobV1SpecTemplateSpecInitContainerVolumeMount.builder()
                                                                                   .name("sql")
@@ -445,7 +442,7 @@ public class GuacamoleConfig {
         JobV1SpecTemplateSpecContainer dbInit = JobV1SpecTemplateSpecContainer
                 .builder()
                 .name("db-init")
-                .image("postgres:16-alpine")
+                .image(DockerImages.POSTGRES_ALPINE_IMAGE)
                 .command(List.of("sh", "-c", script))
                 .env(List.of(
                         jobEnv("PGHOST", db.host()),
@@ -555,10 +552,10 @@ public class GuacamoleConfig {
     }
 
     /**
-     * The emrys-hdrs theme jar as a ConfigMap {@code binaryData} entry — the jar bytes come from
-     * the afon-guacamole-theme artifact on the synth classpath (see {@link #themeJarBytes()}).
+     * The active theme's Guacamole extension jar as a ConfigMap {@code binaryData} entry — the jar
+     * bytes come from the afon-theme artifact on the synth classpath (see {@link #themeJarBytes}).
      */
-    private static ConfigMap buildThemeConfigMap(Construct scope) {
+    private static ConfigMap buildThemeConfigMap(Construct scope, String theme) {
         return ConfigMap.Builder
                 .create(scope, "guacamoleThemeConfigMap")
                 .metadata(ConfigMapMetadata.builder()
@@ -566,7 +563,7 @@ public class GuacamoleConfig {
                                            .namespace("default")
                                            .build())
                 .binaryData(Map.of(THEME_JAR_NAME,
-                                   Base64.getEncoder().encodeToString(themeJarBytes())))
+                                   Base64.getEncoder().encodeToString(themeJarBytes(theme))))
                 .build();
     }
 
@@ -597,50 +594,22 @@ public class GuacamoleConfig {
     }
 
     /**
-     * Bytes of the afon-guacamole-theme artifact. Once Maven has packaged the module, its
-     * {@code guac-manifest.json} marker resolves as a {@code jar:...!} URL; {@link JarURLConnection}
-     * hands back the containing jar's own URL, which is opened directly for its bytes. That URL's
-     * scheme depends on how the jar was loaded — a plain {@code file:} path when run standalone, or
-     * Spring Boot's {@code nested:} scheme when the theme jar lives inside afon-cli.jar's
-     * {@code BOOT-INF/lib} — so it must be read via {@code openStream()} rather than resolved to a
-     * filesystem {@link Path}, which only the {@code file:} case would support.
-     * When running against {@code target/classes} instead (IDE, tests) the resource tree is
-     * zipped on the fly — same result either way.
+     * Bytes of {@code theme}'s Guacamole extension, packaged as a standalone jar from whatever files
+     * {@link ThemeResources} finds under {@code themes/<theme>/guacamole/} — so any theme's own file
+     * set becomes the extension, with {@code guac-manifest.json} landing at the jar's root as
+     * Guacamole requires.
      */
-    private static byte[] themeJarBytes() {
-        URL marker = GuacamoleConfig.class.getResource("/guac-manifest.json");
-        if (marker == null) {
-            throw new IllegalStateException(
-                "guac-manifest.json not on the classpath — build afon-guacamole-theme first");
-        }
-        try {
-            if ("jar".equals(marker.getProtocol())) {
-                JarURLConnection jarConnection = (JarURLConnection) marker.openConnection();
-                try (InputStream in = jarConnection.getJarFileURL().openStream()) {
-                    return in.readAllBytes();
-                }
-            }
-            return zipResourceTree(Path.of(marker.toURI()).getParent());
-        } catch (IOException | URISyntaxException e) {
-            throw new IllegalStateException("Could not read afon-guacamole-theme", e);
-        }
-    }
-
-    private static byte[] zipResourceTree(Path root) throws IOException {
+    private static byte[] themeJarBytes(String theme) {
+        Map<String, byte[]> files = ThemeResources.list("themes/" + theme + "/guacamole/", "guac-manifest.json");
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
-            Files.walk(root)
-                 .filter(Files::isRegularFile)
-                 .forEach(file -> {
-                     try {
-                         zip.putNextEntry(new ZipEntry(
-                                 root.relativize(file).toString().replace('\\', '/')));
-                         zip.write(Files.readAllBytes(file));
-                         zip.closeEntry();
-                     } catch (IOException e) {
-                         throw new UncheckedIOException(e);
-                     }
-                 });
+            for (Map.Entry<String, byte[]> file : files.entrySet()) {
+                zip.putNextEntry(new ZipEntry(file.getKey()));
+                zip.write(file.getValue());
+                zip.closeEntry();
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
         return bytes.toByteArray();
     }

@@ -6,7 +6,7 @@ The `afon.sh` script at the top-level of the source tree acts as a front-end for
 ./afon.sh -h
 ```
 
-For access to the functionality outside the source tree, refer to [Afon CLI](cli/cli.md).
+For access to the functionality outside the source tree, refer to [Afon CLI](cli/afon_cli.md).
 
 ### Options in long form and short form
 
@@ -24,7 +24,7 @@ Every executable ops class `<Name>Main` (in module `afon-ops`) can be run using 
 as a shorthand for the `exec` action:
 
 ```shell
-./afon.sh -a deploy-aws-full-stack     # same as: ./afon.sh -a exec -ec ops.DeployAwsFullStackMain
+./afon.sh -a manage-stack deploy aws-full   # same as: ./afon.sh -a exec -ec ops.ManageStackMain -ea "deploy aws-full"
 ./afon.sh -a manage-polaris-catalogs -ea "create aws"
 ```
 
@@ -43,3 +43,4 @@ same action name, the script takes precedence over the ops class.  The list of o
 ```shell
 ./afon.sh -h
 ```
+
