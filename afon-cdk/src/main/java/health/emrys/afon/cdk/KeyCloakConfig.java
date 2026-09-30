@@ -123,6 +123,7 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         envs.add(envVar("KC_HOSTNAME_STRICT", "true"));
         envs.add(envVar("KC_HTTP_ENABLED", "true"));
         envs.add(envVar(ENV_KC_HOSTNAME, hostname));
+        envs.add(envVar("KC_LOG_LEVEL", "DEBUG"));
         kcProperties.values().forEach(envName -> envs.add(
             envFromSecret(envName, SECRET_NAME, envName))
         );
