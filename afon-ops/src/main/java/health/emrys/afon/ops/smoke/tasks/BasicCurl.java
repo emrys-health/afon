@@ -41,7 +41,7 @@ public class BasicCurl {
         logger.info("Checking domain {}", domain);
         String     command = "curl -I --connect-timeout 3 --max-time 3 https://" + domain;
         ExecResult result  = client.exec(pod, command.split(" "));
-        if (result.exitCode() != 0) { // might be intentional
+        if (!result.isSuccess()) { // might be intentional
             logger.warn("Problem running {} on {}", command, pod);
         }
         return result;

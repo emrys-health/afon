@@ -6,7 +6,9 @@ import io.kubernetes.client.PortForward;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.util.ClientBuilder;
@@ -21,7 +23,10 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -31,15 +36,16 @@ import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
 public class KubeClient implements AutoCloseable {
 
     static final Logger logger = org.slf4j.LoggerFactory.getLogger(KubeClient.class);
-    private final String clusterName;
+    public static final Duration TIMEOUT = Duration.ofMinutes(5);
+    private final String               clusterName;
     private final AfonPropertyProvider properties;
-    private final ApiClient apiClient;
-    private ApiClient execApiClient;
+    private final ApiClient            apiClient;
+    private       ApiClient            execApiClient;
 
     public KubeClient(AfonPropertyProvider properties) {
-        this.properties = properties;
+        this.properties  = properties;
         this.clusterName = properties.getValue(CLUSTER_NAME);
-        this.apiClient = buildClient(properties);
+        this.apiClient   = buildClient(properties);
         Configuration.setDefaultApiClient(KubeClient.this.apiClient);
     }
 
@@ -49,8 +55,8 @@ public class KubeClient implements AutoCloseable {
             FileReader reader = new FileReader(kubeConfigPath);
             return ClientBuilder.kubeconfig(KubeConfig.loadKubeConfig(reader)).build();
         } catch (IOException e) {
-            logger.error("Failed to build client from kube config {}",kubeConfigPath, e);
-            throw new RuntimeException("Failed to build client from kube config "+kubeConfigPath, e);
+            logger.error("Failed to build client from kube config {}", kubeConfigPath, e);
+            throw new RuntimeException("Failed to build client from kube config " + kubeConfigPath, e);
         }
     }
 
@@ -73,15 +79,15 @@ public class KubeClient implements AutoCloseable {
      * @param container may be null, in which case the pod must have exactly one container
      */
     public ExecResult exec(String namespace, String pod, String container, Duration timeout, String... command)
-            throws ApiException, IOException, InterruptedException, TimeoutException {
+    throws ApiException, IOException, InterruptedException, TimeoutException {
         logger.info("Executing\n{}\nin {}/{}{}", String.join(" ", command), namespace, pod,
-                container == null ? "" : " (container " + container + ")");
+                    container == null ? "" : " (container " + container + ")");
         Process process = new Exec(execApiClient())
-                .newExecutionBuilder(namespace, pod, command)
-                .setContainer(container)
-                .setStdin(false)
-                .setTty(false)
-                .execute();
+            .newExecutionBuilder(namespace, pod, command)
+            .setContainer(container)
+            .setStdin(false)
+            .setTty(false)
+            .execute();
         try {
             process.getOutputStream().close();
             // Drain both streams concurrently so neither blocks the remote process by filling up.
@@ -89,9 +95,16 @@ public class KubeClient implements AutoCloseable {
             CompletableFuture<String> stderr = readAsync(process.getErrorStream());
             if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
                 throw new TimeoutException("Command '" + String.join(" ", command) + "' in " + namespace + "/" + pod
-                        + " did not complete within " + timeout);
+                                               + " did not complete within " + timeout);
             }
-            return new ExecResult(process.exitValue(), stdout.join(), stderr.join(), String.join(" ", command));
+            int exitCode = process.exitValue();
+            if (exitCode == -1) {
+                // The client discards the status channel's message unless it carries an exit code, so a
+                // command that never started (eg executable not found) leaves stdout and stderr empty.
+                logger.warn("Command {} in {}/{} did not run (eg executable not found). Each argument must be a"
+                        + " separate element of the command array", Arrays.toString(command), namespace, pod);
+            }
+            return new ExecResult(exitCode, stdout.join(), stderr.join(), String.join(" ", command));
         } finally {
             process.destroy();
         }
@@ -99,7 +112,38 @@ public class KubeClient implements AutoCloseable {
 
     public ExecResult exec(String pod, String... command)
             throws ApiException, IOException, InterruptedException, TimeoutException {
-        return exec("default", pod, null, Duration.ofMinutes(5), command);
+        return exec("default", pod, null, TIMEOUT, command);
+    }
+
+    /**
+     * The equivalent of {@code kubectl exec -n <namespace> deploy/<deployment> -- <command...>}: runs the command
+     * in one of the deployment's running pods.
+     */
+    public ExecResult execInDeployment(String namespace, String deployment, String container,
+                                       String... command)
+            throws ApiException, IOException, InterruptedException, TimeoutException {
+        return exec(namespace, podForDeployment(namespace, deployment), container, TIMEOUT, command);
+    }
+
+    /**
+     * Resolves a deployment to one of its running pods, as {@code kubectl} does for {@code deploy/<name>}.
+     */
+    public String podForDeployment(String namespace, String deployment) throws ApiException {
+        V1Deployment d = new AppsV1Api().readNamespacedDeployment(deployment, namespace).execute();
+        Map<String, String> matchLabels = d.getSpec().getSelector().getMatchLabels();
+        if (matchLabels == null || matchLabels.isEmpty()) {
+            throw new IllegalStateException("Deployment " + namespace + "/" + deployment + " has no matchLabels selector");
+        }
+        String selector = matchLabels.entrySet().stream()
+                                     .map(e -> e.getKey() + "=" + e.getValue())
+                                     .collect(Collectors.joining(","));
+        return new CoreV1Api().listNamespacedPod(namespace).labelSelector(selector).execute().getItems().stream()
+                              .filter(pod -> pod.getMetadata().getDeletionTimestamp() == null)
+                              .filter(pod -> pod.getStatus() != null && "Running".equals(pod.getStatus().getPhase()))
+                              .map(pod -> pod.getMetadata().getName())
+                              .findFirst()
+                              .orElseThrow(() -> new IllegalStateException(
+                                      "No running pod for deployment " + namespace + "/" + deployment + " (" + selector + ")"));
     }
 
     /**
@@ -108,14 +152,16 @@ public class KubeClient implements AutoCloseable {
      * The caller must close the result.
      */
     public PortForward.PortForwardResult portForward(String namespace, String pod, int port)
-            throws ApiException, IOException {
+    throws ApiException, IOException {
         return new PortForward(execApiClient()).forward(namespace, pod, List.of(port));
     }
 
     private static CompletableFuture<String> readAsync(InputStream in) {
         return CompletableFuture.supplyAsync(() -> {
             try (in) {
-                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                String read = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                logger.info("Read: {}", read);
+                return read;
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
