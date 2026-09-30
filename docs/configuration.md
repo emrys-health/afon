@@ -56,28 +56,31 @@ This can be useful when sharing a pre-defined configuration.
 **NOTE**: The config-import command assumes that the `config-<env>` dir does not exist and is created in the process.  
 If a config dir is already present, it will stop.
 
-### Command aws-secrets
+### Command config-vault
 
 You can store snapshots of a config env in AWS Secrets Manager under a tag, and pull them back by it:
 ```shell
-./afon.sh -a aws-secrets -- push --env <env>                    # stores config-<env>, tagged with the current git commit
-./afon.sh -a aws-secrets -- push --env <env> --tag <tag>        # stores config-<env>, tagged with <tag>
-./afon.sh -a aws-secrets -- list --env <env>                    # lists the snapshots of the env
-./afon.sh -a aws-secrets -- pull --env <env> --tag <tag>        # writes the snapshot back to config-<env>
-./afon.sh -a aws-secrets -- pull --env <env> --tag <tag> --force  # overwrites the files if config-<env> is not empty
-./afon.sh -a aws-secrets -- delete --env <env> --tag <tag>      # removes the snapshot, recoverable for 30 days
+afon-cli.sh config-vault push <tag> -e <env>                # stores config-<env>, tagged with <tag>
+afon-cli.sh config-vault list -e <env>                      # lists the snapshots of the env
+afon-cli.sh config-vault pull <tag> -e <env>                # writes the missing files of the snapshot to config-<env>
+afon-cli.sh config-vault pull <tag> -e <env> -- --force     # also overwrites the files of config-<env> that differ
+afon-cli.sh config-vault delete <tag> -e <env>              # removes the snapshot, recoverable for 30 days
 ```
-The `<tag>` is free-form text without spaces, eg a release, a git tag or a name, of letters, digits and
-`/ _ + = . @ -`, as AWS allows no others.  If not given, it is the git commit hash of the current branch of the afon
-checkout, for `pull` and `delete` as well as `push`.
+The env is the global one of `afon.sh` or `afon-cli.sh`: `--env`, `--config-env`, or `AFON_ENV`, which also switch
+the `config` symlink to `config-<env>`.  Without one, it is the env that `config` currently points to.  Likewise the afon home is the global `--home` or `AFON_HOME`.
+
+The `<tag>` is the arg after `push`, `pull` and `delete`, and is required by them, so that each snapshot has a tag that is easy to retrieve it by.  It is free-form text without spaces, eg a release, a git tag or a name, of letters, digits and `/ _ + = . @ -`, as AWS allows no others.
+
+`pull` compares the files of the snapshot with those of `config-<env>`, and reports those that differ and those that
+are missing.  If only some are missing, it writes them.  If any differ, it stops without writing anything, unless
+given `--force`, which overwrites them.  If none differ or are missing, it leaves `config-<env>` untouched.  Config files that the snapshot does not have are
+left alone.  With `--dry-run` it only reports.
 
 Each snapshot is one secret `afon/<env>/<tag>` holding all the config files, empty ones included, and tagged with
-`afon:env`, `afon:tag` and `afon:git-commit`, the commit of the current branch when it was pushed.  Pushing again
-with the same tag needs `--force`, which replaces the snapshot, and `delete --force` deletes it at once, without the
-recovery window.  Add `--dry-run` to see what would be done.
+`afon:env` and `afon:tag`.  Pushing again with the same tag needs `--force`, which replaces the snapshot, and
+`delete --force` deletes it at once, without the recovery window.  Add `--dry-run` to see what would be done.  With `afon.sh`, these options of the script go after a `--`, as `afon.sh` does not take them for its own.
 
-It needs the `aws` CLI, logged in with the `secretsmanager` permissions to create, update, tag, list, read and delete
-secrets, `git` and `jq`.  The region is `--region`, else the default of the `aws` CLI, as `pull` may run before
+It needs the `aws` CLI, logged in with the `secretsmanager` permissions to create, update, tag, list, read and delete secrets, and `jq`.  The region is `--region`, else the default of the `aws` CLI, as `pull` may run before
 there is any afon config to read it from.
 
 ### Command config-status

@@ -30,6 +30,7 @@ public class GenerateScriptMains {
         new ScriptEntry("config", "ConfigImportMain", "config/import.sh"),
         new ScriptEntry("config", "ConfigRenamesMain", "config/renames.sh"),
         new ScriptEntry("config", "ConfigUserMain", "config/user.sh"),
+        new ScriptEntry("config", "ConfigVaultMain", "config/vault.sh"),
 
         new ScriptEntry("cdktf", "CdktfInitMain", "cdktf/init.sh"),
         new ScriptEntry("cdktf", "CdktfStatusMain", "cdktf/status.sh"),
@@ -49,7 +50,6 @@ public class GenerateScriptMains {
         new ScriptEntry("aws", "AwsLoginMain", "aws/login.sh"),
         new ScriptEntry("aws", "AwsMountDataMain", "aws/mount-data.sh"),
         new ScriptEntry("aws", "AwsPolarisMain", "aws/polaris.sh"),
-        new ScriptEntry("aws", "AwsSecretsMain", "aws/secrets.sh"),
         new ScriptEntry("aws", "AwsSnowflakeMain", "aws/snowflake.sh"),
         new ScriptEntry("aws", "AwsUpdateKubeConfigMain", "aws/update-kube-config.sh"),
         new ScriptEntry("aws", "AwsVpcsMain", "aws/vpcs.sh"),
