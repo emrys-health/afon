@@ -24,7 +24,6 @@ A data partner can either host their own Polaris catalog (or compatible iceberg 
 # How to use this repository
 
 If you are looking to deploy the data fabric, the easiest way to do so is through the CLI.  We assume this is the default position.
-If you would like to contribute or explore the codebase in more depth, please see the [contributing guide](./CONTRIBUTING.md).
 
 ## For a host 
 
