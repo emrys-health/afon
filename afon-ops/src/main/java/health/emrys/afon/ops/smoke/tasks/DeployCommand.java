@@ -21,7 +21,7 @@ public class DeployCommand extends CliCommand {
     }
 
     @Override
-    ExecResult run(String command) throws IOException, InterruptedException, ApiException, TimeoutException {
-        return client.execInDeployment("default", deployment, container, command.split("\\s+"));
+    ExecResult run(String[] command) throws IOException, InterruptedException, ApiException, TimeoutException {
+        return client.execInDeployment("default", deployment, container, command);
     }
 }
