@@ -2,8 +2,10 @@ package health.emrys.afon.ops.smoke;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import org.slf4j.Logger;
@@ -24,6 +26,9 @@ import java.util.concurrent.TimeoutException;
 
 import static health.emrys.afon.cdk.JupyterHubConfig.HUB_LABELS;
 import static health.emrys.afon.cdk.JupyterHubConfig.HUB_PORT;
+import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperty.USER_ID;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 
 /**
  * Asks JupyterHub to spawn a user's single-user notebook pod via the hub's REST API, reached through a
@@ -71,26 +76,29 @@ public class JupyterHubSpawnSmoke {
         String hubPod = findHubPod();
         try (PortForwardSmoke forward = new PortForwardSmoke(client, namespace, hubPod, 0, HUB_PORT)) {
             String userUrl = "http://localhost:" + forward.localPort() + "/hub/api/users/"
-                    + URLEncoder.encode(username, StandardCharsets.UTF_8);
+                + URLEncoder.encode(username, StandardCharsets.UTF_8);
+            logger.info("Calling {} ", userUrl);
 
             if (send("GET", userUrl).statusCode() == 404) {
                 logger.info("User {} not known to the hub; creating", username);
                 expect(send("POST", userUrl), 201);
             }
 
-            HttpResponse<String> started = send("POST", userUrl + "/server");
+            String               server     = userUrl + "/server";
+            logger.info("Calling {} ", server);
+            HttpResponse<String> started = send("POST", server);
             switch (started.statusCode()) {
                 case 201 -> logger.info("Server for {} started", username);
                 case 202 -> logger.info("Server for {} is spawning", username);
                 case 400 -> logger.info("Server for {} not started: {}", username, started.body());
-                default  -> expect(started, 201, 202);
+                default -> expect(started, 201, 202);
             }
 
             awaitReady(userUrl, username, timeout);
         }
         String pod = findUserPod(username)
-                .orElseThrow(() -> new IllegalStateException("Hub reports server for " + username
-                        + " as ready but no pod is annotated " + USERNAME_ANNOTATION + "=" + username));
+            .orElseThrow(() -> new IllegalStateException("Hub reports server for " + username
+                                                             + " as ready but no pod is annotated " + USERNAME_ANNOTATION + "=" + username));
         logger.info("User {} has notebook pod {}/{}", username, namespace, pod);
         return pod;
     }
@@ -107,11 +115,11 @@ public class JupyterHubSpawnSmoke {
             }
             if (server.isMissingNode()) {
                 throw new IllegalStateException("Hub has no server for " + username
-                        + "; the spawn failed (see the hub logs). User: " + response.body());
+                                                    + "; the spawn failed (see the hub logs). User: " + response.body());
             }
             if (Instant.now().isAfter(deadline)) {
                 throw new TimeoutException("Server for " + username + " not ready within " + timeout
-                        + ". Pending: " + server.path("pending").asText());
+                                               + ". Pending: " + server.path("pending").asText());
             }
             logger.info("Waiting for server for {} (pending: {})", username, server.path("pending").asText());
             Thread.sleep(POLL_INTERVAL.toMillis());
@@ -130,13 +138,14 @@ public class JupyterHubSpawnSmoke {
     }
 
     private static void expect(HttpResponse<String> response, int... statusCodes) {
+        int actual = response.statusCode();
         for (int code : statusCodes) {
-            if (response.statusCode() == code) {
+            if (actual == code) {
                 return;
             }
         }
         throw new IllegalStateException(response.request().method() + " " + response.uri() + " returned "
-                + response.statusCode() + ": " + response.body());
+                                            + actual + ": " + response.body());
     }
 
     private String findHubPod() throws ApiException {
@@ -162,32 +171,14 @@ public class JupyterHubSpawnSmoke {
     }
 
     public static void main(String[] args) throws Exception {
-        String   namespace = "default";
-        Duration timeout   = Duration.ofMinutes(5);
-        String   username  = null;
+        FilePropertyProvider properties = new FilePropertyProvider();
+        KeyCloakProvider     keyCloak   = new KeyCloakProvider(properties);
 
-        for (int i = 0; i < args.length; i++) {
-            switch (args[i]) {
-                case "-n", "--namespace" -> namespace = requireValue(args, ++i);
-                case "-t", "--timeout" -> timeout = Duration.ofSeconds(Long.parseLong(requireValue(args, ++i)));
-                default -> {
-                    if (username != null) {
-                        throw new IllegalArgumentException("Unexpected argument '" + args[i] + "'. " + USAGE);
-                    }
-                    username = args[i];
-                }
-            }
-        }
-        if (username == null) {
-            throw new IllegalArgumentException(USAGE);
-        }
-        String apiToken = System.getenv("JUPYTERHUB_API_TOKEN");
-        if (apiToken == null || apiToken.isBlank()) {
-            throw new IllegalArgumentException("JUPYTERHUB_API_TOKEN must be set. " + USAGE);
-        }
-
-        try (KubeClient client = new KubeClient(new OpsPropertyProvider())) {
-            String pod = new JupyterHubSpawnSmoke(client, namespace, apiToken).spawn(username, timeout);
+        String user  = properties.getValue(USER_ID);
+        String token = keyCloak.getTokenFor(KEYCLOAK_REALM, user, properties.getValue(POLARIS_SECRET));
+        logger.info("token = {}", token);
+        try (KubeClient client = new KubeClient(properties)) {
+            String pod = new JupyterHubSpawnSmoke(client, "default", token).spawn(user, Duration.ofMinutes(5));
             System.out.println(pod);
         }
     }

@@ -220,7 +220,11 @@ public class KeyCloakProvider implements IdentityProvider {
      */
     @Override
     public String getToken(String realm) throws IOException {
-        if (adminUsername == null || adminUsername.isBlank() || adminPassword == null || adminPassword.isBlank()) {
+        return getTokenFor(realm, adminUsername, adminPassword);
+    }
+
+    public String getTokenFor(String realm, String username, String password) throws IOException {
+        if (username == null || username.isBlank() || password == null || password.isBlank()) {
             throw new IllegalStateException(format(
                 "No KeyCloak bootstrap admin credentials to authenticate against realm '%s': set "
                     + "KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME and KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD", realm));
@@ -230,8 +234,8 @@ public class KeyCloakProvider implements IdentityProvider {
         return restClient.postForm(path, Map.of(
             "grant_type", "password",
             "client_id", "admin-cli",
-            "username", adminUsername,
-            "password", adminPassword
+            "username", username,
+            "password", password
         ), HttpResponses::parseAccessToken);
     }
 
