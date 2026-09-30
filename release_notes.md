@@ -1,5 +1,34 @@
 # Release Notes
 
+## 1.0-beta-6
+
+### Upgrade notes
+
+**IMPORTANT:** one-off steps when upgrading from 1.0-beta-5:
+
+- **User config ([#231](https://github.com/emrys-health/afon-core/issues/231)):** run once, in each config env:
+  ```shell
+  afon-cli.sh config-user
+  ```
+  It updates the user config, renaming `USER_POLARIS_ID` to `USER_ID`, and drops `USER_POLARIS_SECRET` and
+  `USER_POLARIS_EMAIL`, which are now looked up from `users.csv`.  It can then be rerun any time to show the configured
+  user.
+- **Per-stack state ([#232](https://github.com/emrys-health/afon-core/issues/232)):** stacks are now deployed per stack
+  id, each with its own plan and tofu state, e.g. `stacks/aws-keycloak` and `terraform.aws-keycloak.tfstate`, rather
+  than per cloud.  A stack deployed with 1.0-beta-5 or earlier is the *legacy stack* of its cloud, so the first `deploy`
+  or `setup` in each cloud, and each cdktf env, stops and asks to delete it: rerun with `--replace`, or run
+  `manage-stack delete <stack-id>` first.  See
+  [upgrading to per-stack state](docs/stacks.md#upgrading-to-per-stack-state-one-off).
+- **AWS resource names ([#232](https://github.com/emrys-health/afon-core/issues/232)):** AWS resources are now named
+  from `<stack-type>-<CLUSTER_NAME>`, e.g. `keycloak-emrys-cluster`, so the first deploy recreates them.  The AWS
+  scripts acting on a stack now take its type, e.g. `afon-cli.sh aws-cluster keycloak`.
+- **Conflicting stacks ([#238](https://github.com/emrys-health/afon-core/issues/238)):** `deploy` and `setup` no longer
+  delete other running stacks they conflict with, unless given `--replace`, and `delete <stack-id>` deletes just that
+  stack (`delete aws-all` deletes every AWS stack).  `aws-keycloak` and `aws-polaris` can run side by side, as can
+  `aws-full` with `AWS_KEYCLOAK_EXTERNAL=true` (a new, optional property in `afon-aws.properties`).  Some step names
+  changed, e.g. `delete_stacks_conflicting_with_<stack-id>` and `deploy_complete_for_<stack-id>`, so check them before
+  resuming a run from a step.
+
 ## 1.0-beta-5
 
 **Milestone:** [1.0-beta-5](https://github.com/emrys-health/afon-core/milestone/5)
