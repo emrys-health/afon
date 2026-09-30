@@ -2,14 +2,13 @@ package health.emrys.afon.ops.smoke;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.FileUserProvider;
-import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.smoke.tasks.CliCommand;
 import health.emrys.afon.ops.smoke.tasks.DeployCommand;
-import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import org.slf4j.Logger;
@@ -31,9 +30,7 @@ import java.util.concurrent.TimeoutException;
 
 import static health.emrys.afon.cdk.JupyterHubConfig.HUB_LABELS;
 import static health.emrys.afon.cdk.JupyterHubConfig.HUB_PORT;
-import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 import static health.emrys.afon.config.AfonProperty.USER_ID;
-import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 
 /**
  * Asks JupyterHub to spawn a user's single-user notebook pod via the hub's REST API, reached through a
@@ -62,34 +59,55 @@ public class JupyterHubSpawnSmoke {
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
 
+    public static void main(String[] args) throws Exception {
+        FilePropertyProvider properties = new FilePropertyProvider();
+        try (KubeClient client = new KubeClient(properties)) {
+            JupyterHubSpawnSmoke app = new JupyterHubSpawnSmoke(client, "default");
+            app.spawnWithJupyterToken(properties);
+        }
+    }
+
     private final KubeClient   client;
     private final String       namespace;
-    private final String       apiToken;
     private final HttpClient   http   = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public JupyterHubSpawnSmoke(KubeClient client, String namespace, String apiToken) {
+    public JupyterHubSpawnSmoke(KubeClient client, String namespace) {
         this.client    = client;
         this.namespace = namespace;
-        this.apiToken  = apiToken;
+    }
+
+    private void spawnWithJupyterToken(AfonPropertyProvider properties) throws Exception {
+        String     email  = findEmailFor(properties.getValue(USER_ID));
+        ExecResult result = getJupyterTokenFor(email, client);
+        if (result.isSuccess()) {
+            String token = result.stdout().strip();
+            logger.info("JupyterHub Token: {}", token);
+            String pod = spawn(email, Duration.ofMinutes(5), token);
+            logger.info("Pod {} running", pod);
+        } else {
+            String msg = "Could not get token. Error: " + result.stderr();
+            logger.error(msg);
+            throw new Exception(msg);
+        }
     }
 
     /**
      * @return the name of the user's notebook pod once the hub reports their server as ready.
      */
-    public String spawn(String email, Duration timeout) throws Exception {
+    private String spawn(String email, Duration timeout, String apiToken) throws Exception {
         String hubPod = findHubPod();
         try (PortForwardSmoke forward = new PortForwardSmoke(client, namespace, hubPod, 0, HUB_PORT)) {
             String userUrl = "http://localhost:" + forward.localPort() + "/hub/api/users/"
                 + URLEncoder.encode(email, StandardCharsets.UTF_8);
 
-            if (send("GET", userUrl).statusCode() == 404) {
+            if (send("GET", userUrl, apiToken).statusCode() == 404) {
                 logger.info("User {} not known to the hub; creating", email);
-                expect(send("POST", userUrl), 201);
+                expect(send("POST", userUrl, apiToken), 201);
             }
 
             String               server  = userUrl + "/server";
-            HttpResponse<String> started = send("POST", server);
+            HttpResponse<String> started = send("POST", server, apiToken);
             switch (started.statusCode()) {
                 case 201 -> logger.info("Server for {} started", email);
                 case 202 -> logger.info("Server for {} is spawning", email);
@@ -97,7 +115,7 @@ public class JupyterHubSpawnSmoke {
                 default -> expect(started, 201, 202);
             }
 
-            awaitReady(userUrl, email, timeout);
+            awaitReady(userUrl, email, timeout, apiToken);
         }
         String pod = findUserPod(email)
             .orElseThrow(() -> new IllegalStateException("Hub reports server for " + email
@@ -106,7 +124,7 @@ public class JupyterHubSpawnSmoke {
         return pod;
     }
 
-    private static String findEmailFor(String username) throws Exception {
+    private String findEmailFor(String username) throws Exception {
         FileUserProvider users = new FileUserProvider();
         String email = users
             .getUsers()
@@ -118,10 +136,10 @@ public class JupyterHubSpawnSmoke {
         return email;
     }
 
-    private void awaitReady(String userUrl, String username, Duration timeout) throws Exception {
+    private void awaitReady(String userUrl, String username, Duration timeout, String apiToken) throws Exception {
         Instant deadline = Instant.now().plus(timeout);
         while (true) {
-            HttpResponse<String> response = send("GET", userUrl);
+            HttpResponse<String> response = send("GET", userUrl, apiToken);
             expect(response, 200);
             JsonNode server = mapper.readTree(response.body()).path("servers").path("");
             if (server.path("ready").asBoolean(false)) {
@@ -141,7 +159,7 @@ public class JupyterHubSpawnSmoke {
         }
     }
 
-    private HttpResponse<String> send(String method, String url) throws IOException, InterruptedException {
+    private HttpResponse<String> send(String method, String url, String apiToken) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                                          .timeout(Duration.ofSeconds(30))
                                          .header("Authorization", "token " + apiToken)
@@ -185,28 +203,15 @@ public class JupyterHubSpawnSmoke {
         return podLabels != null && podLabels.entrySet().containsAll(labels.entrySet());
     }
 
-    public static void main(String[] args) throws Exception {
-        FilePropertyProvider properties = new FilePropertyProvider();
-        try (KubeClient client = new KubeClient(properties)) {
-            String email = findEmailFor(properties.getValue(USER_ID));
-            CliCommand command = new DeployCommand(client,
-                                                   "hub-deployment",
-                                                   "hub",
-                                                   "jupyterhub token --config /etc/jupyterhub/jupyterhub_config.py " + email);
-            List<ExecResult> results = command.run();
-            assert results.size() == 1;
-            ExecResult result = results.get(0);
-            if (result.isSuccess()) {
-                String token = result.stdout().strip();
-                logger.info("JupyterHub Token: {}", token);
-                String pod = new JupyterHubSpawnSmoke(client, "default", token).spawn(email, Duration.ofMinutes(5));
-                logger.info("Pod {} running", pod);
-            } else {
-                String msg = "Could not get token. Error: " + result.stderr();
-                logger.error(msg);
-                throw new Exception(msg);
-            }
-        }
+    private ExecResult getJupyterTokenFor(String email, KubeClient client) throws Exception {
+        CliCommand command = new DeployCommand(client,
+                                               "hub-deployment",
+                                               "hub",
+                                               "jupyterhub token --config /etc/jupyterhub/jupyterhub_config.py " + email);
+        List<ExecResult> results = command.run();
+        assert results.size() == 1;
+        ExecResult result = results.get(0);
+        return result;
     }
 
 }
