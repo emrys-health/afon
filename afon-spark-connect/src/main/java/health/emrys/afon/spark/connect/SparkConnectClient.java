@@ -2,6 +2,8 @@ package health.emrys.afon.spark.connect;
 
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -15,8 +17,6 @@ import java.util.Map;
 import static health.emrys.afon.config.AfonProperty.OIDC_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonProperty.SPARK_CONNECT_URL;
-import static health.emrys.afon.config.AfonProperty.USER_POLARIS_ID;
-import static health.emrys.afon.config.AfonProperty.USER_POLARIS_SECRET;
 
 /**
  * A thin client for the <a href="https://spark.apache.org/spark-connect/">Spark Connect</a> server
@@ -48,11 +48,15 @@ public class SparkConnectClient {
     private final String token;
 
     /**
-     * Authenticates as the {@link AfonProperty#USER_POLARIS_ID} user, whose OIDC token is obtained
-     * from KeyCloak.
+     * Authenticates as the configured user, from users.csv, named by {@link AfonProperty#USER_ID},
+     * whose OIDC token is obtained from KeyCloak.
      */
     public SparkConnectClient(AfonPropertyProvider properties) throws IOException {
-        this(properties, userToken(properties));
+        this(properties, new FileUserProvider().getConfiguredUser(properties));
+    }
+
+    public SparkConnectClient(AfonPropertyProvider properties, AfonUser user) throws IOException {
+        this(properties, userToken(properties, user));
     }
 
     public SparkConnectClient(AfonPropertyProvider properties, String token) {
@@ -62,9 +66,8 @@ public class SparkConnectClient {
         this.token = token;
     }
 
-    private static String userToken(AfonPropertyProvider properties) throws IOException {
-        return new KeyCloakProvider(properties.getValue(OIDC_DOMAIN_NAME)).userToken(properties.getValue(USER_POLARIS_ID),
-                                                          properties.getValue(USER_POLARIS_SECRET));
+    private static String userToken(AfonPropertyProvider properties, AfonUser user) throws IOException {
+        return new KeyCloakProvider(properties.getValue(OIDC_DOMAIN_NAME)).userToken(user.username(), user.password());
     }
 
     /**

@@ -1,6 +1,7 @@
 package health.emrys.afon.spark;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.junit.jupiter.api.Test;
 
@@ -14,14 +15,13 @@ class KeyCloakSparkWarehouseConfigTest {
     private static final String CLIENT_ID     = "a_client";
     private static final String CLIENT_SECRET = "***REMOVED***";
 
-    private final SparkWarehouseConfig config = new KeyCloakSparkWarehouseConfig(properties());
+    private final SparkWarehouseConfig config = new KeyCloakSparkWarehouseConfig(properties(),
+                                                         AfonUserProvider.createUser(CLIENT_ID, CLIENT_SECRET));
 
     private static AfonPropertyProvider properties() {
         AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
         properties.setValue(POLARIS_ENDPOINT, "polaris.example.com");
         properties.setValue(OIDC_DOMAIN_NAME, "keycloak.example.com");
-        properties.setValue(USER_POLARIS_ID, CLIENT_ID);
-        properties.setValue(USER_POLARIS_SECRET, CLIENT_SECRET);
         return properties;
     }
 

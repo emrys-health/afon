@@ -2,6 +2,7 @@ package health.emrys.afon.spark;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import org.jspecify.annotations.NonNull;
 
@@ -20,8 +21,8 @@ import static java.lang.String.format;
  *
  * <p>This overrides {@link #catalogConfigs(String, String)} to add the {@code oauth2-server-uri} pointing at
  * KeyCloak and to request the {@code openid} scope - KeyCloak rejects Polaris' "PRINCIPAL_ROLE:ALL"
- * scope (and Iceberg's default "catalog") with invalid_scope. The credentials passed to the
- * superclass must identify a client KeyCloak knows about.
+ * scope (and Iceberg's default "catalog") with invalid_scope. The credentials are those of the given
+ * {@link AfonUser}, which KeyCloak knows as a confidential client of the same name and secret.
  */
 public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
 
@@ -33,11 +34,11 @@ public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
 
     private final String oauth2ServerUri;
 
-    KeyCloakSparkWarehouseConfig(AfonPropertyProvider properties) {
+    KeyCloakSparkWarehouseConfig(AfonPropertyProvider properties, AfonUser user) {
         super(properties.getValue(POLARIS_ENDPOINT),
                 protocolFor(properties.getValue(POLARIS_ENDPOINT)),
-                properties.getValue(USER_POLARIS_ID),
-                properties.getValue(USER_POLARIS_SECRET),
+                user.username(),
+                user.password(),
                 new AfonCatalogs(properties)
         );
         this.oauth2ServerUri = kcUriFor(properties.getValue(OIDC_DOMAIN_NAME));

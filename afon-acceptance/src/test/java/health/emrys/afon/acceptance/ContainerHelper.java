@@ -3,7 +3,9 @@ package health.emrys.afon.acceptance;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
@@ -109,9 +111,7 @@ public class ContainerHelper {
                         properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
                         properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD)));
             identityProvider
-                .registerPolarisUser(AfonUserProvider.createUser(
-                            properties.getValue(USER_POLARIS_ID),
-                            properties.getValue(USER_POLARIS_SECRET)));
+                .registerPolarisUser(new FileUserProvider().getConfiguredUser(properties));
             identityProvider
                 .registerPolarisUser(AfonUserProvider.createUser(
                         properties.getValue(POLARIS_ID),
@@ -163,10 +163,11 @@ public class ContainerHelper {
                 polaris.withEnv(envName, properties.getValue(property));
             });
             // Make Polaris authenticate against KeyCloak (OIDC) instead of its internal token store.
+            AfonUser user = new FileUserProvider().getConfiguredUser(properties);
             polarisOidcEnv(
                     internalRealmUrl(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL),
-                    properties.getValue(USER_POLARIS_ID),
-                    properties.getValue(USER_POLARIS_SECRET)).forEach(polaris::withEnv);
+                    user.username(),
+                    user.password()).forEach(polaris::withEnv);
             Map.of(
                             "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL", "DEBUG",
                             "QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL", "DEBUG",

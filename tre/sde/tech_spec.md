@@ -240,6 +240,11 @@ After the config files are completed (or imported) you can validate them for a g
 afon-cli.sh config-validate -c <cloud>
 ```
 
+You can also check the configured user, named by `USER_ID`, which clients authenticate as:
+```shell
+afon-cli.sh config-user
+```
+
 ## Create cloud env
 
 ```md

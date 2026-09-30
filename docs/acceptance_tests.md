@@ -93,6 +93,10 @@ config file, named after the file:
 base64 is used so that multi-line values such as `SNOWFLAKE_PRIVATE_KEY` and
 `GOOGLE_APPLICATION_CREDENTIALS` survive the round trip byte for byte.
 
+The `USER_ID` in `secret.properties` must name one of the users in `users.csv`, which the tests authenticate as,
+with its password read from there.  Check it with `./afon.sh -a config-user`
+(see [config-user](configuration.md#command-config-user)) before publishing.
+
 Publish them from a local config dir using action `github-secrets`:
 ```shell
 ./afon.sh -a github-secrets

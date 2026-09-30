@@ -32,7 +32,9 @@ exist before checking privileges, so reading a table in an empty catalog would n
 
 - A deployed AWS full stack, and a `kubectl` context pointing at its cluster.
 - In `$AFON_HOME/config` (default `~/.afon/config`): `AWS_POLARIS_DOMAIN_NAME`, `OIDC_DOMAIN_NAME`,
-  `USER_POLARIS_ID` and `USER_POLARIS_SECRET`. The test runs as the `USER_POLARIS_ID` user.
+  and `USER_ID`, naming one of the users in [users.csv](configuration.md), whose password is read from there.
+  The test runs as the `USER_ID` user, which you can check with `./afon.sh -a config-user`
+  (see [config-user](configuration.md#command-config-user)).
 - [users-acl.csv](configuration.md) authorising the test user for `AFON_CATALOG` (default `aws`), but not for
   `AFON_FORBIDDEN_CATALOG` (default `aws_forbidden`). Other users may be authorised for any catalog, as each user has
   their own Polaris principal role. For example, testing as `will`:
@@ -63,7 +65,7 @@ smoke/run-oidc-notebook.sh [cloud]
 
 1. reads `<CLOUD>_POLARIS_DOMAIN_NAME` and `OIDC_DOMAIN_NAME` from `$AFON_HOME/config/*.properties`, for the notebook;
 2. checks that OIDC provider is serving requests, with `./afon.sh -a check-oidc`, failing fast if it is not;
-3. gets the OIDC access token of `USER_POLARIS_ID` from OIDC provider, with `./afon.sh -a show-oidc-token <cloud> user`;
+3. gets the OIDC access token of `USER_ID` from OIDC provider, with `./afon.sh -a show-oidc-token <cloud> user`;
 4. port-forwards `pod/spark-connector-0-driver` on port 15002, via the current `kubectl` context;
 5. runs the notebook with `./afon.sh -a jupyter-execute` (see [scripts/jupyter/execute.sh](../scripts/jupyter/execute.sh));
 6. stops the port-forward, whether the run passed or failed.
@@ -118,6 +120,6 @@ The notebook reads these environment variables, all optional apart from `OIDC_TO
 ## Other smoke tests
 
 - `./afon.sh -a exec -ec ops.smoke.SparkConnectSmoke -ea aws` reads the setup table through Spark Connect from Java,
-  with an OIDC token for `USER_POLARIS_ID` (see `SparkConnectClient`).
+  with an OIDC token for `USER_ID` (see `SparkConnectClient`).
 - `ops.demo.GeneratePySparkKeycloakMain` and `ops.demo.GeneratePySparkContextMain` generate PySpark code declaring
   all the configured catalogs, authenticated with `OIDC_TOKEN`, to paste into a notebook.

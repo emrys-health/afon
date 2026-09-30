@@ -29,6 +29,7 @@ public class GenerateScriptMains {
         new ScriptEntry("config", "ConfigExportMain", "config/export.sh"),
         new ScriptEntry("config", "ConfigImportMain", "config/import.sh"),
         new ScriptEntry("config", "ConfigRenamesMain", "config/renames.sh"),
+        new ScriptEntry("config", "ConfigUserMain", "config/user.sh"),
 
         new ScriptEntry("cdktf", "CdktfInitMain", "cdktf/init.sh"),
         new ScriptEntry("cdktf", "CdktfStatusMain", "cdktf/status.sh"),
