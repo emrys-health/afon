@@ -48,6 +48,7 @@ public class GuacamoleDBSmoke {
                 }
             }
         }
+        logger.info("No {} in table {} at {}", guacadmin, table, url);
     }
 
 }
