@@ -66,7 +66,7 @@ public abstract class JupyterHubConfig {
 
     private static final Logger logger = getLogger(JupyterHubConfig.class);
 
-    private static final int HUB_PORT        = 8081;
+    public static final int HUB_PORT         = 8081;
     private static final int PROXY_PUBLIC    = 8000;
     private static final int PROXY_API       = 8001;
     /**
@@ -132,7 +132,7 @@ public abstract class JupyterHubConfig {
      * to reach the hub. A single-user server that cannot reach the hub fails to register and the
      * spawn times out, so this peer is mandatory, not optional.
      */
-    static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
+    public static final Map<String, String> HUB_LABELS   = Map.of("app", "jupyterhub-hub");
     private static final   Map<String, String> PROXY_LABELS      = Map.of("app", "jupyterhub-proxy");
     /**
      * Selector for the pods KubeSpawner spawns, matching the labels it stamps on them.
