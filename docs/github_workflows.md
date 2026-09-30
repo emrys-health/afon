@@ -6,7 +6,8 @@ The [Stack AWS (Linux)](../.github/workflows/aws-stack-linux.yml) workflow runs 
 Run it from the Actions tab: it is `workflow_dispatch` only, with an `action` dropdown
 (`deploy`/`setup`/`delete`), a `stack_id` dropdown (`aws-full`/`aws-keycloak`/`aws-polaris`/`aws-all`, defaulting to
 `aws-full`) and a `from_step` to resume from (blank runs every step, starting with the teardown).
-`deploy` and `setup` tear down the running stacks that conflict with the stack, including itself, before rebuilding it,
+`deploy` and `setup` tear down the running stacks that conflict with the stack, including itself, before rebuilding it
+(the workflow runs `manage-stack` with `--replace`, so it replaces the other conflicting stacks too),
 and `setup` also configures it; `delete` tears it down and leaves it down — a later `deploy` or `setup` run is what
 brings it back.  `aws-keycloak` and `aws-polaris` run side by side, `aws-polaris` using the KeyCloak of `aws-keycloak`,
 while `aws-full` conflicts with both, see [stacks side by side](stacks.md#stacks-side-by-side).

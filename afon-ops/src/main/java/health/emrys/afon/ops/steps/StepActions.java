@@ -40,6 +40,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.*;
@@ -72,6 +73,7 @@ public class StepActions {
     void deleteStacksIn(AfonCloud cloud, StackFilter filter, int maxAttempts, OutputStream outputStream) throws IOException {
         checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
         List<String> stackNames = stackNamesIn(cloud, filter);
+        checkNoRefusal(filter, stackNames);
         if (stackNames.isEmpty()) {
             logger.info("No stack to delete in cloud {}, as selected by: {}", cloud, filter.description());
         }
@@ -86,6 +88,31 @@ public class StepActions {
                 deletePath(Path.of(kubeConfigPath(stackId)));
             }
         }
+    }
+
+    /**
+     * Checks, before deleting any, that none of the selected stacks must be kept, unless {@code --replace} is given.
+     * @throws IllegalStateException naming the stacks refused, and why
+     */
+    void checkNoRefusal(StackFilter filter, List<String> stackNames) {
+        List<StackFilter.Refusal> refusals = stackNames.stream().map(filter.refusal()).filter(Objects::nonNull).toList();
+        if (refusals.isEmpty()) {
+            return;
+        }
+        String deploying = filter.deploying() == null ? "the stack" : filter.deploying().toString();
+        String them = refusals.size() == 1 ? "it" : "them";
+        List<String> deleteCommands = refusals.stream().map(StackFilter.Refusal::deleteCommand)
+                                              .filter(Objects::nonNull).distinct().toList();
+        StringBuilder message = new StringBuilder(format("Cannot deploy %s, as %s.%n", deploying,
+            refusals.stream().map(StackFilter.Refusal::reason).collect(Collectors.joining(";\nand "))));
+        if (!deleteCommands.isEmpty()) {
+            message.append(format("To deploy %s, delete %s first:%n", deploying, them));
+            deleteCommands.forEach(command -> message.append(format("    %s%n", command)));
+            message.append(format("or rerun with --replace to delete %s as part of this run.", them));
+        } else {
+            message.append(format("To deploy %s, rerun with --replace to delete %s as part of this run.", deploying, them));
+        }
+        throw new IllegalStateException(message.toString());
     }
 
     /**
