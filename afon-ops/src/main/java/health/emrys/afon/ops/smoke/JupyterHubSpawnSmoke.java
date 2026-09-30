@@ -170,13 +170,9 @@ public class JupyterHubSpawnSmoke {
 
     public static void main(String[] args) throws Exception {
         FilePropertyProvider properties = new FilePropertyProvider();
-        KeyCloakProvider     keyCloak   = new KeyCloakProvider(properties);
-
-        String user  = properties.getValue(USER_ID);
-        String token = keyCloak.getTokenFor(KEYCLOAK_REALM, user, properties.getValue(POLARIS_SECRET));
-        logger.info("token = {}", token);
+        String token = args[0];
         try (KubeClient client = new KubeClient(properties)) {
-            String pod = new JupyterHubSpawnSmoke(client, "default", token).spawn(user, Duration.ofMinutes(5));
+            String pod = new JupyterHubSpawnSmoke(client, "default", token).spawn("will@emrys.health", Duration.ofMinutes(5));
             System.out.println(pod);
         }
     }
