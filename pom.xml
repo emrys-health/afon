@@ -351,7 +351,9 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.4</version>
                     <configuration>
-                        <argLine>${afon.jvm} ${afon.slf4j}</argLine>
+                        <!-- -Xshare:off, as Mockito's inline mock maker self-attaches an agent that appends to the
+                             bootstrap classpath, which makes the JVM warn on stderr that class data sharing is limited. -->
+                        <argLine>${afon.jvm} ${afon.slf4j} -Xshare:off</argLine>
                         <!-- By default (since surefire 3.4.0) all user properties (mvn -D...) are also
                              promoted to system properties of the forked JVM. Any that are also set in
                              systemPropertyVariables (or argLine) are then reported as overwritten or
