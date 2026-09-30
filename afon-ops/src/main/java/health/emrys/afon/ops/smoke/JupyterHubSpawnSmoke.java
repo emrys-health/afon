@@ -77,15 +77,13 @@ public class JupyterHubSpawnSmoke {
         try (PortForwardSmoke forward = new PortForwardSmoke(client, namespace, hubPod, 0, HUB_PORT)) {
             String userUrl = "http://localhost:" + forward.localPort() + "/hub/api/users/"
                 + URLEncoder.encode(username, StandardCharsets.UTF_8);
-            logger.info("Calling {} ", userUrl);
 
             if (send("GET", userUrl).statusCode() == 404) {
                 logger.info("User {} not known to the hub; creating", username);
                 expect(send("POST", userUrl), 201);
             }
 
-            String               server     = userUrl + "/server";
-            logger.info("Calling {} ", server);
+            String               server  = userUrl + "/server";
             HttpResponse<String> started = send("POST", server);
             switch (started.statusCode()) {
                 case 201 -> logger.info("Server for {} started", username);
@@ -133,7 +131,7 @@ public class JupyterHubSpawnSmoke {
                                          .method(method, HttpRequest.BodyPublishers.noBody())
                                          .build();
         HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-        logger.debug("{} {} -> {} {}", method, url, response.statusCode(), response.body());
+        logger.info("{} {} -> {} {}", method, url, response.statusCode(), response.body());
         return response;
     }
 
