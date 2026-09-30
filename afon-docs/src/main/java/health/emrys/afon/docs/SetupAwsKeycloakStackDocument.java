@@ -1,16 +1,13 @@
 package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.SetupAwsKeycloakStackMain;
-import health.emrys.afon.ops.steps.Step;
-import health.emrys.afon.ops.steps.StepOperations;
 
-import java.util.List;
+import static health.emrys.afon.ops.steps.StackAction.SETUP;
 
-public class SetupAwsKeycloakStackDocument extends AbstractDocument {
+public class SetupAwsKeycloakStackDocument extends AbstractStackDocument {
 
     public SetupAwsKeycloakStackDocument(AfonPropertyProvider properties) {
-        super(properties);
+        super(properties, SETUP, "aws-keycloak");
     }
 
     @Override
@@ -34,14 +31,9 @@ public class SetupAwsKeycloakStackDocument extends AbstractDocument {
             
             Generate and run cleanup script:
             ```shell
-            ./afon.sh -a exec --exec-class ops.GenerateCleanupScriptMain --exec-args aws
+            afon-cli.sh generate-cleanup-script aws-keycloak
             ```
             """);
-    }
-
-    @Override
-    public List<Step> steps(StepOperations stepOperations) {
-        return new SetupAwsKeycloakStackMain().stepsUsing(stepOperations);
     }
 
 }

@@ -6,6 +6,7 @@ import health.emrys.afon.cdk.azure.AzureCleanupHelper;
 import health.emrys.afon.cdk.gcp.GcpCleanupHelper;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.slf4j.Logger;
 
@@ -16,7 +17,8 @@ import java.util.Map;
 import static health.emrys.afon.config.ConfigUtils.afonHome;
 
 /**
- * Generate the CleanupHelper script for the given cloud.
+ * Generates the CleanupHelper script for the given stack, eg {@code aws-keycloak}, into
+ * {@code <afon.home>/<stack-id>-cleanup.sh}.
  */
 public class GenerateCleanupScriptMain {
     static final  Logger logger = org.slf4j.LoggerFactory.getLogger(GenerateCleanupScriptMain.class);
@@ -33,8 +35,12 @@ public class GenerateCleanupScriptMain {
         this.properties = properties;
     }
 
-    public void generateCleanupScript(AfonCloud cloud) {
-        invoke(CLOUD_TO_HELPER.get(cloud), String.format("%s/%s-cleanup.sh", afonHome(), cloud.name().toLowerCase()));
+    public void generateCleanupScript(StackId stackId) {
+        invoke(CLOUD_TO_HELPER.get(stackId.cloud()), stackId.toString(), cleanupScriptPath(stackId));
+    }
+
+    static String cleanupScriptPath(StackId stackId) {
+        return String.format("%s/%s-cleanup.sh", afonHome(), stackId);
     }
 
     private static void invoke(Class<?> target, String... args) {
@@ -55,14 +61,14 @@ public class GenerateCleanupScriptMain {
             String usage = String.format("""
                                         
                     Invalid arguments: '%s'
-                    usage:  %s requires argument: cloud
+                    usage:  %s requires argument: <stack-id>, eg aws-keycloak
                     """, String.join(" ", args), GenerateCleanupScriptMain.class.getSimpleName());
             logger.warn(usage);
             return;
         }
-        AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
+        StackId stackId = StackId.parse(args[0]);
         var properties = new OpsPropertyProvider();
-        new GenerateCleanupScriptMain(properties).generateCleanupScript(cloud);
+        new GenerateCleanupScriptMain(properties).generateCleanupScript(stackId);
     }
 
 

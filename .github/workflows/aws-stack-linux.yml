@@ -1,10 +1,13 @@
 name: AWS Stack (Linux)
 
-# Runs afon.sh's stack deploy or delete for AWS from the self-hosted Linux runner, ie
-# ops.DeployAwsFullStackMain or ops.DeleteAwsFullStackMain — the same entry points as docs/stacks.md.
+# Runs an action on an AWS stack from the self-hosted Linux runner, ie
+# `./afon.sh -a manage-stack <action> <stack-id> [<step>]` — the same command as docs/stacks.md.
 #
-# deploy run first delete against the stack that is currently up, and the run then recreates it.
-# delete just tears down the stack and leaves it down — a later deploy is what brings it back.
+# deploy and setup first delete the stacks that conflict with the stack, including itself if up, and then recreate
+# it; setup also configures it (the OIDC users and, with Polaris, the catalogs).  aws-keycloak and aws-polaris run
+# side by side, aws-polaris using the KeyCloak of aws-keycloak, while aws-full, with its own KeyCloak, conflicts
+# with both.  delete just tears down the stack and leaves it down — a later deploy or setup is what brings it back;
+# delete aws-all tears down every AWS stack that is up.
 # Either way there is a window of about hour or more where Polaris and Jupyter are unavailable.
 # Hence, workflow_dispatch only and never on push, but could be on a schedule.
 #
@@ -29,14 +32,20 @@ on:
       action:
         description: "Stack action to run"
         type: choice
-        options: [deploy, delete]
+        options: [deploy, setup, delete]
+        required: true
+      stack_id:
+        description: "Stack to act on"
+        type: choice
+        options: [aws-full, aws-keycloak, aws-polaris, aws-all]
+        default: aws-full
         required: true
       build_cli:
         description: "Build cli"
         type: boolean
         required: false
       from_step:
-        description: "deploy only: resume from this step, eg all_catalogs_in_emryspolaris (blank runs every step, starting with the teardown). Ignored by delete."
+        description: "Resume from this step, eg create_all_catalogs_for_cloud_aws (blank runs every step, starting with the teardown)"
         type: string
         default: ""
       config_env:
@@ -206,31 +215,34 @@ jobs:
       - name: Run the AWS stack action
         env:
           ACTION: ${{ inputs.action }}
-          # Blank runs every step; a step name (eg aws_spark) resumes from there, per docs/stacks.md.
-          # Only meaningful for deploy — DeleteAwsFullStackMain has a single step (clean_aws).
+          STACK_ID: ${{ inputs.stack_id }}
+          # Blank runs every step; a step name resumes from there, per docs/stacks.md.
           FROM_STEP: ${{ inputs.from_step }}
         run: |
           set -euo pipefail
-          # Using --logging-console INFO because a run this long is unreadable in the Actions log otherwise.
-          if [ "$ACTION" == "delete" ]; then
-            if [ -n "$FROM_STEP" ]; then
-              echo "::warning::from_step is ignored by delete"
-            fi
-            ./afon.sh -a exec --exec-class ops.DeleteAwsStackMain \
-               --logging-console INFO
-          else
-            if [ -n "$FROM_STEP" ]; then
-              echo "Deploy resumes from step $FROM_STEP"
-            fi
-            ./afon.sh -a exec --exec-class ops.DeployAwsFullStackMain \
-              --logging-console INFO --exec-args "$FROM_STEP"
+          ARGS=("$ACTION" "$STACK_ID")
+          if [ -n "$FROM_STEP" ]; then
+            echo "$ACTION of $STACK_ID resumes from step $FROM_STEP"
+            ARGS+=("$FROM_STEP")
           fi
+          # Using --logging-console INFO because a run this long is unreadable in the Actions log otherwise.
+          ./afon.sh -a manage-stack --logging-console INFO "${ARGS[@]}"
 
       - name: Report the cluster status
         if: always()
         continue-on-error: true
+        env:
+          STACK_ID: ${{ inputs.stack_id }}
         run: |
-          ./afon.sh -a script --script-path aws/vpcs.sh
+          # The cluster of each stack is named <stack-type>-<CLUSTER_NAME>, eg for stack_id aws-keycloak
+          if [ "$STACK_ID" == "aws-all" ]; then
+            STACK_TYPES="keycloak polaris full"
+          else
+            STACK_TYPES="${STACK_ID#aws-}"
+          fi
+          for STACK_TYPE in $STACK_TYPES; do
+            ./afon.sh -a aws-cluster "$STACK_TYPE"
+          done
           kubectl get pods -A
 
       - name: Upload stack logs

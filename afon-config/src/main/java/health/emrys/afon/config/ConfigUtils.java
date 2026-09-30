@@ -110,22 +110,66 @@ public class ConfigUtils {
     }
 
     /**
-     * Returns the stack dir located in {@link #afonCkdtf()}/stacks/{@link AfonCloud#name()}
+     * Returns the dir holding the stack dirs, located in {@link #afonCkdtf()}/stacks
      *
-     * @param cloud the {@link AfonCloud}
-     * @return the stack dir
+     * @return the stacks dir
      */
-    public static @NonNull String stackDir(AfonCloud cloud) {
-        return format("%s/stacks/%s", afonCkdtf(), cloud);
+    public static @NonNull String stacksDir() {
+        return format("%s/stacks", afonCkdtf());
     }
 
     /**
-     * Returns the tfState path located in {@link #afonCkdtf()}/terraform.{@link AfonCloud#name()}.tfstate
+     * Returns the stack dir located in {@link #stacksDir()}/{@link StackId}, eg {@code stacks/aws-keycloak}
      *
-     * @param cloud the {@link AfonCloud}
+     * @param stackId the {@link StackId}
      * @return the stack dir
      */
-    public static @NonNull String tfStatePath(AfonCloud cloud) {
+    public static @NonNull String stackDir(StackId stackId) {
+        return format("%s/%s", stacksDir(), stackId);
+    }
+
+    /**
+     * Returns the tfState path located in {@link #afonCkdtf()}/terraform.{@link StackId}.tfstate,
+     * eg {@code terraform.aws-keycloak.tfstate}
+     *
+     * @param stackId the {@link StackId}
+     * @return the tfState path
+     */
+    public static @NonNull String tfStatePath(StackId stackId) {
+        return format("%s/terraform.%s.tfstate", afonCkdtf(), stackId);
+    }
+
+    /**
+     * Returns the kubeconfig path located in {@link #afonCkdtf()}/kube/{@link StackId}.config,
+     * eg {@code kube/aws-keycloak.config}, which the stack's own kubectl and helm commands use,
+     * so that they never act on the cluster of another stack.
+     *
+     * @param stackId the {@link StackId}
+     * @return the kubeconfig path
+     */
+    public static @NonNull String kubeConfigPath(StackId stackId) {
+        return format("%s/kube/%s.config", afonCkdtf(), stackId);
+    }
+
+    /**
+     * Returns the legacy stack dir located in {@link #stacksDir()}/{@link AfonCloud}, shared by all the stacks
+     * of the cloud before each stack had its own, see {@link #stackDir(StackId)}.
+     *
+     * @param cloud the {@link AfonCloud}
+     * @return the legacy stack dir
+     */
+    public static @NonNull String legacyStackDir(AfonCloud cloud) {
+        return format("%s/%s", stacksDir(), cloud);
+    }
+
+    /**
+     * Returns the legacy tfState path located in {@link #afonCkdtf()}/terraform.{@link AfonCloud}.tfstate,
+     * shared by all the stacks of the cloud before each stack had its own, see {@link #tfStatePath(StackId)}.
+     *
+     * @param cloud the {@link AfonCloud}
+     * @return the legacy tfState path
+     */
+    public static @NonNull String legacyTfStatePath(AfonCloud cloud) {
         return format("%s/terraform.%s.tfstate", afonCkdtf(), cloud);
     }
 

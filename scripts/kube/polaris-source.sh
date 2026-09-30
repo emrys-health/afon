@@ -24,6 +24,8 @@
 # code is 0 whenever the status was established and 2 when it could not be verified, so that an
 # expired login or a missing tool is never mistaken for Polaris being down.
 
+# The cluster Polaris runs in, set before sourcing where it isn't $CLUSTER_NAME, eg on AWS <stack-type>-<CLUSTER_NAME>
+POLARIS_CLUSTER_NAME="${POLARIS_CLUSTER_NAME:-$CLUSTER_NAME}"
 POLARIS_OK=true
 POLARIS_CLUSTER_UP=false
 POLARIS_ANSWERING=false # whether Polaris answered the anonymous request
@@ -86,7 +88,7 @@ polaris_check_network() {
   if [ -n "$2" ]; then
     echo "- $1 found: $2"
   else
-    polaris_failed "No $1 found for cluster '$CLUSTER_NAME'"
+    polaris_failed "No $1 found for cluster '$POLARIS_CLUSTER_NAME'"
   fi
 }
 
@@ -96,12 +98,12 @@ polaris_get_credentials() {
   local cloud="$1" not_found="$2"
   shift 2
   if "$@" >/dev/null 2>"$POLARIS_ERR"; then
-    echo "- $cloud credentials obtained for $CLUSTER_NAME"
+    echo "- $cloud credentials obtained for $POLARIS_CLUSTER_NAME"
     POLARIS_CLUSTER_UP=true
   elif grep -qiE "$not_found" "$POLARIS_ERR"; then
-    polaris_failed "No $cloud cluster '$CLUSTER_NAME' found"
+    polaris_failed "No $cloud cluster '$POLARIS_CLUSTER_NAME' found"
   else
-    polaris_cannot_verify "- Could not get $cloud credentials for '$CLUSTER_NAME':"
+    polaris_cannot_verify "- Could not get $cloud credentials for '$POLARIS_CLUSTER_NAME':"
   fi
 }
 

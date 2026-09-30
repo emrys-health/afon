@@ -58,11 +58,14 @@ import health.emrys.afon.cdk.AbstractCloudProvider;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.constructs.Construct;
 
+import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -100,6 +103,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     private final String                     accountId;
     private final String                     region;
     private final String                     clusterName;
+    private final String                     kubeConfigPath;
     private final String                     clusterPolicyArn;
     private final EksCluster                 cluster;
     private final List<ITerraformDependable> eksDependOn;
@@ -116,11 +120,17 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     private final List<ITerraformDependable> lbcIrsaDependables = new ArrayList<>();
     private       KubernetesProvider         k8sProvider;
 
-    AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
+    /**
+     * @param pinnedEgressIp whether the egress IP is pinned to {@code AWS_EGRESS_IP}, if set, else a fresh one is
+     *                       allocated, as only one running stack can hold the pinned one
+     */
+    AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties, StackId stackId,
+                     boolean pinnedEgressIp) {
         super(scope, id);
-        cleanupHelper = new AwsCleanupHelper(properties);
-        componentNames = new AwsComponentNames(properties);
-        clusterName    = properties.getValue(AfonProperty.CLUSTER_NAME);
+        componentNames = new AwsComponentNames(properties, stackId);
+        cleanupHelper  = new AwsCleanupHelper(componentNames);
+        clusterName    = componentNames.getCluster();
+        kubeConfigPath = ConfigUtils.kubeConfigPath(stackId);
 
         // Every kubectl/helm local-exec in this stack — here, and in the shared Polaris/Jupyter/Spark/
         // Guacamole config classes constructed after it — runs against this file rather than the
@@ -168,7 +178,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .create(this, "vpcIgw")
             .vpcId(vpc.getId())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-igw-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getInternetGatewayName())).build();
 
         final Subnet publicSubnet1 = Subnet.Builder
             .create(this, "publicSubnet1")
@@ -179,7 +189,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .dependsOn(List.of(igw))
             .provisioners(uponDestroyRun(cleanupHelper.deleteLoadBalancersCommand()))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-public-1-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getPublicSubnetName(1))).build();
 
         final Subnet publicSubnet2 = Subnet.Builder
             .create(this, "publicSubnet2")
@@ -189,7 +199,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .mapPublicIpOnLaunch(true)
             .dependsOn(List.of(igw))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-public-2-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getPublicSubnetName(2))).build();
 
         final RouteTableRoute route = RouteTableRoute
             .builder()
@@ -203,7 +213,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .tags(Map.of(
                 "Name",
-                "cdktf-eks-public-rt-" + clusterName)).build();
+                componentNames.getPublicRouteTableName())).build();
 
         final RouteTableAssociation subnet1Association = RouteTableAssociation.Builder
             .create(this, "subnet1Association")
@@ -228,7 +238,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         // account, which is what makes the address survive a destroy/apply cycle. Left
         // unset, a fresh EIP is allocated and reported as the `egressIp` output - note that
         // a `tofu destroy` then releases it, and the next apply gets a different address.
-        final String configuredEgressIp = properties.getValue(AWS_EGRESS_IP, "").trim();
+        // Only a stack pinning its egress IP (the Polaris stacks) uses AWS_EGRESS_IP, as an EIP can only be
+        // attached to one NAT gateway, and so to one running stack: the others always get a fresh EIP.
+        final String configuredEgressIp = pinnedEgressIp ? properties.getValue(AWS_EGRESS_IP, "").trim() : "";
         final String natAllocationId;
         if (configuredEgressIp.isEmpty()) {
             final Eip natEip = Eip.Builder
@@ -259,7 +271,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .availabilityZone(region + "a")
             .mapPublicIpOnLaunch(false)
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-private-1-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getPrivateSubnetName(1))).build();
 
         final Subnet privateSubnet2 = Subnet.Builder
             .create(this, "privateSubnet2")
@@ -268,7 +280,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .availabilityZone(region + "b")
             .mapPublicIpOnLaunch(false)
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-private-2-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getPrivateSubnetName(2))).build();
 
         // The NAT gateway itself must sit in a *public* subnet - it is the only thing in
         // the VPC that still talks to the internet gateway directly.
@@ -278,7 +290,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .subnetId(publicSubnet1.getId())
             .dependsOn(List.of(igw, subnet1Association))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-nat-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getNatGatewayName())).build();
 
         final RouteTableRoute natRoute = RouteTableRoute
             .builder()
@@ -290,7 +302,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .vpcId(vpc.getId())
             .route(List.of(natRoute))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .tags(Map.of("Name", "cdktf-eks-private-rt-" + clusterName)).build();
+            .tags(Map.of("Name", componentNames.getPrivateRouteTableName())).build();
 
         final RouteTableAssociation privateSubnet1Association = RouteTableAssociation.Builder
             .create(this, "privateSubnet1Association")
@@ -491,23 +503,24 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .maxSize(3.0)
             .build();
 
-        // Writes this cluster's credentials to the stack's own kubeconfig (see kubeconfigPath), which
-        // every provisioner here reads via KUBECONFIG. --kubeconfig is passed explicitly as well as
-        // being in the environment so the file written is unambiguous. `--alias` names the context
-        // after the cluster rather than the ARN, which keeps `kubectl config current-context` legible
-        // when a human opens the file.
-        List<LocalExecProvisioner> updateKubeConfig = uponCreateRun(
-            format("aws eks update-kubeconfig --name %s --region %s --kubeconfig %s --alias aws_%s",
-                   clusterName, region, kubeconfigPath, clusterName));
+        // Writes the stack's own kubeconfig, which its kubectl and helm commands use (see KubeConfigAspect), and
+        // also updates the default kubeconfig, so that kubectl points at the newly deployed cluster, as for the
+        // smoke tools.  Given explicitly, as the KUBECONFIG set by KubeConfigAspect would otherwise take over.
+        List<LocalExecProvisioner> updateKubeConfig = List.of(
+            LocalExecProvisioner
+                .builder()
+                .when("create") // Run only when the resource is created
+                .command(format(
+                             "mkdir -p %s && aws eks update-kubeconfig --name %s --region %s --kubeconfig %s" +
+                                 " && aws eks update-kubeconfig --name %s --region %s --kubeconfig $HOME/.kube/config",
+                             Path.of(kubeConfigPath).getParent(), clusterName, region, kubeConfigPath,
+                             clusterName, region)
+                        )
+                .type("local-exec")
+                .build()
+                                                             );
         newKubeConfig = Resource.Builder.create(this, "kubeconfigUpdater")
                                         .dependsOn(List.of(cluster, eksAuthData)) // Wait for the cluster to be ready
-                                        // Rewrite the file whenever it names a different cluster or a
-                                        // different endpoint — a cluster rebuilt under the same name gets
-                                        // fresh CA data, and depends_on alone would not re-run the
-                                        // provisioner, leaving every later kubectl pointed at the old one.
-                                        .triggers(Map.of(
-                                            "clusterEndpoint", cluster.getEndpoint(),
-                                            "kubeconfig", kubeconfigPath))
                                         .provisioners(updateKubeConfig)
                                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                         .build();
@@ -1001,7 +1014,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 //                .thumbprintList(List.of("9e99a48a9960b14926cc7f3b02e22da2b0e791e8"))
 
             // Optional: Tag the resource
-            .tags(Map.of("Name", clusterName + "-oidc-provider"))
+            .tags(Map.of("Name", componentNames.getOidcProviderName()))
             .build();
         lbcIrsaDependables.add(new IamOpenidConnectProvider(scope, "EksIamOidcProvider", providerConfig));
         return clusterData;
@@ -1236,6 +1249,13 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .command("aws")
             .args(eksTokenArgs())
             .build();
+    }
+
+    /**
+     * @return the names of the AWS components of the stack
+     */
+    public AwsComponentNames getComponentNames() {
+        return componentNames;
     }
 
     private List<String> eksTokenArgs() {

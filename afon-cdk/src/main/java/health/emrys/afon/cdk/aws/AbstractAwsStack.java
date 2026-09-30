@@ -1,15 +1,19 @@
 package health.emrys.afon.cdk.aws;
 
+import com.hashicorp.cdktf.Aspects;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AbstractCloudStack;
+import health.emrys.afon.cdk.KubeConfigAspect;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.Map;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
+import static health.emrys.afon.config.ConfigUtils.kubeConfigPath;
 
 /**
  * Abstract base class for the AWS stacks, which configures what every AWS stack needs:
@@ -20,14 +24,21 @@ public abstract class AbstractAwsStack extends AbstractCloudStack {
 
     protected final AwsCloudProvider cloudProvider;
 
+    /**
+     * @param pinnedEgressIp whether the stack's egress IP is pinned to {@code AWS_EGRESS_IP}, if set, which only
+     *                       one running stack can hold, else the stack allocates its own
+     */
     protected AbstractAwsStack(@NonNull Construct scope,
-                               AfonCloud id,
-                               AfonPropertyProvider properties) {
-        super(scope, id);
+                               StackId stackId,
+                               AfonPropertyProvider properties,
+                               boolean pinnedEgressIp) {
+        super(scope, stackId);
         NullProvider.Builder.create(this, "nullProvider")
                             .build();
-        cloudProvider = new AwsCloudProvider(this, id.toString(), properties);
+        cloudProvider = new AwsCloudProvider(this, stackId.cloud().toString(), properties, stackId, pinnedEgressIp);
         cloudProvider.configureHelm();
+        // the stack's kubectl and helm commands only ever act on its own cluster
+        Aspects.of(this).add(new KubeConfigAspect(kubeConfigPath(stackId)));
         pinProviderVersions();
     }
 

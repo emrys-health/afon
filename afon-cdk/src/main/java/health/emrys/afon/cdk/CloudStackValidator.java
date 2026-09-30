@@ -1,7 +1,7 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.StackId;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import org.slf4j.Logger;
@@ -17,10 +17,10 @@ import java.util.regex.Pattern;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
- * Validates the config of a stack by synthesising its cdktf plan into {@code <afon.cdktf>/stacks/<cloud>},
- * without deploying it, eg to check that the config dir has all the properties the stack needs.
- * It overwrites the synthesised plan of any previous deploy in that dir, but not the tofu state file
- * {@code <afon.cdktf>/terraform.<cloud>.tfstate}, as it doesn't run tofu.
+ * Validates the config of a stack by synthesising its cdktf plan into {@code <afon.cdktf>/stacks/<stack-id>},
+ * eg {@code aws-keycloak}, without deploying it, eg to check that the config dir has all the properties the stack needs.
+ * It overwrites the synthesised plan of any previous deploy of the stack in that dir, but not the tofu state file
+ * {@code <afon.cdktf>/terraform.<stack-id>.tfstate}, as it doesn't run tofu.
  * <p>
  * The stacks are the public {@link AfonCloudStack}s in {@value #CDK_PACKAGE} with a static main,
  * found on the classpath, so no source code is needed.
@@ -86,13 +86,11 @@ public class CloudStackValidator {
     }
 
     /**
-     * Returns the dir the stack is synthesised into, ie {@code <afon.cdktf>/stacks/<cloud>},
-     * the cloud being the stack's package, eg {@code health.emrys.afon.cdk.azure}.
+     * Returns the dir the stack is synthesised into, ie {@code <afon.cdktf>/stacks/<stack-id>},
+     * the {@link StackId} being named from the stack class, eg {@code aws-keycloak} for {@code AwsKeycloakStack}.
      */
     public String stackDir(Class<? extends AfonCloudStack> stack) {
-        String packageName = stack.getPackageName();
-        String cloud = packageName.substring(packageName.lastIndexOf('.') + 1);
-        return ConfigUtils.stackDir(AfonCloud.valueOf(cloud.toUpperCase()));
+        return ConfigUtils.stackDir(StackId.of(stack));
     }
 
     /**

@@ -4,8 +4,6 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepDocumentation;
 import health.emrys.afon.ops.steps.StepOperations;
-import health.emrys.afon.ops.steps.StepsProvider;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.OutputStream;
@@ -25,7 +23,6 @@ public abstract class AbstractDocument implements DocumentMetadata {
     }
 
     public String getDescription() {
-        Class<?> deployClass = opsClass(this.getClass().getName());
         return format(
                 """
                 # Introduction
@@ -46,28 +43,59 @@ public abstract class AbstractDocument implements DocumentMetadata {
                 %s
                 %s
                 """,
-                    afonExec(deployClass),
-                    stepsBeingRun(deployClass),
+                    howToRun(),
+                    stepsBeingRun(),
                 getSupplementaryIntro());
     }
 
-    private static @NonNull String afonExec(Class<?> deployClass) {
+    /**
+     * How to run the steps, by default with the command of the ops class named after this document, eg
+     * {@code deploy-snowflake-reading-aws-via-aws} for {@code DeploySnowflakeReadingAwsViaAwsDocument}.
+     */
+    protected String howToRun() {
         return format(
                 """
                 
                 To execute, run:
                 ```shell
-               ./afon.sh %s 
+                afon-cli.sh %s
                 ```
-                """, StepDocumentation.afonArgumentsToRun(deployClass, null, "exec"));
+                """, opsCommand());
     }
 
-    private String stepsBeingRun(Class<?> deployClass) {
-        StepsProvider provider = stepProvider(deployClass);
+    /**
+     * How to resume the steps from a failed step, eg {@code lastStep}, by default with the command of the ops
+     * class named after this document, given the step as its arg.
+     */
+    protected String howToResume(String lastStep) {
+        return format(
+                """
+                If the job fails on a given step, you don't need to rerun the full list of steps. 
+                Instead, you can add to the command the step from which to restart:
+                
+                `afon-cli.sh %s <one-of-the-steps-from-list-above>`
+                
+                This will continue the execution starting at the chosen step.                       
+                
+                For example:
+                ```shell
+                afon-cli.sh %s %s
+                ```
+                """,
+                opsCommand(),
+                opsCommand(),
+                lastStep);
+    }
+
+    private String opsCommand() {
+        return StepDocumentation.afonCliCommand(opsClass());
+    }
+
+    private String stepsBeingRun() {
         StepOperations operations = new StepOperations(new StepDocumentation(OutputStream.nullOutputStream()), properties);
-        List<Step> steps = provider.stepsUsing(operations);
+        List<Step> steps = steps(operations);
         if (steps.size() == 0){
-            return format("The steps provider %s has no steps.", deployClass.getName());
+            return format("The document %s has no steps.", getClass().getName());
         }
         String[] stepNames = steps.stream().map(x -> x.getName()).toArray(String[]::new);
         return format(
@@ -75,35 +103,15 @@ public abstract class AbstractDocument implements DocumentMetadata {
                 The steps being run are:
                 - %s
                 
-                If the job fails on a given step, you don't need to rerun the full list of steps. 
-                Instead, you can specify to the exec command the step from which to restart:
-                
-                `--exec-args "<one-of-the-steps-from-list-above>"`
-                
-                This will continue the execution starting at the chosen step.                       
-                
-                For example:
-                ```shell
-                ./afon.sh -a exec --exec-class "%s" --exec-args "%s"
-                ```
-                """,
+                %s""",
                 join(("\n- "), stepNames),
-                deployClass.getCanonicalName(),
-                stepNames[stepNames.length - 1]
+                howToResume(stepNames[stepNames.length - 1])
         );
 
     }
 
-    private static @NonNull StepsProvider stepProvider(Class<?> deployClass) {
-        try {
-            return (StepsProvider)deployClass.getConstructor(new Class[]{}).newInstance(new Object[]{});
-        } catch (Exception e) {
-            throw new RuntimeException("Not a StepsProvider: " + deployClass.getName(), e);
-        }
-    }
-
-    private Class<?> opsClass(String documentClassName) {
-        String opsClassName = documentClassName.replace("docs.", "ops.").replace("Document", "Main");
+    private Class<?> opsClass() {
+        String opsClassName = getClass().getName().replace("docs.", "ops.").replace("Document", "Main");
         try {
             return Class.forName(opsClassName);
         } catch (ClassNotFoundException e) {
