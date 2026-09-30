@@ -4,7 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
+import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.smoke.tasks.CliCommand;
+import health.emrys.afon.ops.smoke.tasks.DeployCommand;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
@@ -20,6 +23,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
@@ -170,17 +174,28 @@ public class JupyterHubSpawnSmoke {
 
     public static void main(String[] args) throws Exception {
         FilePropertyProvider properties = new FilePropertyProvider();
-        String token = args[0];
+
+
         try (KubeClient client = new KubeClient(properties)) {
-            String pod = new JupyterHubSpawnSmoke(client, "default", token).spawn("will@emrys.health", Duration.ofMinutes(5));
-            System.out.println(pod);
+            String email = "will@emrys.health";
+            CliCommand command = new DeployCommand(client,
+                                                   "hub-deployment",
+                                                   "hub",
+                                                   "jupyterhub token --config /etc/jupyterhub/jupyterhub_config.py " + email);
+            List<ExecResult> results = command.run();
+            assert results.size() == 1;
+            ExecResult result = results.get(0);
+            if (result.isSuccess()) {
+                String token = result.stdout().strip();
+                logger.info("JupyterHub Token: {}", token);
+                String pod = new JupyterHubSpawnSmoke(client, "default", token).spawn(email, Duration.ofMinutes(5));
+                System.out.println(pod);
+            } else {
+                String msg = "Could not get token. Error: " + result.stderr();
+                logger.error(msg);
+                throw new Exception(msg);
+            }
         }
     }
 
-    private static String requireValue(String[] args, int index) {
-        if (index >= args.length) {
-            throw new IllegalArgumentException("Missing value for " + args[index - 1] + ". " + USAGE);
-        }
-        return args[index];
-    }
 }
