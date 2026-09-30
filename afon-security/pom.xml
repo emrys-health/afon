@@ -43,4 +43,21 @@
         </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- keycloak-services brings in jboss-logmanager, whose JBossLoggerFinder complains on stderr
+                         that java.util.logging.manager is not set when a System.Logger is first requested.
+                         The tests log via slf4j/logback and do not need it. -->
+                    <classpathDependencyExcludes>
+                        <classpathDependencyExclude>org.jboss.logmanager:jboss-logmanager</classpathDependencyExclude>
+                    </classpathDependencyExcludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

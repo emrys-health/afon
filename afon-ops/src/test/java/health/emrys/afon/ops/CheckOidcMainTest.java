@@ -3,6 +3,9 @@ package health.emrys.afon.ops;
 import health.emrys.afon.security.IdentityProvider;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -10,17 +13,24 @@ import static org.mockito.Mockito.when;
 class CheckOidcMainTest {
 
     private final IdentityProvider identityProvider = mock(IdentityProvider.class);
-    private final CheckOidcMain checkOidc = new CheckOidcMain(identityProvider, "auth.example.com");
+    private final ByteArrayOutputStream out = new ByteArrayOutputStream();
+    private final ByteArrayOutputStream err = new ByteArrayOutputStream();
+    private final CheckOidcMain checkOidc = new CheckOidcMain(identityProvider, "auth.example.com",
+            new PrintStream(out, true), new PrintStream(err, true));
 
     @Test
     void passesWhenTheIdentityProviderIsReady() {
         when(identityProvider.isReady()).thenReturn(true);
         assertThat(checkOidc.check()).isTrue();
+        assertThat(out.toString()).contains("OIDC provider at 'auth.example.com' is ready");
+        assertThat(err.toString()).isEmpty();
     }
 
     @Test
     void failsWhenTheIdentityProviderIsNotReady() {
         when(identityProvider.isReady()).thenReturn(false);
         assertThat(checkOidc.check()).isFalse();
+        assertThat(err.toString()).contains("OIDC provider at 'auth.example.com' is not ready");
+        assertThat(out.toString()).isEmpty();
     }
 }
