@@ -13,6 +13,8 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
@@ -26,9 +28,12 @@ import static health.emrys.afon.polaris.PolarisConstants.POLARIS_INTERNAL_SERVIC
 /**
  * Deploys Polaris, behind its HTTPS ingress and DNS record at {@code AWS_POLARIS_DOMAIN_NAME}.  Polaris uses the
  * KeyCloak server at {@code OIDC_DOMAIN_NAME}, which the {@link AwsKeycloakStack} deploys, so that both can run side
- * by side, while the stacks extending this one, eg {@link AwsFullStack}, deploy their own KeyCloak.
+ * by side, while the stacks extending this one, eg {@link AwsFullStack}, deploy their own KeyCloak, unless
+ * {@code AWS_KEYCLOAK_EXTERNAL} is set, see {@link #isKeyCloakExternal}.
  */
 public class AwsPolarisStack extends AbstractAwsStack {
+
+    private static final Logger logger = LoggerFactory.getLogger(AwsPolarisStack.class);
 
     protected final PolarisConfig polarisConfig;
 
@@ -61,6 +66,9 @@ public class AwsPolarisStack extends AbstractAwsStack {
             polarisDependables.add(keyCloakConfig.getAliasRecord());
         } else {
             keyCloakConfig = null;
+            logger.info("Stack {} deploys no KeyCloak, but uses the one at {} ({}), which the aws-keycloak stack deploys{}",
+                        stackId, properties.getValue(AfonProperty.OIDC_DOMAIN_NAME), AfonProperty.OIDC_DOMAIN_NAME,
+                        isKeyCloakExternal(properties) ? ", as configured by " + AfonProperty.AWS_KEYCLOAK_EXTERNAL + "=true" : "");
         }
         polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties) {
             protected Service configurePolarisService(Deployment polarisDeployment) {

@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.steps;
 
 import com.sun.net.httpserver.HttpServer;
+import health.emrys.afon.config.StackId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -46,6 +47,16 @@ class StepActionsTest {
     }
 
     @Test
+    void onlyStacksWithTfStateAreDeployed() throws IOException {
+        createDirs("stacks/aws", "stacks/gcp", "stacks/aws-keycloak", "stacks/aws-polaris");
+        createFiles("terraform.aws-keycloak.tfstate", "terraform.gcp.tfstate");
+
+        assertThat(actions.deployedStackNames(List.of("aws", "aws-keycloak", "aws-polaris"), cdktfDir))
+            .containsExactly("aws-keycloak");
+        assertThat(actions.deployedStackNames(List.of("gcp"), cdktfDir)).containsExactly("gcp");
+    }
+
+    @Test
     void canFindNoStacksInEmptyOrMissingCdktfDir() throws IOException {
         assertThat(StepActions.stackNamesIn(AWS, cdktfDir)).isEmpty();
         assertThat(StepActions.stackNamesIn(AWS, cdktfDir.resolve("missing"))).isEmpty();
@@ -83,6 +94,31 @@ class StepActionsTest {
             .hasMessageContaining("validate-stack");
         assertThat(commands).isEmpty();
         assertThat(tfState).exists();
+    }
+
+    @Test
+    void refusesToDeleteAnyStackIfOneMustBeKept() {
+        StackFilter filter = new StackFilter(
+            "stacks conflicting with aws-polaris", name -> true,
+            name -> switch (name) {
+                case "aws-polaris" -> null;
+                case "aws-jupyter" -> new StackFilter.Refusal("stack aws-jupyter is running, whose resources are unknown", null);
+                default -> new StackFilter.Refusal("stack " + name + " is running and already deploys Polaris at x (X)",
+                                                   "afon-cli.sh manage-stack delete " + name);
+            },
+            StackId.parse("aws-polaris"));
+        actions.checkNoRefusal(filter, List.of("aws-polaris"));
+        assertThatThrownBy(() -> actions.checkNoRefusal(filter, List.of("aws-polaris", "aws-full")))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage(String.format("""
+                Cannot deploy aws-polaris, as stack aws-full is running and already deploys Polaris at x (X).
+                To deploy aws-polaris, delete it first:
+                    afon-cli.sh manage-stack delete aws-full
+                or rerun with --replace to delete it as part of this run."""));
+        assertThatThrownBy(() -> actions.checkNoRefusal(filter, List.of("aws-jupyter")))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageEndingWith("To deploy aws-polaris, rerun with --replace to delete it as part of this run.");
+        assertThat(commands).isEmpty();
     }
 
     @Test

@@ -40,7 +40,12 @@ public abstract class AbstractStackDocument extends AbstractDocument {
             throw new IllegalArgumentException(format("Unsupported action '%s' on stack '%s'", action, id));
         }
         this.manageStackArgs = action + " " + id;
-        this.note = "";
+        this.note = action == StackAction.DELETE ? "" : format(
+            """
+
+            If another running stack conflicts with `%s`, it fails before deleting any stack: add `--replace` to
+            replace the conflicting stacks too.
+            """, id);
     }
 
     /**
