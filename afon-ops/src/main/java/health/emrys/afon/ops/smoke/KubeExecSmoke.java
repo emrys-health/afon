@@ -1,6 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.ops.config.OpsPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import org.slf4j.Logger;
@@ -70,7 +70,7 @@ public class KubeExecSmoke {
         }
 
         int exitCode;
-        try (KubeClient client = new KubeClient(new OpsPropertyProvider())) {
+        try (KubeClient client = new KubeClient(new FilePropertyProvider())) {
             ExecResult result = new KubeExecSmoke(client).run(namespace, pod, container, timeout, command);
             logger.info("Output:\n{}\nError:\n{}", result.stdout(), result.stderr());
             exitCode = result.exitCode();

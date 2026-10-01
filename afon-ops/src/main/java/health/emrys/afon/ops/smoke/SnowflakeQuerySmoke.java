@@ -1,7 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.config.OpsPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.slf4j.Logger;
 
@@ -46,7 +46,7 @@ public class SnowflakeQuerySmoke {
             return;
         }
         String tableName = args[0];
-        var properties = new OpsPropertyProvider();
+        var properties = new FilePropertyProvider();
         new SnowflakeQuerySmoke(properties).query(tableName);
     }
 }
