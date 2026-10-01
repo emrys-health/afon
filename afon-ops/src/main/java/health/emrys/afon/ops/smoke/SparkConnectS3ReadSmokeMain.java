@@ -39,6 +39,8 @@ import static java.lang.String.format;
  *   <li>The region is stated explicitly, so the AWS SDK does not fall back to its region provider
  *       chain and stall on EC2 instance metadata that a Kubernetes-hosted driver cannot reach.</li>
  * </ol>
+ *
+ * TODO check that PATH can indeed be seen outside the cluster
  */
 public class SparkConnectS3ReadSmokeMain {
 

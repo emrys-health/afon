@@ -14,6 +14,10 @@ public class PolarisEndpoint {
     private final AfonCloud cloud;
     private final String endpoint;
 
+    public static String getPolarisEndpointFor(AfonCloud cloud, AfonPropertyProvider properties) {
+        return new PolarisEndpoint(cloud, properties).getEndpoint();
+    }
+
     public PolarisEndpoint(AfonCloud cloud, AfonPropertyProvider properties) {
         this.cloud = cloud;
         this.endpoint = polarisDomainName(cloud, properties);
