@@ -29,8 +29,8 @@ class OpsCommandsTest {
 
     @Test
     void doesNotExposeClassesNotNamedMain() {
-        assertThat(opsCommands.resolve("network-smoke")).isNull();
-        assertThat(opsCommands.resolve("spark-test-writer")).isNull();
+        assertThat(opsCommands.resolve("exec-result")).isNull();
+        assertThat(opsCommands.resolve("kube-client")).isNull();
     }
 
     @Test
