@@ -12,7 +12,8 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static health.emrys.afon.ops.smoke.SparkConnectSmoke.SPARK_CONNECTOR_POD;
+import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
+import static health.emrys.afon.ops.smoke.SparkConnectSmokeMain.SPARK_CONNECTOR_POD;
 import static java.lang.String.format;
 
 /**
@@ -116,7 +117,7 @@ public class SparkConnectGcsReadSmokeMain {
     public static void main(final String[] args) {
         FilePropertyProvider properties = new FilePropertyProvider();
         try (KubeClient client = new KubeClient(properties)) {
-            SparkConnectGcsReadSmokeMain app = new SparkConnectGcsReadSmokeMain(client, "default");
+            SparkConnectGcsReadSmokeMain app = new SparkConnectGcsReadSmokeMain(client, KUBERNETES_NAMESPACE);
             Dataset<Row>                 df  = app.readTextThroughPortForwarder();
             if (df != null) {
                 String                   msg = format("Test failed. We should not have been allowed to read public bucket %s", PATH);

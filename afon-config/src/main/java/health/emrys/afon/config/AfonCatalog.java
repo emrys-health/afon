@@ -21,6 +21,19 @@ public final class AfonCatalog {
     private final String bucketName;
     private final boolean adminGrants;
 
+    public static AfonCatalog catalogFor(AfonCloud cloud, AfonCatalogs catalogs) {
+        switch (cloud) {
+            case AWS:
+                return catalogs.aws();
+            case AZURE:
+                return catalogs.azure();
+            case GCP:
+                return catalogs.gcp();
+            default:
+                throw new IllegalArgumentException("Unknown cloud: " + cloud);
+        }
+    }
+
     AfonCatalog(String id, AfonCloud cloud, String name, String type, String bucketName, boolean adminGrants) {
         this.id = id;
         this.cloud = cloud;
