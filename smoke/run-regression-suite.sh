@@ -3,14 +3,17 @@
 # Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally deploying them first.
 #
 # usage: smoke/run-regression-suite.sh [--env|-e <env>] [--deploy|-d <stacks>] [--suite|-s <file>] [--tests|-t <tests>]
-#                                      [--list|-l] [--help|-h]
+#                                      [--logging-console|-lc <level>] [--list|-l] [--help|-h]
 #   --env     the afon env, selecting both the config and cdktf envs, as for './afon.sh --env <env>':
 #             $AFON_HOME/config-<env> and $AFON_HOME/cdktf-<env> are symlinked to $AFON_HOME/config and
 #             $AFON_HOME/cdktf.  Exported as AFON_ENV, so that every afon.sh command uses it.
 #   --deploy  the comma-separated stacks to deploy before the tests, in order, eg aws-full,azure-polaris,gcp-polaris,
 #             each with './afon.sh -a manage-stack deploy <stack>'.  The tests are not run if a deploy fails.
-#   --suite   the CSV file of the tests (default: smoke/regression-suite.csv)
+#   --suite   the CSV file of the tests (default: smoke/regression-aws.csv)
 #   --tests   the comma-separated names of the tests to run (default: all), as listed by --list
+#   --logging-console
+#             the logging console level of every afon.sh command, one of OFF|DEBUG|INFO|WARN|ERROR (default: the
+#             logback configuration's, INFO).  Exported as AFON_LOGGING_CONSOLE, which it overrides.
 #   --list    lists the tests and exits
 #
 # The tests are read from the suite file, run in its order.  Its first line is the header
@@ -22,18 +25,20 @@
 # are run, even if some fail, and their output is written to smoke/target/regression/<test>.log.  The script
 # exits non-zero if any test fails.
 #
-# The tests run against the cluster of the current kubectl context, which must be the AWS full stack's: the
-# Spark Connect tests read the azure and gcp catalogs through its Spark Connect server.  --env does not change
-# the kubectl context.  The afon.sh env vars apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
+# The tests run against the cluster of the current kubectl context, which must be the AWS full stack's: the Spark
+# Connect tests read the azure and gcp catalogs through its Spark Connect server.  Given --env, the current context
+# is set to the env's AWS full stack cluster, after any deploys, with
+# './afon.sh -a aws-update-kube-config full -e <env>', and left so.
+# The afon.sh env vars apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
 #
-# As switching env re-points the shared $AFON_HOME symlinks, do not run another afon command on a different env
-# while the suite runs.
+# As switching env re-points the shared $AFON_HOME symlinks, and the current context of the shared ~/.kube/config,
+# do not run another afon or kubectl command on a different env or cluster while the suite runs.
 
 set -euo pipefail
 
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$AFON_ROOT/smoke/target/regression"
-DEFAULT_SUITE_FILE="$AFON_ROOT/smoke/regression-suite.csv"
+DEFAULT_SUITE_FILE="$AFON_ROOT/smoke/regression-aws.csv"
 # Turns off the Maven loggers reporting a test's non-zero exit, as the exec plugin's stack trace and Maven's
 # failure summary, the test's own output being what tells why it failed.
 QUIET_MAVEN_OPTS="-Dorg.slf4j.simpleLogger.log.org.codehaus.mojo.exec=off -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.MavenCli=off"
@@ -136,6 +141,15 @@ use_env() {
   export AFON_ENV="$1"
 }
 
+# Makes the env $1's AWS full stack cluster the current kubectl context, exiting if it fails.
+update_kube_config() {
+  echo "=== Updating the kubectl context to the AWS full stack cluster of env $1"
+  if ! ./afon.sh -a aws-update-kube-config full -e "$1"; then
+    echo "Failed to update the kubectl context for env $1: not running the tests" >&2
+    exit 1
+  fi
+}
+
 # Deploys the comma-separated stacks $1, in order, exiting if any fails.
 deploy_stacks() {
   local stack
@@ -151,6 +165,7 @@ deploy_stacks() {
 DEPLOY=
 ENV=
 LIST=
+LOGGING_CONSOLE=
 SELECTED=
 SUITE_FILE="$DEFAULT_SUITE_FILE"
 
@@ -164,6 +179,8 @@ while [[ $# -gt 0 ]]; do
       require_value "$1" "${2:-}"; SUITE_FILE="$2"; shift 2 ;;
     --tests|-t)
       require_value "$1" "${2:-}"; SELECTED="$2"; shift 2 ;;
+    --logging-console|-lc)
+      require_value "$1" "${2:-}"; LOGGING_CONSOLE="$2"; shift 2 ;;
     --list|-l)
       LIST=true; shift ;;
     --help|-h)
@@ -183,9 +200,17 @@ validate_tests "$SELECTED"
 
 use_env "$ENV"
 
+if [ -n "$LOGGING_CONSOLE" ]; then
+  export AFON_LOGGING_CONSOLE="$LOGGING_CONSOLE"
+fi
+
 cd "$AFON_ROOT"
 
 deploy_stacks "$DEPLOY"
+
+if [ -n "$ENV" ]; then
+  update_kube_config "$ENV"
+fi
 
 mkdir -p "$LOG_DIR"
 PASSED=()
@@ -201,7 +226,7 @@ for test_line in "${TESTS[@]}"; do
   if [ -n "$args" ]; then
     exec_args+=(-ea "$args")
   fi
-  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" ./afon.sh --mvn-quiet -lc INFO "${exec_args[@]}" 2>&1 | tee "$log"; then
+  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" ./afon.sh --mvn-quiet "${exec_args[@]}" 2>&1 | tee "$log"; then
     PASSED+=("$name")
   else
     FAILED+=("$name")

@@ -1,0 +1,5 @@
+name|class|args
+network|ops.smoke.NetworkSmokeMain|
+spark-connect|ops.smoke.SparkConnectSmokeMain|
+spark-gcs-read|ops.smoke.SparkConnectGcsReadSmokeMain|
+spark-s3-read|ops.smoke.SparkConnectS3ReadSmokeMain|
