@@ -117,9 +117,38 @@ The notebook reads these environment variables, all optional apart from `OIDC_TO
 - **Check 4 fails**: the test user is authorised for `AFON_FORBIDDEN_CATALOG`, either in `users-acl.csv` or because
   the ACL has not been applied to Polaris since it changed (`./afon.sh -a configure-users aws all`).
 
+## Regression suite
+
+```shell
+smoke/run-regression-suite.sh [--env <env>] [--deploy <stacks>] [--suite <file>] [--tests <tests>] [--list]
+```
+
+runs the tests listed in a suite file, by default [smoke/regression-suite.csv](../smoke/regression-suite.csv), in order, each with
+`./afon.sh -a exec -ec <class> -ea <args>`. Its first line is the header `name|class|args`, and each other line a test:
+its name, its class, relative to the `health.emrys.afon` package, and its args, if any, separated by spaces. Fields are
+separated by `|`, rather than commas, so that args may contain commas. Blank lines and lines starting with `#` are ignored. The default suite runs:
+
+| Test                  | Class                                 | Checks                                                       |
+|-----------------------|---------------------------------------|--------------------------------------------------------------|
+| `spark-connect-aws`   | `SparkConnectSmoke aws`               | the setup table is read from the `aws` catalog               |
+| `spark-connect-azure` | `SparkConnectSmoke azure`             | the setup table is read from the `azure` catalog             |
+| `spark-connect-gcp`   | `SparkConnectSmoke gcp`               | the setup table is read from the `gcp` catalog               |
+
+- `--env` selects the config and cdktf envs, as `./afon.sh --env <env>` does, for every command the suite runs. It
+  does not change the `kubectl` context. As the env switch re-points the shared `$AFON_HOME/config` and
+  `$AFON_HOME/cdktf` symlinks, do not run another afon command on a different env while the suite runs.
+- `--deploy` deploys the comma-separated stacks first, in order, with `./afon.sh -a manage-stack deploy <stack>`,
+  eg `--deploy aws-full,azure-polaris,gcp-polaris`. The tests are not run if a deploy fails.
+- `--suite` reads the tests from another file, of the same format, eg a subset of the tests for a single cloud.
+- `--tests` runs only the comma-separated tests, eg `--tests spark-connect-aws,spark-connect-gcp`. All are run by default.
+- `--list` lists the tests.
+
+The tests run against the cluster of the current `kubectl` context, which must be the AWS full stack's: the
+`spark-connect-azure` and `spark-connect-gcp` tests read their catalogs through its Spark Connect server, so they also
+need the Azure and GCP Polaris stacks. All the selected tests are run, even if some fail, each one's output being
+written to `smoke/target/regression/<test>.log`. The script ends with a summary, and exits non-zero if any test failed.
+
 ## Other smoke tests
 
-- `./afon.sh -a exec -ec ops.smoke.SparkConnectSmoke -ea aws` reads the setup table through Spark Connect from Java,
-  with an OIDC token for `USER_ID` (see `SparkConnectClient`).
 - `ops.demo.GeneratePySparkKeycloakMain` and `ops.demo.GeneratePySparkContextMain` generate PySpark code declaring
   all the configured catalogs, authenticated with `OIDC_TOKEN`, to paste into a notebook.

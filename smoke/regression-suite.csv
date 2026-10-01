@@ -1,0 +1,4 @@
+name|class|args
+spark-connect-aws|ops.smoke.SparkConnectSmoke|aws
+spark-connect-azure|ops.smoke.SparkConnectSmoke|azure
+spark-connect-gcp|ops.smoke.SparkConnectSmoke|gcp
