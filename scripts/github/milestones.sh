@@ -5,7 +5,9 @@
 #
 # The notes are written to <afon-home>/milestone-<version>.md, where <afon-home> defaults to $HOME/.afon, and, if a
 # notes file is given (e.g. release_notes.md), its '## <version>' section is replaced, or inserted before the first
-# '## ' section if not present.
+# '## ' section if not present.  When replaced, the section keeps its hand-written '### ' subsections, e.g.
+# '### Upgrade notes', ie any but the generated '### Closed Issues' and '### Open Issues', which are put back before
+# the generated issue lists.
 #
 # Requires the gh CLI, authenticated with a token holding the 'repo' scope.
 set -euo pipefail
@@ -119,7 +121,8 @@ if [ -z "$NOTES_FILE" ]; then
   exit 0
 fi
 
-# Replaces the existing version section, or inserts it before the first section (appends if there is none)
+# Replaces the existing version section, keeping its hand-written subsections, or inserts it before the first section
+# (appends if there is none)
 if grep -qxF "## $VERSION" "$NOTES_FILE"; then
   MODE=replace
 else
@@ -127,14 +130,35 @@ else
 fi
 TMP_FILE=$(mktemp)
 awk -v heading="## $VERSION" -v section="$MILESTONE_FILE" -v mode="$MODE" '
-  function emit(  line) { while ((getline line < section) > 0) print line; close(section); print ""; done = 1 }
+  # Emits the generated section, with the kept subsections, if any, before its first issue list
+  function emit(  line, pending) {
+    while (kept ~ /\n\n$/) sub(/\n$/, "", kept)
+    pending = (kept != "")
+    while ((getline line < section) > 0) {
+      if (pending && line ~ /^### (Closed|Open) Issues/) { printf "%s\n", kept; pending = 0 }
+      print line
+    }
+    close(section)
+    if (pending) { print ""; printf "%s", kept }
+    print ""
+    done = 1
+  }
   /^## / {
-    skipping = 0
-    if (mode == "replace" && $0 == heading) { emit(); skipping = 1; next }
+    if (in_section) { emit(); in_section = 0 }
+    if (mode == "replace" && $0 == heading) { in_section = 1; keeping = 0; next }
     if (mode == "insert" && !done) emit()
   }
-  !skipping { print }
-  END { if (!done) { print ""; emit() } }
+  # In the section replaced, keeps the hand-written subsections only
+  in_section {
+    if ($0 ~ /^### /) keeping = ($0 !~ /^### (Closed|Open) Issues/)
+    if (keeping) kept = kept $0 "\n"
+    next
+  }
+  { print }
+  END {
+    if (in_section) emit()
+    if (!done) { print ""; emit() }
+  }
 ' "$NOTES_FILE" > "$TMP_FILE"
 mv "$TMP_FILE" "$NOTES_FILE"
 echo "Milestone $VERSION section updated in $NOTES_FILE ($MODE)"

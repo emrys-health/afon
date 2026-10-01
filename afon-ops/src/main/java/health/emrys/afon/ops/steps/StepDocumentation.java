@@ -170,6 +170,15 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
+    void checkNoRefusal(StackFilter filter, List<String> stackNames) {
+        out.println(format("""
+                   Unless run with `--replace`, fail if any of the %s must be kept, ie is another stack than the one
+                   to deploy, before deleting any.
+                   """, filter.description()));
+        out.flush();
+    }
+
+    @Override
     void checkAnswers(String url, String failure) {
         out.println(format("""
                    Check that `%s` answers with 200, eg with:

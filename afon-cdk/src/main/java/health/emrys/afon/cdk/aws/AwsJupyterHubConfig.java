@@ -29,6 +29,10 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
     private final TerraformStack stack;
     private final Route53Record  keycloakAliasRecord;
 
+    /**
+     * @param keycloakAliasRecord the DNS record of the stack's own KeyCloak, or {@code null} if the stack uses the
+     *                            KeyCloak another stack deploys, whose record then already exists
+     */
     public AwsJupyterHubConfig(TerraformStack stack,
                                AwsCloudProvider cloudProvider,
                                AfonPropertyProvider properties,
@@ -71,7 +75,7 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
         // a resolver upstream of CoreDNS (which itself only caches for 30s) keeps for about 5 minutes
         // and serves to every pod in the cluster. So nothing that polls the issuer may start before
         // the record exists.
-        return List.of(keycloakAliasRecord);
+        return keycloakAliasRecord == null ? List.of() : List.of(keycloakAliasRecord);
     }
 
     @Override
@@ -82,7 +86,9 @@ public class AwsJupyterHubConfig extends JupyterHubConfig {
         // resolves NXDOMAIN. The wait-for-issuer init container still covers DNS propagation lag,
         // which no dependency edge can express.
         List<ITerraformDependable> deps = new ArrayList<>(proxyDeps);
-        deps.add(keycloakAliasRecord);
+        if (keycloakAliasRecord != null) {
+            deps.add(keycloakAliasRecord);
+        }
         return new JupyterMfaConfig(
             this.stack,
             deps,

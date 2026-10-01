@@ -40,6 +40,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.*;
@@ -72,6 +73,8 @@ public class StepActions {
     void deleteStacksIn(AfonCloud cloud, StackFilter filter, int maxAttempts, OutputStream outputStream) throws IOException {
         checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
         List<String> stackNames = stackNamesIn(cloud, filter);
+        // only a deployed stack, ie with a tofu state, may need keeping: a stack dir without one is just deleted
+        checkNoRefusal(filter, deployedStackNames(stackNames, Path.of(ConfigUtils.afonCkdtf())));
         if (stackNames.isEmpty()) {
             logger.info("No stack to delete in cloud {}, as selected by: {}", cloud, filter.description());
         }
@@ -89,6 +92,33 @@ public class StepActions {
     }
 
     /**
+     * Checks, before deleting any, that none of the selected deployed stacks must be kept, unless {@code --replace}
+     * is given.
+     * @param stackNames the names of the selected stacks that are deployed, ie with a tofu state
+     * @throws IllegalStateException naming the stacks refused, and why
+     */
+    void checkNoRefusal(StackFilter filter, List<String> stackNames) {
+        List<StackFilter.Refusal> refusals = stackNames.stream().map(filter.refusal()).filter(Objects::nonNull).toList();
+        if (refusals.isEmpty()) {
+            return;
+        }
+        String deploying = filter.deploying() == null ? "the stack" : filter.deploying().toString();
+        String them = refusals.size() == 1 ? "it" : "them";
+        List<String> deleteCommands = refusals.stream().map(StackFilter.Refusal::deleteCommand)
+                                              .filter(Objects::nonNull).distinct().toList();
+        StringBuilder message = new StringBuilder(format("Cannot deploy %s, as %s.%n", deploying,
+            refusals.stream().map(StackFilter.Refusal::reason).collect(Collectors.joining(";\nand "))));
+        if (!deleteCommands.isEmpty()) {
+            message.append(format("To deploy %s, delete %s first:%n", deploying, them));
+            deleteCommands.forEach(command -> message.append(format("    %s%n", command)));
+            message.append(format("or rerun with --replace to delete %s as part of this run.", them));
+        } else {
+            message.append(format("To deploy %s, rerun with --replace to delete %s as part of this run.", deploying, them));
+        }
+        throw new IllegalStateException(message.toString());
+    }
+
+    /**
      * Returns the names of the stacks in the cloud selected by the filter, see {@link #stackNamesIn(AfonCloud)}.
      */
     List<String> stackNamesIn(AfonCloud cloud, StackFilter filter) throws IOException {
@@ -102,6 +132,17 @@ public class StepActions {
      */
     List<String> stackNamesIn(AfonCloud cloud) throws IOException {
         return stackNamesIn(cloud, Path.of(ConfigUtils.afonCkdtf()));
+    }
+
+    /**
+     * @return the names of the stacks that are deployed, ie with a tofu state in the cdktf dir, eg
+     * {@code terraform.aws-keycloak.tfstate} for {@code aws-keycloak}, or {@code terraform.aws.tfstate} for the legacy
+     * {@code aws}, rather than just a stack dir, eg left from synthesising a stack without deploying it
+     */
+    List<String> deployedStackNames(List<String> stackNames, Path cdktfDir) {
+        return stackNames.stream()
+                         .filter(name -> exists(cdktfDir.resolve(TF_STATE_PREFIX + name + TF_STATE_SUFFIX)))
+                         .toList();
     }
 
     static List<String> stackNamesIn(AfonCloud cloud, Path cdktfDir) throws IOException {

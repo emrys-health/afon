@@ -4,10 +4,11 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Aws, External}
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
-import health.emrys.afon.config.AfonProperty.{AWS_REGION, ENV_NAME}
+import health.emrys.afon.config.AfonProperty.{AWS_ACCESS_KEY_ID, AWS_REGION, AWS_SECRET_ACCESS_KEY, ENV_NAME}
 import health.emrys.afon.polaris.catalogs.GlueAwsPolarisCatalog
 import org.apache.spark.sql.SparkSession
 import org.scalatest.GivenWhenThen
+import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, AwsCredentialsProvider, DefaultCredentialsProvider, StaticCredentialsProvider}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.glue.GlueClient
 import software.amazon.awssdk.services.glue.model._
@@ -51,11 +52,13 @@ class AwsGlueExternalTableSpec extends SpecPretifier with GivenWhenThen {
     val tableName         = s"DatumAccTest2_${properties.getValue(ENV_NAME)}"
     val sparkNamespace    = "ph_glue_iceberg_db"
     val awsRegion         = properties.getValue(AWS_REGION)
+    val awsCredentials    = AwsGlueExternalTableSpec.credentialsProvider(
+      properties.getValue(AWS_ACCESS_KEY_ID, ""), properties.getValue(AWS_SECRET_ACCESS_KEY, ""))
 
     "have its underlying Iceberg table created if absent" in {
       Given(f"a bucket called $externalBucket")
       When(f"we ensure the table $sparkNamespace.$tableName exists")
-      AwsGlueExternalTableSpec.ensureTableExists(awsRegion, sparkNamespace, tableName, externalBucket)
+      AwsGlueExternalTableSpec.ensureTableExists(awsRegion, awsCredentials, sparkNamespace, tableName, externalBucket)
       Then(f"the table exists, created now or already there from a previous run")
     }
     "be visible to our Polaris" in {
@@ -123,12 +126,21 @@ object AwsGlueExternalTableSpec {
   )
 
   /**
+   * The AWS keys of the afon config (secret-aws.properties), as used by Polaris, when both are set - eg in CI,
+   * where there is no AWS profile or env to fall back on.  Else the default chain, eg a local AWS profile.
+   */
+  def credentialsProvider(accessKeyId: String, secretAccessKey: String): AwsCredentialsProvider =
+    if (accessKeyId.isBlank || secretAccessKey.isBlank) DefaultCredentialsProvider.builder().build()
+    else StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKeyId, secretAccessKey))
+
+  /**
    * Creates the Iceberg-backed Glue table this spec depends on, if it doesn't already exist -
    * previously a manual, easy-to-forget "somebody has run the command" prerequisite; now run by
    * the spec itself so there's no separate setup step to get wrong or skip.
    */
-  def ensureTableExists(region: String, dbName: String, tableName: String, bucket: String): Unit = {
-    val glue = GlueClient.builder().region(Region.of(region)).build()
+  def ensureTableExists(region: String, credentials: AwsCredentialsProvider,
+                        dbName: String, tableName: String, bucket: String): Unit = {
+    val glue = GlueClient.builder().region(Region.of(region)).credentialsProvider(credentials).build()
     try {
       val exists =
         try {

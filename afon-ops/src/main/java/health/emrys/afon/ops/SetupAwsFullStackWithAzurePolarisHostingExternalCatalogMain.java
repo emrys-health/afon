@@ -1,5 +1,6 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepRunner;
@@ -31,7 +32,7 @@ public class SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain impleme
             stepOperations.deleteExternalPolarisTableFor(AZURE),
             stepOperations.createExternalCatalogFor(AZURE),
             stepOperations.runAwsSparkDeferringToAzurePolarisHostingExternalCatalog(),
-            stepOperations.setupComplete(AZURE)));
+            stepOperations.setupComplete(new StackId(AZURE, "polaris"))));
         return steps;
     }
 

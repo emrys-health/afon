@@ -1,5 +1,71 @@
 # Release Notes
 
+## 1.0-beta-6
+
+**Milestone:** [1.0-beta-6](https://github.com/emrys-health/afon-core/milestone/6)
+**Due:** 2026-09-30
+
+### Upgrade notes
+
+**IMPORTANT:** one-off steps when upgrading from 1.0-beta-5:
+
+- **User config ([#231](https://github.com/emrys-health/afon-core/issues/231)):** run once, in each config env:
+  ```shell
+  afon-cli.sh config-user
+  ```
+  It updates the user config, renaming `USER_POLARIS_ID` to `USER_ID`, and drops `USER_POLARIS_SECRET` and
+  `USER_POLARIS_EMAIL`, which are now looked up from `users.csv`.  It can then be rerun any time to show the configured
+  user.
+- **Per-stack state ([#232](https://github.com/emrys-health/afon-core/issues/232)):** stacks are now deployed per stack
+  id, each with its own plan and tofu state, e.g. `stacks/aws-keycloak` and `terraform.aws-keycloak.tfstate`, rather
+  than per cloud.  A stack deployed with 1.0-beta-5 or earlier is the *legacy stack* of its cloud, so the first `deploy`
+  or `setup` in each cloud, and each cdktf env, stops and asks to delete it: rerun with `--replace`, or run
+  `manage-stack delete <stack-id>` first.  See
+  [upgrading to per-stack state](docs/stacks.md#upgrading-to-per-stack-state-one-off).
+- **AWS resource names ([#232](https://github.com/emrys-health/afon-core/issues/232)):** AWS resources are now named
+  from `<stack-type>-<CLUSTER_NAME>`, e.g. `keycloak-emrys-cluster`, so the first deploy recreates them.  The AWS
+  scripts acting on a stack now take its type, e.g. `afon-cli.sh aws-cluster keycloak`.
+- **Conflicting stacks ([#238](https://github.com/emrys-health/afon-core/issues/238)):** `deploy` and `setup` no longer
+  delete other running stacks they conflict with, unless given `--replace`, and `delete <stack-id>` deletes just that
+  stack (`delete aws-all` deletes every AWS stack).  `aws-keycloak` and `aws-polaris` can run side by side, as can
+  `aws-full` with `AWS_KEYCLOAK_EXTERNAL=true` (a new, optional property in `afon-aws.properties`).  Some step names
+  changed, e.g. `delete_stacks_conflicting_with_<stack-id>` and `deploy_complete_for_<stack-id>`, so check them before
+  resuming a run from a step.
+
+### Closed Issues (31)
+
+- [#240](https://github.com/emrys-health/afon-core/issues/240) Add config-vault command to store/retrieve config by env and tag
+- [#238](https://github.com/emrys-health/afon-core/issues/238) Handle conflicts while deploying an AWS stack
+- **enhancement, devops** — [#235](https://github.com/emrys-health/afon-core/issues/235) Add `manage-stack` command to manage all stack operations
+- **devops, configuration** — [#232](https://github.com/emrys-health/afon-core/issues/232) Allow multiple stack types to coexist in the same AWS cloud
+- **configuration** — [#231](https://github.com/emrys-health/afon-core/issues/231) Replace USER_POLARIS_SECRET/EMAIL with lookup via AfonUserProvider.  Rename USER_POLARIS_ID to USER_ID.
+- **devops** — [#230](https://github.com/emrys-health/afon-core/issues/230) Add AWS Keycloak-only stack
+- **enhancement, tech debt** — [#229](https://github.com/emrys-health/afon-core/issues/229) Add afon-rest module
+- **devops** — [#228](https://github.com/emrys-health/afon-core/issues/228) Ensure flag options override the corresponding env options in afon.sh and afon-cli.sh
+- **security, tech debt** — [#227](https://github.com/emrys-health/afon-core/issues/227) Ensure all OIDC tokens are retrieved via IdentityProvider
+- **devops, configuration** — [#226](https://github.com/emrys-health/afon-core/issues/226) Allow catalog exclusions in the user ACL
+- **security** — [#225](https://github.com/emrys-health/afon-core/issues/225) Give each Polaris user their own principal role
+- **devops** — [#224](https://github.com/emrys-health/afon-core/issues/224) Ensure <cloud>-polaris commands are aligned
+- **devops, tech debt** — [#223](https://github.com/emrys-health/afon-core/issues/223) Suppress runtime JVM warnings
+- **documentation** — [#221](https://github.com/emrys-health/afon-core/issues/221) Update docs to be command-centric
+- **enhancement, devops** — [#220](https://github.com/emrys-health/afon-core/issues/220) Add timings for tofu operations and make tofu output stream configurable.
+- **enhancement, devops** — [#219](https://github.com/emrys-health/afon-core/issues/219) Update release notes with issues closed for milestone version upon release
+- **enhancement** — [#217](https://github.com/emrys-health/afon-core/issues/217) Guacamole should use different db name for different clusters
+- **enhancement, configuration** — [#214](https://github.com/emrys-health/afon-core/issues/214) Add Afon theme UI branding for Guacamole and Keycloak
+- **devops, configuration** — [#212](https://github.com/emrys-health/afon-core/issues/212) Make github/secrets.sh env-aware
+- **devops** — [#208](https://github.com/emrys-health/afon-core/issues/208) Improve cleanupCRDs strategies in AWS Stacks
+- [#202](https://github.com/emrys-health/afon-core/issues/202) Create test data in the cloud for demos
+- **logging, security, smoke test** — [#199](https://github.com/emrys-health/afon-core/issues/199) PolarisRestClient fails silently upon auth failure
+- [#198](https://github.com/emrys-health/afon-core/issues/198) Fix circular dependency between OIDC setup, catalog creation, and Polaris user config on a new Keycloak db
+- [#195](https://github.com/emrys-health/afon-core/issues/195) Write deployment metadata to an Iceberg table
+- **devops, configuration** — [#192](https://github.com/emrys-health/afon-core/issues/192) Centralise all docker image names
+- **security, smoke test** — [#185](https://github.com/emrys-health/afon-core/issues/185) SmokeTest: data exfiltration
+- **security** — [#177](https://github.com/emrys-health/afon-core/issues/177) Remove guacadmin from Guacamole's DB
+- **security** — [#162](https://github.com/emrys-health/afon-core/issues/162) Key exfiltration danger
+- **configuration, tech debt** — [#159](https://github.com/emrys-health/afon-core/issues/159) Deployment to a given cloud stack should only require properties for that cloud provider
+- **security, configuration** — [#86](https://github.com/emrys-health/afon-core/issues/86) Remove all the Spark Connect pre-configured warehouses
+- **devops** — [#84](https://github.com/emrys-health/afon-core/issues/84) AWS hangs on tofu destroy
+
 ## 1.0-beta-5
 
 **Milestone:** [1.0-beta-5](https://github.com/emrys-health/afon-core/milestone/5)

@@ -39,13 +39,14 @@ public class AwsJupyterStack extends AwsPolarisStack {
     public AwsJupyterStack(final Construct scope,
                            final StackId stackId,
                            final AfonPropertyProvider properties) {
-        super(scope, stackId, properties, true);
+        // deploys its own KeyCloak, unless configured to use the one the aws-keycloak stack deploys
+        super(scope, stackId, properties, !isKeyCloakExternal(properties));
         List<ITerraformDependable> dependables = cloudProvider.getDependables();
         JupyterHubConfig jupyter = new AwsJupyterHubConfig(
             this,
             cloudProvider,
             properties,
-            getKeyCloakConfig().getAliasRecord());
+            getKeyCloakConfig() == null ? null : getKeyCloakConfig().getAliasRecord());
         NetworkConfig network = new NetworkConfig(this, properties);
         // Every Service the hub deploy creates (guacamole-web, the per-user VNC services,
         // jupyterhub-proxy-public) fires the AWS LB Controller's mutating webhook
