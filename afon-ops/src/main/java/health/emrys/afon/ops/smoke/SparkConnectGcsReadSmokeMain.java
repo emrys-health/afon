@@ -16,7 +16,7 @@ import static health.emrys.afon.ops.smoke.SparkConnectSmoke.SPARK_CONNECTOR_POD;
 import static java.lang.String.format;
 
 /**
- * The GCS counterpart of {@link SparkConnectS3ReadSmoke}: reads a text file from a public
+ * The GCS counterpart of {@link SparkConnectS3ReadSmokeMain}: reads a text file from a public
  * (anonymously readable) Google Cloud Storage bucket over Spark Connect. As with the S3 version,
  * the read succeeding is the failure condition.
  *
