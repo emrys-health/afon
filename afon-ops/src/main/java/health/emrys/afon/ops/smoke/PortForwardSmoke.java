@@ -40,22 +40,22 @@ public class PortForwardSmoke implements AutoCloseable {
 
     private static final String USAGE = "Usage: PortForwardSmoke [-n namespace] <pod> <localPort>:<remotePort>";
 
-    private final KubeClient client;
-    private final String namespace;
-    private final String pod;
-    private final int remotePort;
-    private final ServerSocket serverSocket;
+    private final KubeClient      client;
+    private final String          namespace;
+    private final String          pod;
+    private final int             remotePort;
+    private final ServerSocket    serverSocket;
     private final ExecutorService executor;
-    private final Set<Closeable> openResources = ConcurrentHashMap.newKeySet();
+    private final Set<Closeable>  openResources = ConcurrentHashMap.newKeySet();
 
     public PortForwardSmoke(KubeClient client, String namespace, String pod, int localPort, int remotePort)
-            throws IOException {
-        this.client = client;
-        this.namespace = namespace;
-        this.pod = pod;
-        this.remotePort = remotePort;
+    throws IOException {
+        this.client       = client;
+        this.namespace    = namespace;
+        this.pod          = pod;
+        this.remotePort   = remotePort;
         this.serverSocket = new ServerSocket(localPort, 50, InetAddress.getLoopbackAddress());
-        this.executor = Executors.newCachedThreadPool(daemonThreads());
+        this.executor     = Executors.newCachedThreadPool(daemonThreads());
         executor.submit(this::acceptLoop);
         logger.info("Forwarding localhost:{} -> {}/{}:{}", localPort(), namespace, pod, remotePort);
     }
@@ -87,13 +87,13 @@ public class PortForwardSmoke implements AutoCloseable {
             forward = client.portForward(namespace, pod, remotePort);
             openResources.add(forward);
             logger.debug("Connection from {} forwarded to {}/{}:{}",
-                    socket.getRemoteSocketAddress(), namespace, pod, remotePort);
+                         socket.getRemoteSocketAddress(), namespace, pod, remotePort);
 
-            InputStream fromLocal = socket.getInputStream();
-            OutputStream toLocal = socket.getOutputStream();
-            InputStream fromPod = forward.getInputStream(remotePort);
-            OutputStream toPod = forward.getOutboundStream(remotePort);
-            InputStream podErrors = forward.getErrorStream(remotePort);
+            InputStream  fromLocal = socket.getInputStream();
+            OutputStream toLocal   = socket.getOutputStream();
+            InputStream  fromPod   = forward.getInputStream(remotePort);
+            OutputStream toPod     = forward.getOutboundStream(remotePort);
+            InputStream  podErrors = forward.getErrorStream(remotePort);
 
             CountDownLatch finished = new CountDownLatch(1);
             executor.submit(() -> pipe(fromLocal, toPod, finished));
@@ -175,8 +175,8 @@ public class PortForwardSmoke implements AutoCloseable {
 
     public static void main(String[] args) throws Exception {
         String namespace = "default";
-        String pod = null;
-        String ports = null;
+        String pod       = null;
+        String ports     = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -200,13 +200,13 @@ public class PortForwardSmoke implements AutoCloseable {
         if (pod == null || ports == null) {
             throw new IllegalArgumentException(USAGE);
         }
-        String[] split = ports.split(":");
-        int localPort = Integer.parseInt(split[0]);
-        int remotePort = Integer.parseInt(split.length > 1 ? split[1] : split[0]);
+        String[] split      = ports.split(":");
+        int      localPort  = Integer.parseInt(split[0]);
+        int      remotePort = Integer.parseInt(split.length > 1 ? split[1] : split[0]);
 
-        KubeClient client = new KubeClient(new OpsPropertyProvider());
-        PortForwardSmoke session = new PortForwardSmoke(client, namespace, pod, localPort, remotePort);
-        CountDownLatch shutdown = new CountDownLatch(1);
+        KubeClient       client   = new KubeClient(new OpsPropertyProvider());
+        PortForwardSmoke session  = new PortForwardSmoke(client, namespace, pod, localPort, remotePort);
+        CountDownLatch   shutdown = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             session.close();
             try {
@@ -217,7 +217,7 @@ public class PortForwardSmoke implements AutoCloseable {
             shutdown.countDown();
         }));
         System.out.printf("Forwarding localhost:%d -> %s/%s:%d. Ctrl-C to stop.%n",
-                session.localPort(), namespace, pod, remotePort);
+                          session.localPort(), namespace, pod, remotePort);
         shutdown.await();
     }
 }
