@@ -28,8 +28,30 @@ for FILE in $CONFIG_FILES ; do {
     fi
   } done
 } done
+# Catalogs of a cloud sharing a bucket fail the validation, as Polaris rejects creating a catalog whose location
+# overlaps an existing catalog's.  Glue catalogs are excluded: being federated, they reuse an external catalog's bucket.
+SHARED=0
+for CATALOGS_FILE in $CONFIG_DIR/catalogs-*.properties ; do {
+  [ -f $CATALOGS_FILE ] || continue
+  CLOUD=$(basename $CATALOGS_FILE .properties | perl -pe 's/^catalogs-//; $_ = uc')
+  IDS=$(grep "^${CLOUD}_CATALOG_IDS=" $CATALOGS_FILE | cut -d= -f2 | tr ',' ' ' || true)
+  BUCKET_IDS=$(for ID in $IDS ; do {
+    if grep -qE "^${CLOUD}_CATALOG_TYPE_$ID=glue[[:space:]]*$" $CATALOGS_FILE ; then
+      continue
+    fi
+    BUCKET=$(grep "^${CLOUD}_BUCKET_NAME_$ID=" $CATALOGS_FILE | cut -d= -f2 | tr -d '[:space:]' || true)
+    if [ -n "$BUCKET" ] ; then
+      echo "$BUCKET $ID"
+    fi
+  } done)
+  for BUCKET in $(echo "$BUCKET_IDS" | awk 'NF { print $1 }' | sort | uniq -d) ; do {
+    echo "Shared bucket $BUCKET in $(basename $CATALOGS_FILE): catalogs $(echo "$BUCKET_IDS" | awk -v b=$BUCKET '$1 == b { print $2 }' | paste -sd, -)"
+    SHARED=$((SHARED + 1))
+  } done
+} done
 echo "NOTE: If validation fails, it may be useful to compare config dir with a previous config: diff --colour dir1 dir2"
-if [ $MISSING -gt 0 ]; then
-  echo "Validation failed: $MISSING config file(s) missing"
+if [ $MISSING -gt 0 ] || [ $SHARED -gt 0 ]; then
+  [ $MISSING -gt 0 ] && echo "Validation failed: $MISSING config file(s) missing"
+  [ $SHARED -gt 0 ] && echo "Validation failed: $SHARED bucket(s) shared by catalogs"
   exit 1
 fi
