@@ -14,13 +14,13 @@ import java.sql.SQLException;
 import static java.lang.String.format;
 
 
-public class GuacamoleDBSmoke {
+public class GuacamoleDBSmokeMain {
 
-    private static final Logger logger = LoggerFactory.getLogger(GuacamoleDBSmoke.class);
+    private static final Logger logger = LoggerFactory.getLogger(GuacamoleDBSmokeMain.class);
 
     public static void main(String[] args) {
         try {
-            new GuacamoleDBSmoke().findAdminInQuacDb();
+            new GuacamoleDBSmokeMain().findAdminInQuacDb();
         } catch (Exception e) {
             logger.error("Failed to check Guacamole's DB", e);
         }
