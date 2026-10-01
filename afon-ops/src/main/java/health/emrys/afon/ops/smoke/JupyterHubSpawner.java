@@ -36,6 +36,8 @@ import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
 /**
  * Asks JupyterHub to spawn a user's single-user notebook pod via the hub's REST API, reached through a
  * port-forward to the hub pod, then waits until the server is ready and its pod exists.
+ *
+ * Unfortunately, this way of spawning the Jupyter pod does not add an OIDC_TOKEN environment variable to the env.
  */
 public class JupyterHubSpawner {
 
