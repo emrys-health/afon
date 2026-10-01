@@ -1,14 +1,18 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.kube.KubeClient;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static health.emrys.afon.ops.smoke.SparkConnectSmoke.SPARK_CONNECTOR_POD;
 import static java.lang.String.format;
 
 /**
@@ -17,7 +21,6 @@ import static java.lang.String.format;
  * <p>Five things have to line up for this to work:
  *
  * <ol>
- *   <li>Run kubectl port-forward pod/spark-connector-0-driver 15002:15002</li>
  *   <li>The S3A settings are passed as <em>read options</em>, not as {@code spark.hadoop.*} builder
  *       configs. Over Spark Connect the builder's configs are applied to the remote session at
  *       runtime, but the server's Hadoop {@code Configuration} was built from its own
@@ -36,26 +39,45 @@ import static java.lang.String.format;
  *       chain and stall on EC2 instance metadata that a Kubernetes-hosted driver cannot reach.</li>
  * </ol>
  */
-public class SparkConnectS3ReadSmoke {
+public class SparkConnectS3ReadSmokeMain {
 
-    private static final Logger logger = LoggerFactory.getLogger(SparkConnectS3ReadSmoke.class);
+    private static final Logger logger = LoggerFactory.getLogger(SparkConnectS3ReadSmokeMain.class);
 
-    private static final String REMOTE   = "sc://localhost:15002";
-    private static final String REGION   = "eu-north-1";
+    private static final String REGION = "eu-north-1";
     private static final String ENDPOINT = "s3." + REGION + ".amazonaws.com";
     private static final String PATH     = "s3a://s3.carriagereturn.nl/hello.txt";
+    private final KubeClient client;
+    private final String namespace;
 
-    public Dataset<Row> readText() {
+    private SparkConnectS3ReadSmokeMain(KubeClient client, String namespace) {
+        this.client    = client;
+        this.namespace = namespace;
+    }
+
+    private Dataset<Row> readTextViaPortForward() throws IOException {
+        try (PortForwarder forward = new PortForwarder(client, namespace, SPARK_CONNECTOR_POD, 0, 15002)) {
+            String remote = "sc://localhost:" + forward.localPort();
+            return readText(remote);
+        }
+    }
+
+    private Dataset<Row> readText(String remote) {
         SparkSession spark = SparkSession
             .builder()
             .connect()
-            .remote(REMOTE)
+            .remote(remote)
             .getOrCreate();
 
-        logger.info("Reading {} via {}", PATH, REMOTE);
+        logger.info("Reading {} via {}", PATH, remote);
         Dataset<Row> lines = spark.read().options(anonymousS3Options()).text(PATH);
-        lines.show(false);
-        logger.error(format("Test failed. We should not have been allowed to read %s", PATH));
+        try {
+            lines.show(false);
+            String msg = format("Test failed. We should not have been allowed to read %s", PATH);
+            logger.error(msg);
+            throw new Exception(msg);
+        } catch (Exception e) {
+            logger.info("Could not read {} so test passes", PATH);
+        }
         return lines;
     }
 
@@ -70,7 +92,10 @@ public class SparkConnectS3ReadSmoke {
         return options;
     }
 
-    public static void main(final String[] args) {
-        new SparkConnectS3ReadSmoke().readText();
+    public static void main(final String[] args) throws Exception {
+        FilePropertyProvider properties = new FilePropertyProvider();
+        try (KubeClient client = new KubeClient(properties)) {
+            new SparkConnectS3ReadSmokeMain(client, "default").readTextViaPortForward();
+        }
     }
 }
