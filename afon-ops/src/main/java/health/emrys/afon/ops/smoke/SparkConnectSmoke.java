@@ -33,14 +33,16 @@ import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
  */
 public class SparkConnectSmoke {
 
-    private static final Logger logger         = LoggerFactory.getLogger(SparkConnectSmoke.class);
-    public static final  String TEST_WAREHOUSE = "test_warehouse";
+    private static final Logger logger = LoggerFactory.getLogger(SparkConnectSmoke.class);
+
+    public static final String TEST_WAREHOUSE      = "test_warehouse";
+    public static final String SPARK_CONNECTOR_POD = "spark-connector-0-driver";
 
     public SparkSession smokeTest(SparkConnectClient client, AfonCatalog catalog) {
         SparkSession spark    = client.sparkSession(TEST_WAREHOUSE, catalog.toString());
         String       tableFQN = String.format("%s.%s.%s", TEST_WAREHOUSE, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
         logger.info("Reading table {}", tableFQN);
-        spark.sql(String.format("SELECT * FROM %s", tableFQN)).show();
+        spark.sql(String.format("SELECT * FROM %s", tableFQN)).show(false);
         return spark;
     }
 
@@ -63,10 +65,10 @@ public class SparkConnectSmoke {
     private void callSparkConnectorInCluster(AfonPropertyProvider properties, AfonCatalog catalog) {
         try {
             KubeClient client = new KubeClient(properties);
-            try (PortForwardSmoke session = new PortForwardSmoke(
+            try (PortForwarder session = new PortForwarder(
                 client,
                 "default",
-                "spark-connector-0-driver",
+                SPARK_CONNECTOR_POD,
                 15002,
                 15002)) {
                 logger.info(String.format("Connecting to cloud %s", catalog.cloud()));

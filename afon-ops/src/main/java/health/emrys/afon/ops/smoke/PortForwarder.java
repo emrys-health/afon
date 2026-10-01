@@ -26,19 +26,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A port-forwarding session, like {@code kubectl port-forward}. Listens on localhost and tunnels each
  * accepted connection to a port on a pod until closed. Usage:
  * <pre>
- *   PortForwardSmoke [-n namespace] &lt;pod&gt; &lt;localPort&gt;:&lt;remotePort&gt;
+ *   PortForwarder [-n namespace] &lt;pod&gt; &lt;localPort&gt;:&lt;remotePort&gt;
  * </pre>
  * Eg
  * <pre>
- *   PortForwardSmoke spark-connector-0-driver 15002:15002
+ *   PortForwarder spark-connector-0-driver 15002:15002
  * </pre>
  * Runs until killed. A local port of 0 picks a free port.
  */
-public class PortForwardSmoke implements AutoCloseable {
+public class PortForwarder implements AutoCloseable {
 
-    private static final Logger logger = LoggerFactory.getLogger(PortForwardSmoke.class);
+    private static final Logger logger = LoggerFactory.getLogger(PortForwarder.class);
 
-    private static final String USAGE = "Usage: PortForwardSmoke [-n namespace] <pod> <localPort>:<remotePort>";
+    private static final String USAGE = "Usage: PortForwarder [-n namespace] <pod> <localPort>:<remotePort>";
 
     private final KubeClient      client;
     private final String          namespace;
@@ -48,7 +48,7 @@ public class PortForwardSmoke implements AutoCloseable {
     private final ExecutorService executor;
     private final Set<Closeable>  openResources = ConcurrentHashMap.newKeySet();
 
-    public PortForwardSmoke(KubeClient client, String namespace, String pod, int localPort, int remotePort)
+    public PortForwarder(KubeClient client, String namespace, String pod, int localPort, int remotePort)
     throws IOException {
         this.client       = client;
         this.namespace    = namespace;
@@ -204,9 +204,9 @@ public class PortForwardSmoke implements AutoCloseable {
         int      localPort  = Integer.parseInt(split[0]);
         int      remotePort = Integer.parseInt(split.length > 1 ? split[1] : split[0]);
 
-        KubeClient       client   = new KubeClient(new OpsPropertyProvider());
-        PortForwardSmoke session  = new PortForwardSmoke(client, namespace, pod, localPort, remotePort);
-        CountDownLatch   shutdown = new CountDownLatch(1);
+        KubeClient     client   = new KubeClient(new OpsPropertyProvider());
+        PortForwarder  session  = new PortForwarder(client, namespace, pod, localPort, remotePort);
+        CountDownLatch shutdown = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             session.close();
             try {
