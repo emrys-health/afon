@@ -50,8 +50,6 @@ public class JupyterHubSpawnSmoke {
 
     private static final Logger logger = LoggerFactory.getLogger(JupyterHubSpawnSmoke.class);
 
-    private static final String USAGE = "Usage: JupyterHubSpawnSmoke [-n namespace] [-t timeoutSeconds] <username>";
-
     /**
      * KubeSpawner annotates each pod it spawns with the (unescaped) hub username.
      */
@@ -97,7 +95,7 @@ public class JupyterHubSpawnSmoke {
      */
     private String spawn(String email, Duration timeout, String apiToken) throws Exception {
         String hubPod = findHubPod();
-        try (PortForwardSmoke forward = new PortForwardSmoke(client, namespace, hubPod, 0, HUB_PORT)) {
+        try (PortForwarder forward = new PortForwarder(client, namespace, hubPod, 0, HUB_PORT)) {
             String userUrl = "http://localhost:" + forward.localPort() + "/hub/api/users/"
                 + URLEncoder.encode(email, StandardCharsets.UTF_8);
 

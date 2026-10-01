@@ -1,14 +1,18 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.kube.KubeClient;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static health.emrys.afon.ops.smoke.SparkConnectSmoke.SPARK_CONNECTOR_POD;
 import static java.lang.String.format;
 
 /**
@@ -38,35 +42,48 @@ import static java.lang.String.format;
  * concept, and GCS is served from a single global endpoint, so there is no region for the client to
  * go looking for on the instance metadata service.
  */
-public class SparkConnectGcsReadSmoke {
+public class SparkConnectGcsReadSmokeMain {
 
-    private static final Logger logger = LoggerFactory.getLogger(SparkConnectGcsReadSmoke.class);
+    private static final Logger logger = LoggerFactory.getLogger(SparkConnectGcsReadSmokeMain.class);
 
-    private static final String REMOTE = "sc://localhost:15002";
-    private static final String PATH   = "gs://dataflow-samples/shakespeare/kinglear.txt";
-    private static final String GCS_FILE_SYSTEM =
+    private static final String     PATH            = "gs://dataflow-samples/shakespeare/kinglear.txt";
+    private static final String     GCS_FILE_SYSTEM =
         "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem";
+    private final        KubeClient client;
+    private final        String     namespace;
 
-    public Dataset<Row> readText() {
+    private SparkConnectGcsReadSmokeMain(KubeClient client, String namespace) {
+        this.client    = client;
+        this.namespace = namespace;
+    }
+
+    public Dataset<Row> readTextThroughPortForwarder() throws IOException {
+        try (PortForwarder forward = new PortForwarder(client, namespace, SPARK_CONNECTOR_POD, 0, 15002)) {
+            String remote = "sc://localhost:" + forward.localPort();
+            return readText(remote);
+        }
+    }
+
+    public Dataset<Row> readText(String remote) {
         SparkSession spark = SparkSession
             .builder()
             .connect()
-            .remote(REMOTE)
+            .remote(remote)
             .getOrCreate();
 
-        logger.info("Reading {} via {}", PATH, REMOTE);
+        logger.info("Reading {} via {}", PATH, remote);
         Dataset<Row> lines = null;
         try {
             lines = spark.read().options(anonymousGcsOptions()).text(PATH);
             lines.show(false);
-            logger.error(format("Test failed. We should not have been allowed to read %s", PATH));
         } catch (Exception e) {
             if (isMissingConnector(e)) {
                 logger.warn(format("The driver has no GCS connector, so " +
-                                    "reading %s failed due to the classpath rather than access " +
-                                    "control. If this is because downloading packages is disabled, everything is OK",
+                                       "reading %s failed due to the classpath rather than access " +
+                                       "control. If this is because downloading packages is disabled, everything is OK",
                                    PATH), e);
             }
+            lines = null;
         }
 
         return lines;
@@ -77,7 +94,7 @@ public class SparkConnectGcsReadSmoke {
             String message = cause.getMessage();
             if (cause instanceof ClassNotFoundException
                 || (message != null && (message.contains(GCS_FILE_SYSTEM)
-                                        || message.contains("No FileSystem for scheme")))) {
+                || message.contains("No FileSystem for scheme")))) {
                 return true;
             }
         }
@@ -90,13 +107,25 @@ public class SparkConnectGcsReadSmoke {
         options.put("fs.gs.impl", GCS_FILE_SYSTEM);
         options.put("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS");
         options.put("spark.jars.packages",
-                       "com.google.cloud.bigdataoss:gcs-connector:4.0.5");
+                    "com.google.cloud.bigdataoss:gcs-connector:4.0.5");
         // gcs-connector >= 2.2.3. Older releases spell this google.cloud.auth.null.enable=true.
         options.put("fs.gs.auth.type", "UNAUTHENTICATED");
         return options;
     }
 
     public static void main(final String[] args) {
-        new SparkConnectGcsReadSmoke().readText();
+        FilePropertyProvider properties = new FilePropertyProvider();
+        try (KubeClient client = new KubeClient(properties)) {
+            SparkConnectGcsReadSmokeMain app = new SparkConnectGcsReadSmokeMain(client, "default");
+            Dataset<Row>                 df  = app.readTextThroughPortForwarder();
+            if (df != null) {
+                String                   msg = format("Test failed. We should not have been allowed to read public bucket %s", PATH);
+                logger.error(msg);
+                throw new Exception(msg);
+            }
+            logger.info("Test complete. We could not talk to {}", PATH);
+        } catch (Exception e) {
+            logger.info("Test passed. We were blocked from reading {}", PATH);
+        }
     }
 }
