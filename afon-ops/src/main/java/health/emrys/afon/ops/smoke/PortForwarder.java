@@ -22,6 +22,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
+
 /**
  * A port-forwarding session, like {@code kubectl port-forward}. Listens on localhost and tunnels each
  * accepted connection to a port on a pod until closed. Usage:
@@ -174,7 +176,7 @@ public class PortForwarder implements AutoCloseable {
     }
 
     public static void main(String[] args) throws Exception {
-        String namespace = "default";
+        String namespace = KUBERNETES_NAMESPACE;
         String pod       = null;
         String ports     = null;
 

@@ -9,6 +9,8 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.Arrays;
 
+import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
+
 /**
  * Runs an arbitrary command in a pod, like {@code kubectl exec}. Usage:
  * <pre>
@@ -43,7 +45,7 @@ public class KubeExecSmoke {
     }
 
     public static void main(String[] args) throws Exception {
-        String namespace = "default";
+        String namespace = KUBERNETES_NAMESPACE;
         String container = null;
         Duration timeout = Duration.ofMinutes(5);
         String pod = null;

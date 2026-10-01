@@ -12,7 +12,8 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static health.emrys.afon.ops.smoke.SparkConnectSmoke.SPARK_CONNECTOR_POD;
+import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
+import static health.emrys.afon.ops.smoke.SparkConnectSmokeMain.SPARK_CONNECTOR_POD;
 import static java.lang.String.format;
 
 /**
@@ -95,7 +96,7 @@ public class SparkConnectS3ReadSmokeMain {
     public static void main(final String[] args) throws Exception {
         FilePropertyProvider properties = new FilePropertyProvider();
         try (KubeClient client = new KubeClient(properties)) {
-            new SparkConnectS3ReadSmokeMain(client, "default").readTextViaPortForward();
+            new SparkConnectS3ReadSmokeMain(client, KUBERNETES_NAMESPACE).readTextViaPortForward();
         }
     }
 }

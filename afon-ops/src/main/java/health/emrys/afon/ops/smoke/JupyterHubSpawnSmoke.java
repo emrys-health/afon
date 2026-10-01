@@ -31,6 +31,7 @@ import java.util.concurrent.TimeoutException;
 import static health.emrys.afon.cdk.JupyterHubConfig.HUB_LABELS;
 import static health.emrys.afon.cdk.JupyterHubConfig.HUB_PORT;
 import static health.emrys.afon.config.AfonProperty.USER_ID;
+import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
 
 /**
  * Asks JupyterHub to spawn a user's single-user notebook pod via the hub's REST API, reached through a
@@ -60,7 +61,7 @@ public class JupyterHubSpawnSmoke {
     public static void main(String[] args) throws Exception {
         FilePropertyProvider properties = new FilePropertyProvider();
         try (KubeClient client = new KubeClient(properties)) {
-            JupyterHubSpawnSmoke app = new JupyterHubSpawnSmoke(client, "default");
+            JupyterHubSpawnSmoke app = new JupyterHubSpawnSmoke(client, KUBERNETES_NAMESPACE);
             app.spawnWithJupyterToken(properties);
         }
     }
