@@ -417,20 +417,6 @@ public class NetworkConfig {
             .build();
     }
 
-    private static @NonNull NetworkPolicySpecEgress createWebEgressPolicy() {
-        String                          hdrsWebsite = "185.230.220.0/8";
-        List<NetworkPolicySpecEgressTo> externalIps = ipBlocksFor(hdrsWebsite);
-        List<NetworkPolicySpecEgressPorts> webPorts = List.of(
-            NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("80").build(),
-            NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build());
-        NetworkPolicySpecEgress webEgress = NetworkPolicySpecEgress
-            .builder()
-            .to(externalIps)
-            .ports(webPorts)
-            .build();
-        return webEgress;
-    }
-
     private static @NonNull NetworkPolicySpecEgress createDnsEgressPolicy() {
         List<NetworkPolicySpecEgressPorts> dnsPorts = List.of(
             NetworkPolicySpecEgressPorts.builder().protocol("UDP").port("53").build(),
@@ -514,17 +500,6 @@ public class NetworkConfig {
             .builder()
             .matchLabels(sparkOperatorLables)
             .build();
-    }
-
-    private static @NonNull List<NetworkPolicySpecEgressTo> ipBlocksFor(String clusterCIDR) {
-        return List.of(
-            NetworkPolicySpecEgressTo
-                .builder()
-                .ipBlock(NetworkPolicySpecEgressToIpBlock
-                             .builder()
-                             .cidr(clusterCIDR)
-                             .build())
-                .build());
     }
 
 }

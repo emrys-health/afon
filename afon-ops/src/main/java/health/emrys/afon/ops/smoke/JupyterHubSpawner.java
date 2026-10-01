@@ -35,21 +35,11 @@ import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
 
 /**
  * Asks JupyterHub to spawn a user's single-user notebook pod via the hub's REST API, reached through a
- * port-forward to the hub pod, then waits until the server is ready and its pod exists. Usage:
- * <pre>
- *   JupyterHubSpawnSmoke [-n namespace] [-t timeoutSeconds] &lt;username&gt;
- * </pre>
- * Eg
- * <pre>
- *   JUPYTERHUB_API_TOKEN=... JupyterHubSpawnSmoke someone@example.com
- * </pre>
- * The username is the hub's name for the user, ie their email (see {@code username_claim} in JupyterHubConfig).
- * The token in {@code JUPYTERHUB_API_TOKEN} needs the {@code admin:servers} scope (and {@code admin:users} if the
- * user has not been created in the hub yet), eg one registered as a service in {@code c.JupyterHub.services}.
+ * port-forward to the hub pod, then waits until the server is ready and its pod exists.
  */
-public class JupyterHubSpawnSmoke {
+public class JupyterHubSpawner {
 
-    private static final Logger logger = LoggerFactory.getLogger(JupyterHubSpawnSmoke.class);
+    private static final Logger logger = LoggerFactory.getLogger(JupyterHubSpawner.class);
 
     /**
      * KubeSpawner annotates each pod it spawns with the (unescaped) hub username.
@@ -61,7 +51,7 @@ public class JupyterHubSpawnSmoke {
     public static void main(String[] args) throws Exception {
         FilePropertyProvider properties = new FilePropertyProvider();
         try (KubeClient client = new KubeClient(properties)) {
-            JupyterHubSpawnSmoke app = new JupyterHubSpawnSmoke(client, KUBERNETES_NAMESPACE);
+            JupyterHubSpawner app = new JupyterHubSpawner(client, KUBERNETES_NAMESPACE);
             app.spawnWithJupyterToken(properties);
         }
     }
@@ -71,12 +61,15 @@ public class JupyterHubSpawnSmoke {
     private final HttpClient   http   = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public JupyterHubSpawnSmoke(KubeClient client, String namespace) {
+    public JupyterHubSpawner(KubeClient client, String namespace) {
         this.client    = client;
         this.namespace = namespace;
     }
 
-    private void spawnWithJupyterToken(AfonPropertyProvider properties) throws Exception {
+    /**
+     * @return the name of the user's notebook pod once the hub reports their server as ready.
+     */
+    String spawnWithJupyterToken(AfonPropertyProvider properties) throws Exception {
         String     email  = findEmailFor(properties.getValue(USER_ID));
         ExecResult result = getJupyterTokenFor(email, client);
         if (result.isSuccess()) {
@@ -84,6 +77,7 @@ public class JupyterHubSpawnSmoke {
             logger.info("JupyterHub Token: {}", token);
             String pod = spawn(email, Duration.ofMinutes(5), token);
             logger.info("Pod {} running", pod);
+            return pod;
         } else {
             String msg = "Could not get token. Error: " + result.stderr();
             logger.error(msg);
@@ -91,9 +85,6 @@ public class JupyterHubSpawnSmoke {
         }
     }
 
-    /**
-     * @return the name of the user's notebook pod once the hub reports their server as ready.
-     */
     private String spawn(String email, Duration timeout, String apiToken) throws Exception {
         String hubPod = findHubPod();
         try (PortForwarder forward = new PortForwarder(client, namespace, hubPod, 0, HUB_PORT)) {
@@ -202,6 +193,9 @@ public class JupyterHubSpawnSmoke {
         return podLabels != null && podLabels.entrySet().containsAll(labels.entrySet());
     }
 
+    /**
+     * Note this is fragile as the command to mint a Jupyter token is not fixed.
+     */
     private ExecResult getJupyterTokenFor(String email, KubeClient client) throws Exception {
         CliCommand command = new DeployCommand(client,
                                                "hub-deployment",
