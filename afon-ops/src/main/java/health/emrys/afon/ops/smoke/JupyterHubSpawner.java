@@ -61,6 +61,10 @@ public class JupyterHubSpawner {
     private final HttpClient   http   = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
     private final ObjectMapper mapper = new ObjectMapper();
 
+    public JupyterHubSpawner(KubeClient client) {
+        this(client, KUBERNETES_NAMESPACE);
+    }
+
     public JupyterHubSpawner(KubeClient client, String namespace) {
         this.client    = client;
         this.namespace = namespace;
