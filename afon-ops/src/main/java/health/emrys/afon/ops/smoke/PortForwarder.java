@@ -1,6 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.ops.config.OpsPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import io.kubernetes.client.PortForward;
 import org.slf4j.Logger;
@@ -206,7 +206,7 @@ public class PortForwarder implements AutoCloseable {
         int      localPort  = Integer.parseInt(split[0]);
         int      remotePort = Integer.parseInt(split.length > 1 ? split[1] : split[0]);
 
-        KubeClient     client   = new KubeClient(new OpsPropertyProvider());
+        KubeClient     client   = new KubeClient(new FilePropertyProvider());
         PortForwarder  session  = new PortForwarder(client, namespace, pod, localPort, remotePort);
         CountDownLatch shutdown = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
