@@ -120,33 +120,39 @@ The notebook reads these environment variables, all optional apart from `OIDC_TO
 ## Regression suite
 
 ```shell
-smoke/run-regression-suite.sh [--env <env>] [--deploy <stacks>] [--suite <file>] [--tests <tests>] [--list]
+smoke/run-regression-suite.sh [--env <env>] [--deploy <stacks>] [--suite <file>] [--tests <tests>]
+                              [--logging-console <level>] [--list]
 ```
 
-runs the tests listed in a suite file, by default [smoke/regression-suite.csv](../smoke/regression-suite.csv), in order, each with
-`./afon.sh -a exec -ec <class> -ea <args>`. Its first line is the header `name|class|args`, and each other line a test:
-its name, its class, relative to the `health.emrys.afon` package, and its args, if any, separated by spaces. Fields are
-separated by `|`, rather than commas, so that args may contain commas. Blank lines and lines starting with `#` are ignored. The default suite runs:
+runs the tests listed in a suite file, by default [smoke/regression-aws.csv](../smoke/regression-aws.csv), in
+order, each with `./afon.sh -a exec -ec <class> -ea <args>`. Its first line is the header `name|class|args`, and each
+other line a test: its name, its class, relative to the `health.emrys.afon` package, and its args, if any, separated by
+spaces. Fields are separated by `|`, rather than commas, so that args may contain commas. Blank lines and lines
+starting with `#` are ignored. For example:
 
-| Test                  | Class                                 | Checks                                                       |
-|-----------------------|---------------------------------------|--------------------------------------------------------------|
-| `spark-connect-aws`   | `SparkConnectSmoke aws`               | the setup table is read from the `aws` catalog               |
-| `spark-connect-azure` | `SparkConnectSmoke azure`             | the setup table is read from the `azure` catalog             |
-| `spark-connect-gcp`   | `SparkConnectSmoke gcp`               | the setup table is read from the `gcp` catalog               |
+```
+name|class|args
+network|ops.smoke.NetworkSmokeMain|
+spark-connect|ops.smoke.SparkConnectSmokeMain|
+```
 
-- `--env` selects the config and cdktf envs, as `./afon.sh --env <env>` does, for every command the suite runs. It
-  does not change the `kubectl` context. As the env switch re-points the shared `$AFON_HOME/config` and
-  `$AFON_HOME/cdktf` symlinks, do not run another afon command on a different env while the suite runs.
+- `--env` selects the config and cdktf envs, as `./afon.sh --env <env>` does, for every command the suite runs. As
+  the env switch re-points the shared `$AFON_HOME/config` and `$AFON_HOME/cdktf` symlinks, do not run another afon
+  command on a different env while the suite runs. It also makes the env's AWS full stack cluster the current
+  `kubectl` context, after any deploys, with `./afon.sh -a aws-update-kube-config full -e <env>`, leaving it so after
+  the suite.
 - `--deploy` deploys the comma-separated stacks first, in order, with `./afon.sh -a manage-stack deploy <stack>`,
   eg `--deploy aws-full,azure-polaris,gcp-polaris`. The tests are not run if a deploy fails.
 - `--suite` reads the tests from another file, of the same format, eg a subset of the tests for a single cloud.
-- `--tests` runs only the comma-separated tests, eg `--tests spark-connect-aws,spark-connect-gcp`. All are run by default.
+- `--tests` runs only the comma-separated tests, eg `--tests network,spark-connect`. All are run by default.
+- `--logging-console` sets the logging console level, one of `OFF|DEBUG|INFO|WARN|ERROR`, of every afon command the
+  suite runs, by exporting `AFON_LOGGING_CONSOLE`. It defaults to the logback configuration's, `INFO`.
 - `--list` lists the tests.
 
-The tests run against the cluster of the current `kubectl` context, which must be the AWS full stack's: the
-`spark-connect-azure` and `spark-connect-gcp` tests read their catalogs through its Spark Connect server, so they also
-need the Azure and GCP Polaris stacks. All the selected tests are run, even if some fail, each one's output being
-written to `smoke/target/regression/<test>.log`. The script ends with a summary, and exits non-zero if any test failed.
+The tests run against the cluster of the current `kubectl` context, which must be the AWS full stack's: the Spark
+Connect tests read the Azure and GCP catalogs through its Spark Connect server, so they also need the Azure and GCP
+Polaris stacks. All the selected tests are run, even if some fail, each one's output being written to
+`smoke/target/regression/<test>.log`. The script ends with a summary, and exits non-zero if any test failed.
 
 ## Other smoke tests
 
