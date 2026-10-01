@@ -13,7 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
-import static health.emrys.afon.ops.smoke.SparkConnectSmokeMain.SPARK_CONNECTOR_POD;
+import static health.emrys.afon.ops.smoke.SmokeUtils.SPARK_CONNECTOR_POD;
 import static java.lang.String.format;
 
 /**

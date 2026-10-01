@@ -36,8 +36,6 @@ public class SparkConnectSmokeMain {
 
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectSmokeMain.class);
 
-    public static final String SPARK_CONNECTOR_POD = "spark-connector-0-driver";
-
     public static void main(String[] args) {
         if (args.length == 0) {
             System.out.printf("%s requires argument: cloud", SparkConnectSmokeMain.class.getSimpleName());
@@ -75,7 +73,7 @@ public class SparkConnectSmokeMain {
             try (PortForwarder session = new PortForwarder(
                 client,
                 KUBERNETES_NAMESPACE,
-                SPARK_CONNECTOR_POD,
+                SmokeUtils.SPARK_CONNECTOR_POD,
                 15002,
                 15002)) {
                 SparkSession spark = smokeTest(new SparkConnectClient(properties));
