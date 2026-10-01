@@ -42,6 +42,8 @@ import static java.lang.String.format;
  * <p>The S3 version's remaining two settings have no GCS equivalent: path-style addressing is an S3
  * concept, and GCS is served from a single global endpoint, so there is no region for the client to
  * go looking for on the instance metadata service.
+ *
+ * TODO check that PATH can indeed be seen outside the cluster
  */
 public class SparkConnectGcsReadSmokeMain {
 

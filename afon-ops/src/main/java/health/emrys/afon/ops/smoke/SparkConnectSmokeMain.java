@@ -48,8 +48,8 @@ public class SparkConnectSmokeMain {
     private final AfonCatalog          catalog;
 
     public SparkConnectSmokeMain() {
-        AfonCloud cloud           = AfonCloud.AWS; // TODO make configurable
         var       properties      = new FilePropertyProvider();
+        AfonCloud cloud           = new SmokeUtils(properties).cloudToTest();
         String    polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
         var       afonCatalogs    = new AfonCatalogs(properties);
         properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
