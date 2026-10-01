@@ -38,3 +38,33 @@ which is wiped out at each checkout.   On the runner, the `$AFON_HOME` points to
 The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log is uploaded as the
 `afon-stack-aws-logs-<run id>` artifact.
 
+## Slack notifications
+
+The [Acceptance Tests (Linux)](../.github/workflows/acceptance-tests-linux.yml),
+[AWS Stack (Linux)](../.github/workflows/aws-stack-linux.yml) and [CLI (Linux)](../.github/workflows/cli-linux.yml)
+workflows post to the Slack channel `#afon-ci` on `emryshealth.slack.com` when their job fails, with the workflow, the
+branch, the commit, what triggered the run and a link to it.  Successful runs post nothing.
+
+The channel is the one the Slack incoming webhook was created for, not something set in the workflows.  The webhook
+URL is held in the repository secret `SLACK_WEBHOOK_URL`.  Without it, the workflows only warn that no notification
+was sent, and do not fail on that account.
+
+To set up the webhook, or to replace it:
+
+1. Go to https://api.slack.com/apps, **Create New App** > **From scratch**, name it eg `afon CI` and pick the
+   `emryshealth` workspace.
+2. In **Incoming Webhooks**, switch them on, then **Add New Webhook to Workspace** and choose `#afon-ci`.  The
+   workspace may need an admin to approve the app.
+3. Copy the webhook URL and store it as the repository secret, which prompts for its value so that it is not left in
+   the shell history:
+
+   ```bash
+   gh secret set SLACK_WEBHOOK_URL --repo emrys-health/afon-core
+   ```
+
+**NOTE**: anyone with the webhook URL can post to the channel, so keep it in the secret only.  To post to another
+channel, create a webhook for that channel and replace the secret.
+
+GitHub itself also notifies the user who started a run when it fails, ie who pushed the commit or ran the workflow
+by hand, under **Settings** > **Notifications** > **System** > **Actions** of their GitHub account.  It does not
+notify anyone else, hence the Slack channel.
