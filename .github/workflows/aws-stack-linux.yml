@@ -55,6 +55,8 @@ on:
 
 permissions:
   contents: read
+  # To read the previous runs, for the Slack recovery notification.
+  actions: read
 
 # One stack action at a time, and never cancel one in flight: a half-applied plan leaves both AWS
 # and the local tfstate in a state the next run has to untangle by hand.
@@ -274,21 +276,18 @@ jobs:
         if: always()
         run: rm -rf "$AFON_HOME/config"
 
-      # Posts to the Slack channel #afon-ci (emryshealth.slack.com) when the job fails.  The channel is the one
-      # the incoming webhook was created for, held in the repository secret SLACK_WEBHOOK_URL.  Without it, the
-      # step only warns, so that a missing webhook does not hide the actual failure.
+      # Posts to the Slack channel #afon-ci (emryshealth.slack.com) when the job fails, and when it passes again after
+      # a failure, see scripts/github/slack.sh.  The channel is the one the incoming webhook was created for, held in
+      # the repository secret SLACK_WEBHOOK_URL.
       - name: Notify Slack on failure
         if: failure()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          set -euo pipefail
-          if [ -z "$SLACK_WEBHOOK_URL" ]; then
-            echo "::warning::No SLACK_WEBHOOK_URL secret, so no Slack notification sent"
-            exit 0
-          fi
-          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          TEXT=":x: *$GITHUB_WORKFLOW* failed on \`$GITHUB_REF_NAME\` (\`${GITHUB_SHA::8}\`, $GITHUB_EVENT_NAME by $GITHUB_ACTOR): <$RUN_URL|run $GITHUB_RUN_ID>"
-          jq -n --arg text "$TEXT" '{text: $text}' \
-            | curl -sSf -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK_URL" > /dev/null
-          echo "Notified Slack of the failure"
+        run: scripts/github/slack.sh failure
+
+      - name: Notify Slack on recovery
+        if: success()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: scripts/github/slack.sh recovery

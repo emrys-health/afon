@@ -43,11 +43,18 @@ The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log i
 The [Acceptance Tests (Linux)](../.github/workflows/acceptance-tests-linux.yml),
 [AWS Stack (Linux)](../.github/workflows/aws-stack-linux.yml) and [CLI (Linux)](../.github/workflows/cli-linux.yml)
 workflows post to the Slack channel `#afon-ci` on `emryshealth.slack.com` when their job fails, with the workflow, the
-branch, the commit, what triggered the run and a link to it.  Successful runs post nothing.
+branch, the commit, what triggered the run and a link to it.  When a job then passes again, they post that it has
+recovered.  Other successful runs post nothing.
+
+A job has recovered when the run before it failed: the previous attempt of the same run, when it is re-run, else the
+latest earlier run of the same workflow on the same branch, passing over skipped and cancelled runs.  For the
+AWS Stack workflow, that earlier run may be of another action or stack.  The notifications are posted by
+[slack.sh](../scripts/github/slack.sh), which reads the earlier runs with the job's own token, hence the
+`actions: read` permission of the workflows.
 
 The channel is the one the Slack incoming webhook was created for, not something set in the workflows.  The webhook
 URL is held in the repository secret `SLACK_WEBHOOK_URL`.  Without it, the workflows only warn that no notification
-was sent, and do not fail on that account.
+was sent, and do not fail on that account.  Likewise if Slack or the GitHub API cannot be reached.
 
 To set up the webhook, or to replace it:
 
