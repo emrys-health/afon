@@ -1,4 +1,5 @@
 name|class|args
+guacamole-db|ops.smoke.GuacamoleDBSmokeMain|
 network|ops.smoke.NetworkSmokeMain|
 spark-connect|ops.smoke.SparkConnectSmokeMain|
 spark-gcs-read|ops.smoke.SparkConnectGcsReadSmokeMain|
