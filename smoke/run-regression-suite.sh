@@ -55,12 +55,10 @@ QUIET_MAVEN_OPTS="-Dorg.slf4j.simpleLogger.log.org.codehaus.mojo.exec=off -Dorg.
 # a terminal.  The passed tests are in green, which logback has no level for.
 INFO_COLOR=
 SUCCESS_COLOR=
-ERROR_COLOR=
 RESET_COLOR=
 if [ -t 1 ]; then
   INFO_COLOR=$(printf '\033[34m')
   SUCCESS_COLOR=$(printf '\033[32m')
-  ERROR_COLOR=$(printf '\033[1;31m')
   RESET_COLOR=$(printf '\033[0;39m')
 fi
 STDERR_WARN_COLOR=
@@ -433,13 +431,13 @@ banner "Regression summary (log in $(afon_log_file))"
 # Empty arrays are guarded, as expanding them fails under set -u in bash 3.2, the macOS default.
 if [ ${#PASSED[@]} -gt 0 ]; then
   for name in "${PASSED[@]}"; do
-    echo "${SUCCESS_COLOR}PASSED  $name${RESET_COLOR}"
+    success "$name passed"
   done
 fi
 if [ ${#FAILED[@]} -gt 0 ]; then
   for name in "${FAILED[@]}"; do
-    echo "${ERROR_COLOR}FAILED  $name${RESET_COLOR}"
+    error "$name failed"
   done
 fi
-echo "${#PASSED[@]} passed, ${#FAILED[@]} failed"
+banner "${#PASSED[@]} passed, ${#FAILED[@]} failed"
 [ ${#FAILED[@]} -eq 0 ]
