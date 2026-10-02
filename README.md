@@ -13,6 +13,7 @@ It was built to solve a gap in the health research data ecosystem; there is no m
 This repository is for SDE or TRE administrators and their support teams who want to deploy and manage a data fabric for a research project.
 
 This repository is also for members of the health data community who want to contribute to the project or learn more about how it works.
+See [contributing](docs/contributing/README.md) for how to report issues, propose changes and open pull requests.
 
 In any project the infrastructure can be divided into the organisation hosting the central TRE (a host), where a researcher will log in and analyse data, and the organisations hosting the data that will be used by the researchers (a data partner).
 
