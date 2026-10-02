@@ -1,4 +1,4 @@
-package health.emrys.afon.ops.smoke;
+package health.emrys.afon.ops.kube.tools;
 
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
 
 /**
  * A port-forwarding session, like {@code kubectl port-forward}. Listens on localhost and tunnels each
@@ -42,7 +42,7 @@ public class PortForwarder implements AutoCloseable {
 
     private static final String USAGE = "Usage: PortForwarder [-n namespace] <pod> <localPort>:<remotePort>";
 
-    private final KubeClient      client;
+    private final KubeClient client;
     private final String          namespace;
     private final String          pod;
     private final int             remotePort;

@@ -2,21 +2,28 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
-import health.emrys.afon.ops.smoke.tasks.BasicCurl;
-import health.emrys.afon.polaris.config.PolarisEndpoint;
+import health.emrys.afon.ops.kube.commands.CurlCommand;
+import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
+import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
-import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 import static health.emrys.afon.polaris.config.PolarisEndpoint.getPolarisEndpointFor;
@@ -26,65 +33,45 @@ public class NetworkSmokeMain {
 
     static final  Logger               logger = LoggerFactory.getLogger(NetworkSmokeMain.class);
     private final AfonPropertyProvider properties;
-    private final KubeClient           client;
+    private final KubeClient client;
 
     private NetworkSmokeMain(AfonPropertyProvider properties, KubeClient client) {
         this.properties = properties;
         this.client     = client;
     }
 
-    public static void main(String[] args) throws Exception {
-        FilePropertyProvider filePropertyProvider = new FilePropertyProvider();
-        try (KubeClient client = new KubeClient(filePropertyProvider)) {
-            NetworkSmokeMain app    = new NetworkSmokeMain(filePropertyProvider, client);
-            List<ExecResult> errors = app.checkNetworkWith();
-            if (errors.isEmpty()) {
-                logger.info("Network Smoke is OK");
-            } else {
-                StringBuilder szb = new StringBuilder();
-                for (ExecResult error : errors) {
-                    szb.append(error).append("\n");
-                }
-                logger.error(szb.toString());
-            }
-        } catch (Exception e) {
-            logger.error(e.getMessage(), e);
-            throw e;
-        }
-    }
-
     interface Check {
         List<ExecResult> check(String pod) throws Exception;
     }
 
-    public List<ExecResult> checkNetworkWith() throws Exception {
+    public List<ExecResult> checkNetworkWithPods() throws Exception {
         List<ExecResult> results = new ArrayList<>();
         results.addAll(checkPolarisOnlyAccessibleFromCluster());
-        results.addAll(checkNetworkWith(sparkPods(), List.of(this::checkCanSeeAllowedDomains,
+        results.addAll(checkNetworkWithPods(sparkPods(), List.of(this::checkCanSeeAllowedDomains,
                                                              this::checkCannotSeeOtherBuckets)));
-        results.addAll(checkNetworkWith(jupyterPods(), List.of(this::checkCannotSeeOtherBuckets)));
+        results.addAll(checkNetworkWithPods(jupyterPods(), List.of(this::checkCannotSeeOtherBuckets)));
         return results;
     }
 
     private List<ExecResult> checkPolarisOnlyAccessibleFromCluster() throws Exception {
-        SmokeUtils        smokeUtils    = new SmokeUtils(properties);
-        AfonCloud         cloud         = smokeUtils.cloudToTest();
+        SmokeConfig smokeConfig = new SmokeConfig(properties);
+        AfonCloud         cloud         = smokeConfig.cloud();
         String            polarisHost   = getPolarisEndpointFor(cloud, properties);
         PolarisRestClient polarisClient = PolarisRestClientFactory.clientFactory().createClient(properties, polarisHost);
         List<ExecResult>  results = new ArrayList<>();
         try {
-            logger.warn("About to call {}. Note that if whitelisting is turned on, this can take some time. TODO add a timeout",
-                        polarisHost);
-            HttpResponse response = polarisClient.get("/", "bogus_token");
+            logger.warn("About to call {}. Note that if whitelisting is turned on, this can take up to {}s",
+                        polarisHost, smokeConfig.callTimeoutSeconds());
+            HttpResponse response = getWithProgress(polarisClient, polarisHost, smokeConfig);
             int          httpCode = response.getCode(); // probably a 403 or 404 but that's not the point!
             String       message  = format(
                 """
                     Managed to make an HTTP call to %s. Received HTTP code %d. 
                     Run this to make Polaris white list the TRE's IP address:
                     
-                    kubectl annotate ingress polaris-ingress -n default --overwrite alb.ingress.kubernetes.io/inbound-cidrs=EGRESS_IP/32
+                    kubectl annotate ingress polaris-ingress -n default --overwrite alb.ingress.kubernetes.io/inbound-cidrs=%s/32
                     
-                    The configured EGRESS_IP of this cluster is %s
+                    The EGRESS_IP of this cluster is configured in config/afon-aws.properties.
                     
                     If you want to add this machines IP address to that whitelist (danger, Will Robinson), get it via:
                     
@@ -94,7 +81,7 @@ public class NetworkSmokeMain {
                     """,
                 polarisHost,
                 httpCode,
-                smokeUtils.egressIP());
+                smokeConfig.egressIP());
             results.add(new ExecResult(-1, message, "", format("curl https://%s", polarisHost)));
         } catch (IOException x) {
             String msg = format("Was unable to talk to %s. Error = %s", polarisHost, x.getMessage());
@@ -104,37 +91,76 @@ public class NetworkSmokeMain {
         return results;
     }
 
-    public List<ExecResult> checkNetworkWith(List<String> pods, List<Check> checks) throws Exception {
-        List<ExecResult> errors = new ArrayList<>();
+    /**
+     * Calls Polaris' root, logging every {@link SmokeConfig#progressIntervalSeconds()} that it is still waiting for a
+     * response, as a call from outside the cluster to a restricted Polaris only fails once it times out, and giving up
+     * after {@link SmokeConfig#callTimeoutSeconds()}, rather than after the system's own connect timeout, eg 75s per
+     * address on macOS.
+     *
+     * @throws IOException if the call fails, eg as the connection timed out, or gets no response in time
+     */
+    private HttpResponse getWithProgress(PolarisRestClient polarisClient, String polarisHost, SmokeConfig smokeConfig)
+        throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<HttpResponse> response = executor.submit(() -> polarisClient.get("/", "bogus_token"));
+            long start = System.nanoTime();
+            while (true) {
+                try {
+                    return response.get(smokeConfig.progressIntervalSeconds(), TimeUnit.SECONDS);
+                } catch (TimeoutException e) {
+                    long elapsed = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start);
+                    if (elapsed >= smokeConfig.callTimeoutSeconds()) {
+                        response.cancel(true);
+                        throw new SocketTimeoutException(format("No response within %ds", elapsed));
+                    }
+                    logger.info("Still waiting for a response from {} after {}s", polarisHost, elapsed);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof IOException cause) {
+                        throw cause;
+                    }
+                    throw e;
+                }
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private List<ExecResult> checkNetworkWithPods(List<String> pods, List<Check> checks) throws Exception {
+        List<ExecResult> results = new ArrayList<>();
         for (String pod : pods) {
             logger.info("Checking pod {}", pod);
             try {
                 for (Check check : checks) {
-                    errors.addAll(check.check(pod));
+                    results.addAll(check.check(pod));
                 }
             } catch (Exception e) {
-                logger.error("Could not execute on pod" + pod, e);
+                logger.error("Could not execute on pod " + pod, e);
+                results.add(new ExecResult(-1, "", e.getMessage(), format("checks on pod %s", pod)));
             }
         }
-        return errors;
+        return results;
     }
 
     protected List<String> sparkPods() throws Exception {
-        return client.listPods().stream().map(x -> x.getMetadata().getName()).filter(name -> {
+        List<String> pods = client.listPods().stream().map(x -> x.getMetadata().getName()).filter(name -> {
             return //name.contains(MASTER) ||name.contains("emrys-worker") || // don't need to worry about Spark as need the connector to upload JARS
-                name.contains("spark-connector");
+                    name.contains("spark-connector");
         }).toList();
+        logger.info("Checking Spark pods: {}", pods);
+        return pods;
     }
 
     protected List<String> jupyterPods() throws Exception {
         List<String> pods = new ArrayList<>();
         pods.add(new JupyterHubSpawner(client).spawnWithJupyterToken(properties));
-        logger.info("Will check pods: {}", pods);
+        logger.info("Checking Jupyter pods: {}", pods);
         return pods;
     }
 
     private List<ExecResult> checkCannotSeeOtherBuckets(String pod) throws Exception {
-        List<ExecResult> errors = new ArrayList<>();
+        List<ExecResult> results = new ArrayList<>();
         String[] providers = new String[]{
             "unreachablebucket.eu-west-2.amazonaws.com",
             "unreachablebucket.blob.core.windows.net",
@@ -143,20 +169,40 @@ public class NetworkSmokeMain {
             "pypi.org",
             };
         for (String provider : providers) {
-            BasicCurl command = new BasicCurl(client, pod, provider, false);
-            errors.addAll(command.run());
+            CurlCommand command = new CurlCommand(client, pod, provider, false);
+            results.addAll(command.run());
         }
-        return errors;
+        return results;
     }
 
     private List<ExecResult> checkCanSeeAllowedDomains(String pod) throws Exception {
-        List<ExecResult> errors = new ArrayList<>();
-        String           csv    = properties.getValue(ALLOWED_DOMAINS_CSV);
-        for (String domain : csv.split(",")) {
-            BasicCurl command = new BasicCurl(client, pod, domain, true);
-            errors.addAll(command.run());
+        List<ExecResult> results = new ArrayList<>();
+        String allowedDomains = properties.getValue(ALLOWED_DOMAINS_CSV);
+        for (String domain : allowedDomains.split(",")) {
+            CurlCommand command = new CurlCommand(client, pod, domain, true);
+            results.addAll(command.run());
         }
-        return errors;
+        return results;
+    }
+
+    public static void main(String[] args) throws Exception {
+        int exitCode = 0;
+        AfonPropertyProvider properties = new OpsPropertyProvider();
+        try (KubeClient client = new KubeClient(properties)) {
+            NetworkSmokeMain app    = new NetworkSmokeMain(properties, client);
+            List<ExecResult> results  = app.checkNetworkWithPods();
+            List<ExecResult> failures = results.stream().filter(result -> !result.isSuccess()).toList();
+            if (!failures.isEmpty()) {
+                logger.error("{} of {} network checks failed:\n{}", failures.size(), results.size(), ExecResult.join(failures));
+                exitCode = 1;
+            } else {
+                logger.info("Network smoke test passed: {} checks", results.size());
+            }
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            exitCode = 1;
+        }
+        System.exit(exitCode);
     }
 
 }

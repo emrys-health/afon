@@ -123,6 +123,8 @@ public enum AfonProperty {
     SPARK_CONNECT_URL("SPARK_CONNECT_URL"),
 
     ALLOWED_DOMAINS_CSV("ALLOWED_DOMAINS_CSV"),
+    /** The cloud of the stack hosting the TRE, eg {@code aws-full}, one of aws|azure|gcp.  Defaults to aws. */
+    TRE_CLOUD("TRE_CLOUD"),
     ;
 
     private final String name;

@@ -28,7 +28,9 @@
 # The tests run against the cluster of the current kubectl context, which must be the AWS full stack's: the Spark
 # Connect tests read the azure and gcp catalogs through its Spark Connect server.  Given --env, the current context
 # is set to the env's AWS full stack cluster, after any deploys, with
-# './afon.sh -a aws-update-kube-config full -e <env>', and left so.
+# './afon.sh -a aws-update-kube-config full -e <env>', and left so.  Its Polaris ingress is then restricted, as the
+# network smoke test expects, to the AWS_POLARIS_ALLOWED_CIDRS of afon-aws.properties plus the cluster's egress IP,
+# that of its NAT gateway, or by default AWS_EGRESS_IP.
 # The afon.sh env vars apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
 #
 # As switching env re-points the shared $AFON_HOME symlinks, and the current context of the shared ~/.kube/config,
@@ -150,6 +152,70 @@ update_kube_config() {
   fi
 }
 
+# Prints property $1 of afon-aws.properties, without whitespace, or nothing if it is not set.
+aws_property() {
+  grep -h "^$1=" "${AFON_HOME:-$HOME/.afon}/config/afon-aws.properties" 2>/dev/null | tail -1 | cut -d= -f2- \
+    | tr -d '[:space:]' || true
+}
+
+# Prints the public IP of the NAT gateway of the cluster of the current kubectl context, the address all its
+# outbound traffic comes from, or nothing if it cannot be found, eg if the context is not an EKS cluster's.
+cluster_egress_ip() {
+  local context region cluster ip
+  context=$(kubectl config current-context 2>/dev/null || true)
+  # As written by 'aws eks update-kubeconfig': arn:aws:eks:<region>:<account>:cluster/<cluster>
+  case "$context" in
+    arn:aws:eks:*:cluster/*) ;;
+    *) return 0 ;;
+  esac
+  region=$(echo "$context" | cut -d: -f4)
+  cluster=$(echo "$context" | cut -d/ -f2)
+  # The NAT gateway is named after the cluster, see AwsComponentNames.getNatGatewayName.
+  ip=$(aws ec2 describe-nat-gateways --region "$region" \
+         --filter "Name=tag:Name,Values=cdktf-eks-nat-$cluster" Name=state,Values=available \
+         --query 'NatGateways[0].NatGatewayAddresses[0].PublicIp' --output text 2>/dev/null || true)
+  if [ -n "$ip" ] && [ "$ip" != "None" ]; then
+    echo "$ip"
+  fi
+}
+
+# Restricts the Polaris ingress of the current kubectl context to the CIDRs AwsPolarisStack admits when
+# AWS_POLARIS_ALLOWED_CIDRS is set: those CIDRs plus the cluster's egress IP, so that its pods calling Polaris by
+# its public domain name are not locked out.  The egress IP is the one of the cluster's NAT gateway, as the
+# AWS_EGRESS_IP of afon-aws.properties may be stale, eg if the stack was deployed without it, or by default
+# AWS_EGRESS_IP if the NAT gateway cannot be found.  Exits if the annotation fails, and is skipped, with a
+# warning, if there is no egress IP.
+restrict_polaris_ingress() {
+  local configured_ip egress_ip cidrs cidr
+  configured_ip=$(aws_property AWS_EGRESS_IP)
+  egress_ip=$(cluster_egress_ip)
+  if [ -z "$egress_ip" ]; then
+    echo "WARNING: no NAT gateway found for kubectl context $(kubectl config current-context 2>/dev/null || true):" \
+         "using AWS_EGRESS_IP '$configured_ip'" >&2
+    egress_ip="$configured_ip"
+  elif [ -n "$configured_ip" ] && [ "$configured_ip" != "$egress_ip" ]; then
+    echo "WARNING: the cluster's egress IP $egress_ip is not AWS_EGRESS_IP $configured_ip: using $egress_ip." \
+         "Update AWS_EGRESS_IP for the stack to keep its egress IP across rebuilds" >&2
+  fi
+  if [ -z "$egress_ip" ]; then
+    echo "WARNING: no egress IP for the cluster: not restricting the Polaris ingress" >&2
+    return
+  fi
+  cidrs=
+  for cidr in $(aws_property AWS_POLARIS_ALLOWED_CIDRS | tr ',' ' '); do
+    if [ "$cidr" != "$egress_ip/32" ]; then
+      cidrs="$cidrs$cidr,"
+    fi
+  done
+  cidrs="$cidrs$egress_ip/32"
+  echo "=== Restricting the Polaris ingress to $cidrs"
+  if ! kubectl annotate ingress polaris-ingress -n default --overwrite \
+         "alb.ingress.kubernetes.io/inbound-cidrs=$cidrs"; then
+    echo "Failed to restrict the Polaris ingress: not running the tests" >&2
+    exit 1
+  fi
+}
+
 # Deploys the comma-separated stacks $1, in order, exiting if any fails.
 deploy_stacks() {
   local stack
@@ -210,6 +276,7 @@ deploy_stacks "$DEPLOY"
 
 if [ -n "$ENV" ]; then
   update_kube_config "$ENV"
+  restrict_polaris_ingress
 fi
 
 mkdir -p "$LOG_DIR"

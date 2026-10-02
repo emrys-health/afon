@@ -1,15 +1,12 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.cdk.GuacamoleConfig;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 
 import static java.lang.String.format;
 
@@ -17,17 +14,13 @@ import static java.lang.String.format;
 public class GuacamoleDBSmokeMain {
 
     private static final Logger logger = LoggerFactory.getLogger(GuacamoleDBSmokeMain.class);
+    private final AfonPropertyProvider properties;
 
-    public static void main(String[] args) {
-        try {
-            new GuacamoleDBSmokeMain().findAdminInQuacDb();
-        } catch (Exception e) {
-            logger.error("Failed to check Guacamole's DB", e);
-        }
+    public GuacamoleDBSmokeMain(AfonPropertyProvider properties) {
+        this.properties = properties;
     }
 
-    private void findAdminInQuacDb() throws SQLException {
-        FilePropertyProvider     properties = new FilePropertyProvider();
+    private void findAdmin() throws SQLException {
         GuacamoleConfig.DbConfig db         = GuacamoleConfig.DbConfig.create(properties);
         String                   url        = format("jdbc:postgresql://%s:%d/%s", db.host(), db.port(), db.database());
         String                   guacadmin  = "guacadmin";
@@ -49,6 +42,19 @@ public class GuacamoleDBSmokeMain {
             }
         }
         logger.info("No {} in table {} at {}", guacadmin, table, url);
+    }
+
+    public static void main(String[] args) {
+        int exitCode = 0;
+        AfonPropertyProvider properties = new OpsPropertyProvider();
+        var app = new GuacamoleDBSmokeMain(properties);
+        try {
+            app.findAdmin();
+        } catch (Exception e) {
+            logger.error("Failed to check Guacamole's DB", e);
+            exitCode = 1;
+        }
+        System.exit(exitCode);
     }
 
 }

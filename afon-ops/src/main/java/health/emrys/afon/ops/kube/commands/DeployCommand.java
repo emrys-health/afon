@@ -1,4 +1,4 @@
-package health.emrys.afon.ops.smoke.tasks;
+package health.emrys.afon.ops.kube.commands;
 
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
@@ -7,7 +7,7 @@ import io.kubernetes.client.openapi.ApiException;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
-import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
 
 public class DeployCommand extends CliCommand {
     private final String deployment;

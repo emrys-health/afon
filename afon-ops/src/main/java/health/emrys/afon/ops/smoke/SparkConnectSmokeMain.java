@@ -5,6 +5,8 @@ import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.smoke.config.SmokeConfig;
+import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.connect.SparkConnectClient;
 import org.apache.spark.sql.SparkSession;
@@ -17,7 +19,7 @@ import static health.emrys.afon.config.AfonCatalog.catalogFor;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
-import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
 
 /**
  * You need have some data in Polaris to run this, eg:
@@ -49,7 +51,7 @@ public class SparkConnectSmokeMain {
 
     public SparkConnectSmokeMain() {
         var       properties      = new FilePropertyProvider();
-        AfonCloud cloud           = new SmokeUtils(properties).cloudToTest();
+        AfonCloud cloud           = new SmokeConfig(properties).cloud();
         String    polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
         var       afonCatalogs    = new AfonCatalogs(properties);
         properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
@@ -68,12 +70,13 @@ public class SparkConnectSmokeMain {
     }
 
     private void callSparkConnectorInCluster() {
+        int exitCode = 0;
         try {
             KubeClient client = new KubeClient(properties);
             try (PortForwarder session = new PortForwarder(
                 client,
                 KUBERNETES_NAMESPACE,
-                SmokeUtils.SPARK_CONNECTOR_POD,
+                SmokeConfig.SPARK_CONNECTOR_POD,
                 15002,
                 15002)) {
                 SparkSession spark = smokeTest(new SparkConnectClient(properties));
@@ -81,8 +84,10 @@ public class SparkConnectSmokeMain {
                 spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
             }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            logger.error("Error while closing Spark Session. Please check your configuration.", e);
+            exitCode = 1;
         }
+        System.exit(exitCode);
     }
 
 

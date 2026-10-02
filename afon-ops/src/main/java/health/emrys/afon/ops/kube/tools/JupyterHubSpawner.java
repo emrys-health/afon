@@ -1,4 +1,4 @@
-package health.emrys.afon.ops.smoke;
+package health.emrys.afon.ops.kube.tools;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,8 +7,8 @@ import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
-import health.emrys.afon.ops.smoke.tasks.CliCommand;
-import health.emrys.afon.ops.smoke.tasks.DeployCommand;
+import health.emrys.afon.ops.kube.commands.CliCommand;
+import health.emrys.afon.ops.kube.commands.DeployCommand;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import org.slf4j.Logger;
@@ -31,7 +31,7 @@ import java.util.concurrent.TimeoutException;
 import static health.emrys.afon.cdk.JupyterHubConfig.HUB_LABELS;
 import static health.emrys.afon.cdk.JupyterHubConfig.HUB_PORT;
 import static health.emrys.afon.config.AfonProperty.USER_ID;
-import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
 
 /**
  * Asks JupyterHub to spawn a user's single-user notebook pod via the hub's REST API, reached through a
@@ -75,7 +75,7 @@ public class JupyterHubSpawner {
     /**
      * @return the name of the user's notebook pod once the hub reports their server as ready.
      */
-    String spawnWithJupyterToken(AfonPropertyProvider properties) throws Exception {
+    public String spawnWithJupyterToken(AfonPropertyProvider properties) throws Exception {
         String     email  = findEmailFor(properties.getValue(USER_ID));
         ExecResult result = getJupyterTokenFor(email, client);
         if (result.isSuccess()) {

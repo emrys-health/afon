@@ -140,7 +140,12 @@ spark-connect|ops.smoke.SparkConnectSmokeMain|
   the env switch re-points the shared `$AFON_HOME/config` and `$AFON_HOME/cdktf` symlinks, do not run another afon
   command on a different env while the suite runs. It also makes the env's AWS full stack cluster the current
   `kubectl` context, after any deploys, with `./afon.sh -a aws-update-kube-config full -e <env>`, leaving it so after
-  the suite.
+  the suite. It then restricts that cluster's Polaris ingress, as the network smoke test expects, by annotating
+  `polaris-ingress` with `alb.ingress.kubernetes.io/inbound-cidrs`. As `AwsPolarisStack` does when
+  `AWS_POLARIS_ALLOWED_CIDRS` is set, it admits those CIDRs plus the cluster's egress IP. The egress IP is read from the
+  cluster's NAT gateway, so that it is right even if `AWS_EGRESS_IP` is stale, with a warning if they differ, falling
+  back to `AWS_EGRESS_IP` if the NAT gateway cannot be found. As the annotation only depends on the env's config and
+  cluster, the suite gives the same results whoever runs it. A redeploy undoes it.
 - `--deploy` deploys the comma-separated stacks first, in order, with `./afon.sh -a manage-stack deploy <stack>`,
   eg `--deploy aws-full,azure-polaris,gcp-polaris`. The tests are not run if a deploy fails.
 - `--suite` reads the tests from another file, of the same format, eg a subset of the tests for a single cloud.
