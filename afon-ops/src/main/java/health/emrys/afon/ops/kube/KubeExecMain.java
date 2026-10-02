@@ -1,8 +1,6 @@
-package health.emrys.afon.ops.smoke;
+package health.emrys.afon.ops.kube;
 
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.ops.kube.ExecResult;
-import health.emrys.afon.ops.kube.KubeClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,24 +12,24 @@ import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPAC
 /**
  * Runs an arbitrary command in a pod, like {@code kubectl exec}. Usage:
  * <pre>
- *   KubeExecSmoke [-n namespace] [-c container] [-t timeoutSeconds] pod -- command [args...]
+ *   KubeExecMain [-n namespace] [-c container] [-t timeoutSeconds] pod -- command [args...]
  * </pre>
  * Exits with the remote command's exit code.
  * Eg
  * <pre>
- *   KubeExecSmoke  spark-connector-0-driver -- curl --connect-timeout 3 https://tvsafonstorageaccount.blob.core.windows.net
+ *   KubeExecMain  spark-connector-0-driver -- curl --connect-timeout 3 https://tvsafonstorageaccount.blob.core.windows.net
  * </pre>
  */
-public class KubeExecSmoke {
+public class KubeExecMain {
 
-    private static final Logger logger = LoggerFactory.getLogger(KubeExecSmoke.class);
+    private static final Logger logger = LoggerFactory.getLogger(KubeExecMain.class);
 
     private static final String USAGE =
-            "Usage: KubeExecSmoke [-n namespace] [-c container] [-t timeoutSeconds] <pod> -- <command> [args...]";
+            "Usage: KubeExecMain [-n namespace] [-c container] [-t timeoutSeconds] <pod> -- <command> [args...]";
 
     private final KubeClient client;
 
-    public KubeExecSmoke(KubeClient client) {
+    public KubeExecMain(KubeClient client) {
         this.client = client;
     }
 
@@ -71,7 +69,7 @@ public class KubeExecSmoke {
 
         int exitCode;
         try (KubeClient client = new KubeClient(new FilePropertyProvider())) {
-            ExecResult result = new KubeExecSmoke(client).run(namespace, pod, container, timeout, command);
+            ExecResult result = new KubeExecMain(client).run(namespace, pod, container, timeout, command);
             logger.info("Output:\n{}\nError:\n{}", result.stdout(), result.stderr());
             exitCode = result.exitCode();
         }

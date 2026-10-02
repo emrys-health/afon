@@ -1,12 +1,10 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.AfonCatalog;
-import health.emrys.afon.config.AfonCatalogs;
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.*;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
-import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
+import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.connect.SparkConnectClient;
 import org.apache.spark.sql.SparkSession;
@@ -38,32 +36,21 @@ public class SparkConnectSmokeMain {
 
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectSmokeMain.class);
 
-    public static void main(String[] args) {
-        if (args.length == 0) {
-            System.out.printf("%s requires argument: cloud", SparkConnectSmokeMain.class.getSimpleName());
-            return;
-        }
-        new SparkConnectSmokeMain().callSparkConnectorInCluster();
-    }
+    private final AfonPropertyProvider properties;
+    private final AfonCatalog catalog;
 
-    private final FilePropertyProvider properties;
-    private final AfonCatalog          catalog;
-
-    public SparkConnectSmokeMain() {
-        var       properties      = new FilePropertyProvider();
-        AfonCloud cloud           = new SmokeConfig(properties).cloud();
-        String    polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
-        var       afonCatalogs    = new AfonCatalogs(properties);
-        properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
+    public SparkConnectSmokeMain(AfonPropertyProvider properties) {
         this.properties = properties;
-
-        catalog = catalogFor(cloud, afonCatalogs);
+        AfonCloud cloud = new SmokeConfig(properties).cloud();
+        String polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
+        this.properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
+        catalog = catalogFor(cloud, new AfonCatalogs(properties));
     }
 
-    public SparkSession smokeTest(SparkConnectClient client) {
-        String       warehouse = "test_warehouse";
-        SparkSession spark     = client.sparkSession(warehouse, catalog.toString());
-        String       tableFQN  = String.format("%s.%s.%s", warehouse, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
+    private SparkSession readTable(SparkConnectClient client) {
+        String warehouse = "test_warehouse";
+        SparkSession spark = client.sparkSession(warehouse, catalog.toString());
+        String tableFQN = String.format("%s.%s.%s", warehouse, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
         logger.info("Reading table {}", tableFQN);
         spark.sql(String.format("SELECT * FROM %s", tableFQN)).show(false);
         return spark;
@@ -74,12 +61,12 @@ public class SparkConnectSmokeMain {
         try {
             KubeClient client = new KubeClient(properties);
             try (PortForwarder session = new PortForwarder(
-                client,
-                KUBERNETES_NAMESPACE,
-                SmokeConfig.SPARK_CONNECTOR_POD,
-                15002,
-                15002)) {
-                SparkSession spark = smokeTest(new SparkConnectClient(properties));
+                    client,
+                    KUBERNETES_NAMESPACE,
+                    SmokeConfig.SPARK_CONNECTOR_POD,
+                    15002,
+                    15002)) {
+                SparkSession spark = readTable(new SparkConnectClient(properties));
                 logger.info("Test successful. About to close Spark session. Please wait for threads to die...");
                 spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
             }
@@ -90,6 +77,10 @@ public class SparkConnectSmokeMain {
         System.exit(exitCode);
     }
 
+    public static void main(String[] args) {
+        AfonPropertyProvider properties = new OpsPropertyProvider();
+        new SparkConnectSmokeMain(properties).callSparkConnectorInCluster();
+    }
 
 }
 

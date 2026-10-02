@@ -120,7 +120,7 @@ The notebook reads these environment variables, all optional apart from `OIDC_TO
 ## Regression suite
 
 ```shell
-smoke/run-regression-suite.sh [--env <env>] [--deploy <stacks>] [--suite <file>] [--tests <tests>]
+smoke/run-regression-suite.sh [--env <env>] [--deploy <stacks> [--teardown]] [--suite <file>] [--tests <tests>]
                               [--logging-console <level>] [--list]
 ```
 
@@ -147,7 +147,14 @@ spark-connect|ops.smoke.SparkConnectSmokeMain|
   back to `AWS_EGRESS_IP` if the NAT gateway cannot be found. As the annotation only depends on the env's config and
   cluster, the suite gives the same results whoever runs it. A redeploy undoes it.
 - `--deploy` deploys the comma-separated stacks first, in order, with `./afon.sh -a manage-stack deploy <stack>`,
-  eg `--deploy aws-full,azure-polaris,gcp-polaris`. The tests are not run if a deploy fails.
+  eg `--deploy aws-full,azure-polaris,gcp-polaris`. The tests are not run if a deploy fails. The stacks, including one
+  whose deploy failed part way, are left up, and the commands deleting them are printed on exit, unless `--teardown`
+  is given.
+- `--teardown` tears down the deployed stacks on exit, in reverse order, with
+  `./afon.sh -a manage-stack delete <stack>`, whether the tests passed or failed, or a deploy failed. The suite fails if
+  a teardown fails, naming the stack to delete. The stacks are never torn down if the suite is interrupted, eg with
+  Ctrl-C: that may stop a deploy part way, with its tofu state still locked, so the commands deleting them are printed
+  instead.
 - `--suite` reads the tests from another file, of the same format, eg a subset of the tests for a single cloud.
 - `--tests` runs only the comma-separated tests, eg `--tests network,spark-connect`. All are run by default.
 - `--logging-console` sets the logging console level, one of `OFF|DEBUG|INFO|WARN|ERROR`, of every afon command the
@@ -158,6 +165,8 @@ The tests run against the cluster of the current `kubectl` context, which must b
 Connect tests read the Azure and GCP catalogs through its Spark Connect server, so they also need the Azure and GCP
 Polaris stacks. All the selected tests are run, even if some fail, each one's output being written to
 `smoke/target/regression/<test>.log`. The script ends with a summary, and exits non-zero if any test failed.
+Run from a terminal, the tests' logging keeps its colours, so the logs hold ANSI colour codes: view them with
+`less -R`.
 
 ## Other smoke tests
 
