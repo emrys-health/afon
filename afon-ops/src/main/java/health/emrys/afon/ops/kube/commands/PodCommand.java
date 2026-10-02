@@ -1,4 +1,4 @@
-package health.emrys.afon.ops.smoke.tasks;
+package health.emrys.afon.ops.kube.commands;
 
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;

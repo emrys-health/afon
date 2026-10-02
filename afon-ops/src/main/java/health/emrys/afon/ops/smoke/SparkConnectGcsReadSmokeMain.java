@@ -1,7 +1,9 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.kube.tools.PortForwarder;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -12,8 +14,8 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static health.emrys.afon.ops.smoke.SmokeUtils.KUBERNETES_NAMESPACE;
-import static health.emrys.afon.ops.smoke.SmokeUtils.SPARK_CONNECTOR_POD;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.SPARK_CONNECTOR_POD;
 import static java.lang.String.format;
 
 /**
@@ -117,7 +119,8 @@ public class SparkConnectGcsReadSmokeMain {
     }
 
     public static void main(final String[] args) {
-        FilePropertyProvider properties = new FilePropertyProvider();
+        AfonPropertyProvider properties = new OpsPropertyProvider();
+        int exitCode = 0;
         try (KubeClient client = new KubeClient(properties)) {
             SparkConnectGcsReadSmokeMain app = new SparkConnectGcsReadSmokeMain(client, KUBERNETES_NAMESPACE);
             Dataset<Row>                 df  = app.readTextThroughPortForwarder();
@@ -128,7 +131,8 @@ public class SparkConnectGcsReadSmokeMain {
             }
             logger.info("Test complete. We could not talk to {}", PATH);
         } catch (Exception e) {
-            logger.info("Test passed. We were blocked from reading {}", PATH);
+            exitCode = 1;
         }
+        System.exit(exitCode);
     }
 }

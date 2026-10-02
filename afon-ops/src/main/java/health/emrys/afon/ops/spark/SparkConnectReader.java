@@ -1,4 +1,4 @@
-package health.emrys.afon.ops.smoke;
+package health.emrys.afon.ops.spark;
 
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
