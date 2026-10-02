@@ -2,13 +2,20 @@
 #
 # Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally deploying them first.
 #
-# usage: smoke/run-regression-suite.sh [--env|-e <env>] [--deploy|-d <stacks>] [--suite|-s <file>] [--tests|-t <tests>]
-#                                      [--logging-console|-lc <level>] [--list|-l] [--help|-h]
+# usage: smoke/run-regression-suite.sh [--env|-e <env>] [--deploy|-d <stacks> [--teardown]] [--suite|-s <file>]
+#                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--list|-l] [--help|-h]
 #   --env     the afon env, selecting both the config and cdktf envs, as for './afon.sh --env <env>':
 #             $AFON_HOME/config-<env> and $AFON_HOME/cdktf-<env> are symlinked to $AFON_HOME/config and
 #             $AFON_HOME/cdktf.  Exported as AFON_ENV, so that every afon.sh command uses it.
 #   --deploy  the comma-separated stacks to deploy before the tests, in order, eg aws-full,azure-polaris,gcp-polaris,
 #             each with './afon.sh -a manage-stack deploy <stack>'.  The tests are not run if a deploy fails.
+#             The stacks, including one whose deploy failed, are left up, the commands deleting them being printed
+#             on exit, unless --teardown is given.
+#   --teardown
+#             tears down the deployed stacks on exit, in reverse order, each with
+#             './afon.sh -a manage-stack delete <stack>', whether the tests passed or failed, or a deploy failed.
+#             Never done if the script is interrupted, eg with Ctrl-C, which may stop a deploy part way: the commands
+#             deleting the stacks are printed instead.
 #   --suite   the CSV file of the tests (default: smoke/regression-aws.csv)
 #   --tests   the comma-separated names of the tests to run (default: all), as listed by --list
 #   --logging-console
@@ -44,6 +51,12 @@ DEFAULT_SUITE_FILE="$AFON_ROOT/smoke/regression-aws.csv"
 # Turns off the Maven loggers reporting a test's non-zero exit, as the exec plugin's stack trace and Maven's
 # failure summary, the test's own output being what tells why it failed.
 QUIET_MAVEN_OPTS="-Dorg.slf4j.simpleLogger.log.org.codehaus.mojo.exec=off -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.MavenCli=off"
+# Keeps the ANSI colours of a test's logging when the script's output is a terminal: as a test's output is piped to
+# its log, Maven would otherwise strip them.  Given as MAVEN_ARGS, as Maven only reads style.color as an argument.
+COLOR_MAVEN_ARGS=
+if [ -t 1 ]; then
+  COLOR_MAVEN_ARGS="-Dstyle.color=always"
+fi
 
 usage() {
   sed -n '3,/^$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'
@@ -216,10 +229,19 @@ restrict_polaris_ingress() {
   fi
 }
 
-# Deploys the comma-separated stacks $1, in order, exiting if any fails.
+# Deploys the comma-separated stacks $1, in order, exiting if any fails.  Each stack is recorded in DEPLOYED_STACKS
+# before being deployed, so that a stack whose deploy failed part way is also handled by finish_stacks, which is
+# run on exit, however the script exits.
 deploy_stacks() {
   local stack
+  if [ -z "$1" ]; then
+    return
+  fi
+  trap finish_stacks EXIT
+  trap 'INTERRUPTED=true; exit 130' INT
+  trap 'INTERRUPTED=true; exit 143' TERM
   for stack in ${1//,/ }; do
+    DEPLOYED_STACKS+=("$stack")
     echo "=== Deploying stack $stack"
     if ! ./afon.sh -a manage-stack deploy "$stack"; then
       echo "Failed to deploy stack $stack: not running the tests" >&2
@@ -228,7 +250,66 @@ deploy_stacks() {
   done
 }
 
+# Prints the stacks of DEPLOYED_STACKS in reverse order, the order in which to tear them down.
+reversed_deployed_stacks() {
+  local index
+  index=$((${#DEPLOYED_STACKS[@]} - 1))
+  while [ $index -ge 0 ]; do
+    echo "${DEPLOYED_STACKS[$index]}"
+    index=$((index - 1))
+  done
+}
+
+# Prints the commands deleting the stacks of DEPLOYED_STACKS, in the order in which to run them.
+print_delete_commands() {
+  local stack
+  for stack in $(reversed_deployed_stacks); do
+    echo "  ./afon.sh -a manage-stack delete $stack"
+  done
+}
+
+# Tears down the stacks of DEPLOYED_STACKS, in reverse order, with './afon.sh -a manage-stack delete <stack>',
+# trying all of them, and returning non-zero if any fails.
+teardown_stacks() {
+  local stack failed=0
+  for stack in $(reversed_deployed_stacks); do
+    echo "=== Tearing down stack $stack"
+    if ! "$AFON_ROOT/afon.sh" -a manage-stack delete "$stack"; then
+      echo "Failed to tear down stack $stack: delete it with './afon.sh -a manage-stack delete $stack'" >&2
+      failed=1
+    fi
+  done
+  return $failed
+}
+
+# The EXIT trap of deploy_stacks, keeping the exit status, unless a teardown fails.  Never tears down the deployed
+# stacks if the script was interrupted, as a deploy may then have been stopped part way, with its tofu state still
+# locked, and a teardown would take as long as the deploy: it only says how to delete them.  Else it tears them
+# down if --teardown is given, or says how to delete them.
+finish_stacks() {
+  local status=$?
+  trap - EXIT
+  if [ ${#DEPLOYED_STACKS[@]} -eq 0 ]; then
+    exit $status
+  fi
+  if [ -n "$INTERRUPTED" ]; then
+    echo "Interrupted: not tearing down the deployed stacks, which may be part way deployed.  Delete them with:" >&2
+    print_delete_commands >&2
+  elif [ -n "$TEARDOWN" ]; then
+    if ! teardown_stacks; then
+      status=1
+    fi
+  else
+    echo "Leaving the deployed stacks up, as --teardown is not given.  Delete them with:"
+    print_delete_commands
+  fi
+  exit $status
+}
+
 DEPLOY=
+DEPLOYED_STACKS=()
+INTERRUPTED=
+TEARDOWN=
 ENV=
 LIST=
 LOGGING_CONSOLE=
@@ -241,6 +322,8 @@ while [[ $# -gt 0 ]]; do
       require_value "$1" "${2:-}"; ENV="$2"; shift 2 ;;
     --deploy|-d)
       require_value "$1" "${2:-}"; DEPLOY="$2"; shift 2 ;;
+    --teardown)
+      TEARDOWN=true; shift ;;
     --suite|-s)
       require_value "$1" "${2:-}"; SUITE_FILE="$2"; shift 2 ;;
     --tests|-t)
@@ -256,6 +339,11 @@ while [[ $# -gt 0 ]]; do
       usage >&2; exit 1 ;;
   esac
 done
+
+if [ -n "$TEARDOWN" ] && [ -z "$DEPLOY" ]; then
+  echo "Option --teardown requires --deploy" >&2
+  usage >&2; exit 1
+fi
 
 load_tests "$SUITE_FILE"
 if [ -n "$LIST" ]; then
@@ -293,7 +381,7 @@ for test_line in "${TESTS[@]}"; do
   if [ -n "$args" ]; then
     exec_args+=(-ea "$args")
   fi
-  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" ./afon.sh --mvn-quiet "${exec_args[@]}" 2>&1 | tee "$log"; then
+  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" MAVEN_ARGS="${MAVEN_ARGS:-} $COLOR_MAVEN_ARGS" ./afon.sh --mvn-quiet "${exec_args[@]}" 2>&1 | tee "$log"; then
     PASSED+=("$name")
   else
     FAILED+=("$name")

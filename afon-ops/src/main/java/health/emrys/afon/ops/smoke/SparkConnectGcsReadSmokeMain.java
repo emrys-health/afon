@@ -131,6 +131,7 @@ public class SparkConnectGcsReadSmokeMain {
             }
             logger.info("Test complete. We could not talk to {}", PATH);
         } catch (Exception e) {
+            logger.error(e.getMessage(), e);
             exitCode = 1;
         }
         System.exit(exitCode);
