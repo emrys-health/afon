@@ -163,10 +163,9 @@ spark-connect|ops.smoke.SparkConnectSmokeMain|
 
 The tests run against the cluster of the current `kubectl` context, which must be the AWS full stack's: the Spark
 Connect tests read the Azure and GCP catalogs through its Spark Connect server, so they also need the Azure and GCP
-Polaris stacks. All the selected tests are run, even if some fail, each one's output being written to
-`smoke/target/regression/<test>.log`. The script ends with a summary, and exits non-zero if any test failed.
-Run from a terminal, the tests' logging keeps its colours, so the logs hold ANSI colour codes: view them with
-`less -R`.
+Polaris stacks. All the selected tests are run, even if some fail. Their logging goes to the afon log file,
+`$AFON_HOME/logs/afon-core.log`, and to the console as set by `--logging-console`. The script ends with a summary, and
+exits non-zero if any test failed.
 
 ## Other smoke tests
 

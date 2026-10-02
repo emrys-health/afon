@@ -29,8 +29,8 @@
 # Blank lines and lines starting with '#' are ignored.
 #
 # Each test is run with './afon.sh -a exec -ec <class> -ea <args>', and passes if it exits zero.  All the tests
-# are run, even if some fail, and their output is written to smoke/target/regression/<test>.log.  The script
-# exits non-zero if any test fails.
+# are run, even if some fail.  Their logging goes to the afon log file, $AFON_HOME/logs/afon-core.log, and to the
+# console as set by --logging-console.  The script exits non-zero if any test fails.
 #
 # The tests run against the cluster of the current kubectl context, which must be the AWS full stack's: the Spark
 # Connect tests read the azure and gcp catalogs through its Spark Connect server.  Given --env, the current context
@@ -46,17 +46,57 @@
 set -euo pipefail
 
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOG_DIR="$AFON_ROOT/smoke/target/regression"
 DEFAULT_SUITE_FILE="$AFON_ROOT/smoke/regression-aws.csv"
 # Turns off the Maven loggers reporting a test's non-zero exit, as the exec plugin's stack trace and Maven's
 # failure summary, the test's own output being what tells why it failed.
 QUIET_MAVEN_OPTS="-Dorg.slf4j.simpleLogger.log.org.codehaus.mojo.exec=off -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.MavenCli=off"
-# Keeps the ANSI colours of a test's logging when the script's output is a terminal: as a test's output is piped to
-# its log, Maven would otherwise strip them.  Given as MAVEN_ARGS, as Maven only reads style.color as an argument.
-COLOR_MAVEN_ARGS=
+# The script's own messages are coloured as logback's %highlight colours the levels (see logback.xml): the
+# banners as INFO, the warnings as WARN and the errors, and the failed tests, as ERROR, each stream only if it is
+# a terminal.  The passed tests are in green, which logback has no level for.
+INFO_COLOR=
+SUCCESS_COLOR=
+ERROR_COLOR=
+RESET_COLOR=
 if [ -t 1 ]; then
-  COLOR_MAVEN_ARGS="-Dstyle.color=always"
+  INFO_COLOR=$(printf '\033[34m')
+  SUCCESS_COLOR=$(printf '\033[32m')
+  ERROR_COLOR=$(printf '\033[1;31m')
+  RESET_COLOR=$(printf '\033[0;39m')
 fi
+STDERR_WARN_COLOR=
+STDERR_ERROR_COLOR=
+STDERR_RESET_COLOR=
+if [ -t 2 ]; then
+  STDERR_WARN_COLOR=$(printf '\033[31m')
+  STDERR_ERROR_COLOR=$(printf '\033[1;31m')
+  STDERR_RESET_COLOR=$(printf '\033[0;39m')
+fi
+
+# Prints the banner "=== <args>", in logback's INFO colour if the output is a terminal.
+banner() {
+  echo "${INFO_COLOR}=== $*${RESET_COLOR}"
+}
+
+# Prints the banner "=== <args>" of a success, eg a passed test, in green if the output is a terminal.
+success() {
+  echo "${SUCCESS_COLOR}=== $*${RESET_COLOR}"
+}
+
+# Prints the warning "WARNING: <args>" to stderr, in logback's WARN colour if stderr is a terminal.
+warning() {
+  echo "${STDERR_WARN_COLOR}WARNING: $*${STDERR_RESET_COLOR}" >&2
+}
+
+# Prints the error "ERROR: <args>" to stderr, in logback's ERROR colour if stderr is a terminal: an error either
+# stops the script or fails a test, while the script carries on as before after a warning.
+error() {
+  echo "${STDERR_ERROR_COLOR}ERROR: $*${STDERR_RESET_COLOR}" >&2
+}
+
+# Prints the afon log file, which logback.xml writes under the afon home.
+afon_log_file() {
+  echo "${AFON_HOME:-$HOME/.afon}/logs/afon-core.log"
+}
 
 usage() {
   sed -n '3,/^$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'
@@ -67,7 +107,7 @@ usage() {
 load_tests() {
   local suite_file="$1"
   if [ ! -f "$suite_file" ]; then
-    echo "Missing tests file $suite_file" >&2
+    error "Missing tests file $suite_file"
     exit 1
   fi
   TESTS=()
@@ -83,13 +123,13 @@ load_tests() {
       continue
     fi
     if [ -z "$(test_field "$line" 1)" ] || [ -z "$(test_field "$line" 2)" ]; then
-      echo "No name or class in line $number of $suite_file: $line" >&2
+      error "No name or class in line $number of $suite_file: $line"
       exit 1
     fi
     TESTS+=("$line")
   done < "$suite_file"
   if [ ${#TESTS[@]} -eq 0 ]; then
-    echo "No tests in $suite_file" >&2
+    error "No tests in $suite_file"
     exit 1
   fi
 }
@@ -120,7 +160,7 @@ test_names() {
 # Exits if option $1 has no value $2.
 require_value() {
   if [ -z "$2" ]; then
-    echo "Option $1 requires a value" >&2
+    error "Option $1 requires a value"
     usage >&2; exit 1
   fi
 }
@@ -135,7 +175,7 @@ validate_tests() {
   local name
   for name in ${1//,/ }; do
     if ! test_names | grep -x "$name" >/dev/null; then
-      echo "Unknown test: $name.  The tests are:" >&2
+      error "Unknown test: $name.  The tests are:"
       list_tests >&2
       exit 1
     fi
@@ -149,7 +189,7 @@ use_env() {
   fi
   AFON_HOME="${AFON_HOME:-$HOME/.afon}"
   if [ ! -d "$AFON_HOME/config-$1" ]; then
-    echo "Unknown env: $1 (no config dir $AFON_HOME/config-$1)" >&2
+    error "Unknown env: $1 (no config dir $AFON_HOME/config-$1)"
     exit 1
   fi
   echo "Using env $1"
@@ -158,9 +198,9 @@ use_env() {
 
 # Makes the env $1's AWS full stack cluster the current kubectl context, exiting if it fails.
 update_kube_config() {
-  echo "=== Updating the kubectl context to the AWS full stack cluster of env $1"
+  banner "Updating the kubectl context to the AWS full stack cluster of env $1"
   if ! ./afon.sh -a aws-update-kube-config full -e "$1"; then
-    echo "Failed to update the kubectl context for env $1: not running the tests" >&2
+    error "Failed to update the kubectl context for env $1: not running the tests"
     exit 1
   fi
 }
@@ -203,15 +243,15 @@ restrict_polaris_ingress() {
   configured_ip=$(aws_property AWS_EGRESS_IP)
   egress_ip=$(cluster_egress_ip)
   if [ -z "$egress_ip" ]; then
-    echo "WARNING: no NAT gateway found for kubectl context $(kubectl config current-context 2>/dev/null || true):" \
-         "using AWS_EGRESS_IP '$configured_ip'" >&2
+    warning "no NAT gateway found for kubectl context $(kubectl config current-context 2>/dev/null || true):" \
+            "using AWS_EGRESS_IP '$configured_ip'"
     egress_ip="$configured_ip"
   elif [ -n "$configured_ip" ] && [ "$configured_ip" != "$egress_ip" ]; then
-    echo "WARNING: the cluster's egress IP $egress_ip is not AWS_EGRESS_IP $configured_ip: using $egress_ip." \
-         "Update AWS_EGRESS_IP for the stack to keep its egress IP across rebuilds" >&2
+    warning "the cluster's egress IP $egress_ip is not AWS_EGRESS_IP $configured_ip: using $egress_ip." \
+            "Update AWS_EGRESS_IP for the stack to keep its egress IP across rebuilds"
   fi
   if [ -z "$egress_ip" ]; then
-    echo "WARNING: no egress IP for the cluster: not restricting the Polaris ingress" >&2
+    warning "no egress IP for the cluster: not restricting the Polaris ingress"
     return
   fi
   cidrs=
@@ -221,10 +261,10 @@ restrict_polaris_ingress() {
     fi
   done
   cidrs="$cidrs$egress_ip/32"
-  echo "=== Restricting the Polaris ingress to $cidrs"
+  banner "Restricting the Polaris ingress to $cidrs"
   if ! kubectl annotate ingress polaris-ingress -n default --overwrite \
          "alb.ingress.kubernetes.io/inbound-cidrs=$cidrs"; then
-    echo "Failed to restrict the Polaris ingress: not running the tests" >&2
+    error "Failed to restrict the Polaris ingress: not running the tests"
     exit 1
   fi
 }
@@ -242,9 +282,9 @@ deploy_stacks() {
   trap 'INTERRUPTED=true; exit 143' TERM
   for stack in ${1//,/ }; do
     DEPLOYED_STACKS+=("$stack")
-    echo "=== Deploying stack $stack"
+    banner "Deploying stack $stack"
     if ! ./afon.sh -a manage-stack deploy "$stack"; then
-      echo "Failed to deploy stack $stack: not running the tests" >&2
+      error "Failed to deploy stack $stack: not running the tests"
       exit 1
     fi
   done
@@ -273,9 +313,9 @@ print_delete_commands() {
 teardown_stacks() {
   local stack failed=0
   for stack in $(reversed_deployed_stacks); do
-    echo "=== Tearing down stack $stack"
+    banner "Tearing down stack $stack"
     if ! "$AFON_ROOT/afon.sh" -a manage-stack delete "$stack"; then
-      echo "Failed to tear down stack $stack: delete it with './afon.sh -a manage-stack delete $stack'" >&2
+      warning "Failed to tear down stack $stack: delete it with './afon.sh -a manage-stack delete $stack'"
       failed=1
     fi
   done
@@ -293,7 +333,7 @@ finish_stacks() {
     exit $status
   fi
   if [ -n "$INTERRUPTED" ]; then
-    echo "Interrupted: not tearing down the deployed stacks, which may be part way deployed.  Delete them with:" >&2
+    error "Interrupted: not tearing down the deployed stacks, which may be part way deployed.  Delete them with:"
     print_delete_commands >&2
   elif [ -n "$TEARDOWN" ]; then
     if ! teardown_stacks; then
@@ -335,13 +375,13 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       usage; exit 0 ;;
     *)
-      echo "Unknown option: $1" >&2
+      error "Unknown option: $1"
       usage >&2; exit 1 ;;
   esac
 done
 
 if [ -n "$TEARDOWN" ] && [ -z "$DEPLOY" ]; then
-  echo "Option --teardown requires --deploy" >&2
+  error "Option --teardown requires --deploy"
   usage >&2; exit 1
 fi
 
@@ -367,7 +407,6 @@ if [ -n "$ENV" ]; then
   restrict_polaris_ingress
 fi
 
-mkdir -p "$LOG_DIR"
 PASSED=()
 FAILED=()
 for test_line in "${TESTS[@]}"; do
@@ -375,30 +414,31 @@ for test_line in "${TESTS[@]}"; do
   class=$(test_field "$test_line" 2)
   args=$(test_field "$test_line" 3)
   is_selected "$name" || continue
-  log="$LOG_DIR/$name.log"
-  echo "=== Running test $name: $class $args"
+  banner "Running test $name: $class $args"
   exec_args=(-a exec -ec "$class")
   if [ -n "$args" ]; then
     exec_args+=(-ea "$args")
   fi
-  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" MAVEN_ARGS="${MAVEN_ARGS:-} $COLOR_MAVEN_ARGS" ./afon.sh --mvn-quiet "${exec_args[@]}" 2>&1 | tee "$log"; then
+  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" ./afon.sh --mvn-quiet "${exec_args[@]}"; then
     PASSED+=("$name")
+    success "Test $name passed"
   else
     FAILED+=("$name")
+    error "Test $name failed: see $(afon_log_file)"
   fi
 done
 
 echo
-echo "=== Regression summary (logs in $LOG_DIR)"
+banner "Regression summary (log in $(afon_log_file))"
 # Empty arrays are guarded, as expanding them fails under set -u in bash 3.2, the macOS default.
 if [ ${#PASSED[@]} -gt 0 ]; then
   for name in "${PASSED[@]}"; do
-    echo "PASSED  $name"
+    echo "${SUCCESS_COLOR}PASSED  $name${RESET_COLOR}"
   done
 fi
 if [ ${#FAILED[@]} -gt 0 ]; then
   for name in "${FAILED[@]}"; do
-    echo "FAILED  $name"
+    echo "${ERROR_COLOR}FAILED  $name${RESET_COLOR}"
   done
 fi
 echo "${#PASSED[@]} passed, ${#FAILED[@]} failed"
