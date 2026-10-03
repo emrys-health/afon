@@ -11,6 +11,8 @@ It is packaged as a zip consisting of:
 - `afon-cli-scripts.sh`: a script that executes the cli scripts, setting the appropriate env variables.
 - `docs`: the docs relating the running of the commands.
 - `scripts`: the scripts that can be executed via both `afon-cli.sh` and `afon-cli-scripts.sh`
+- `smoke`: the smoke tests, ie the regression suite `run-regression-suite.sh` with its suite files, and the OIDC
+  notebook (see [smoke tests](smoke_tests.md)).
 - `templates`: the config templates.
 
 ## Installing Afon CLI 
@@ -119,3 +121,13 @@ afon-cli.sh -lc INFO <command>
 
 **NOTE:** The options `--logging`/`-l` and `--logging-console`/`-lc` are not supported by `afon-cli-scripts.sh` as the scripts it runs have no use for a logging level, so those two are only recognised before the command name, configuring this JVM's own logging — after the command name they're not recognised at all and get forwarded as plain args to the script.
 
+## Smoke tests
+
+The `smoke` dir of the distribution holds the smoke regression suite (see [smoke tests](smoke_tests.md#regression-suite)).
+Run from the distribution, it runs its commands, the smoke tests' as well as those deploying or reaching the stacks,
+with the distribution's `afon-cli.sh`, which resolves them as any other command, as if given `--cli`: the
+distribution, being independent of the source tree, has no `afon.sh`.
+```shell
+$AFON_CLI_DIR/smoke/run-regression-suite.sh --env <env>
+```
+It runs the tests of `smoke/regression-aws.csv` by default, or those of another suite file given with `--suite`.
