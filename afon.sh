@@ -18,7 +18,8 @@ usage (){
   echo "          [--cdktf-env <cdktf-env>]"
   echo "          [--config-env <config-env>] [--config-zip <zip>]"
   echo "          [--cloud|-c <cloud>]"
-  echo "          [--logging|-l <logging>] [--logging-console|-lc <console>] [--mvn-quiet]"
+  echo "          [--logging|-l <logging>] [--logging-console|-lc <console>]"
+  echo "          [--bash-quiet] [--mvn-quiet] [--quiet|-q]"
   echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
   echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp <profiles>]"
   echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>]"
@@ -54,7 +55,10 @@ usage (){
   echo "                  Also settable via env variable 'AFON_LOGGING' (the flag wins over the env variable)."
   echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "                  Also settable via env variable 'AFON_LOGGING_CONSOLE' (the flag wins over the env variable)."
+  echo "bash-quiet:       the flag to hush the messages of afon.sh itself, eg 'Using home dir ...', but not its errors,"
+  echo "                  nor the output of the scripts and mvn commands it runs."
   echo "mvn-quiet:        the flag to hush the mvn output"
+  echo "quiet:            the flag to hush both the afon.sh messages and the mvn output.  Sets both --bash-quiet and --mvn-quiet."
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
   echo "build-args:       the build args.  eg '--offline'."
@@ -69,10 +73,26 @@ usage (){
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
 }
 
+# Prints the message $*, unless --bash-quiet or --quiet is given.
+info(){
+  if [ -z "$BASH_QUIET" ]; then
+    echo "$@"
+  fi
+}
+
+# Runs the command $*, hushing its output if --bash-quiet or --quiet is given, eg the implicit env switches.
+quietly(){
+  if [ -n "$BASH_QUIET" ]; then
+    "$@" >/dev/null
+  else
+    "$@"
+  fi
+}
+
 check_acceptance(){
   SCENARIOS_FILE="afon-acceptance/target/surefire-reports/scenarios.txt"
   if [ -f "$SCENARIOS_FILE" ]; then
-    echo "Checking all acceptance specs have been run in $SCENARIOS_FILE"
+    info "Checking all acceptance specs have been run in $SCENARIOS_FILE"
     for SPEC in $(find afon-acceptance -name \*Spec.scala 2>/dev/null | perl -pe s/.*\\///g | perl -pe s/.scala//g | grep -v Abstract) ; do {
       grep $SPEC $SCENARIOS_FILE >/dev/null || echo "$SPEC has not been run"
     } done
@@ -84,7 +104,7 @@ exec_ansible(){
   if [ -z "$ANSIBLE_PLAYBOOK" ]; then
     ANSIBLE_PLAYBOOK="runner-setup.yml"
   fi
-  echo "Executing: ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS"
+  info "Executing: ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS"
   ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS
 }
 
@@ -168,7 +188,7 @@ resolve_ops_action(){
   local ops_class
   ops_class=$(find_ops_class "$ACTION") || return 0
   EXEC_CLASS="$ops_class"
-  echo "Action $ACTION is the ops command $EXEC_CLASS"
+  info "Action $ACTION is the ops command $EXEC_CLASS"
   ACTION="exec"
 }
 
@@ -187,7 +207,7 @@ mvn_envs(){
 
 exec_mvn() {
   MVN="$MVN_CMD $MVN_PROFILES $MVN_ENVS $MVN_ARGS $MVN_GOALS"
-  echo "Executing: $MVN"
+  info "Executing: $MVN"
   eval "$MVN"
 }
 
@@ -227,7 +247,7 @@ exec_script(){
     echo "Action script requires option --script-path"
     usage; exit 0
   fi
-  echo "Executing $SCRIPT_PATH $SCRIPT_ARGS"
+  info "Executing $SCRIPT_PATH $SCRIPT_ARGS"
   source $AFON_ROOT/scripts/$SCRIPT_PATH $SCRIPT_ARGS
 }
 
@@ -265,6 +285,7 @@ MVN_PROFILES=
 MVN_GOALS=
 MVN_ARGS=
 MVN_ENVS=
+BASH_QUIET=
 MVN_QUIET=
 SCRIPT_PATH=
 SCRIPT_ARGS=
@@ -313,8 +334,13 @@ while [[ $# -gt 0 ]]; do
       LOGGING="$2"; shift 2 ;;
     --logging-console|-lc)
       LOGGING_CONSOLE="$2"; shift 2 ;;
+    --bash-quiet)
+      BASH_QUIET=true; shift ;;
     --mvn-quiet)
       MVN_QUIET=true; shift ;;
+    --quiet|-q)
+      # Sets both --bash-quiet and --mvn-quiet.
+      BASH_QUIET=true; MVN_QUIET=true; shift ;;
     --script-path|-sp)
       SCRIPT_PATH="$2"; shift 2 ;;
     --script-args|-sa)
@@ -356,7 +382,7 @@ if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
   fi
 fi
 
-echo "Using AFON_ROOT=$AFON_ROOT"
+info "Using AFON_ROOT=$AFON_ROOT"
 
 # A flag always wins over its env var, as in afon-cli.sh: the env var only applies when the flag is not given.
 AFON_HOME="${AFON_HOME:-}"
@@ -365,36 +391,36 @@ if [ -z "$HOME_DIR" ] && [ -n "$AFON_HOME" ]; then
 fi
 
 if [ -n "$HOME_DIR" ]; then
-  echo "Using home dir $HOME_DIR"
+  info "Using home dir $HOME_DIR"
 else
   HOME_DIR="$HOME/.afon"
-  echo "Home dir not specified. Defaulting to $HOME_DIR"
+  info "Home dir not specified. Defaulting to $HOME_DIR"
 fi
 # The scripts read AFON_HOME, so it must be the dir resolved from the flag, env var or default.
 AFON_HOME="$HOME_DIR"
-echo "Setting AFON_HOME=$AFON_HOME"
+info "Setting AFON_HOME=$AFON_HOME"
 
 AFON_ENV="${AFON_ENV:-}"
 if [ -n "$ENV" ]; then
   # The --env flag sets both envs, overriding the --cdktf-env and --config-env flags.
-  echo "Using env=$ENV"
-  echo "Both cdktf and config env are set to $ENV"
+  info "Using env=$ENV"
+  info "Both cdktf and config env are set to $ENV"
   CDKTF_ENV="$ENV"
   CONFIG_ENV="$ENV"
 elif [ -n "$AFON_ENV" ]; then
   # The AFON_ENV env var only sets the envs not given by the --cdktf-env and --config-env flags.
   ENV="$AFON_ENV"
-  echo "Using env=$ENV, from AFON_ENV"
+  info "Using env=$ENV, from AFON_ENV"
   CDKTF_ENV="${CDKTF_ENV:-$ENV}"
   CONFIG_ENV="${CONFIG_ENV:-$ENV}"
-  echo "Cdktf env is $CDKTF_ENV and config env is $CONFIG_ENV"
+  info "Cdktf env is $CDKTF_ENV and config env is $CONFIG_ENV"
 fi
 
 CONFIG_DIR="$HOME_DIR/config"
-echo "Using config dir $CONFIG_DIR"
+info "Using config dir $CONFIG_DIR"
 
 if [ -n "$CONFIG_ENV" ]; then
-  exec_config_switch
+  quietly exec_config_switch
 fi
 
 AFON_CDKTF="${AFON_CDKTF:-}"
@@ -403,16 +429,16 @@ if [ -z "$CDKTF_DIR" ] && [ -n "$AFON_CDKTF" ]; then
 fi
 
 if [ -n "$CDKTF_DIR" ]; then
-  echo "Using cdktf dir $CDKTF_DIR"
+  info "Using cdktf dir $CDKTF_DIR"
 else
   CDKTF_DIR="$HOME_DIR/cdktf"
-  echo "Cdktf dir not specified. Defaulting to $CDKTF_DIR"
+  info "Cdktf dir not specified. Defaulting to $CDKTF_DIR"
 fi
 AFON_CDKTF="$CDKTF_DIR"
-echo "Setting AFON_CDKTF=$AFON_CDKTF"
+info "Setting AFON_CDKTF=$AFON_CDKTF"
 
 if [ -n "$CDKTF_ENV" ]; then
-  exec_cdktf_switch
+  quietly exec_cdktf_switch
 fi
 
 AFON_LOGGING="${AFON_LOGGING:-}"
@@ -421,7 +447,7 @@ if [ -z "$LOGGING" ] && [ -n "$AFON_LOGGING" ]; then
 fi
 
 if [ -n "$LOGGING" ]; then
-  echo "Using logging level: $LOGGING"
+  info "Using logging level: $LOGGING"
 fi
 
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-}"
@@ -430,7 +456,7 @@ if [ -z "$LOGGING_CONSOLE" ] && [ -n "$AFON_LOGGING_CONSOLE" ]; then
 fi
 
 if [ -n "$LOGGING_CONSOLE" ]; then
-  echo "Using logging console level: $LOGGING_CONSOLE"
+  info "Using logging console level: $LOGGING_CONSOLE"
 fi
 
 if [ "$HELP" == "true" ]; then
@@ -439,11 +465,11 @@ fi
 
 if [ "$ACTION" == "" ]; then
   ACTION="build"
-  echo "Action not specified. Defaulting to $ACTION"
+  info "Action not specified. Defaulting to $ACTION"
 fi
 
 if [ -n "$BUILD_PROFILES" ]; then
-  echo "Using build profiles $BUILD_PROFILES"
+  info "Using build profiles $BUILD_PROFILES"
   MVN_PROFILES="-P$BUILD_PROFILES"
 fi
 
@@ -467,7 +493,7 @@ case $ACTION in
       MVN_ARGS="$BUILD_ARGS"
     fi
     if [ -n "$CLOUD" ]; then
-      echo "Using cloud '$CLOUD'"
+      info "Using cloud '$CLOUD'"
         if [ -n "$MVN_PROFILES" ]; then
           MVN_PROFILES="$MVN_PROFILES,$CLOUD"
         else

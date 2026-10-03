@@ -99,7 +99,7 @@ error() {
   echo "${STDERR_ERROR_COLOR}ERROR: $*${STDERR_RESET_COLOR}" >&2
 }
 
-# Prints the afon log file, which logback.xml writes under the afon home.
+# Prints the afon log file, which logback.xml writes to in afon home.
 afon_log_file() {
   echo "${AFON_HOME:-$HOME/.afon}/logs/afon-core.log"
 }
@@ -120,28 +120,32 @@ cli_script() {
   echo "${AFON_CLI_DIR:-$default_dir}/afon-cli.sh"
 }
 
-# Runs the afon command $1, eg manage-stack, with the args $2..., with afon-cli.sh given --cli, without its Spring
-# banner unless SPRING_MAIN_BANNER_MODE says otherwise, else with afon.sh, the args following '--', so that afon.sh
-# passes them all on to the command.
-run_afon() {
+# Sets AFON_COMMAND to the command line running the afon command $1, eg manage-stack, with the args $2...: with
+# afon-cli.sh given --cli, else with afon.sh, quietly, any args following '--', so that afon.sh passes them all on
+# to the command.  The one place building it, so that what run_afon runs is what afon_command_line prints.
+afon_command() {
   local command="$1"
   shift
   if [ -n "$CLI" ]; then
-    SPRING_MAIN_BANNER_MODE="${SPRING_MAIN_BANNER_MODE:-off}" "$(cli_script)" "$command" "$@"
+    AFON_COMMAND=("$(cli_script)" "$command" "$@")
   else
-    "$AFON_ROOT/afon.sh" --mvn-quiet -a "$command" -- "$@"
+    AFON_COMMAND=("$AFON_ROOT/afon.sh" -q -a "$command")
+    if [ $# -gt 0 ]; then
+      AFON_COMMAND+=(-- "$@")
+    fi
   fi
+}
+
+# Runs the afon command $1 with the args $2..., as afon_command builds it.
+run_afon() {
+  afon_command "$@"
+  "${AFON_COMMAND[@]}"
 }
 
 # Prints the command line running the afon command $1 with the args $2..., as run_afon runs it, for the user.
 afon_command_line() {
-  local command="$1"
-  shift
-  if [ -n "$CLI" ]; then
-    echo "$(cli_script) $command $*"
-  else
-    echo "./afon.sh -a $command $*"
-  fi
+  afon_command "$@"
+  echo "${AFON_COMMAND[*]}"
 }
 
 # Whether $1 is an afon ops command of the source tree, ie the kebab-case name of an afon-ops *Main class, eg
@@ -407,6 +411,7 @@ finish_stacks() {
   exit $status
 }
 
+AFON_COMMAND=()
 CLI=
 DEPLOY=
 DEPLOYED_STACKS=()
@@ -474,6 +479,8 @@ use_env "$ENV"
 
 if [ -n "$CLI" ]; then
   echo "Running the afon commands with $(cli_script)"
+  # Without afon-cli.sh's banner on every command, unless SPRING_MAIN_BANNER_MODE says otherwise.
+  export SPRING_MAIN_BANNER_MODE="${SPRING_MAIN_BANNER_MODE:-off}"
 fi
 
 if [ -n "$LOGGING_CONSOLE" ]; then
@@ -489,6 +496,7 @@ if [ -n "$ENV" ]; then
   restrict_polaris_ingress
 fi
 
+# The results of the passed and failed tests, eg "network passed in 12s", timed in whole seconds with SECONDS.
 PASSED=()
 FAILED=()
 for test_line in "${TESTS[@]}"; do
@@ -497,13 +505,16 @@ for test_line in "${TESTS[@]}"; do
   args=$(test_field "$test_line" 3)
   is_selected "$name" || continue
   banner "Running test $name: $(afon_command_line "$command" $args)"
+  start=$SECONDS
   # The args are left unquoted, to split them on spaces.
   if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" run_afon "$command" $args; then
-    PASSED+=("$name")
-    success "Test $name passed"
+    result="$name passed in $((SECONDS - start))s"
+    PASSED+=("$result")
+    success "Test $result"
   else
-    FAILED+=("$name")
-    error "Test $name failed: see $(afon_log_file)"
+    result="$name failed in $((SECONDS - start))s"
+    FAILED+=("$result")
+    error "Test $result: see $(afon_log_file)"
   fi
 done
 
@@ -511,13 +522,13 @@ echo
 banner "Regression summary (log in $(afon_log_file))"
 # Empty arrays are guarded, as expanding them fails under set -u in bash 3.2, the macOS default.
 if [ ${#PASSED[@]} -gt 0 ]; then
-  for name in "${PASSED[@]}"; do
-    success "$name passed"
+  for result in "${PASSED[@]}"; do
+    success "$result"
   done
 fi
 if [ ${#FAILED[@]} -gt 0 ]; then
-  for name in "${FAILED[@]}"; do
-    error "$name failed"
+  for result in "${FAILED[@]}"; do
+    error "$result"
   done
 fi
 banner "${#PASSED[@]} passed, ${#FAILED[@]} failed"
