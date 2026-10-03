@@ -11,12 +11,12 @@ import java.sql.*;
 import static java.lang.String.format;
 
 
-public class GuacamoleDBSmokeMain {
+public class GuacamoleDbSmokeMain {
 
-    private static final Logger logger = LoggerFactory.getLogger(GuacamoleDBSmokeMain.class);
+    private static final Logger logger = LoggerFactory.getLogger(GuacamoleDbSmokeMain.class);
     private final AfonPropertyProvider properties;
 
-    public GuacamoleDBSmokeMain(AfonPropertyProvider properties) {
+    public GuacamoleDbSmokeMain(AfonPropertyProvider properties) {
         this.properties = properties;
     }
 
@@ -47,7 +47,7 @@ public class GuacamoleDBSmokeMain {
     public static void main(String[] args) {
         int exitCode = 0;
         AfonPropertyProvider properties = new OpsPropertyProvider();
-        var app = new GuacamoleDBSmokeMain(properties);
+        var app = new GuacamoleDbSmokeMain(properties);
         try {
             app.findAdmin();
         } catch (Exception e) {

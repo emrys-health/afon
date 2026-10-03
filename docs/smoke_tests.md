@@ -120,45 +120,55 @@ The notebook reads these environment variables, all optional apart from `OIDC_TO
 ## Regression suite
 
 ```shell
-smoke/run-regression-suite.sh [--env <env>] [--deploy <stacks> [--teardown]] [--suite <file>] [--tests <tests>]
-                              [--logging-console <level>] [--list]
+smoke/run-regression-suite.sh [--cli] [--env <env>] [--deploy <stacks> [--teardown]] [--suite <file>]
+                              [--tests <tests>] [--logging-console <level>] [--list]
 ```
 
 runs the tests listed in a suite file, by default [smoke/regression-aws.csv](../smoke/regression-aws.csv), in
-order, each with `./afon.sh -a exec -ec <class> -ea <args>`. Its first line is the header `name|class|args`, and each
-other line a test: its name, its class, relative to the `health.emrys.afon` package, and its args, if any, separated by
-spaces. Fields are separated by `|`, rather than commas, so that args may contain commas. Blank lines and lines
-starting with `#` are ignored. For example:
+order, each as an afon command. Its first line is the header `name|command|args`, and each other line a test: its
+name, its afon command, eg `network-smoke` for the ops class `NetworkSmokeMain`, and the command's args, if any,
+separated by spaces. Fields are separated by `|`, rather than commas, so that args may contain commas. Blank lines and
+lines starting with `#` are ignored. For example:
 
 ```
-name|class|args
-network|ops.smoke.NetworkSmokeMain|
-spark-connect|ops.smoke.SparkConnectSmokeMain|
+name|command|args
+network|network-smoke|
+spark-connect|spark-connect-smoke|
 ```
 
+The suite runs every afon command, the tests' as well as those deploying, tearing down or reaching the stacks, with
+`afon.sh`, as `./afon.sh -a <command> -- <args>`, or with `afon-cli.sh`, as `afon-cli.sh <command> <args>`, given
+`--cli`. With `afon.sh`, the commands are checked when the suite file is read, against the afon-ops `*Main` classes of
+the source tree, as `afon.sh` exits zero on an unknown command. With `--cli`, `afon-cli.sh` resolves them in its JVM,
+independently of the source tree, and a test whose command is unknown fails.
+
+- `--cli` runs the afon commands with `afon-cli.sh`: that of the cli distribution in `$AFON_CLI_DIR`, if set, else in
+  `$AFON_HOME/cli`. It is implied when the suite runs from a cli distribution (see [Afon CLI](afon_cli.md#smoke-tests)),
+  which has no `afon.sh`, the default `afon-cli.sh` then being that of the distribution.
 - `--env` selects the config and cdktf envs, as `./afon.sh --env <env>` does, for every command the suite runs. As
   the env switch re-points the shared `$AFON_HOME/config` and `$AFON_HOME/cdktf` symlinks, do not run another afon
   command on a different env while the suite runs. It also makes the env's AWS full stack cluster the current
-  `kubectl` context, after any deploys, with `./afon.sh -a aws-update-kube-config full -e <env>`, leaving it so after
-  the suite. It then restricts that cluster's Polaris ingress, as the network smoke test expects, by annotating
+  `kubectl` context, after any deploys, with the afon command `aws-update-kube-config full`, leaving it so after the
+  suite. It then restricts that cluster's Polaris ingress, as the network smoke test expects, by annotating
   `polaris-ingress` with `alb.ingress.kubernetes.io/inbound-cidrs`. As `AwsPolarisStack` does when
   `AWS_POLARIS_ALLOWED_CIDRS` is set, it admits those CIDRs plus the cluster's egress IP. The egress IP is read from the
   cluster's NAT gateway, so that it is right even if `AWS_EGRESS_IP` is stale, with a warning if they differ, falling
   back to `AWS_EGRESS_IP` if the NAT gateway cannot be found. As the annotation only depends on the env's config and
   cluster, the suite gives the same results whoever runs it. A redeploy undoes it.
-- `--deploy` deploys the comma-separated stacks first, in order, with `./afon.sh -a manage-stack deploy <stack>`,
+- `--deploy` deploys the comma-separated stacks first, in order, with the afon command `manage-stack deploy <stack>`,
   eg `--deploy aws-full,azure-polaris,gcp-polaris`. The tests are not run if a deploy fails. The stacks, including one
   whose deploy failed part way, are left up, and the commands deleting them are printed on exit, unless `--teardown`
   is given.
-- `--teardown` tears down the deployed stacks on exit, in reverse order, with
-  `./afon.sh -a manage-stack delete <stack>`, whether the tests passed or failed, or a deploy failed. The suite fails if
+- `--teardown` tears down the deployed stacks on exit, in reverse order, with the afon command
+  `manage-stack delete <stack>`, whether the tests passed or failed, or a deploy failed. The suite fails if
   a teardown fails, naming the stack to delete. The stacks are never torn down if the suite is interrupted, eg with
   Ctrl-C: that may stop a deploy part way, with its tofu state still locked, so the commands deleting them are printed
   instead.
 - `--suite` reads the tests from another file, of the same format, eg a subset of the tests for a single cloud.
 - `--tests` runs only the comma-separated tests, eg `--tests network,spark-connect`. All are run by default.
 - `--logging-console` sets the logging console level, one of `OFF|DEBUG|INFO|WARN|ERROR`, of every afon command the
-  suite runs, by exporting `AFON_LOGGING_CONSOLE`. It defaults to the logback configuration's, `INFO`.
+  suite runs, by exporting `AFON_LOGGING_CONSOLE`. It defaults to that of `afon.sh`, `INFO`, or of `afon-cli.sh`,
+  `OFF`.
 - `--list` lists the tests.
 
 The tests run against the cluster of the current `kubectl` context, which must be the AWS full stack's: the Spark

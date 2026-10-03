@@ -2,43 +2,50 @@
 #
 # Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally deploying them first.
 #
-# usage: smoke/run-regression-suite.sh [--env|-e <env>] [--deploy|-d <stacks> [--teardown]] [--suite|-s <file>]
+# usage: smoke/run-regression-suite.sh [--cli] [--env|-e <env>] [--deploy|-d <stacks> [--teardown]] [--suite|-s <file>]
 #                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--list|-l] [--help|-h]
+#   --cli     runs the afon commands with afon-cli.sh, rather than afon.sh: that of the cli distribution in
+#             $AFON_CLI_DIR, if set, else in $AFON_HOME/cli.  Implied when the script runs from a cli distribution,
+#             eg as $AFON_CLI_DIR/smoke/run-regression-suite.sh, which, being independent of the source tree, has
+#             no afon.sh: the default afon-cli.sh is then that of the distribution.  Each command <command> <args> is run as 'afon-cli.sh <command> <args>', or else as
+#             './afon.sh -a <command> -- <args>'.
 #   --env     the afon env, selecting both the config and cdktf envs, as for './afon.sh --env <env>':
 #             $AFON_HOME/config-<env> and $AFON_HOME/cdktf-<env> are symlinked to $AFON_HOME/config and
-#             $AFON_HOME/cdktf.  Exported as AFON_ENV, so that every afon.sh command uses it.
+#             $AFON_HOME/cdktf.  Exported as AFON_ENV, so that every afon command uses it.
 #   --deploy  the comma-separated stacks to deploy before the tests, in order, eg aws-full,azure-polaris,gcp-polaris,
-#             each with './afon.sh -a manage-stack deploy <stack>'.  The tests are not run if a deploy fails.
+#             each with the afon command 'manage-stack deploy <stack>'.  The tests are not run if a deploy fails.
 #             The stacks, including one whose deploy failed, are left up, the commands deleting them being printed
 #             on exit, unless --teardown is given.
 #   --teardown
-#             tears down the deployed stacks on exit, in reverse order, each with
-#             './afon.sh -a manage-stack delete <stack>', whether the tests passed or failed, or a deploy failed.
-#             Never done if the script is interrupted, eg with Ctrl-C, which may stop a deploy part way: the commands
-#             deleting the stacks are printed instead.
+#             tears down the deployed stacks on exit, in reverse order, each with the afon command
+#             'manage-stack delete <stack>', whether the tests passed or failed, or a deploy failed.  Never done if
+#             the script is interrupted, eg with Ctrl-C, which may stop a deploy part way: the commands deleting the
+#             stacks are printed instead.
 #   --suite   the CSV file of the tests (default: smoke/regression-aws.csv)
 #   --tests   the comma-separated names of the tests to run (default: all), as listed by --list
 #   --logging-console
-#             the logging console level of every afon.sh command, one of OFF|DEBUG|INFO|WARN|ERROR (default: the
-#             logback configuration's, INFO).  Exported as AFON_LOGGING_CONSOLE, which it overrides.
+#             the logging console level of every afon command, one of OFF|DEBUG|INFO|WARN|ERROR (default: that of
+#             afon.sh, INFO, or of afon-cli.sh, OFF).  Exported as AFON_LOGGING_CONSOLE, which it overrides.
 #   --list    lists the tests and exits
 #
-# The tests are read from the suite file, run in its order.  Its first line is the header
-# 'name|class|args', and each other line a test: its name, its class, relative to the health.emrys.afon package,
-# and its args, if any, separated by spaces.  Fields are separated by '|', so that args may contain commas.
+# The tests are read from the suite file, run in its order.  Its first line is the header 'name|command|args', and
+# each other line a test: its name, its afon command, eg network-smoke for the ops class NetworkSmokeMain, and the
+# command's args, if any, separated by spaces.  With afon.sh, the commands are checked against the afon-ops *Main
+# classes of the source tree when the suite file is read, as afon.sh exits zero on an unknown command.  With
+# --cli, afon-cli.sh resolves them, failing a test whose command is unknown.  Fields are separated by '|', so that args may contain commas.
 # Blank lines and lines starting with '#' are ignored.
 #
-# Each test is run with './afon.sh -a exec -ec <class> -ea <args>', and passes if it exits zero.  All the tests
-# are run, even if some fail.  Their logging goes to the afon log file, $AFON_HOME/logs/afon-core.log, and to the
-# console as set by --logging-console.  The script exits non-zero if any test fails.
+# Each test is run as an afon command, and passes if it exits zero.  All the tests are run, even if some fail.
+# Their logging goes to the afon log file, $AFON_HOME/logs/afon-core.log, and to the console as set by
+# --logging-console.  The script exits non-zero if any test fails.
 #
 # The tests run against the cluster of the current kubectl context, which must be the AWS full stack's: the Spark
 # Connect tests read the azure and gcp catalogs through its Spark Connect server.  Given --env, the current context
-# is set to the env's AWS full stack cluster, after any deploys, with
-# './afon.sh -a aws-update-kube-config full -e <env>', and left so.  Its Polaris ingress is then restricted, as the
-# network smoke test expects, to the AWS_POLARIS_ALLOWED_CIDRS of afon-aws.properties plus the cluster's egress IP,
-# that of its NAT gateway, or by default AWS_EGRESS_IP.
-# The afon.sh env vars apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
+# is set to the env's AWS full stack cluster, after any deploys, with the afon command
+# 'aws-update-kube-config full', and left so.  Its Polaris ingress is then restricted, as the network smoke test
+# expects, to the AWS_POLARIS_ALLOWED_CIDRS of afon-aws.properties plus the cluster's egress IP, that of its NAT
+# gateway, or by default AWS_EGRESS_IP.
+# The env vars of afon.sh and afon-cli.sh apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
 #
 # As switching env re-points the shared $AFON_HOME symlinks, and the current context of the shared ~/.kube/config,
 # do not run another afon or kubectl command on a different env or cluster while the suite runs.
@@ -47,8 +54,9 @@ set -euo pipefail
 
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_SUITE_FILE="$AFON_ROOT/smoke/regression-aws.csv"
-# Turns off the Maven loggers reporting a test's non-zero exit, as the exec plugin's stack trace and Maven's
-# failure summary, the test's own output being what tells why it failed.
+OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
+# Turns off the Maven loggers of afon.sh reporting a test's non-zero exit, as the exec plugin's stack trace and
+# Maven's failure summary, the test's own output being what tells why it failed.
 QUIET_MAVEN_OPTS="-Dorg.slf4j.simpleLogger.log.org.codehaus.mojo.exec=off -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.MavenCli=off"
 # The script's own messages are coloured as logback's %highlight colours the levels (see logback.xml): the
 # banners as INFO, the warnings as WARN and the errors, and the failed tests, as ERROR, each stream only if it is
@@ -96,12 +104,62 @@ afon_log_file() {
   echo "${AFON_HOME:-$HOME/.afon}/logs/afon-core.log"
 }
 
+# Whether the script runs from a cli distribution, ie its parent dir has afon-cli.sh, but no afon.sh, as the
+# distribution is independent of the source tree.
+from_cli_distribution() {
+  [ -x "$AFON_ROOT/afon-cli.sh" ] && [ ! -e "$AFON_ROOT/afon.sh" ]
+}
+
+# Prints the afon-cli.sh that --cli runs: that of the cli distribution in AFON_CLI_DIR, if set, else that of the
+# distribution the script runs from, if any, else that in $AFON_HOME/cli.
+cli_script() {
+  local default_dir="${AFON_HOME:-$HOME/.afon}/cli"
+  if from_cli_distribution; then
+    default_dir="$AFON_ROOT"
+  fi
+  echo "${AFON_CLI_DIR:-$default_dir}/afon-cli.sh"
+}
+
+# Runs the afon command $1, eg manage-stack, with the args $2..., with afon-cli.sh given --cli, without its Spring
+# banner unless SPRING_MAIN_BANNER_MODE says otherwise, else with afon.sh, the args following '--', so that afon.sh
+# passes them all on to the command.
+run_afon() {
+  local command="$1"
+  shift
+  if [ -n "$CLI" ]; then
+    SPRING_MAIN_BANNER_MODE="${SPRING_MAIN_BANNER_MODE:-off}" "$(cli_script)" "$command" "$@"
+  else
+    "$AFON_ROOT/afon.sh" --mvn-quiet -a "$command" -- "$@"
+  fi
+}
+
+# Prints the command line running the afon command $1 with the args $2..., as run_afon runs it, for the user.
+afon_command_line() {
+  local command="$1"
+  shift
+  if [ -n "$CLI" ]; then
+    echo "$(cli_script) $command $*"
+  else
+    echo "./afon.sh -a $command $*"
+  fi
+}
+
+# Whether $1 is an afon ops command of the source tree, ie the kebab-case name of an afon-ops *Main class, eg
+# network-smoke for NetworkSmokeMain, as afon.sh resolves it, case-insensitively.  Checked up front with afon.sh,
+# as it exits zero on an unknown command, but not with afon-cli.sh, which resolves the commands in its JVM,
+# independently of the source tree, failing on an unknown one.
+is_ops_command() {
+  local class
+  class=$(echo "$1" | awk -F- '{ for (i = 1; i <= NF; i++) printf "%s", toupper(substr($i, 1, 1)) substr($i, 2) }')
+  [ -n "$(find "$OPS_JAVA_DIR" -iname "${class}Main.java" -not -path '*/ops/scripts/*' 2>/dev/null | head -1)" ]
+}
+
 usage() {
   sed -n '3,/^$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'
 }
 
-# Reads the tests of the suite file $1 into TESTS, as its "<name>|<class>|<args>" lines, exiting if there are none,
-# or if any has no name or class.
+# Reads the tests of the suite file $1 into TESTS, as its "<name>|<command>|<args>" lines, exiting if there are
+# none, or if any has no name or command, or, with afon.sh, an unknown command.
 load_tests() {
   local suite_file="$1"
   if [ ! -f "$suite_file" ]; then
@@ -121,7 +179,11 @@ load_tests() {
       continue
     fi
     if [ -z "$(test_field "$line" 1)" ] || [ -z "$(test_field "$line" 2)" ]; then
-      error "No name or class in line $number of $suite_file: $line"
+      error "No name or command in line $number of $suite_file: $line"
+      exit 1
+    fi
+    if [ -z "$CLI" ] && ! is_ops_command "$(test_field "$line" 2)"; then
+      error "Unknown command in line $number of $suite_file, with no afon-ops *Main class: $line"
       exit 1
     fi
     TESTS+=("$line")
@@ -132,7 +194,7 @@ load_tests() {
   fi
 }
 
-# Prints field $2 of test $1, 1 being its name, 2 its class and 3 its args.
+# Prints field $2 of test $1, 1 being its name, 2 its command and 3 its args.
 test_field() {
   if [ "$2" -eq 3 ]; then
     echo "$1" | cut -d'|' -f3-
@@ -180,7 +242,7 @@ validate_tests() {
   done
 }
 
-# Selects the env $1, if given, for every afon.sh command, exiting if it has no config dir.
+# Selects the env $1, if given, for every afon command, exiting if it has no config dir.
 use_env() {
   if [ -z "$1" ]; then
     return
@@ -194,10 +256,11 @@ use_env() {
   export AFON_ENV="$1"
 }
 
-# Makes the env $1's AWS full stack cluster the current kubectl context, exiting if it fails.
+# Makes the env $1's AWS full stack cluster the current kubectl context, exiting if it fails.  The env is that of
+# AFON_ENV, which use_env exports.
 update_kube_config() {
   banner "Updating the kubectl context to the AWS full stack cluster of env $1"
-  if ! ./afon.sh -a aws-update-kube-config full -e "$1"; then
+  if ! run_afon aws-update-kube-config full; then
     error "Failed to update the kubectl context for env $1: not running the tests"
     exit 1
   fi
@@ -281,7 +344,7 @@ deploy_stacks() {
   for stack in ${1//,/ }; do
     DEPLOYED_STACKS+=("$stack")
     banner "Deploying stack $stack"
-    if ! ./afon.sh -a manage-stack deploy "$stack"; then
+    if ! run_afon manage-stack deploy "$stack"; then
       error "Failed to deploy stack $stack: not running the tests"
       exit 1
     fi
@@ -302,18 +365,18 @@ reversed_deployed_stacks() {
 print_delete_commands() {
   local stack
   for stack in $(reversed_deployed_stacks); do
-    echo "  ./afon.sh -a manage-stack delete $stack"
+    echo "  $(afon_command_line manage-stack delete "$stack")"
   done
 }
 
-# Tears down the stacks of DEPLOYED_STACKS, in reverse order, with './afon.sh -a manage-stack delete <stack>',
+# Tears down the stacks of DEPLOYED_STACKS, in reverse order, with the afon command 'manage-stack delete <stack>',
 # trying all of them, and returning non-zero if any fails.
 teardown_stacks() {
   local stack failed=0
   for stack in $(reversed_deployed_stacks); do
     banner "Tearing down stack $stack"
-    if ! "$AFON_ROOT/afon.sh" -a manage-stack delete "$stack"; then
-      warning "Failed to tear down stack $stack: delete it with './afon.sh -a manage-stack delete $stack'"
+    if ! run_afon manage-stack delete "$stack"; then
+      warning "Failed to tear down stack $stack: delete it with '$(afon_command_line manage-stack delete "$stack")'"
       failed=1
     fi
   done
@@ -344,6 +407,7 @@ finish_stacks() {
   exit $status
 }
 
+CLI=
 DEPLOY=
 DEPLOYED_STACKS=()
 INTERRUPTED=
@@ -356,6 +420,8 @@ SUITE_FILE="$DEFAULT_SUITE_FILE"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --cli)
+      CLI=true; shift ;;
     --env|-e)
       require_value "$1" "${2:-}"; ENV="$2"; shift 2 ;;
     --deploy|-d)
@@ -383,6 +449,20 @@ if [ -n "$TEARDOWN" ] && [ -z "$DEPLOY" ]; then
   usage >&2; exit 1
 fi
 
+# Run from a cli distribution, which has no afon.sh, the commands can only be run with afon-cli.sh.
+if [ -z "$CLI" ] && from_cli_distribution; then
+  CLI=true
+fi
+
+if [ -n "$CLI" ] && [ ! -x "$(cli_script)" ]; then
+  error "No afon-cli.sh at $(cli_script): install the cli distribution in \$AFON_HOME/cli, or set AFON_CLI_DIR to it"
+  exit 1
+fi
+if [ -z "$CLI" ] && [ ! -x "$AFON_ROOT/afon.sh" ]; then
+  error "No afon.sh at $AFON_ROOT, if running from the cli distribution: use --cli"
+  exit 1
+fi
+
 load_tests "$SUITE_FILE"
 if [ -n "$LIST" ]; then
   list_tests; exit 0
@@ -391,6 +471,10 @@ fi
 validate_tests "$SELECTED"
 
 use_env "$ENV"
+
+if [ -n "$CLI" ]; then
+  echo "Running the afon commands with $(cli_script)"
+fi
 
 if [ -n "$LOGGING_CONSOLE" ]; then
   export AFON_LOGGING_CONSOLE="$LOGGING_CONSOLE"
@@ -409,15 +493,12 @@ PASSED=()
 FAILED=()
 for test_line in "${TESTS[@]}"; do
   name=$(test_field "$test_line" 1)
-  class=$(test_field "$test_line" 2)
+  command=$(test_field "$test_line" 2)
   args=$(test_field "$test_line" 3)
   is_selected "$name" || continue
-  banner "Running test $name: $class $args"
-  exec_args=(-a exec -ec "$class")
-  if [ -n "$args" ]; then
-    exec_args+=(-ea "$args")
-  fi
-  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" ./afon.sh --mvn-quiet "${exec_args[@]}"; then
+  banner "Running test $name: $(afon_command_line "$command" $args)"
+  # The args are left unquoted, to split them on spaces.
+  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" run_afon "$command" $args; then
     PASSED+=("$name")
     success "Test $name passed"
   else

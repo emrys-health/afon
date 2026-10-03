@@ -1,6 +1,6 @@
-name|class|args
-guacamole-db|ops.smoke.GuacamoleDBSmokeMain|
-network|ops.smoke.NetworkSmokeMain|
-spark-connect|ops.smoke.SparkConnectSmokeMain|
-spark-gcs-read|ops.smoke.SparkConnectGcsReadSmokeMain|
-spark-s3-read|ops.smoke.SparkConnectS3ReadSmokeMain|
+name|command|args
+guacamole-db|guacamole-db-smoke|
+network|network-smoke|
+spark-connect|spark-connect-smoke|
+spark-gcs-read|spark-connect-gcs-read-smoke|
+spark-s3-read|spark-connect-s3-read-smoke|

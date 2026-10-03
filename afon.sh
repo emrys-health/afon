@@ -154,7 +154,9 @@ find_ops_class(){
     pascal="$pascal$(capitaliseFirst "$part")"
   done
   local file
-  file=$(find "$OPS_JAVA_DIR" -name "${pascal}Main.java" -not -path '*/ops/scripts/*' 2>/dev/null | head -1)
+  # Case-insensitively, as the cli resolves commands: a class name with consecutive capitals, eg "XMLParserMain",
+  # has the kebab-case name "xmlparser", which capitalises back to "Xmlparser", not "XMLParser".
+  file=$(find "$OPS_JAVA_DIR" -iname "${pascal}Main.java" -not -path '*/ops/scripts/*' 2>/dev/null | head -1)
   [ -n "$file" ] || return 1
   file="${file#"$OPS_JAVA_DIR"/}"
   echo "ops.$(echo "${file%.java}" | tr / .)"
