@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 #
-# Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally deploying them first.
+# Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally setting them up first.
 #
-# usage: smoke/run-regression-suite.sh [--cli] [--env|-e <env>] [--deploy|-d <stacks> [--teardown]] [--suite|-s <file>]
+# usage: smoke/run-regression-suite.sh [--cli] [--env|-e <env>] [--setup <stacks> [--teardown]] [--suite|-s <file>]
 #                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--list|-l] [--help|-h]
 #   --cli     runs the afon commands with afon-cli.sh, rather than afon.sh: that of the cli distribution in
 #             $AFON_CLI_DIR, if set, else in $AFON_HOME/cli.  Implied when the script runs from a cli distribution,
 #             eg as $AFON_CLI_DIR/smoke/run-regression-suite.sh, which, being independent of the source tree, has
-#             no afon.sh: the default afon-cli.sh is then that of the distribution.  Each command <command> <args> is run as 'afon-cli.sh <command> <args>', or else as
-#             './afon.sh -a <command> -- <args>'.
+#             no afon.sh: the default afon-cli.sh is then that of the distribution.  Each command <command> <args>
+#             is run as 'afon-cli.sh <command> <args>', or else as './afon.sh -a <command> -- <args>'.
 #   --env     the afon env, selecting both the config and cdktf envs, as for './afon.sh --env <env>':
 #             $AFON_HOME/config-<env> and $AFON_HOME/cdktf-<env> are symlinked to $AFON_HOME/config and
 #             $AFON_HOME/cdktf.  Exported as AFON_ENV, so that every afon command uses it.
-#   --deploy  the comma-separated stacks to deploy before the tests, in order, eg aws-full,azure-polaris,gcp-polaris,
-#             each with the afon command 'manage-stack deploy <stack>'.  The tests are not run if a deploy fails.
-#             The stacks, including one whose deploy failed, are left up, the commands deleting them being printed
-#             on exit, unless --teardown is given.
+#   --setup   the comma-separated stacks to set up, ie deploy and configure, before the tests, in order, eg
+#             aws-full,azure-polaris,gcp-polaris, each with the afon command 'manage-stack setup <stack>'.  The tests
+#             are not run if a setup fails.  The stacks, including one whose setup failed, are left up, the commands
+#             deleting them being printed on exit, unless --teardown is given.
 #   --teardown
-#             tears down the deployed stacks on exit, in reverse order, each with the afon command
-#             'manage-stack delete <stack>', whether the tests passed or failed, or a deploy failed.  Never done if
-#             the script is interrupted, eg with Ctrl-C, which may stop a deploy part way: the commands deleting the
+#             tears down the set up stacks on exit, in reverse order, each with the afon command
+#             'manage-stack delete <stack>', whether the tests passed or failed, or a setup failed.  Never done if
+#             the script is interrupted, eg with Ctrl-C, which may stop a setup part way: the commands deleting the
 #             stacks are printed instead.
 #   --suite   the CSV file of the tests (default: smoke/regression-aws.csv)
 #   --tests   the comma-separated names of the tests to run (default: all), as listed by --list
@@ -30,21 +30,25 @@
 #
 # The tests are read from the suite file, run in its order.  Its first line is the header 'name|command|args', and
 # each other line a test: its name, its afon command, eg network-smoke for the ops class NetworkSmokeMain, and the
-# command's args, if any, separated by spaces.  With afon.sh, the commands are checked against the afon-ops *Main
-# classes of the source tree when the suite file is read, as afon.sh exits zero on an unknown command.  With
-# --cli, afon-cli.sh resolves them, failing a test whose command is unknown.  Fields are separated by '|', so that args may contain commas.
-# Blank lines and lines starting with '#' are ignored.
+# command's args, if any, separated by spaces.
+# With afon.sh, the commands are checked against the afon-ops *Main
+# classes of the source tree when the suite file is read, as afon.sh exits zero on an unknown command.
+# With --cli, afon-cli.sh resolves them, failing a test whose command is unknown.
+# Fields are separated by '|', so that args may contain commas. Blank lines and lines starting with '#' are ignored.
 #
 # Each test is run as an afon command, and passes if it exits zero.  All the tests are run, even if some fail.
 # Their logging goes to the afon log file, $AFON_HOME/logs/afon-core.log, and to the console as set by
-# --logging-console.  The script exits non-zero if any test fails.
+# --logging-console.  The script exits non-zero if any test fails.  The results of each run, ie its settings, the
+# times and outcomes of its stack setups, tests and teardowns, and its summary, are also written, without any
+# logging, to smoke/target/regression/results-<yyyymmdd-hhmmss>.txt.
 #
-# The tests run against the cluster of the current kubectl context, which must be the AWS full stack's: the Spark
-# Connect tests read the azure and gcp catalogs through its Spark Connect server.  Given --env, the current context
-# is set to the env's AWS full stack cluster, after any deploys, with the afon command
+# The tests run against the AWS full stack's cluster: the Spark Connect tests read the azure and gcp catalogs
+# through its Spark Connect server.  After any setups, the current kubectl context is set to the AWS full stack
+# cluster of the env, that of --env, if given, else that of the current config, with the afon command
 # 'aws-update-kube-config full', and left so.  Its Polaris ingress is then restricted, as the network smoke test
 # expects, to the AWS_POLARIS_ALLOWED_CIDRS of afon-aws.properties plus the cluster's egress IP, that of its NAT
-# gateway, or by default AWS_EGRESS_IP.
+# gateway, or by default AWS_EGRESS_IP.  So the tests only depend on the env's config and stacks, however recently
+# deployed, whoever runs them.
 # The env vars of afon.sh and afon-cli.sh apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
 #
 # As switching env re-points the shared $AFON_HOME symlinks, and the current context of the shared ~/.kube/config,
@@ -55,6 +59,8 @@ set -euo pipefail
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_SUITE_FILE="$AFON_ROOT/smoke/regression-aws.csv"
 OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
+# The dir of the results files, one per run, eg results-<yyyymmdd-hhmmss>.txt.
+RESULTS_DIR="$AFON_ROOT/smoke/target/regression"
 # Turns off the Maven loggers of afon.sh reporting a test's non-zero exit, as the exec plugin's stack trace and
 # Maven's failure summary, the test's own output being what tells why it failed.
 QUIET_MAVEN_OPTS="-Dorg.slf4j.simpleLogger.log.org.codehaus.mojo.exec=off -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.MavenCli=off"
@@ -97,6 +103,56 @@ warning() {
 # stops the script or fails a test, while the script carries on as before after a warning.
 error() {
   echo "${STDERR_ERROR_COLOR}ERROR: $*${STDERR_RESET_COLOR}" >&2
+}
+
+# Starts the results file of this run, RESULTS_FILE, with the run's settings.  It holds the results of the run, as
+# record writes them, without the logging of the commands, which the console may also show, eg with
+# --logging-console INFO.
+start_results() {
+  mkdir -p "$RESULTS_DIR"
+  RESULTS_FILE="$RESULTS_DIR/results-$(date +%Y%m%d-%H%M%S).txt"
+  {
+    echo "Regression suite run of $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "env: $(current_env)"
+    echo "suite: $SUITE_FILE"
+    echo "tests: ${SELECTED:-all}"
+    echo "stacks set up: ${SETUP:-none}${TEARDOWN:+, then torn down}"
+    if [ -n "$CLI" ]; then
+      echo "commands run with: $(cli_script)"
+    else
+      echo "commands run with: $AFON_ROOT/afon.sh"
+    fi
+    echo
+  } > "$RESULTS_FILE"
+}
+
+# Prints the time elapsed since $1, a value of SECONDS, in whole seconds, as mm:ss, eg 17:01, or as hh:mm:ss, eg
+# 01:17:01, from an hour.
+elapsed_since() {
+  local elapsed=$((SECONDS - $1))
+  if [ $elapsed -ge 3600 ]; then
+    printf '%02d:' $((elapsed / 3600))
+  fi
+  printf '%02d:%02d' $((elapsed % 3600 / 60)) $((elapsed % 60))
+}
+
+# Records and prints the time the whole run took, from the start of the script, including any setup and teardown:
+# as completed, or else as interrupted, given $1.  Then prints the results file, last, so it is easy to find.
+finish_run() {
+  local outcome="completed in"
+  if [ -n "${1:-}" ]; then
+    outcome="interrupted after"
+  fi
+  record "regression suite $outcome $(elapsed_since 0)"
+  banner "Regression suite $outcome $(elapsed_since 0)"
+  banner "Results in $RESULTS_FILE"
+}
+
+# Appends the result $* to the results file, once started.
+record() {
+  if [ -n "$RESULTS_FILE" ]; then
+    echo "$*" >> "$RESULTS_FILE"
+  fi
 }
 
 # Prints the afon log file, which logback.xml writes to in afon home.
@@ -260,12 +316,26 @@ use_env() {
   export AFON_ENV="$1"
 }
 
-# Makes the env $1's AWS full stack cluster the current kubectl context, exiting if it fails.  The env is that of
-# AFON_ENV, which use_env exports.
+# Prints the env the afon commands run in: that of AFON_ENV, which use_env exports given --env, else that of the
+# current config, ie the env of the config-<env> dir $AFON_HOME/config links to, if any.
+current_env() {
+  local config_dir
+  if [ -n "${AFON_ENV:-}" ]; then
+    echo "$AFON_ENV"
+    return
+  fi
+  config_dir=$(readlink "${AFON_HOME:-$HOME/.afon}/config" 2>/dev/null || true)
+  case "$(basename "$config_dir")" in
+    config-*) basename "$config_dir" | sed 's/^config-//' ;;
+    *) echo "of the current config" ;;
+  esac
+}
+
+# Makes the AWS full stack cluster of the current env the current kubectl context, exiting if it fails.
 update_kube_config() {
-  banner "Updating the kubectl context to the AWS full stack cluster of env $1"
+  banner "Updating the kubectl context to the AWS full stack cluster of env $(current_env)"
   if ! run_afon aws-update-kube-config full; then
-    error "Failed to update the kubectl context for env $1: not running the tests"
+    error "Failed to update the kubectl context for env $(current_env): not running the tests"
     exit 1
   fi
 }
@@ -334,11 +404,11 @@ restrict_polaris_ingress() {
   fi
 }
 
-# Deploys the comma-separated stacks $1, in order, exiting if any fails.  Each stack is recorded in DEPLOYED_STACKS
-# before being deployed, so that a stack whose deploy failed part way is also handled by finish_stacks, which is
-# run on exit, however the script exits.
-deploy_stacks() {
-  local stack
+# Sets up the comma-separated stacks $1, in order, exiting if any fails.  Each stack is recorded in SETUP_STACKS
+# before being set up, so that a stack whose setup failed part way is also handled by finish_stacks, which is run
+# on exit, however the script exits.
+setup_stacks() {
+  local stack start result
   if [ -z "$1" ]; then
     return
   fi
@@ -346,75 +416,93 @@ deploy_stacks() {
   trap 'INTERRUPTED=true; exit 130' INT
   trap 'INTERRUPTED=true; exit 143' TERM
   for stack in ${1//,/ }; do
-    DEPLOYED_STACKS+=("$stack")
-    banner "Deploying stack $stack"
-    if ! run_afon manage-stack deploy "$stack"; then
-      error "Failed to deploy stack $stack: not running the tests"
+    SETUP_STACKS+=("$stack")
+    banner "Setting up stack $stack"
+    start=$SECONDS
+    if ! run_afon manage-stack setup "$stack"; then
+      result="stack $stack failed to set up in $(elapsed_since $start)"
+      record "$result: tests not run"
+      error "Stack ${result#stack }: not running the tests"
       exit 1
     fi
+    result="stack $stack set up in $(elapsed_since $start)"
+    record "$result"
+    success "Stack ${result#stack }"
   done
 }
 
-# Prints the stacks of DEPLOYED_STACKS in reverse order, the order in which to tear them down.
-reversed_deployed_stacks() {
+# Prints the stacks of SETUP_STACKS in reverse order, the order in which to tear them down.
+reversed_setup_stacks() {
   local index
-  index=$((${#DEPLOYED_STACKS[@]} - 1))
+  index=$((${#SETUP_STACKS[@]} - 1))
   while [ $index -ge 0 ]; do
-    echo "${DEPLOYED_STACKS[$index]}"
+    echo "${SETUP_STACKS[$index]}"
     index=$((index - 1))
   done
 }
 
-# Prints the commands deleting the stacks of DEPLOYED_STACKS, in the order in which to run them.
+# Prints the commands deleting the stacks of SETUP_STACKS, in the order in which to run them.
 print_delete_commands() {
   local stack
-  for stack in $(reversed_deployed_stacks); do
+  for stack in $(reversed_setup_stacks); do
     echo "  $(afon_command_line manage-stack delete "$stack")"
   done
 }
 
-# Tears down the stacks of DEPLOYED_STACKS, in reverse order, with the afon command 'manage-stack delete <stack>',
+# Tears down the stacks of SETUP_STACKS, in reverse order, with the afon command 'manage-stack delete <stack>',
 # trying all of them, and returning non-zero if any fails.
 teardown_stacks() {
-  local stack failed=0
-  for stack in $(reversed_deployed_stacks); do
+  local stack start result failed=0
+  for stack in $(reversed_setup_stacks); do
     banner "Tearing down stack $stack"
-    if ! run_afon manage-stack delete "$stack"; then
-      warning "Failed to tear down stack $stack: delete it with '$(afon_command_line manage-stack delete "$stack")'"
+    start=$SECONDS
+    if run_afon manage-stack delete "$stack"; then
+      result="stack $stack torn down in $(elapsed_since $start)"
+      record "$result"
+      success "Stack ${result#stack }"
+    else
+      result="stack $stack failed to tear down in $(elapsed_since $start):"
+      result="$result delete it with '$(afon_command_line manage-stack delete "$stack")'"
+      record "$result"
+      warning "Stack ${result#stack }"
       failed=1
     fi
   done
   return $failed
 }
 
-# The EXIT trap of deploy_stacks, keeping the exit status, unless a teardown fails.  Never tears down the deployed
-# stacks if the script was interrupted, as a deploy may then have been stopped part way, with its tofu state still
-# locked, and a teardown would take as long as the deploy: it only says how to delete them.  Else it tears them
+# The EXIT trap of setup_stacks, keeping the exit status, unless a teardown fails.  Never tears down the set up
+# stacks if the script was interrupted, as a setup may then have been stopped part way, with its tofu state still
+# locked, and a teardown would take as long as the setup: it only says how to delete them.  Else it tears them
 # down if --teardown is given, or says how to delete them.
 finish_stacks() {
   local status=$?
   trap - EXIT
-  if [ ${#DEPLOYED_STACKS[@]} -eq 0 ]; then
+  if [ ${#SETUP_STACKS[@]} -eq 0 ]; then
     exit $status
   fi
   if [ -n "$INTERRUPTED" ]; then
-    error "Interrupted: not tearing down the deployed stacks, which may be part way deployed.  Delete them with:"
+    record "Interrupted: the stacks were not torn down"
+    error "Interrupted: not tearing down the set up stacks, which may be part way set up.  Delete them with:"
     print_delete_commands >&2
   elif [ -n "$TEARDOWN" ]; then
     if ! teardown_stacks; then
       status=1
     fi
   else
-    echo "Leaving the deployed stacks up, as --teardown is not given.  Delete them with:"
+    record "Stacks left up, as --teardown is not given"
+    echo "Leaving the set up stacks up, as --teardown is not given.  Delete them with:"
     print_delete_commands
   fi
+  finish_run "$INTERRUPTED"
   exit $status
 }
 
 AFON_COMMAND=()
 CLI=
-DEPLOY=
-DEPLOYED_STACKS=()
+RESULTS_FILE=
+SETUP=
+SETUP_STACKS=()
 INTERRUPTED=
 TEARDOWN=
 ENV=
@@ -429,8 +517,8 @@ while [[ $# -gt 0 ]]; do
       CLI=true; shift ;;
     --env|-e)
       require_value "$1" "${2:-}"; ENV="$2"; shift 2 ;;
-    --deploy|-d)
-      require_value "$1" "${2:-}"; DEPLOY="$2"; shift 2 ;;
+    --setup)
+      require_value "$1" "${2:-}"; SETUP="$2"; shift 2 ;;
     --teardown)
       TEARDOWN=true; shift ;;
     --suite|-s)
@@ -449,8 +537,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [ -n "$TEARDOWN" ] && [ -z "$DEPLOY" ]; then
-  error "Option --teardown requires --deploy"
+if [ -n "$TEARDOWN" ] && [ -z "$SETUP" ]; then
+  error "Option --teardown requires --setup"
   usage >&2; exit 1
 fi
 
@@ -489,14 +577,14 @@ fi
 
 cd "$AFON_ROOT"
 
-deploy_stacks "$DEPLOY"
+start_results
+setup_stacks "$SETUP"
 
-if [ -n "$ENV" ]; then
-  update_kube_config "$ENV"
-  restrict_polaris_ingress
-fi
+update_kube_config
+restrict_polaris_ingress
 
-# The results of the passed and failed tests, eg "network passed in 12s", timed in whole seconds with SECONDS.
+# The results of the passed and failed tests, eg "test network passed in 02:11", recorded as they are, and printed
+# capitalised, as are those of the stacks, eg "stack aws-full set up in 17:01".
 PASSED=()
 FAILED=()
 for test_line in "${TESTS[@]}"; do
@@ -508,13 +596,15 @@ for test_line in "${TESTS[@]}"; do
   start=$SECONDS
   # The args are left unquoted, to split them on spaces.
   if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" run_afon "$command" $args; then
-    result="$name passed in $((SECONDS - start))s"
+    result="test $name passed in $(elapsed_since $start)"
     PASSED+=("$result")
-    success "Test $result"
+    record "$result"
+    success "Test ${result#test }"
   else
-    result="$name failed in $((SECONDS - start))s"
+    result="test $name failed in $(elapsed_since $start)"
     FAILED+=("$result")
-    error "Test $result: see $(afon_log_file)"
+    record "$result"
+    error "Test ${result#test }: see $(afon_log_file)"
   fi
 done
 
@@ -523,13 +613,18 @@ banner "Regression summary (log in $(afon_log_file))"
 # Empty arrays are guarded, as expanding them fails under set -u in bash 3.2, the macOS default.
 if [ ${#PASSED[@]} -gt 0 ]; then
   for result in "${PASSED[@]}"; do
-    success "$result"
+    success "Test ${result#test }"
   done
 fi
 if [ ${#FAILED[@]} -gt 0 ]; then
   for result in "${FAILED[@]}"; do
-    error "$result"
+    error "Test ${result#test }"
   done
 fi
-banner "${#PASSED[@]} passed, ${#FAILED[@]} failed"
+record "tests: ${#PASSED[@]} passed, ${#FAILED[@]} failed"
+banner "Tests: ${#PASSED[@]} passed, ${#FAILED[@]} failed"
+# With stacks set up, finish_stacks finishes the run on exit, after any teardown.
+if [ ${#SETUP_STACKS[@]} -eq 0 ]; then
+  finish_run
+fi
 [ ${#FAILED[@]} -eq 0 ]

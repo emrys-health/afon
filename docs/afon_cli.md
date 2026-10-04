@@ -124,7 +124,7 @@ afon-cli.sh -lc INFO <command>
 ## Smoke tests
 
 The `smoke` dir of the distribution holds the smoke regression suite (see [smoke tests](smoke_tests.md#regression-suite)).
-Run from the distribution, it runs its commands, the smoke tests' as well as those deploying or reaching the stacks,
+Run from the distribution, it runs its commands, the smoke tests' as well as those setting up or reaching the stacks,
 with the distribution's `afon-cli.sh`, which resolves them as any other command, as if given `--cli`: the
 distribution, being independent of the source tree, has no `afon.sh`.
 ```shell
