@@ -15,7 +15,7 @@ The identity running `afon-cli.sh manage-stack ... gcp-polaris`, ie the active `
 | `roles/compute.networkAdmin`              | The VPC, subnet, Cloud Router and Cloud NAT                                                                                                                                                                 |
 | `roles/container.admin`                   | Creating, updating and deleting the GKE cluster, and the Kubernetes objects Helm and Kubernetes create in it: namespaces, Jobs, Secrets, Deployments, Services and Ingress, including cert-manager and nginx-ingress |
 | `roles/iam.serviceAccountUser`            | Acting as the cluster nodes' service account, by default the project's Compute Engine one, `<project-number>-compute@developer.gserviceaccount.com`, on the creation of the cluster                          |
-| `roles/dns.admin`                         | Reading the `polaris-zone` managed zone, and creating the Polaris DNS record set.  `roles/dns.reader` is not enough                                                                                         |
+| `roles/dns.admin`                         | Reading the Polaris DNS zone, and creating the Polaris DNS record set.  `roles/dns.reader` is not enough                                                                                         |
 | `roles/serviceusage.serviceUsageConsumer` | Using the project's APIs                                                                                                                                                                                    |
 
 `roles/iam.serviceAccountUser` is granted on the service account, not the project, for a narrower scope:
@@ -48,7 +48,7 @@ These are not roles, but are also required:
 
 - The APIs are enabled: `compute.googleapis.com`, `container.googleapis.com`, `dns.googleapis.com`,
   `iam.googleapis.com`.
-- The `polaris-zone` managed zone exists in the project, as the stack assumes it.
+- The Polaris DNS zone exists in the project, as the stack assumes it, named after `GCP_POLARIS_DOMAIN_NAME` with its dots replaced by dashes, eg `emryspolarisgcp2-click`.  `scripts/gcp/create.sh` creates it.
 - The default Compute Engine service account exists and is enabled.
 
 ## Account setup
