@@ -1,15 +1,9 @@
 package health.emrys.afon.security.keycloak;
 
-import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import static health.emrys.afon.config.AfonProperty.KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD;
-import static health.emrys.afon.config.AfonProperty.KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME;
 import static java.lang.String.format;
 
 public class KeyCloakConfigurer {
@@ -18,12 +12,6 @@ public class KeyCloakConfigurer {
 
     public static final String HTTP = "http";
     public static final int    KEYCLOAK_PORT  = 8080;
-    /**
-     * KeyCloak's env var names (Quarkus config), which map to
-     * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME} and {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD}.
-     */
-    private static final String ENV_KC_BOOTSTRAP_ADMIN_USERNAME = "KC_BOOTSTRAP_ADMIN_USERNAME";
-    private static final String ENV_KC_BOOTSTRAP_ADMIN_PASSWORD = "KC_BOOTSTRAP_ADMIN_PASSWORD";
 
     /**
      * The realm, client and user that Polaris trusts. The user/password is the credential that a
@@ -73,21 +61,6 @@ public class KeyCloakConfigurer {
 
     public KeyCloakConfigurer(AfonPropertyProvider properties) {
         this.properties = properties;
-    }
-
-    public Map<String, String> config() {
-        Map<String, String> config = new HashMap<>();
-        config.put(ENV_KC_BOOTSTRAP_ADMIN_USERNAME, properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME));
-        config.put(ENV_KC_BOOTSTRAP_ADMIN_PASSWORD, properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD));
-        config.put("KC_HTTP_ENABLED", "true");
-        // Run KeyCloak at DEBUG level to aid diagnosing OIDC/token issues.
-        config.put("KC_LOG_LEVEL", "DEBUG");
-        // Issuer is left dynamic (stamped from the request host) so host-side callers can use
-        // 'localhost' with no /etc/hosts entry. Polaris tolerates the resulting issuer-host
-        // difference via quarkus.oidc.token.issuer=any (see KeyCloakHelper#polarisOidcEnv);
-        // the token signature is still validated. For production, pin KC_HOSTNAME instead.
-        config.put("KC_HOSTNAME_STRICT", "false");
-        return config;
     }
 
 }
