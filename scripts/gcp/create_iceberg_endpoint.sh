@@ -9,14 +9,14 @@ for API in bigquery.googleapis.com bigqueryconnection.googleapis.com biglake.goo
   fi
 done
 
-#PROJECT_ID="afon-core"
 #LOCATION="europe-west2"
 #CATALOG_ID="afon_iceberg_catalog"
 #
 #gcloud alpha biglake iceberg catalogs create $CATALOG_ID --project=$PROJECT_ID --catalog-type=gcs-bucket
 
 ICEBERG_BUCKET="emrys_afon_core_2"
-EXTERNAL_SA="external-sa@fjords-450014.iam.gserviceaccount.com"
+PROJECT_ID="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.properties}"
+EXTERNAL_SA="external-sa@$PROJECT_ID.iam.gserviceaccount.com"
 BLIRC_SA="blirc-600159231093-i76b@gcp-sa-biglakerestcatalog.iam.gserviceaccount.com"
 
 if gcloud storage buckets describe "gs://$ICEBERG_BUCKET" >/dev/null 2>&1; then

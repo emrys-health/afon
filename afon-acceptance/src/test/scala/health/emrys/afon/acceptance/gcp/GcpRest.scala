@@ -4,7 +4,7 @@ import health.emrys.afon.acceptance.fixtures.Datum
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
-import health.emrys.afon.config.AfonProperty.GOOGLE_APPLICATION_CREDENTIALS
+import health.emrys.afon.config.AfonProperty.{GCP_PROJECT_ID, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.ConfigUtils
 
 import java.nio.file.{Files, Paths}
@@ -31,11 +31,12 @@ object GcpRest {
       GOOGLE_APPLICATION_CREDENTIALS.getName,
       GOOGLE_APPLICATION_CREDENTIALS.getValueFrom(properties))
     println(s"Using GOOGLE_APPLICATION_CREDENTIALS from $gcpSecrets")
+    Using.resource(Files.newInputStream(Paths.get(ConfigUtils.configDir, "afon-gcp.properties")))(in => properties.load(in))
 
     val catalog_name = "CATALOG_NAME"
     val spark = SparkSession.builder.config(new SparkConf().setMaster("local[2]").setAppName("Tests")
         .set(f"spark.sql.catalog.$catalog_name", "org.apache.iceberg.spark.SparkCatalog")
-        .set(f"spark.sql.catalog.$catalog_name.header.x-goog-user-project", "fjords-450014")
+        .set(f"spark.sql.catalog.$catalog_name.header.x-goog-user-project", GCP_PROJECT_ID.getValueFrom(properties))
         .set(f"spark.sql.catalog.$catalog_name.header.X-Iceberg-Access-Delegation","vended-credentials")
         .set(f"spark.sql.catalog.$catalog_name.io-impl", "org.apache.iceberg.gcp.gcs.GCSFileIO")
         .set(f"spark.sql.catalog.$catalog_name.rest.auth.type", "org.apache.iceberg.gcp.auth.GoogleAuthManager")

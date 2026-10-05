@@ -5,7 +5,7 @@ source $AFON_ROOT/scripts/kube/polaris-source.sh
 # Polaris pod, ingress external IP, TLS secret, then real HTTPS requests, anonymous and as the Polaris admin.
 # See kube/status-source.sh for the layers and the exit codes: 0 status reported, 2 could not verify.
 
-POLARIS_PROJECT="afon-core" # as deployed by GcpKubernetesStack
+POLARIS_PROJECT="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.properties}"
 
 status_require_domain GCP_POLARIS_DOMAIN_NAME "$GCP_POLARIS_DOMAIN_NAME"
 status_require gcloud kubectl curl

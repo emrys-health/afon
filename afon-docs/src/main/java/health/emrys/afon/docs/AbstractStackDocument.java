@@ -12,6 +12,7 @@ import health.emrys.afon.ops.steps.StepsProvider;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.config.AfonProperty.GCP_PROJECT_ID;
 import static java.lang.String.format;
 
 /**
@@ -69,6 +70,14 @@ public abstract class AbstractStackDocument extends AbstractDocument {
     @Override
     public List<Step> steps(StepOperations stepOperations) {
         return stepsProvider.stepsUsing(stepOperations);
+    }
+
+    /**
+     * @return the configured {@code GCP_PROJECT_ID}, or its name if not set, as in the templates
+     */
+    protected String gcpProjectId() {
+        String projectId = properties.getValue(GCP_PROJECT_ID, "").trim();
+        return projectId.isEmpty() ? "<GCP_PROJECT_ID>" : projectId;
     }
 
     @Override

@@ -18,7 +18,7 @@ public class GcpCleanupHelper extends CleanupHelper {
     public String cleanupCommands() {
         return String.format("""
                #!/bin/bash
-               PROJECT_ID="afon-core"
+               PROJECT_ID="%s"
                VPC_NAME="gke-private-vpc"
                REGION="%s"
                
@@ -83,7 +83,7 @@ public class GcpCleanupHelper extends CleanupHelper {
                gcloud compute networks delete $VPC_NAME --project=$PROJECT_ID --quiet
                
                echo "Cleanup complete."
-               """, properties.getValue(AfonProperty.GCP_REGION));
+               """, properties.getValue(AfonProperty.GCP_PROJECT_ID), properties.getValue(AfonProperty.GCP_REGION));
     }
 
     /**

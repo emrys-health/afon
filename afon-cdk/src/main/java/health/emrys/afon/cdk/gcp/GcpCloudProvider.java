@@ -43,22 +43,17 @@ import static java.lang.String.format;
  * Install with: gcloud components install gke-gcloud-auth-plugin
  * <p>
  * If you need to destroy by hand, run:
- * gcloud container clusters delete $CLUSTER_NAME --region=$REGION --project afon-core
+ * gcloud container clusters delete $CLUSTER_NAME --region=$REGION --project $GCP_PROJECT_ID
  */
 public class GcpCloudProvider extends AbstractCloudProvider {
-
-    /**
-     * Generate with:
-     * gcloud projects list --format="table(projectId,name)"
-     */
-    private final String PROJECT_ID = "afon-core";
 
     private final ContainerCluster   gkeCluster;
     private       KubernetesProvider k8sProvider;
     private       HelmProvider       helmProvider;
 
-    GcpCloudProvider(final Construct scope, final String id, String projectID, AfonPropertyProvider properties) {
+    GcpCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
         super(scope, id);
+        String projectId = projectIdFrom(properties);
         String clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
         String gcpRegion = properties.getValue(AfonProperty.GCP_REGION);
         String vpcName     = "gke-private-vpc-" + clusterName;
@@ -69,7 +64,7 @@ public class GcpCloudProvider extends AbstractCloudProvider {
         new GoogleProvider(
             this, "google", GoogleProviderConfig
             .builder()
-            .project(projectID)
+            .project(projectId)
             .region(gcpRegion).zone("europe-west2-a")
             .accessToken(printGcloudAccessToken())
             .build());
@@ -136,7 +131,7 @@ public class GcpCloudProvider extends AbstractCloudProvider {
 
         String gcloudCommand = format(
             "gcloud container clusters get-credentials %s --region %s --project %s",
-            clusterName, gcpRegion, PROJECT_ID);
+            clusterName, gcpRegion, projectId);
         // This refreshes your local K8s config
         LocalExecProvisioner refreshCredentials = LocalExecProvisioner
             .builder()
@@ -177,6 +172,20 @@ public class GcpCloudProvider extends AbstractCloudProvider {
         com.hashicorp.cdktf.TerraformOutput.Builder.create(this, "gkeEndpoint")
                                                    .value(gkeCluster.getEndpoint())
                                                    .build();
+    }
+
+    /**
+     * @return the project the stack is deployed into, as configured by {@link AfonProperty#GCP_PROJECT_ID}.
+     * Find the available ones with: {@code gcloud projects list --format="table(projectId,name)"}
+     * @throws IllegalArgumentException if it is not set
+     */
+    private static String projectIdFrom(AfonPropertyProvider properties) {
+        String projectId = properties.getValue(AfonProperty.GCP_PROJECT_ID, "").trim();
+        if (projectId.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Property GCP_PROJECT_ID is required by the GCP stacks, but is not set: set it in afon-gcp.properties");
+        }
+        return projectId;
     }
 
     // -------------------------------------------------------------------------

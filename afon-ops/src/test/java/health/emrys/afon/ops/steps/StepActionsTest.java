@@ -75,6 +75,24 @@ class StepActionsTest {
     }
 
     @Test
+    void doesNotSynthesiseStackWithoutTfStateBeforeDeletingIt() {
+        // a deployed stack would be synthesised, which needs the stack's config, so this passes only if it is not
+        actions.resynthesise(StackId.parse("gcp-polaris"), cdktfDir.resolve("terraform.gcp-polaris.tfstate"));
+
+        assertThat(commands).isEmpty();
+    }
+
+    @Test
+    void doesNotSynthesiseDeployedStackWithoutStackClassBeforeDeletingIt() throws IOException {
+        Path tfState = createFiles("terraform.aws-nosuchstack.tfstate").get(0);
+
+        actions.resynthesise(StackId.parse("aws-nosuchstack"), tfState);
+
+        assertThat(commands).isEmpty();
+        assertThat(tfState).exists();
+    }
+
+    @Test
     void canDeleteStackWithoutTfStateWithoutRunningTofu() throws IOException {
         Path stackDir = createDirs("stacks/aws-keycloak").get(0);
 

@@ -4,7 +4,7 @@ import health.emrys.afon.acceptance.SparkHelper.sparkWarehouse
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.{AcceptanceTestConfig, GrantCatalogAdmin, CreateCatalogRole}
 import health.emrys.afon.acceptance.tags.{External, Gcp}
-import health.emrys.afon.config.AfonProperty.GOOGLE_APPLICATION_CREDENTIALS
+import health.emrys.afon.config.AfonProperty.{GCP_PROJECT_ID, GOOGLE_APPLICATION_CREDENTIALS}
 import health.emrys.afon.config.{AfonCatalog, AfonCloud}
 import health.emrys.afon.polaris.catalogs.{ExternalPolarisCatalog, GcpPolarisCatalog}
 import org.apache.iceberg.gcp.auth.GoogleAuthManager
@@ -40,7 +40,7 @@ class GcpExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
       override protected def createCatalog(): ExternalCatalog = {
         val bucketProperties = CatalogProperties.builder().setDefaultBaseLocation(bucketUri()).build()
-        val clientId     = "my-vendable-sa@fjords-450014.iam.gserviceaccount.com" // from GCP props
+        val clientId     = s"my-vendable-sa@${properties.getValue(GCP_PROJECT_ID)}.iam.gserviceaccount.com" // from GCP props
         val clientSecret = properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)
         val authenticationParameters =
           new OAuthClientCredentialsParameters(
