@@ -1,0 +1,200 @@
+// Emrys Health — surface and type rules on top of the colour scheme.
+// Flat surfaces: 1px hairline borders, no shadows, no gradients.
+
+// ---------- Type ----------
+body {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.main-content {
+  // Display register: Light 300 for the page title only (large, so it doesn't thin out)
+  h1 {
+    font-weight: 300;
+    font-size: 2.25rem;
+    line-height: 1.2;
+    color: $emrys-blue;
+  }
+
+  h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    color: $emrys-blue;
+  }
+
+  // Cap the reading measure at about 66 characters
+  p, li, dd, blockquote {
+    max-width: 66ch;
+  }
+
+  blockquote {
+    border-left: 2px solid $emrys-teal;
+    color: $emrys-night-blue;
+  }
+
+  hr {
+    background-color: $emrys-border;
+    height: 1px;
+  }
+
+  // Inline code
+  code {
+    font-family: $mono-font-family;
+    background-color: $emrys-panel;
+    border: 1px solid $emrys-border;
+  }
+}
+
+// Section label: write <p class="eyebrow">Getting started</p> above a heading
+.main-content .eyebrow {
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: $emrys-teal;
+}
+
+// ---------- Navigation ----------
+.side-bar {
+  border-right: 1px solid $emrys-border;
+}
+
+.site-title {
+  font-weight: 600;
+  color: $emrys-blue;
+
+  &:hover {
+    background-image: none;
+    background-color: $emrys-light-grey;
+  }
+}
+
+.nav-list .nav-list-item {
+  .nav-list-link {
+    &:hover,
+    &.active {
+      background-image: none;
+      background-color: $emrys-light-grey;
+    }
+
+    &.active {
+      color: $emrys-blue;
+      font-weight: 600;
+      box-shadow: inset 2px 0 0 $emrys-teal;  // teal rule marks the current page
+    }
+  }
+
+  .nav-list-expander:hover {
+    background-image: none;
+    background-color: $emrys-light-grey;
+  }
+}
+
+.site-footer,
+.site-footer a {
+  color: $emrys-muted;
+}
+
+// ---------- Flat surfaces ----------
+.search-input-wrap,
+.search-results,
+.table-wrapper,
+.btn,
+.btn:focus,
+.btn.focus,
+.btn:active,
+.btn.selected {
+  box-shadow: none !important;
+}
+
+.search-input-wrap {
+  border: 1px solid $emrys-border;
+  border-radius: 999px;  // controls are full pills
+}
+
+.search-input {
+  border-radius: 999px;
+}
+
+.search-results {
+  border: 1px solid $emrys-border;
+  border-radius: 16px;
+}
+
+.search-result:hover,
+.search-result.active {
+  background-image: none;
+  background-color: $emrys-light-grey;
+}
+
+.table-wrapper {
+  border: 1px solid $emrys-border;
+}
+
+th {
+  text-align: left;
+  color: $emrys-blue;
+  font-weight: 600;
+  background-color: $emrys-panel;
+}
+
+tbody tr:nth-child(even) td {
+  background-color: $emrys-panel;  // banding
+}
+
+// Code blocks: hairline border instead of the theme's dark outline
+div.highlighter-rouge div.highlight,
+div.listingblock div.content,
+figure.highlight,
+.main-content pre.highlight {
+  border-color: $emrys-border !important;
+  box-shadow: none;
+}
+
+// Page footer: secondary text
+.main-content footer {
+  font-size: 0.875rem;
+  color: $emrys-muted;
+}
+
+// Buttons: full pills, flat (the theme's buttons use gradients)
+.btn {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.btn,
+.btn:hover,
+.btn:active,
+.btn.selected,
+.site-button:hover {
+  background-image: none !important;
+}
+
+.btn-primary,
+.btn-primary:active,
+.btn-primary.selected {
+  background-color: $emrys-teal;
+  color: $emrys-white;   // white on teal green
+}
+
+.btn-primary:hover {
+  background-color: $emrys-blue;   // white on blue
+}
+
+.site-button:hover {
+  background-color: $emrys-light-grey;
+}
+
+.btn-outline {
+  box-shadow: inset 0 0 0 1px $emrys-teal !important;
+  color: $emrys-teal;
+}
+
+// Visible keyboard focus in brand teal
+a:focus-visible,
+.btn:focus-visible,
+.search-input:focus-visible {
+  outline: 2px solid $emrys-teal;
+  outline-offset: 2px;
+}
