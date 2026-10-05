@@ -1,0 +1,26 @@
+# Site settings — edit the title, description and repository link
+title: Afon documentation
+description: Afon documentation maintained by Emrys Health.
+
+# Theme (pinned so the site doesn't change unexpectedly when the theme updates)
+remote_theme: just-the-docs/just-the-docs@v0.12.0
+plugins:
+  - jekyll-remote-theme
+
+# Emrys brand colours, fonts and surfaces live in _sass/
+color_scheme: emrys
+
+# Logo: add the teal horizontal lockup from the Emrys design system to
+# docs/assets/images/ and uncomment the line below. Without it, the title shows as text.
+# logo: "/assets/images/emrys-logo-horizontal-teal.png"
+
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "Back to top"
+
+# Link shown in the top-right of every page — replace with your repository URL
+aux_links:
+  "View on GitHub":
+    - "https://github.com/emrys-health/afon-core"
+aux_links_new_tab: true
