@@ -73,11 +73,42 @@ usage (){
   echo "setup-output:     the output file where to write the setup.  Defaults to 'versions.md'"
 }
 
+# ANSI colours, as in maven: info in light blue, errors in red, the execution statements in bold.
+# Only used when the stream is a terminal and NO_COLOR is not set (see https://no-color.org).
+ANSI_RESET=$'\033[0m'
+ANSI_INFO=$'\033[94m'
+ANSI_ERROR=$'\033[31m'
+ANSI_EXEC=$'\033[1;35m'
+
+# Prints the message $2... wrapped in the ANSI colour $1 to the fd $3, if that fd is a terminal and NO_COLOR is not set.
+colour_echo(){
+  local colour="$1" fd="$2"
+  shift 2
+  if [ -z "${NO_COLOR:-}" ] && [ -t "$fd" ]; then
+    echo "${colour}$*${ANSI_RESET}" >&"$fd"
+  else
+    echo "$*" >&"$fd"
+  fi
+}
+
 # Prints the message $*, unless --bash-quiet or --quiet is given.
 info(){
   if [ -z "$BASH_QUIET" ]; then
-    echo "$@"
+    colour_echo "$ANSI_INFO" 1 "$@"
   fi
+}
+
+# Prints the execution statement $*, highlighted, unless --bash-quiet or --quiet is given.
+# The output of the executed command itself is left as is.
+info_exec(){
+  if [ -z "$BASH_QUIET" ]; then
+    colour_echo "$ANSI_EXEC" 1 "$@"
+  fi
+}
+
+# Prints the error message $* to stderr.  Never hushed.
+error(){
+  colour_echo "$ANSI_ERROR" 2 "$@"
 }
 
 # Runs the command $*, hushing its output if --bash-quiet or --quiet is given, eg the implicit env switches.
@@ -104,7 +135,7 @@ exec_ansible(){
   if [ -z "$ANSIBLE_PLAYBOOK" ]; then
     ANSIBLE_PLAYBOOK="runner-setup.yml"
   fi
-  info "Executing: ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS"
+  info_exec "Executing: ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS"
   ansible-playbook $ANSIBLE_PLAYBOOK $ANSIBLE_ARGS
 }
 
@@ -138,7 +169,7 @@ find_script_path(){
 
 resolve_script_path(){
   if ! find_script_path "$1"; then
-    echo "Action not supported: $1 (no script scripts/$DIR/$NAME.sh)"
+    error "Action not supported: $1 (no script scripts/$DIR/$NAME.sh)"
     usage; exit 0
   fi
 }
@@ -207,7 +238,7 @@ mvn_envs(){
 
 exec_mvn() {
   MVN="$MVN_CMD $MVN_PROFILES $MVN_ENVS $MVN_ARGS $MVN_GOALS"
-  info "Executing: $MVN"
+  info_exec "Executing: $MVN"
   eval "$MVN"
 }
 
@@ -216,7 +247,7 @@ exec_jvm(){
     EXEC_PACKAGE="health.emrys.afon"
   fi
   if [ -z "$EXEC_CLASS" ]; then
-    echo "Action exec requires option --exec-class"
+    error "Action exec requires option --exec-class"
     usage; exit 0
   fi
   if [ -n "$EXEC_PACKAGE" ]; then
@@ -244,10 +275,10 @@ exec_jvm(){
 
 exec_script(){
   if [ -z "$SCRIPT_PATH" ]; then
-    echo "Action script requires option --script-path"
+    error "Action script requires option --script-path"
     usage; exit 0
   fi
-  info "Executing $SCRIPT_PATH $SCRIPT_ARGS"
+  info_exec "Executing $SCRIPT_PATH $SCRIPT_ARGS"
   source $AFON_ROOT/scripts/$SCRIPT_PATH $SCRIPT_ARGS
 }
 
@@ -350,7 +381,7 @@ while [[ $# -gt 0 ]]; do
     --)
       shift; POSITIONAL_ARGS+=("$@"); break ;;
     -*)
-      echo "Unknown option: $1" >&2;
+      error "Unknown option: $1"
       usage; exit 0
       ;;
     *)
@@ -366,18 +397,18 @@ done
 if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
   if [ -n "$(find_ops_class "$ACTION")" ]; then
     if [ -n "$EXEC_ARGS" ]; then
-      echo "The ops command $ACTION takes its args either as positional args or via --exec-args, not both." >&2
+      error "The ops command $ACTION takes its args either as positional args or via --exec-args, not both."
       usage; exit 0
     fi
     EXEC_ARGS="${POSITIONAL_ARGS[*]}"
   elif find_script_path "$ACTION" 2>/dev/null; then
     if [ -n "$SCRIPT_ARGS" ]; then
-      echo "The script $ACTION takes its args either as positional args or via --script-args, not both." >&2
+      error "The script $ACTION takes its args either as positional args or via --script-args, not both."
       usage; exit 0
     fi
     SCRIPT_ARGS="${POSITIONAL_ARGS[*]}"
   else
-    echo "Unknown option: ${POSITIONAL_ARGS[0]}" >&2
+    error "Unknown option: ${POSITIONAL_ARGS[0]}"
     usage; exit 0
   fi
 fi
@@ -514,7 +545,7 @@ case $ACTION in
     exec_action_script
     ;;
   *)
-    echo "Unknown action: $ACTION"
+    error "Unknown action: $ACTION"
     ;;
 esac
 cd $AFON_ROOT

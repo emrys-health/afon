@@ -25,7 +25,7 @@ class GcpKubernetesStack extends AbstractCloudStack {
         this.gcpDomainName = properties.getValue(GCP_POLARIS_DOMAIN_NAME);
         this.properties    = properties;
         NullProvider.Builder.create(this, "null").build();
-        cloudProvider = new GcpCloudProvider(this, stackId.cloud().toString(), "afon-core", properties);
+        cloudProvider = new GcpCloudProvider(this, stackId.cloud().toString(), properties);
     }
 
     @Override

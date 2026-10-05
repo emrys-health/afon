@@ -27,7 +27,7 @@ Credentials to access the database are specified in [configuration](configuratio
 Finally, if you want to use Jupyter/Guacamole, an OAuth2 security provider is required.
 
 Afon uses Google Cloud as provider, so you'll need a Google account to register your domain in
-[Google Auth](https://console.cloud.google.com/auth/clients?project=afon-core).
+[Google Auth](https://console.cloud.google.com/auth/clients?project=<GCP_PROJECT_ID>).
 
 Doing so will generate the OAUTH2 client id and secret that can be set in your [configuration](configuration.md). 
 
@@ -141,7 +141,7 @@ Then, the Kubernetes cluster for that cloud can point the domain name at its own
 
 GCP assumes that the managed zone exists:
 ```shell
-$ gcloud dns managed-zones describe polaris-zone --project=afon-core
+$ gcloud dns managed-zones describe polaris-zone --project=$GCP_PROJECT_ID
 cloudLoggingConfig:
   kind: dns#managedZoneCloudLoggingConfig
 creationTime: '2026-03-06T13:59:46.276Z'

@@ -1,6 +1,6 @@
 source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
-PROJECT_ID="fjords-450014"
+PROJECT_ID="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.properties}"
 EXTERNAL_SA="external-sa@$PROJECT_ID.iam.gserviceaccount.com"
 BLIRC_SA="blirc-600159231093-i76b@gcp-sa-biglakerestcatalog.iam.gserviceaccount.com"
 ICEBERG_BUCKET="emrys_afon_core_2"

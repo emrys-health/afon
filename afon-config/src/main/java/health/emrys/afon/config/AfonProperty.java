@@ -44,6 +44,8 @@ public enum AfonProperty {
     AWS_POLARIS_ALLOWED_CIDRS("AWS_POLARIS_ALLOWED_CIDRS"),
 
     // GCP
+    /** Project the GCP stacks are deployed into, eg {@code afon-core}.  Required for the GCP stacks. */
+    GCP_PROJECT_ID("GCP_PROJECT_ID"),
     GCP_REGION("GCP_REGION"),
     GCP_SERVICE_ACCOUNT("GCP_SERVICE_ACCOUNT"),
     GCP_USER_ACCOUNT("GCP_USER_ACCOUNT"),

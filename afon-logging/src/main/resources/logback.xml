@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration debug="false">
 
+  <!-- Hushes logback's own status messages, which are otherwise all dumped to the console (eg in surefire tests)
+       as soon as a warning is raised, eg for a logback.xml found multiple times on the classpath. -->
+  <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
+
   <property name="DIR" value="${afon.home:-../}/logs" />
   <property name="LEVEL" value="${afon.logging:-INFO}" />
   <!-- The console is filtered out entirely by default, logging to file only.

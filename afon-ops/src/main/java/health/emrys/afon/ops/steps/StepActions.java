@@ -6,6 +6,8 @@ import ch.vorburger.exec.ManagedProcessException;
 import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import health.emrys.afon.cdk.AfonCloudStack;
+import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCloud;
@@ -23,6 +25,7 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.URI;
@@ -84,6 +87,7 @@ public class StepActions {
                 deleteStack(Path.of(legacyStackDir(cloud)), Path.of(legacyTfStatePath(cloud)), maxAttempts, outputStream);
             } else {
                 StackId stackId = StackId.parse(stackName);
+                resynthesise(stackId);
                 deleteStack(Path.of(ConfigUtils.stackDir(stackId)), Path.of(tfStatePath(stackId)), maxAttempts, outputStream);
                 // the kubeconfig of the stack's cluster, which is now gone
                 deletePath(Path.of(kubeConfigPath(stackId)));
@@ -174,6 +178,40 @@ public class StepActions {
 
     private static boolean isStackNameIn(AfonCloud cloud, String name) {
         return name.equals(cloud.toString()) || name.startsWith(cloud + "-");
+    }
+
+    /**
+     * Synthesises the plan of a deployed stack again from the current config, so that {@code tofu destroy} doesn't
+     * run on the plan left by the last deploy or validation, which can be stale: eg the GCP access token embedded in
+     * it at synthesis time expires after an hour.  It also fails early, before anything is destroyed, if the stack no
+     * longer synthesises, eg because of a missing property.  Does nothing if the stack is not deployed, ie has no
+     * tofu state, or has no stack class, as the legacy stacks.
+     * @throws IllegalStateException if the stack fails to synthesise
+     */
+    void resynthesise(StackId stackId) {
+        resynthesise(stackId, Path.of(tfStatePath(stackId)));
+    }
+
+    void resynthesise(StackId stackId, Path tfState) {
+        if (!exists(tfState)) {
+            return;
+        }
+        CloudStackValidator validator = new CloudStackValidator();
+        Class<? extends AfonCloudStack> stack = validator.resolve(stackId.toString());
+        if (stack == null) {
+            logger.info("No stack class for stack {}, so not synthesising it before deleting it", stackId);
+            return;
+        }
+        logger.info("Synthesising stack {} again before deleting it, so that its plan is current", stackId);
+        try {
+            validator.validate(stack);
+        } catch (ReflectiveOperationException e) {
+            Throwable cause = e instanceof InvocationTargetException && e.getCause() != null ? e.getCause() : e;
+            throw new IllegalStateException(String.format(
+                "Cannot delete stack %s, as it failed to synthesise from the current config: %s%n"
+                + "Fix the config, as validated with 'afon-cli.sh validate-stack %s', and run again.",
+                stackId, cause.getMessage(), stackId), cause);
+        }
     }
 
     /**
