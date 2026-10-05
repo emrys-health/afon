@@ -2,12 +2,12 @@ package health.emrys.afon.acceptance;
 
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.security.IdentityProvider;
-import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
 import health.emrys.afon.trino.TrinoServerConfiguration;
@@ -23,17 +23,20 @@ import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.time.Duration;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Scanner;
+import java.util.Set;
 
 import static health.emrys.afon.acceptance.AcceptanceTestConfig.testConfigIncludes;
+import static health.emrys.afon.cdk.DockerImages.*;
 import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static health.emrys.afon.polaris.keycloak.KeyCloakHelper.polarisOidcEnv;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.*;
-import static health.emrys.afon.cdk.DockerImages.KEYCLOAK_IMAGE;
-import static health.emrys.afon.cdk.DockerImages.POLARIS_IMAGE;
-import static health.emrys.afon.cdk.DockerImages.SPARK_IMAGE;
 import static java.lang.String.format;
 import static org.apache.polaris.core.persistence.bootstrap.RootCredentialsSet.ENVIRONMENT_VARIABLE;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -45,6 +48,13 @@ public class ContainerHelper {
     public static final ContainerHelper instance = new ContainerHelper();
 
     private static final String GOOGLE_FILE = "/tmp/application_default_credentials.json";
+
+    /**
+     * KeyCloak's env var names (Quarkus config), which map to
+     * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME} and {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD}.
+     */
+    private static final String ENV_KC_BOOTSTRAP_ADMIN_USERNAME = "KC_BOOTSTRAP_ADMIN_USERNAME";
+    private static final String ENV_KC_BOOTSTRAP_ADMIN_PASSWORD = "KC_BOOTSTRAP_ADMIN_PASSWORD";
 
     /**
      * Network alias used by Polaris (running on the same docker network) to reach KeyCloak.
@@ -95,7 +105,7 @@ public class ContainerHelper {
                                 .forPort(KEYCLOAK_PORT)
                                 .forStatusCode(200)
                                 .withStartupTimeout(Duration.ofMinutes(3)));
-            new KeyCloakConfigurer(properties).config().entrySet().forEach(entry ->
+            keycloakConfigForTests(properties).entrySet().forEach(entry ->
                     keyCloak.withEnv(entry.getKey(), entry.getValue())
             );
             // Fixed binding so the host-side KeyCloakProvider can reach it at localhost:8080.
@@ -118,6 +128,22 @@ public class ContainerHelper {
                         properties.getValue(POLARIS_SECRET)));
         }
         return keyCloak;
+    }
+
+
+    private Map<String, String> keycloakConfigForTests(AfonPropertyProvider properties) {
+        Map<String, String> config = new HashMap<>();
+        config.put(ENV_KC_BOOTSTRAP_ADMIN_USERNAME, properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME));
+        config.put(ENV_KC_BOOTSTRAP_ADMIN_PASSWORD, properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD));
+        config.put("KC_HTTP_ENABLED", "true");
+        // Run KeyCloak at DEBUG level to aid diagnosing OIDC/token issues.
+        config.put("KC_LOG_LEVEL", "DEBUG");
+        // Issuer is left dynamic (stamped from the request host) so host-side callers can use
+        // 'localhost' with no /etc/hosts entry. Polaris tolerates the resulting issuer-host
+        // difference via quarkus.oidc.token.issuer=any (see KeyCloakHelper#polarisOidcEnv);
+        // the token signature is still validated. For production, pin KC_HOSTNAME instead.
+        config.put("KC_HOSTNAME_STRICT", "false");
+        return config;
     }
 
     public synchronized void startSparkConnect(AfonPropertyProvider properties) {
