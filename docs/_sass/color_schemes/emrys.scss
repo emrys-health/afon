@@ -1,0 +1,28 @@
+// Emrys Health colour scheme for Just the Docs.
+// White leads, teal carries the brand, blue for headings, light green punctuates only.
+
+$emrys-white:       #ffffff;
+$emrys-teal:        #167d7f;
+$emrys-blue:        #074058;
+$emrys-light-green: #25c9ba;
+$emrys-night-blue:  #021c26;
+$emrys-light-grey:  #ecefff;
+$emrys-panel:       #f7f8fc;
+$emrys-border:      #d8dcec;
+$emrys-muted:       #6b7488;
+
+$color-scheme: light;
+$body-background-color: $emrys-white;
+$body-heading-color: $emrys-blue;
+$body-text-color: $emrys-night-blue;
+$link-color: $emrys-teal;
+$nav-child-link-color: $emrys-night-blue;
+$sidebar-color: $emrys-panel;
+$base-button-color: $emrys-panel;
+$btn-primary-color: $emrys-teal;
+$code-background-color: $emrys-panel;
+$feedback-color: $emrys-light-grey;
+$table-background-color: $emrys-white;
+$search-background-color: $emrys-white;
+$search-result-preview-color: $emrys-muted;
+$border-color: $emrys-border;
