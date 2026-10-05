@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Afon.  Afon is an open source data fabric for secure, cross-organisation
 access to sensitive (eg health) data, and contributions from the wider community, whether from TRE/SDE operators, data
-partners, researchers or developers, are very welcome.
+partners, researchers or developers, are very welcome. By contributing to Afon, you are helping build the open digital infrastructure that keeps sensitive health data secure, accessible, and safe. Whether you are fixing a typo or building a new core feature we are very grateful for your contribution.
 
 This guide covers:
 
@@ -23,7 +23,9 @@ You don't need to write code to contribute.  All of the following are valuable:
 - **Reviewing** open pull requests.
 - **Fixing bugs or implementing features**, starting with the issues labelled `good first issue` or `help wanted`.
 
-## Contribution criteria
+
+
+## Contribution criteria (How we maintain quality together)
 
 These are the standard criteria for contributions to an open source project, and the ones every contribution to Afon
 is reviewed against.
@@ -62,6 +64,7 @@ Unrelated refactoring, reformatting or dependency updates belong in their own is
 - **No breaking changes** without discussion: changes to configuration properties, CLI actions or deployed resources
   that break existing deployments must be agreed in the issue, and called out in the pull request.
 
+
 ### Security
 
 Afon handles credentials and controls access to sensitive data, so security is part of every review.
@@ -80,7 +83,18 @@ We expect all contributors to be respectful, constructive and inclusive, in issu
 Assume good intent, critique the code rather than the person, and remember that maintainers and contributors are
 often volunteering their time.  Harassment or abusive behaviour of any kind is not tolerated.
 
+### Guidelines for AI-assisted Contributions
+
+Contributors may use a variety of tools when preparing changes to Afon, including AI systems (e.g., large language models, code assistants or agents). Contributors using such systems are expected to adhere to the following principles:
+
+- Regardless of how a change is produced, the individual submitting the pull request is considered the author of the contribution and is fully responsible for it.
+- The pull request author must understand the implementation end-to-end and be able to explain and justify the design and code during review.
+- Tools, including AI systems, are not considered contributors. Responsibility and authorship remain with the human submitting the change.
+- Contributors are encouraged to disclose significant AI assistance in the pull request description for transparency.
+
 ## Getting started
+
+If you have never contributed to Afon before, we recommend starting with issues labelled `good first issue` or `help wanted`. These are designed to be approachable for newcomers and provide a gentle introduction to the codebase. If you would like to speak to someone about how to contribute - please join the slack channel and we'll be happy to help - https://join.slack.com/t/afontalk/shared_invite/zt-4bg5ei3r6-AsPFebfb0~sa4Z46SOk3Mg
 
 1. Read the [README](../../README.md) and the [architecture](../architecture.md) to understand what Afon does and
    how it is structured.
