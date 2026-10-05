@@ -69,11 +69,12 @@ az network dns record-set a delete \
 
 ### GCP
 
-Create a DNS zone through the GUI.  Note you might need admin rights to do this.
+The DNS zone is created by `scripts/gcp/create.sh`, named after the domain name with its dots replaced by dashes,
+eg `emryspolarisgcp2-click` for `emryspolarisgcp2.click`.  Note you might need admin rights to do this.
 
 Once it's created, you can run:
 ```shell
-$ gcloud dns managed-zones describe $GCP_POLARIS_DOMAIN_NAME --project=$PROJECT_ID
+$ gcloud dns managed-zones describe ${GCP_POLARIS_DOMAIN_NAME//./-} --project=$GCP_PROJECT_ID
 ```
 Just like for Azure, this will show a list of name servers:
 ```

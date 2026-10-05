@@ -141,7 +141,7 @@ Then, the Kubernetes cluster for that cloud can point the domain name at its own
 
 GCP assumes that the managed zone exists:
 ```shell
-$ gcloud dns managed-zones describe polaris-zone --project=$GCP_PROJECT_ID
+$ gcloud dns managed-zones describe ${GCP_POLARIS_DOMAIN_NAME//./-} --project=$GCP_PROJECT_ID
 cloudLoggingConfig:
   kind: dns#managedZoneCloudLoggingConfig
 creationTime: '2026-03-06T13:59:46.276Z'

@@ -53,7 +53,7 @@ if gcloud iam service-accounts describe $GCP_SERVICE_ACCOUNT >/dev/null 2>&1; th
     echo "- Role iam.serviceAccountTokenCreator not granted to $BLIRC_SA on $GCP_SERVICE_ACCOUNT, skipping"
   fi
 
-  if [ -n "$GCP_USER_ACCOUNT" ]; then
+  if [ -n "${GCP_USER_ACCOUNT:-}" ]; then
     if gcloud iam service-accounts get-iam-policy $GCP_SERVICE_ACCOUNT --flatten="bindings[].members" --filter="bindings.role=roles/iam.serviceAccountTokenCreator AND bindings.members=user:$GCP_USER_ACCOUNT" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
       echo "- Revoking iam.serviceAccountTokenCreator on $GCP_SERVICE_ACCOUNT from $GCP_USER_ACCOUNT"
       gcloud iam service-accounts remove-iam-policy-binding $GCP_SERVICE_ACCOUNT --member="user:$GCP_USER_ACCOUNT" --role="roles/iam.serviceAccountTokenCreator"
@@ -67,8 +67,7 @@ fi
 
 ## Storage Buckets
 
-# Every catalog's bucket is revoked and deleted, including gcp_external's - even though create.sh
-# never creates it (assumed externally-provisioned), destroy.sh has always torn it down too.
+# Every catalog's bucket is revoked and deleted, including gcp_external's, as create.sh creates them all.
 for ID in "${CATALOG_IDS[@]}"; do
   BUCKET="$(bucket_of "$ID")"
   if [ -z "$BUCKET" ]; then

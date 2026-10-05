@@ -1,11 +1,13 @@
 source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
+PROJECT_ID="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.properties}"
+
 for API in bigquery.googleapis.com bigqueryconnection.googleapis.com biglake.googleapis.com iamcredentials.googleapis.com; do
-  if gcloud services list --enabled --filter="config.name=$API" --format="value(config.name)" 2>/dev/null | grep -q "^$API$"; then
+  if gcloud services list --enabled --project=$PROJECT_ID --filter="config.name=$API" --format="value(config.name)" 2>/dev/null | grep -q "^$API$"; then
     echo "- API $API already enabled, skipping"
   else
     echo "- Enabling API $API"
-    gcloud services enable $API || exit 1
+    gcloud services enable $API --project=$PROJECT_ID || exit 1
   fi
 done
 
@@ -15,7 +17,6 @@ done
 #gcloud alpha biglake iceberg catalogs create $CATALOG_ID --project=$PROJECT_ID --catalog-type=gcs-bucket
 
 ICEBERG_BUCKET="emrys_afon_core_2"
-PROJECT_ID="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.properties}"
 EXTERNAL_SA="external-sa@$PROJECT_ID.iam.gserviceaccount.com"
 BLIRC_SA="blirc-600159231093-i76b@gcp-sa-biglakerestcatalog.iam.gserviceaccount.com"
 
@@ -23,7 +24,7 @@ if gcloud storage buckets describe "gs://$ICEBERG_BUCKET" >/dev/null 2>&1; then
   echo "- Bucket $ICEBERG_BUCKET already exists, skipping"
 else
   echo "- Creating bucket $ICEBERG_BUCKET"
-  gcloud storage buckets create "gs://$ICEBERG_BUCKET" --location=europe-west2 || exit 1
+  gcloud storage buckets create "gs://$ICEBERG_BUCKET" --location=europe-west2 --project=$PROJECT_ID || exit 1
 fi
 
 if gcloud storage buckets get-iam-policy "gs://$ICEBERG_BUCKET" --flatten="bindings[].members" --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:$EXTERNAL_SA" --format="value(bindings.members)" 2>/dev/null | grep -q .; then

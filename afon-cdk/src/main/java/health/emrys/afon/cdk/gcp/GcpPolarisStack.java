@@ -19,13 +19,15 @@ import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_INGRESS_NAME;
 
 public class GcpPolarisStack extends GcpKubernetesStack {
 
-    private static final String DNS_ZONE_NAME    = "polaris-zone";
+    private static final Pattern DNS_ZONE_NAME_RULE = Pattern.compile("[a-z]([-a-z0-9]*[a-z0-9])?");
+    private static final int     DNS_ZONE_NAME_MAX  = 63;
     private static final String POLARIS_INTERNAL = "polaris-internal";
     private static final String TLS_SECRET_NAME  = "polaris-tls";
     private static final int    POLARIS_PORT     = 8181;
@@ -52,13 +54,32 @@ public class GcpPolarisStack extends GcpKubernetesStack {
     }
 
 
+    /**
+     * @return the name of the Cloud DNS managed zone of the domain name: the domain name with its dots replaced by
+     * dashes, eg {@code emryspolarisgcp2-click} for {@code emryspolarisgcp2.click}.  An Azure DNS zone is named after
+     * its domain name, but the name of a Cloud DNS zone cannot hold dots.  {@code scripts/gcp/create.sh} creates the
+     * zone with the same name.
+     * @throws IllegalArgumentException if the name is not a valid zone name, ie 1 to 63 lowercase letters, digits or
+     * dashes, starting with a letter and not ending with a dash
+     */
+    static String dnsZoneName(String domainName) {
+        String name = domainName.replace('.', '-');
+        if (name.length() > DNS_ZONE_NAME_MAX || !DNS_ZONE_NAME_RULE.matcher(name).matches()) {
+            throw new IllegalArgumentException(String.format(
+                "The Cloud DNS zone name '%s', derived from the domain name '%s' by replacing its dots with dashes, "
+                + "must be 1 to %d lowercase letters, digits or dashes, starting with a letter and not ending with a dash",
+                name, domainName, DNS_ZONE_NAME_MAX));
+        }
+        return name;
+    }
+
     private void configureDns(IngressV1 ingress) {
         DataGoogleDnsManagedZone zone = new DataGoogleDnsManagedZone(
             this,
             "dns-zone",
             DataGoogleDnsManagedZoneConfig
                 .builder()
-                .name(DNS_ZONE_NAME)
+                .name(dnsZoneName(gcpDomainName))
                 .build());
 
         String ingressIp = ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getIp();
