@@ -1,0 +1,7 @@
+// Emrys Health — typography and shape tokens.
+// Loaded before the theme's modules, so these replace Just the Docs defaults.
+
+$body-font-family: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+$mono-font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+
+$border-radius: 6px;   // fields, code blocks, tables
