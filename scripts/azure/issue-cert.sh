@@ -145,12 +145,13 @@ issue_via_acme() {
   export AZUREDNS_CLIENTSECRET=$AZURE_APP_SECRET
 
   echo "- Requesting/renewing $AZURE_POLARIS_DOMAIN_NAME via Let's Encrypt (DNS-01)"
+  # The CLI runs scripts under set -e, so capture the exit code without aborting on it
+  ACME_EXIT=0
   "$ACME_HOME/acme.sh" --config-home "$ACME_HOME" --issue --dns dns_azure \
     -d "$AZURE_POLARIS_DOMAIN_NAME" \
     --keylength 2048 \
     --server letsencrypt \
-    --accountemail "admin@$AZURE_POLARIS_DOMAIN_NAME"
-  ACME_EXIT=$?
+    --accountemail "admin@$AZURE_POLARIS_DOMAIN_NAME" || ACME_EXIT=$?
   # acme.sh exits 2 for "not yet due for renewal" - not an error, the cached cert is
   # still valid and gets re-pushed below unchanged.
   if [ $ACME_EXIT -ne 0 ] && [ $ACME_EXIT -ne 2 ]; then
