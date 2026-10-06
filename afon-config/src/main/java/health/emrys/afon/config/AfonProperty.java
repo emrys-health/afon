@@ -52,6 +52,12 @@ public enum AfonProperty {
     GOOGLE_APPLICATION_CREDENTIALS("GOOGLE_APPLICATION_CREDENTIALS"),
     GCP_POLARIS_DOMAIN_NAME("GCP_POLARIS_DOMAIN_NAME"),
     GCP_JUPYTER_DOMAIN_NAME("GCP_JUPYTER_DOMAIN_NAME"),
+    /**
+     * Whether the Polaris TLS cert cached in Secret Manager is restored on deploy.  Defaults to false.
+     * A plain switch, unlike {@link #AZURE_KEY_VAULT_NAME}: Secret Manager has no named vault, its secrets live
+     * directly in the project {@link #GCP_PROJECT_ID}.
+     */
+    GCP_SECRETS_ENABLED("GCP_SECRETS_ENABLED"),
 
     // AZURE
     AZURE_SUBSCRIPTION("AZURE_SUBSCRIPTION"),

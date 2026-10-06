@@ -145,3 +145,30 @@ This is not a free service and the issuer needs to be registered.
 Set as properties `AZURE_CA_ID/AZURE_CA_PASSWORD` in `config/secret-azure.properties` the issuer credentials.
 
 **NOTE**:  one advantage of using Azure CA is that Key Vault handles renewal on its own schedule going forward.
+
+### GCP
+
+For GCP, the secrets manager is Google Secret Manager, scoped to the project `GCP_PROJECT_ID`.
+
+Unlike Azure, there is no vault to name or create: Secret Manager has no vault object, and its secrets live directly
+in the project.  The two secrets are named after the domain name, `<domain-with-dashes>-tls-crt` and
+`<domain-with-dashes>-tls-key`, and are created on first store.  So where Azure is configured with a vault name
+(`AZURE_KEY_VAULT_NAME`), GCP is configured with a plain on/off switch.
+
+In `config/afon-gcp.properties` set `GCP_SECRETS_ENABLED=true` (the template default).
+If not `true`, the restoring of the cached cert on deploy is disabled.
+
+To issue a cert via ACME (Let's Encrypt) and store it in Secret Manager:
+```shell
+afon-cli.sh gcp-issue-cert acme
+```
+The active gcloud account needs the DNS Administrator role (to answer the DNS-01 challenge) and
+Secret Manager Admin.  This is a one-off operation but can be repeated (idempotently) to renew the cert.
+
+To store an existing PEM cert and key, and to inspect or remove the secrets:
+```shell
+afon-cli.sh gcp-secrets store <cert.pem> <key.pem>
+afon-cli.sh gcp-secrets {show|list|delete}
+```
+On deploy, `GcpPolarisStack` restores the secrets into the `polaris-tls` Kubernetes secret before cert-manager
+asks Let's Encrypt for a new one; if the secrets are missing it simply falls back to issuing a new cert.

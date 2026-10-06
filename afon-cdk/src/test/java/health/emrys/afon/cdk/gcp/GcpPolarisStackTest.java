@@ -22,4 +22,18 @@ class GcpPolarisStackTest {
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("63");
     }
 
+    @Test
+    void tlsSecretNamesMatchSecretsScript() {
+        assertThat(GcpPolarisStack.tlsSecretNames("polaris.example.com"))
+            .containsExactly("polaris-example-com-tls-crt", "polaris-example-com-tls-key");
+    }
+
+    @Test
+    void restoreCommandReadsSecretsFromProject() {
+        String command = GcpPolarisStack.restoreCachedCertCommand("my-proj", new String[]{"a-tls-crt", "a-tls-key"});
+        assertThat(command).contains("--secret='a-tls-crt' --project='my-proj'")
+                           .contains("--secret='a-tls-key' --project='my-proj'")
+                           .contains("kubectl create secret generic polaris-tls");
+    }
+
 }

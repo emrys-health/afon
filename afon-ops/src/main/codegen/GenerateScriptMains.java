@@ -73,9 +73,11 @@ public class GenerateScriptMains {
         new ScriptEntry("gcp", "GcpCreateIcebergEndpointMain", "gcp/create_iceberg_endpoint.sh"),
         new ScriptEntry("gcp", "GcpCreateMain", "gcp/create.sh"),
         new ScriptEntry("gcp", "GcpDestroyMain", "gcp/destroy.sh"),
+        new ScriptEntry("gcp", "GcpIssueCertMain", "gcp/issue-cert.sh"),
         new ScriptEntry("gcp", "GcpLoginAsServiceAccountMain", "gcp/login-as-service-account.sh"),
         new ScriptEntry("gcp", "GcpLoginMain", "gcp/login.sh"),
         new ScriptEntry("gcp", "GcpPolarisMain", "gcp/polaris.sh"),
+        new ScriptEntry("gcp", "GcpSecretsMain", "gcp/secrets.sh"),
 
         new ScriptEntry("github", "GithubMilestonesMain", "github/milestones.sh"),
         new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
