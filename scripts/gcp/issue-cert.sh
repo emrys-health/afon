@@ -46,12 +46,13 @@ issue_via_acme() {
   export CLOUDSDK_CORE_PROJECT=$PROJECT_ID
 
   echo "- Requesting/renewing $GCP_POLARIS_DOMAIN_NAME via Let's Encrypt (DNS-01)"
+  # The CLI runs scripts under set -e, so capture the exit code without aborting on it
+  ACME_EXIT=0
   "$ACME_HOME/acme.sh" --config-home "$ACME_HOME" --issue --dns dns_gcloud \
     -d "$GCP_POLARIS_DOMAIN_NAME" \
     --keylength 2048 \
     --server letsencrypt \
-    --accountemail "admin@$GCP_POLARIS_DOMAIN_NAME"
-  ACME_EXIT=$?
+    --accountemail "admin@$GCP_POLARIS_DOMAIN_NAME" || ACME_EXIT=$?
   # acme.sh exits 2 for "not yet due for renewal" - not an error, the cached cert is
   # still valid and gets re-pushed below unchanged.
   if [ $ACME_EXIT -ne 0 ] && [ $ACME_EXIT -ne 2 ]; then
