@@ -24,6 +24,7 @@ public class PolarisRestClient extends RestClient {
         super(endpoint);
         this.clientId     = clientId;
         this.clientSecret = ***REMOVED***
+        logger.info("Talking to Polaris as user {}", clientId);
     }
 
     public static @NonNull String tokensURI(String endpoint) {

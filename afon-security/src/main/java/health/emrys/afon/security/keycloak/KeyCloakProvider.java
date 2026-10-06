@@ -30,7 +30,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 /**
  * Provisions, via the KeyCloak admin REST API, the realm, client and username/password that Polaris
  * trusts. After registration, a client can obtain a token from KeyCloak.
- *
+ * <p>
  * Note: In KeyCloak parlance, client is an app and user is a human
  */
 public class KeyCloakProvider implements IdentityProvider {
@@ -49,25 +49,31 @@ public class KeyCloakProvider implements IdentityProvider {
     /**
      * The default {@link AfonProperty#AFON_THEME}
      */
-    public static final String DEFAULT_AFON_THEME = "emrys-hdrs";
+    public static final String DEFAULT_AFON_THEME    = "emrys-hdrs";
 
     /**
      * The callback URIs, for the given domain, eg
      * {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
      * {@code https://jupyter.example/hub/oauth_callback} (JupyterHub).
-    */
+     */
     public static @NonNull List<String> callbackURIs(String jupyterDomain) {
         return List.of(
-                "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
-                "https://" + jupyterDomain + JUPYTERHUB_CALLBACK);
+            "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
+            "https://" + jupyterDomain + JUPYTERHUB_CALLBACK);
     }
 
-    /** Alias of the copied browser flow that this realm binds to, with its OTP step forced on. */
-    public static final String BROWSER_MFA_FLOW = "browser-mfa";
-    /** Alias of the copied direct-grant flow that this realm binds to, with its OTP step taken out. */
+    /**
+     * Alias of the copied browser flow that this realm binds to, with its OTP step forced on.
+     */
+    public static final String BROWSER_MFA_FLOW         = "browser-mfa";
+    /**
+     * Alias of the copied direct-grant flow that this realm binds to, with its OTP step taken out.
+     */
     public static final String DIRECT_GRANT_NO_OTP_FLOW = "direct-grant-no-otp";
 
-    /** 10 hours: how long an issued access token stays valid, so an interactive session lasts a working day. */
+    /**
+     * 10 hours: how long an issued access token stays valid, so an interactive session lasts a working day.
+     */
     private static final int ACCESS_TOKEN_LIFESPAN_SECONDS = 10 * 60 * 60;
     /**
      * The SSO session bounds cap a token's lifespan, so they must exceed {@link #ACCESS_TOKEN_LIFESPAN_SECONDS}
@@ -78,9 +84,9 @@ public class KeyCloakProvider implements IdentityProvider {
     private final ObjectMapper mapper = new ObjectMapper();
 
     private final RestClient restClient;
-    private final String adminUsername;
-    private final String adminPassword;
-    private final String loginTheme;
+    private final String     adminUsername;
+    private final String     adminPassword;
+    private final String     loginTheme;
 
     /**
      * Creates a provider for token requests only ({@link #userToken}, {@link #clientToken}), which need no
@@ -105,24 +111,25 @@ public class KeyCloakProvider implements IdentityProvider {
      * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME},
      * {@link AfonProperty#KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD},
      * {@link AfonProperty#AFON_THEME}
+     *
      * @param properties
      */
     public KeyCloakProvider(AfonPropertyProvider properties) {
         this(properties.getValue(OIDC_DOMAIN_NAME),
-                properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
-                properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD),
-                properties.getValue(AFON_THEME, DEFAULT_AFON_THEME));
+             properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
+             properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD),
+             properties.getValue(AFON_THEME, DEFAULT_AFON_THEME));
     }
 
     KeyCloakProvider(String hostname,
-                            String adminUsername,
-                            String adminPassword,
-                            String loginTheme) {
-        this.restClient = new RestClient(KeyCloakConfigurer.urlFor(hostname, protocolFor(hostname)));
+                     String adminUsername,
+                     String adminPassword,
+                     String loginTheme) {
+        this.restClient    = new RestClient(KeyCloakConfigurer.urlFor(hostname, protocolFor(hostname)));
         this.adminUsername = adminUsername;
         this.adminPassword = adminPassword;
         this.loginTheme    = loginTheme;
-        logger.info("Using KeyCloak URL: {}", restClient.getBaseUrl());
+        logger.info("Using KeyCloak URL: {}, admin user = {}", restClient.getBaseUrl(), adminUsername);
     }
 
 
@@ -130,7 +137,7 @@ public class KeyCloakProvider implements IdentityProvider {
      * Registers a Polaris user, also setting the user's (verified) email.
      * A verified email is required for logins that go through oauth2-proxy, which rejects id_tokens
      * whose email is unverified. Pass {@code null}/blank to leave the email unset.
-     *
+     * <p>
      * Ensures the Polaris realm, client and user all exist.
      * Idempotent: anything that already exists is left untouched.
      */
@@ -143,10 +150,10 @@ public class KeyCloakProvider implements IdentityProvider {
             createConfidentialClient(adminToken, keycloakRealm, user.username(), user.password());
             createUser(adminToken, keycloakRealm, user);
             logger.info("KeyCloak realm '{}' provisioned with client user '{}' (email '{}')",
-                    keycloakRealm, user.username(), user.email());
+                        keycloakRealm, user.username(), user.email());
         } catch (IOException e) {
             String message = String.format("Failed to provision KeyCloak realm '%s' with client user '%s' (email '%s')",
-                    keycloakRealm, user.username(), user.email());
+                                           keycloakRealm, user.username(), user.email());
             throw new RuntimeException(message, e);
         }
     }
@@ -160,11 +167,11 @@ public class KeyCloakProvider implements IdentityProvider {
     public String userToken(String username, String password) throws IOException {
         logger.info("Getting token for user '{}'", username);
         return polarisRealmToken(Map.of(
-            "grant_type",    "password",
-            "client_id",     username,
+            "grant_type", "password",
+            "client_id", username,
             "client_secret", password,
-            "username",      username,
-            "password",      password
+            "username", username,
+            "password", password
         ));
     }
 
@@ -178,8 +185,8 @@ public class KeyCloakProvider implements IdentityProvider {
     public String clientToken(String clientId, String clientSecret) throws IOException {
         logger.info("Getting token for client '{}'", clientId);
         return polarisRealmToken(Map.of(
-            "grant_type",    "client_credentials",
-            "client_id",     clientId,
+            "grant_type", "client_credentials",
+            "client_id", clientId,
             "client_secret", clientSecret
         ));
     }
@@ -199,8 +206,9 @@ public class KeyCloakProvider implements IdentityProvider {
 
     /**
      * Authenticates against the 'master' realm as the bootstrap admin.
-     *
+     * <p>
      * Note: This is the 'master' realm so only the admin user can call this.
+     *
      * @return An access token for the admin REST API.
      * @throws IOException
      */
@@ -265,8 +273,8 @@ public class KeyCloakProvider implements IdentityProvider {
         // Branding text lives with the theme, in afon-theme's themes/<theme>/realm.properties, so a
         // new theme can supply its own display name without touching this class. Left unset (falling
         // back to KeyCloak's own default of showing the realm id) if the theme defines neither.
-        Properties branding = loadThemeProperties(loginTheme, "realm.properties");
-        String displayName = branding.getProperty("displayName");
+        Properties branding    = loadThemeProperties(loginTheme, "realm.properties");
+        String     displayName = branding.getProperty("displayName");
         if (displayName != null) {
             realmConfig.put("displayName", displayName);
         }
@@ -274,7 +282,7 @@ public class KeyCloakProvider implements IdentityProvider {
         if (displayNameHtml != null) {
             realmConfig.put("displayNameHtml", displayNameHtml);
         }
-        String json = mapper.writeValueAsString(realmConfig);
+        String       json    = mapper.writeValueAsString(realmConfig);
         HttpResponse created = postJson(adminToken, "/admin/realms", json, "realm " + realm);
         if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
             if (isFailure(putJson(adminToken, format("/admin/realms/%s", realm), json, "realm " + realm))) {
@@ -329,7 +337,9 @@ public class KeyCloakProvider implements IdentityProvider {
         return ensureClientMapper(adminToken, realm, clientId, hardcodedPrincipalMapper(clientId));
     }
 
-    /** The dedicated claim Polaris reads the principal name from (see KeyCloakHelper). */
+    /**
+     * The dedicated claim Polaris reads the principal name from (see KeyCloakHelper).
+     */
     private static final String PRINCIPAL_CLAIM = "polaris_principal";
 
     /**
@@ -398,7 +408,7 @@ public class KeyCloakProvider implements IdentityProvider {
      * below rather than left alone, since KeyCloak's database survives a cluster rebuild and would
      * otherwise pin the callbacks of whichever deploy first created it.
      *
-     * @param clientId the OAUTH2 client id
+     * @param clientId     the OAUTH2 client id
      * @param clientSecret the OAUTH2 client secret
      * @param redirectUris the {@link #callbackURIs(String)}
      */
@@ -467,13 +477,13 @@ public class KeyCloakProvider implements IdentityProvider {
      * (the admin API keys updates on the UUID, not the human-readable client ID).
      */
     private HttpResponse updateBrowserClient(String adminToken, String realm, String clientId, String json)
-        throws IOException {
+    throws IOException {
         String uuid = clientUuid(adminToken, realm, clientId);
         if (uuid == null) {
             logger.warn("Browser client {} reported as existing but could not be looked up", clientId);
             return null;
         }
-        String uri = format("/admin/realms/%s/clients/%s", realm, uuid);
+        String       uri      = format("/admin/realms/%s/clients/%s", realm, uuid);
         HttpResponse response = putJson(adminToken, uri, json, "browser client " + clientId);
         if (isFailure(response)) {
             logger.warn("Could not update browser client {}", clientId);
@@ -509,7 +519,7 @@ public class KeyCloakProvider implements IdentityProvider {
      */
     @Override
     public List<HttpResponse> configureMfa(String adminToken, String realm) throws IOException {
-        List<HttpResponse> responses = new  ArrayList<>();
+        List<HttpResponse> responses = new ArrayList<>();
         responses.addAll(requireOtpForBrowserLogins(adminToken, realm));
         responses.addAll(skipOtpForDirectGrants(adminToken, realm));
         return responses;
@@ -519,7 +529,7 @@ public class KeyCloakProvider implements IdentityProvider {
      * Binds the realm to a browser flow whose OTP step is mandatory rather than opt-in.
      */
     private List<HttpResponse> requireOtpForBrowserLogins(String adminToken, String realm) throws IOException {
-        List<HttpResponse> responses = new  ArrayList<>();
+        List<HttpResponse> responses = new ArrayList<>();
         responses.add(copyFlow(adminToken, realm, DefaultAuthenticationFlows.BROWSER_FLOW, BROWSER_MFA_FLOW));
         List<Map<String, Object>> changed =
             KeyCloakMfa.requireOtp(flowExecutions(adminToken, realm, BROWSER_MFA_FLOW));
@@ -572,7 +582,7 @@ public class KeyCloakProvider implements IdentityProvider {
     private static Properties loadThemeProperties(String theme, String fileName) throws IOException {
         Properties properties = new Properties();
         try (InputStream in = KeyCloakProvider.class.getResourceAsStream(
-                "/themes/" + theme + "/" + fileName)) {
+            "/themes/" + theme + "/" + fileName)) {
             if (in != null) {
                 properties.load(in);
             }
@@ -580,10 +590,12 @@ public class KeyCloakProvider implements IdentityProvider {
         return properties;
     }
 
-    /** A flow's executions, depth-first and each carrying its nesting level, as {@link KeyCloakMfa} expects. */
+    /**
+     * A flow's executions, depth-first and each carrying its nesting level, as {@link KeyCloakMfa} expects.
+     */
     private List<Map<String, Object>> flowExecutions(String adminToken, String realm, String flowAlias)
-        throws IOException {
-        String  uri = format("/admin/realms/%s/authentication/flows/%s/executions", realm, pathSegment(flowAlias));
+    throws IOException {
+        String uri = format("/admin/realms/%s/authentication/flows/%s/executions", realm, pathSegment(flowAlias));
         return restClient.get(uri, adminToken, response -> {
             if (response.getCode() != HttpStatus.SC_OK) {
                 throw new IOException(format(
@@ -600,10 +612,10 @@ public class KeyCloakProvider implements IdentityProvider {
      */
     private List<HttpResponse> updateFlowExecutions(String adminToken, String realm, String flowAlias,
                                                     List<Map<String, Object>> executions) throws IOException {
-        String uri = format("/admin/realms/%s/authentication/flows/%s/executions", realm, pathSegment(flowAlias));
+        String             uri       = format("/admin/realms/%s/authentication/flows/%s/executions", realm, pathSegment(flowAlias));
         List<HttpResponse> responses = new ArrayList<>();
         for (Map<String, Object> execution : executions) {
-            String what = execution.get("displayName") + " -> " + execution.get("requirement");
+            String       what     = execution.get("displayName") + " -> " + execution.get("requirement");
             HttpResponse response = putJson(adminToken, uri, mapper.writeValueAsString(execution), "execution " + what);
             responses.add(response);
             if (isFailure(response)) {
@@ -618,7 +630,7 @@ public class KeyCloakProvider implements IdentityProvider {
      * there is no window in which logins run a half-converged flow.
      */
     private HttpResponse bindFlow(String adminToken, String realm, String binding, String flowAlias) throws IOException {
-        String json = mapper.writeValueAsString(Map.of("realm", realm, binding, flowAlias));
+        String       json     = mapper.writeValueAsString(Map.of("realm", realm, binding, flowAlias));
         HttpResponse response = putJson(adminToken, format("/admin/realms/%s", realm), json, "realm " + realm);
         if (isFailure(response)) {
             throw new IOException(format(
@@ -627,7 +639,9 @@ public class KeyCloakProvider implements IdentityProvider {
         return response;
     }
 
-    /** The internal UUID KeyCloak assigns a client, or null when no such client exists. */
+    /**
+     * The internal UUID KeyCloak assigns a client, or null when no such client exists.
+     */
     private String clientUuid(String adminToken, String realm, String clientId) throws IOException {
         String uri = format("/admin/realms/%s/clients?clientId=%s",
                             realm, URLEncoder.encode(clientId, StandardCharsets.UTF_8));
@@ -686,8 +700,8 @@ public class KeyCloakProvider implements IdentityProvider {
         if (code == HttpStatus.SC_CONFLICT && !userExists(adminToken, realm, user.username())) {
             throw new IOException(format(
                 "Could not create KeyCloak user '%s' in realm '%s': HTTP 409 but no user with that "
-                + "username exists. The email '%s' is most likely already held by another user "
-                + "(realm duplicateEmailsAllowed=false).", user.username(), realm, user.email()));
+                    + "username exists. The email '%s' is most likely already held by another user "
+                    + "(realm duplicateEmailsAllowed=false).", user.username(), realm, user.email()));
         }
         return response;
     }
@@ -712,7 +726,7 @@ public class KeyCloakProvider implements IdentityProvider {
         // Never log the JSON: it can carry secrets, eg a user's password or a client secret.
         logger.info("Calling POST {} for {}", uri, what);
         HttpResponse response = restClient.post(uri, json, adminToken);
-        int code = response.getCode();
+        int          code     = response.getCode();
         if (code == HttpStatus.SC_CREATED) {
             logger.info("Created KeyCloak {}", what);
         } else if (code == HttpStatus.SC_CONFLICT) {
