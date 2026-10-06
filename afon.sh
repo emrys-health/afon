@@ -382,6 +382,8 @@ while [[ $# -gt 0 ]]; do
       shift; POSITIONAL_ARGS+=("$@"); break ;;
     -*)
       error "Unknown option: $1"
+      error "Args that are not known to $0, eg $1, are for the action's script or ops command and must come after '--'."
+      error "The $0 options (eg -a, -e) must come before the '--', eg: $0 -a <action> -e <env> -- <args> $1"
       usage; exit 0
       ;;
     *)
