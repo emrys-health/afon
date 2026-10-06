@@ -15,6 +15,7 @@ import health.emrys.afon.cdk.PolarisConfig;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
+import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.List;
@@ -23,8 +24,13 @@ import java.util.regex.Pattern;
 
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_PROVISIONERS;
 import static health.emrys.afon.cdk.CdkHelper.POLARIS_INGRESS_NAME;
+import static health.emrys.afon.config.AfonProperty.GCP_PROJECT_ID;
+import static health.emrys.afon.config.AfonProperty.GCP_SECRETS_ENABLED;
+import static java.lang.String.format;
 
 public class GcpPolarisStack extends GcpKubernetesStack {
+
+    static final Logger logger = org.slf4j.LoggerFactory.getLogger(GcpPolarisStack.class);
 
     private static final Pattern DNS_ZONE_NAME_RULE = Pattern.compile("[a-z]([-a-z0-9]*[a-z0-9])?");
     private static final int     DNS_ZONE_NAME_MAX  = 63;
@@ -42,7 +48,10 @@ public class GcpPolarisStack extends GcpKubernetesStack {
         HelmProvider               helm            = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables     = cloudProvider.getDependables();
         Release                    nginxRelease    = CdkHelper.installNginxIngress(this, helm, dependables, null);
-        Release                    certManager     = util.installCertManager(this, helm, dependables);
+        Release certManager = Boolean.parseBoolean(properties.getValue(GCP_SECRETS_ENABLED, "false"))
+            ? util.installCertManager(this, helm, dependables,
+                List.of(restoreCachedCertCommand(properties.getValue(GCP_PROJECT_ID), tlsSecretNames(gcpDomainName))))
+            : util.installCertManager(this, helm, dependables);
         Service                    internalService = polarisConfig.deployPolaris(dependables);
         IngressV1 ingress = util.createIngress(
             List.of(
@@ -53,6 +62,34 @@ public class GcpPolarisStack extends GcpKubernetesStack {
         configureDns(ingress);
     }
 
+    static String[] tlsSecretNames(String domainName) {
+        String kebabDomainName = domainName.replace(".", "-");
+        return new String[]{kebabDomainName + "-tls-crt", kebabDomainName + "-tls-key"};
+    }
+
+    /**
+     * Restores the Polaris TLS secrets from Secret Manager before cert-manager's ingress-shim gets a
+     * chance to request a fresh cert from Let's Encrypt.  Attached as an extra create-time command
+     * on the cert-manager Helm release, so it runs (and completes) before the dependent Ingress is
+     * even created.  The cache is populated externally, ahead of deploy, by
+     * {@code scripts/gcp/issue-cert.sh} (or {@code scripts/gcp/secrets.sh store}).  A missing or empty
+     * secret is not an error, cert-manager simply issues a new cert via its HTTP-01 ClusterIssuer as a fallback.
+     */
+    static String restoreCachedCertCommand(String projectId, String[] secretNames) {
+        logger.info("Restoring cached secrets {} from Secret Manager of project {}", secretNames, projectId);
+        return format(
+            """
+            CRT_B64=$(gcloud secrets versions access latest --secret='%2$s' --project='%1$s' 2>/dev/null)
+            KEY_B64=$(gcloud secrets versions access latest --secret='%3$s' --project='%1$s' 2>/dev/null)
+            if [ -n "$CRT_B64" ] && [ -n "$KEY_B64" ]; then
+              kubectl create secret generic %4$s \
+                --type=kubernetes.io/tls \
+                --from-literal=tls.crt="$(echo "$CRT_B64" | base64 -d)" \
+                --from-literal=tls.key="$(echo "$KEY_B64" | base64 -d)" \
+                --dry-run=client -o yaml | kubectl apply -f -
+            fi
+            """, projectId, secretNames[0], secretNames[1], TLS_SECRET_NAME);
+    }
 
     /**
      * @return the name of the Cloud DNS managed zone of the domain name: the domain name with its dots replaced by

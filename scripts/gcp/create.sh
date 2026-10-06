@@ -151,6 +151,17 @@ else
       --role="roles/serviceusage.serviceUsageConsumer" || exit 1
 fi
 
+# Secret Manager, which stores the TLS cert (see secrets.sh): no vault to create, but the API must be enabled
+if [ "$GCP_SECRETS_ENABLED" = "true" ]; then
+  SECRETS_API="secretmanager.googleapis.com"
+  if gcloud services list --enabled --project=$PROJECT_ID --filter="config.name=$SECRETS_API" --format="value(config.name)" 2>/dev/null | grep -q "^$SECRETS_API$"; then
+    echo "- API $SECRETS_API already enabled, skipping"
+  else
+    echo "- Enabling API $SECRETS_API"
+    gcloud services enable $SECRETS_API --project=$PROJECT_ID || exit 1
+  fi
+fi
+
 # DNS zone, named after the domain name with its dots replaced by dashes, as GcpPolarisStack names it
 
 DNS_ZONE="${GCP_POLARIS_DOMAIN_NAME//./-}"
