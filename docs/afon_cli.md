@@ -44,7 +44,7 @@ You don't need to be in the location of the `afon-cli.sh` file to execute it.
 On linux or macOS, you can set up your local env by running:
 
 ```shell
-afon-cli.sh setup-local
+afon-cli.sh local-setup
 ```
 
 ## Afon CLI configuration

@@ -9,7 +9,7 @@ For linux and macOS bash is provided.
 To set up on a given OS, run: 
 
 ```shell
-afon-cli.sh setup-local -c <cloud>
+afon-cli.sh local-setup -c <cloud>
 ```
 
 The following packages are installed:
@@ -30,7 +30,7 @@ If no `<cloud>` is specified all are installed.
 
 To show what is currently installed:
 ```shell
-afon-cli.sh setup-show -c <cloud>
+afon-cli.sh local-versions -c <cloud>
 ```
 
 ## Docker 

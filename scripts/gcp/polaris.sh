@@ -10,7 +10,7 @@ POLARIS_PROJECT="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.proper
 status_require_domain GCP_POLARIS_DOMAIN_NAME "$GCP_POLARIS_DOMAIN_NAME"
 status_require gcloud kubectl curl
 if ! command -v gke-gcloud-auth-plugin >/dev/null 2>&1; then
-  status_cannot_verify "gke-gcloud-auth-plugin not found, cannot verify Polaris (install it with: afon-cli.sh setup-local -c gcp)"
+  status_cannot_verify "gke-gcloud-auth-plugin not found, cannot verify Polaris (install it with: afon-cli.sh local-setup -c gcp)"
 fi
 
 echo "- Checking Polaris for cluster '$CLUSTER_NAME' at $STATUS_DOMAIN"
