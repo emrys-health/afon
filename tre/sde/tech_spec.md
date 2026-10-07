@@ -57,7 +57,7 @@ We are happy to support in any stage of this task list and have developed a CLI 
 | # | Task                                                          | Outcome                                                 |
 |---|---------------------------------------------------------------|---------------------------------------------------------|
 | 1 | [Install Afon CLI locally](#install-the-afon-cli-locally)     | Afon CLI installed in `$AFON_HOME/cli`                  |
-| 2 | [Setup local env](#setup-local-env)                           | A linux or macOS machine with tools to build and deploy |
+| 2 | [Setup local env](#local-setup-env)                           | A linux or macOS machine with tools to build and deploy |
 | 3 | [Provision app registration](#provision-app-registration)     | A clean cloud subscription with appropriate permissions |
 | 4 | [Register Polaris domain name](#register-polaris-domain-name) | Domain name such as `<env>`polaris.click is registered  |
 | 5 | [Create DNS zone](#create-dns-zone)                           | DNS nameservers are configured                          |
@@ -114,14 +114,14 @@ So that I build and deploy Afon on my cloud infrastructure
 
 ```md
 Given a local system (linux or macos)
-When we run the following setup-local action for cloud <cloud>
+When we run the following local-setup action for cloud <cloud>
 Then the Afon build env is set up locally for cloud <cloud>
 ```
 
 **How to do it**
 
 ```shell
-afon-cli.sh setup-local -c <cloud>
+afon-cli.sh local-setup -c <cloud>
 ```
 
 The following packages are installed:

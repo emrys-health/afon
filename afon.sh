@@ -24,7 +24,7 @@ usage (){
   echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp <profiles>]"
   echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>]"
   echo "          [--script-path|-sp <path>] [--script-args|-sa <args>]"
-  echo "          [--setup-output <file>]"
+  echo "          [--versions-output <file>]"
   echo "actions:  ansible|build|exec|script|<dir>-<name>|<ops-command>"
   echo "          ansible:      : executes the ansible playbook."
   echo "          build         : executes the mvn build."
@@ -320,7 +320,7 @@ BASH_QUIET=
 MVN_QUIET=
 SCRIPT_PATH=
 SCRIPT_ARGS=
-SETUP_OUTPUT=
+VERSIONS_OUTPUT=
 POSITIONAL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -376,8 +376,8 @@ while [[ $# -gt 0 ]]; do
       SCRIPT_PATH="$2"; shift 2 ;;
     --script-args|-sa)
       SCRIPT_ARGS="$2"; shift 2 ;;
-    --setup-output)
-      SETUP_OUTPUT="$2"; shift 2 ;;
+    --versions-output)
+      VERSIONS_OUTPUT="$2"; shift 2 ;;
     --)
       shift; POSITIONAL_ARGS+=("$@"); break ;;
     -*)

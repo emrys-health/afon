@@ -85,8 +85,8 @@ public class GenerateScriptMains {
 
         new ScriptEntry("jupyter", "JupyterExecuteMain", "jupyter/execute.sh"),
 
-        new ScriptEntry("setup", "SetupLocalMain", "setup/local.sh"),
-        new ScriptEntry("setup", "SetupShowMain", "setup/show.sh"),
+        new ScriptEntry("local", "LocalSetupMain", "local/setup.sh"),
+        new ScriptEntry("local", "LocalVersionsMain", "local/versions.sh"),
 
         new ScriptEntry("kube", "KubePodsMain", "kube/pods.sh"),
         new ScriptEntry("kube", "KubeLogsMain", "kube/logs.sh"),
