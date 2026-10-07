@@ -33,7 +33,10 @@ class GcpPolarisStackTest {
         String command = GcpPolarisStack.restoreCachedCertCommand("my-proj", new String[]{"a-tls-crt", "a-tls-key"});
         assertThat(command).contains("--secret='a-tls-crt' --project='my-proj'")
                            .contains("--secret='a-tls-key' --project='my-proj'")
-                           .contains("kubectl create secret generic polaris-tls");
+                           .contains("kubectl create secret generic polaris-tls")
+                           .contains("kubectl apply --server-side")
+                           .contains("kubectl annotate secret polaris-tls")
+                           .contains("cert-manager.io/issuer-name=letsencrypt-prod");
     }
 
 }
