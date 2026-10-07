@@ -1,31 +1,32 @@
 package health.emrys.afon.cdk.aws;
 
-import com.hashicorp.cdktf.App;
-import com.hashicorp.cdktf.AppConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
-import health.emrys.afon.config.*;
+import health.emrys.afon.cdk.component.StackComponent;
+import health.emrys.afon.cdk.component.StackContext;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
-import org.slf4j.Logger;
-import software.constructs.Construct;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 
-public class AwsFullStack extends AwsTrinoStack {
+/**
+ * The monitoring of the cluster: kube-prometheus-stack for the metrics, with the Cilium ServiceMonitors, and Loki, with
+ * Promtail shipping the logs to it, which keeps them in S3.  It waits for the {@link AwsCrdCleanupComponent}, so
+ * that on destroy it is uninstalled before the CRDs it needs are gone.
+ */
+public class AwsMonitoringComponent implements StackComponent {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(AwsFullStack.class);
-
-    public AwsFullStack(@NonNull Construct scope,
-                        @NonNull StackId stackId,
-                        AfonPropertyProvider properties) {
-        super(scope, stackId, properties);
-        List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>();
-        dependablesAndLoadBalancers.addAll(loadBalancers);
-        dependablesAndLoadBalancers.addAll(cloudProvider.getDependables());
+    @Override
+    public void deploy(StackContext context) {
+        AwsCloudProvider cloudProvider = (AwsCloudProvider) context.platform();
+        TerraformStack   stack         = context.stack();
+        List<ITerraformDependable> dependablesAndLoadBalancers = new ArrayList<>(cloudProvider.getDependables());
         // kube-prometheus-stack, Loki and Promtail all create Services, and the AWS LB
         // Controller's mservice.elbv2.k8s.aws webhook (failurePolicy=Fail) intercepts every
         // Service creation, not just type: LoadBalancer. Wait on the controller's Helm release
@@ -39,12 +40,13 @@ public class AwsFullStack extends AwsTrinoStack {
         // manifest contains Prometheus/Alertmanager/ServiceMonitor/PrometheusRule objects, and Helm
         // cannot uninstall objects whose CRD is gone ("failed to delete release"). Depending on the
         // cleanup makes these releases be uninstalled before it runs.
-        dependablesAndLoadBalancers.add(crdCleanup);
-        deployPrometheus(dependablesAndLoadBalancers, properties);
-        Release loki = deployLoki(dependablesAndLoadBalancers, properties);
-        deployPromtail(dependablesAndLoadBalancers, loki, properties);
+        dependablesAndLoadBalancers.add(context.require(AwsCrdCleanupComponent.class).cleanup());
+        // The Loki tenant is the cluster name <stack-type>-<CLUSTER_NAME>, which prefixes the logs in S3
+        String lokiTenant = cloudProvider.getComponentNames().getCluster();
+        deployPrometheus(stack, lokiTenant, dependablesAndLoadBalancers);
+        Release loki = deployLoki(stack, dependablesAndLoadBalancers, context.properties());
+        deployPromtail(stack, lokiTenant, dependablesAndLoadBalancers, loki);
     }
-
 
     /**
      * Declarative description of a Service we want Prometheus to scrape.
@@ -72,7 +74,7 @@ public class AwsFullStack extends AwsTrinoStack {
         new MonitoredService("hubble-relay",    "k8s-app",                "hubble-relay",    "metrics")
     );
 
-    private void deployPrometheus(List<@NonNull ITerraformDependable> eksDependOn, AfonPropertyProvider properties) {
+    private void deployPrometheus(TerraformStack stack, String lokiTenant, List<@NonNull ITerraformDependable> eksDependOn) {
         // Configuration Overrides for the Helm Chart
         // We use the ReleaseSet.builder() for the `set` block in Terraform
         final List<ReleaseSet> chartOverrides = List.of(
@@ -90,9 +92,9 @@ public class AwsFullStack extends AwsTrinoStack {
 
         // Install the kube-prometheus-stack Helm chart
         Release.Builder
-            .create(this, "prometheusRelease")
+            .create(stack, "prometheusRelease")
             .name("kube-prometheus-stack")
-            .chart(vendoredChart(this, "prometheusChart", "kube-prometheus-stack-51.8.0.tgz"))
+            .chart(vendoredChart(stack, "prometheusChart", "kube-prometheus-stack-51.8.0.tgz"))
 
             // Reference the namespace created above
             .namespace("default")
@@ -105,7 +107,7 @@ public class AwsFullStack extends AwsTrinoStack {
             // in the same Grafana instance kube-prometheus-stack already ships.
             .values(List.of(
                 additionalServiceMonitorsValues(CILIUM_MONITORS),
-                grafanaLokiDatasourceValues(lokiTenant())
+                grafanaLokiDatasourceValues(lokiTenant)
                           ))
             .timeout(600)
             .atomic(true)
@@ -149,21 +151,20 @@ public class AwsFullStack extends AwsTrinoStack {
      * Installs the current {@code grafana/loki} chart (single-binary mode,
      * ships Loki 3.x) configured to push chunks and the index to S3. The
      * bucket, region, and IAM credentials are read from the
-     * {@link AfonPropertyProvider} passed to the {@link AwsFullStack}
-     * constructor (keys {@code AWS_BUCKET_NAME_aws} (the "aws" catalog's bucket,
+     * {@link AfonPropertyProvider} of the stack (keys {@code AWS_BUCKET_NAME_aws} (the "aws" catalog's bucket,
      * see catalogs-aws.properties), {@code AWS_REGION},
      * {@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY}).
      *
      * <p>The companion log shipper is installed by
-     * {@link #deployPromtail(List, Release, AfonPropertyProvider)}; logs are queried in the same
+     * {@link #deployPromtail}; logs are queried in the same
      * Grafana that kube-prometheus-stack already deploys, wired up by
      * {@link #grafanaLokiDatasourceValues(String)}.
      */
-    private Release deployLoki(List<@NonNull ITerraformDependable> eksDependOn, AfonPropertyProvider properties) {
+    private Release deployLoki(TerraformStack stack, List<@NonNull ITerraformDependable> eksDependOn, AfonPropertyProvider properties) {
         return Release.Builder
-            .create(this, "lokiRelease")
+            .create(stack, "lokiRelease")
             .name("loki")
-            .chart(vendoredChart(this, "lokiChart", "loki-6.16.0.tgz"))
+            .chart(vendoredChart(stack, "lokiChart", "loki-6.16.0.tgz"))
             .namespace("default")
             .values(List.of(lokiValues(properties)))
             .timeout(600)
@@ -180,15 +181,15 @@ public class AwsFullStack extends AwsTrinoStack {
      * lines to the {@code default} namespace, so Loki only stores what the
      * user asked for.
      */
-    private void deployPromtail(List<@NonNull ITerraformDependable> eksDependOn, Release loki, AfonPropertyProvider properties) {
+    private void deployPromtail(TerraformStack stack, String lokiTenant, List<@NonNull ITerraformDependable> eksDependOn, Release loki) {
         List<ITerraformDependable> deps = new ArrayList<>(eksDependOn);
         deps.add(loki);
         Release.Builder
-            .create(this, "promtailRelease")
+            .create(stack, "promtailRelease")
             .name("promtail")
-            .chart(vendoredChart(this, "promtailChart", "promtail-6.16.5.tgz"))
+            .chart(vendoredChart(stack, "promtailChart", "promtail-6.16.5.tgz"))
             .namespace("default")
-            .values(List.of(promtailValues(lokiTenant())))
+            .values(List.of(promtailValues(lokiTenant)))
             .timeout(600)
             .atomic(true)
             .forceUpdate(true)
@@ -328,24 +329,5 @@ public class AwsFullStack extends AwsTrinoStack {
                   secureJsonData:
                     httpHeaderValue1: %s
             """, tenant);
-    }
-
-    /**
-     * The Loki tenant, ie the cluster name {@code <stack-type>-<CLUSTER_NAME>}, which prefixes the logs in S3.
-     */
-    private String lokiTenant() {
-        return cloudProvider.getComponentNames().getCluster();
-    }
-
-    public static void main(String[] args) {
-        logger.info("Creating full stack");
-        final App app = createApp();
-        try {
-            new AwsFullStack(app, StackId.of(AwsFullStack.class), new FilePropertyProvider());
-            app.synth();
-        } catch (RuntimeException e) {
-            logger.error(e.toString());
-            throw new RuntimeException(e);
-        }
     }
 }

@@ -1,7 +1,6 @@
 package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
-import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
@@ -33,17 +32,12 @@ public class StepDocumentation extends StepActions {
      * <ul>
      *   <li>an ops {@code *Main} class is run by its kebab-named command, eg {@code configure-users} for
      *       {@code ConfigureUsersMain};</li>
-     *   <li>a stack is synthesised by {@code validate-stack <stack>}, eg {@code validate-stack aws-full} for
-     *       {@code AwsFullStack}.</li>
      * </ul>
      */
     public static String afonCliCommand(Class<?> clazz) {
         String simpleName = clazz.getSimpleName();
         if (clazz.getName().startsWith(OPS_PACKAGE + ".") && simpleName.endsWith("Main")) {
             return kebabCase(simpleName.substring(0, simpleName.length() - "Main".length()));
-        }
-        if (AfonCloudStack.class.isAssignableFrom(clazz) && simpleName.endsWith("Stack")) {
-            return "validate-stack " + kebabCase(simpleName.substring(0, simpleName.length() - "Stack".length()));
         }
         return null;
     }
@@ -92,6 +86,11 @@ public class StepDocumentation extends StepActions {
                    ```
                    """, certArn, region));
         out.flush();
+    }
+
+    @Override
+    protected void synthesiseStack(StackId stackId) throws Exception {
+        run("afon-cli.sh", null, "validate-stack", stackId.toString());
     }
 
     @Override

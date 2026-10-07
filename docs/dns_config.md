@@ -170,5 +170,5 @@ To store an existing PEM cert and key, and to inspect or remove the secrets:
 afon-cli.sh gcp-secrets store <cert.pem> <key.pem>
 afon-cli.sh gcp-secrets {show|list|delete}
 ```
-On deploy, `GcpPolarisStack` restores the secrets into the `polaris-tls` Kubernetes secret before cert-manager
+On deploy, the `GcpCloudProvider` restores the secrets into the `polaris-tls` Kubernetes secret before cert-manager
 asks Let's Encrypt for a new one; if the secrets are missing it simply falls back to issuing a new cert.

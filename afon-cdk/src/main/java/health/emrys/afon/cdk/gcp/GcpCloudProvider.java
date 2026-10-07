@@ -3,6 +3,7 @@ package health.emrys.afon.cdk.gcp;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
 import com.hashicorp.cdktf.providers.google.compute_network.ComputeNetwork;
 import com.hashicorp.cdktf.providers.google.compute_network.ComputeNetworkConfig;
@@ -14,22 +15,37 @@ import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetwork
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkConfig;
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkSecondaryIpRange;
 import com.hashicorp.cdktf.providers.google.container_cluster.*;
+import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZone;
+import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZoneConfig;
+import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSet;
+import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSetConfig;
 import com.hashicorp.cdktf.providers.google.provider.GoogleProvider;
 import com.hashicorp.cdktf.providers.google.provider.GoogleProviderConfig;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
+import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import health.emrys.afon.cdk.AbstractCloudProvider;
+import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
+import health.emrys.afon.cdk.AbstractNginxCloudProvider;
+import health.emrys.afon.cdk.CachedTlsSecret;
+import health.emrys.afon.cdk.HttpsRoute;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.StackId;
+import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
+import static health.emrys.afon.config.AfonCloud.GCP;
+import static health.emrys.afon.config.AfonProperty.GCP_SECRETS_ENABLED;
 import static java.lang.String.format;
 
 /**
@@ -46,15 +62,27 @@ import static java.lang.String.format;
  * If you need to destroy by hand, run:
  * gcloud container clusters delete $CLUSTER_NAME --region=$REGION --project $GCP_PROJECT_ID
  */
-public class GcpCloudProvider extends AbstractCloudProvider {
+public class GcpCloudProvider extends AbstractNginxCloudProvider {
+
+    private static final Logger  logger             = org.slf4j.LoggerFactory.getLogger(GcpCloudProvider.class);
+    private static final Pattern DNS_ZONE_NAME_RULE = Pattern.compile("[a-z]([-a-z0-9]*[a-z0-9])?");
+    private static final int     DNS_ZONE_NAME_MAX  = 63;
 
     private final ContainerCluster   gkeCluster;
+    private final String             projectId;
+    private final boolean            secretsEnabled;
     private       KubernetesProvider k8sProvider;
     private       HelmProvider       helmProvider;
 
+    public static GcpCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties) {
+        NullProvider.Builder.create(stack, "null").build();
+        return new GcpCloudProvider(stack, stackId.cloud().toString(), properties);
+    }
+
     GcpCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
         super(scope, id);
-        String projectId = projectIdFrom(properties);
+        this.projectId = projectIdFrom(properties);
+        this.secretsEnabled = Boolean.parseBoolean(properties.getValue(GCP_SECRETS_ENABLED, "false"));
         String clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
         String gcpRegion = properties.getValue(AfonProperty.GCP_REGION);
         String vpcName     = "gke-private-vpc-" + clusterName;
@@ -248,7 +276,7 @@ public class GcpCloudProvider extends AbstractCloudProvider {
     // Ingress controller + TLS (mirroring AzureCloudProvider)
     // -------------------------------------------------------------------------
 
-    synchronized HelmProvider configureHelm() {
+    public synchronized HelmProvider configureHelm() {
         if (helmProvider == null) {
             HelmProviderKubernetesExec helmPlugin = HelmProviderKubernetesExec
                 .builder()
@@ -270,4 +298,86 @@ public class GcpCloudProvider extends AbstractCloudProvider {
         return helmProvider;
     }
 
+
+    @Override
+    public AfonCloud cloud() {
+        return GCP;
+    }
+
+    @Override
+    protected Map<String, String> nginxAnnotations() {
+        return null;
+    }
+
+    @Override
+    protected Optional<String> restoreCachedCertCommand(HttpsRoute route) {
+        return secretsEnabled
+            ? Optional.of(restoreCachedCertCommand(projectId, tlsSecretNames(route.domainName()), route.tlsSecretName()))
+            : Optional.empty();
+    }
+
+    static String[] tlsSecretNames(String domainName) {
+        return CachedTlsSecret.secretNames(domainName);
+    }
+
+    /**
+     * Restores the TLS secrets from Secret Manager before cert-manager's ingress-shim gets a
+     * chance to request a fresh cert from Let's Encrypt.  Attached as an extra create-time command
+     * on the cert-manager Helm release, so it runs (and completes) before the dependent Ingress is
+     * even created.  The cache is populated externally, ahead of deploy, by
+     * {@code scripts/gcp/issue-cert.sh} (or {@code scripts/gcp/secrets.sh store}).  A missing or empty
+     * secret is not an error, cert-manager simply issues a new cert via its HTTP-01 ClusterIssuer as a fallback.
+     */
+    static String restoreCachedCertCommand(String projectId, String[] secretNames, String tlsSecretName) {
+        logger.info("Restoring cached secrets {} from Secret Manager of project {}", secretNames, projectId);
+        return CachedTlsSecret.restoreCommand(
+            format("gcloud secrets versions access latest --secret='%s' --project='%s' 2>/dev/null", secretNames[0], projectId),
+            format("gcloud secrets versions access latest --secret='%s' --project='%s' 2>/dev/null", secretNames[1], projectId),
+            tlsSecretName);
+    }
+
+    /**
+     * @return the name of the Cloud DNS managed zone of the domain name: the domain name with its dots replaced by
+     * dashes, eg {@code emryspolarisgcp2-click} for {@code emryspolarisgcp2.click}.  An Azure DNS zone is named after
+     * its domain name, but the name of a Cloud DNS zone cannot hold dots.  {@code scripts/gcp/create.sh} creates the
+     * zone with the same name.
+     * @throws IllegalArgumentException if the name is not a valid zone name, ie 1 to 63 lowercase letters, digits or
+     * dashes, starting with a letter and not ending with a dash
+     */
+    static String dnsZoneName(String domainName) {
+        String name = domainName.replace('.', '-');
+        if (name.length() > DNS_ZONE_NAME_MAX || !DNS_ZONE_NAME_RULE.matcher(name).matches()) {
+            throw new IllegalArgumentException(String.format(
+                "The Cloud DNS zone name '%s', derived from the domain name '%s' by replacing its dots with dashes, "
+                + "must be 1 to %d lowercase letters, digits or dashes, starting with a letter and not ending with a dash",
+                name, domainName, DNS_ZONE_NAME_MAX));
+        }
+        return name;
+    }
+
+    @Override
+    protected ITerraformDependable configureDns(IngressV1 ingress, HttpsRoute route) {
+        // the ids of the first component exposed, Polaris, are in the tofu state of the deployed stacks
+        boolean polaris = route.component().equals("polaris");
+        DataGoogleDnsManagedZone zone = new DataGoogleDnsManagedZone(
+            stack(),
+            polaris ? "dns-zone" : "dns-zone-" + route.component(),
+            DataGoogleDnsManagedZoneConfig
+                .builder()
+                .name(dnsZoneName(route.domainName()))
+                .build());
+
+        String ingressIp = ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getIp();
+        return new DnsRecordSet(
+            stack(),
+            route.component() + "-dns",
+            DnsRecordSetConfig
+                .builder()
+                .name(route.domainName() + ".")
+                .type("A")
+                .ttl(300)
+                .managedZone(zone.getName())
+                .rrdatas(List.of(ingressIp))
+                .build());
+    }
 }

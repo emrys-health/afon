@@ -284,6 +284,19 @@ public class CdkHelper {
         HelmProvider helmProvider,
         final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
         List<String> extraCreateCommands) {
+        return installCertManager(construct, helmProvider, dependsOn, domainName, extraCreateCommands);
+    }
+
+    /**
+     * As {@link #installCertManager(Construct, HelmProvider, List, List)}, for the Let's Encrypt account of the
+     * given domain name.
+     */
+    public static Release installCertManager(
+        Construct construct,
+        HelmProvider helmProvider,
+        final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
+        String domainName,
+        List<String> extraCreateCommands) {
         String clusterIssuerYaml = format(
             """
             kubectl apply -f - <<'YAML'

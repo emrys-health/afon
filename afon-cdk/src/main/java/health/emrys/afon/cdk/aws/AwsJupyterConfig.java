@@ -4,6 +4,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import health.emrys.afon.cdk.CdkHelper;
+import health.emrys.afon.cdk.HealthCheck;
 import health.emrys.afon.cdk.JupyterConfig;
 import health.emrys.afon.cdk.JupyterMfaConfig;
 import health.emrys.afon.config.AfonProperty;
@@ -45,7 +46,7 @@ public class AwsJupyterConfig extends JupyterConfig {
             jupyterDomain,
             CdkHelper.PROXY_SERVICE_NAME,
             CdkHelper.PROXY_PORT,
-            AwsCloudProvider.HealthCheck.onTrafficPort(JupyterMfaConfig.PING_PATH),
+            HealthCheck.onTrafficPort(JupyterMfaConfig.PING_PATH),
             cloudProvider.getSubnetIds());
 
         cloudProvider.configureDNS(

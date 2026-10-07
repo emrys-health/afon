@@ -3,7 +3,11 @@ package health.emrys.afon.cdk.azure;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_client_config.DataAzurermClientConfig;
+import com.hashicorp.cdktf.providers.azurerm.data_azurerm_dns_zone.DataAzurermDnsZone;
+import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecord;
+import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecordConfig;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_resource_group.DataAzurermResourceGroup;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_resource_group.DataAzurermResourceGroupConfig;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.*;
@@ -25,26 +29,35 @@ import com.hashicorp.cdktf.providers.azurerm.virtual_network.VirtualNetworkConfi
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetesExec;
+import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.AbstractCloudProvider;
+import health.emrys.afon.cdk.AbstractNginxCloudProvider;
+import health.emrys.afon.cdk.CachedTlsSecret;
+import health.emrys.afon.cdk.HttpsRoute;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonProperty.AZURE_RESOURCE_PROVIDER_REGISTRATIONS;
 import static java.lang.String.format;
 
-public class AzureCloudProvider extends AbstractCloudProvider {
+public class AzureCloudProvider extends AbstractNginxCloudProvider {
 
+    private static final Logger                  logger             = org.slf4j.LoggerFactory.getLogger(AzureCloudProvider.class);
     private static final String                  KUBERNETES_VERSION = "1.36.2";
     /**
      * Well-known AKS AAD server application ID; kubelogin requests a token for this audience.
@@ -61,6 +74,7 @@ public class AzureCloudProvider extends AbstractCloudProvider {
     private final        DataAzurermClientConfig clientConfig;
     private final        String                  providerRegistrations;
     private final        Map<String, String>     nodePoolConfig;
+    private final        String                  keyVaultName;
     private              RoleAssignment          clusterAdminAssignment;
     private              KubernetesProvider      k8sProvider;
     private              HelmProvider            helmProvider;
@@ -74,10 +88,15 @@ public class AzureCloudProvider extends AbstractCloudProvider {
         subscriptionId           = properties.getValue(AZURE_SUBSCRIPTION);
         providerRegistrations    = properties.getValue(AZURE_RESOURCE_PROVIDER_REGISTRATIONS, "core");
         nodePoolConfig           = parseNodePoolConfig(properties.getValue(AZURE_AKS_NODE_POOL, ""));
+        keyVaultName             = properties.getValue(AZURE_KEY_VAULT_NAME, "");
         configureProviders();
         clientConfig = new DataAzurermClientConfig(this, "current");
         aksCluster   = createCluster(lookupResourceGroup());
         grantClusterAdmin();
+    }
+
+    public static AzureCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties) {
+        return new AzureCloudProvider(stack, stackId.cloud().toString(), properties);
     }
 
     /**
@@ -494,7 +513,7 @@ public class AzureCloudProvider extends AbstractCloudProvider {
     // Ingress controller + TLS
     // -------------------------------------------------------------------------
 
-    synchronized HelmProvider configureHelm() {
+    public synchronized HelmProvider configureHelm() {
         if (helmProvider == null) {
             var cfg = aksCluster.getKubeConfig().get(0);
             helmProvider = HelmProvider.Builder.create(this, "helm")
@@ -514,4 +533,80 @@ public class AzureCloudProvider extends AbstractCloudProvider {
         return helmProvider;
     }
 
+
+    @Override
+    public AfonCloud cloud() {
+        return AZURE;
+    }
+
+    /**
+     * The Azure CNI (Cilium) data plane is not necessarily ready the moment the azurerm_kubernetes_cluster resource
+     * reports "created".  Gating the Spark operator on the nginx release, which has already scheduled pods
+     * successfully, proves the cilium-agent is serving requests, avoiding the "Cilium API client timeout exceeded"
+     * pod-sandbox failure.
+     */
+    @Override
+    public List<? extends ITerraformDependable> sparkOperatorDependencies() {
+        return List.of(nginxRelease());
+    }
+
+    @Override
+    protected Map<String, String> nginxAnnotations() {
+        return Map.of(
+            "controller.service.annotations.service\\.beta\\" +
+            ".kubernetes\\.io/azure-load-balancer-health-probe" +
+            "-request-path", "/healthz");
+    }
+
+    @Override
+    protected Optional<String> restoreCachedCertCommand(HttpsRoute route) {
+        return keyVaultName.isBlank()
+            ? Optional.empty()
+            : Optional.of(restoreCachedCertCommand(keyVaultName, tlsSecretNames(route.domainName()), route.tlsSecretName()));
+    }
+
+    static String[] tlsSecretNames(String domainName) {
+        return CachedTlsSecret.secretNames(domainName);
+    }
+
+    /**
+     * Restores the TLS secrets from Key Vault before cert-manager's ingress-shim gets a
+     * chance to request a fresh cert from Let's Encrypt. Attached as an extra create-time command
+     * on the cert-manager Helm release, so it runs (and completes) before the dependent Ingress is
+     * even created. The cache is populated externally, ahead of deploy, by {@code scripts/azure/
+     * issue-cert.sh <acme|digicert|globalsign>} — issuer-agnostic from here, it's just two named
+     * secrets. A missing or empty Key Vault entry is not an error, cert-manager simply issues a new
+     * cert via its HTTP-01 ClusterIssuer as a fallback.
+     */
+    static String restoreCachedCertCommand(String keyVaultName, String[] secretNames, String tlsSecretName) {
+        logger.info("Restoring cached secrets {} from key vault {}", secretNames, keyVaultName);
+        return CachedTlsSecret.restoreCommand(
+            format("az keyvault secret show --vault-name '%s' --name '%s' --query value -o tsv 2>/dev/null", keyVaultName, secretNames[0]),
+            format("az keyvault secret show --vault-name '%s' --name '%s' --query value -o tsv 2>/dev/null", keyVaultName, secretNames[1]),
+            tlsSecretName);
+    }
+
+    @Override
+    protected ITerraformDependable configureDns(IngressV1 ingress, HttpsRoute route) {
+        String domainName = route.domainName();
+        String suffix = domainName.replace(".", "-");
+        DataAzurermDnsZone dnsZone = DataAzurermDnsZone.Builder
+            .create(stack(), "dns-zone-" + suffix)
+            .name(domainName)
+            .resourceGroupName(resourceGroup)
+            .build();
+
+        List<String> ipAddresses = List.of(
+            ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getIp());
+        return new DnsARecord(
+            stack(), "dns-" + suffix,
+            DnsARecordConfig
+                .builder()
+                .name("@")
+                .zoneName(dnsZone.getName())
+                .resourceGroupName(resourceGroup)
+                .ttl(300)
+                .records(ipAddresses)
+                .build());
+    }
 }
