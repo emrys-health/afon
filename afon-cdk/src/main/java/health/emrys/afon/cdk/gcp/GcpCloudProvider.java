@@ -27,19 +27,20 @@ import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import software.constructs.Construct;
 
-import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import static java.lang.String.format;
 
 /**
- * Authentication: runs {@code gcloud auth print-access-token} at synthesis time to
- * read a fresh OAuth2 token from {@code $HOME/.config/gcloud} without going through
- * the OAuth2 refresh flow (which triggers RAPT on Workspace accounts).
- * The token is valid for 1 hour, so synth and apply must complete within that window.
+ * Authentication: the Google provider uses Application Default Credentials (ADC), resolved when it runs and
+ * renewed by the Google auth library, as the AWS and Azure providers resolve the credentials of the AWS SDK
+ * and of {@code az login}.  No token is written into the plan, so it does not expire after an hour.
+ * Locally, log in once with {@code gcloud auth login --update-adc} (as {@code gcp-login} does), or
+ * point {@code GOOGLE_APPLICATION_CREDENTIALS} at a credentials file, eg one from Workload Identity Federation in CI.
  * <p>
  * The Kubernetes and Helm providers use gke-gcloud-auth-plugin, which fetches
- * tokens on demand without going through the refresh flow.
+ * tokens on demand.
  * Install with: gcloud components install gke-gcloud-auth-plugin
  * <p>
  * If you need to destroy by hand, run:
@@ -59,14 +60,15 @@ public class GcpCloudProvider extends AbstractCloudProvider {
         String vpcName     = "gke-private-vpc-" + clusterName;
         String subnetName  = "gke-private-subnet-" + clusterName;
 
-        // Reads a fresh access token from ~/.config/gcloud via gcloud CLI.
-        // This avoids the OAuth2 refresh flow that triggers RAPT on Workspace accounts.
+        // Credentials come from Application Default Credentials at run time.  User credentials need a project
+        // to bill API usage to, which is the stack's own, rather than the one of the Google client.
         new GoogleProvider(
             this, "google", GoogleProviderConfig
             .builder()
             .project(projectId)
             .region(gcpRegion).zone("europe-west2-a")
-            .accessToken(printGcloudAccessToken())
+            .userProjectOverride(true)
+            .billingProject(projectId)
             .build());
 
         // 2. Create the GKE Cluster
@@ -208,10 +210,18 @@ public class GcpCloudProvider extends AbstractCloudProvider {
     }
 
     /**
-     * Uses gke-gcloud-auth-plugin instead of a static token so that credentials
-     * are fetched on demand during apply without going through the OAuth2 refresh
-     * flow (which triggers RAPT on Google Workspace accounts).
+     * Uses gke-gcloud-auth-plugin so that credentials are fetched on demand during apply.
      */
+    /**
+     * GKE adds {@code cloud.google.com/neg: {"ingress":true}} to the Services it can serve with network endpoint
+     * groups, which only the GKE ingress needs.  The ingress here is nginx, which reaches the pods through its own
+     * Service, so opt out: GKE does not add the annotation if it is already declared.
+     */
+    @Override
+    public Map<String, String> getServiceAnnotations() {
+        return Map.of("cloud.google.com/neg", "{\"ingress\": false}");
+    }
+
     @Override
     public synchronized KubernetesProvider configureK8s() {
         if (k8sProvider == null) {
@@ -232,27 +242,6 @@ public class GcpCloudProvider extends AbstractCloudProvider {
     @Override
     public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
         throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    /**
-     * Reads a short-lived access token from {@code ~/.config/gcloud} by invoking
-     * {@code gcloud auth print-access-token}.  This avoids the OAuth2 refresh flow
-     * that triggers RAPT on Google Workspace accounts.
-     */
-    private static String printGcloudAccessToken() {
-        try {
-            Process p = new ProcessBuilder("gcloud", "auth", "print-access-token")
-                .redirectErrorStream(true)
-                .start();
-            String token = new String(p.getInputStream().readAllBytes()).trim();
-            int    rc    = p.waitFor();
-            if (rc != 0 || token.isEmpty()) {
-                throw new RuntimeException("gcloud auth print-access-token failed (exit " + rc + "): " + token);
-            }
-            return token;
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException("Failed to read gcloud access token from ~/.config/gcloud", e);
-        }
     }
 
     // -------------------------------------------------------------------------

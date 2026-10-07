@@ -182,8 +182,8 @@ public class StepActions {
 
     /**
      * Validates the plan of a deployed stack from the current config, so that {@code tofu destroy} doesn't
-     * run on the plan left by the last deploy or validation, which can be stale: eg the GCP access token embedded in
-     * it at synthesis time expires after an hour.  It also fails early, before anything is destroyed, if the stack no
+     * run on the plan left by the last deploy or validation, which can be stale, eg after a change of config.
+     * It also fails early, before anything is destroyed, if the stack no
      * longer validates, eg because of a missing property.  Does nothing if the stack is not deployed, ie has no
      * tofu state, or has no stack class, as the legacy stacks.
      * @throws IllegalStateException if the stack fails to synthesise

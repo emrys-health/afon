@@ -35,6 +35,25 @@ gcloud projects add-iam-policy-binding $GCP_PROJECT_ID --member="user:<account>"
 The `roles/editor` role covers all of these but `roles/container.admin` and `roles/iam.serviceAccountUser`, but is
 broader than needed: use it for a development project only.
 
+### Authentication
+
+The stacks authenticate with Application Default Credentials (ADC), resolved when `tofu` runs and renewed by the
+Google auth library, as the AWS and Azure stacks use the credentials of the AWS SDK and of `az login`.  No token is written
+into the plan, so a plan synthesised earlier can still be applied, destroyed or inspected.
+
+Log in once with `afon-cli.sh gcp-login`, which runs `gcloud auth login --update-adc`.  It logs in the `gcloud` commands of
+the scripts and, with `--update-adc`, also writes the same login to the ADC used by the Google provider, so both run as
+the same user.  `gcloud auth application-default login` alone only sets the ADC, not the account of the `gcloud` commands.
+
+Where the user cannot log in, eg in CI, point `GOOGLE_APPLICATION_CREDENTIALS` at a credentials file instead, eg one
+issued by Workload Identity Federation.  The Google provider and `gcloud` both read it.
+
+The provider bills the API usage to the stack's own project, `GCP_PROJECT_ID`, which is why the deployer needs
+`roles/serviceusage.serviceUsageConsumer`.
+
+If Google asks to log in again while a long command is running, with `invalid_rapt` or a reauthentication error, the
+Google Workspace session control forces a new login after a set time: run `gcp-login` again.
+
 ### Symptoms of a missing role
 
 | Error                                                                                         | Missing                                      |
