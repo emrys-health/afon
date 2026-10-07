@@ -35,7 +35,7 @@ public class GcpPolarisStack extends GcpKubernetesStack {
     private static final Pattern DNS_ZONE_NAME_RULE = Pattern.compile("[a-z]([-a-z0-9]*[a-z0-9])?");
     private static final int     DNS_ZONE_NAME_MAX  = 63;
     private static final String POLARIS_INTERNAL = "polaris-internal";
-    private static final String TLS_SECRET_NAME  = "polaris-tls";
+    private static final String POLARIS_TLS_SECRET_NAME = "polaris-tls";
     private static final int    POLARIS_PORT     = 8181;
 
 
@@ -43,7 +43,7 @@ public class GcpPolarisStack extends GcpKubernetesStack {
         super(scope, stackId, properties);
         PolarisConfig polarisConfig = new PolarisConfig(this, "polaris", cloudProvider, properties);
         var util = new CdkHelper(
-            this, gcpDomainName, TLS_SECRET_NAME, POLARIS_PORT
+            this, gcpDomainName, POLARIS_TLS_SECRET_NAME, POLARIS_PORT
             , POLARIS_INTERNAL, POLARIS_INGRESS_NAME);
         HelmProvider               helm            = cloudProvider.configureHelm();
         List<ITerraformDependable> dependables     = cloudProvider.getDependables();
@@ -86,9 +86,13 @@ public class GcpPolarisStack extends GcpKubernetesStack {
                 --type=kubernetes.io/tls \
                 --from-literal=tls.crt="$(echo "$CRT_B64" | base64 -d)" \
                 --from-literal=tls.key="$(echo "$KEY_B64" | base64 -d)" \
-                --dry-run=client -o yaml | kubectl apply -f -
+                --dry-run=client -o yaml | kubectl apply --server-side --force-conflicts -f -
+              kubectl annotate secret %4$s --overwrite \
+                cert-manager.io/issuer-name=%5$s \
+                cert-manager.io/issuer-kind=ClusterIssuer \
+                cert-manager.io/issuer-group=cert-manager.io
             fi
-            """, projectId, secretNames[0], secretNames[1], TLS_SECRET_NAME);
+            """, projectId, secretNames[0], secretNames[1], POLARIS_TLS_SECRET_NAME, CdkHelper.CLUSTER_ISSUER_NAME);
     }
 
     /**

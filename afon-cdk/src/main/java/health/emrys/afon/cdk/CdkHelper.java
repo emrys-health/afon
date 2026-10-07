@@ -32,6 +32,8 @@ public class CdkHelper {
     public static final int    PROXY_PORT     = 4180;
     public static final String PROXY_SERVICE_NAME = "oauth2-proxy";
     public static final String POLARIS_INGRESS_NAME = "polaris-ingress";
+    /** Name of the cert-manager ClusterIssuer, which the ingress refers to and a restored TLS secret must be annotated with. */
+    public static final String CLUSTER_ISSUER_NAME = "letsencrypt-prod";
     public static final String JUPYTER_INGRESS_NAME = "jupyter-ingress";
     public static final String JUPYTER_SERVICE_NAME = "jupyter-web";
     public static final String SPARK_CONNECTOR_NAME = "spark-connector";
@@ -234,7 +236,7 @@ public class CdkHelper {
                           .builder()
                           .name(ingressName)
                           .annotations(Map.of(
-                              "cert-manager.io/cluster-issuer", "letsencrypt-prod"
+                              "cert-manager.io/cluster-issuer", CLUSTER_ISSUER_NAME
                           ))
                           .build())
             .dependsOn(dependencies)
@@ -277,7 +279,7 @@ public class CdkHelper {
             apiVersion: cert-manager.io/v1
             kind: ClusterIssuer
             metadata:
-              name: letsencrypt-prod
+              name: %s
             spec:
               acme:
                 server: https://acme-v02.api.letsencrypt.org/directory
@@ -288,7 +290,7 @@ public class CdkHelper {
                 - http01:
                     ingress:
                       class: nginx
-            YAML""", domainName);
+            YAML""", CLUSTER_ISSUER_NAME, domainName);
 
         List<String> commands = new java.util.ArrayList<>();
         commands.add(clusterIssuerYaml);

@@ -67,7 +67,7 @@ public class AzurePolarisStack extends AzureKubernetesStack {
         configureDns(ingress, azurePolarisDomainName);
     }
 
-    private String[] tlsSecretNames(String domainName) {
+    static String[] tlsSecretNames(String domainName) {
         String kebabDomainName = domainName.replace(".", "-");
         return new String[]{kebabDomainName + "-tls-crt", kebabDomainName + "-tls-key"};
     }
@@ -81,7 +81,7 @@ public class AzurePolarisStack extends AzureKubernetesStack {
      * secrets. A missing or empty Key Vault entry is not an error, cert-manager simply issues a new
      * cert via its HTTP-01 ClusterIssuer as a fallback.
      */
-    private String restoreCachedCertCommand(String keyVaultName, String[] secretNames) {
+    static String restoreCachedCertCommand(String keyVaultName, String[] secretNames) {
         logger.info("Restoring cached secrets {} from key vault {}", secretNames, keyVaultName);
         return format(
             """
@@ -92,9 +92,13 @@ public class AzurePolarisStack extends AzureKubernetesStack {
                 --type=kubernetes.io/tls \
                 --from-literal=tls.crt="$(echo "$CRT_B64" | base64 -d)" \
                 --from-literal=tls.key="$(echo "$KEY_B64" | base64 -d)" \
-                --dry-run=client -o yaml | kubectl apply -f -
+                --dry-run=client -o yaml | kubectl apply --server-side --force-conflicts -f -
+              kubectl annotate secret %4$s --overwrite \
+                cert-manager.io/issuer-name=%5$s \
+                cert-manager.io/issuer-kind=ClusterIssuer \
+                cert-manager.io/issuer-group=cert-manager.io
             fi
-            """, keyVaultName, secretNames[0], secretNames[1], POLARIS_TLS_SECRET_NAME);
+            """, keyVaultName, secretNames[0], secretNames[1], POLARIS_TLS_SECRET_NAME, CdkHelper.CLUSTER_ISSUER_NAME);
     }
 
     private @NonNull Release configureNginx(HelmProvider helm, List<ITerraformDependable> dependables) {
