@@ -5,6 +5,7 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 
 import java.util.List;
+import java.util.Map;
 
 public interface CloudProvider {
 
@@ -18,6 +19,15 @@ public interface CloudProvider {
      */
     default List<ITerraformDependable> getServiceDependables() {
         return List.of();
+    }
+
+    /**
+     * Annotations that the cloud's controllers would otherwise add to the {@link Service} of a workload behind the
+     * ingress, which tofu would then report as a change on every plan.  Declaring them makes them part of the
+     * plan.  On GCP this is the GKE annotation for network endpoint groups.  Empty by default.
+     */
+    default Map<String, String> getServiceAnnotations() {
+        return Map.of();
     }
 
     void configureLoadBalancerDestroy(List<Service> loadBalancers);

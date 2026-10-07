@@ -57,9 +57,11 @@ public class PolarisConfig extends Construct {
     private final JobV1 polarisDbInitJob;
     private final ServiceSpecPort polarisSpecPort;
     private final Map<String, String> polarisLabels;
+    private final CloudProvider cloudProvider;
 
     public PolarisConfig(@NonNull Construct scope, @NonNull String id, CloudProvider cloudProvider, AfonPropertyProvider properties) {
         super(scope, id);
+        this.cloudProvider = cloudProvider;
         // Configure the Kubernetes Provider
         cloudProvider.configureK8s();
 
@@ -419,7 +421,8 @@ public class PolarisConfig extends Construct {
             polarisLabels,
                 POLARIS_INTERNAL_SERVICE_NAME,
             List.of(polarisSpecPort),
-            this);
+            this,
+            cloudProvider.getServiceAnnotations());
     }
 
 }

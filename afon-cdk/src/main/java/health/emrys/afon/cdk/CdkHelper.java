@@ -85,7 +85,16 @@ public class CdkHelper {
                                                     String serviceName,
                                                     List<ServiceSpecPort> ports,
                                                     Construct scope) {
-        return typedService("ClusterIP", dependsOn, labels, serviceName, ports, scope);
+        return clusterIpService(dependsOn, labels, serviceName, ports, scope, Map.of());
+    }
+
+    public static @NonNull Service clusterIpService(java.util.List<? extends ITerraformDependable> dependsOn,
+                                                    Map<String, String> labels,
+                                                    String serviceName,
+                                                    List<ServiceSpecPort> ports,
+                                                    Construct scope,
+                                                    Map<String, String> annotations) {
+        return typedService("ClusterIP", dependsOn, labels, serviceName, ports, scope, annotations);
     }
 
     /**
@@ -100,7 +109,7 @@ public class CdkHelper {
                                                    String serviceName,
                                                    List<ServiceSpecPort> ports,
                                                    Construct scope) {
-        return typedService("NodePort", dependsOn, labels, serviceName, ports, scope);
+        return typedService("NodePort", dependsOn, labels, serviceName, ports, scope, Map.of());
     }
 
     private static @NonNull Service typedService(String type,
@@ -108,12 +117,14 @@ public class CdkHelper {
                                                  Map<String, String> labels,
                                                  String serviceName,
                                                  List<ServiceSpecPort> ports,
-                                                 Construct scope) {
+                                                 Construct scope,
+                                                 Map<String, String> annotations) {
         return Service.Builder
             .create(scope, serviceName)
             .metadata(ServiceMetadata
                           .builder()
                           .name(serviceName)
+                          .annotations(annotations.isEmpty() ? null : annotations)
                           .build())
             .dependsOn(dependsOn)
             .spec(ServiceSpec
