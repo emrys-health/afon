@@ -367,7 +367,7 @@ cluster_egress_ip() {
   fi
 }
 
-# Restricts the Polaris ingress of the current kubectl context to the CIDRs AwsPolarisStack admits when
+# Restricts the Polaris ingress of the current kubectl context to the CIDRs AwsCloudProvider admits when
 # AWS_POLARIS_ALLOWED_CIDRS is set: those CIDRs plus the cluster's egress IP, so that its pods calling Polaris by
 # its public domain name are not locked out.  The egress IP is the one of the cluster's NAT gateway, as the
 # AWS_EGRESS_IP of afon-aws.properties may be stale, eg if the stack was deployed without it, or by default

@@ -4,17 +4,17 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class AzurePolarisStackTest {
+class AzureCloudProviderTest {
 
     @Test
     void tlsSecretNamesMatchIssueCertScript() {
-        assertThat(AzurePolarisStack.tlsSecretNames("polaris.example.com"))
+        assertThat(AzureCloudProvider.tlsSecretNames("polaris.example.com"))
             .containsExactly("polaris-example-com-tls-crt", "polaris-example-com-tls-key");
     }
 
     @Test
     void restoreCommandReadsSecretsFromKeyVault() {
-        String command = AzurePolarisStack.restoreCachedCertCommand("my-vault", new String[]{"a-tls-crt", "a-tls-key"});
+        String command = AzureCloudProvider.restoreCachedCertCommand("my-vault", new String[]{"a-tls-crt", "a-tls-key"}, "polaris-tls");
         assertThat(command).contains("--vault-name 'my-vault' --name 'a-tls-crt'")
                            .contains("--vault-name 'my-vault' --name 'a-tls-key'")
                            .contains("kubectl create secret generic polaris-tls")

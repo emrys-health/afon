@@ -33,6 +33,9 @@ import java.util.*;
 
 import static health.emrys.afon.cdk.CdkUtils.withAppKubernetesIoName;
 import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
+import static health.emrys.afon.cdk.CdkHelper.JUPYTER_INGRESS_NAME;
+import static health.emrys.afon.cdk.CdkHelper.PROXY_PORT;
+import static health.emrys.afon.cdk.CdkHelper.PROXY_SERVICE_NAME;
 import static health.emrys.afon.cdk.CdkHelper.envFromSecret;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -62,7 +65,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  * enforces MFA); the hub itself therefore uses a pass-through authenticator. oauth2-proxy points at
  * the {@code proxy-public} ClusterIP service rather than at a single Jupyter pod.
  */
-public abstract class JupyterHubConfig {
+public class JupyterHubConfig {
 
     private static final Logger logger = getLogger(JupyterHubConfig.class);
 
@@ -140,16 +143,31 @@ public abstract class JupyterHubConfig {
     protected static final Map<String, String> USER_POD_LABELS =
         Map.of(SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE);
 
+    private static final String TLS_SECRET_NAME = "jupyter-secret";
+
     private final   TerraformStack                stack;
+    private final   CloudPlatform                 platform;
+    private final   List<ITerraformDependable>    issuerDependencies;
     private final   String                        jupyterPassword;
     private final   List<GuacamoleConfig.Session> sessions;
     private final   AfonUserProvider              userProvider = new FileUserProvider();
     protected final AfonPropertyProvider        properties;
 
+    /**
+     * @param platform           the cloud to deploy to, whose own properties configure the hub, eg
+     *                           {@code AWS_JUPYTER_DOMAIN_NAME}
+     * @param issuerDependencies what must exist before the hub starts, because it does OIDC discovery against the
+     *                           issuer hostname on startup (see {@code _discover} in the hub config), eg the issuer's
+     *                           DNS record
+     */
     public JupyterHubConfig(
         TerraformStack stack,
-        AfonPropertyProvider properties) {
+        CloudPlatform platform,
+        AfonPropertyProvider properties,
+        List<ITerraformDependable> issuerDependencies) {
         this.stack           = stack;
+        this.platform        = platform;
+        this.issuerDependencies = List.copyOf(issuerDependencies);
         this.properties      = properties;
         this.jupyterPassword = properties.getValue(AfonProperty.JUPYTER_VNC_PASSWORD);
         // One Guacamole login per user, keyed by email; each streams that user's own pod desktop on
@@ -577,30 +595,58 @@ public abstract class JupyterHubConfig {
         }
     }
 
-    protected abstract void configureHttpsAndDNS();
-
     /**
-     * What must exist before the hub starts, because it does OIDC discovery against the issuer
-     * hostname on startup (see {@code _discover} in the hub config), eg the issuer's DNS record.
+     * Exposes the oauth2-proxy MFA gate over HTTPS at the Jupyter domain, which forwards to JupyterHub's public proxy.
      */
-    protected List<ITerraformDependable> issuerDependencies() {
-        return List.of();
+    private void configureHttpsAndDNS() {
+        platform.exposeHttps(new HttpsRoute(
+            "jupyter", jupyterDomain(), PROXY_SERVICE_NAME, PROXY_PORT, JUPYTER_INGRESS_NAME,
+            HealthCheck.onTrafficPort(JupyterMfaConfig.PING_PATH),
+            TLS_SECRET_NAME, false, List.of(), Optional.empty()));
     }
 
-    protected abstract JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps);
+    /**
+     * What must exist before the hub starts, see the constructor.
+     */
+    protected List<ITerraformDependable> issuerDependencies() {
+        return issuerDependencies;
+    }
+
+    /**
+     * The oauth2-proxy MFA gate, which waits for the issuer too, as it does OIDC discovery on startup.
+     */
+    private JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps) {
+        List<ITerraformDependable> deps = new ArrayList<>(proxyDeps);
+        deps.addAll(issuerDependencies);
+        return new JupyterMfaConfig(
+            stack,
+            deps,
+            properties,
+            MFA_UPSTREAMS,
+            jupyterDomain(),
+            properties.getValue(AfonProperty.OAUTH2_CLIENT_ID),
+            properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET),
+            properties.getValue(AfonProperty.OAUTH2_COOKIE_SECRET));
+    }
 
     /**
      * Public domain JupyterHub is served on; used to build the OIDC callback URL.
      */
-    protected abstract String jupyterDomain();
+    protected String jupyterDomain() {
+        return properties.getCloudValue(platform.cloud(), "JUPYTER_DOMAIN_NAME");
+    }
 
     /**
      * OIDC client id for JupyterHub's OAuthenticator (same provider as oauth2-proxy).
      */
-    protected abstract String oauthClientId();
+    protected String oauthClientId() {
+        return properties.getValue(AfonProperty.OAUTH2_CLIENT_ID);
+    }
 
     /**
      * OIDC client secret for JupyterHub's OAuthenticator.
      */
-    protected abstract String oauthClientSecret();
+    protected String oauthClientSecret() {
+        return properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET);
+    }
 }

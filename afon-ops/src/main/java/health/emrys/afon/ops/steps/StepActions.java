@@ -6,7 +6,6 @@ import ch.vorburger.exec.ManagedProcessException;
 import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.config.AfonCatalog;
@@ -185,7 +184,7 @@ public class StepActions {
      * run on the plan left by the last deploy or validation, which can be stale, eg after a change of config.
      * It also fails early, before anything is destroyed, if the stack no
      * longer validates, eg because of a missing property.  Does nothing if the stack is not deployed, ie has no
-     * tofu state, or has no stack class, as the legacy stacks.
+     * tofu state, or has no definition, as the legacy stacks.
      * @throws IllegalStateException if the stack fails to synthesise
      */
     void validateStack(StackId stackId) {
@@ -197,16 +196,14 @@ public class StepActions {
             return;
         }
         CloudStackValidator validator = new CloudStackValidator();
-        Class<? extends AfonCloudStack> stack = validator.resolve(stackId.toString());
-        if (stack == null) {
-            logger.info("No stack class for stack {}, so not validating it before deleting it", stackId);
+        if (validator.resolve(stackId.toString()) == null) {
+            logger.info("No definition of stack {}, so not validating it before deleting it", stackId);
             return;
         }
         logger.info("Validating stack {} again before deleting it, so that its plan is current", stackId);
         try {
-            validator.validate(stack);
-        } catch (ReflectiveOperationException e) {
-            Throwable cause = e instanceof InvocationTargetException && e.getCause() != null ? e.getCause() : e;
+            validator.validate(stackId);
+        } catch (RuntimeException cause) {
             throw new IllegalStateException(String.format(
                 "Cannot delete stack %s, as it failed to validate against the current config: %s%n"
                 + "Fix the config, as validated with 'afon-cli.sh validate-stack %s', and run again.",
@@ -308,19 +305,26 @@ public class StepActions {
      * @param outputStream the stream to which the tofu output is written
      * @throws Exception
      */
-    void startStack(Class<?> stackClass, OutputStream outputStream) throws Exception {
-        startStack(stackClass, 1, outputStream);
+    void startStack(StackId stackId, OutputStream outputStream) throws Exception {
+        startStack(stackId, 1, outputStream);
     }
 
     /**
-     * Starts the stack, attempting for a given number of retries, in the stack dir of its {@link StackId},
-     * named from the stack class, eg {@code aws-keycloak} for {@code AwsKeycloakStack}.
+     * Starts the stack, attempting for a given number of retries, in the stack dir of its {@link StackId}, eg
+     * {@code aws-keycloak}, after synthesising its plan there.
      * @param outputStream the stream to which the tofu output is written
      * @throws Exception
      */
-    void startStack(Class<?> stackClass, int maxAttempts, OutputStream outputStream) throws Exception {
-        executeMainOf(stackClass, new String[]{});
-        startManagedStack(StackId.of(stackClass), maxAttempts, outputStream);
+    void startStack(StackId stackId, int maxAttempts, OutputStream outputStream) throws Exception {
+        synthesiseStack(stackId);
+        startManagedStack(stackId, maxAttempts, outputStream);
+    }
+
+    /**
+     * Synthesises the plan of the stack into its stack dir.
+     */
+    protected void synthesiseStack(StackId stackId) throws Exception {
+        new CloudStackValidator().validate(stackId);
     }
 
     private void startManagedStack(StackId stackId, int maxAttempts, OutputStream outputStream) throws IOException {

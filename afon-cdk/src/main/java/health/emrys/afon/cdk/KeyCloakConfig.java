@@ -43,7 +43,7 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PO
  * KEYCLOAK_DB_USERNAME
  * KEYCLOAK_DB_PASSWORD
  */
-public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct {
+public class KeyCloakConfig extends Construct {
     private static final String APP_NAME = "keycloak";
     private static final String SECRET_NAME = "kcsecrets";
     private static final String THEME_CONFIGMAP = "keycloak-theme";
@@ -74,14 +74,17 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
             .targetPort("" + KEYCLOAK_MANAGEMENT_PORT)
             .protocol("TCP")
             .build();
-    protected final T cloudProvider;
+    protected final CloudPlatform cloudProvider;
+    private final AfonPropertyProvider properties;
+    private ITerraformDependable dnsRecord;
 
     public KeyCloakConfig(
         @NonNull Construct scope,
         @NonNull AfonPropertyProvider properties,
-        @NonNull T cloudProvider) {
+        @NonNull CloudPlatform cloudProvider) {
         super(scope, APP_NAME + "_scope");
         this.cloudProvider = cloudProvider;
+        this.properties = properties;
 
         // Login theme, packaged as classpath resources under afon-theme's
         // themes/<theme>/keycloak/login/ and mounted at /opt/keycloak/themes/<theme>. The realm
@@ -245,5 +248,22 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         }
     }
 
-    protected abstract void configureHttpsAndDNS();
+    /**
+     * Exposes KeyCloak over HTTPS at {@code OIDC_DOMAIN_NAME}, and makes it resolvable.
+     */
+    public void configureHttpsAndDNS() {
+        dnsRecord = cloudProvider.exposeHttps(new HttpsRoute(
+            "keycloak", properties.getValue(OIDC_DOMAIN_NAME), KEYCLOAK_SERVICE_NAME, KEYCLOAK_PORT,
+            KEYCLOAK_INGRESS_NAME, new HealthCheck(HEALTH_READY_PATH, MANAGEMENT_PORT_NAME),
+            "keycloak-tls", false, List.of(), Optional.empty())).dnsRecord();
+    }
+
+    /**
+     * The DNS record that makes the KeyCloak hostname, and hence the OIDC issuer, resolvable.
+     * Null until {@link #configureHttpsAndDNS()} has run.  Anything that performs OIDC discovery at
+     * startup should depend on this, or it may be created while the hostname still does not exist.
+     */
+    public ITerraformDependable getDnsRecord() {
+        return dnsRecord;
+    }
 }

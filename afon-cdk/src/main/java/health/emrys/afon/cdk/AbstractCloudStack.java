@@ -1,7 +1,7 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.*;
-import health.emrys.afon.cdk.aws.AwsSparkStack;
+
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
 import org.jetbrains.annotations.NotNull;
@@ -17,7 +17,7 @@ import static health.emrys.afon.config.ConfigUtils.tfStatePath;
  * {@link ConfigUtils#tfStatePath(StackId)}.
  */
 public abstract class AbstractCloudStack extends TerraformStack implements AfonCloudStack {
-    private final static Logger logger = org.slf4j.LoggerFactory.getLogger(AwsSparkStack.class);
+    private final static Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractCloudStack.class);
 
     private final StackId stackId;
     private String localBackendPath;

@@ -49,7 +49,7 @@ public class NetworkConfig {
 
     /**
      * The pods backing {@code emrys-master-svc}, expressed exactly as the Service selects them
-     * (see {@code AwsSparkStack.sparkExternalService}). {@link SparkWorkloads#MASTER} names the
+     * (see {@code AwsCloudProvider.exposeSparkMaster}). {@link SparkWorkloads#MASTER} names the
      * StatefulSet the Spark operator creates for the {@code SparkCluster}; the {@code k8s:} prefix
      * is Cilium's source qualifier for a Kubernetes label.
      */

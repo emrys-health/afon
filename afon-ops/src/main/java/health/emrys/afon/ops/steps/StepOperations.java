@@ -1,12 +1,6 @@
 package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
-import health.emrys.afon.cdk.aws.AwsFullStack;
-import health.emrys.afon.cdk.aws.AwsKeycloakStack;
-import health.emrys.afon.cdk.aws.AwsPolarisStack;
-import health.emrys.afon.cdk.azure.AzureFullStack;
-import health.emrys.afon.cdk.azure.AzurePolarisStack;
-import health.emrys.afon.cdk.gcp.GcpPolarisStack;
 import health.emrys.afon.config.*;
 import health.emrys.afon.ops.snowflake.SnowflakeStatements;
 import health.emrys.afon.ops.spark.SparkRunner;
@@ -106,6 +100,10 @@ public class StepOperations {
                     "Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first, eg: afon-cli.sh manage-stack setup aws-keycloak"));
     }
 
+    private void startStack(StackId stackId) throws Exception {
+        timed(deployDurations, stackId, () -> actions.startStack(stackId, tofuOutput()));
+    }
+
     public Step deployFullStackIn(AfonCloud cloud) {
         logger.info(format("Deploying full stack in cloud %s", cloud));
         switch (cloud) {
@@ -115,12 +113,12 @@ public class StepOperations {
                         () -> {
                             checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN,
                                     AWS_JUPYTER_CERT_ARN,AWS_POLARIS_CERT_ARN);
-                            timed(deployDurations, StackId.of(AwsFullStack.class), () -> actions.startStack(AwsFullStack.class, tofuOutput()));
+                            startStack(new StackId(AWS, "full"));
                         });
             case AZURE:
                 return new Step("deploy_azure_full_stack",
                         "deploy full stack in Azure",
-                        () -> timed(deployDurations, StackId.of(AzureFullStack.class), () -> actions.startStack(AzureFullStack.class, tofuOutput())));
+                        () -> startStack(new StackId(AZURE, "full")));
             case GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -207,16 +205,16 @@ public class StepOperations {
                         "deploy Polaris stack in AWS",
                         () -> {
                             checkAwsCertificatesIssued(AWS_POLARIS_CERT_ARN);
-                            timed(deployDurations, StackId.of(AwsPolarisStack.class), () -> actions.startStack(AwsPolarisStack.class, tofuOutput()));
+                            startStack(new StackId(AWS, "polaris"));
                         });
             case AZURE:
                 return new Step("deploy_azure_polaris_stack",
                         "deploy Polaris stack in Azure",
-                        () -> timed(deployDurations, StackId.of(AzurePolarisStack.class), () -> actions.startStack(AzurePolarisStack.class, tofuOutput())));
+                        () -> startStack(new StackId(AZURE, "polaris")));
             case GCP:
                 return new Step("deploy_gcp_polaris_stack",
                         "deploy Polaris stack in GCP",
-                        () -> timed(deployDurations, StackId.of(GcpPolarisStack.class), () -> actions.startStack(GcpPolarisStack.class, tofuOutput())));
+                        () -> startStack(new StackId(GCP, "polaris")));
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
@@ -230,7 +228,7 @@ public class StepOperations {
                         "deploy KeyCloak stack in AWS",
                         () -> {
                             checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN);
-                            timed(deployDurations, StackId.of(AwsKeycloakStack.class), () -> actions.startStack(AwsKeycloakStack.class, tofuOutput()));
+                            startStack(new StackId(AWS, "keycloak"));
                         });
             case AZURE, GCP:
             default:

@@ -148,7 +148,7 @@ Cilium Envoy (`cilium-envoy-*`) deals with higher level traffic (including HTTP)
 It allows network policies to be set at this level.
 
 It's thanks to Cilium that we can limit network traffic out of the cluster and stop exfiltration.
-The network constraint code currently lives in AwsFullStack.java
+The network constraint code lives in `NetworkConfig.java`, deployed by the `NetworkPoliciesComponent`.
 
 #### Egress IP (AWS)
 

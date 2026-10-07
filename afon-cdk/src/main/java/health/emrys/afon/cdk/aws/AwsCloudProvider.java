@@ -1,6 +1,8 @@
 package health.emrys.afon.cdk.aws;
 
+import com.hashicorp.cdktf.Aspects;
 import com.hashicorp.cdktf.Fn;
+import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformOutput;
@@ -51,10 +53,19 @@ import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
+import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
+import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.AbstractCloudProvider;
+import health.emrys.afon.cdk.KubeConfigAspect;
+import health.emrys.afon.cdk.HealthCheck;
+import health.emrys.afon.cdk.HttpsExposure;
+import health.emrys.afon.cdk.HttpsRoute;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
@@ -69,9 +80,12 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.*;
+import static health.emrys.afon.cdk.CdkUtils.addMaps;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
+import static health.emrys.afon.cdk.SparkWorkloads.MASTER_LABELS;
+import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
 import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
 import static java.lang.String.format;
@@ -94,6 +108,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
      */
     static final String INGRESS_LOAD_BALANCER_TIMEOUT = "5m";
 
+    private final AfonPropertyProvider       properties;
     private final AwsCleanupHelper           cleanupHelper;
     private final AwsComponentNames          componentNames;
     private final String                     accountId;
@@ -123,6 +138,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     AwsCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties, StackId stackId,
                      boolean pinnedEgressIp) {
         super(scope, id);
+        this.properties = properties;
         componentNames = new AwsComponentNames(properties, stackId);
         cleanupHelper  = new AwsCleanupHelper(componentNames);
         clusterName    = componentNames.getCluster();
@@ -612,7 +628,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 // The matching ServiceMonitor toggles (prometheus.serviceMonitor.enabled,
                 // operator.prometheus.serviceMonitor.enabled) are intentionally LEFT OFF:
                 // they need monitoring.coreos.com CRDs which kube-prometheus-stack
-                // installs in a later stack (AwsFullStack). The ServiceMonitor
+                // installs in a later component (AwsMonitoringComponent). The ServiceMonitor
                 // for Cilium is therefore created on the Prometheus side once those CRDs
                 // exist.
                 createValue("prometheus.enabled", "true"),
@@ -1033,26 +1049,157 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
     }
 
-    /** Restricts an ALB to the given comma-separated source CIDRs; absent means open to all. */
-    public static final String INBOUND_CIDRS_ANNOTATION = "alb.ingress.kubernetes.io/inbound-cidrs";
+    /**
+     * Sets up what every AWS stack needs: the null provider, the provider with its Helm provider, the stack's own
+     * kubeconfig for its kubectl and helm commands, which only ever act on its own cluster, and the pinned provider
+     * versions.
+     *
+     * @param pinnedEgressIp whether the stack's egress IP is pinned to {@code AWS_EGRESS_IP}, if set, which only
+     *                       one running stack can hold, else the stack allocates its own
+     */
+    public static AwsCloudProvider bootstrap(TerraformStack stack,
+                                             StackId stackId,
+                                             AfonPropertyProvider properties,
+                                             boolean pinnedEgressIp) {
+        NullProvider.Builder.create(stack, "nullProvider")
+                            .build();
+        AwsCloudProvider cloudProvider = new AwsCloudProvider(
+            stack, stackId.cloud().toString(), properties, stackId, pinnedEgressIp);
+        cloudProvider.configureHelm();
+        Aspects.of(stack).add(new KubeConfigAspect(ConfigUtils.kubeConfigPath(stackId)));
+        pinProviderVersions(stack);
+        return cloudProvider;
+    }
 
     /**
-     * Where the ALB probes a backend's pods to decide whether they are healthy. Without one the ALB
-     * GETs {@code /} on the traffic port and only accepts a 200, which none of our backends return:
-     * Keycloak and oauth2-proxy redirect, and Polaris only serves its health on its management port.
-     *
-     * @param path the health endpoint's path
-     * @param port {@link #TRAFFIC_PORT}, or the name of a Service port, which the LBC resolves to its
-     *             node port (instance targets) or target port (ip targets) - so that port must be
-     *             exposed by the Service
+     * Pins the exact versions of the providers every AWS stack uses.
      */
-    public record HealthCheck(String path, String port) {
-        public static final String TRAFFIC_PORT = "traffic-port";
-
-        public static HealthCheck onTrafficPort(String path) {
-            return new HealthCheck(path, TRAFFIC_PORT);
-        }
+    private static void pinProviderVersions(TerraformStack stack) {
+        stack.addOverride(
+            "terraform.required_providers.aws", Map.of(
+                "source", "hashicorp/aws",
+                "version", "6.27.0"   // 👈 Pin exact version
+                                                      ));
+        stack.addOverride(
+            "terraform.required_providers.helm", Map.of(
+                "source", "hashicorp/helm",
+                "version", "3.2.0"   // 👈 Pin exact version
+                                                       ));
+        stack.addOverride(
+            "terraform.required_providers.kubernetes", Map.of(
+                "source", "hashicorp/kubernetes",
+                // 3.2.1 fixes "Unexpected Identity Change" errors when a resource takes
+                // extended time to become ready (as happened when an EKS token expired
+                // mid-rollout of oauth2-proxy). Do not downgrade below 3.2.1.
+                "version", "3.2.1"   // 👈 Pin exact version
+                                                             ));
     }
+
+    @Override
+    public AfonCloud cloud() {
+        return AWS;
+    }
+
+    /**
+     * The ALB targets instances, which needs a node port on each node.
+     */
+    @Override
+    public boolean routesToNodePorts() {
+        return true;
+    }
+
+    @Override
+    public void exposeSparkMaster(List<ITerraformDependable> eksDependOn) {
+        String subnetIds = getSubnetIds().stream().collect(Collectors.joining(","));
+        ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
+        lbDependencies.add(loadBalancerRole);
+        // Creating this LoadBalancer Service fires the AWS LB Controller's
+        // mutating webhook (mservice.elbv2.k8s.aws). Depend on the controller's
+        // Helm release — which is installed atomically, so Terraform waits for
+        // its pods to be Ready — otherwise the webhook Service can still have
+        // zero endpoints and the apply fails with "no endpoints available for
+        // service aws-load-balancer-webhook-service".
+        lbDependencies.add(getLbRelease());
+        Service.Builder.create(stack(), SPARK_SERVICE_NAME)
+                      .metadata(ServiceMetadata.builder()
+                                               .name(SPARK_SERVICE_NAME)
+                                               .labels(addMaps(MASTER_LABELS, Map.of(
+                                                              "spark-version", "4.0.1",
+                                                              "spark.operator/name", "spark-kubernetes-operator",
+                                                              "spark.operator/spark-cluster-name", "prod"
+                                                             )))
+                                               .annotations(Map.of(
+                                                       "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
+                                                       "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
+                                               .build())
+                      .dependsOn(lbDependencies)
+                      .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
+                      .spec(ServiceSpec.builder()
+                                       .selector(MASTER_LABELS)
+                                       .type("LoadBalancer")
+                                       .port(List.of(
+                                               ServiceSpecPort.builder()
+                                                              .name("web")
+                                                              .port(8080) // Port the load balancer listens on
+                                                              .targetPort("web") // Port the container is listening on
+                                                              .protocol("TCP")
+                                                              .build(),
+                                               ServiceSpecPort.builder()
+                                                              .name("spark")
+                                                              .port(7077) // Port the load balancer listens on
+                                                              .targetPort("7077") // Port the container is listening on
+                                                              .protocol("TCP")
+                                                              .build(),
+                                               ServiceSpecPort.builder()
+                                                              .name("rest")
+                                                              .port(6066) // Port the load balancer listens on
+                                                              .targetPort("rest") // Port the container is listening on
+                                                              .protocol("TCP")
+                                                              .build()
+                                                    ))
+                                       .build())
+                              .build();
+    }
+
+
+    /**
+     * Exposes the component behind an ALB, whose ACM certificate, Route 53 zone and, optionally, allow-list of source
+     * CIDRs are configured by {@code AWS_<COMPONENT>_CERT_ARN}, {@code AWS_<COMPONENT>_DNS_ZONE} and
+     * {@code AWS_<COMPONENT>_ALLOWED_CIDRS}.  The ALB terminates TLS, so the route's TLS secret is not used, and the
+     * destroy-time finalizers of the ingress are removed by the provider.
+     */
+    @Override
+    public HttpsExposure exposeHttps(HttpsRoute route) {
+        String component = route.component().toUpperCase();
+        // the construct ids are in the tofu state of the deployed stacks, so cannot be named alike
+        String[] constructIds = switch (route.component()) {
+            case "polaris" -> new String[]{"polaris-https-ingress", "IngressAliasRecord"};
+            case "jupyter" -> new String[]{"jupyterhub-https-ingress", "JupyterHubAliasRecord"};
+            case "keycloak" -> new String[]{"keycloak-https-ingress", "KeyCloakAliasRecord"};
+            default -> new String[]{route.component() + "-https-ingress", route.component() + "AliasRecord"};
+        };
+        IngressV1 ingress = createHttpsIngress(
+            constructIds[0],
+            route.ingressName(),
+            properties.getCloudValue(AWS, component + "_CERT_ARN"),
+            route.domainName(),
+            route.service(),
+            route.port(),
+            route.healthCheck(),
+            getSubnetIds(),
+            polarisInboundCidrs(properties.getCloudValue(AWS, component + "_ALLOWED_CIDRS", "")));
+        Route53Record dnsRecord = configureDNS(
+            constructIds[1],
+            properties.getCloudValue(AWS, component + "_DNS_ZONE"),
+            route.domainName(),
+            getLbRelease(),
+            ingress,
+            route.ingressName());
+        return new HttpsExposure(ingress, dnsRecord);
+    }
+
+    /** Restricts an ALB to the given comma-separated source CIDRs; absent means open to all. */
+    public static final String INBOUND_CIDRS_ANNOTATION = "alb.ingress.kubernetes.io/inbound-cidrs";
 
     public IngressV1 createHttpsIngress(
         final String constructId,

@@ -1,7 +1,7 @@
 package health.emrys.afon.ops.steps;
 
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.cdk.aws.AbstractAwsStack;
+import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -246,7 +246,7 @@ public class StackStepsFactory {
      */
     private Set<AfonProperty> declaredResources(StackId stackId, AfonPropertyProvider properties) {
         Set<AfonProperty> resources = new TreeSet<>(exclusiveResources.getOrDefault(stackId, Set.of()));
-        if (ownKeyCloakUnlessExternal.contains(stackId) && AbstractAwsStack.isKeyCloakExternal(properties)) {
+        if (ownKeyCloakUnlessExternal.contains(stackId) && StackDefinitions.isKeyCloakExternal(properties)) {
             resources.remove(OIDC_DOMAIN_NAME);
         }
         return resources;
@@ -296,7 +296,7 @@ public class StackStepsFactory {
         AfonPropertyProvider properties = ops.properties();
         if (usesExternalKeyCloak(stackId, properties)) {
             logger.info("Stack {} uses the KeyCloak at {}, which the aws-keycloak stack deploys{}", stackId, OIDC_DOMAIN_NAME,
-                        ownKeyCloakUnlessExternal.contains(stackId) && AbstractAwsStack.isKeyCloakExternal(properties)
+                        ownKeyCloakUnlessExternal.contains(stackId) && StackDefinitions.isKeyCloakExternal(properties)
                         ? ", as configured by " + AWS_KEYCLOAK_EXTERNAL + "=true" : ", as it deploys none of its own");
             steps.add(ops.checkKeyCloakAnswers());
         }

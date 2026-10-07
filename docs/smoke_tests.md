@@ -170,7 +170,7 @@ Spark Connect server, so they also need the Azure and GCP Polaris stacks. On eve
 1. makes the env's AWS full stack cluster the current `kubectl` context, with the afon command
    `aws-update-kube-config full`, leaving it so after the suite;
 2. restricts that cluster's Polaris ingress, as the network smoke test expects, by annotating `polaris-ingress` with
-   `alb.ingress.kubernetes.io/inbound-cidrs`. As `AwsPolarisStack` does when `AWS_POLARIS_ALLOWED_CIDRS` is set, it
+   `alb.ingress.kubernetes.io/inbound-cidrs`. As `AwsCloudProvider` does for Polaris when `AWS_POLARIS_ALLOWED_CIDRS` is set, it
    admits those CIDRs plus the cluster's egress IP. The egress IP is read from the cluster's NAT gateway, so that it is
    right even if `AWS_EGRESS_IP` is stale, with a warning if they differ, falling back to `AWS_EGRESS_IP` if the NAT
    gateway cannot be found. A redeploy undoes the annotation, which a freshly deployed stack does not have.

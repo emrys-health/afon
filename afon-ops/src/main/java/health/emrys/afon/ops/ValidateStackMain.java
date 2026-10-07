@@ -1,9 +1,7 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.cdk.AfonCloudStack;
 import health.emrys.afon.cdk.CloudStackValidator;
-
-import java.lang.reflect.InvocationTargetException;
+import health.emrys.afon.config.StackId;
 
 /**
  * Validates the config of a stack, via {@link CloudStackValidator}.
@@ -12,13 +10,13 @@ import java.lang.reflect.InvocationTargetException;
  */
 public class ValidateStackMain {
 
-    public static void main(String[] args) throws ReflectiveOperationException {
+    public static void main(String[] args) {
         CloudStackValidator validator = new CloudStackValidator();
         if (args.length != 1) {
             printUsage(validator);
             return;
         }
-        Class<? extends AfonCloudStack> stack = validator.resolve(args[0]);
+        StackId stack = validator.resolve(args[0]);
         if (stack == null) {
             System.out.println("Stack not found: " + args[0]);
             printUsage(validator);
@@ -28,13 +26,13 @@ public class ValidateStackMain {
         String stackDir;
         try {
             stackDir = validator.validate(stack);
-        } catch (InvocationTargetException e) {
+        } catch (RuntimeException e) {
             // printed as well as logged, as the console logging may be off, eg in the CLI
-            System.err.printf("Failed to validate stack %s: %s%n", stack.getSimpleName(), e.getCause());
+            System.err.printf("Failed to validate stack %s: %s%n", stack, e);
             System.exit(1);
             return;
         }
-        System.out.printf("Validated stack %s by synthesising it into %s%n", stack.getSimpleName(), stackDir);
+        System.out.printf("Validated stack %s by synthesising it into %s%n", stack, stackDir);
     }
 
     private static void printUsage(CloudStackValidator validator) {

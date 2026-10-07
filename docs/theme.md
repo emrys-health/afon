@@ -68,6 +68,6 @@ No changes to `GuacamoleConfig`, `KeyCloakConfig`, or `KeyCloakProvider` are nee
 
 ## Verifying a theme without deploying
 
-`cdktf synth` (via any of the `App`-based `main` entry points, e.g. `AwsFullStack`) generates the
+`cdktf synth` (via `afon-cli.sh validate-stack <stack>`, e.g. `aws-full`) generates the
 Terraform plan locally with no cloud credentials or live calls — useful to check a new theme's
 ConfigMaps and volume mounts come out correctly before an actual deploy.
