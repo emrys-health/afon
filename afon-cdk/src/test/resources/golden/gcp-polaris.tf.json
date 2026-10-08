@@ -449,7 +449,7 @@
         "depends_on" : [ "kubernetes_deployment.polaris_polarisDeployment_7567D239" ],
         "metadata" : {
           "annotations" : {
-            "cloud.google.com/neg" : "{\"ingress\":false}"
+            "cloud.google.com/neg" : "{\"ingress\": false}"
           },
           "name" : "polaris-internal"
         },

@@ -1,7 +1,5 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.cdk.aws.AwsLoadBalancerCleanupComponent;
-import health.emrys.afon.cdk.aws.AwsSecretsComponent;
 import health.emrys.afon.cdk.components.CrdCleanupComponent;
 import health.emrys.afon.cdk.components.JupyterComponent;
 import health.emrys.afon.cdk.components.MonitoringComponent;
@@ -75,7 +73,7 @@ public final class StackDefinitions {
         }
         components.addAll(List.of(
             new PolarisComponent(), new JupyterComponent(), new NetworkPoliciesComponent(),
-            new AwsSecretsComponent(), new AwsLoadBalancerCleanupComponent(), new SparkOperatorComponent()));
+            new SparkOperatorComponent()));
         return components;
     }
 

@@ -56,9 +56,6 @@ kube-system   cilium-w9tln                                               1/1    
 kube-system   cilium-wdsx9                                               1/1     Running     0               2d22h
 kube-system   coredns-85b99dc87-9tkls                                    1/1     Running     0               2d22h
 kube-system   coredns-85b99dc87-mqjwf                                    1/1     Running     0               2d22h
-kube-system   csi-secrets-store-secrets-store-csi-driver-dctq2           3/3     Running     0               2d22h
-kube-system   csi-secrets-store-secrets-store-csi-driver-jzjt5           3/3     Running     0               2d22h
-kube-system   csi-secrets-store-secrets-store-csi-driver-stb8t           3/3     Running     0               2d22h
 kube-system   hubble-relay-587fd6785-t2d87                               1/1     Running     0               2d22h
 kube-system   hubble-ui-f799d8b94-t8qpx                                  2/2     Running     0               2d22h
 kube-system   metrics-server-8699ccc578-5xtjw                            1/1     Running     0               2d22h
@@ -121,14 +118,9 @@ Note the `/run/secrets/kubernetes.io/serviceaccount` mount point.
 
 ## The `kube-system` namespace
 
-The Polaris secrets are stored in AWS and can be listed by running:
-```shell
-aws secretsmanager list-secrets
-```
-
-They're the ones called `cdktf-app-config-secret-spark-cluster`, a name that comes from the code that creates the 
-Terraform plan (AwsCloudProvider.java).
-The bridge between AWS and Kubernetes are the `csi-secrets-store-secrets-store-csi-driver-*` pods.
+Polaris reads its credentials from the Kubernetes secret `polaris-secret`, which `PolarisConfig` builds from the
+configuration when it generates the Terraform plan, and mounts as a volume. The other workloads work the same way, eg
+`kcsecrets` for Keycloak and `jupyterhub-secrets` for JupyterHub. No workload reads AWS Secrets Manager.
 
 The `aws-load-balancer-controller-chart-*` pods are the bridge between the Kubernetes cluster and the greater internet.
 When Emrys offers services to the outside world (for example, Jupyter and Polaris HTTP/s access) this is done through K8s Ingresses.

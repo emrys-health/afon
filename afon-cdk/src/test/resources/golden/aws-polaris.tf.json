@@ -236,7 +236,7 @@
           }
         },
         "cluster_name" : "${aws_eks_cluster.aws_eksCluster_06387EF2.name}",
-        "depends_on" : [ "aws_eks_cluster.aws_eksCluster_06387EF2", "aws_iam_role_policy_attachment.aws_cniPolicyAttachment_61910354", "aws_iam_role_policy_attachment.aws_containerRegistryPolicyAttachment_C1DC05B0", "aws_iam_role_policy_attachment.aws_customSecretPolicyAttachment_5BFE4E94", "aws_iam_role_policy_attachment.aws_workerNodePolicyAttachment_F3B6E21C", "aws_route_table_association.aws_privateSubnet1Association_6ABC486D", "aws_route_table_association.aws_privateSubnet2Association_A2528445", "aws_route_table_association.aws_subnet1Association_9B94D668", "aws_route_table_association.aws_subnet2Association_F8EE958F", "aws_subnet.aws_publicSubnet1_CEA7CFE9", "aws_subnet.aws_publicSubnet2_33D65A96", "data.aws_eks_cluster_auth.aws_eksClusterAuthData_BFB4066C", "null_resource.aws_kubeconfigUpdater_DC156772" ],
+        "depends_on" : [ "aws_eks_cluster.aws_eksCluster_06387EF2", "aws_iam_role_policy_attachment.aws_cniPolicyAttachment_61910354", "aws_iam_role_policy_attachment.aws_containerRegistryPolicyAttachment_C1DC05B0", "aws_iam_role_policy_attachment.aws_workerNodePolicyAttachment_F3B6E21C", "aws_route_table_association.aws_privateSubnet1Association_6ABC486D", "aws_route_table_association.aws_privateSubnet2Association_A2528445", "aws_route_table_association.aws_subnet1Association_9B94D668", "aws_route_table_association.aws_subnet2Association_F8EE958F", "aws_subnet.aws_publicSubnet1_CEA7CFE9", "aws_subnet.aws_publicSubnet2_33D65A96", "data.aws_eks_cluster_auth.aws_eksClusterAuthData_BFB4066C", "null_resource.aws_kubeconfigUpdater_DC156772" ],
         "disk_size" : 50,
         "instance_types" : [ "r6i.large" ],
         "lifecycle" : {
@@ -270,19 +270,6 @@
         "url" : "${data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer}"
       }
     },
-    "aws_iam_policy" : {
-      "aws_SecretAccessPolicy_4D1DFB89" : {
-        "//" : {
-          "metadata" : {
-            "path" : "aws-polaris/aws/SecretAccessPolicy",
-            "uniqueId" : "aws_SecretAccessPolicy_4D1DFB89"
-          }
-        },
-        "description" : "Allows EKS Node Group to read the specific application config secret.",
-        "name" : "EKS-Secret-Access-Policy-polaris-golden-cluster",
-        "policy" : "{\"Statement\":[{\"Action\":\"secretsmanager:GetSecretValue\",\"Effect\":\"Allow\",\"Resource\":\"${aws_secretsmanager_secret.aws_ApplicationSecret_72AA44E1.arn}\"}],\"Version\":\"2012-10-17\"}"
-      }
-    },
     "aws_iam_role" : {
       "AmazonEKSLoadBalancerControllerRole" : {
         "//" : {
@@ -301,7 +288,7 @@
             "uniqueId" : "aws_eksClusterRole_364FC8C4"
           }
         },
-        "assume_role_policy" : "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"eks.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+        "assume_role_policy" : "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"eks.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}",
         "lifecycle" : {
           "prevent_destroy" : false
         },
@@ -314,7 +301,7 @@
             "uniqueId" : "aws_eksNodeGroupRole_92145051"
           }
         },
-        "assume_role_policy" : "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"}},{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"elasticloadbalancing.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+        "assume_role_policy" : "{\"Version\":\"2012-10-17\",\n\"Statement\":[{\n        \"Effect\":\"Allow\",\n        \"Principal\":{\n            \"Service\": \"ec2.amazonaws.com\"\n        },\n        \"Action\":\"sts:AssumeRole\"\n    },\n    {\n        \"Effect\":\"Allow\",\n        \"Principal\":{\n            \"Service\": \"elasticloadbalancing.amazonaws.com\"\n        },\n        \"Action\":\"sts:AssumeRole\"\n    }\n] }",
         "name" : "cdktf-eks-nodegroup-role-polaris-golden-cluster"
       }
     },
@@ -364,19 +351,6 @@
           "prevent_destroy" : false
         },
         "policy_arn" : "${data.aws_iam_policy.aws_containerRegistryPolicy_655DDEE6.arn}",
-        "role" : "${aws_iam_role.aws_eksNodeGroupRole_92145051.name}"
-      },
-      "aws_customSecretPolicyAttachment_5BFE4E94" : {
-        "//" : {
-          "metadata" : {
-            "path" : "aws-polaris/aws/customSecretPolicyAttachment",
-            "uniqueId" : "aws_customSecretPolicyAttachment_5BFE4E94"
-          }
-        },
-        "lifecycle" : {
-          "prevent_destroy" : false
-        },
-        "policy_arn" : "${aws_iam_policy.aws_SecretAccessPolicy_4D1DFB89.arn}",
         "role" : "${aws_iam_role.aws_eksNodeGroupRole_92145051.name}"
       },
       "aws_eksClusterRoleAttachment_C45A3CA0" : {
@@ -596,22 +570,6 @@
         },
         "route_table_id" : "${aws_route_table.aws_publicRouteTable_271EDFA5.id}",
         "subnet_id" : "${aws_subnet.aws_publicSubnet2_33D65A96.id}"
-      }
-    },
-    "aws_secretsmanager_secret" : {
-      "aws_ApplicationSecret_72AA44E1" : {
-        "//" : {
-          "metadata" : {
-            "path" : "aws-polaris/aws/ApplicationSecret",
-            "uniqueId" : "aws_ApplicationSecret_72AA44E1"
-          }
-        },
-        "description" : "Secret containing application configuration or API keys for EKS.",
-        "name" : "cdktf-app-config-secret-polaris-golden-cluster",
-        "recovery_window_in_days" : 0,
-        "tags" : {
-          "Name" : "EKSAppConfig"
-        }
       }
     },
     "aws_subnet" : {
@@ -1037,7 +995,7 @@
             "alb.ingress.kubernetes.io/certificate-arn" : "golden-aws-polaris-cert-arn",
             "alb.ingress.kubernetes.io/healthcheck-path" : "/q/health/ready",
             "alb.ingress.kubernetes.io/healthcheck-port" : "management",
-            "alb.ingress.kubernetes.io/listen-ports" : "[{\"HTTP\":80},{\"HTTPS\":443}]",
+            "alb.ingress.kubernetes.io/listen-ports" : "[{\"HTTP\": 80}, {\"HTTPS\": 443}]",
             "alb.ingress.kubernetes.io/scheme" : "internet-facing",
             "alb.ingress.kubernetes.io/subnets" : "${aws_subnet.aws_publicSubnet1_CEA7CFE9.id},${aws_subnet.aws_publicSubnet2_33D65A96.id}",
             "external-dns.alpha.kubernetes.io/hostname" : "polaris.golden.example",
@@ -1203,7 +1161,6 @@
           "namespace" : "default"
         },
         "spec" : {
-          "cluster_ips" : [ ],
           "internal_traffic_policy" : "Cluster",
           "port" : [ {
             "name" : "web",

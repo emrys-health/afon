@@ -268,11 +268,6 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
         return k8sProvider;
     }
 
-    @Override
-    public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
     // -------------------------------------------------------------------------
     // Ingress controller + TLS (mirroring AzureCloudProvider)
     // -------------------------------------------------------------------------

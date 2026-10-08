@@ -67,7 +67,8 @@ public class PolarisComponent implements StackComponent {
 
     /**
      * For a platform whose load balancer routes to node ports: the ingress is exposed first, and the NodePort service
-     * is the stack's own.  The ids of the resources are in the tofu state of the deployed stacks, so cannot be
+     * is the stack's own, whose cluster IPs are left to the cluster: the plan must not set them, else the provider replaces the
+     * service on each apply, as the cluster has assigned some.  The ids of the resources are in the tofu state of the deployed stacks, so cannot be
      * named alike those of {@link #deployBehindClusterIp}.
      */
     private void deployBehindNodePort(StackContext context) {
@@ -96,7 +97,6 @@ public class PolarisComponent implements StackComponent {
                       .selector(polarisConfig.getPolarisLabels()) // Selects the Pods created by the Polaris deployment
                       .type("NodePort")
                       .internalTrafficPolicy("Cluster")
-                      .clusterIps(List.of())
                       // The management port is exposed too, so the load balancer can reach the health checks.
                       .port(List.of(polarisConfig.getPolarisSpecPort(), polarisConfig.getPolarisManagementSpecPort()))
                       .build())

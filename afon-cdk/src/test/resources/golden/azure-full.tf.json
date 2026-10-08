@@ -500,7 +500,7 @@
           }
         },
         "binary_data" : {
-          "guacamole-theme.jar" : "zip{css/hdrs.css=2be5f4e92602f382, guac-manifest.json=4176448b29042a88, images/emrys-icon-white.png=089fcb2a3450c1ba, images/emrys-logo-dark.png=360a0286f343b1fa, images/emrys-logo-horizontal-white.png=03afcb7f92b16ccc, images/emrys-logo-white.png=78286325ee9e229a, images/favicon-144.png=6f86cb0ee14c524b, images/favicon-64.png=03670d2ef1898067, images/hdrs-icon-dark.png=c25f840a0147f6d8, images/hdrs-icon-light.png=2f7f1405d3a7760a, images/hdrs-logo-dark.png=9dc280ec2f5086fe, images/hdrs-logo-horizontal-light.png=2656ab947fe267e0, images/hdrs-logo-vertical-dark.png=cffabcfb089e6ab4, images/hdrs-logo-vertical-light.png=9b1ba2ae7d6eaf4d, translations/en.json=935f9f8cdd554d1c}"
+          "guacamole-theme.jar" : "<486076 chars, sha256 a8b829ea45b520f8>"
         },
         "metadata" : {
           "name" : "guacamole-theme",

@@ -27,7 +27,6 @@ import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroup;
 import com.hashicorp.cdktf.providers.aws.eks_node_group.EksNodeGroupScalingConfig;
 import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidConnectProvider;
 import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidConnectProviderConfig;
-import com.hashicorp.cdktf.providers.aws.iam_policy.IamPolicy;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRoleConfig;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachment;
@@ -41,7 +40,6 @@ import com.hashicorp.cdktf.providers.aws.route53_record.Route53RecordConfig;
 import com.hashicorp.cdktf.providers.aws.route_table.RouteTable;
 import com.hashicorp.cdktf.providers.aws.route_table.RouteTableRoute;
 import com.hashicorp.cdktf.providers.aws.route_table_association.RouteTableAssociation;
-import com.hashicorp.cdktf.providers.aws.secretsmanager_secret.SecretsmanagerSecret;
 import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
@@ -154,18 +152,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                            .region(region) // Set your desired AWS Region
                            .build();
 
-
-        // --- 1. SECRETS MANAGER CREATION ---
-
-        // Create the secret container
-        final var applicationSecret = SecretsmanagerSecret.Builder
-            .create(this, "ApplicationSecret")
-            .name(componentNames.getSecret())
-            .description("Secret containing application " +
-                             "configuration or API keys for EKS.")
-            .tags(Map.of("Name", "EKSAppConfig"))
-            .recoveryWindowInDays(0)
-            .build();
 
         vpc = Vpc.Builder
             .create(this, "eksVpc")
@@ -430,40 +416,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .name(componentNames.getNodeGroupRoleName())
             .assumeRolePolicy(workerAssumeRolePolicy).build();
 
-        // ** NEW STEP: Create Custom IAM Policy referencing the Secret ARN **
-        // We use String.format to insert the secret's ARN dynamically into the policy JSON.
-        // %s will be replaced by the Secret ARN
-        final String customSecretPolicyDocument = String.format(
-            """
-            {
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Effect": "Allow",
-                  "Action": "secretsmanager:GetSecretValue",
-                  "Resource": "%s"
-                }
-              ]
-            }""", applicationSecret.getArn()
-                                                               );
-
-        final IamPolicy customSecretPolicy = IamPolicy.Builder
-            .create(this, "SecretAccessPolicy")
-            .name(componentNames.getAccessPolicyName())
-            .description("Allows EKS Node Group to read the " +
-                             "specific application config secret.")
-            .policy(customSecretPolicyDocument)
-            .build();
-
-        // ** NEW ATTACHMENT: Attach the custom secret policy to the Node Group role **
-        final IamRolePolicyAttachment customSecretAttachment = IamRolePolicyAttachment.Builder
-            .create(this, "customSecretPolicyAttachment")
-            .policyArn(customSecretPolicy.getArn())
-            .role(nodeGroupRole.getName())
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .build();
-
-        // Existing required policy attachments
+        // Required policy attachments
         final DataAwsIamPolicy workerNodePolicy = DataAwsIamPolicy.Builder
             .create(this, "workerNodePolicy")
             .name("AmazonEKSWorkerNodePolicy").build();
@@ -548,7 +501,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 newKubeConfig, cluster, eksAuthData,
                 publicSubnet1, publicSubnet2,
                 subnet1Association, subnet2Association,
-                customSecretAttachment, workerNodeAttachment,
+                workerNodeAttachment,
                 cniAttachment, containerRegistryAttachment,
                 privateSubnet1Association, privateSubnet2Association))
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
@@ -1170,6 +1123,10 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                       .spec(ServiceSpec.builder()
                                        .selector(MASTER_LABELS)
                                        .type("LoadBalancer")
+                                       // The load balancer controller's webhook sets the class of every LoadBalancer
+                                       // service. If the plan leaves it out, the provider sees it removed from the
+                                       // live service, and replaces the service, and its load balancer, on each apply.
+                                       .loadBalancerClass(LOAD_BALANCER_CLASS)
                                        .port(List.of(
                                                ServiceSpecPort.builder()
                                                               .name("web")
@@ -1230,6 +1187,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             route.ingressName());
         return new HttpsExposure(ingress, dnsRecord);
     }
+
+    /** The class the AWS load balancer controller gives the LoadBalancer services it provisions an NLB for. */
+    private static final String LOAD_BALANCER_CLASS = "service.k8s.aws/nlb";
 
     /** Restricts an ALB to the given comma-separated source CIDRs; absent means open to all. */
     public static final String INBOUND_CIDRS_ANNOTATION = "alb.ingress.kubernetes.io/inbound-cidrs";
@@ -1456,21 +1416,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         // "no endpoints available for service aws-load-balancer-webhook-service" race.
         return lbRelease == null ? List.of() : List.of(lbRelease);
     }
-
-    public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
-        Resource.Builder
-            .create(this, "cleanupELBs")
-            // Ensure this runs only after the K8s Services are destroyed by Terraform
-            .dependsOn(loadBalancers)
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .build();
-        Resource.Builder
-            .create(this, "cleanupSecurityGroups")
-            .dependsOn(loadBalancers)
-            .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
-            .build();
-    }
-
 
     /**
      * The public subnets. These are for internet-facing load balancers only - workloads

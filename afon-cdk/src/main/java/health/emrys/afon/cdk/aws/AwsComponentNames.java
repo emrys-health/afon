@@ -110,10 +110,16 @@ public class AwsComponentNames {
         return cluster + "-oidc-provider";
     }
 
+    /**
+     * The Secrets Manager secret that stacks deployed before it was removed created and nothing read, kept to be cleaned up.
+     */
     public String getSecret() {
         return "cdktf-app-config-secret-" + cluster;
     }
 
+    /**
+     * The IAM policy reading {@link #getSecret()}, kept to be cleaned up like it.
+     */
     public String getAccessPolicyName() {
         return "EKS-Secret-Access-Policy-" + cluster;
     }
