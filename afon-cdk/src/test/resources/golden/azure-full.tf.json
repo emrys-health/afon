@@ -1277,7 +1277,7 @@
           }
         },
         "data" : {
-          "polaris_env.sh" : "<1790 chars, sha256 8bfa2b07bc1e582d>"
+          "polaris_env.sh" : "<1808 chars, sha256 add9e6e293271010>"
         },
         "depends_on" : [ "azurerm_kubernetes_cluster.azure_aks_34ABF01D", "azurerm_role_assignment.azure_tofu-cluster-admin_49483F90" ],
         "metadata" : {

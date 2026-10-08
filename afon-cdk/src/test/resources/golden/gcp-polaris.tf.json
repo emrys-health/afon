@@ -429,7 +429,7 @@
           }
         },
         "data" : {
-          "polaris_env.sh" : "<1788 chars, sha256 3e796b007c65a6b4>"
+          "polaris_env.sh" : "<1806 chars, sha256 c78400a24b7a0418>"
         },
         "depends_on" : [ "google_container_cluster.gcp_gkeCluster_57353C4A" ],
         "metadata" : {
