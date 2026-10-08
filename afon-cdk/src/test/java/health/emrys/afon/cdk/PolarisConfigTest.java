@@ -56,7 +56,7 @@ class PolarisConfigTest {
 
         String script = PolarisConfig.getProviderCredentials(properties, "azure");
 
-        assertThat(script).contains("export AZURE_CLIENT_ID=azure-app-id");
+        assertThat(script).contains("export AZURE_CLIENT_ID='azure-app-id'");
         assertThat(script).doesNotContain(AWS_ACCESS_KEY_ID.getName());
         assertThat(script).doesNotContain(GOOGLE_APPLICATION_CREDENTIALS.getName());
     }
@@ -72,7 +72,7 @@ class PolarisConfigTest {
 
         String script = PolarisConfig.getProviderCredentials(properties, "azure");
 
-        assertThat(script).contains("export AWS_ACCESS_KEY_ID=aws-key-id");
+        assertThat(script).contains("export AWS_ACCESS_KEY_ID='aws-key-id'");
         assertThat(script).doesNotContain(AWS_SECRET_ACCESS_KEY.getName()); // blank in templates
         assertThat(script).contains("export GOOGLE_APPLICATION_CREDENTIALS=");
     }

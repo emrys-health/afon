@@ -263,7 +263,7 @@ public class PolarisConfig extends Construct {
         List<String> exports = env
             .entrySet()
             .stream()
-            .map(e -> format("export %s=%s", e.getKey(), e.getValue()))
+            .map(e -> format("export %s='%s'", e.getKey(), e.getValue()))
             .toList();
         String gcpExport = gcpCredentials(properties, deploymentId).isBlank()
             ? ""
@@ -276,7 +276,7 @@ public class PolarisConfig extends Construct {
             export POLARIS_PERSISTENCE_TYPE="relational-jdbc"
             export QUARKUS_DATASOURCE_JDBC_URL="jdbc:postgresql://%s:%d/%s"
             export QUARKUS_DATASOURCE_USERNAME=postgres
-            export QUARKUS_DATASOURCE_PASSWORD=%s
+            export QUARKUS_DATASOURCE_PASSWORD="%s"
 
             """,
             properties.getValue(POLARIS_DB_HOST),
