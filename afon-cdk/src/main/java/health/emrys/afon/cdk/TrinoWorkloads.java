@@ -1,6 +1,5 @@
 package health.emrys.afon.cdk;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -68,24 +67,21 @@ public class TrinoWorkloads {
             "service", Map.of("type", "ClusterIP", "port", TRINO_PORT),
             "additionalCatalogs", catalogFiles(id.toString()));
 
-        try {
-            // JSON is valid YAML, so the existing ObjectMapper produces a values document Helm
-            // accepts — avoiding a YAML dependency while keeping the multi-line catalog strings.
-            String valuesYaml = new ObjectMapper().writeValueAsString(values);
+        // JSON is valid YAML, so a JSON serializer produces a values document Helm
+        // accepts — avoiding a YAML dependency while keeping the multi-line catalog strings.
+        // Canonical (key-sorted) so the values string, which Helm diffs as text, is stable.
+        String valuesYaml = CdkUtils.toCanonicalJson(values);
 
-            Release.Builder.create(scope, "trino")
-                           .provider(helmProvider)
-                           .name("trino")
-                           .chart(CdkUtils.vendoredChart(scope, "trinoChart", "trino-" + CHART_VERSION + ".tgz"))
-                           .namespace("default")
-                           .atomic(true)
-                           .timeout(600)
-                           .values(List.of(valuesYaml))
-                           .dependsOn(dependsOn)
-                           .build();
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize Trino Helm values", e);
-        }
+        Release.Builder.create(scope, "trino")
+                       .provider(helmProvider)
+                       .name("trino")
+                       .chart(CdkUtils.vendoredChart(scope, "trinoChart", "trino-" + CHART_VERSION + ".tgz"))
+                       .namespace("default")
+                       .atomic(true)
+                       .timeout(600)
+                       .values(List.of(valuesYaml))
+                       .dependsOn(dependsOn)
+                       .build();
     }
 
     /**
