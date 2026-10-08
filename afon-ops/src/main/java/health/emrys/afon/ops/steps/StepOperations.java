@@ -146,6 +146,24 @@ public class StepOperations {
         }
     }
 
+    /**
+     * Deploys the stack, after checking that the certificates it needs are issued, if any, ie on AWS.
+     * Applies to any {@link StackId} defined in {@link health.emrys.afon.cdk.StackDefinitions}.
+     *
+     * @param certificates the properties of the ARNs of the ACM certificates the stack's load balancers use
+     */
+    public Step deployStack(StackId stackId, List<AfonProperty> certificates) {
+        logger.info(format("Deploying stack %s", stackId));
+        return new Step(format("deploy_%s_stack", stepName(stackId)),
+                format("deploy stack %s", stackId),
+                () -> {
+                    if (!certificates.isEmpty()) {
+                        checkAwsCertificatesIssued(certificates.toArray(new AfonProperty[0]));
+                    }
+                    startStack(stackId);
+                });
+    }
+
     public Step deployFullStackIn(AfonCloud cloud) {
         logger.info(format("Deploying full stack in cloud %s", cloud));
         switch (cloud) {

@@ -20,6 +20,11 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Runs the destroy-time CRD cleanup script for real, under {@code sh}, against a stub
  * {@code kubectl} that models a cluster: a list of CRDs, custom resources whose finalizers keep
  * their CRD in Terminating, and CRDs that never go away.
+ * <p>
+ * The script reads the time and sleeps between attempts, so a fake clock stands in for both: {@code sleep} advances it instead of
+ * waiting, and {@code date +%s} reads it.  The grace period and the time to give up then depend on the script's logic only, and
+ * not on how busy the machine is, as with the real clock, where a pause of a second or two while it runs is enough to
+ * escalate to the CRD's own finalizers too soon.  It also makes the tests instant.
  */
 class CrdCleanupTest {
 
@@ -91,6 +96,23 @@ class CrdCleanupTest {
         exit 0
         """;
 
+    /**
+     * {@code date +%s} stand-in: the fake clock, which only {@link #SLEEP} advances.
+     */
+    private static final String DATE = """
+        #!/bin/sh
+        cat "$STUB/clock"
+        """;
+
+    /**
+     * {@code sleep} stand-in: advances the fake clock by the seconds asked, instead of waiting.
+     */
+    private static final String SLEEP = """
+        #!/bin/sh
+        now=$(cat "$STUB/clock")
+        echo $((now + ${1:-0})) > "$STUB/clock"
+        """;
+
     @TempDir
     Path stub;
 
@@ -99,9 +121,16 @@ class CrdCleanupTest {
         for (String file : List.of("crds", "deleting", "undeletable", "needs_crd_patch", "crd_patched", "calls")) {
             Files.writeString(stub.resolve(file), "");
         }
-        Path kubectl = stub.resolve("kubectl");
-        Files.writeString(kubectl, KUBECTL);
-        assertThat(kubectl.toFile().setExecutable(true)).isTrue();
+        Files.writeString(stub.resolve("clock"), "1000\n");
+        executable("kubectl", KUBECTL);
+        executable("date", DATE);
+        executable("sleep", SLEEP);
+    }
+
+    private void executable(String name, String script) throws IOException {
+        Path file = stub.resolve(name);
+        Files.writeString(file, script);
+        assertThat(file.toFile().setExecutable(true)).isTrue();
     }
 
     @Test
