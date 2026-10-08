@@ -42,7 +42,7 @@ class ComponentPlanTest {
     void keycloakHoldsItsDomainWaitsForItAndConfiguresTheOidcUsers() {
         KeycloakPlan keycloak = new KeycloakPlan();
 
-        assertThat(keycloak.label()).isEqualTo("KeyCloak");
+        assertThat(keycloak.label()).isEqualTo("Keycloak");
         assertThat(keycloak.domains(AWS)).containsExactly(OIDC_DOMAIN_NAME);
         assertThat(keycloak.waitsFor()).containsExactly(KEYCLOAK);
         assertThat(setupOf(keycloak, AWS)).containsExactly("configureOidcUsersFor(aws)");
