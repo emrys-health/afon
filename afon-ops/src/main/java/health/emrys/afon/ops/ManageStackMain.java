@@ -1,8 +1,8 @@
 package health.emrys.afon.ops;
 
-import health.emrys.afon.ops.steps.StackAction;
 import health.emrys.afon.config.StackId;
-import health.emrys.afon.ops.steps.StackStepsFactory;
+import health.emrys.afon.ops.plan.StackPlanFactory;
+import health.emrys.afon.ops.steps.StackAction;
 import health.emrys.afon.ops.steps.StepRunner;
 import health.emrys.afon.ops.steps.StepsProvider;
 import org.slf4j.Logger;
@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
- * Manages a stack, by running the steps of an action on it, as provided by {@link StackStepsFactory}:
+ * Manages a stack, by running the steps of an action on it, as provided by {@link StackPlanFactory}:
  * <pre>
  * manage-stack &lt;action&gt; &lt;stack-id&gt; [&lt;step&gt;] [--replace]
  * </pre>
@@ -26,7 +26,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  *       stack, else they fail, naming them, before deleting any.</li>
  * </ul>
  * Stacks run side by side unless they conflict, so deploying or setting up a stack first deletes the stacks it
- * conflicts with, while deleting a stack deletes just that stack, see {@link StackStepsFactory}.
+ * conflicts with, while deleting a stack deletes just that stack, see {@link StackPlanFactory}.
  */
 public class ManageStackMain {
 
@@ -37,9 +37,9 @@ public class ManageStackMain {
      */
     static final String REPLACE = "--replace";
 
-    private final StackStepsFactory factory;
+    private final StackPlanFactory factory;
 
-    ManageStackMain(StackStepsFactory factory) {
+    ManageStackMain(StackPlanFactory factory) {
         this.factory = factory;
     }
 
@@ -81,7 +81,7 @@ public class ManageStackMain {
     }
 
     public static void main(String[] allArgs) {
-        ManageStackMain manager = new ManageStackMain(new StackStepsFactory());
+        ManageStackMain manager = new ManageStackMain(new StackPlanFactory());
         boolean replace = Arrays.asList(allArgs).contains(REPLACE);
         String[] args = Arrays.stream(allArgs).filter(arg -> !arg.equals(REPLACE)).toArray(String[]::new);
         if (args.length < 2) {

@@ -101,7 +101,8 @@ Executables are composed of reusable steps:
 - **`StepActions`** — low-level operations that actually execute commands (run Maven, run OpenTofu, call Polaris APIs)
 - **`StepRunner`** — executes a list of steps in order, with the ability to resume from a named step
 - **`StepsProvider`** — interface providing a step list
-- **`StackStepsFactory`** — the single definition of the steps of each action (`delete`, `deploy`, `setup`) on each stack, keyed by stack id (`<cloud>-<stack-type>`, eg `aws-keycloak`), composed from `StepOperations` and run by the `manage-stack` command
+- **`StackPlanFactory`** — the steps of each action (`delete`, `deploy`, `setup`) on each stack, keyed by stack id (`<cloud>-<stack-type>`, eg `aws-keycloak`), derived from the components of the stack (see [Steps derived from the components](#steps-derived-from-the-components)) and run by the `manage-stack` command
+- **`StackStepsFactory`** — the legacy, hand-written steps of each stack, still used by the `Delete|Deploy|Setup*Main` commands and the generated stack documents
 
 The other ops commands, eg the Snowflake and cross-cloud ones, compose their steps from `StepOperations` too, reusing
 the stacks' steps. For example, `SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain` reuses the steps setting up
@@ -110,6 +111,29 @@ the `aws-full` stack and then adds Azure-specific steps.
 The corresponding `*Document` classes generate markdown documentation describing each step — this keeps documentation
 in lock-step with the actual deployment code.  The stack documents extend `AbstractStackDocument`, taking their steps
 from `StackStepsFactory`.
+
+### Steps derived from the components
+
+`manage-stack` takes its steps from `StackPlanFactory` (package `ops.plan`), which derives them from the `StackDefinition` of the
+stack, so that every stack of `StackDefinitions` can be managed with nothing written per stack.
+
+The stack is deployed **as a whole**, by one step (`StepOperations.deployStack`) applying the plan of all its components.
+A component's `ComponentPlan` does **not** deploy it, but decorates its deployment: it says what the component brings to the
+commands on the stack, besides being deployed with it:
+
+- `domains`: the domain names it holds, which only one running stack can serve, so stacks holding a common one conflict;
+- `certificates`: the certificates it needs (AWS), checked before the stack is deployed;
+- `waitsFor`: what must answer once the stack is deployed, the union over all components being waited for;
+- `setupSteps`: what it configures when the stack is set up, in the order of the components, without duplicates;
+- `label`: its name in messages.
+
+The defaults bring nothing, which is what the infrastructure-only components are (`InfrastructurePlan`).  Some behaviour comes
+from absence: a stack with no `KeycloakComponent` uses the KeyCloak of another stack, so it checks that it answers.
+Every kind of component must be declared in `ComponentPlanRegistry`, even if it brings nothing, which a test enforces.
+
+For example, `setup` of `aws-full` runs: delete the stacks conflicting with it, check the certificates (KeyCloak, Polaris,
+Jupyter), deploy the stack, wait for Polaris and KeyCloak, report the deployment complete, configure the OIDC users, create the
+catalogs, configure the Polaris users, run the Spark write check, and report the setup complete.
 
 ### Stack composition
 

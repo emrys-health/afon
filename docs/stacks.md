@@ -37,8 +37,8 @@ afon-cli.sh manage-stack <action> <stack-id> [<step>] [--replace]  # run without
 where:
 - `<action>` is one of `delete`, `deploy` or `setup`;
 - `<stack-id>` is `<cloud>-<stack-type>`, eg `aws-keycloak`, named as `validate-stack` lists the stacks.
-  Only the stacks that can be deployed or set up are listed: `aws-full`, `aws-keycloak`, `aws-polaris`,
-  `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
+  Every defined stack is listed: `aws-full`, `aws-keycloak`, `aws-polaris`, `aws-jupyter`, `aws-spark`, `aws-trino`,
+  `azure-full`, `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
 - `<step>`, if given, is the step from which to resume a failed run (see
   [Resume a failed stack deployment](#resume-a-failed-stack-deployment-from-a-specific-step));
 - `--replace`, if given, lets `deploy` and `setup` delete the other stacks conflicting with the stack, see
@@ -53,8 +53,9 @@ afon-cli.sh manage-stack delete aws-full
 ```
 With `afon.sh`, pass the same args positionally, eg `./afon.sh -a manage-stack setup aws-keycloak`.
 
-The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, still work and run the same
-steps, eg `setup-aws-keycloak-stack` is the same as `manage-stack setup aws-keycloak`, but they will be removed.
+The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, still work, with
+hand-written steps, which differ slightly from those of `manage-stack`, derived from the components of the stack (eg `setup`
+also reports the deployment complete), but they will be removed.
 
 ### Stacks side by side
 
