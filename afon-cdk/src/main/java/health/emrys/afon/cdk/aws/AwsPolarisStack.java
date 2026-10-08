@@ -90,7 +90,9 @@ public class AwsPolarisStack extends AbstractAwsStack {
                       .type("NodePort")
                       .internalTrafficPolicy("Cluster")
                       .clusterIps(List.of())
-                      .port(List.of(polarisConfig.getPolarisSpecPort()))
+                      // The management port is exposed too, so the load balancer can reach the health checks.
+                      .port(List.of(polarisConfig.getPolarisSpecPort(),
+                                    polarisConfig.getPolarisManagementSpecPort()))
                       .build())
             .build();
     }
@@ -106,6 +108,7 @@ public class AwsPolarisStack extends AbstractAwsStack {
             polarisDomainName,
             POLARIS_INTERNAL_SERVICE_NAME,
             8181,
+            new AwsCloudProvider.HealthCheck(PolarisConfig.HEALTH_READY_PATH, PolarisConfig.MANAGEMENT_PORT_NAME),
             cloudProvider.getSubnetIds(),
             cloudProvider.polarisInboundCidrs(properties.getValue(AWS_POLARIS_ALLOWED_CIDRS, "")));
         cloudProvider.configureDNS(
