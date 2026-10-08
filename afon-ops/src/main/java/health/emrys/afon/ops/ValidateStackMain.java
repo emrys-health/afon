@@ -1,12 +1,14 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.CloudStackValidator;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.config.StackId;
 
 /**
- * Validates the config of a stack, via {@link CloudStackValidator}.
- * The stack is given in kebab case, with or without the "stack" suffix, eg {@code azure-polaris},
- * or as the class simple name, eg {@code AzurePolarisStack}.  With no stack, it lists the stacks.
+ * Validates the config of a stack, via {@link CloudStackValidator}, by synthesising its plan from the config,
+ * without deploying it.
+ * The stack is given by its id, {@code <cloud>-<stack-type>}, eg {@code azure-polaris}, as defined in
+ * {@link health.emrys.afon.cdk.StackDefinitions}.  With no stack, it lists the stacks.
  */
 public class ValidateStackMain {
 
@@ -25,7 +27,7 @@ public class ValidateStackMain {
         }
         String stackDir;
         try {
-            stackDir = validator.validate(stack);
+            stackDir = validator.validate(stack, new OpsPropertyProvider());
         } catch (RuntimeException e) {
             // printed as well as logged, as the console logging may be off, eg in the CLI
             System.err.printf("Failed to validate stack %s: %s%n", stack, e);
