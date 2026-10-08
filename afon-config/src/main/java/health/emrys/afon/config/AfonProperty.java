@@ -44,6 +44,11 @@ public enum AfonProperty {
     /** Elastic IP that all outbound cluster traffic egresses from.  Optional: a new one is allocated when unset. */
     AWS_EGRESS_IP("AWS_EGRESS_IP"),
     AWS_POLARIS_ALLOWED_CIDRS("AWS_POLARIS_ALLOWED_CIDRS"),
+    /**
+     * S3 bucket that Fluent Bit ships Polaris' console logs to, under {@code polaris/<cluster>/}, so that they
+     * outlive the cluster.  Optional: no logs are shipped when unset.
+     */
+    AWS_POLARIS_LOG_BUCKET("AWS_POLARIS_LOG_BUCKET"),
 
     // GCP
     /** Project the GCP stacks are deployed into, eg {@code afon-core}.  Required for the GCP stacks. */

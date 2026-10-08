@@ -29,6 +29,7 @@ import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidCo
 import com.hashicorp.cdktf.providers.aws.iam_openid_connect_provider.IamOpenidConnectProviderConfig;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
 import com.hashicorp.cdktf.providers.aws.iam_role.IamRoleConfig;
+import com.hashicorp.cdktf.providers.aws.iam_role.IamRoleInlinePolicy;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachment;
 import com.hashicorp.cdktf.providers.aws.iam_role_policy_attachment.IamRolePolicyAttachmentConfig;
 import com.hashicorp.cdktf.providers.aws.internet_gateway.InternetGateway;
@@ -726,10 +727,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             ))
             .build();
 
-        String trustPolicy = format(
-            """
-            ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
-            """, accountId);
+        String trustPolicy = irsaTrustPolicy("kube-system", "aws-load-balancer-controller");
         loadBalancerRole = new IamRole(
             scope, "AmazonEKSLoadBalancerControllerRole",
             IamRoleConfig
@@ -885,6 +883,35 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                        .build())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .build());
+    }
+
+    /**
+     * The trust policy of a role assumed via IRSA by the given service account, through the OIDC provider
+     * {@link #associateOIDCProvider} creates.
+     */
+    private String irsaTrustPolicy(String namespace, String serviceAccount) {
+        return format(
+            """
+            ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:%s:%s\"}}}]})}
+            """, accountId, namespace, serviceAccount);
+    }
+
+    /**
+     * Creates a role that the given service account assumes via IRSA, as the load balancer controller does.  Pods
+     * cannot use the node role instead: the nodes require IMDSv2 with a hop limit of 1, so the instance metadata,
+     * and with it the node role's credentials, is out of a pod's reach.
+     *
+     * @param policy the role's inline policy
+     */
+    public IamRole createIrsaRole(String id, String roleName, String namespace, String serviceAccount, String policy) {
+        return IamRole.Builder
+            .create(this, id)
+            .name(roleName)
+            .assumeRolePolicy(irsaTrustPolicy(namespace, serviceAccount))
+            .inlinePolicy(List.of(IamRoleInlinePolicy.builder().name(roleName + "-policy").policy(policy).build()))
+            // The OIDC provider must exist for the role to be assumed, and outlive the pods assuming it.
+            .dependsOn(lbcIrsaDependables)
+            .build();
     }
 
     private Release configureIngress(Construct scope, IamRole loadBalancerRole) {

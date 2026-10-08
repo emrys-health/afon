@@ -195,6 +195,30 @@ connection and opens its own, so the Polaris pod only ever sees the ALB's or a n
 
 ## Logging & Monitoring
 
+### Polaris logs in S3 (AWS)
+
+Set `AWS_POLARIS_LOG_BUCKET` to an existing S3 bucket to keep Polaris' logs after the pod, or the whole cluster,
+is gone.  A Fluent Bit DaemonSet (`fluent-bit-polaris-*` in `kube-system`) tails the console output of the Polaris
+containers and uploads it, at least every minute, as gzipped JSON lines (one per log line, with the pod's
+metadata) to:
+
+```
+s3://<AWS_POLARIS_LOG_BUCKET>/polaris/<cluster>/<yyyy>/<mm>/<dd>/<HHMMSS>-<uuid>.json.gz
+```
+
+Fluent Bit assumes the IAM role `cdktf-eks-fluent-bit-role-<cluster>` via IRSA, which may only write under that
+prefix.  On destroy, Polaris is removed before Fluent Bit, which uploads what it still holds when it stops.  To
+read the logs:
+
+```shell
+aws s3 ls --recursive s3://<bucket>/polaris/<cluster>/
+aws s3 cp s3://<bucket>/polaris/<cluster>/<key> - | gunzip | jq -r .log
+```
+
+Nothing is shipped when the property is empty.
+
+### Monitoring
+
 Currently, we use an external Grafana and tunneling into the cluster.
 But Grafana (`kube-prometheus-stack-grafana-*`) is deployed as part of the Prometheus Helm chart.
 So is the Alert Manager (`alertmanager-kube-prometheus-stack-alertmanager-0`).
