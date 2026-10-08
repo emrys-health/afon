@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -605,8 +606,12 @@ public class GuacamoleConfig {
         Map<String, byte[]> files = ThemeResources.list("themes/" + theme + "/guacamole/", "guac-manifest.json");
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
-            for (Map.Entry<String, byte[]> file : files.entrySet()) {
-                zip.putNextEntry(new ZipEntry(file.getKey()));
+            // The jar goes into the plan, so is the same on each synthesis: the files are in the order of their names and
+            // the entries are not stamped with the time they were made
+            for (Map.Entry<String, byte[]> file : new TreeMap<>(files).entrySet()) {
+                ZipEntry entry = new ZipEntry(file.getKey());
+                entry.setTime(0);
+                zip.putNextEntry(entry);
                 zip.write(file.getValue());
                 zip.closeEntry();
             }

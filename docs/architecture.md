@@ -131,7 +131,7 @@ The stacks, as composed by `StackDefinitions`:
 |---|---|
 | `aws-keycloak` | Keycloak |
 | `aws-polaris` | Polaris |
-| `aws-jupyter` | Keycloak (unless `AWS_KEYCLOAK_EXTERNAL`), Polaris, Jupyter, NetworkPolicies, AwsSecrets, AwsLoadBalancerCleanup, SparkOperator |
+| `aws-jupyter` | Keycloak (unless `AWS_KEYCLOAK_EXTERNAL`), Polaris, Jupyter, NetworkPolicies, SparkOperator |
 | `aws-spark` | as `aws-jupyter`, then Spark and CrdCleanup |
 | `aws-trino` | as `aws-spark`, then Trino |
 | `aws-full` | as `aws-trino`, then Monitoring |
@@ -150,6 +150,12 @@ stack has them, must come before it (`PolarisComponent` is after `KeycloakCompon
 against it). A stack composed wrongly fails when it is built, naming the problem, eg
 `Stack aws-test needs SparkOperatorComponent before SparkComponent`. `StackCompositionTest` checks every stack.
 
+**Deterministic plans.** What goes into a plan must be the same on each synthesis, or `tofu` sees a changed string and replaces
+what holds it, eg a `kubectl` manifest, on every deploy. The iteration order of an immutable `Map.of` differs from one JVM run
+to the next, so JSON embedded in the plan, eg a manifest or Helm values, is written by `CdkUtils.toCanonicalJson`, which sorts the keys of
+maps, and the jars are built with the entries in order of their names and no timestamps. `DeterministicSynthesisTest` synthesises
+every stack in three separate JVMs and requires the same plan from each.
+
 **Adding a component.**
 1. Implement `StackComponent` in `cdk.components`, taking its config from `context.properties()` by cloud, and asking
    `context.platform()` for what is cloud-specific, eg `exposeHttps`.
@@ -159,10 +165,10 @@ against it). A stack composed wrongly fails when it is built, naming the problem
 4. Add it to the stacks in `StackDefinitions`.
 
 **Guarding the plans.** `StackSynthesisGoldenTest` synthesises every stack from the template config and compares it with
-`afon-cdk/src/test/resources/golden/<stack-id>.tf.json`. The plan is normalised so that it is the same on each run: keys and
-`depends_on` are sorted, zips are reduced to their entries and long strings to their hash. A refactoring must leave the
-golden files unchanged, as the ids of the Terraform resources are in the state of the deployed stacks, so renaming one
-makes `tofu` destroy and recreate it. After an intended change of a plan, regenerate them and review the diff:
+`afon-cdk/src/test/resources/golden/<stack-id>.tf.json`. Only the layout is normalised, to keep the files small and
+readable: keys and `depends_on` are sorted, and long strings reduced to their hash. A refactoring must leave the golden
+files unchanged, as the ids of the Terraform resources are in the state of the deployed stacks, so renaming one makes `tofu`
+destroy and recreate it. After an intended change of a plan, regenerate them and review the diff:
 
 ```shell
 GOLDEN_UPDATE=1 mvn -o test -pl afon-cdk -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=StackSynthesisGoldenTest

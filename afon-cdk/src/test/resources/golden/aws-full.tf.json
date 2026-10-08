@@ -265,7 +265,7 @@
           }
         },
         "cluster_name" : "${aws_eks_cluster.aws_eksCluster_06387EF2.name}",
-        "depends_on" : [ "aws_eks_cluster.aws_eksCluster_06387EF2", "aws_iam_role_policy_attachment.aws_cniPolicyAttachment_61910354", "aws_iam_role_policy_attachment.aws_containerRegistryPolicyAttachment_C1DC05B0", "aws_iam_role_policy_attachment.aws_customSecretPolicyAttachment_5BFE4E94", "aws_iam_role_policy_attachment.aws_workerNodePolicyAttachment_F3B6E21C", "aws_route_table_association.aws_privateSubnet1Association_6ABC486D", "aws_route_table_association.aws_privateSubnet2Association_A2528445", "aws_route_table_association.aws_subnet1Association_9B94D668", "aws_route_table_association.aws_subnet2Association_F8EE958F", "aws_subnet.aws_publicSubnet1_CEA7CFE9", "aws_subnet.aws_publicSubnet2_33D65A96", "data.aws_eks_cluster_auth.aws_eksClusterAuthData_BFB4066C", "null_resource.aws_kubeconfigUpdater_DC156772" ],
+        "depends_on" : [ "aws_eks_cluster.aws_eksCluster_06387EF2", "aws_iam_role_policy_attachment.aws_cniPolicyAttachment_61910354", "aws_iam_role_policy_attachment.aws_containerRegistryPolicyAttachment_C1DC05B0", "aws_iam_role_policy_attachment.aws_workerNodePolicyAttachment_F3B6E21C", "aws_route_table_association.aws_privateSubnet1Association_6ABC486D", "aws_route_table_association.aws_privateSubnet2Association_A2528445", "aws_route_table_association.aws_subnet1Association_9B94D668", "aws_route_table_association.aws_subnet2Association_F8EE958F", "aws_subnet.aws_publicSubnet1_CEA7CFE9", "aws_subnet.aws_publicSubnet2_33D65A96", "data.aws_eks_cluster_auth.aws_eksClusterAuthData_BFB4066C", "null_resource.aws_kubeconfigUpdater_DC156772" ],
         "disk_size" : 50,
         "instance_types" : [ "r6i.large" ],
         "lifecycle" : {
@@ -299,19 +299,6 @@
         "url" : "${data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer}"
       }
     },
-    "aws_iam_policy" : {
-      "aws_SecretAccessPolicy_4D1DFB89" : {
-        "//" : {
-          "metadata" : {
-            "path" : "aws-full/aws/SecretAccessPolicy",
-            "uniqueId" : "aws_SecretAccessPolicy_4D1DFB89"
-          }
-        },
-        "description" : "Allows EKS Node Group to read the specific application config secret.",
-        "name" : "EKS-Secret-Access-Policy-full-golden-cluster",
-        "policy" : "{\"Statement\":[{\"Action\":\"secretsmanager:GetSecretValue\",\"Effect\":\"Allow\",\"Resource\":\"${aws_secretsmanager_secret.aws_ApplicationSecret_72AA44E1.arn}\"}],\"Version\":\"2012-10-17\"}"
-      }
-    },
     "aws_iam_role" : {
       "AmazonEKSLoadBalancerControllerRole" : {
         "//" : {
@@ -330,7 +317,7 @@
             "uniqueId" : "aws_eksClusterRole_364FC8C4"
           }
         },
-        "assume_role_policy" : "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"eks.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+        "assume_role_policy" : "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"eks.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}",
         "lifecycle" : {
           "prevent_destroy" : false
         },
@@ -343,7 +330,7 @@
             "uniqueId" : "aws_eksNodeGroupRole_92145051"
           }
         },
-        "assume_role_policy" : "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"}},{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"elasticloadbalancing.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+        "assume_role_policy" : "{\"Version\":\"2012-10-17\",\n\"Statement\":[{\n        \"Effect\":\"Allow\",\n        \"Principal\":{\n            \"Service\": \"ec2.amazonaws.com\"\n        },\n        \"Action\":\"sts:AssumeRole\"\n    },\n    {\n        \"Effect\":\"Allow\",\n        \"Principal\":{\n            \"Service\": \"elasticloadbalancing.amazonaws.com\"\n        },\n        \"Action\":\"sts:AssumeRole\"\n    }\n] }",
         "name" : "cdktf-eks-nodegroup-role-full-golden-cluster"
       }
     },
@@ -393,19 +380,6 @@
           "prevent_destroy" : false
         },
         "policy_arn" : "${data.aws_iam_policy.aws_containerRegistryPolicy_655DDEE6.arn}",
-        "role" : "${aws_iam_role.aws_eksNodeGroupRole_92145051.name}"
-      },
-      "aws_customSecretPolicyAttachment_5BFE4E94" : {
-        "//" : {
-          "metadata" : {
-            "path" : "aws-full/aws/customSecretPolicyAttachment",
-            "uniqueId" : "aws_customSecretPolicyAttachment_5BFE4E94"
-          }
-        },
-        "lifecycle" : {
-          "prevent_destroy" : false
-        },
-        "policy_arn" : "${aws_iam_policy.aws_SecretAccessPolicy_4D1DFB89.arn}",
         "role" : "${aws_iam_role.aws_eksNodeGroupRole_92145051.name}"
       },
       "aws_eksClusterRoleAttachment_C45A3CA0" : {
@@ -667,22 +641,6 @@
         },
         "route_table_id" : "${aws_route_table.aws_publicRouteTable_271EDFA5.id}",
         "subnet_id" : "${aws_subnet.aws_publicSubnet2_33D65A96.id}"
-      }
-    },
-    "aws_secretsmanager_secret" : {
-      "aws_ApplicationSecret_72AA44E1" : {
-        "//" : {
-          "metadata" : {
-            "path" : "aws-full/aws/ApplicationSecret",
-            "uniqueId" : "aws_ApplicationSecret_72AA44E1"
-          }
-        },
-        "description" : "Secret containing application configuration or API keys for EKS.",
-        "name" : "cdktf-app-config-secret-full-golden-cluster",
-        "recovery_window_in_days" : 0,
-        "tags" : {
-          "Name" : "EKSAppConfig"
-        }
       }
     },
     "aws_subnet" : {
@@ -1082,23 +1040,6 @@
         "timeout" : 600,
         "values" : [ "config:\n  clients:\n    # tenant_id sets the X-Scope-OrgID header on every push, which\n    # is the tenant Loki uses as the top-level S3 directory.\n    - url: http://loki.default.svc.cluster.local:3100/loki/api/v1/push\n      tenant_id: full-golden-cluster\n  snippets:\n    extraRelabelConfigs:\n      - source_labels: [__meta_kubernetes_namespace]\n        action: keep\n        regex: default\n" ]
       },
-      "secrets-store-csi-driver" : {
-        "//" : {
-          "metadata" : {
-            "path" : "aws-full/secrets-store-csi-driver",
-            "uniqueId" : "secrets-store-csi-driver"
-          }
-        },
-        "atomic" : true,
-        "chart" : "assets/csiDriverChart/03FF9321112C32266F91E0BC8F87DE8B/secrets-store-csi-driver-1.5.4.tgz",
-        "depends_on" : [ "aws_eks_cluster.aws_eksCluster_06387EF2", "aws_subnet.aws_publicSubnet1_CEA7CFE9", "aws_subnet.aws_publicSubnet2_33D65A96", "data.aws_eks_cluster_auth.aws_eksClusterAuthData_BFB4066C", "helm_release.aws_cilium_E256BE73", "null_resource.aws_kubeconfigUpdater_DC156772" ],
-        "lifecycle" : {
-          "prevent_destroy" : false
-        },
-        "name" : "csi-secrets-store",
-        "namespace" : "kube-system",
-        "timeout" : 300
-      },
       "sparkop_sparkOperator_1B5F0655" : {
         "//" : {
           "metadata" : {
@@ -1200,7 +1141,7 @@
           }
         },
         "binary_data" : {
-          "guacamole-theme.jar" : "zip{css/hdrs.css=2be5f4e92602f382, guac-manifest.json=4176448b29042a88, images/emrys-icon-white.png=089fcb2a3450c1ba, images/emrys-logo-dark.png=360a0286f343b1fa, images/emrys-logo-horizontal-white.png=03afcb7f92b16ccc, images/emrys-logo-white.png=78286325ee9e229a, images/favicon-144.png=6f86cb0ee14c524b, images/favicon-64.png=03670d2ef1898067, images/hdrs-icon-dark.png=c25f840a0147f6d8, images/hdrs-icon-light.png=2f7f1405d3a7760a, images/hdrs-logo-dark.png=9dc280ec2f5086fe, images/hdrs-logo-horizontal-light.png=2656ab947fe267e0, images/hdrs-logo-vertical-dark.png=cffabcfb089e6ab4, images/hdrs-logo-vertical-light.png=9b1ba2ae7d6eaf4d, translations/en.json=935f9f8cdd554d1c}"
+          "guacamole-theme.jar" : "<486076 chars, sha256 a8b829ea45b520f8>"
         },
         "metadata" : {
           "name" : "guacamole-theme",
@@ -1801,7 +1742,7 @@
             "alb.ingress.kubernetes.io/certificate-arn" : "golden-aws-jupyter-cert-arn",
             "alb.ingress.kubernetes.io/healthcheck-path" : "/ping",
             "alb.ingress.kubernetes.io/healthcheck-port" : "traffic-port",
-            "alb.ingress.kubernetes.io/listen-ports" : "[{\"HTTP\":80},{\"HTTPS\":443}]",
+            "alb.ingress.kubernetes.io/listen-ports" : "[{\"HTTP\": 80}, {\"HTTPS\": 443}]",
             "alb.ingress.kubernetes.io/scheme" : "internet-facing",
             "alb.ingress.kubernetes.io/subnets" : "${aws_subnet.aws_publicSubnet1_CEA7CFE9.id},${aws_subnet.aws_publicSubnet2_33D65A96.id}",
             "external-dns.alpha.kubernetes.io/hostname" : "jupyter.golden.example",
@@ -1863,7 +1804,7 @@
             "alb.ingress.kubernetes.io/certificate-arn" : "golden-aws-keycloak-cert-arn",
             "alb.ingress.kubernetes.io/healthcheck-path" : "/health/ready",
             "alb.ingress.kubernetes.io/healthcheck-port" : "management",
-            "alb.ingress.kubernetes.io/listen-ports" : "[{\"HTTP\":80},{\"HTTPS\":443}]",
+            "alb.ingress.kubernetes.io/listen-ports" : "[{\"HTTP\": 80}, {\"HTTPS\": 443}]",
             "alb.ingress.kubernetes.io/scheme" : "internet-facing",
             "alb.ingress.kubernetes.io/subnets" : "${aws_subnet.aws_publicSubnet1_CEA7CFE9.id},${aws_subnet.aws_publicSubnet2_33D65A96.id}",
             "external-dns.alpha.kubernetes.io/hostname" : "emrysoauth.click",
@@ -1925,7 +1866,7 @@
             "alb.ingress.kubernetes.io/certificate-arn" : "golden-aws-polaris-cert-arn",
             "alb.ingress.kubernetes.io/healthcheck-path" : "/q/health/ready",
             "alb.ingress.kubernetes.io/healthcheck-port" : "management",
-            "alb.ingress.kubernetes.io/listen-ports" : "[{\"HTTP\":80},{\"HTTPS\":443}]",
+            "alb.ingress.kubernetes.io/listen-ports" : "[{\"HTTP\": 80}, {\"HTTPS\": 443}]",
             "alb.ingress.kubernetes.io/scheme" : "internet-facing",
             "alb.ingress.kubernetes.io/subnets" : "${aws_subnet.aws_publicSubnet1_CEA7CFE9.id},${aws_subnet.aws_publicSubnet2_33D65A96.id}",
             "external-dns.alpha.kubernetes.io/hostname" : "polaris.golden.example",
@@ -2510,7 +2451,6 @@
           "namespace" : "default"
         },
         "spec" : {
-          "cluster_ips" : [ ],
           "internal_traffic_policy" : "Cluster",
           "port" : [ {
             "name" : "web",
@@ -2608,6 +2548,7 @@
           }
         } ],
         "spec" : {
+          "load_balancer_class" : "service.k8s.aws/nlb",
           "port" : [ {
             "name" : "web",
             "port" : 8080,
@@ -2808,30 +2749,6 @@
             "when" : "create"
           }
         } ]
-      },
-      "aws_cleanupELBs_248BFDB2" : {
-        "//" : {
-          "metadata" : {
-            "path" : "aws-full/aws/cleanupELBs",
-            "uniqueId" : "aws_cleanupELBs_248BFDB2"
-          }
-        },
-        "depends_on" : [ ],
-        "lifecycle" : {
-          "prevent_destroy" : false
-        }
-      },
-      "aws_cleanupSecurityGroups_1F1C73C7" : {
-        "//" : {
-          "metadata" : {
-            "path" : "aws-full/aws/cleanupSecurityGroups",
-            "uniqueId" : "aws_cleanupSecurityGroups_1F1C73C7"
-          }
-        },
-        "depends_on" : [ ],
-        "lifecycle" : {
-          "prevent_destroy" : false
-        }
       },
       "aws_kubeconfigUpdater_DC156772" : {
         "//" : {

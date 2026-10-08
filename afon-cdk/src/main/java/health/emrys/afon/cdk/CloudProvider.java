@@ -30,8 +30,6 @@ public interface CloudProvider {
         return Map.of();
     }
 
-    void configureLoadBalancerDestroy(List<Service> loadBalancers);
-
     KubernetesProvider configureK8s();
 
     String getId();

@@ -504,11 +504,6 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         return List.of(aksCluster, clusterAdminAssignment);
     }
 
-    @Override
-    public void configureLoadBalancerDestroy(List<Service> loadBalancers) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
     // -------------------------------------------------------------------------
     // Ingress controller + TLS
     // -------------------------------------------------------------------------
