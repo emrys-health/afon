@@ -1036,6 +1036,24 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     /** Restricts an ALB to the given comma-separated source CIDRs; absent means open to all. */
     public static final String INBOUND_CIDRS_ANNOTATION = "alb.ingress.kubernetes.io/inbound-cidrs";
 
+    /**
+     * Where the ALB probes a backend's pods to decide whether they are healthy. Without one the ALB
+     * GETs {@code /} on the traffic port and only accepts a 200, which none of our backends return:
+     * Keycloak and oauth2-proxy redirect, and Polaris only serves its health on its management port.
+     *
+     * @param path the health endpoint's path
+     * @param port {@link #TRAFFIC_PORT}, or the name of a Service port, which the LBC resolves to its
+     *             node port (instance targets) or target port (ip targets) - so that port must be
+     *             exposed by the Service
+     */
+    public record HealthCheck(String path, String port) {
+        public static final String TRAFFIC_PORT = "traffic-port";
+
+        public static HealthCheck onTrafficPort(String path) {
+            return new HealthCheck(path, TRAFFIC_PORT);
+        }
+    }
+
     public IngressV1 createHttpsIngress(
         final String constructId,
         final String ingressName,
@@ -1043,9 +1061,10 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         final String hostName,
         final String serviceName,
         final int servicePort,
+        final HealthCheck healthCheck,
         final List<String> subnetIds) {
         return createHttpsIngress(constructId, ingressName, certArn, hostName, serviceName, servicePort,
-                                  subnetIds, List.of());
+                                  healthCheck, subnetIds, List.of());
     }
 
     /**
@@ -1061,6 +1080,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         final String hostName,
         final String serviceName,
         final int servicePort,
+        final HealthCheck healthCheck,
         final List<String> subnetIds,
         final List<String> inboundCidrs) {
         KubernetesProvider kubernetesProvider = configureK8s();
@@ -1089,6 +1109,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
             "alb.ingress.kubernetes.io/subnets", subnetIdsCSV
                                                    ));
+        albAnnotations.put("alb.ingress.kubernetes.io/healthcheck-path", healthCheck.path());
+        albAnnotations.put("alb.ingress.kubernetes.io/healthcheck-port", healthCheck.port());
         if (!inboundCidrs.isEmpty()) {
             albAnnotations.put(INBOUND_CIDRS_ANNOTATION, String.join(",", inboundCidrs));
         }

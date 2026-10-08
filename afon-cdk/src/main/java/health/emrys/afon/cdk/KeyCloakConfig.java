@@ -47,6 +47,10 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
     private static final String APP_NAME = "keycloak";
     private static final String SECRET_NAME = "kcsecrets";
     private static final String THEME_CONFIGMAP = "keycloak-theme";
+    /** KeyCloak serves its health checks on its management interface, not on {@code KEYCLOAK_PORT}. */
+    public static final int KEYCLOAK_MANAGEMENT_PORT = 9000;
+    public static final String MANAGEMENT_PORT_NAME = "management";
+    public static final String HEALTH_READY_PATH = "/health/ready";
     /**
      * KeyCloak's own env vars (Quarkus config), which the container requires verbatim,
      * we need to map them to {@link AfonProperty} names
@@ -62,6 +66,12 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
             .name("web")
             .port(KEYCLOAK_PORT)
             .targetPort("" + KEYCLOAK_PORT)
+            .protocol("TCP")
+            .build();
+    private static final ServiceSpecPort MANAGEMENT_SERVICE_SPEC_PORT = ServiceSpecPort.builder()
+            .name(MANAGEMENT_PORT_NAME)
+            .port(KEYCLOAK_MANAGEMENT_PORT)
+            .targetPort("" + KEYCLOAK_MANAGEMENT_PORT)
             .protocol("TCP")
             .build();
     protected final T cloudProvider;
@@ -122,6 +132,8 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         envs.add(envVar("KC_PROXY_HEADERS", "xforwarded"));
         envs.add(envVar("KC_HOSTNAME_STRICT", "true"));
         envs.add(envVar("KC_HTTP_ENABLED", "true"));
+        // Serves /health/ready on the management port, for the load balancer's health checks.
+        envs.add(envVar("KC_HEALTH_ENABLED", "true"));
         envs.add(envVar(ENV_KC_HOSTNAME, hostname));
         envs.add(envVar("KC_LOG_LEVEL", "DEBUG"));
         kcProperties.values().forEach(envName -> envs.add(
@@ -203,7 +215,9 @@ public abstract class KeyCloakConfig<T extends CloudProvider> extends Construct 
         dependants.addAll(cloudProvider.getServiceDependables());
         // NodePort (not ClusterIP): the AWS Load Balancer Controller uses instance targets by
         // default and requires a node port to build the ingress TargetGroup.
-        nodePortService(dependants, labels, KEYCLOAK_SERVICE_NAME, List.of(SERVICE_SPEC_PORT), this);
+        // The management port is exposed too, so the load balancer can reach the health checks.
+        nodePortService(dependants, labels, KEYCLOAK_SERVICE_NAME,
+                        List.of(SERVICE_SPEC_PORT, MANAGEMENT_SERVICE_SPEC_PORT), this);
     }
 
     private static DeploymentSpecTemplateSpecVolumeConfigMapItems themeItem(String key, String path) {
