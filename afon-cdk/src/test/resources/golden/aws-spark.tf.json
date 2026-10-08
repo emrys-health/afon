@@ -2183,7 +2183,7 @@
           }
         },
         "data" : {
-          "polaris_env.sh" : "<1784 chars, sha256 515cef8c74013240>"
+          "polaris_env.sh" : "<1802 chars, sha256 680b803c5d7c2162>"
         },
         "depends_on" : [ "aws_eks_cluster.aws_eksCluster_06387EF2", "aws_subnet.aws_publicSubnet1_CEA7CFE9", "aws_subnet.aws_publicSubnet2_33D65A96", "data.aws_eks_cluster_auth.aws_eksClusterAuthData_BFB4066C", "helm_release.aws_cilium_E256BE73", "null_resource.aws_kubeconfigUpdater_DC156772" ],
         "metadata" : {
