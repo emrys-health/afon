@@ -160,7 +160,7 @@ public class NetworkConfig {
                                    .build(),
             createSparkConnectorEgressPolicy(sparkConnectorName));
         networkPolicyFor(USER_POD_LABELS, egress);
-        lockdownJupyterPods(USER_POD_LABELS, allowedDomains, dependsOn);
+        lockdownJupyterPods(USER_POD_LABELS, dependsOn);
 
         lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of());
         lockdownSpark(dependsOn, DRIVER_LABELS, "spark-driver", List.of(AllowedDomain.create(MASTER + "-svc")));
@@ -219,8 +219,7 @@ public class NetworkConfig {
      * Whitelists egress to a set of domain names.
      * <p>
      * A Kubernetes {@link NetworkPolicy} only understands CIDRs, so a name whose address is
-     * decided by a CDN and changes underneath us cannot be expressed there - hence the
-     * hard-coded IP block in {@link #createWebEgressPolicy()}. Cilium (our CNI) does
+     * decided by a CDN and changes underneath us cannot be expressed there. Cilium (our CNI) does
      * understand names: its DNS proxy watches the pod's own DNS answers and programs the
      * addresses it sees into the policy at runtime, which is what {@code toFQDNs} below
      * relies on. That proxy is gated cluster-wide by the {@code enable-fqdn-policy}
@@ -248,7 +247,6 @@ public class NetworkConfig {
      * the Cilium release that registers the {@code cilium.io/v2} CRD this manifest needs.
      */
     private void lockdownJupyterPods(Map<String, String> labels,
-                                     List<AllowedDomain> allowedDomains,
                                      List<ITerraformDependable> dependsOn
     ) {
         Map<String, Object> manifest = connectionManifest(labels, List.of());
