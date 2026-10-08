@@ -24,8 +24,6 @@ class CloudStackValidatorTest {
     void canResolveStackByName() {
         StackId azurePolaris = new StackId(AZURE, "polaris");
         assertThat(validator.resolve("azure-polaris")).isEqualTo(azurePolaris);
-        assertThat(validator.resolve("azure-polaris-stack")).isEqualTo(azurePolaris);
-        assertThat(validator.resolve("AzurePolarisStack")).isEqualTo(azurePolaris);
         assertThat(validator.resolve("AZURE-POLARIS")).isEqualTo(azurePolaris);
         assertThat(validator.resolve("aws-full")).isEqualTo(new StackId(AWS, "full"));
         assertThat(validator.resolve("aws-keycloak")).isEqualTo(new StackId(AWS, "keycloak"));
@@ -42,5 +40,8 @@ class CloudStackValidatorTest {
         assertThat(validator.resolve("aws-unknown")).isNull();
         assertThat(validator.resolve("mars-polaris")).isNull();
         assertThat(validator.resolve("gcp-full")).isNull();
+        // the stacks are not classes, so not named as such
+        assertThat(validator.resolve("azure-polaris-stack")).isNull();
+        assertThat(validator.resolve("AzurePolarisStack")).isNull();
     }
 }

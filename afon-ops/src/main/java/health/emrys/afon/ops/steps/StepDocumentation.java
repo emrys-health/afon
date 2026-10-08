@@ -89,7 +89,7 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    protected void synthesiseStack(StackId stackId) throws Exception {
+    protected void synthesiseStack(StackId stackId, AfonPropertyProvider properties) throws Exception {
         run("afon-cli.sh", null, "validate-stack", stackId.toString());
     }
 

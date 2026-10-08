@@ -139,6 +139,73 @@ The stacks, as composed by `StackDefinitions`:
 | `azure-full` | Polaris, SparkOperator, Spark, Jupyter |
 | `gcp-polaris` | Polaris |
 
+**Synthesising a stack.** `ComposedStack.synthesise(StackId, AfonPropertyProvider)` is the only way into the CDKTF world, and it
+needs nothing but a stack id, registered in `StackDefinitions`, and the config. It
+1. looks the id up in `StackDefinitions`, failing with `No such stack: <id>` if it is not registered,
+2. creates the CDKTF app, whose output dir is the Afon cdktf dir (`$AFON_CDKTF`),
+3. builds the `ComposedStack` of the definition: it sets up the platform of the cloud, then deploys the components in order,
+   after checking that they are composed correctly (`requires()` and `after()`), and
+4. synthesises it, which writes the plan `stacks/<stack-id>/cdk.tf.json` and its assets, with the local tofu backend pointing at
+   `terraform.<stack-id>.tfstate`, but never touches that state.
+
+No code of Afon outside the tests creates a CDKTF app or a stack: there is no class or main per stack, so adding a stack to
+`StackDefinitions` is all that it takes to synthesise and validate it. (To deploy it with `manage-stack` it also needs registering
+in `StackStepsFactory`.) The tests, `StackSynthesisGoldenTest` and `DeterministicSynthesisTest`, build the same `ComposedStack`
+in a temp dir. The plan is a function of the stack id and the config alone, which is why it must be deterministic.
+`ComposedStack.main(<stack-id>)` runs it by hand, from the config dir.
+
+It is also how stacks are validated. `CloudStackValidator.validate(stackId, properties)` calls it, so validating a stack is
+synthesising its plan, without any login to the cloud and without running `tofu`. That checks that the stack is registered, that the
+config has every property its components need for that cloud, that the components are composed correctly, and that
+CDKTF accepts the result. The validator is used by:
+- `afon-cli.sh validate-stack <stack-id>`, which lists the registered stacks when run without one;
+- `StepOperations`, with the config it was created with, so that a step is validated against the config it runs with. It
+  synthesises the plan before starting a stack (`tofu` applies the plan it has just written), and before deleting a deployed
+  stack, so that `tofu destroy` runs on a current plan and fails early, before anything is destroyed, if the stack no longer
+  validates, eg because a property is missing.
+
+The flow, from the commands to the plan:
+
+```
+  manage-stack {setup|deploy|delete} <stack-id>               validate-stack <stack-id>
+              │                                                          │
+              ▼                                                          │
+  ┌──────────────────────────────────────────┐                           │
+  │ StepOperations                           │                           │
+  │ holds the AfonPropertyProvider of a run  │                           │
+  │ - before starting a stack                │                           │
+  │ - before deleting a deployed stack       │                           │
+  └────────────────────┬─────────────────────┘                           │
+                       │ synthesiseStack(stackId, properties)            │
+                       ▼                                                 │
+  ┌──────────────────────────────────────────┐                           │
+  │ StepActions.synthesiseStack              │                           │
+  │ (StepDocumentation prints the command    │                           │
+  │  `afon-cli.sh validate-stack <stack-id>`)│                           │
+  └────────────────────┬─────────────────────┘                           │
+                       │ validate(stackId, properties)                   │ validate(stackId, properties)
+                       ▼                                                 ▼
+  ┌────────────────────────────────────────────────────────────────────────────┐
+  │ CloudStackValidator.validate(stackId, properties)                          │
+  └────────────────────────────────────┬───────────────────────────────────────┘
+                                       │ synthesise(stackId, properties)
+                                       ▼
+  ┌────────────────────────────────────────────────────────────────────────────┐
+  │ ComposedStack.synthesise(stackId, properties)   the only entry to CDKTF    │
+  │  1. StackDefinitions.get(stackId)               fails if not registered    │
+  │  2. new ComposedStack(app, definition, properties)                         │
+  │       - the cloud's platform (AWS / Azure / GCP cloud provider)            │
+  │       - the components, in order, checked: requires() and after()          │
+  │  3. app.synth()                                                            │
+  └────────────────────────────────────┬───────────────────────────────────────┘
+                                       ▼
+                 $AFON_CDKTF/stacks/<stack-id>/cdk.tf.json
+                 (the tofu state terraform.<stack-id>.tfstate is not touched)
+                                       │ only when starting a stack
+                                       ▼
+                 StepActions.startStack: tofu init, tofu apply
+```
+
 **Config per cloud.** A component asks for the logical name of a property and gets the one of its cloud, by the
 convention `<CLOUD>_<NAME>`, eg `getCloudValue(cloud, "POLARIS_DOMAIN_NAME")` reads `AWS_POLARIS_DOMAIN_NAME` on AWS and
 `AZURE_POLARIS_DOMAIN_NAME` on Azure. The properties are still declared in `AfonProperty`. A property the cloud does

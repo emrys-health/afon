@@ -2,12 +2,10 @@ package health.emrys.afon.cdk;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
-import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
 import org.slf4j.Logger;
 
 import java.util.List;
-import java.util.regex.Pattern;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -21,9 +19,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  */
 public class CloudStackValidator {
 
-    private static final Logger  logger         = getLogger(CloudStackValidator.class);
-    private static final String  STACK_SUFFIX   = "-stack";
-    private static final Pattern CAMEL_BOUNDARY = Pattern.compile("(?<=[a-z0-9])(?=[A-Z])");
+    private static final Logger logger = getLogger(CloudStackValidator.class);
 
     /**
      * @return the stacks, in order of their ids
@@ -40,18 +36,13 @@ public class CloudStackValidator {
     }
 
     /**
-     * Resolves a stack name, case-insensitively, in kebab case, with or without the "stack" suffix,
-     * eg "azure-polaris" or "azure-polaris-stack", or as a class simple name, eg "AzurePolarisStack".
+     * Resolves a stack id, case-insensitively, eg "azure-polaris" or "AWS-Full".
      *
-     * @return the stack, or {@code null} if not found
+     * @return the stack, or {@code null} if there is no such stack
      */
     public StackId resolve(String name) {
-        String kebabName = CAMEL_BOUNDARY.matcher(name).replaceAll("-").toLowerCase();
-        if (kebabName.endsWith(STACK_SUFFIX)) {
-            kebabName = kebabName.substring(0, kebabName.length() - STACK_SUFFIX.length());
-        }
         try {
-            StackId stackId = StackId.parse(kebabName);
+            StackId stackId = StackId.parse(name);
             return StackDefinitions.find(stackId).isPresent() ? stackId : null;
         } catch (IllegalArgumentException e) {
             return null;
@@ -66,17 +57,11 @@ public class CloudStackValidator {
     }
 
     /**
-     * Validates the stack by synthesising its plan into {@link #stackDir(StackId)}, from the config dir.
+     * Validates the stack by synthesising its plan into {@link #stackDir(StackId)}, from the given config,
+     * which is that of the caller, eg the operations of the steps, rather than one read again.
      *
      * @return the dir the stack was synthesised into
      * @throws RuntimeException if the stack fails to synthesise, eg because a property is missing
-     */
-    public String validate(StackId stackId) {
-        return validate(stackId, new FilePropertyProvider());
-    }
-
-    /**
-     * As {@link #validate(StackId)}, from the given config.
      */
     public String validate(StackId stackId, AfonPropertyProvider properties) {
         String stackDir = stackDir(stackId);

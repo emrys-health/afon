@@ -8,11 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.cdk.azure.AzureReader;
-import health.emrys.afon.config.AfonCatalog;
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.ConfigUtils;
-import health.emrys.afon.config.StackId;
+import health.emrys.afon.config.*;
 import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
@@ -24,14 +20,13 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
@@ -42,6 +37,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
@@ -59,10 +55,13 @@ public class StepActions {
     /**
      * Deletes the stacks in the cloud selected by the filter, allowing for a single attempt.
      * @param outputStream the stream to which the tofu output is written
+     * @param beforeDeleting called with each stack, just before it is deleted, eg to validate its plan, see
+     *                       {@link StepOperations#validatePlanBeforeDeleting(StackId)}
      * @throws IOException
      */
-    void deleteStacksIn(AfonCloud cloud, StackFilter filter, OutputStream outputStream) throws IOException {
-        deleteStacksIn(cloud, filter, 1, outputStream);
+    void deleteStacksIn(AfonCloud cloud, StackFilter filter, OutputStream outputStream,
+                        Consumer<StackId> beforeDeleting) throws IOException {
+        deleteStacksIn(cloud, filter, 1, outputStream, beforeDeleting);
     }
 
     /**
@@ -70,9 +69,11 @@ public class StepActions {
      * allowing a given number of retries.  These include the legacy stack, whose dir and tofu state were shared by
      * all the stacks of the cloud, named as the cloud.
      * @param outputStream the stream to which the tofu output is written
+     * @param beforeDeleting called with each stack with a stack id, just before it is deleted
      * @throws IOException
      */
-    void deleteStacksIn(AfonCloud cloud, StackFilter filter, int maxAttempts, OutputStream outputStream) throws IOException {
+    void deleteStacksIn(AfonCloud cloud, StackFilter filter, int maxAttempts, OutputStream outputStream,
+                        Consumer<StackId> beforeDeleting) throws IOException {
         checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
         List<String> stackNames = stackNamesIn(cloud, filter);
         // only a deployed stack, ie with a tofu state, may need keeping: a stack dir without one is just deleted
@@ -86,7 +87,7 @@ public class StepActions {
                 deleteStack(Path.of(legacyStackDir(cloud)), Path.of(legacyTfStatePath(cloud)), maxAttempts, outputStream);
             } else {
                 StackId stackId = StackId.parse(stackName);
-                validateStack(stackId);
+                beforeDeleting.accept(stackId);
                 deleteStack(Path.of(ConfigUtils.stackDir(stackId)), Path.of(tfStatePath(stackId)), maxAttempts, outputStream);
                 // the kubeconfig of the stack's cluster, which is now gone
                 deletePath(Path.of(kubeConfigPath(stackId)));
@@ -180,38 +181,6 @@ public class StepActions {
     }
 
     /**
-     * Validates the plan of a deployed stack from the current config, so that {@code tofu destroy} doesn't
-     * run on the plan left by the last deploy or validation, which can be stale, eg after a change of config.
-     * It also fails early, before anything is destroyed, if the stack no
-     * longer validates, eg because of a missing property.  Does nothing if the stack is not deployed, ie has no
-     * tofu state, or has no definition, as the legacy stacks.
-     * @throws IllegalStateException if the stack fails to synthesise
-     */
-    void validateStack(StackId stackId) {
-        validateStack(stackId, Path.of(tfStatePath(stackId)));
-    }
-
-    void validateStack(StackId stackId, Path tfState) {
-        if (!exists(tfState)) {
-            return;
-        }
-        CloudStackValidator validator = new CloudStackValidator();
-        if (validator.resolve(stackId.toString()) == null) {
-            logger.info("No definition of stack {}, so not validating it before deleting it", stackId);
-            return;
-        }
-        logger.info("Validating stack {} again before deleting it, so that its plan is current", stackId);
-        try {
-            validator.validate(stackId);
-        } catch (RuntimeException cause) {
-            throw new IllegalStateException(String.format(
-                "Cannot delete stack %s, as it failed to validate against the current config: %s%n"
-                + "Fix the config, as validated with 'afon-cli.sh validate-stack %s', and run again.",
-                stackId, cause.getMessage(), stackId), cause);
-        }
-    }
-
-    /**
      * Deletes the stack by running {@code tofu destroy} in its dir, if it has a tofu state, then deleting
      * its dir and tofu state.
      * @throws IllegalStateException if the stack has a tofu state but no dir, as tofu cannot destroy it
@@ -301,6 +270,15 @@ public class StepActions {
     }
 
     /**
+     * Synthesises the plan of the stack into its stack dir, from the config.
+     * @param properties the config, which the caller has already, so that every step is validated against the same
+     * @throws RuntimeException if the stack fails to synthesise, eg because of a missing property
+     */
+    protected void synthesiseStack(StackId stackId, AfonPropertyProvider properties) throws Exception {
+        new CloudStackValidator().validate(stackId, properties);
+    }
+
+    /**
      * Starts the stack, allowing for a single attempt.
      * @param outputStream the stream to which the tofu output is written
      * @throws Exception
@@ -311,20 +289,12 @@ public class StepActions {
 
     /**
      * Starts the stack, attempting for a given number of retries, in the stack dir of its {@link StackId}, eg
-     * {@code aws-keycloak}, after synthesising its plan there.
+     * {@code aws-keycloak}, whose plan must have been synthesised there, see {@link #synthesiseStack}.
      * @param outputStream the stream to which the tofu output is written
      * @throws Exception
      */
     void startStack(StackId stackId, int maxAttempts, OutputStream outputStream) throws Exception {
-        synthesiseStack(stackId);
         startManagedStack(stackId, maxAttempts, outputStream);
-    }
-
-    /**
-     * Synthesises the plan of the stack into its stack dir.
-     */
-    protected void synthesiseStack(StackId stackId) throws Exception {
-        new CloudStackValidator().validate(stackId);
     }
 
     private void startManagedStack(StackId stackId, int maxAttempts, OutputStream outputStream) throws IOException {

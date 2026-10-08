@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
+import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.config.*;
 import health.emrys.afon.ops.snowflake.SnowflakeStatements;
 import health.emrys.afon.ops.spark.SparkRunner;
@@ -12,12 +13,15 @@ import org.slf4j.Logger;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.steps.DurationUtils.formatDuration;
@@ -75,7 +79,8 @@ public class StepOperations {
         logger.info(format("Deleting %s in cloud %s", filter.description(), cloud));
         return new Step(stepName,
                 format("delete %s in %s", filter.description(), cloud),
-                () -> timed(deleteDurations, stackId, () -> actions.deleteStacksIn(cloud, filter, tofuOutput())));
+                () -> timed(deleteDurations, stackId, () -> actions.deleteStacksIn(
+                    cloud, filter, tofuOutput(), this::validatePlanBeforeDeleting)));
     }
 
     /**
@@ -100,8 +105,45 @@ public class StepOperations {
                     "Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first, eg: afon-cli.sh manage-stack setup aws-keycloak"));
     }
 
+    /**
+     * Starts the stack, after synthesising its plan from the config these operations were created with.
+     */
     private void startStack(StackId stackId) throws Exception {
-        timed(deployDurations, stackId, () -> actions.startStack(stackId, tofuOutput()));
+        timed(deployDurations, stackId, () -> {
+            actions.synthesiseStack(stackId, properties);
+            actions.startStack(stackId, tofuOutput());
+        });
+    }
+
+    /**
+     * Validates the plan of a deployed stack from the current config, so that {@code tofu destroy} doesn't
+     * run on the plan left by the last deploy or validation, which can be stale, eg after a change of config.
+     * It also fails early, before anything is destroyed, if the stack no
+     * longer validates, eg because of a missing property.  Does nothing if the stack is not deployed, ie has no
+     * tofu state, or has no definition, as the legacy stacks.
+     * @throws IllegalStateException if the stack fails to synthesise
+     */
+    void validatePlanBeforeDeleting(StackId stackId) {
+        validatePlanBeforeDeleting(stackId, Path.of(tfStatePath(stackId)));
+    }
+
+    void validatePlanBeforeDeleting(StackId stackId, Path tfState) {
+        if (!Files.exists(tfState)) {
+            return;
+        }
+        if (new CloudStackValidator().resolve(stackId.toString()) == null) {
+            logger.info("No definition of stack {}, so not validating it before deleting it", stackId);
+            return;
+        }
+        logger.info("Validating stack {} again before deleting it, so that its plan is current", stackId);
+        try {
+            actions.synthesiseStack(stackId, properties);
+        } catch (Exception cause) {
+            throw new IllegalStateException(String.format(
+                "Cannot delete stack %s, as it failed to validate against the current config: %s%n"
+                + "Fix the config, as validated with 'afon-cli.sh validate-stack %s', and run again.",
+                stackId, cause.getMessage(), stackId), cause);
+        }
     }
 
     public Step deployFullStackIn(AfonCloud cloud) {
