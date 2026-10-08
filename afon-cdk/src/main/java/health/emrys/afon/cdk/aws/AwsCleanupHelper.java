@@ -179,7 +179,7 @@ public class AwsCleanupHelper extends CleanupHelper {
                 aws ec2 delete-vpc --vpc-id $VPC_ID
             } done
             
-            for ROLE_NAME in $(echo "%s" "%s" "%s") ; do {
+            for ROLE_NAME in $(echo "%s" "%s" "%s" "%s") ; do {
                echo $ROLE_NAME ;
                for ARN in $(aws iam list-attached-role-policies --role-name $ROLE_NAME --query 'AttachedPolicies[*].PolicyArn' --output text) ; do {
                    echo "Detaching $ROLE_NAME from $ARN"
@@ -206,6 +206,7 @@ public class AwsCleanupHelper extends CleanupHelper {
             componentNames.getClusterRoleName(),
             componentNames.getNodeGroupRoleName(),
             componentNames.getLoadBalancerRoleName(),
+            componentNames.getEbsCsiDriverRoleName(),
             componentNames.getAccessPolicyName(),
             componentNames.getRegion(),
             componentNames.getSecret()

@@ -18,6 +18,7 @@ import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntryConfig;
 import com.hashicorp.cdktf.providers.aws.eks_access_policy_association.EksAccessPolicyAssociation;
 import com.hashicorp.cdktf.providers.aws.eks_access_policy_association.EksAccessPolicyAssociationAccessScope;
 import com.hashicorp.cdktf.providers.aws.eks_access_policy_association.EksAccessPolicyAssociationConfig;
+import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksCluster;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterAccessConfig;
 import com.hashicorp.cdktf.providers.aws.eks_cluster.EksClusterVpcConfig;
@@ -53,6 +54,8 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
+import com.hashicorp.cdktf.providers.kubernetes.storage_class_v1.StorageClassV1;
+import com.hashicorp.cdktf.providers.kubernetes.storage_class_v1.StorageClassV1Metadata;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.AbstractCloudProvider;
 import health.emrys.afon.config.AfonProperty;
@@ -115,6 +118,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     private       HelmProvider               helmProvider;
     private final List<ITerraformDependable> lbcIrsaDependables = new ArrayList<>();
     private       KubernetesProvider         k8sProvider;
+    private final EksNodeGroup               nodeGroup;
+    private       List<ITerraformDependable> storageDependables;
 
     /**
      * @param pinnedEgressIp whether the egress IP is pinned to {@code AWS_EGRESS_IP}, if set, else a fresh one is
@@ -508,7 +513,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                                         .provisioners(updateKubeConfig)
                                         .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
                                         .build();
-        EksNodeGroup nodeGroup = EksNodeGroup.Builder
+        nodeGroup = EksNodeGroup.Builder
             .create(this, "eksNodeGroup")
             .clusterName(cluster.getName())
             .nodeGroupName("default-ng")
@@ -756,10 +761,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             ))
             .build();
 
-        String trustPolicy = format(
-            """
-            ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:aws-load-balancer-controller\"}}}]})}
-            """, accountId);
+        String trustPolicy = irsaTrustPolicy("aws-load-balancer-controller");
         loadBalancerRole = new IamRole(
             scope, "AmazonEKSLoadBalancerControllerRole",
             IamRoleConfig
@@ -915,6 +917,17 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                        .build())
             .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
             .build());
+    }
+
+    /**
+     * The trust policy of a role assumed via IRSA by the given service account in {@code kube-system}, through the
+     * OIDC provider {@link #associateOIDCProvider} creates.
+     */
+    private String irsaTrustPolicy(String serviceAccount) {
+        return format(
+            """
+            ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:kube-system:%s\"}}}]})}
+            """, accountId, serviceAccount);
     }
 
     private Release configureIngress(Construct scope, IamRole loadBalancerRole) {
@@ -1266,6 +1279,80 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     private List<String> eksTokenArgs() {
         return List.of("eks", "get-token", "--cluster-name", clusterName, "--region", region);
+    }
+
+    /** The service account the EBS CSI driver add-on runs its controller as. */
+    private static final String EBS_CSI_SERVICE_ACCOUNT = "ebs-csi-controller-sa";
+
+    /** The StorageClass {@link #getStorageDependables()} creates for EBS gp3 volumes. */
+    static final String EBS_STORAGE_CLASS = "ebs-gp3";
+
+    @Override
+    public String getStorageClassName() {
+        return EBS_STORAGE_CLASS;
+    }
+
+    /**
+     * EKS no longer provisions volumes out of the box: the in-tree EBS provisioner behind its legacy {@code gp2}
+     * StorageClass has been migrated to the EBS CSI driver, which is an add-on, so a claim would stay
+     * {@code Pending}.  This installs the add-on, lets it manage volumes via IRSA, and adds a gp3 StorageClass,
+     * which is not made the cluster default so that nothing else starts provisioning volumes unannounced.
+     * <p>
+     * IRSA rather than the node role, as for the load balancer controller: the nodes require IMDSv2 with a hop
+     * limit of 1, so pods cannot reach the instance metadata for the node role's credentials, and the driver's
+     * controller fails its health check (and the add-on never becomes {@code ACTIVE}).
+     * <p>
+     * {@code WaitForFirstConsumer} creates the volume in the availability zone the pod is scheduled to, as an EBS
+     * volume can only attach to a node in its own zone.  The volumes are deleted with their claims, but
+     * asynchronously, by the driver, so on destroy the StorageClass waits for them to go before the driver can.
+     */
+    @Override
+    public synchronized List<ITerraformDependable> getStorageDependables() {
+        if (storageDependables == null) {
+            IamRole ebsCsiRole = IamRole.Builder
+                .create(this, "ebsCsiDriverRole")
+                .name(componentNames.getEbsCsiDriverRoleName())
+                .assumeRolePolicy(irsaTrustPolicy(EBS_CSI_SERVICE_ACCOUNT))
+                .build();
+            IamRolePolicyAttachment ebsCsiAttachment = IamRolePolicyAttachment.Builder
+                .create(this, "ebsCsiDriverPolicyAttachment")
+                .policyArn("arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy")
+                .role(ebsCsiRole.getName())
+                .lifecycle(TerraformResourceLifecycle.builder().preventDestroy(false).build())
+                .build();
+            // Its controller needs pod networking, ie Cilium (in eksDependOn), as well as nodes to run on, and the
+            // OIDC provider (in lbcIrsaDependables) to assume its role.
+            List<ITerraformDependable> addonDependOn = new ArrayList<>(eksDependOn);
+            addonDependOn.add(nodeGroup);
+            addonDependOn.addAll(lbcIrsaDependables);
+            addonDependOn.add(ebsCsiAttachment);
+            EksAddon ebsCsiDriver = EksAddon.Builder
+                .create(this, "ebsCsiDriver")
+                .clusterName(cluster.getName())
+                .addonName("aws-ebs-csi-driver")
+                .serviceAccountRoleArn(ebsCsiRole.getArn())
+                .resolveConflictsOnCreate("OVERWRITE")
+                .resolveConflictsOnUpdate("OVERWRITE")
+                .dependsOn(addonDependOn)
+                .build();
+            StorageClassV1 storageClass = StorageClassV1.Builder
+                .create(this, "ebsGp3StorageClass")
+                .dependsOn(List.of(ebsCsiDriver))
+                .metadata(StorageClassV1Metadata.builder().name(EBS_STORAGE_CLASS).build())
+                .storageProvisioner("ebs.csi.aws.com")
+                .reclaimPolicy("Delete")
+                .volumeBindingMode("WaitForFirstConsumer")
+                .allowVolumeExpansion(true)
+                .parameters(Map.of("type", "gp3", "encrypted", "true"))
+                .provisioners(uponDestroyRun(format(
+                    "for i in $(seq 60); do " +
+                        "kubectl get pv -o jsonpath='{.items[?(@.spec.storageClassName==\"%s\")].metadata.name}'" +
+                        " | grep -q . || exit 0; echo 'waiting for EBS volumes to be deleted'; sleep 5; done",
+                    EBS_STORAGE_CLASS)))
+                .build();
+            storageDependables = List.of(ebsCsiDriver, storageClass);
+        }
+        return storageDependables;
     }
 
     @Override

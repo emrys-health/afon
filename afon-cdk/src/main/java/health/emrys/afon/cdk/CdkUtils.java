@@ -92,6 +92,27 @@ public class CdkUtils {
         List<DeploymentSpecTemplateSpecVolume>        volumes,
         String                                        name,
         String                                        createTimeout) {
+        return deploy(scope, eksDependOn, labels, containers, initContainers, volumes, name, createTimeout, null, null);
+    }
+
+    /**
+     * As {@link #deploy(Construct, List, Map, List, List, List, String, String)}, additionally taking the
+     * Deployment's update strategy and the pod's security context, each left at the Kubernetes default when
+     * {@code null}.  A pod mounting a {@code ReadWriteOnce} volume needs the {@code Recreate} strategy: a rolling
+     * update starts the new pod before stopping the old one, and if the scheduler places it on another node it
+     * waits forever for a volume the old pod still holds.
+     */
+    public static Deployment deploy(
+        Construct                                     scope,
+        List<@NonNull ITerraformDependable>           eksDependOn,
+        Map<String, String>                           labels,
+        List<DeploymentSpecTemplateSpecContainer>     containers,
+        List<DeploymentSpecTemplateSpecInitContainer> initContainers,
+        List<DeploymentSpecTemplateSpecVolume>        volumes,
+        String                                        name,
+        String                                        createTimeout,
+        DeploymentSpecStrategy                        strategy,
+        DeploymentSpecTemplateSpecSecurityContext     securityContext) {
         // Mirror `app` onto the canonical Kubernetes label so Hubble UI shows
         // a real workload name rather than "Unknown App". Only the pod template
         // gets the extra label — the selector and Deployment metadata keep the
@@ -106,6 +127,9 @@ public class CdkUtils {
         if (!initContainers.isEmpty()) {
             podSpec.initContainer(initContainers);
         }
+        if (securityContext != null) {
+            podSpec.securityContext(securityContext);
+        }
         DeploymentSpecTemplate specTemplate = DeploymentSpecTemplate
             .builder()
             .metadata(metadata)
@@ -119,6 +143,9 @@ public class CdkUtils {
                           .build())
             .replicas("1")
             .template(specTemplate);
+        if (strategy != null) {
+            deploymentSpec.strategy(strategy);
+        }
         // Kubernetes fails a rollout once its own progressDeadlineSeconds (default 600s / 10m)
         // elapses, surfacing a "Deployment exceeded its progress deadline" condition that the
         // provider reports as an error long before the Terraform create timeout below is reached.

@@ -29,7 +29,8 @@ public class AwsComponentNames {
         }
         cluster = clusterName(properties.getValue(CLUSTER_NAME), stackId);
         region = properties.getValue(AWS_REGION);
-        checkRoleNameLength(getClusterRoleName(), getNodeGroupRoleName(), getLoadBalancerRoleName());
+        checkRoleNameLength(getClusterRoleName(), getNodeGroupRoleName(), getLoadBalancerRoleName(),
+                            getEbsCsiDriverRoleName());
     }
 
     /**
@@ -120,5 +121,9 @@ public class AwsComponentNames {
 
     public String getLoadBalancerRoleName() {
         return "AmazonEKSLoadBalancerControllerRole" + cluster;
+    }
+
+    public String getEbsCsiDriverRoleName() {
+        return "cdktf-eks-ebs-csi-role-" + cluster;
     }
 }

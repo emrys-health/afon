@@ -17,6 +17,10 @@ import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecInit
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecInitContainerVolumeMount;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecVolume;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecVolumeEmptyDir;
+import com.hashicorp.cdktf.providers.kubernetes.persistent_volume_claim_v1.PersistentVolumeClaimV1;
+import com.hashicorp.cdktf.providers.kubernetes.persistent_volume_claim_v1.PersistentVolumeClaimV1Metadata;
+import com.hashicorp.cdktf.providers.kubernetes.persistent_volume_claim_v1.PersistentVolumeClaimV1Spec;
+import com.hashicorp.cdktf.providers.kubernetes.persistent_volume_claim_v1.PersistentVolumeClaimV1SpecResources;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
@@ -53,6 +57,12 @@ public class PolarisConfig extends Construct {
     private static final String          SECRET_VOLUME    = "secret-volume";
     private static final String          POLARIS_ENV_FILE = "polaris_env.sh";
     private static final String      GCP_CREDENTIALS_FILE = "service-account.json";
+    private static final String          LOGS_CLAIM       = "polaris-logs";
+    private static final String          LOGS_VOLUME      = "logs-volume";
+    static final         String          LOGS_DIR         = "/var/log/polaris";
+    private static final String          LOGS_SIZE        = "5Gi";
+    /** The group of the {@code polaris} user (uid 10000) the image runs as. */
+    private static final int             POLARIS_GID      = 10001;
     /** Quarkus' management interface, which serves Polaris' health checks (not the API port). */
     public static final int             MANAGEMENT_PORT      = 8182;
     public static final String          MANAGEMENT_PORT_NAME = "management";
@@ -295,6 +305,10 @@ public class PolarisConfig extends Construct {
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL=DEBUG
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL=ERROR
             export QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS_LOG__LEVEL=ERROR
+            export QUARKUS_LOG_FILE_ENABLE=true
+            export QUARKUS_LOG_FILE_PATH=%s/polaris.log
+            export QUARKUS_LOG_FILE_ROTATION_MAX_FILE_SIZE=100M
+            export QUARKUS_LOG_FILE_ROTATION_MAX_BACKUP_COUNT=20
             export QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING=true
 
             export POLARIS_FEATURES_ENABLE_CATALOG_FEDERATION=true
@@ -303,7 +317,8 @@ public class PolarisConfig extends Construct {
             """,
             kcConfig,
             String.join("\n", exports),
-            gcpExport
+            gcpExport,
+            LOGS_DIR
         );
     }
 
@@ -370,6 +385,7 @@ public class PolarisConfig extends Construct {
     public Service deployPolaris(List<ITerraformDependable> eksDependOn) {
         List<ITerraformDependable> dependsOn = new ArrayList<>(eksDependOn);
         dependsOn.add(polarisDbInitJob);
+        dependsOn.add(buildLogsClaim(eksDependOn));
 
         List<DeploymentSpecTemplateSpecVolume> volumes = List.of(
             DeploymentSpecTemplateSpecVolume
@@ -379,6 +395,14 @@ public class PolarisConfig extends Construct {
                             .builder()
                             .secretName(SECRET_NAME)
                             .build())
+                .build(),
+            DeploymentSpecTemplateSpecVolume
+                .builder()
+                .name(LOGS_VOLUME)
+                .persistentVolumeClaim(DeploymentSpecTemplateSpecVolumePersistentVolumeClaim
+                                           .builder()
+                                           .claimName(LOGS_CLAIM)
+                                           .build())
                 .build());
 
 
@@ -388,6 +412,11 @@ public class PolarisConfig extends Construct {
                         .name(SECRET_VOLUME)
                         .mountPath(SECRETS_DIR)
                         .readOnly(true)
+                        .build(),
+                    DeploymentSpecTemplateSpecContainerVolumeMount
+                        .builder()
+                        .name(LOGS_VOLUME)
+                        .mountPath(LOGS_DIR)
                         .build());
 
         List<String> commands = List.of(
@@ -422,10 +451,45 @@ public class PolarisConfig extends Construct {
             dependsOn,
             polarisLabels,
             List.of(polarisContainer),
+            List.of(),
             volumes,
-            "polaris");
+            "polaris",
+            null,
+            // The logs volume is ReadWriteOnce, see CdkUtils#deploy.
+            DeploymentSpecStrategy.builder().type("Recreate").build(),
+            // A freshly provisioned disk is owned by root: fsGroup makes it writable by the polaris user.
+            DeploymentSpecTemplateSpecSecurityContext.builder()
+                                                     .fsGroup(String.valueOf(POLARIS_GID))
+                                                     .build());
 
         return configurePolarisService(polarisDeployment);
+    }
+
+    /**
+     * The claim on the volume Polaris logs to (as well as to the console), so that its logs outlive the pod.  The
+     * volume is provisioned when the pod is first scheduled, in its zone, hence no waiting for the claim to be bound,
+     * which would never happen while the Deployment waits for the claim.
+     */
+    private PersistentVolumeClaimV1 buildLogsClaim(List<ITerraformDependable> eksDependOn) {
+        List<ITerraformDependable> dependsOn = new ArrayList<>(eksDependOn);
+        dependsOn.addAll(cloudProvider.getStorageDependables());
+        PersistentVolumeClaimV1Spec.Builder spec = PersistentVolumeClaimV1Spec
+            .builder()
+            .accessModes(List.of("ReadWriteOnce"))
+            .resources(PersistentVolumeClaimV1SpecResources.builder()
+                                                           .requests(Map.of("storage", LOGS_SIZE))
+                                                           .build());
+        String storageClassName = cloudProvider.getStorageClassName();
+        if (storageClassName != null) {
+            spec.storageClassName(storageClassName);
+        }
+        return PersistentVolumeClaimV1.Builder
+            .create(this, "polarisLogsClaim")
+            .dependsOn(dependsOn)
+            .metadata(PersistentVolumeClaimV1Metadata.builder().name(LOGS_CLAIM).namespace("default").build())
+            .spec(spec.build())
+            .waitUntilBound(false)
+            .build();
     }
 
     protected Service configurePolarisService(Deployment polarisDeployment) {

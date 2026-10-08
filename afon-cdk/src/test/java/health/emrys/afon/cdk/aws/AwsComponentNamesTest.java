@@ -43,6 +43,7 @@ class AwsComponentNamesTest {
         assertThat(names.getClusterRoleName()).isEqualTo("cdktf-eks-cluster-role-keycloak-emrys-cluster");
         assertThat(names.getNodeGroupRoleName()).isEqualTo("cdktf-eks-nodegroup-role-keycloak-emrys-cluster");
         assertThat(names.getLoadBalancerRoleName()).isEqualTo("AmazonEKSLoadBalancerControllerRolekeycloak-emrys-cluster");
+        assertThat(names.getEbsCsiDriverRoleName()).isEqualTo("cdktf-eks-ebs-csi-role-keycloak-emrys-cluster");
     }
 
     @Test

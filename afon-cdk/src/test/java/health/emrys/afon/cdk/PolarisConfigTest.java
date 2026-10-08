@@ -39,6 +39,8 @@ class PolarisConfigTest {
         String script = PolarisConfig.getProviderCredentials(properties, deploymentId);
         String polarisDbName = "polaris_db_" + PolarisConfig.polarisDomainName(properties, deploymentId).replace(".", "_");
         assertThat(script).contains(polarisDbName);
+        assertThat(script).contains("export QUARKUS_LOG_FILE_ENABLE=true");
+        assertThat(script).contains("export QUARKUS_LOG_FILE_PATH=" + PolarisConfig.LOGS_DIR + "/polaris.log");
         PolarisConstants.getPolarisProperties(cloud)
                 .forEach((property, envName) -> {
                     assertThat(script).contains(envName);

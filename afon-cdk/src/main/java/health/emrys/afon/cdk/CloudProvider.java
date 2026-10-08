@@ -30,6 +30,24 @@ public interface CloudProvider {
         return Map.of();
     }
 
+    /**
+     * The StorageClass for a workload's {@code ReadWriteOnce} PersistentVolumeClaim, or {@code null} for the
+     * cluster's default one.  AKS ({@code managed-csi}) and GKE ({@code standard-rwo}) come with a default that
+     * provisions a disk dynamically, so they use it.  EKS has none that works, see the AWS override.
+     */
+    default String getStorageClassName() {
+        return null;
+    }
+
+    /**
+     * Dependencies that a PersistentVolumeClaim must wait on beyond {@link #getDependables()}, ie whatever
+     * provisions its volume.  On AWS this is the EBS CSI driver add-on and its StorageClass, created by the first
+     * call, so that stacks without a claim do without them.  Empty by default.
+     */
+    default List<ITerraformDependable> getStorageDependables() {
+        return List.of();
+    }
+
     void configureLoadBalancerDestroy(List<Service> loadBalancers);
 
     KubernetesProvider configureK8s();
