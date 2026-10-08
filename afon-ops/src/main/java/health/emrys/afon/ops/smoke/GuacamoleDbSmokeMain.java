@@ -1,6 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.cdk.GuacamoleConfig;
+import health.emrys.afon.cdk.configs.GuacamoleConfig;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.slf4j.Logger;

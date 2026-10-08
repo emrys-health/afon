@@ -64,6 +64,7 @@ import health.emrys.afon.cdk.AbstractCloudProvider;
 import health.emrys.afon.cdk.KubeConfigAspect;
 import health.emrys.afon.cdk.HealthCheck;
 import health.emrys.afon.cdk.HttpsExposure;
+import health.emrys.afon.cdk.LogStorage;
 import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
@@ -84,7 +85,7 @@ import static health.emrys.afon.cdk.CdkUtils.addMaps;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
-import static health.emrys.afon.cdk.SparkWorkloads.MASTER_LABELS;
+import static health.emrys.afon.cdk.configs.SparkWorkloads.MASTER_LABELS;
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
 import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
@@ -628,7 +629,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 // The matching ServiceMonitor toggles (prometheus.serviceMonitor.enabled,
                 // operator.prometheus.serviceMonitor.enabled) are intentionally LEFT OFF:
                 // they need monitoring.coreos.com CRDs which kube-prometheus-stack
-                // installs in a later component (AwsMonitoringComponent). The ServiceMonitor
+                // installs in a later component (MonitoringComponent). The ServiceMonitor
                 // for Cilium is therefore created on the Prometheus side once those CRDs
                 // exist.
                 createValue("prometheus.enabled", "true"),
@@ -1098,6 +1099,38 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     @Override
     public AfonCloud cloud() {
         return AWS;
+    }
+
+    /**
+     * @return the cluster name qualified by the stack type, eg {@code full-emrys-cluster}
+     */
+    @Override
+    public String clusterName() {
+        return componentNames.getCluster();
+    }
+
+    /**
+     * The logs are kept in the bucket of the "aws" catalog (see catalogs-aws.properties), in the region, with the access
+     * key of {@code AWS_ACCESS_KEY_ID} and {@code AWS_SECRET_ACCESS_KEY}.
+     */
+    @Override
+    public LogStorage logStorage() {
+        String bucket = properties.getCatalogProperty("AWS_BUCKET_NAME", "aws");
+        return new LogStorage("S3", "s3", String.format("""
+            type: s3
+            bucketNames:
+              chunks: %1$s
+              ruler: %1$s
+              admin: %1$s
+            s3:
+              region: %2$s
+              endpoint: ""
+              accessKeyId: %3$s
+              secretAccessKey: %4$s
+              s3ForcePathStyle: false
+              insecure: false
+            """, bucket, region, properties.getValue(AfonProperty.AWS_ACCESS_KEY_ID),
+                                                       properties.getValue(AfonProperty.AWS_SECRET_ACCESS_KEY)));
     }
 
     /**

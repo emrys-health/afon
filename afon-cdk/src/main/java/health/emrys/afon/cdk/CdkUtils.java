@@ -175,7 +175,7 @@ public class CdkUtils {
      * {@code app.kubernetes.io/name} is already set the input is returned
      * unchanged.
      */
-    static Map<String, String> withAppKubernetesIoName(Map<String, String> labels) {
+    public static Map<String, String> withAppKubernetesIoName(Map<String, String> labels) {
         if (labels.containsKey("app.kubernetes.io/name")) {
             return labels;
         }

@@ -1,10 +1,11 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.cdk.component.StackComponent;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -20,4 +21,44 @@ import java.util.function.Function;
 public record StackDefinition(StackId id,
                               boolean pinnedEgressIp,
                               Function<AfonPropertyProvider, List<StackComponent>> components) {
+
+    /**
+     * @return the stack's components for the config, new for each call, checked to be composed correctly
+     * @throws IllegalStateException if a component is more than once in the stack, or the stack has not what a component
+     *                               requires before it, or has what it must come after, after it
+     */
+    public List<StackComponent> componentsFor(AfonPropertyProvider properties) {
+        List<StackComponent> components = components().apply(properties);
+        validate(id, components);
+        return components;
+    }
+
+    static void validate(StackId id, List<StackComponent> components) {
+        Set<Class<? extends StackComponent>> deployed = new HashSet<>();
+        for (StackComponent component : components) {
+            String name = component.getClass().getSimpleName();
+            if (deployed.contains(component.getClass())) {
+                throw new IllegalStateException(String.format("Stack %s has %s more than once", id, name));
+            }
+            for (Class<? extends StackComponent> required : component.requires()) {
+                if (!deployed.contains(required)) {
+                    throw new IllegalStateException(String.format(
+                        "Stack %s needs %s before %s", id, required.getSimpleName(), name));
+                }
+            }
+            deployed.add(component.getClass());
+        }
+        // what a component must come after, if the stack has it, must not be deployed later
+        Set<Class<? extends StackComponent>> seen = new HashSet<>();
+        for (StackComponent component : components) {
+            seen.add(component.getClass());
+            for (Class<? extends StackComponent> before : component.after()) {
+                boolean hasIt = components.stream().anyMatch(other -> other.getClass().equals(before));
+                if (hasIt && !seen.contains(before)) {
+                    throw new IllegalStateException(String.format(
+                        "Stack %s needs %s before %s", id, before.getSimpleName(), component.getClass().getSimpleName()));
+                }
+            }
+        }
+    }
 }

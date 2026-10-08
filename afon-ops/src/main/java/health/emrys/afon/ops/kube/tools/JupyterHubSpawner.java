@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
-import static health.emrys.afon.cdk.JupyterHubConfig.HUB_LABELS;
-import static health.emrys.afon.cdk.JupyterHubConfig.HUB_PORT;
+import static health.emrys.afon.cdk.configs.JupyterHubConfig.HUB_LABELS;
+import static health.emrys.afon.cdk.configs.JupyterHubConfig.HUB_PORT;
 import static health.emrys.afon.config.AfonProperty.USER_ID;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
 

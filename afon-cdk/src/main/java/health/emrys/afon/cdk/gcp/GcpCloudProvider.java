@@ -29,7 +29,7 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.AbstractNginxCloudProvider;
+import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
 import health.emrys.afon.cdk.CachedTlsSecret;
 import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.config.AfonCloud;
@@ -62,7 +62,7 @@ import static java.lang.String.format;
  * If you need to destroy by hand, run:
  * gcloud container clusters delete $CLUSTER_NAME --region=$REGION --project $GCP_PROJECT_ID
  */
-public class GcpCloudProvider extends AbstractNginxCloudProvider {
+public class GcpCloudProvider extends AbstractHttpsCloudProvider {
 
     private static final Logger  logger             = org.slf4j.LoggerFactory.getLogger(GcpCloudProvider.class);
     private static final Pattern DNS_ZONE_NAME_RULE = Pattern.compile("[a-z]([-a-z0-9]*[a-z0-9])?");
@@ -70,6 +70,7 @@ public class GcpCloudProvider extends AbstractNginxCloudProvider {
 
     private final ContainerCluster   gkeCluster;
     private final String             projectId;
+    private final String             clusterName;
     private final boolean            secretsEnabled;
     private       KubernetesProvider k8sProvider;
     private       HelmProvider       helmProvider;
@@ -83,7 +84,7 @@ public class GcpCloudProvider extends AbstractNginxCloudProvider {
         super(scope, id);
         this.projectId = projectIdFrom(properties);
         this.secretsEnabled = Boolean.parseBoolean(properties.getValue(GCP_SECRETS_ENABLED, "false"));
-        String clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
+        this.clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
         String gcpRegion = properties.getValue(AfonProperty.GCP_REGION);
         String vpcName     = "gke-private-vpc-" + clusterName;
         String subnetName  = "gke-private-subnet-" + clusterName;
@@ -302,6 +303,11 @@ public class GcpCloudProvider extends AbstractNginxCloudProvider {
     @Override
     public AfonCloud cloud() {
         return GCP;
+    }
+
+    @Override
+    public String clusterName() {
+        return clusterName;
     }
 
     @Override

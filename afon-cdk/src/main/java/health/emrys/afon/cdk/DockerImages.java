@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import health.emrys.afon.cdk.configs.TrinoWorkloads;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;

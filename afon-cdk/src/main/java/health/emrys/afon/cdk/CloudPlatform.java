@@ -19,6 +19,19 @@ public interface CloudPlatform extends CloudProvider {
     AfonCloud cloud();
 
     /**
+     * @return the name of the cluster, which also names what is kept per cluster, eg the Loki tenant of its logs
+     */
+    String clusterName();
+
+    /**
+     * @return where Loki keeps the logs of the cluster
+     * @throws UnsupportedOperationException if the platform has no log storage configured, so cannot run the monitoring
+     */
+    default LogStorage logStorage() {
+        throw new UnsupportedOperationException("No log storage is configured for " + cloud());
+    }
+
+    /**
      * @return the Helm provider of the cluster
      */
     HelmProvider configureHelm();

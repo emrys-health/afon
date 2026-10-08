@@ -8,7 +8,8 @@ import static health.emrys.afon.cdk.CdkUtils.escapeTerraformTemplate;
 
 /**
  * The destroy-time cleanup of the CRDs left behind by the monitoring stack and Cilium, run by the
- * {@code cleanupCRDs} resource of the AWS stacks on every {@code tofu destroy}.
+ * {@code cleanupCRDs} resource of {@link health.emrys.afon.cdk.components.CrdCleanupComponent} on every
+ * {@code tofu destroy}.
  */
 public final class CrdCleanup {
 

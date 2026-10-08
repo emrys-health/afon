@@ -1,11 +1,10 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.cdk.component.JupyterComponent;
-import health.emrys.afon.cdk.component.KeycloakComponent;
-import health.emrys.afon.cdk.component.PolarisComponent;
-import health.emrys.afon.cdk.component.SparkComponent;
-import health.emrys.afon.cdk.component.StackComponent;
-import health.emrys.afon.cdk.component.TrinoComponent;
+import health.emrys.afon.cdk.components.JupyterComponent;
+import health.emrys.afon.cdk.components.KeycloakComponent;
+import health.emrys.afon.cdk.components.PolarisComponent;
+import health.emrys.afon.cdk.components.SparkComponent;
+import health.emrys.afon.cdk.components.TrinoComponent;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -53,7 +52,7 @@ class StackDefinitionsTest {
         assertThat(definition.components().apply(properties).get(0))
             .isNotSameAs(definition.components().apply(properties).get(0));
         assertThat(componentsOf("azure-full")).containsExactly(
-            PolarisComponent.class, health.emrys.afon.cdk.component.SparkOperatorComponent.class, SparkComponent.class,
+            PolarisComponent.class, health.emrys.afon.cdk.components.SparkOperatorComponent.class, SparkComponent.class,
             JupyterComponent.class);
     }
 
