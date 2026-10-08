@@ -142,6 +142,9 @@ It overwrites the plan in `$AFON_CDKTF/stacks/<stack-id>` (ie `cdk.tf.json` and 
 `$AFON_CDKTF/terraform.<stack-id>.tfstate`, as it doesn't run tofu.  To leave the plan of a running or previous deploy
 of the same stack untouched, synthesise into another cdktf dir, eg `afon-cli.sh --cdktf /tmp/cdktf validate-stack azure-polaris`.
 
+A stack is a list of components, eg Polaris, Keycloak, Jupyter, Spark, Trino, deployed to its cloud: see
+[Stack composition](architecture.md#stack-composition) for what each stack is made of, and how to define a new one.
+
 ### Setup AWS full stack
 
 The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).

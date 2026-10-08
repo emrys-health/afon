@@ -111,6 +111,63 @@ The corresponding `*Document` classes generate markdown documentation describing
 in lock-step with the actual deployment code.  The stack documents extend `AbstractStackDocument`, taking their steps
 from `StackStepsFactory`.
 
+### Stack composition
+
+A stack is a `StackId` (`<cloud>-<stack-type>`, eg `aws-full`) and the ordered list of components
+deployed to that cloud, as defined in `StackDefinitions`. `ComposedStack` builds it: it sets up the cloud's
+platform, then deploys each component in turn. Adding a stack, eg a subset of the components, or on another cloud, is
+adding an entry to `StackDefinitions`.
+
+| Concept | What it is |
+|---|---|
+| `StackComponent` | A part of a stack, eg `PolarisComponent`, `JupyterComponent`, `SparkComponent`, `TrinoComponent`, written once for every cloud (package `components`) |
+| `StackContext` | What a component is deployed with: the Terraform stack, the `StackId`, the platform, the config, and the components deployed before it, which it finds with `find(Class)` or `require(Class)` |
+| `CloudPlatform` | What a component needs of its cloud, implemented by the AWS, Azure and GCP providers. The cloud's cluster, and what is done differently per cloud, eg `exposeHttps(HttpsRoute)`: an ALB with a Route 53 record on AWS, the nginx ingress with cert-manager and a DNS record on Azure and GCP |
+| `StackDefinition` | The id of a stack and how to create its components from the config, checked by `componentsFor(properties)` |
+
+The stacks, as composed by `StackDefinitions`:
+
+| Stack | Components, in order |
+|---|---|
+| `aws-keycloak` | Keycloak |
+| `aws-polaris` | Polaris |
+| `aws-jupyter` | Keycloak (unless `AWS_KEYCLOAK_EXTERNAL`), Polaris, Jupyter, NetworkPolicies, AwsSecrets, AwsLoadBalancerCleanup, SparkOperator |
+| `aws-spark` | as `aws-jupyter`, then Spark and CrdCleanup |
+| `aws-trino` | as `aws-spark`, then Trino |
+| `aws-full` | as `aws-trino`, then Monitoring |
+| `azure-polaris` | Polaris |
+| `azure-full` | Polaris, SparkOperator, Spark, Jupyter |
+| `gcp-polaris` | Polaris |
+
+**Config per cloud.** A component asks for the logical name of a property and gets the one of its cloud, by the
+convention `<CLOUD>_<NAME>`, eg `getCloudValue(cloud, "POLARIS_DOMAIN_NAME")` reads `AWS_POLARIS_DOMAIN_NAME` on AWS and
+`AZURE_POLARIS_DOMAIN_NAME` on Azure. The properties are still declared in `AfonProperty`. A property the cloud does
+not have, eg the Route 53 zone on Azure, is an error, or the default when one is given.
+
+**What a component needs of the others** is declared, not implied by the order: `requires()` lists the components that
+must be in the stack before it (`SparkComponent` requires `SparkOperatorComponent`), and `after()` those that, if the
+stack has them, must come before it (`PolarisComponent` is after `KeycloakComponent`, as Polaris does OIDC discovery
+against it). A stack composed wrongly fails when it is built, naming the problem, eg
+`Stack aws-test needs SparkOperatorComponent before SparkComponent`. `StackCompositionTest` checks every stack.
+
+**Adding a component.**
+1. Implement `StackComponent` in `cdk.components`, taking its config from `context.properties()` by cloud, and asking
+   `context.platform()` for what is cloud-specific, eg `exposeHttps`.
+2. If a cloud needs something new of its platform, add a method to `CloudPlatform` with a default that fails clearly on
+   the clouds that don't implement it, as `logStorage()` does for the monitoring.
+3. Declare `requires()` and `after()`.
+4. Add it to the stacks in `StackDefinitions`.
+
+**Guarding the plans.** `StackSynthesisGoldenTest` synthesises every stack from the template config and compares it with
+`afon-cdk/src/test/resources/golden/<stack-id>.tf.json`. The plan is normalised so that it is the same on each run: keys and
+`depends_on` are sorted, zips are reduced to their entries and long strings to their hash. A refactoring must leave the
+golden files unchanged, as the ids of the Terraform resources are in the state of the deployed stacks, so renaming one
+makes `tofu` destroy and recreate it. After an intended change of a plan, regenerate them and review the diff:
+
+```shell
+GOLDEN_UPDATE=1 mvn -o test -pl afon-cdk -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=StackSynthesisGoldenTest
+```
+
 ### Terraform-based deployment
 
 The afon-cdk module generates CDKTF (Cloud Development Kit for Terraform) files.

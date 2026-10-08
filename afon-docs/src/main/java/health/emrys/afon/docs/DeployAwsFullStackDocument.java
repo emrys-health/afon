@@ -1,6 +1,6 @@
 package health.emrys.afon.docs;
 
-import health.emrys.afon.cdk.SparkWorkloads;
+import health.emrys.afon.cdk.configs.SparkWorkloads;
 import health.emrys.afon.config.AfonPropertyProvider;
 
 import static health.emrys.afon.ops.steps.StackAction.DEPLOY;

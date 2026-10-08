@@ -34,7 +34,7 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.AbstractNginxCloudProvider;
+import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
 import health.emrys.afon.cdk.CachedTlsSecret;
 import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.config.AfonCloud;
@@ -55,7 +55,7 @@ import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.config.AfonProperty.AZURE_RESOURCE_PROVIDER_REGISTRATIONS;
 import static java.lang.String.format;
 
-public class AzureCloudProvider extends AbstractNginxCloudProvider {
+public class AzureCloudProvider extends AbstractHttpsCloudProvider {
 
     private static final Logger                  logger             = org.slf4j.LoggerFactory.getLogger(AzureCloudProvider.class);
     private static final String                  KUBERNETES_VERSION = "1.36.2";
@@ -548,6 +548,11 @@ public class AzureCloudProvider extends AbstractNginxCloudProvider {
     @Override
     public List<? extends ITerraformDependable> sparkOperatorDependencies() {
         return List.of(nginxRelease());
+    }
+
+    @Override
+    public String clusterName() {
+        return clusterName;
     }
 
     @Override

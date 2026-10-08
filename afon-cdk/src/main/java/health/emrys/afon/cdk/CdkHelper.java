@@ -162,7 +162,7 @@ public class CdkHelper {
         return builder.build();
     }
 
-    static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
+    public static DeploymentSpecTemplateSpecContainerEnv envFromSecret(
         String envName, String secretName, String secretKey) {
         return DeploymentSpecTemplateSpecContainerEnv
             .builder()

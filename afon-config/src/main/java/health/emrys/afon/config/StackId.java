@@ -2,8 +2,6 @@ package health.emrys.afon.config;
 
 import org.jspecify.annotations.NonNull;
 
-import java.util.regex.Pattern;
-
 /**
  * Identifies a stack as {@code <cloud>-<stack-type>}, eg {@code aws-keycloak}, named as {@code validate-stack}
  * names the stacks.  Each stack has its own plan dir and tofu state, see {@link ConfigUtils#stackDir(StackId)}
@@ -15,9 +13,6 @@ public record StackId(@NonNull AfonCloud cloud, @NonNull String type) implements
      * The type standing for every stack of a cloud, eg {@code aws-all}, which is not a stack itself.
      */
     public static final String ALL_TYPE = "all";
-
-    private static final String  STACK_SUFFIX   = "Stack";
-    private static final Pattern CAMEL_BOUNDARY = Pattern.compile("(?<=[a-z0-9])(?=[A-Z])");
 
     /**
      * Parses a stack id, case-insensitively, eg {@code aws-keycloak}.
@@ -36,22 +31,6 @@ public record StackId(@NonNull AfonCloud cloud, @NonNull String type) implements
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(String.format("Stack id '%s' has an unknown cloud '%s'", stackId, cloud));
         }
-    }
-
-    /**
-     * Returns the id of a stack class, named {@code <Cloud><StackType>Stack}, eg {@code aws-keycloak}
-     * for {@code AwsKeycloakStack}, as {@code validate-stack} names the stacks.
-     *
-     * @throws IllegalArgumentException if the class isn't named {@code <Cloud><StackType>Stack}, with a known cloud
-     */
-    public static StackId of(Class<?> stack) {
-        String simpleName = stack.getSimpleName();
-        if (!simpleName.endsWith(STACK_SUFFIX)) {
-            throw new IllegalArgumentException(
-                String.format("Stack class '%s' is not named <Cloud><StackType>Stack, eg AwsKeycloakStack", simpleName));
-        }
-        String name = simpleName.substring(0, simpleName.length() - STACK_SUFFIX.length());
-        return parse(CAMEL_BOUNDARY.matcher(name).replaceAll("-"));
     }
 
     /**

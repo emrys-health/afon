@@ -1,16 +1,16 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.cdk.aws.AwsClusterAddonsComponent;
-import health.emrys.afon.cdk.aws.AwsCrdCleanupComponent;
-import health.emrys.afon.cdk.aws.AwsMonitoringComponent;
-import health.emrys.afon.cdk.component.JupyterComponent;
-import health.emrys.afon.cdk.component.KeycloakComponent;
-import health.emrys.afon.cdk.component.NetworkPoliciesComponent;
-import health.emrys.afon.cdk.component.PolarisComponent;
-import health.emrys.afon.cdk.component.SparkComponent;
-import health.emrys.afon.cdk.component.SparkOperatorComponent;
-import health.emrys.afon.cdk.component.StackComponent;
-import health.emrys.afon.cdk.component.TrinoComponent;
+import health.emrys.afon.cdk.aws.AwsLoadBalancerCleanupComponent;
+import health.emrys.afon.cdk.aws.AwsSecretsComponent;
+import health.emrys.afon.cdk.components.CrdCleanupComponent;
+import health.emrys.afon.cdk.components.JupyterComponent;
+import health.emrys.afon.cdk.components.MonitoringComponent;
+import health.emrys.afon.cdk.components.KeycloakComponent;
+import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
+import health.emrys.afon.cdk.components.PolarisComponent;
+import health.emrys.afon.cdk.components.SparkComponent;
+import health.emrys.afon.cdk.components.SparkOperatorComponent;
+import health.emrys.afon.cdk.components.TrinoComponent;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
 
@@ -46,7 +46,7 @@ public final class StackDefinitions {
         add(new StackId(AWS, "trino"), true,
             properties -> concat(awsJupyter(properties), awsSpark(), List.of(new TrinoComponent())));
         add(new StackId(AWS, "full"), true,
-            properties -> concat(awsJupyter(properties), awsSpark(), List.of(new TrinoComponent(), new AwsMonitoringComponent())));
+            properties -> concat(awsJupyter(properties), awsSpark(), List.of(new TrinoComponent(), new MonitoringComponent())));
 
         add(new StackId(AZURE, "polaris"), true, properties -> List.of(new PolarisComponent()));
         // The operator only launches Spark in response to the resources of the Spark component
@@ -75,12 +75,12 @@ public final class StackDefinitions {
         }
         components.addAll(List.of(
             new PolarisComponent(), new JupyterComponent(), new NetworkPoliciesComponent(),
-            new AwsClusterAddonsComponent(), new SparkOperatorComponent()));
+            new AwsSecretsComponent(), new AwsLoadBalancerCleanupComponent(), new SparkOperatorComponent()));
         return components;
     }
 
     private static List<StackComponent> awsSpark() {
-        return List.of(new SparkComponent(), new AwsCrdCleanupComponent());
+        return List.of(new SparkComponent(), new CrdCleanupComponent());
     }
 
     @SafeVarargs

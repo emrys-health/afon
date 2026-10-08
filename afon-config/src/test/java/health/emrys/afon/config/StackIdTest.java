@@ -26,29 +26,4 @@ class StackIdTest {
         assertThat(StackId.all(AWS).isAll()).isTrue();
         assertThat(new StackId(AWS, "keycloak").isAll()).isFalse();
     }
-
-    @Test
-    void canGetStackIdOfStackClass() {
-        assertThat(StackId.of(AwsKeycloakStack.class)).isEqualTo(new StackId(AWS, "keycloak"));
-        assertThat(StackId.of(AzurePolarisStack.class)).isEqualTo(new StackId(AZURE, "polaris"));
-        for (Class<?> invalid : List.of(AwsKeycloak.class, KeycloakStack.class, MarsPolarisStack.class)) {
-            assertThatThrownBy(() -> StackId.of(invalid)).isInstanceOf(IllegalArgumentException.class);
-        }
-    }
-
-    private static class AwsKeycloakStack {
-    }
-
-    private static class AzurePolarisStack {
-    }
-
-    private static class AwsKeycloak {
-    }
-
-    private static class KeycloakStack {
-    }
-
-    private static class MarsPolarisStack {
-    }
-
 }
