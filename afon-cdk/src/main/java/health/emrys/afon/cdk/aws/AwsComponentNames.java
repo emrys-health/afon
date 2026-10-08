@@ -29,7 +29,8 @@ public class AwsComponentNames {
         }
         cluster = clusterName(properties.getValue(CLUSTER_NAME), stackId);
         region = properties.getValue(AWS_REGION);
-        checkRoleNameLength(getClusterRoleName(), getNodeGroupRoleName(), getLoadBalancerRoleName());
+        checkRoleNameLength(getClusterRoleName(), getNodeGroupRoleName(), getLoadBalancerRoleName(),
+                            getPolarisLogShipperRoleName());
     }
 
     /**
@@ -126,5 +127,9 @@ public class AwsComponentNames {
 
     public String getLoadBalancerRoleName() {
         return "AmazonEKSLoadBalancerControllerRole" + cluster;
+    }
+
+    public String getPolarisLogShipperRoleName() {
+        return "cdktf-eks-fluent-bit-role-" + cluster;
     }
 }
