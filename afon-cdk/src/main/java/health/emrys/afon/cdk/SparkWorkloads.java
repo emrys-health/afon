@@ -1,6 +1,5 @@
 package health.emrys.afon.cdk;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
@@ -78,7 +77,7 @@ public class SparkWorkloads {
             )
         );
 
-        String sparkClusterJson = toJson(sparkClusterManifest);
+        String sparkClusterJson = toCanonicalJson(sparkClusterManifest);
         List<LocalExecProvisioner> allClusterProvisioners = new ArrayList<>();
         allClusterProvisioners.addAll(uponCreateRun("echo '" + sparkClusterJson + "' | kubectl apply -f -"));
         allClusterProvisioners.addAll(uponDestroyRun(
@@ -143,17 +142,8 @@ public class SparkWorkloads {
             )
         );
 
-        String sparkConnectJson = toJson(sparkConnectManifest);
+        String sparkConnectJson = toCanonicalJson(sparkConnectManifest);
         return "echo '" + sparkConnectJson + "' | kubectl apply -f -";
-    }
-
-    private static String toJson(Map<String, Object> map) {
-        ObjectMapper mapper = new ObjectMapper();
-        try {
-            return mapper.writeValueAsString(map);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize manifest to JSON", e);
-        }
     }
 
     /**

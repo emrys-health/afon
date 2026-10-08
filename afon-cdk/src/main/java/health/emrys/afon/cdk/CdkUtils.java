@@ -1,5 +1,8 @@
 package health.emrys.afon.cdk;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.hashicorp.cdktf.AssetType;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
@@ -17,6 +20,9 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 public class CdkUtils {
+
+    private static final ObjectMapper CANONICAL_JSON = new ObjectMapper()
+        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
     public static @NonNull List<LocalExecProvisioner> uponDestroyRun(String... commands) {
         return Arrays.stream(commands).map(command ->
@@ -233,5 +239,19 @@ public class CdkUtils {
         Map<String, String> results = new HashMap<>(base);
         results.putAll(overrides);
         return results;
+    }
+
+    /**
+     * Serializes {@code value} to JSON with every map's keys sorted, so that equal content always
+     * yields the same string. Without it, maps such as {@code Map.of}, whose iteration order is
+     * randomised per JVM, make the JSON differ between synths, and anything keyed on that string
+     * (resource triggers, Helm values) shows a spurious diff on every plan.
+     */
+    public static String toCanonicalJson(Object value) {
+        try {
+            return CANONICAL_JSON.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new UncheckedIOException("Failed to serialize to JSON", e);
+        }
     }
 }

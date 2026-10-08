@@ -1,6 +1,5 @@
 package health.emrys.afon.cdk;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformStack;
@@ -116,7 +115,7 @@ public class NetworkConfig {
         Map<String, Object> manifest = connectionManifest(
             USER_POD_LABELS,
             List.of());
-        System.out.println(format("echo '%s' | kubectl apply -f -", toJson(manifest)));
+        System.out.println(format("echo '%s' | kubectl apply -f -", toCanonicalJson(manifest)));
     }
 
     private static @NonNull List<AllowedDomain> getAllowedDomainsFrom(AfonPropertyProvider properties) {
@@ -257,7 +256,7 @@ public class NetworkConfig {
                                     Map<String, Object> manifest,
                                     String whiteListName
     ) {
-        String manifestJson = toJson(manifest);
+        String manifestJson = toCanonicalJson(manifest);
         List<LocalExecProvisioner> provisioners = new ArrayList<>(
             uponCreateRun("echo '" + manifestJson + "' | kubectl apply -f -"));
         provisioners.addAll(uponDestroyRun(
@@ -374,14 +373,6 @@ public class NetworkConfig {
             }
         }
         return List.copyOf(rules);
-    }
-
-    private static @NonNull String toJson(Map<String, Object> manifest) {
-        try {
-            return new ObjectMapper().writeValueAsString(manifest);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize " + DOMAIN_POLICY_NAME, e);
-        }
     }
 
     /**
