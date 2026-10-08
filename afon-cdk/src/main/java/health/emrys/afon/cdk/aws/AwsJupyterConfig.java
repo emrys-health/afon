@@ -45,6 +45,7 @@ public class AwsJupyterConfig extends JupyterConfig {
             jupyterDomain,
             CdkHelper.PROXY_SERVICE_NAME,
             CdkHelper.PROXY_PORT,
+            AwsCloudProvider.HealthCheck.onTrafficPort(JupyterMfaConfig.PING_PATH),
             cloudProvider.getSubnetIds());
 
         cloudProvider.configureDNS(

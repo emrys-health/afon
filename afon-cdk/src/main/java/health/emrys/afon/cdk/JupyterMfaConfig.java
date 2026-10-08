@@ -34,6 +34,8 @@ public class JupyterMfaConfig {
 
     private static final Map<String, String> PROXY_LABELS = Map.of("app", CdkHelper.PROXY_SERVICE_NAME);
     private static final String              SECRET_NAME  = CdkHelper.PROXY_SERVICE_NAME +"-secret";
+    /** oauth2-proxy answers this itself, unauthenticated, so the load balancer can health check it. */
+    public static final String               PING_PATH    = "/ping";
 
     public JupyterMfaConfig(Construct scope,
                      List<ITerraformDependable> dependsOn,
@@ -88,7 +90,7 @@ public class JupyterMfaConfig {
             // header-auth extension reads this to log the user in with no second login page.
             "--pass-user-headers=true",
             "--skip-provider-button=false",
-            "--ping-path=/ping",
+            "--ping-path=" + PING_PATH,
             format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)));
         // One --upstream per app; oauth2-proxy routes by the path component of each URL.
         upstreamUrls.forEach(url -> proxyArgs.add("--upstream=" + url));

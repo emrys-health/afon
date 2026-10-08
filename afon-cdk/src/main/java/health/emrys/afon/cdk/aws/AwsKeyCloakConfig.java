@@ -37,6 +37,7 @@ public class AwsKeyCloakConfig extends KeyCloakConfig<AwsCloudProvider> {
             hostname,
             CdkHelper.KEYCLOAK_SERVICE_NAME,
             KEYCLOAK_PORT,
+            new AwsCloudProvider.HealthCheck(HEALTH_READY_PATH, MANAGEMENT_PORT_NAME),
             cloudProvider.getSubnetIds());
 
         aliasRecord = cloudProvider.configureDNS(

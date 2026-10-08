@@ -53,9 +53,14 @@ public class PolarisConfig extends Construct {
     private static final String          SECRET_VOLUME    = "secret-volume";
     private static final String          POLARIS_ENV_FILE = "polaris_env.sh";
     private static final String      GCP_CREDENTIALS_FILE = "service-account.json";
+    /** Quarkus' management interface, which serves Polaris' health checks (not the API port). */
+    public static final int             MANAGEMENT_PORT      = 8182;
+    public static final String          MANAGEMENT_PORT_NAME = "management";
+    public static final String          HEALTH_READY_PATH    = "/q/health/ready";
 
     private final JobV1 polarisDbInitJob;
     private final ServiceSpecPort polarisSpecPort;
+    private final ServiceSpecPort polarisManagementSpecPort;
     private final Map<String, String> polarisLabels;
     private final CloudProvider cloudProvider;
 
@@ -99,11 +104,19 @@ public class PolarisConfig extends Construct {
                 .targetPort("8181")
                 .protocol("TCP")
                 .build();
+        polarisManagementSpecPort = ServiceSpecPort.builder()
+                .name(MANAGEMENT_PORT_NAME)
+                .port(MANAGEMENT_PORT)
+                .targetPort(String.valueOf(MANAGEMENT_PORT))
+                .protocol("TCP")
+                .build();
 
         polarisLabels = Map.of("app", "polaris");
     }
 
     public ServiceSpecPort getPolarisSpecPort() { return polarisSpecPort; }
+
+    public ServiceSpecPort getPolarisManagementSpecPort() { return polarisManagementSpecPort; }
 
     public Map<String, String> getPolarisLabels() { return polarisLabels; }
 
@@ -389,7 +402,7 @@ public class PolarisConfig extends Construct {
                 .httpGet(DeploymentSpecTemplateSpecContainerReadinessProbeHttpGet
                              .builder()
                              .path("/q/health")
-                             .port("8182")
+                             .port(String.valueOf(MANAGEMENT_PORT))
                              .build())
                 .initialDelaySeconds(30)
                 .periodSeconds(10)
