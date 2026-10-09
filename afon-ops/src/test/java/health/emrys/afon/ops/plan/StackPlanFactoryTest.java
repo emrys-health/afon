@@ -3,6 +3,7 @@ package health.emrys.afon.ops.plan;
 import health.emrys.afon.cdk.StackComponent;
 import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -54,6 +55,9 @@ class StackPlanFactoryTest {
     private final StepOperations ops = mock(StepOperations.class, (Answer<Object>) invocation -> {
         if (invocation.getMethod().getName().equals("properties")) {
             return properties;
+        }
+        if (invocation.getMethod().getName().equals("afonCatalogs")) {
+            return new AfonCatalogs(properties);
         }
         if (invocation.getMethod().getReturnType() != Step.class) {
             return RETURNS_DEFAULTS.answer(invocation);
@@ -153,6 +157,36 @@ class StackPlanFactoryTest {
     }
 
     @Test
+    void snowflakeStackIsSetUpAsTheFullStackSinceSnowflakeDeploysAndConfiguresNothing() {
+        List<String> full = derived(SETUP, "aws-full");
+        List<String> snowflake = derived(SETUP, "aws-snowflake");
+        assertThat(snowflake).hasSameSizeAs(full);
+        assertThat(snowflake).containsExactlyElementsOf(full.stream().map(step -> step.replace("aws-full", "aws-snowflake").replace("aws_full", "aws_snowflake")).toList());
+        // it holds what the full stack holds, so they conflict
+        assertThat(factory.conflicts(StackId.parse("aws-snowflake"), "aws-full", properties)).isTrue();
+    }
+
+    @Test
+    void stacksRunTheScenariosOfTheirComponentsInOrderOfListing() {
+        assertThat(factory.scenarios(StackId.parse("aws-snowflake"), properties).keySet())
+            .containsExactly("reading-aws", "reading-azure", "reading-gcp", "writing-azure");
+        assertThat(factory.scenarios(StackId.parse("aws-full"), properties)).isEmpty();
+        assertThat(factory.scenarios(StackId.parse("aws-all"), properties)).isEmpty();
+        assertThat(factory.scenarios(StackId.parse("azure-full"), properties)).isEmpty();
+    }
+
+    @Test
+    void scenarioStepsAreOnlyCreatedWhenRun() {
+        assertThat(factory.runSteps(StackId.parse("aws-snowflake"), "reading-azure", ops).stream().map(Step::getName).toList())
+            .hasSize(2).first().asString().startsWith("runAwsSparkWritingTo(azure)");
+        assertThat(factory.runSteps(StackId.parse("aws-snowflake"), "reading-aws", ops)).hasSize(1);
+        assertThat(factory.runSteps(StackId.parse("aws-snowflake"), "writing-azure", ops).stream().map(Step::getName).toList())
+            .hasSize(4).first().asString().startsWith("snowflakeWritingTo(azure)");
+        assertThatThrownBy(() -> factory.runSteps(StackId.parse("aws-full"), "reading-aws", ops))
+            .isInstanceOf(IllegalArgumentException.class).hasMessage("Stack 'aws-full' has no scenario 'reading-aws'");
+    }
+
+    @Test
     void checksTheCertificatesOfTheLoadBalancersOfTheStackAsEachDeploymentDoesToday() {
         // aws-keycloak checked AWS_KEYCLOAK_CERT_ARN, the Polaris stacks AWS_POLARIS_CERT_ARN, aws-full all three, and the other
         // clouds have no ACM certificates
@@ -171,7 +205,7 @@ class StackPlanFactoryTest {
     @Test
     void providesTheStepsOfEveryActionOnEveryStackDefinedAndOnlyDeletesEveryStackOfACloud() {
         assertThat(factory.supportedActions().keySet().stream().map(StackId::toString)).containsExactly(
-            "aws-all", "aws-full", "aws-jupyter", "aws-keycloak", "aws-polaris", "aws-spark", "aws-trino",
+            "aws-all", "aws-full", "aws-jupyter", "aws-keycloak", "aws-polaris", "aws-snowflake", "aws-spark", "aws-trino",
             "azure-all", "azure-full", "azure-polaris", "gcp-all", "gcp-polaris");
         factory.supportedActions().forEach((stackId, actions) -> assertThat(actions).as(stackId.toString())
             .isEqualTo(stackId.isAll() ? List.of(DELETE) : List.of(DELETE, DEPLOY, SETUP)));

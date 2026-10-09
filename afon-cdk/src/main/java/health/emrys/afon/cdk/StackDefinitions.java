@@ -6,6 +6,7 @@ import health.emrys.afon.cdk.components.MonitoringComponent;
 import health.emrys.afon.cdk.components.KeycloakComponent;
 import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
 import health.emrys.afon.cdk.components.PolarisComponent;
+import health.emrys.afon.cdk.components.SnowflakeComponent;
 import health.emrys.afon.cdk.components.SparkComponent;
 import health.emrys.afon.cdk.components.SparkOperatorComponent;
 import health.emrys.afon.cdk.components.TrinoComponent;
@@ -34,6 +35,7 @@ public final class StackDefinitions {
     private static final Map<StackId, StackDefinition> DEFINITIONS = new TreeMap<>();
 
     static {
+        // AWS
         // Only the KeyCloak, never holding the egress IP, which the Polaris stacks hold
         add(new StackId(AWS, "keycloak"), false, properties -> List.of(new KeycloakComponent()));
         // Polaris uses the KeyCloak server at OIDC_DOMAIN_NAME, which the aws-keycloak stack deploys, so that both can
@@ -43,14 +45,18 @@ public final class StackDefinitions {
         add(new StackId(AWS, "spark"), true, properties -> concat(awsJupyter(properties), awsSpark()));
         add(new StackId(AWS, "trino"), true,
             properties -> concat(awsJupyter(properties), awsSpark(), List.of(new TrinoComponent())));
-        add(new StackId(AWS, "full"), true,
-            properties -> concat(awsJupyter(properties), awsSpark(), List.of(new TrinoComponent(), new MonitoringComponent())));
+        add(new StackId(AWS, "full"), true, StackDefinitions::awsFull);
+        // Snowflake queries the catalogs of the full stack through its Polaris, so it holds what the full stack holds
+        add(new StackId(AWS, "snowflake"), true,
+            properties -> concat(awsFull(properties), List.of(new SnowflakeComponent())));
 
+        // AZURE
         add(new StackId(AZURE, "polaris"), true, properties -> List.of(new PolarisComponent()));
         // The operator only launches Spark in response to the resources of the Spark component
         add(new StackId(AZURE, "full"), true, properties -> List.of(
             new PolarisComponent(), new SparkOperatorComponent(), new SparkComponent(), new JupyterComponent()));
 
+        // GCP
         add(new StackId(GCP, "polaris"), true, properties -> List.of(new PolarisComponent()));
     }
 
@@ -75,6 +81,10 @@ public final class StackDefinitions {
             new PolarisComponent(), new JupyterComponent(), new NetworkPoliciesComponent(),
             new SparkOperatorComponent()));
         return components;
+    }
+
+    private static List<StackComponent> awsFull(AfonPropertyProvider properties) {
+        return concat(awsJupyter(properties), awsSpark(), List.of(new TrinoComponent(), new MonitoringComponent()));
     }
 
     private static List<StackComponent> awsSpark() {

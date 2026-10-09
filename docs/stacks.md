@@ -38,7 +38,7 @@ where:
 - `<action>` is one of `delete`, `deploy` or `setup`;
 - `<stack-id>` is `<cloud>-<stack-type>`, eg `aws-keycloak`, named as `validate-stack` lists the stacks.
   Every defined stack is listed: `aws-full`, `aws-keycloak`, `aws-polaris`, `aws-jupyter`, `aws-spark`, `aws-trino`,
-  `azure-full`, `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
+  `aws-snowflake`, `azure-full`, `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
 - `<step>`, if given, is the step from which to resume a failed run (see
   [Resume a failed stack deployment](#resume-a-failed-stack-deployment-from-a-specific-step));
 - `--replace`, if given, lets `deploy` and `setup` delete the other stacks conflicting with the stack, see
@@ -52,6 +52,17 @@ afon-cli.sh manage-stack deploy aws-full "wait_on_emryspolaris_then_wait_on_emry
 afon-cli.sh manage-stack delete aws-full
 ```
 With `afon.sh`, pass the same args positionally, eg `./afon.sh -a manage-stack setup aws-keycloak`.
+
+To run a scenario on a stack that is set up, ie what its components can be asked to run beyond setting up, use
+```shell
+afon-cli.sh manage-stack run <stack-id> [<scenario> [<step>]]
+```
+Without a `<scenario>` it lists those of the stack, and `<step>` resumes a failed run.  For example `aws-snowflake` has
+`reading-aws`, `reading-azure`, `reading-gcp` and `writing-azure`, which replace the `deploy-snowflake-*` commands:
+```shell
+afon-cli.sh manage-stack setup aws-snowflake --replace
+afon-cli.sh manage-stack run aws-snowflake reading-azure
+```
 
 The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, still work, with
 hand-written steps, which differ slightly from those of `manage-stack`, derived from the components of the stack (eg `setup`
@@ -376,12 +387,10 @@ afon-cli.sh manage-stack deploy gcp-polaris
 # Cross-cloud external catalogs (AWS + Azure federation)
 afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog
 
-# Snowflake reading cross-cloud data
-afon-cli.sh deploy-snowflake-reading-gcp-via-aws
-afon-cli.sh deploy-snowflake-reading-azure-via-aws
-
-# Snowflake writing to Azure
-afon-cli.sh deploy-snowflake-writing-azure-via-aws
+# Snowflake: set up the stack, then run a scenario, ie one of reading-aws, reading-azure, reading-gcp, writing-azure
+afon-cli.sh manage-stack setup aws-snowflake
+afon-cli.sh manage-stack run aws-snowflake reading-gcp
+afon-cli.sh manage-stack run aws-snowflake writing-azure
 ```
 
 ## Deployment checklist

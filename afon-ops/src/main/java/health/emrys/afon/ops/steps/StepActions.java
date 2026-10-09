@@ -595,6 +595,9 @@ public class StepActions {
         SnowflakeConnectionFactory factory = new SnowflakeConnectionFactory(properties);
         try (Connection conn = factory.getConnection();
              Statement stmt = conn.createStatement()) {
+            // Snowflake cancels a statement it cannot finish, eg as it cannot reach Polaris, rather than the driver waiting for it
+            stmt.setQueryTimeout(SnowflakeConnectionFactory.QUERY_TIMEOUT_SECONDS);
+            logger.info("Snowflake statements are cancelled after {}s", SnowflakeConnectionFactory.QUERY_TIMEOUT_SECONDS);
             for (String sql : statements) {
                 logger.info("Running sql:\n{}", sql);
                 ResultSet rs = stmt.executeQuery(sql);

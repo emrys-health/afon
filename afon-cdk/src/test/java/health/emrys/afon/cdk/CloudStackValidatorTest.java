@@ -16,7 +16,7 @@ class CloudStackValidatorTest {
     @Test
     void canListStacks() {
         assertThat(validator.stackNames()).containsExactly(
-            "aws-full", "aws-jupyter", "aws-keycloak", "aws-polaris", "aws-spark", "aws-trino",
+            "aws-full", "aws-jupyter", "aws-keycloak", "aws-polaris", "aws-snowflake", "aws-spark", "aws-trino",
             "azure-full", "azure-polaris", "gcp-polaris");
     }
 

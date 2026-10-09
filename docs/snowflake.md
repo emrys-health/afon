@@ -2,24 +2,30 @@
 
 Afon can configure Snowflake to read Iceberg tables from any cloud via Polaris as a catalog integration.
 
-The following commands deploy the AWS full stack, write test data to the target cloud, then create a Snowflake catalog integration and iceberg table that reads through Polaris.
+The following commands run on the `aws-snowflake` stack, which is the AWS full stack that Snowflake queries.  Set it up once, replacing
+the stacks conflicting with it, eg `aws-full`; then each scenario writes test data to the target cloud, if need be, and creates a Snowflake
+catalog integration and iceberg table that reads through Polaris.  `manage-stack run aws-snowflake` lists the scenarios.
+
+```shell
+afon-cli.sh manage-stack setup aws-snowflake --replace
+```
 
 ## Read AWS data via AWS Polaris:**
 
 ```shell
-afon-cli.sh deploy-snowflake-reading-aws-via-aws
+afon-cli.sh manage-stack run aws-snowflake reading-aws
 ```
 
 ## Read GCP data via AWS Polaris
 
 ```shell
-afon-cli.sh deploy-snowflake-reading-gcp-via-aws
+afon-cli.sh manage-stack run aws-snowflake reading-gcp
 ```
 
 ## Read Azure data via AWS Polaris:**
 
 ```shell
-afon-cli.sh deploy-snowflake-reading-azure-via-aws
+afon-cli.sh manage-stack run aws-snowflake reading-azure
 ```
 
 ## Write data from Snowflake to Azure blob storage
@@ -35,7 +41,7 @@ In summary:
 The deployment is automated via:
 
 ```shell
-afon-cli.sh deploy-snowflake-writing-azure-via-aws
+afon-cli.sh manage-stack run aws-snowflake writing-azure
 ```
 
 ### Connecting to Snowflake

@@ -18,8 +18,20 @@
         </dependency>
         <dependency>
             <groupId>net.snowflake</groupId>
-            <artifactId>snowflake-jdbc</artifactId>
-            <version>3.27.1</version>
+            <artifactId>snowflake-jdbc-thin</artifactId>
+            <version>4.4.0</version>
+            <exclusions>
+                <!-- The thin driver, unlike the fat one, does not shade these, so they would replace what the rest of Afon uses:
+                     reactor-netty-core 1.2.x for the 1.0.x of the Azure SDK, and commons-logging beside jcl-over-slf4j of Spark. -->
+                <exclusion>
+                    <groupId>io.projectreactor.netty</groupId>
+                    <artifactId>reactor-netty-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 

@@ -41,7 +41,7 @@ class StackSynthesisGoldenTest {
     private static final Path   GOLDEN_DIR           = Path.of("src/test/resources/golden");
 
     @ParameterizedTest
-    @ValueSource(strings = {"aws-keycloak", "aws-polaris", "aws-jupyter", "aws-spark", "aws-trino", "aws-full",
+    @ValueSource(strings = {"aws-keycloak", "aws-polaris", "aws-jupyter", "aws-spark", "aws-trino", "aws-full", "aws-snowflake",
                             "azure-polaris", "azure-full", "gcp-polaris"})
     void synthesisedPlanMatchesGolden(String stackName, @TempDir Path outDir) throws IOException {
         String plan = normalise(SynthesisSupport.synthesise(StackId.parse(stackName), outDir));
