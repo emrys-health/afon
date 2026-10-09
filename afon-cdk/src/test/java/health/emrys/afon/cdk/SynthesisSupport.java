@@ -14,10 +14,11 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import static health.emrys.afon.config.ConfigUtils.AFON_CDKTF_PROPERTY;
+import static health.emrys.afon.config.ConfigUtils.AFON_HOME_PROPERTY;
 
 /**
- * Synthesises the plan of a stack from the template config, with fixed values for what it leaves blank, as the tests of
- * the plans do, see {@link StackSynthesisGoldenTest} and {@link DeterministicSynthesisTest}.  It also runs on its own,
+ * Synthesises the plan of a stack from the template config, with fixed values for what it leaves blank, as
+ * {@link DeterministicSynthesisTest} does.  It also runs on its own,
  * in a JVM of its own, to synthesise the plans of the stacks named by the args into the dir.
  */
 public class SynthesisSupport {
@@ -63,6 +64,8 @@ public class SynthesisSupport {
         Map<String, String> systemProperties = new TreeMap<>(FIXED_VALUES);
         // the tofu state path is part of the plan
         systemProperties.put(AFON_CDKTF_PROPERTY, "/golden/cdktf");
+        // what is read from the afon home, eg the users, is the template's, not the developer's own
+        systemProperties.put(AFON_HOME_PROPERTY, templatesHome().toString());
         systemProperties.forEach(System::setProperty);
         try {
             AfonPropertyProvider properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
@@ -75,6 +78,14 @@ public class SynthesisSupport {
         return Files.readString(outDir.resolve("stacks").resolve(stackId.toString()).resolve("cdk.tf.json"));
     }
 
+
+    private static Path templatesHome() throws IOException {
+        Path home = Files.createTempDirectory("afon-home");
+        home.toFile().deleteOnExit();
+        Path config = Files.createSymbolicLink(home.resolve("config"), Path.of(TEMPLATES_CONFIG_DIR).toAbsolutePath().normalize());
+        config.toFile().deleteOnExit();
+        return home;
+    }
 
     /**
      * @param args the dir to write the plans of the stacks to, as {@code <stack-id>.tf.json}, then the ids of the stacks

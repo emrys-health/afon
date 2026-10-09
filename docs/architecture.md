@@ -175,7 +175,7 @@ needs nothing but a stack id, registered in `StackDefinitions`, and the config. 
 
 No code of Afon outside the tests creates a CDKTF app or a stack: there is no class or main per stack, so adding a stack to
 `StackDefinitions` is all that it takes to synthesise and validate it. (`manage-stack` derives its steps from the components, so nothing
-else needs registering.) The tests, `StackSynthesisGoldenTest` and `DeterministicSynthesisTest`, build the same `ComposedStack`
+else needs registering.) The test `DeterministicSynthesisTest` builds the same `ComposedStack`
 in a temp dir. The plan is a function of the stack id and the config alone, which is why it must be deterministic.
 `ComposedStack.main(<stack-id>)` runs it by hand, from the config dir.
 
@@ -256,15 +256,25 @@ every stack in three separate JVMs and requires the same plan from each.
 3. Declare `requires()` and `after()`.
 4. Add it to the stacks in `StackDefinitions`.
 
-**Guarding the plans.** `StackSynthesisGoldenTest` synthesises every stack from the template config and compares it with
-`afon-cdk/src/test/resources/golden/<stack-id>.tf.json`. Only the layout is normalised, to keep the files small and
-readable: keys and `depends_on` are sorted, and long strings reduced to their hash. A refactoring must leave the golden
-files unchanged, as the ids of the Terraform resources are in the state of the deployed stacks, so renaming one makes `tofu`
-destroy and recreate it. After an intended change of a plan, regenerate them and review the diff:
+**Guarding the plans.** `DeterministicSynthesisTest` synthesises every stack from the template config in three JVMs and checks
+that the plans are identical, as `tofu` replaces whatever holds a string that differs between runs. The ids of the Terraform
+resources are in the state of the deployed stacks, so renaming one makes `tofu` destroy and recreate it: check the plans
+before and after a refactoring, with snapshots of the synthesised plans that are not kept in git:
 
 ```shell
-GOLDEN_UPDATE=1 mvn -o test -pl afon-cdk -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=StackSynthesisGoldenTest
+./afon.sh -a validate-stack aws-keycloak          # synthesises the stack into the stacks dir, repeat for the stacks to check
+./afon.sh -a snapshot-stacks /tmp/plans-before
+# ... change the code ...
+./afon.sh -a validate-stack aws-keycloak
+./afon.sh -a snapshot-stacks /tmp/plans-after
+./afon.sh -a compare-stacks /tmp/plans-before /tmp/plans-after
 ```
+
+`snapshot-stacks <dir> [<stack-id>...]` copies to `<dir>/<stack-id>/cdk.tf.json` the plan of each stack that was synthesised, or of
+those given, and nothing else. It needs no source tree or git, so it runs the same with `afon-cli.sh`, on a deployed machine, and
+`compare-stacks` takes any two such dirs, or the stacks dirs themselves. It lists the resources that were added or removed
+(a renamed one is both, and `tofu` would destroy and recreate it), then the values that changed, with the long ones reduced to their hash,
+and exits 1 if the plans differ.
 
 ### Terraform-based deployment
 

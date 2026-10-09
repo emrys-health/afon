@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Checks that the stacks are composed correctly, ie that each component has what it declares to need, without
- * synthesising them.  {@link StackSynthesisGoldenTest} checks what they synthesise.
+ * synthesising them.  {@link DeterministicSynthesisTest} checks what they synthesise.
  */
 class StackCompositionTest {
 
