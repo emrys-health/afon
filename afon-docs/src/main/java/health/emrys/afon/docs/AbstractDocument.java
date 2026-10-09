@@ -50,8 +50,7 @@ public abstract class AbstractDocument implements DocumentMetadata {
 
     /**
      * How to run the steps, by default with the command of the ops class named after this document, eg
-     * {@code setup-aws-full-stack-with-azure-polaris-hosting-external-catalog} for
-     * {@code SetupAwsFullStackWithAzurePolarisHostingExternalCatalogDocument}.
+     * {@code show-env} for {@code ShowEnvDocument}.
      */
     protected String howToRun() {
         return format(

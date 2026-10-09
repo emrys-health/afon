@@ -2,9 +2,9 @@ package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 
-public class SnowflakeWritingAzureViaAwsDocument extends AbstractSnowflakeScenarioDocument {
+public class SnowflakeWritingAzureViaAwsDocument extends AbstractScenarioDocument {
 
-    public SnowflakeWritingAzureViaAwsDocument(AfonPropertyProvider properties) { super(properties, "writing-azure"); }
+    public SnowflakeWritingAzureViaAwsDocument(AfonPropertyProvider properties) { super(properties, "aws-snowflake", "writing-azure"); }
 
     @Override
     public String getFilename() {

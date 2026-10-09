@@ -11,6 +11,7 @@ import java.util.Map;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.SecurityUtils.protocolFor;
+import static health.emrys.afon.security.SecurityUtils.KEYCLOAK_SCOPE;
 import static java.lang.String.format;
 
 /**
@@ -25,8 +26,6 @@ import static java.lang.String.format;
  * {@link AfonUser}, which KeyCloak knows as a confidential client of the same name and secret.
  */
 public class KeyCloakSparkWarehouseConfig extends SparkWarehouseConfig {
-
-    private static final String KEYCLOAK_SCOPE = "openid";
 
     private static String kcUriFor(String kcHost) {
         return KeyCloakConfigurer.tokenEndpoint(kcHost, protocolFor(kcHost));

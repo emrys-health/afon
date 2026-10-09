@@ -9,7 +9,6 @@ import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.StackAction;
 import health.emrys.afon.ops.steps.StackFilter;
-import health.emrys.afon.ops.steps.StackStepsFactory;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import org.junit.jupiter.api.Test;
@@ -28,12 +27,10 @@ import static org.mockito.Mockito.RETURNS_DEFAULTS;
 import static org.mockito.Mockito.mock;
 
 /**
- * Shows that the steps derived from the components of a stack are those of {@link StackStepsFactory}, which lists them per stack
- * and is still used by the {@code Delete|Deploy|Setup*Main} commands, and what else they bring.
+ * Shows the steps derived from the components of each stack, for each action, and what else the components bring.
  */
 class StackPlanFactoryTest {
 
-    private final StackStepsFactory legacy = new StackStepsFactory();
     private final StackPlanFactory factory = new StackPlanFactory();
 
     private final AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
@@ -71,75 +68,123 @@ class StackPlanFactoryTest {
         return factory.steps(action, StackId.parse(stackId), ops, false).stream().map(Step::getName).toList();
     }
 
-    private List<String> today(StackAction action, String stackId) {
-        return legacy.steps(action, StackId.parse(stackId), ops).stream().map(Step::getName).toList();
-    }
-
-    /**
-     * The legacy step deploying the stack, which the stacks replace by one for every stack.
-     */
-    private static String legacyDeployStep(String stackId) {
-        StackId id = StackId.parse(stackId);
-        return switch (id.type()) {
-            case "keycloak" -> "deployKeycloakStackIn(" + id.cloud() + ")";
-            case "full" -> "deployFullStackIn(" + id.cloud() + ")";
-            default -> "deployPolarisStackIn(" + id.cloud() + ")";
-        };
-    }
-
-    private static List<String> asToday(List<String> derived, String stackId) {
-        return derived.stream().map(step -> step.startsWith("deployStack(" + stackId + ",") ? legacyDeployStep(stackId) : step).toList();
+    private static String deleteStack(String stackId) {
+        return String.format("deleteStacksIn(%s,delete_%s_stack,stack %s and the legacy stack)", stackId, stackId.replace('-', '_'), stackId);
     }
 
     @Test
-    void deploysAndDeletesAsTheStepsListedPerStack() {
-        for (String stack : List.of("aws-keycloak", "aws-full", "aws-polaris", "azure-polaris", "gcp-polaris")) {
-            assertThat(asToday(derived(DEPLOY, stack), stack)).as("deploy " + stack).isEqualTo(today(DEPLOY, stack));
-            assertThat(derived(DELETE, stack)).as("delete " + stack).isEqualTo(today(DELETE, stack));
-        }
-        assertThat(derived(DELETE, "aws-all")).isEqualTo(today(DELETE, "aws-all"));
-    }
-
-    @Test
-    void setsUpAsTheStepsListedPerStackExceptThatEveryStackReportsItsDeployment() {
-        // The one difference: setting up the full stack reports the deployment complete, the other stacks do not.  Deriving the
-        // stack makes it the same for all.
-        for (String stack : List.of("aws-full")) {
-            assertThat(asToday(derived(SETUP, stack), stack)).as("setup " + stack).isEqualTo(today(SETUP, stack));
-        }
-        for (String stack : List.of("aws-keycloak", "aws-polaris", "azure-polaris", "gcp-polaris")) {
-            List<String> withoutDeployComplete = asToday(derived(SETUP, stack), stack).stream()
-                .filter(step -> !step.equals("deployComplete(" + stack + ")")).toList();
-            assertThat(withoutDeployComplete).as("setup " + stack).isEqualTo(today(SETUP, stack));
+    void deploysEachStackAfterDeletingTheStacksConflictingWithIt() {
+        assertThat(derived(DEPLOY, "aws-keycloak")).containsExactly(
+            deleteConflicting("aws-keycloak"), "deployStack(aws-keycloak,[AWS_KEYCLOAK_CERT_ARN])", "waitForKeyCloak()",
+            "deployComplete(aws-keycloak)");
+        assertThat(derived(DEPLOY, "aws-polaris")).containsExactly(
+            deleteConflicting("aws-polaris"), "checkKeyCloakAnswers()", "deployStack(aws-polaris,[AWS_POLARIS_CERT_ARN])",
+            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-polaris)");
+        assertThat(derived(DEPLOY, "aws-full")).containsExactly(
+            deleteConflicting("aws-full"),
+            "deployStack(aws-full,[AWS_KEYCLOAK_CERT_ARN, AWS_POLARIS_CERT_ARN, AWS_JUPYTER_CERT_ARN])",
+            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-full)");
+        for (String cloud : List.of("azure", "gcp")) {
+            String stack = cloud + "-polaris";
+            assertThat(derived(DEPLOY, stack)).containsExactly(
+                deleteConflicting(stack), "checkKeyCloakAnswers()", "deployStack(" + stack + ",[])",
+                "waitForPolarisAndKeycloakIn(" + cloud + ")", "deployComplete(" + stack + ")");
         }
     }
 
     @Test
-    void stacksConflictAsTheyDoWhenListedPerStack() {
-        for (String external : List.of("false", "true")) {
-            properties.setValue(AWS_KEYCLOAK_EXTERNAL, external);
-            for (String egress : List.of("", "1.2.3.4")) {
-                properties.setValue(AWS_EGRESS_IP, egress);
-                List<String> stacks = List.of("aws-keycloak", "aws-full", "aws-polaris", "azure-polaris", "gcp-polaris");
-                for (String stack : stacks) {
-                    for (String other : stacks) {
-                        assertThat(factory.conflicts(StackId.parse(stack), other, properties))
-                            .as("%s conflicts with %s, external KeyCloak %s, egress IP '%s'", stack, other, external, egress)
-                            .isEqualTo(legacy.conflicts(StackId.parse(stack), other, properties));
-                    }
-                    // the legacy stack of the cloud, named as the cloud, may be any stack
-                    String cloud = StackId.parse(stack).cloud().toString();
-                    assertThat(factory.conflicts(StackId.parse(stack), cloud, properties)).isTrue();
-                }
+    void setsUpEachStackAfterDeployingItInOrderOfTheComponents() {
+        assertThat(derived(SETUP, "aws-keycloak")).containsExactly(
+            deleteConflicting("aws-keycloak"), "deployStack(aws-keycloak,[AWS_KEYCLOAK_CERT_ARN])", "waitForKeyCloak()",
+            "deployComplete(aws-keycloak)", "configureOidcUsersFor(aws)", "setupComplete(aws-keycloak)");
+        assertThat(derived(SETUP, "aws-polaris")).containsExactly(
+            deleteConflicting("aws-polaris"), "checkKeyCloakAnswers()", "deployStack(aws-polaris,[AWS_POLARIS_CERT_ARN])",
+            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-polaris)", "configureOidcUsersFor(aws)",
+            "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "setupComplete(aws-polaris)");
+        assertThat(derived(SETUP, "aws-full")).containsExactly(
+            deleteConflicting("aws-full"),
+            "deployStack(aws-full,[AWS_KEYCLOAK_CERT_ARN, AWS_POLARIS_CERT_ARN, AWS_JUPYTER_CERT_ARN])",
+            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-full)", "configureOidcUsersFor(aws)",
+            "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "runAwsSparkWritingTo(aws)",
+            "setupComplete(aws-full)");
+        for (String cloud : List.of("azure", "gcp")) {
+            String stack = cloud + "-polaris";
+            assertThat(derived(SETUP, stack)).containsExactly(
+                deleteConflicting(stack), "checkKeyCloakAnswers()", "deployStack(" + stack + ",[])",
+                "waitForPolarisAndKeycloakIn(" + cloud + ")", "deployComplete(" + stack + ")", "configureOidcUsersFor(" + cloud + ")",
+                "createAllCatalogsFor(" + cloud + ")", "configurePolarisUsersOnAllCatalogsFor(" + cloud + ")", "setupComplete(" + stack + ")");
+        }
+    }
+
+    @Test
+    void deletesJustTheStackAndTheLegacyStackOrEveryStackOfTheCloud() {
+        for (String stack : List.of("aws-keycloak", "aws-polaris", "aws-full", "azure-polaris", "gcp-polaris")) {
+            assertThat(derived(DELETE, stack)).as(stack).containsExactly(deleteStack(stack), "deleteComplete(" + stack + ")");
+        }
+        for (String cloud : List.of("aws", "azure", "gcp")) {
+            assertThat(derived(DELETE, cloud + "-all")).containsExactly("deleteStackIn(" + cloud + ")", "deleteComplete(" + cloud + "-all)");
+        }
+    }
+
+    @Test
+    void stacksConflictWhenHoldingCommonExclusiveResource() {
+        StackId keycloak = StackId.parse("aws-keycloak");
+        StackId polaris = StackId.parse("aws-polaris");
+        StackId full = StackId.parse("aws-full");
+        // KeyCloak and Polaris run side by side, as Polaris uses KeyCloak rather than deploying its own
+        assertThat(factory.conflicts(polaris, "aws-keycloak", properties)).isFalse();
+        assertThat(factory.conflicts(keycloak, "aws-polaris", properties)).isFalse();
+        // the full stack deploys its own KeyCloak and Polaris
+        assertThat(factory.conflicts(full, "aws-keycloak", properties)).isTrue();
+        assertThat(factory.conflicts(full, "aws-polaris", properties)).isTrue();
+        assertThat(factory.conflicts(keycloak, "aws-full", properties)).isTrue();
+        assertThat(factory.conflicts(polaris, "aws-full", properties)).isTrue();
+        // stacks of different clouds hold nothing in common
+        assertThat(factory.conflicts(StackId.parse("azure-polaris"), "aws-full", properties)).isFalse();
+        assertThat(factory.conflicts(StackId.parse("gcp-polaris"), "azure-polaris", properties)).isFalse();
+        // a stack conflicts with itself, the legacy stack of its cloud, and any stack that is not defined, as its resources are unknown
+        for (StackId stackId : List.of(keycloak, polaris, full, StackId.parse("azure-polaris"), StackId.parse("gcp-polaris"))) {
+            assertThat(factory.conflicts(stackId, stackId.toString(), properties)).as(stackId.toString()).isTrue();
+            assertThat(factory.conflicts(stackId, stackId.cloud().toString(), properties)).as(stackId.toString()).isTrue();
+            assertThat(factory.conflicts(stackId, stackId.cloud() + "-unknown", properties)).as(stackId.toString()).isTrue();
+        }
+    }
+
+    @Test
+    void fullStackRunsSideBySideWithKeyCloakStackWhenUsingExternalKeyCloak() {
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "true");
+        properties.setValue(AWS_EGRESS_IP, "");
+        assertThat(factory.conflicts(StackId.parse("aws-full"), "aws-keycloak", properties)).isFalse();
+        assertThat(factory.conflicts(StackId.parse("aws-keycloak"), "aws-full", properties)).isFalse();
+        // still holding the Polaris domain name
+        assertThat(factory.conflicts(StackId.parse("aws-full"), "aws-polaris", properties)).isTrue();
+    }
+
+    @Test
+    void deletingAStackNeverRefusesToDeleteTheLegacyStackOrItself() {
+        List<StackFilter> filters = new ArrayList<>();
+        factory.steps(DELETE, StackId.parse("aws-keycloak"), recordingFiltersIn(filters), false);
+
+        StackFilter filter = filters.get(0);
+        assertThat(filter.selects()).accepts("aws-keycloak", "aws").rejects("aws-full", "azure-polaris");
+        assertThat(filter.refusal().apply("aws-keycloak")).isNull();
+        assertThat(filter.refusal().apply("aws")).isNull();
+    }
+
+    private StepOperations recordingFiltersIn(List<StackFilter> filters) {
+        return mock(StepOperations.class, (Answer<Object>) invocation -> {
+            if (invocation.getMethod().getName().equals("properties")) {
+                return properties;
             }
-        }
+            Arrays.stream(invocation.getArguments()).filter(StackFilter.class::isInstance)
+                  .forEach(arg -> filters.add((StackFilter) arg));
+            return invocation.getMethod().getReturnType() == Step.class
+                   ? new Step("step", "step", () -> {}) : RETURNS_DEFAULTS.answer(invocation);
+        });
     }
 
     @Test
-    void stacksNeverListedAreManagedToo() {
-        // aws-jupyter, aws-spark, aws-trino and azure-full were not manageable, and were taken to conflict with every stack
-        assertThatThrownBy(() -> legacy.steps(DEPLOY, StackId.parse("azure-full"), ops)).isInstanceOf(IllegalArgumentException.class);
-
+    void stacksComposedOfComponentsAreManagedLikeTheOthers() {
         assertThat(derived(DEPLOY, "azure-full")).containsExactly(
             deleteConflicting("azure-full"), "checkKeyCloakAnswers()", "deployStack(azure-full,[])",
             "waitForPolarisAndKeycloakIn(azure)", "deployComplete(azure-full)");
@@ -168,11 +213,28 @@ class StackPlanFactoryTest {
 
     @Test
     void stacksRunTheScenariosOfTheirComponentsInOrderOfListing() {
+        // the scenarios of the components, in the order of the components: Spark's, then Snowflake's
         assertThat(factory.scenarios(StackId.parse("aws-snowflake"), properties).keySet())
-            .containsExactly("reading-aws", "reading-azure", "reading-gcp", "writing-azure");
-        assertThat(factory.scenarios(StackId.parse("aws-full"), properties)).isEmpty();
+            .containsExactly("external-azure", "reading-aws", "reading-azure", "reading-gcp", "writing-azure");
+        assertThat(factory.scenarios(StackId.parse("aws-full"), properties).keySet()).containsExactly("external-azure");
+        assertThat(factory.scenarios(StackId.parse("aws-spark"), properties).keySet()).containsExactly("external-azure");
+        // no Spark, so nothing to defer to the Azure Polaris
+        assertThat(factory.scenarios(StackId.parse("aws-polaris"), properties)).isEmpty();
+        assertThat(factory.scenarios(StackId.parse("aws-keycloak"), properties)).isEmpty();
         assertThat(factory.scenarios(StackId.parse("aws-all"), properties)).isEmpty();
         assertThat(factory.scenarios(StackId.parse("azure-full"), properties)).isEmpty();
+    }
+
+    @Test
+    void externalAzureChecksTheAzurePolarisBeforeFederatingToIt() {
+        properties.setValue(AZURE_POLARIS_DOMAIN_NAME, "polaris-azure.example");
+        assertThat(factory.runSteps(StackId.parse("aws-full"), "external-azure", ops).stream().map(Step::getName).toList())
+            .hasSize(4)
+            .satisfiesExactly(
+                step -> assertThat(step).isEqualTo("checkPolarisAnswers(azure)"),
+                step -> assertThat(step).startsWith("deleteExternalPolarisTableFor(azure)"),
+                step -> assertThat(step).startsWith("createExternalCatalogFor(azure)"),
+                step -> assertThat(step).startsWith("runAwsSparkDeferringToAzurePolarisHostingExternalCatalog"));
     }
 
     @Test
@@ -187,8 +249,8 @@ class StackPlanFactoryTest {
     }
 
     @Test
-    void checksTheCertificatesOfTheLoadBalancersOfTheStackAsEachDeploymentDoesToday() {
-        // aws-keycloak checked AWS_KEYCLOAK_CERT_ARN, the Polaris stacks AWS_POLARIS_CERT_ARN, aws-full all three, and the other
+    void checksTheCertificatesOfTheLoadBalancersOfTheStack() {
+        // aws-keycloak checks AWS_KEYCLOAK_CERT_ARN, the Polaris stacks AWS_POLARIS_CERT_ARN, aws-full all three, and the other
         // clouds have no ACM certificates
         assertThat(deployStepOf("aws-keycloak")).isEqualTo("deployStack(aws-keycloak,[AWS_KEYCLOAK_CERT_ARN])");
         assertThat(deployStepOf("aws-polaris")).isEqualTo("deployStack(aws-polaris,[AWS_POLARIS_CERT_ARN])");
@@ -246,15 +308,7 @@ class StackPlanFactoryTest {
     @Test
     void refusesToDeleteAnotherConflictingStackUnlessReplacing() {
         List<StackFilter> filters = new ArrayList<>();
-        StepOperations recording = mock(StepOperations.class, (Answer<Object>) invocation -> {
-            if (invocation.getMethod().getName().equals("properties")) {
-                return properties;
-            }
-            Arrays.stream(invocation.getArguments()).filter(StackFilter.class::isInstance)
-                  .forEach(arg -> filters.add((StackFilter) arg));
-            return invocation.getMethod().getReturnType() == Step.class
-                   ? new Step("step", "step", () -> {}) : RETURNS_DEFAULTS.answer(invocation);
-        });
+        StepOperations recording = recordingFiltersIn(filters);
         properties.setValue(AWS_EGRESS_IP, "");
 
         factory.steps(DEPLOY, StackId.parse("aws-polaris"), recording, false);
@@ -267,7 +321,7 @@ class StackPlanFactoryTest {
         assertThat(keeping.refusal().apply("aws-polaris")).isNull();
         assertThat(replacing.refusal().apply("aws-full")).isNull();
 
-        // as when listed per stack, it names every resource held in common, and how to delete the stack instead
+        // it names every resource held in common, and how to delete the stack instead
         properties.setValue(AWS_EGRESS_IP, "203.0.113.7");
         filters.clear();
         factory.steps(DEPLOY, StackId.parse("aws-polaris"), recording, false);

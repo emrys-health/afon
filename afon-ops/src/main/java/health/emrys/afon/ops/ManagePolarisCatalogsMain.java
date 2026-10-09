@@ -30,14 +30,34 @@ public class ManagePolarisCatalogsMain {
     private final String polarisDomain;
 
     public ManagePolarisCatalogsMain(AfonPropertyProvider properties) {
-        this.catalogManager = new PolarisCatalogManager(properties);
-        this.afonCatalogs = new AfonCatalogs(properties);
-        this.polarisDomain = properties.getValue(POLARIS_ENDPOINT);
+        this(new PolarisCatalogManager(properties), new AfonCatalogs(properties), properties.getValue(POLARIS_ENDPOINT));
+    }
+
+    ManagePolarisCatalogsMain(PolarisCatalogManager catalogManager, AfonCatalogs afonCatalogs, String polarisDomain) {
+        this.catalogManager = catalogManager;
+        this.afonCatalogs = afonCatalogs;
+        this.polarisDomain = polarisDomain;
     }
 
     public void createAllCatalogs() throws IncorrectConfigException, IOException {
         logger.info("Creating all catalogs for domain {}", polarisDomain);
         catalogManager.configureAllCatalogs();
+    }
+
+    /**
+     * Deletes just what is named: every catalog if none is, else the catalog if no namespace is named, else the namespace if no table
+     * is named, else the table.  Naming a table or namespace must never delete the catalog holding it.
+     */
+    void delete(String catalogName, String namespace, String tableName) throws IOException, ParseException {
+        if (catalogName == null) {
+            deleteAllCatalogs();
+        } else if (namespace == null) {
+            deleteCatalog(catalogName);
+        } else if (tableName == null) {
+            deleteNamespace(catalogName, namespace);
+        } else {
+            deleteTable(catalogName, namespace, tableName);
+        }
     }
 
     public void createCatalog(String catalogName) throws IncorrectConfigException, IOException {
@@ -108,6 +128,7 @@ public class ManagePolarisCatalogsMain {
                             [delete|create|recreate] cloud
                             [delete|create] cloud catalog-name
                             [delete] cloud catalog-name [namespace] [table-name]
+                            where deleting a namespace or table leaves the catalog, and deleting a table leaves the namespace
                     """, String.join(" ", args), ManagePolarisCatalogsMain.class.getSimpleName());
             logger.warn(usage);
             return;
@@ -119,17 +140,7 @@ public class ManagePolarisCatalogsMain {
         ManagePolarisCatalogsMain app = new ManagePolarisCatalogsMain(properties);
         try {
             if (action.equals(DELETE)) {
-                if (catalogName == null) {
-                    app.deleteAllCatalogs();
-                } else {
-                    app.deleteCatalog(catalogName);
-                }
-                if (namespace != null && tableName == null) {
-                    app.deleteNamespace(catalogName, namespace);
-                }
-                if (namespace != null && tableName != null) {
-                    app.deleteTable(catalogName, namespace, tableName);
-                }
+                app.delete(catalogName, namespace, tableName);
             }
             if (action.equals(CREATE)) {
                 if (catalogName == null) {

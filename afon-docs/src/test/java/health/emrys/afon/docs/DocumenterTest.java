@@ -61,6 +61,13 @@ class DocumenterTest {
             .contains("afon-cli.sh manage-stack run aws-snowflake reading-azure ")
             .contains("snowflake_reads_catalog_azure")
             .doesNotContain("deploy-snowflake");
+        // the scenario spanning two stacks says to set up both
+        assertThat(documenter.getContent(new SparkExternalAzureViaAwsDocument(properties)))
+            .contains("afon-cli.sh manage-stack setup aws-full\nafon-cli.sh manage-stack setup azure-polaris")
+            .contains("afon-cli.sh manage-stack run aws-full external-azure")
+            .contains("- check_polaris_answers_for_cloud_azure")
+            .contains("- create_catalog_azure_external_for_cloud_azure")
+            .contains("answers with one of 200, 401, 403");
         assertThat(documenter.getContent(new SnowflakeWritingAzureViaAwsDocument(properties)))
             .contains("afon-cli.sh manage-stack run aws-snowflake writing-azure")
             .contains("snowflake_writes_to_azure");

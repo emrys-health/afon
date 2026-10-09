@@ -4,9 +4,9 @@ import health.emrys.afon.config.AfonPropertyProvider;
 
 import static health.emrys.afon.config.AfonCloud.GCP;
 
-public class SnowflakeReadingGcpViaAwsDocument extends AbstractSnowflakeScenarioDocument {
+public class SnowflakeReadingGcpViaAwsDocument extends AbstractScenarioDocument {
 
-    public SnowflakeReadingGcpViaAwsDocument(AfonPropertyProvider properties) { super(properties, "reading-gcp"); }
+    public SnowflakeReadingGcpViaAwsDocument(AfonPropertyProvider properties) { super(properties, "aws-snowflake", "reading-gcp"); }
 
     @Override
     public String getFilename() {

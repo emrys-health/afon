@@ -37,10 +37,6 @@ public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
         return "aws";
     }
 
-    @Override
-    protected List<String> scopes() {
-        return List.of();
-    }
 
     @Override
     protected @NonNull String endpoint() {

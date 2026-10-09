@@ -8,16 +8,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.security.SecurityUtils.KEYCLOAK_SCOPE;
 import static java.lang.String.format;
 
 public class SnowflakeStatements {
     public static final  String SNOWFLAKE_OUT_DIR = "my_project_folder";
-
-    /**
-     * The scope requested from KeyCloak, as for Spark and Trino: KeyCloak rejects the "PRINCIPAL_ROLE:ALL" scope of Polaris'
-     * own token endpoint with {@code invalid_scope}.
-     */
-    static final String KEYCLOAK_SCOPE = "openid";
 
     public static String[] readingViaAwsPolaris(AfonCatalog catalog, AfonPropertyProvider properties) {
         return new String[]{

@@ -48,7 +48,7 @@ where:
 For example:
 ```shell
 afon-cli.sh manage-stack setup aws-keycloak
-afon-cli.sh manage-stack deploy aws-full "wait_on_emryspolaris_then_wait_on_emrysoauth"
+afon-cli.sh manage-stack deploy aws-full wait_on_emryspolaris_then_wait_on_emrysoauth
 afon-cli.sh manage-stack delete aws-full
 ```
 With `afon.sh`, pass the same args positionally, eg `./afon.sh -a manage-stack setup aws-keycloak`.
@@ -64,10 +64,9 @@ afon-cli.sh manage-stack setup aws-snowflake --replace
 afon-cli.sh manage-stack run aws-snowflake reading-azure
 ```
 
-The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, are gone: use `manage-stack`,
-eg `manage-stack delete <stack-id>`, or `manage-stack delete <cloud>-all` for every stack of a cloud, eg `aws-all`.
-Only the commands spanning two clouds remain, ie `deploy-aws-full-stack-and-azure-polaris-stack` and
-`setup-aws-full-stack-with-azure-polaris-hosting-external-catalog`.
+The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, are gone, as are those spanning two
+clouds: use `manage-stack`, eg `manage-stack delete <stack-id>`, or `manage-stack delete <cloud>-all` for every stack of a cloud,
+eg `aws-all`.  What spans stacks is a scenario, eg `manage-stack run aws-full external-azure`, run once the stacks it needs are set up.
 
 ### Stacks side by side
 
@@ -222,21 +221,26 @@ Steps: `delete_stacks_conflicting_with_gcp_polaris` → `check_keycloak_answers`
 
 ### Setup cross-cloud external catalogs (AWS + Azure)
 
-To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate to Azure Polaris for cross-cloud querying.
+To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate to Azure Polaris for cross-cloud querying,
+set up both stacks, then run the scenario `external-azure` of the AWS stack:
 
 ```shell
-afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog
+afon-cli.sh manage-stack setup aws-full --replace
+afon-cli.sh manage-stack setup azure-polaris --replace
+afon-cli.sh manage-stack run aws-full external-azure
 ```
 
-Steps: `delete_aws_all_stack → deploy_aws_full_stack → wait_on_emryspolaris_then_wait_on_emrysoauth → create_all_catalogs_for_cloud_aws → aws_spark_talks_to_catalog_aws → delete_azure_all_stack → deploy_azure_polaris_stack → wait_on_emryspolarisazure_then_wait_on_emrysoauth → delete_table_azure.namespaceph.test_table_for_cloud_azure → create_external_catalog_azure_for_cloud_azure → aws_spark_talks_to_catalog_azure_external`
+The scenario starts by checking that the Azure Polaris answers, and fails, saying to set up `azure-polaris`, if it doesn't.  It then
+deletes the test table of the `azure` catalog, creates the `azure_external` catalog, and checks that Spark writes through the AWS
+Polaris to it.  It runs on any AWS stack with Spark, eg `aws-full` or `aws-snowflake`.
 
 ### Resume a failed stack deployment from a specific step
 
 If a deployment fails partway through, you can resume from a specific step, by adding it to the command, e.g.:
 
 ```shell
-afon-cli.sh manage-stack setup aws-full "create_all_catalogs_for_cloud_aws"
-afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog "deploy_azure_polaris_stack"
+afon-cli.sh manage-stack setup aws-full create_all_catalogs_for_cloud_aws
+afon-cli.sh manage-stack run aws-full external-azure create_catalog_azure_external_for_cloud_azure
 ```
 
 ### Teardown a deployed stack
@@ -385,8 +389,10 @@ afon-cli.sh manage-stack deploy azure-polaris
 # GCP Polaris (standalone)
 afon-cli.sh manage-stack deploy gcp-polaris
 
-# Cross-cloud external catalogs (AWS + Azure federation)
-afon-cli.sh setup-aws-full-stack-with-azure-polaris-hosting-external-catalog
+# Cross-cloud external catalogs (AWS + Azure federation): set up both stacks, then run the scenario
+afon-cli.sh manage-stack setup aws-full
+afon-cli.sh manage-stack setup azure-polaris
+afon-cli.sh manage-stack run aws-full external-azure
 
 # Snowflake: set up the stack, then run a scenario, ie one of reading-aws, reading-azure, reading-gcp, writing-azure
 afon-cli.sh manage-stack setup aws-snowflake

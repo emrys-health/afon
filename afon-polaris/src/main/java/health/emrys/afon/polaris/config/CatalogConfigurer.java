@@ -258,14 +258,30 @@ public class CatalogConfigurer {
         return response;
     }
 
-    public ClassicHttpResponse deleteCatalogRole(String catalogName, String roleName) throws IOException {
+    /**
+     * Deletes the catalog role if the catalog has it.  It asks first, rather than deleting a role that may be absent and
+     * ignoring the 404, as Polaris 1.6.0 answers 204 to the deletion of a role that a federated (external) catalog does not
+     * have, and drops the whole catalog instead, so that every request that follows cannot find it.
+     */
+    public void deleteCatalogRole(String catalogName, String roleName) throws IOException {
+        if (!hasCatalogRole(catalogName, roleName)) {
+            logger.info("No role {} for catalog {} to delete", roleName, catalogName);
+            return;
+        }
         logger.info("Deleting role {} for catalog {}", roleName, catalogName);
         String uri = catalogRolesURI(catalogName) + "/" + roleName;
         ClassicHttpResponse response = client.delete(uri, accessToken);
         if (isFailure(response)) {
             logger.warn("Failed to delete role {}", roleName);
         }
-        return response;
+    }
+
+    private boolean hasCatalogRole(String catalogName, String roleName) throws IOException {
+        try {
+            return catalogRoleNames(catalogName).contains(roleName);
+        } catch (ParseException e) {
+            throw new IOException(e);
+        }
     }
 
     /**
