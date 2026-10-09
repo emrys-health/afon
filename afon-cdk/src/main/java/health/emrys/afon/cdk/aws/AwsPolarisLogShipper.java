@@ -135,7 +135,7 @@ public class AwsPolarisLogShipper {
                     use_put_object On
                     compression gzip
                     total_file_size 50M
-                    upload_timeout 1m
+                    upload_timeout 30m
                     store_dir /var/log/fluent-bit-polaris/s3
                     s3_key_format /%3$s/%%Y/%%m/%%d/%%H%%M%%S-$UUID.json.gz
             """, bucket, region, prefix, roleArn, SERVICE_ACCOUNT, GRACE_SECONDS);
