@@ -110,6 +110,39 @@ public class StackPlanFactory {
         };
     }
 
+    /**
+     * @return the scenarios that the components of the stack can run once it is set up, by name, in the order of the components,
+     * which is none for a stack that is not defined, or whose components have none
+     * @throws IllegalStateException if more than one component has a scenario of the same name
+     */
+    public Map<String, StepsProvider> scenarios(StackId stackId, AfonPropertyProvider properties) {
+        Map<String, StepsProvider> scenarios = new LinkedHashMap<>();
+        if (StackDefinitions.find(stackId).isEmpty()) {
+            return scenarios;
+        }
+        for (StackComponent component : StackDefinitions.get(stackId).componentsFor(properties)) {
+            registry.of(component).runSteps(stackId.cloud()).forEach((name, steps) -> {
+                if (scenarios.putIfAbsent(name, steps) != null) {
+                    throw new IllegalStateException(String.format(
+                        "Stack %s has more than one scenario named '%s'", stackId, name));
+                }
+            });
+        }
+        return scenarios;
+    }
+
+    /**
+     * @return the steps of the scenario of the stack
+     * @throws IllegalArgumentException if the stack has no such scenario
+     */
+    public List<Step> runSteps(StackId stackId, String scenario, StepOperations ops) {
+        StepsProvider steps = scenarios(stackId, ops.properties()).get(scenario);
+        if (steps == null) {
+            throw new IllegalArgumentException(String.format("Stack '%s' has no scenario '%s'", stackId, scenario));
+        }
+        return steps.stepsUsing(ops);
+    }
+
     private List<Step> delete(StackId stackId, StepOperations ops) {
         StackFilter filter = new StackFilter(
             String.format("stack %s and the legacy stack", stackId),

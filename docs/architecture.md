@@ -125,6 +125,7 @@ commands on the stack, besides being deployed with it:
 - `certificates`: the certificates it needs (AWS), checked before the stack is deployed;
 - `waitsFor`: what must answer once the stack is deployed, the union over all components being waited for;
 - `setupSteps`: what it configures when the stack is set up, in the order of the components, without duplicates;
+- `runSteps`: the named scenarios it can run on a stack that is set up, by `manage-stack run` (see below), listed in the order of the components;
 - `label`: its name in messages.
 
 The defaults bring nothing, which is what the infrastructure-only components are (`InfrastructurePlan`).  Some behaviour comes
@@ -159,6 +160,7 @@ The stacks, as composed by `StackDefinitions`:
 | `aws-spark` | as `aws-jupyter`, then Spark and CrdCleanup |
 | `aws-trino` | as `aws-spark`, then Trino |
 | `aws-full` | as `aws-trino`, then Monitoring |
+| `aws-snowflake` | as `aws-full`, then Snowflake, a query engine outside of the stack, so it deploys nothing |
 | `azure-polaris` | Polaris |
 | `azure-full` | Polaris, SparkOperator, Spark, Jupyter |
 | `gcp-polaris` | Polaris |

@@ -50,7 +50,7 @@ public abstract class AbstractDocument implements DocumentMetadata {
 
     /**
      * How to run the steps, by default with the command of the ops class named after this document, eg
-     * {@code deploy-snowflake-reading-aws-via-aws} for {@code DeploySnowflakeReadingAwsViaAwsDocument}.
+     * {@code setup-aws-keycloak-stack} for {@code SetupAwsKeycloakStackDocument}.
      */
     protected String howToRun() {
         return format(

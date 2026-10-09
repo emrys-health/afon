@@ -3,6 +3,7 @@ package health.emrys.afon.cdk;
 import health.emrys.afon.cdk.components.JupyterComponent;
 import health.emrys.afon.cdk.components.KeycloakComponent;
 import health.emrys.afon.cdk.components.PolarisComponent;
+import health.emrys.afon.cdk.components.SnowflakeComponent;
 import health.emrys.afon.cdk.components.SparkComponent;
 import health.emrys.afon.cdk.components.TrinoComponent;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -34,6 +35,12 @@ class StackDefinitionsTest {
         assertThat(componentsOf("aws-spark")).containsAll(componentsOf("aws-jupyter")).contains(SparkComponent.class);
         assertThat(componentsOf("aws-trino")).containsAll(componentsOf("aws-spark")).contains(TrinoComponent.class);
         assertThat(componentsOf("aws-full")).containsAll(componentsOf("aws-trino")).hasSize(componentsOf("aws-trino").size() + 1);
+    }
+
+    @Test
+    void snowflakeStackIsTheFullStackQueriedBySnowflake() {
+        assertThat(componentsOf("aws-snowflake")).startsWith(componentsOf("aws-full").toArray(new Class<?>[0]))
+            .hasSize(componentsOf("aws-full").size() + 1).endsWith(SnowflakeComponent.class);
     }
 
     @Test

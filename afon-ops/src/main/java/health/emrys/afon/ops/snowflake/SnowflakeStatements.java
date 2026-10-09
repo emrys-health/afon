@@ -2,6 +2,7 @@ package health.emrys.afon.ops.snowflake;
 
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -12,14 +13,20 @@ import static java.lang.String.format;
 public class SnowflakeStatements {
     public static final  String SNOWFLAKE_OUT_DIR = "my_project_folder";
 
+    /**
+     * The scope requested from KeyCloak, as for Spark and Trino: KeyCloak rejects the "PRINCIPAL_ROLE:ALL" scope of Polaris'
+     * own token endpoint with {@code invalid_scope}.
+     */
+    static final String KEYCLOAK_SCOPE = "openid";
+
     public static String[] readingViaAwsPolaris(AfonCatalog catalog, AfonPropertyProvider properties) {
         return new String[]{
                 "USE DATABASE SNOWFLAKE_LEARNING_DB",
-                "DROP ICEBERG TABLE my_gcp_table_id",
-                "DROP CATALOG INTEGRATION iceberg_gcp_id",
+                "DROP ICEBERG TABLE IF EXISTS " + tableName(catalog),
+                "DROP CATALOG INTEGRATION IF EXISTS " + integrationName(catalog),
                 format(
                         """
-                                CREATE OR REPLACE CATALOG INTEGRATION iceberg_gcp_id
+                                CREATE OR REPLACE CATALOG INTEGRATION %s
                                   CATALOG_SOURCE = ICEBERG_REST
                                   TABLE_FORMAT = ICEBERG
                                   REST_CONFIG = (
@@ -29,31 +36,64 @@ public class SnowflakeStatements {
                                   )
                                   REST_AUTHENTICATION = (
                                       TYPE = OAUTH
+                                      OAUTH_TOKEN_URI = '%s'
                                       OAUTH_CLIENT_ID = '%s'
                                       OAUTH_CLIENT_SECRET = '%s'
-                                      OAUTH_ALLOWED_SCOPES = ('PRINCIPAL_ROLE:ALL')
+                                      OAUTH_ALLOWED_SCOPES = ('%s')
                                   )
                                   ENABLED = TRUE;
                                 """,
+                        integrationName(catalog),
                         properties.getValue(AWS_POLARIS_DOMAIN_NAME),
                         catalog,
+                        oidcTokenEndpoint(properties),
                         properties.getValue(POLARIS_ID),
-                        properties.getValue(POLARIS_SECRET)),
+                        properties.getValue(POLARIS_SECRET),
+                        KEYCLOAK_SCOPE),
                 format(
                         """              
                                 -- NOTE!!!!
                                 -- This query can take a minute or two to run
                                 -- Please wait... 
-                                CREATE OR REPLACE ICEBERG TABLE my_gcp_table_id
-                                     CATALOG = 'iceberg_gcp_id'
+                                CREATE OR REPLACE ICEBERG TABLE %s
+                                     CATALOG = '%s'
                                      CATALOG_TABLE_NAME = '%s'
                                      CATALOG_NAMESPACE = '%s'
                                      REPLACE_INVALID_CHARACTERS = TRUE;
                                 """,
+                        tableName(catalog),
+                        integrationName(catalog),
                         properties.getValue(POLARIS_TABLE_NAME),
                         properties.getValue(POLARIS_NAMESPACE_EXTERNAL)),
-                "SELECT COUNT(*) FROM my_gcp_table_id"
+                "SELECT COUNT(*) FROM " + tableName(catalog)
         };
+    }
+
+    /**
+     * @return the name of the catalog integration reading the catalog, one for each catalog so that reading one
+     * does not replace the integration of another, eg {@code iceberg_azure_id}
+     */
+    public static String integrationName(AfonCatalog catalog) {
+        return "iceberg_" + identifier(catalog) + "_id";
+    }
+
+    /**
+     * @return the name of the Iceberg table through which Snowflake reads the catalog, eg {@code my_azure_table_id}
+     */
+    public static String tableName(AfonCatalog catalog) {
+        return "my_" + identifier(catalog) + "_table_id";
+    }
+
+    private static String identifier(AfonCatalog catalog) {
+        return catalog.id().toLowerCase().replaceAll("[^a-z0-9_]", "_");
+    }
+
+    /**
+     * The token endpoint of KeyCloak, from which Snowflake gets its token for Polaris: Polaris, which defers to KeyCloak for
+     * OAuth, returns HTTP 501 from its own token endpoint, so Snowflake cannot ask it for one.
+     */
+    static String oidcTokenEndpoint(AfonPropertyProvider properties) {
+        return KeyCloakConfigurer.tokenEndpoint(properties.getValue(OIDC_DOMAIN_NAME), properties.getValue(OIDC_PROTOCOL, "https"));
     }
 
     public static String[] writingToAzure(AfonPropertyProvider properties) {

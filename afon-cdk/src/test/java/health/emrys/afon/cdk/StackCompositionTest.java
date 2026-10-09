@@ -5,6 +5,7 @@ import health.emrys.afon.cdk.components.JupyterComponent;
 import health.emrys.afon.cdk.components.KeycloakComponent;
 import health.emrys.afon.cdk.components.MonitoringComponent;
 import health.emrys.afon.cdk.components.PolarisComponent;
+import health.emrys.afon.cdk.components.SnowflakeComponent;
 import health.emrys.afon.cdk.components.SparkComponent;
 import health.emrys.afon.cdk.components.SparkOperatorComponent;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -57,6 +58,7 @@ class StackCompositionTest {
         assertThat(new JupyterComponent().after()).containsExactly(KeycloakComponent.class);
         assertThat(new SparkComponent().requires()).containsExactly(SparkOperatorComponent.class);
         assertThat(new MonitoringComponent().requires()).containsExactly(CrdCleanupComponent.class);
+        assertThat(new SnowflakeComponent().requires()).containsExactly(PolarisComponent.class);
         assertThat(new KeycloakComponent().requires()).isEmpty();
         assertThat(new KeycloakComponent().after()).isEmpty();
     }

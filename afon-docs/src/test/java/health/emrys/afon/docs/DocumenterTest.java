@@ -49,4 +49,21 @@ class DocumenterTest {
         assertThat(content).doesNotContain(properties.getValue(POLARIS_SECRET));
     }
 
+    @Test
+    void documentsSnowflakeScenariosAsRunByManageStack() {
+        // the scenarios read the catalogs, which the template config defines
+        AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
+        Documenter documenter = new Documenter(properties);
+        String content = documenter.getContent(new SnowflakeReadingAzureViaAwsDocument(properties));
+        assertThat(content)
+            .contains("afon-cli.sh manage-stack setup aws-snowflake")
+            .contains("afon-cli.sh manage-stack run aws-snowflake reading-azure")
+            .contains("afon-cli.sh manage-stack run aws-snowflake reading-azure ")
+            .contains("snowflake_reads_catalog_azure")
+            .doesNotContain("deploy-snowflake");
+        assertThat(documenter.getContent(new SnowflakeWritingAzureViaAwsDocument(properties)))
+            .contains("afon-cli.sh manage-stack run aws-snowflake writing-azure")
+            .contains("snowflake_writes_to_azure");
+    }
+
 }

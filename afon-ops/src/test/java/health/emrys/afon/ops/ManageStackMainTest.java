@@ -1,6 +1,8 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.CloudStackValidator;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.plan.StackPlanFactory;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,16 @@ class ManageStackMainTest {
         assertThat(manager.stepsProviderFor("deploy", "azure-unknown")).isNull();
         assertThat(manager.stepsProviderFor("deploy", "mars-keycloak")).isNull();
         assertThat(manager.stepsProviderFor("deploy", "keycloak")).isNull();
+    }
+
+    @Test
+    void canResolveScenarioOfStack() {
+        AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
+        assertThat(manager.runProviderFor("aws-snowflake", "reading-azure", properties)).isNotNull();
+        assertThat(manager.runProviderFor("aws-snowflake", "reading-mars", properties)).isNull();
+        assertThat(manager.runProviderFor("aws-full", "reading-azure", properties)).isNull();
+        assertThat(manager.runProviderFor("aws-unknown", "reading-azure", properties)).isNull();
+        assertThat(manager.runProviderFor("snowflake", "reading-azure", properties)).isNull();
     }
 
     @Test
