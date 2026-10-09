@@ -158,7 +158,7 @@ public class StepOperations {
                 format("deploy stack %s", stackId),
                 () -> {
                     if (!certificates.isEmpty()) {
-                        checkAwsCertificatesIssued(certificates.toArray(new AfonProperty[0]));
+                        checkCertificatesIssued(certificates.toArray(new AfonProperty[0]));
                     }
                     startStack(stackId);
                 });
@@ -171,7 +171,7 @@ public class StepOperations {
                 return new Step("deploy_aws_full_stack",
                         "deploy full stack in AWS",
                         () -> {
-                            checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN,
+                            checkCertificatesIssued(AWS_KEYCLOAK_CERT_ARN,
                                     AWS_JUPYTER_CERT_ARN,AWS_POLARIS_CERT_ARN);
                             startStack(new StackId(AWS, "full"));
                         });
@@ -229,17 +229,19 @@ public class StepOperations {
      * in a generic "Load Balancer is not ready yet" error from the ALB controller endlessly
      * retrying {@code CreateListener} against a certificate AWS will never accept. Re-issue a
      * failing one with {@code scripts/aws/issue-cert.sh}.
+     * <p>
+     * Only AWS has certificate properties for now, so the certificates are ACM's.
      */
-    void checkAwsCertificatesIssued(AfonProperty... arns) throws ManagedProcessException {
+    void checkCertificatesIssued(AfonProperty... certificates) throws ManagedProcessException {
         String region = properties.getValue(AWS_REGION);
 
         List<String> problems = new ArrayList<>();
-        for (AfonProperty property : arns) {
-            String arn = properties.getValue(property);
-            if (arn == null || arn.isBlank()) {
+        for (AfonProperty property : certificates) {
+            String certificate = properties.getValue(property);
+            if (certificate == null || certificate.isBlank()) {
                 return;
             }
-            String status = describeCertificateStatus(arn, region);
+            String status = describeCertificateStatus(certificate, region);
             if (!"ISSUED".equals(status)) {
                 problems.add(format("%s is %s, not ISSUED", property, status));
             }
@@ -251,9 +253,9 @@ public class StepOperations {
         }
     }
 
-    private String describeCertificateStatus(String certArn, String region) throws ManagedProcessException {
+    private String describeCertificateStatus(String certificate, String region) throws ManagedProcessException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        actions.awsDescribeCertificate(certArn, region, out);
+        actions.awsDescribeCertificate(certificate, region, out);
         return out.toString().trim();
     }
 
@@ -264,7 +266,7 @@ public class StepOperations {
                 return new Step("deploy_aws_polaris_stack",
                         "deploy Polaris stack in AWS",
                         () -> {
-                            checkAwsCertificatesIssued(AWS_POLARIS_CERT_ARN);
+                            checkCertificatesIssued(AWS_POLARIS_CERT_ARN);
                             startStack(new StackId(AWS, "polaris"));
                         });
             case AZURE:
@@ -287,7 +289,7 @@ public class StepOperations {
                 return new Step("deploy_aws_keycloak_stack",
                         "deploy KeyCloak stack in AWS",
                         () -> {
-                            checkAwsCertificatesIssued(AWS_KEYCLOAK_CERT_ARN);
+                            checkCertificatesIssued(AWS_KEYCLOAK_CERT_ARN);
                             startStack(new StackId(AWS, "keycloak"));
                         });
             case AZURE, GCP:

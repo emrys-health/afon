@@ -41,7 +41,7 @@ public interface ComponentPlan {
     }
 
     /**
-     * What a stack is waited for on, once deployed, which is when its DNS record has propagated.
+     * The endpoint a stack is waited for on, once deployed, which is when its DNS record has propagated.
      */
     enum Endpoint {KEYCLOAK, POLARIS}
 
@@ -64,8 +64,8 @@ public interface ComponentPlan {
 
     /**
      * @return the properties of the certificates the component's HTTPS endpoint needs on the cloud, which must be issued
-     * before the stack is deployed, eg the ACM certificate ARN of the ALB of the Polaris DNS record on AWS.  None by default, and on
-     * the clouds that issue them in the cluster.
+     * before the stack is deployed, eg the ACM certificate ARN of the ALB of the Polaris DNS record on AWS.  None by default, and
+     * on the clouds that issue them in the cluster, ie that have no such property, see {@link #ofCloud}.
      */
     default List<AfonProperty> certificates(AfonCloud cloud) {
         return List.of();
