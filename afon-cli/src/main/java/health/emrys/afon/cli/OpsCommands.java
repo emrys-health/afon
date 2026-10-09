@@ -64,8 +64,8 @@ class OpsCommands {
     }
 
     /**
-     * Resolves a command name, accepted either in kebab-case (e.g. "deploy-aws-full-stack")
-     * or as the raw class simple name (e.g. "DeployAwsFullStackMain"), case-insensitively.
+     * Resolves a command name, accepted either in kebab-case (e.g. "show-env")
+     * or as the raw class simple name (e.g. "ShowEnvMain"), case-insensitively.
      */
     Class<?> resolve(String command) {
         return commandsByName.get(command.toLowerCase());

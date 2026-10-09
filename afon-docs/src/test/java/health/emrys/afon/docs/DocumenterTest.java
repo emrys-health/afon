@@ -66,4 +66,18 @@ class DocumenterTest {
             .contains("snowflake_writes_to_azure");
     }
 
+    @Test
+    void documentsEveryDocumentWithTheStepsManageStackRuns() {
+        AfonPropertyProvider templates = new FilePropertyProvider("../templates/config");
+        List<DocumentMetadata> documents = new DocumentFinder(templates).findDocuments();
+        assertThat(documents).isNotEmpty();
+        for (DocumentMetadata document : documents) {
+            assertThat(new Documenter(templates).getContent(document))
+                .as(document.getClass().getSimpleName()).contains("The steps being run are:");
+        }
+        // the steps are those derived from the components of the stack, which report the deployment complete
+        assertThat(new Documenter(templates).getContent(new SetupAwsKeycloakStackDocument(templates)))
+            .contains("- deploy_complete_for_aws_keycloak", "- setup_complete_for_aws_keycloak");
+    }
+
 }

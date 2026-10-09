@@ -4,7 +4,7 @@ set -euo pipefail
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
 
-# Lists the kebab-case names of the ops *Main classes (eg DeployAwsFullStackMain -> deploy-aws-full-stack).
+# Lists the kebab-case names of the ops *Main classes (eg ShowEnvMain -> show-env).
 # The ops/scripts package is excluded: it holds the script-command template, handled by the <dir>-<name> actions.
 ops_command_names(){
   find "$OPS_JAVA_DIR" -name '*Main.java' -not -path '*/ops/scripts/*' 2>/dev/null \
@@ -34,8 +34,8 @@ usage (){
   echo "                          eg cdktf-status, config-switch, aws-login, azure-account"
   echo "                          Its script args can be given as positional args instead of --script-args, eg"
   echo "                          '-a github-secrets push --env dev'. Use '--' before any other arg starting with '-'."
-  echo "          <ops-command> : executes the ops class <OpsCommand>Main, eg deploy-aws-full-stack for"
-  echo "                          'exec -ec ops.DeployAwsFullStackMain'.  The other --exec-* options still apply."
+  echo "          <ops-command> : executes the ops class <OpsCommand>Main, eg show-env for"
+  echo "                          'exec -ec ops.ShowEnvMain'.  The other --exec-* options still apply."
   echo "                          Its exec args can be given as positional args instead of --exec-args, eg"
   echo "                          '-a manage-polaris-catalogs create aws'. Use '--' before any other arg starting with '-'."
   echo "                          The ops commands are:"
@@ -190,8 +190,8 @@ exec_action_script(){
 }
 
 find_ops_class(){
-  # Prints the ops class (relative to the base package, eg "ops.DeployAwsFullStackMain") for the
-  # "<kebab-name>" action $1, eg "deploy-aws-full-stack", or returns 1 if there is none.
+  # Prints the ops class (relative to the base package, eg "ops.ShowEnvMain") for the
+  # "<kebab-name>" action $1, eg "show-env", or returns 1 if there is none.
   # Pure bash: the class is looked up in the source tree, no dependency on the cli.
   # Meant to be called in a subshell, as find_script_path sets globals.
   [[ "$1" == *-* ]] || return 1
@@ -214,8 +214,8 @@ find_ops_class(){
 }
 
 resolve_ops_action(){
-  # Rewrites an ops command action, eg "deploy-aws-full-stack", into the equivalent of
-  # "exec -ec ops.DeployAwsFullStackMain".
+  # Rewrites an ops command action, eg "show-env", into the equivalent of
+  # "exec -ec ops.ShowEnvMain".
   local ops_class
   ops_class=$(find_ops_class "$ACTION") || return 0
   EXEC_CLASS="$ops_class"

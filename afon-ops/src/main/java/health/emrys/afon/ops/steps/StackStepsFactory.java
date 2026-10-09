@@ -17,9 +17,9 @@ import static health.emrys.afon.ops.steps.StepsUtils.setupFullStackStepsUsing;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
- * Provides the steps of each action on each stack, keyed by {@link StackId}, eg the steps to deploy
- * {@code aws-keycloak}.  It is the single definition of the steps of each stack, used by {@code manage-stack}
- * and by the {@code Delete|Deploy|Setup*StackMain} commands it replaces.
+ * Provides the hand-written steps of each action on each stack, keyed by {@link StackId}, eg the steps to deploy
+ * {@code aws-keycloak}.  {@code manage-stack} no longer uses it, as it runs the steps derived from the components of the
+ * stack by {@code StackPlanFactory}, which the tests compare with these.  It is still used by the documents of the stacks.
  * <p>
  * Stacks run side by side, unless they conflict, ie they hold a common exclusive resource, such as the DNS record of
  * a domain name, or the pinned egress IP, which only one running stack can hold.  So deploying or setting up a stack

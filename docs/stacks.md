@@ -64,9 +64,10 @@ afon-cli.sh manage-stack setup aws-snowflake --replace
 afon-cli.sh manage-stack run aws-snowflake reading-azure
 ```
 
-The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, still work, with
-hand-written steps, which differ slightly from those of `manage-stack`, derived from the components of the stack (eg `setup`
-also reports the deployment complete), but they will be removed.
+The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, are gone: use `manage-stack`,
+eg `manage-stack delete <stack-id>`, or `manage-stack delete <cloud>-all` for every stack of a cloud, eg `aws-all`.
+Only the commands spanning two clouds remain, ie `deploy-aws-full-stack-and-azure-polaris-stack` and
+`setup-aws-full-stack-with-azure-polaris-hosting-external-catalog`.
 
 ### Stacks side by side
 
