@@ -12,13 +12,13 @@ class OpsCommandsTest {
 
     @Test
     void resolvesKnownCommandsByKebabCaseName() {
-        assertThat(opsCommands.resolve("deploy-aws-full-stack")).isEqualTo(health.emrys.afon.ops.DeployAwsFullStackMain.class);
+        assertThat(opsCommands.resolve("show-env")).isEqualTo(health.emrys.afon.ops.ShowEnvMain.class);
     }
 
     @Test
     void resolvesKnownCommandsByRawClassNameCaseInsensitively() {
-        assertThat(opsCommands.resolve("DeployAwsFullStackMain")).isEqualTo(health.emrys.afon.ops.DeployAwsFullStackMain.class);
-        assertThat(opsCommands.resolve("deployawsfullstackmain")).isEqualTo(health.emrys.afon.ops.DeployAwsFullStackMain.class);
+        assertThat(opsCommands.resolve("ShowEnvMain")).isEqualTo(health.emrys.afon.ops.ShowEnvMain.class);
+        assertThat(opsCommands.resolve("showenvmain")).isEqualTo(health.emrys.afon.ops.ShowEnvMain.class);
     }
 
     @Test
@@ -48,9 +48,28 @@ class OpsCommandsTest {
 
     @Test
     void namesCanBeFilteredByCloud() {
-        assertThat(opsCommands.names("aws")).contains("deploy-aws-full-stack", "delete-aws-stack");
-        assertThat(opsCommands.names("azure")).contains("deploy-azure-polaris-stack", "delete-azure-stack");
-        assertThat(opsCommands.names("gcp")).contains("deploy-gcp-polaris-stack", "delete-gcp-stack");
+        assertThat(opsCommands.names("aws")).contains("aws-login");
+        assertThat(opsCommands.names("azure")).contains("azure-account");
+        assertThat(opsCommands.names("gcp")).contains("gcp-account");
+    }
+
+    @Test
+    void managingStacksIsOnlyByManageStack() {
+        assertThat(opsCommands.names()).doesNotContain(
+            "deploy-aws-full-stack", "deploy-aws-keycloak-stack", "deploy-aws-polaris-stack",
+            "deploy-azure-polaris-stack", "deploy-gcp-polaris-stack",
+            "setup-aws-full-stack", "setup-aws-keycloak-stack", "setup-aws-polaris-stack",
+            "setup-azure-polaris-stack", "setup-gcp-polaris-stack");
+        // these span two clouds, which manage-stack, managing one stack, does not
+        assertThat(opsCommands.names()).contains(
+            "deploy-aws-full-stack-and-azure-polaris-stack",
+            "setup-aws-full-stack-with-azure-polaris-hosting-external-catalog");
+    }
+
+    @Test
+    void deletingStacksIsOnlyByManageStack() {
+        assertThat(opsCommands.names()).doesNotContain("delete-aws-stack", "delete-azure-stack", "delete-gcp-stack");
+        assertThat(opsCommands.names()).contains("manage-stack");
     }
 
     @Test

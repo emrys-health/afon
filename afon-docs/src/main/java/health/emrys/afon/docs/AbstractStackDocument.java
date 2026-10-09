@@ -2,9 +2,9 @@ package health.emrys.afon.docs;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.ops.steps.StackAction;
 import health.emrys.afon.config.StackId;
-import health.emrys.afon.ops.steps.StackStepsFactory;
+import health.emrys.afon.ops.plan.StackPlanFactory;
+import health.emrys.afon.ops.steps.StackAction;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import health.emrys.afon.ops.steps.StepsProvider;
@@ -17,11 +17,11 @@ import static java.lang.String.format;
 
 /**
  * Abstract base class for the documents of an action on a stack, run with {@code manage-stack <action> <stack-id>},
- * whose steps are provided by {@link StackStepsFactory}.
+ * whose steps are those it runs, provided by {@link StackPlanFactory}.
  */
 public abstract class AbstractStackDocument extends AbstractDocument {
 
-    private static final StackStepsFactory FACTORY = new StackStepsFactory();
+    private static final StackPlanFactory FACTORY = new StackPlanFactory();
 
     private final StepsProvider stepsProvider;
     /**
@@ -36,7 +36,7 @@ public abstract class AbstractStackDocument extends AbstractDocument {
     protected AbstractStackDocument(AfonPropertyProvider properties, StackAction action, String stackId) {
         super(properties);
         StackId id = StackId.parse(stackId);
-        this.stepsProvider = FACTORY.stepsProviderFor(action, id);
+        this.stepsProvider = FACTORY.stepsProviderFor(action, id, false);
         if (stepsProvider == null) {
             throw new IllegalArgumentException(format("Unsupported action '%s' on stack '%s'", action, id));
         }
@@ -58,7 +58,7 @@ public abstract class AbstractStackDocument extends AbstractDocument {
                                        .filter(id -> id.cloud() == cloud && !id.isAll())
                                        .map(StackId::toString)
                                        .toList();
-        this.stepsProvider = FACTORY.deleteIn(cloud);
+        this.stepsProvider = ops -> FACTORY.steps(StackAction.DELETE, StackId.all(cloud), ops, false);
         this.manageStackArgs = StackAction.DELETE + " " + StackId.all(cloud);
         this.note = format(
             """

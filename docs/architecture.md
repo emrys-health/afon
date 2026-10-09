@@ -102,7 +102,7 @@ Executables are composed of reusable steps:
 - **`StepRunner`** — executes a list of steps in order, with the ability to resume from a named step
 - **`StepsProvider`** — interface providing a step list
 - **`StackPlanFactory`** — the steps of each action (`delete`, `deploy`, `setup`) on each stack, keyed by stack id (`<cloud>-<stack-type>`, eg `aws-keycloak`), derived from the components of the stack (see [Steps derived from the components](#steps-derived-from-the-components)) and run by the `manage-stack` command
-- **`StackStepsFactory`** — the legacy, hand-written steps of each stack, still used by the `Delete|Deploy|Setup*Main` commands and the generated stack documents
+- **`StackStepsFactory`** — the legacy, hand-written steps of each stack, no longer used by any command or document, only by the tests that check the derived steps against them
 
 The other ops commands, eg the Snowflake and cross-cloud ones, compose their steps from `StepOperations` too, reusing
 the stacks' steps. For example, `SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain` reuses the steps setting up
@@ -110,7 +110,7 @@ the `aws-full` stack and then adds Azure-specific steps.
 
 The corresponding `*Document` classes generate markdown documentation describing each step — this keeps documentation
 in lock-step with the actual deployment code.  The stack documents extend `AbstractStackDocument`, taking their steps
-from `StackStepsFactory`.
+from `StackPlanFactory`, so they list the steps that `manage-stack` runs.
 
 ### Steps derived from the components
 
@@ -175,8 +175,8 @@ needs nothing but a stack id, registered in `StackDefinitions`, and the config. 
    `terraform.<stack-id>.tfstate`, but never touches that state.
 
 No code of Afon outside the tests creates a CDKTF app or a stack: there is no class or main per stack, so adding a stack to
-`StackDefinitions` is all that it takes to synthesise and validate it. (To deploy it with `manage-stack` it also needs registering
-in `StackStepsFactory`.) The tests, `StackSynthesisGoldenTest` and `DeterministicSynthesisTest`, build the same `ComposedStack`
+`StackDefinitions` is all that it takes to synthesise and validate it. (`manage-stack` derives its steps from the components, so nothing
+else needs registering.) The tests, `StackSynthesisGoldenTest` and `DeterministicSynthesisTest`, build the same `ComposedStack`
 in a temp dir. The plan is a function of the stack id and the config alone, which is why it must be deterministic.
 `ComposedStack.main(<stack-id>)` runs it by hand, from the config dir.
 
