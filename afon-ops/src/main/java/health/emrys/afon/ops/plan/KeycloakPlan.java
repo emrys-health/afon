@@ -31,7 +31,7 @@ public class KeycloakPlan implements ComponentPlan {
     }
 
     /**
-     * The KeyCloak domain is not one of a cloud, but its certificate is.
+     * The Keycloak domain certificates, on the clouds that have the property, ie AWS.
      */
     @Override
     public List<AfonProperty> certificates(AfonCloud cloud) {

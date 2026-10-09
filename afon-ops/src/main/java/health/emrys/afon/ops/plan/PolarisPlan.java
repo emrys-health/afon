@@ -30,6 +30,9 @@ public class PolarisPlan implements ComponentPlan {
         return List.of(AfonProperty.forCloud(cloud, "POLARIS_DOMAIN_NAME").orElseThrow());
     }
 
+    /**
+     * The Polaris domain certificates, on the clouds that have the property, ie AWS.
+     */
     @Override
     public List<AfonProperty> certificates(AfonCloud cloud) {
         return ComponentPlan.ofCloud(cloud, "POLARIS_CERT_ARN");

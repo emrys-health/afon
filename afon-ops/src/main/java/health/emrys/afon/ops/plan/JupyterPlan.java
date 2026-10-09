@@ -6,6 +6,7 @@ import health.emrys.afon.config.AfonProperty;
 
 import java.util.List;
 
+
 /**
  * The {@link ComponentPlan} for the {@link JupyterComponent}, decorating its deployment:
  * it holds the Jupyter domain name of the cloud, which only one running stack can serve,
