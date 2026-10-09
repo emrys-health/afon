@@ -9,7 +9,6 @@ import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.catalogs.AzureUtils.abfssBucketUrl;
-import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 
 public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
     private final @NonNull String catalogName;
@@ -38,10 +37,6 @@ public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
         return "azure";
     }
 
-    @Override
-    protected List<String> scopes() {
-        return List.of(OAUTH_SCOPE);
-    }
 
     @Override
     protected @NonNull String endpoint() {

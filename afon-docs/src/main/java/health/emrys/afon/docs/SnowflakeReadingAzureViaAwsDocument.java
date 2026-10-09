@@ -4,9 +4,9 @@ import health.emrys.afon.config.AfonPropertyProvider;
 
 import static health.emrys.afon.config.AfonCloud.AZURE;
 
-public class SnowflakeReadingAzureViaAwsDocument extends AbstractSnowflakeScenarioDocument {
+public class SnowflakeReadingAzureViaAwsDocument extends AbstractScenarioDocument {
 
-    public SnowflakeReadingAzureViaAwsDocument(AfonPropertyProvider properties) { super(properties, "reading-azure"); }
+    public SnowflakeReadingAzureViaAwsDocument(AfonPropertyProvider properties) { super(properties, "aws-snowflake", "reading-azure"); }
 
     @Override
     public String getFilename() {

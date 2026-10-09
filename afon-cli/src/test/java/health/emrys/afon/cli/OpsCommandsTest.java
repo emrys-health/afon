@@ -59,9 +59,7 @@ class OpsCommandsTest {
             "deploy-aws-full-stack", "deploy-aws-keycloak-stack", "deploy-aws-polaris-stack",
             "deploy-azure-polaris-stack", "deploy-gcp-polaris-stack",
             "setup-aws-full-stack", "setup-aws-keycloak-stack", "setup-aws-polaris-stack",
-            "setup-azure-polaris-stack", "setup-gcp-polaris-stack");
-        // these span two clouds, which manage-stack, managing one stack, does not
-        assertThat(opsCommands.names()).contains(
+            "setup-azure-polaris-stack", "setup-gcp-polaris-stack",
             "deploy-aws-full-stack-and-azure-polaris-stack",
             "setup-aws-full-stack-with-azure-polaris-hosting-external-catalog");
     }

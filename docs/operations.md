@@ -183,9 +183,9 @@ It will generate some PySpark to run in Jupyter and SQL to run in Snowflake.
 
 When a Polaris stack deploy, is it empty.  So, for example for `aws` cloud, to create the catalogs:
 ```shell
-afon-cli.sh manage-polaris-catalogs "create aws"
+afon-cli.sh manage-polaris-catalogs create aws
 ```
 and to register tables on catalog `aws`, something like:
 ```shell
-afon-cli.sh register-polaris-table "aws aws acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json <user_polaris_id> <user_polaris_secret>"
+afon-cli.sh register-polaris-table aws aws acceptancetests AwsAccessSpec s3://emrys-afon-bucket/acceptancetests/AwsAccessSpec251117511401/metadata/00000-685ec54b-684f-48cb-bb58-6ae6aacb92e6.metadata.json <user_polaris_id> <user_polaris_secret>
 ```

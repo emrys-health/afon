@@ -13,6 +13,7 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -178,14 +179,17 @@ public class StepDocumentation extends StepActions {
     }
 
     @Override
-    void checkAnswers(String url, String failure) {
+    void checkAnswers(String url, String failure, Set<Integer> codes) {
+        String expected = codes.size() == 1
+                          ? "with " + codes.iterator().next()
+                          : "with one of " + codes.stream().sorted().map(String::valueOf).collect(Collectors.joining(", "));
         out.println(format("""
-                   Check that `%s` answers with 200, eg with:
+                   Check that `%s` answers %s, eg with:
                    ```shell
                    curl -s -o /dev/null -w '%%{http_code}' %s
                    ```
                    If it doesn't: %s
-                   """, url, url, failure));
+                   """, url, expected, url, failure));
         out.flush();
     }
 

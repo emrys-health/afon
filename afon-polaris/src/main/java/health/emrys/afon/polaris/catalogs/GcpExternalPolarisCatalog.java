@@ -11,7 +11,6 @@ import java.util.List;
 import static health.emrys.afon.config.AfonProperty.GCP_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperty.GCP_SERVICE_ACCOUNT;
 import static health.emrys.afon.polaris.catalogs.GcpUtils.gsBucketUrl;
-import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static org.apache.polaris.core.admin.model.StorageConfigInfo.StorageTypeEnum.GCS;
 
 public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
@@ -37,10 +36,6 @@ public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
         return "gcp";
     }
 
-    @Override
-    protected List<String> scopes() {
-        return List.of(OAUTH_SCOPE);
-    }
 
     @Override
     protected @NonNull String bucketUri() {

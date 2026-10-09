@@ -615,6 +615,16 @@ public class StepActions {
      * @throws IllegalStateException if it doesn't answer, or not with 200
      */
     void checkAnswers(String url, String failure) throws InterruptedException {
+        checkAnswers(url, failure, Set.of(200));
+    }
+
+    /**
+     * Checks that the URL answers a GET with one of the given codes, eg that a server another stack deploys is up, which,
+     * if it needs authentication, answers 401 to a call without.
+     * @param failure what to say if it doesn't, eg what to deploy first
+     * @throws IllegalStateException if it doesn't answer, or not with one of the codes
+     */
+    void checkAnswers(String url, String failure, Set<Integer> codes) throws InterruptedException {
         logger.info("Checking {} answers", url);
         String problem;
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
@@ -622,7 +632,7 @@ public class StepActions {
             HttpResponse<Void> response = client.send(
                 HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30)).GET().build(),
                 HttpResponse.BodyHandlers.discarding());
-            if (response.statusCode() == 200) {
+            if (codes.contains(response.statusCode())) {
                 logger.info("{} answers", url);
                 return;
             }

@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
@@ -103,6 +104,20 @@ public class StepOperations {
                 format("check KeyCloak answers at %s", url),
                 () -> actions.checkAnswers(url,
                     "Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first, eg: afon-cli.sh manage-stack setup aws-keycloak"));
+    }
+
+    /**
+     * Checks that the Polaris of the cloud answers, ie that its stack is set up, as a Polaris that needs authentication answers
+     * a call without it with 401.  It asks for the config of the catalog API, which it answers before any catalog exists.
+     */
+    public Step checkPolarisAnswers(AfonCloud cloud) {
+        String url = "https://" + properties.getCloudValue(cloud, "POLARIS_DOMAIN_NAME") + "/api/catalog/v1/config";
+        StackId polaris = new StackId(cloud, "polaris");
+        return new Step(format("check_polaris_answers_for_cloud_%s", cloud),
+                format("check Polaris answers at %s", url),
+                () -> actions.checkAnswers(url,
+                    format("Set up the %s Polaris stack first, eg: afon-cli.sh manage-stack setup %s", cloud, polaris),
+                    Set.of(200, 401, 403)));
     }
 
     /**

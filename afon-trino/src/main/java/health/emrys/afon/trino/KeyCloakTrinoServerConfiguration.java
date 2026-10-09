@@ -5,6 +5,8 @@ import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.FileUserProvider;
 import org.jspecify.annotations.NonNull;
 
+import static health.emrys.afon.security.SecurityUtils.KEYCLOAK_SCOPE;
+
 /**
  * A {@link TrinoServerConfiguration} for a Polaris running in external-auth mode (KeyCloak as the
  * OIDC identity provider). Polaris no longer implements its own token endpoint
@@ -19,7 +21,6 @@ import org.jspecify.annotations.NonNull;
  */
 public class KeyCloakTrinoServerConfiguration extends TrinoServerConfiguration {
 
-    private static final String KEYCLOAK_SCOPE = "openid";
 
     private final String oauth2ServerUri;
 

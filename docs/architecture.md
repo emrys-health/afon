@@ -102,11 +102,10 @@ Executables are composed of reusable steps:
 - **`StepRunner`** — executes a list of steps in order, with the ability to resume from a named step
 - **`StepsProvider`** — interface providing a step list
 - **`StackPlanFactory`** — the steps of each action (`delete`, `deploy`, `setup`) on each stack, keyed by stack id (`<cloud>-<stack-type>`, eg `aws-keycloak`), derived from the components of the stack (see [Steps derived from the components](#steps-derived-from-the-components)) and run by the `manage-stack` command
-- **`StackStepsFactory`** — the legacy, hand-written steps of each stack, no longer used by any command or document, only by the tests that check the derived steps against them
 
-The other ops commands, eg the Snowflake and cross-cloud ones, compose their steps from `StepOperations` too, reusing
-the stacks' steps. For example, `SetupAwsFullStackWithAzurePolarisHostingExternalCatalogMain` reuses the steps setting up
-the `aws-full` stack and then adds Azure-specific steps.
+What spans stacks or clouds, eg Snowflake reading a catalog, or AWS federating to the Azure Polaris, is a scenario declared by the
+component plan (`ComponentPlan.runSteps`) and run on a set up stack by `manage-stack run <stack-id> <scenario>`.  The other ops
+commands compose their steps from `StepOperations` directly.
 
 The corresponding `*Document` classes generate markdown documentation describing each step — this keeps documentation
 in lock-step with the actual deployment code.  The stack documents extend `AbstractStackDocument`, taking their steps
