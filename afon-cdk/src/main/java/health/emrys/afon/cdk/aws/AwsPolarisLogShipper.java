@@ -46,6 +46,8 @@ public class AwsPolarisLogShipper {
             putObjectPolicy(bucket, prefix));
         List<ITerraformDependable> dependsOn = new ArrayList<>(eksDependOn);
         dependsOn.add(role);
+        // The chart always creates a (metrics) Service, which the load balancer controller's webhook must admit.
+        dependsOn.addAll(cloudProvider.getServiceDependables());
         return Release.Builder
             .create(scope, "polarisLogShipper")
             .name("fluent-bit-polaris")
