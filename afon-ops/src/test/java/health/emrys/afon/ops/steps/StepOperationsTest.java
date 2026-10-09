@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonCloud.GCP;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -90,7 +89,7 @@ class StepOperationsTest {
 
     @Test
     void deploysStackFromAPlanSynthesisedFromTheConfigOfTheOperations() throws Exception {
-        operations.deployPolarisStackIn(GCP).getFunction().run();
+        operations.deployStack(StackId.parse("gcp-polaris"), List.of()).getFunction().run();
 
         assertThat(calls).containsExactly("synthesise gcp-polaris with the config of the operations", "start gcp-polaris");
     }

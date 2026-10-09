@@ -179,27 +179,6 @@ public class StepOperations {
                 });
     }
 
-    public Step deployFullStackIn(AfonCloud cloud) {
-        logger.info(format("Deploying full stack in cloud %s", cloud));
-        switch (cloud) {
-            case AWS:
-                return new Step("deploy_aws_full_stack",
-                        "deploy full stack in AWS",
-                        () -> {
-                            checkCertificatesIssued(AWS_KEYCLOAK_CERT_ARN,
-                                    AWS_JUPYTER_CERT_ARN,AWS_POLARIS_CERT_ARN);
-                            startStack(new StackId(AWS, "full"));
-                        });
-            case AZURE:
-                return new Step("deploy_azure_full_stack",
-                        "deploy full stack in Azure",
-                        () -> startStack(new StackId(AZURE, "full")));
-            case GCP:
-            default:
-                throw new RuntimeException("Unsupported cloud " + cloud);
-        }
-    }
-
     /**
      * Runs the operation, recording its elapsed time for the stack, so that it can be reported
      * by the *Complete steps.
@@ -272,45 +251,6 @@ public class StepOperations {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         actions.awsDescribeCertificate(certificate, region, out);
         return out.toString().trim();
-    }
-
-    public Step deployPolarisStackIn(AfonCloud cloud) {
-        logger.info(format("Deploying Polaris stack in cloud %s", cloud));
-        switch (cloud) {
-            case AWS:
-                return new Step("deploy_aws_polaris_stack",
-                        "deploy Polaris stack in AWS",
-                        () -> {
-                            checkCertificatesIssued(AWS_POLARIS_CERT_ARN);
-                            startStack(new StackId(AWS, "polaris"));
-                        });
-            case AZURE:
-                return new Step("deploy_azure_polaris_stack",
-                        "deploy Polaris stack in Azure",
-                        () -> startStack(new StackId(AZURE, "polaris")));
-            case GCP:
-                return new Step("deploy_gcp_polaris_stack",
-                        "deploy Polaris stack in GCP",
-                        () -> startStack(new StackId(GCP, "polaris")));
-            default:
-                throw new RuntimeException("Unsupported cloud " + cloud);
-        }
-    }
-
-    public Step deployKeycloakStackIn(AfonCloud cloud) {
-        logger.info(format("Deploying KeyCloak stack in cloud %s", cloud));
-        switch (cloud) {
-            case AWS:
-                return new Step("deploy_aws_keycloak_stack",
-                        "deploy KeyCloak stack in AWS",
-                        () -> {
-                            checkCertificatesIssued(AWS_KEYCLOAK_CERT_ARN);
-                            startStack(new StackId(AWS, "keycloak"));
-                        });
-            case AZURE, GCP:
-            default:
-                throw new RuntimeException("Unsupported cloud " + cloud);
-        }
     }
 
     public Step waitForPolarisAndKeycloakIn(AfonCloud cloud) {
