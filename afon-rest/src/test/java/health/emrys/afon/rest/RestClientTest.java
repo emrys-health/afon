@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RestClientTest {
 
@@ -145,6 +146,31 @@ class RestClientTest {
         assertThat(EntityUtils.toString(response.getEntity())).contains("from server");
         assertLogsMention("from server");
         assertLogsDoNotContain(SECRET);
+    }
+
+    @Test
+    void existsIsTrueOnA200() throws Exception {
+        assertThat(client.exists("/things/a_name", "a_token")).isTrue();
+        assertThat(method.get()).isEqualTo("GET");
+        assertThat(authorization.get()).isEqualTo("Bearer a_token");
+    }
+
+    @Test
+    void existsIsFalseOnA404WithoutLoggingAWarning() throws Exception {
+        code.set(404);
+
+        assertThat(client.exists("/things/a_name", "a_token")).isFalse();
+        assertThat(logs.list).noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.WARN));
+    }
+
+    @Test
+    void existsRaisesAnyOtherCodeRatherThanReadingItAsAbsent() {
+        for (int failure : new int[]{403, 500}) {
+            code.set(failure);
+            assertThatThrownBy(() -> client.exists("/things/a_name", "a_token"))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining(String.valueOf(failure));
+        }
     }
 
     private void assertLogsMention(String text) {

@@ -4,9 +4,9 @@ import health.emrys.afon.config.*;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.catalogs.PolarisSerialiser;
 import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
 import org.apache.hc.core5.http.HttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
-import org.apache.polaris.core.admin.model.PrincipalWithCredentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,7 +108,6 @@ public class PolarisUserManager {
     private HttpResponse configureUser(String principalName, String catalogName) throws IncorrectConfigException, IOException {
         logger.info("Configuring user '{}' for catalog '{}'", principalName, catalogName);
         createPrincipal(principalName);
-        logger.info("Admin '{}' created principal '{}'", clientId, principalName);
         // Not recreated, unlike the catalog role: it holds the user's grants on their other catalogs.
         String userPrincipalRoleName = userPrincipalRoleName(principalName);
         createPrincipalRole(userPrincipalRoleName);
@@ -161,9 +160,22 @@ public class PolarisUserManager {
         return failures;
     }
 
-    public PrincipalWithCredentials createPrincipal(String principalName) throws IncorrectConfigException, IOException {
+    /**
+     * Creates the principal if absent. An existing one is kept, with its credentials, rather than recreated
+     * for every catalog the user is authorised for.
+     */
+    public void createPrincipal(String principalName) throws IncorrectConfigException, IOException {
+        configurer.createPrincipal(principalName);
+    }
+
+    /**
+     * Deletes the principal if present and creates it anew, returning its new credentials, which Polaris only
+     * gives on creation. Rotates the credentials of an existing principal, so use only where that is wanted.
+     */
+    public PrincipalWithCredentials recreatePrincipal(String principalName) throws IncorrectConfigException, IOException {
         configurer.deletePrincipal(principalName);
-        return principalWithCredentials(configurer.createPrincipal(principalName));
+        ClassicHttpResponse response = configurer.createPrincipal(principalName);
+        return new PolarisSerialiser().fromJson(response.getEntity().getContent(), PrincipalWithCredentials.class);
     }
 
     public void createPrincipalRole(String principalRoleName) throws IOException, IncorrectConfigException {
@@ -176,11 +188,6 @@ public class PolarisUserManager {
 
     public HttpResponse associatePrincipalRole(String catalogName, String principalRoleName, String catalogRoleName) throws IncorrectConfigException, IOException {
         return configurer.associatePrincipalRole(catalogName, principalRoleName, catalogRoleName);
-    }
-
-    private PrincipalWithCredentials principalWithCredentials(ClassicHttpResponse response) throws IOException {
-        PolarisSerialiser serialiser = new PolarisSerialiser();
-        return serialiser.fromJson(response.getEntity().getContent(), PrincipalWithCredentials.class);
     }
 
 }

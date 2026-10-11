@@ -10,4 +10,5 @@ With the cloud only, configures the OIDC users, the Jupyter browser client if th
 the Polaris users on every catalog.  It is cloud-scoped, meant to run once per cloud and before any catalog
 exists: it creates the Keycloak realm and each user's confidential client.
 With a catalog name, configures the Polaris users for just that catalog, eg to pick up a catalog created after
-the cloud was last configured.  Use 'all' as the catalog name to populate all the catalogs of the cloud.
+the cloud was last configured.  Rerunning it leaves the principals and principal roles that exist as they are, so the
+users keep their credentials; only the catalog role is recreated, dropping its grants to users no longer authorised.  Use 'all' as the catalog name to populate all the catalogs of the cloud.

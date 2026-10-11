@@ -10,6 +10,7 @@ import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.message.BasicClassicHttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,10 @@ public class CatalogConfigurer {
 
     public static String catalogRolesURI(String catalogName) {
         return format("/api/management/v1/catalogs/%s/catalog-roles", catalogName);
+    }
+
+    public static String catalogRoleURI(String catalogName, String roleName) {
+        return format("%s/%s", catalogRolesURI(catalogName), roleName);
     }
 
     public static String catalogRolesURI(String roleName, String catalogName) {
@@ -86,6 +91,14 @@ public class CatalogConfigurer {
     private final PolarisSerialiser serialiser;
     private final String accessToken;
 
+    /**
+     * The response of a guarded call that was skipped, as there was nothing to do: a success, so that callers
+     * need not tell it from one that was sent.
+     */
+    private static ClassicHttpResponse skipped(String reason) {
+        return new BasicClassicHttpResponse(HttpStatus.SC_OK, reason);
+    }
+
     public CatalogConfigurer(PolarisRestClient client) {
         this.client = client;
         this.serialiser = new PolarisSerialiser();
@@ -93,7 +106,7 @@ public class CatalogConfigurer {
     }
 
     /**
-     * Creates a catalog and, depending on {@link PolarisCatalog#adminGrants()},
+     * Creates a catalog if absent, leaving an existing one (and its roles) as it is, and, depending on {@link PolarisCatalog#adminGrants()},
      * additionally invokes {@link #adminGrantsCatalog(PolarisCatalog)}.
      *
      * @param catalog the {@link PolarisCatalog}
@@ -104,7 +117,7 @@ public class CatalogConfigurer {
     public List<HttpResponse> configureCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
         logger.info("Configuring catalog {}", catalog.catalogName());
         List<HttpResponse> responses = new ArrayList<>();
-        responses.add(createCatalog(catalog));
+        responses.add(createCatalogIfAbsent(catalog));
         if (catalog.adminGrants()) {
             responses.add(adminGrantsCatalog(catalog));
         }
@@ -119,18 +132,16 @@ public class CatalogConfigurer {
         return client.put(catalogRolesAdminGrantsURI(catalogName), catalog.catalogAdminGrants(), accessToken);
     }
 
-    // TODO: check if catalog exist before attempting to delete it, failure is expected if there is no catalog
-    public ClassicHttpResponse createCatalog(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
-        deleteCatalog(catalog);
-        return createCatalogIfAbsent(catalog);
-    }
-
     /**
      * Creates the catalog without first deleting any existing one, so an already-existing catalog
      * (and anything set up against it - grants, roles, cached readers) is left untouched.
      */
     public ClassicHttpResponse createCatalogIfAbsent(PolarisCatalog catalog) throws IOException, IncorrectConfigException {
         String catalogName = catalog.catalogName();
+        if (client.exists(catalogsURI(catalogName), accessToken)) {
+            logger.info("Catalog {} already exists", catalogName);
+            return skipped("Catalog already exists");
+        }
         logger.info("Creating catalog {}", catalogName);
         ClassicHttpResponse response = client.post(catalogsURI(), catalog.catalogConfig(), accessToken);
         if (isFailure(response)) {
@@ -139,11 +150,11 @@ public class CatalogConfigurer {
         return response;
     }
 
-    private ClassicHttpResponse deleteCatalog(PolarisCatalog catalog) throws IOException {
-        return deleteCatalog(catalog.catalogName());
-    }
-
     public ClassicHttpResponse deleteCatalog(String catalogName) throws IOException {
+        if (!client.exists(catalogsURI(catalogName), accessToken)) {
+            logger.info("Catalog {} not present, nothing to delete", catalogName);
+            return skipped("Catalog not present");
+        }
         logger.info("Deleting catalog {}", catalogName);
         ClassicHttpResponse response = client.delete(catalogsURI(catalogName), accessToken);
         if (isFailure(response)) {
@@ -248,6 +259,10 @@ public class CatalogConfigurer {
     }
 
     public ClassicHttpResponse createCatalogRole(String catalogName, String roleName) throws IOException, IncorrectConfigException {
+        if (hasCatalogRole(catalogName, roleName)) {
+            logger.info("Role {} for catalog {} already exists", roleName, catalogName);
+            return skipped("Catalog role already exists");
+        }
         logger.info("Creating role {} for catalog {}", roleName, catalogName);
         String uri = catalogRolesURI(catalogName);
         String json = serialiser.catalogRoleCreation(roleName);
@@ -269,13 +284,16 @@ public class CatalogConfigurer {
             return;
         }
         logger.info("Deleting role {} for catalog {}", roleName, catalogName);
-        String uri = catalogRolesURI(catalogName) + "/" + roleName;
-        ClassicHttpResponse response = client.delete(uri, accessToken);
+        ClassicHttpResponse response = client.delete(catalogRoleURI(catalogName, roleName), accessToken);
         if (isFailure(response)) {
             logger.warn("Failed to delete role {}", roleName);
         }
     }
 
+    /**
+     * Whether the catalog has the role, from its list of roles: Polaris answers a GET of a single role that is absent
+     * with a 500 ("Invalid entity type: CATALOG"), not a 404, so {@link PolarisRestClient#exists} can't be used.
+     */
     private boolean hasCatalogRole(String catalogName, String roleName) throws IOException {
         try {
             return catalogRoleNames(catalogName).contains(roleName);
@@ -285,26 +303,34 @@ public class CatalogConfigurer {
     }
 
     /**
-     * Deletes the principal role if it is present, returning a 404 harmlessly when it is not. Polaris
+     * Deletes the principal role if it is present, doing nothing when it is not. Polaris
      * cascades this: removing a principal role also drops its associations with catalog roles, so this
      * is enough to clear a stale role left by a previous run before it is recreated.
      */
     public ClassicHttpResponse deletePrincipalRole(String principalRoleName) throws IOException {
-        logger.info("Deleting principal role {}", principalRoleName);
         String uri = principalRolesURI() + "/" + principalRoleName;
+        if (!client.exists(uri, accessToken)) {
+            logger.info("Principal role {} not present, nothing to delete", principalRoleName);
+            return skipped("Principal role not present");
+        }
+        logger.info("Deleting principal role {}", principalRoleName);
         ClassicHttpResponse response = client.delete(uri, accessToken);
-        if (isFailure(response) && response.getCode() != HttpStatus.SC_NOT_FOUND) {
+        if (isFailure(response)) {
             logger.warn("Failed to delete principal role {}", principalRoleName);
         }
         return response;
     }
 
     public ClassicHttpResponse createPrincipalRole(String principalRoleName) throws IOException, IncorrectConfigException {
+        if (client.exists(principalRolesURI() + "/" + principalRoleName, accessToken)) {
+            logger.info("Principal role {} already exists", principalRoleName);
+            return skipped("Principal role already exists");
+        }
         logger.info("Creating principal role {}", principalRoleName);
         String uri = principalRolesURI();
         String json = serialiser.principalRoleCreation(principalRoleName);
         ClassicHttpResponse response = client.post(uri, json, accessToken);
-        if (isFailure(response) && response.getCode() != HttpStatus.SC_CONFLICT) { // conflict: it already exists
+        if (isFailure(response)) {
             logger.warn("Failed to create principal role {}", principalRoleName);
         }
         return response;
@@ -321,7 +347,14 @@ public class CatalogConfigurer {
         return response;
     }
 
+    /**
+     * Creates the principal if absent. An existing principal is left as it is, keeping its credentials.
+     */
     public ClassicHttpResponse createPrincipal(String principalName) throws IncorrectConfigException, IOException {
+        if (client.exists(principalsURI() + "/" + principalName, accessToken)) {
+            logger.info("Principal {} already exists", principalName);
+            return skipped("Principal already exists");
+        }
         logger.info("Creating principal {}", principalName);
         String uri = principalsURI();
         String json = serialiser.principalCreation(principalName);
@@ -333,8 +366,12 @@ public class CatalogConfigurer {
     }
 
     public ClassicHttpResponse deletePrincipal(String principalName) throws IOException {
-        logger.info("Deleting principal {}", principalName);
         String uri = principalsURI() + "/" + principalName;
+        if (!client.exists(uri, accessToken)) {
+            logger.info("Principal {} not present, nothing to delete", principalName);
+            return skipped("Principal not present");
+        }
+        logger.info("Deleting principal {}", principalName);
         ClassicHttpResponse response = client.delete(uri, accessToken);
         if (isFailure(response)) {
             logger.warn("Failed to delete principal {}", principalName);

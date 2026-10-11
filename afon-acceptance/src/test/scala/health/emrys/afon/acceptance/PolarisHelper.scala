@@ -15,7 +15,7 @@ object PolarisHelper {
 class PolarisHelper {
   def createPrincipal(): PrincipalWithCredentials = {
     val userManager = new PolarisUserManager(instance.getProperties)
-    val principal   = userManager.createPrincipal(principalName)
+    val principal   = userManager.recreatePrincipal(principalName)
     userManager.createPrincipalRole(principalRoleName)
     userManager.associatePrincipalRole(principalName, principalRoleName)
     principal

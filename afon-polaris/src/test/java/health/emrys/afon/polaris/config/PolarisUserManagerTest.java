@@ -4,7 +4,6 @@ import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserAcl;
 import health.emrys.afon.config.AfonUserProvider;
 import org.apache.hc.core5.http.ClassicHttpResponse;
-import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +29,6 @@ class PolarisUserManagerTest {
 
     @BeforeEach
     void polaris() throws Exception {
-        when(configurer.createPrincipal(anyString())).thenAnswer(invocation -> principal(invocation.getArgument(0)));
         ClassicHttpResponse created = mock(ClassicHttpResponse.class);
         when(created.getCode()).thenReturn(201);
         when(configurer.createCatalogRole(anyString(), anyString())).thenReturn(created);
@@ -73,17 +71,18 @@ class PolarisUserManagerTest {
     }
 
     @Test
+    void createsAUserPrincipalOnlyIfAbsentSoItsCredentialsAreKept() throws Exception {
+        manager.configureUsers("aws", users(Map.of("will", "aws:gcp")));
+        manager.configureUsers("gcp", users(Map.of("will", "aws:gcp")));
+
+        verify(configurer, times(2)).createPrincipal("will");
+        verify(configurer, never()).deletePrincipal(anyString());
+    }
+
+    @Test
     void namesPrincipalRolesAfterUsers() {
         assertThat(PolarisUserManager.userPrincipalRoleName("will")).isEqualTo("willPrincipal");
         assertThat(PolarisUserManager.sharedPrincipalRoleName(CATALOG_ROLE)).isEqualTo(SHARED_ROLE);
-    }
-
-    private static ClassicHttpResponse principal(String name) {
-        ClassicHttpResponse response = mock(ClassicHttpResponse.class);
-        when(response.getCode()).thenReturn(201);
-        when(response.getEntity()).thenReturn(new StringEntity(String.format(
-            "{\"principal\":{\"name\":\"%s\"},\"credentials\":{\"clientId\":\"id\",\"clientSecret\":\"secret\"}}", name)));
-        return response;
     }
 
     private static AfonUserProvider users(Map<String, String> acls) {

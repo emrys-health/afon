@@ -22,6 +22,9 @@ public class PolarisCatalogManager {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(PolarisCatalogManager.class);
 
+    private static final String CATALOG_ADMIN_ROLE = "catalog_admin";
+    private static final String EXTERNAL_CATALOG_TYPE = "external";
+
     @FunctionalInterface
     private interface CatalogFactory {
         PolarisCatalog create(AfonCatalog catalog, AfonPropertyProvider properties);
@@ -58,9 +61,14 @@ public class PolarisCatalogManager {
     private final CatalogConfigurer configurer;
 
     public PolarisCatalogManager(AfonPropertyProvider properties) {
+        this(properties, new AfonCatalogs(properties),
+             new CatalogConfigurer(PolarisRestClientFactory.clientFactory().createClient(properties)));
+    }
+
+    PolarisCatalogManager(AfonPropertyProvider properties, AfonCatalogs afonCatalogs, CatalogConfigurer configurer) {
         this.properties = properties;
-        this.afonCatalogs = new AfonCatalogs(properties);
-        this.configurer = new CatalogConfigurer(PolarisRestClientFactory.clientFactory().createClient(properties));
+        this.afonCatalogs = afonCatalogs;
+        this.configurer = configurer;
     }
 
     /**
@@ -127,39 +135,60 @@ public class PolarisCatalogManager {
         }
     }
 
-    public void deleteCatalog(String catalogName) throws IOException, ParseException {
-        purgeNamespacesAndTables(catalogName);
-        configurer.deleteCatalog(catalogName);
+    /**
+     * Deletes the catalog with the given id, with everything in it.  An {@code external} catalog is only a
+     * federation to a remote catalog, whose namespaces and tables are not ours to purge (and which Polaris
+     * cannot list once the remote catalog is gone), so only its own roles are purged.
+     *
+     * @param catalogId the id of the catalog, as for creating it (see {@link AfonCatalogs#get})
+     */
+    public void deleteCatalog(String catalogId) throws IOException, ParseException {
+        AfonCatalog catalog = afonCatalogs.get(catalogId);
+        String catalogName = catalog.name();
+        if (EXTERNAL_CATALOG_TYPE.equals(catalog.type())) {
+            logger.info("Catalog {} is federated, leaving its remote namespaces and tables", catalogName);
+        } else {
+            purgeNamespacesAndTables(catalogName);
+        }
         purgeRoles(catalogName);
+        configurer.deleteCatalog(catalogName);
     }
 
+    /**
+     * Deletes the roles of the catalog, other than its built-in {@code catalog_admin}, which goes with the catalog.
+     */
     private void purgeRoles(String catalogName) throws IOException, ParseException {
         for (String roleName : configurer.catalogRoleNames(catalogName)) {
-            configurer.deleteCatalogRole(catalogName, roleName);
+            if (!CATALOG_ADMIN_ROLE.equals(roleName)) {
+                configurer.deleteCatalogRole(catalogName, roleName);
+            }
         }
     }
 
     private void purgeNamespacesAndTables(String catalogName) throws IOException, ParseException {
         for (String namespace : configurer.namespacesOf(catalogName)) {
-            deleteAllTables(catalogName, namespace);
-            deleteNamespace(catalogName, namespace);
+            for (String table : configurer.tableNamesOf(catalogName, namespace)) {
+                configurer.deleteTable(catalogName, namespace, table);
+            }
+            configurer.deleteNamespace(catalogName, namespace);
         }
     }
 
-    public void deleteNamespace(String catalogName, String namespace) throws IOException {
-        configurer.deleteNamespace(catalogName, namespace);
+    public void deleteNamespace(String catalogId, String namespace) throws IOException {
+        configurer.deleteNamespace(afonCatalogs.get(catalogId).name(), namespace);
     }
 
-    public List<HttpResponse> deleteAllTables(String catalogName, String namespace) throws IOException, ParseException {
+    public List<HttpResponse> deleteAllTables(String catalogId, String namespace) throws IOException, ParseException {
+        String catalogName = afonCatalogs.get(catalogId).name();
         List<HttpResponse> responses = new ArrayList<>();
         for (String table : configurer.tableNamesOf(catalogName, namespace)) {
-            responses.add(deleteTable(catalogName, namespace, table));
+            responses.add(configurer.deleteTable(catalogName, namespace, table));
         }
         return responses;
     }
 
-    public HttpResponse deleteTable(String catalogName, String namespace, String table) throws IOException {
-        return configurer.deleteTable(catalogName, namespace, table);
+    public HttpResponse deleteTable(String catalogId, String namespace, String table) throws IOException {
+        return configurer.deleteTable(afonCatalogs.get(catalogId).name(), namespace, table);
     }
 
     public HttpResponse grantCatalogAdmin(PolarisCatalog catalog, String warehouseName) throws IOException, IncorrectConfigException {
