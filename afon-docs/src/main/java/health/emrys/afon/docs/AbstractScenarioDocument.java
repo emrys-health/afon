@@ -45,7 +45,7 @@ public abstract class AbstractScenarioDocument extends AbstractDocument {
 
     @Override
     public List<Step> steps(StepOperations stepOperations) {
-        return factory.runSteps(stack, scenario, stepOperations);
+        return factory.scenarioSteps(stack, scenario, stepOperations);
     }
 
     @Override

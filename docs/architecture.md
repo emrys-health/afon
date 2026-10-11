@@ -104,7 +104,7 @@ Executables are composed of reusable steps:
 - **`StackPlanFactory`** — the steps of each action (`delete`, `deploy`, `setup`) on each stack, keyed by stack id (`<cloud>-<stack-type>`, eg `aws-keycloak`), derived from the components of the stack (see [Steps derived from the components](#steps-derived-from-the-components)) and run by the `manage-stack` command
 
 What spans stacks or clouds, eg Snowflake reading a catalog, or AWS federating to the Azure Polaris, is a scenario declared by the
-component plan (`ComponentPlan.runSteps`) and run on a set up stack by `manage-stack run <stack-id> <scenario>`.  The other ops
+component plan (`ComponentPlan.scenarioSteps`) and run on a set up stack by `manage-stack run <stack-id> <scenario>`.  The other ops
 commands compose their steps from `StepOperations` directly.
 
 The corresponding `*Document` classes generate markdown documentation describing each step — this keeps documentation
@@ -124,7 +124,7 @@ commands on the stack, besides being deployed with it:
 - `certificates`: the certificates it needs (AWS), checked before the stack is deployed;
 - `waitsFor`: what must answer once the stack is deployed, the union over all components being waited for;
 - `setupSteps`: what it configures when the stack is set up, in the order of the components, without duplicates;
-- `runSteps`: the named scenarios it can run on a stack that is set up, by `manage-stack run` (see below), listed in the order of the components;
+- `scenarioSteps`: the named scenarios it can run on a stack that is set up, by `manage-stack run` (see below), listed in the order of the components;
 - `label`: its name in messages.
 
 The defaults bring nothing, which is what the infrastructure-only components are (`InfrastructurePlan`).  Some behaviour comes

@@ -45,6 +45,14 @@ class ManageStackMainTest {
     }
 
     @Test
+    void runDistinguishesAFlowFromAStack() {
+        assertThat(manager.isFlow("cross-cloud-azure")).isTrue();
+        assertThat(manager.isFlow("aws-full")).isFalse();
+        assertThat(manager.isFlow("aws-snowflake")).isFalse();
+        assertThat(manager.isFlow("unknown")).isFalse();
+    }
+
+    @Test
     void canResolveScenarioOfStack() {
         AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
         assertThat(manager.runProviderFor("aws-snowflake", "reading-azure", properties)).isNotNull();

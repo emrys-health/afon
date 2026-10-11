@@ -1,7 +1,13 @@
 ###  Deploy the catalogs
 
 To deploy Polaris to AWS and Azure, populate catalogs, and run a Spark smoke test, set up both stacks and run the scenario that
-federates AWS to Azure:
+federates AWS to Azure, with the flow `cross-cloud-azure`:
+
+```shell
+afon-cli.sh manage-stack run cross-cloud-azure --replace
+```
+
+It is a [flow](stacks.md#run-a-flow-of-stacks) of three items, which can also be run one at a time:
 
 ```shell
 afon-cli.sh manage-stack setup aws-full --replace

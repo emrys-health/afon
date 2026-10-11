@@ -90,11 +90,14 @@ public class Documenter {
 
      private void writeSteps(DocumentMetadata documentMetadata, OutputStream fos) {
         List<Step> steps = documentMetadata.steps(new StepOperations(new StepDocumentation(fos), properties));
-        new StepRunner().runSteps(steps.stream().map(x -> decorating(x, fos)).toList());
+        new StepRunner().runSteps(steps.stream().map(x -> decorating(x, fos, documentMetadata.sectionHeading(x))).toList());
     }
 
-    private Step decorating(Step step, OutputStream outputStream) {
+    private Step decorating(Step step, OutputStream outputStream, String sectionHeading) {
         return new Step(step.getName(), step.getDescription(), () -> {
+            if (sectionHeading != null) {
+                appendTo(outputStream, format("## %s", sectionHeading));
+            }
             appendTo(outputStream, format("### %s", capitalizeFirst(step.getDescription())));
             step.getFunction().run();
         });

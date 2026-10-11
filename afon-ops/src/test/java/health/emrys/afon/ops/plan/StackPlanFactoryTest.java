@@ -228,7 +228,7 @@ class StackPlanFactoryTest {
     @Test
     void externalAzureChecksTheAzurePolarisBeforeFederatingToIt() {
         properties.setValue(AZURE_POLARIS_DOMAIN_NAME, "polaris-azure.example");
-        assertThat(factory.runSteps(StackId.parse("aws-full"), "external-azure", ops).stream().map(Step::getName).toList())
+        assertThat(factory.scenarioSteps(StackId.parse("aws-full"), "external-azure", ops).stream().map(Step::getName).toList())
             .hasSize(4)
             .satisfiesExactly(
                 step -> assertThat(step).isEqualTo("checkPolarisAnswers(azure)"),
@@ -239,12 +239,12 @@ class StackPlanFactoryTest {
 
     @Test
     void scenarioStepsAreOnlyCreatedWhenRun() {
-        assertThat(factory.runSteps(StackId.parse("aws-snowflake"), "reading-azure", ops).stream().map(Step::getName).toList())
+        assertThat(factory.scenarioSteps(StackId.parse("aws-snowflake"), "reading-azure", ops).stream().map(Step::getName).toList())
             .hasSize(2).first().asString().startsWith("runAwsSparkWritingTo(azure)");
-        assertThat(factory.runSteps(StackId.parse("aws-snowflake"), "reading-aws", ops)).hasSize(1);
-        assertThat(factory.runSteps(StackId.parse("aws-snowflake"), "writing-azure", ops).stream().map(Step::getName).toList())
+        assertThat(factory.scenarioSteps(StackId.parse("aws-snowflake"), "reading-aws", ops)).hasSize(1);
+        assertThat(factory.scenarioSteps(StackId.parse("aws-snowflake"), "writing-azure", ops).stream().map(Step::getName).toList())
             .hasSize(4).first().asString().startsWith("snowflakeWritingTo(azure)");
-        assertThatThrownBy(() -> factory.runSteps(StackId.parse("aws-full"), "reading-aws", ops))
+        assertThatThrownBy(() -> factory.scenarioSteps(StackId.parse("aws-full"), "reading-aws", ops))
             .isInstanceOf(IllegalArgumentException.class).hasMessage("Stack 'aws-full' has no scenario 'reading-aws'");
     }
 

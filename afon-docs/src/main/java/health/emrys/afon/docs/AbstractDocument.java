@@ -91,7 +91,10 @@ public abstract class AbstractDocument implements DocumentMetadata {
         return StepDocumentation.afonCliCommand(opsClass());
     }
 
-    private String stepsBeingRun() {
+    /**
+     * The list of the steps being run, with how to resume from one.
+     */
+    protected String stepsBeingRun() {
         StepOperations operations = new StepOperations(new StepDocumentation(OutputStream.nullOutputStream()), properties);
         List<Step> steps = steps(operations);
         if (steps.size() == 0){
