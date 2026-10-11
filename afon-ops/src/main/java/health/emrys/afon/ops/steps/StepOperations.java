@@ -254,7 +254,9 @@ public class StepOperations {
     }
 
     public Step waitForPolarisAndKeycloakIn(AfonCloud cloud) {
-        return waitForPolaris(cloud).andThen(waitForKeyCloak());
+        return Step.sequence(format("wait_on_polaris_and_keycloak_for_cloud_%s", cloud),
+                format("wait on DNS for Polaris and KeyCloak for cloud `%s`", cloud),
+                waitForPolaris(cloud), waitForKeyCloak());
     }
 
     private Step waitForPolaris(AfonCloud cloud) {
@@ -327,10 +329,11 @@ public class StepOperations {
      */
     public Step configurePolarisUsersOnAllCatalogsFor(AfonCloud cloud) {
         // Not glue: it isn't created by createAllCatalogsFor, so there'd be no catalog to configure.
-        return afonCatalogs.allExcluding("glue").stream()
+        Step[] steps = afonCatalogs.allExcluding("glue").stream()
             .map(catalog -> configurePolarisUsers(cloud, catalog))
-            .reduce(Step::andThen)
-            .orElse(Step.NoOp);
+            .toArray(Step[]::new);
+        return Step.sequence(format("configure_polaris_users_on_all_catalogs_for_cloud_%s", cloud),
+                format("configure Polaris users on all catalogs for cloud `%s`", cloud), steps);
     }
 
     private @NonNull Step configurePolarisUsers(AfonCloud cloud, AfonCatalog catalog) {
@@ -377,8 +380,9 @@ public class StepOperations {
         switch (cloud) {
             case AZURE:
                 AfonCatalog azureCatalog = afonCatalogs.azure();
-                return deleteCatalogFor(AWS, azureCatalog)
-                        .andThen(createCatalogFor(AWS, azureCatalog));
+                return Step.sequence(format("recreate_catalog_%s_for_cloud_%s", azureCatalog, AWS),
+                        format("recreate Polaris catalog `%s` for cloud `%s`", azureCatalog, AWS),
+                        deleteCatalogFor(AWS, azureCatalog), createCatalogFor(AWS, azureCatalog));
             case AWS, GCP:
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
@@ -410,25 +414,29 @@ public class StepOperations {
 
     private Step awsSparkWritingTo(AfonCatalog catalog, String namespace) {
         AfonCloud cloud = AWS;
-        return configurePolarisUsers(cloud, catalog)
-                .andThen(runSpark("Spark writing table",
-                        cloud, catalog, namespace, polarisTableName, SparkTestWriter.class));
+        return configureUsersThenRunSpark("Spark writing table",
+                cloud, catalog, namespace, polarisTableName, SparkTestWriter.class);
     }
 
     public @NonNull Step runAwsSparkDeferringToAzurePolarisHostingExternalCatalog() {
         AfonCloud cloud = AWS;
         AfonCatalog catalog = afonCatalogs.azureExternal();
-        return configurePolarisUsers(cloud, catalog)
-                .andThen(runSpark(format("Spark defers to %s writing table", AZURE),
-                        cloud, catalog, polarisNamespaceExternal, polarisTableName, SparkTestWriter.class));
+        return configureUsersThenRunSpark(format("Spark defers to %s writing table", AZURE),
+                cloud, catalog, polarisNamespaceExternal, polarisTableName, SparkTestWriter.class);
     }
 
 
     public @NonNull Step runAwsSparkReadingFrom(AfonCatalog catalog) {
         AfonCloud cloud = AWS;
-        return configurePolarisUsers(cloud, catalog)
-                .andThen(runSpark("Spark reading table",
-                        cloud, catalog, polarisNamespace, polarisTableName, SparkTestReader.class));
+        return configureUsersThenRunSpark("Spark reading table",
+                cloud, catalog, polarisNamespace, polarisTableName, SparkTestReader.class);
+    }
+
+    private @NonNull Step configureUsersThenRunSpark(String description, AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, Class<? extends SparkRunner> sparkRunner) {
+        Step spark = runSpark(description, cloud, catalog, namespace, tableName, sparkRunner);
+        return Step.sequence(spark.getName(),
+                "configure Polaris users then " + spark.getDescription(),
+                configurePolarisUsers(cloud, catalog), spark);
     }
 
     private @NonNull Step runSpark(String description, AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, Class<? extends SparkRunner> sparkRunner) {

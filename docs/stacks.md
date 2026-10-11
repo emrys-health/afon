@@ -48,7 +48,7 @@ where:
 For example:
 ```shell
 afon-cli.sh manage-stack setup aws-keycloak
-afon-cli.sh manage-stack deploy aws-full wait_on_emryspolaris_then_wait_on_emrysoauth
+afon-cli.sh manage-stack deploy aws-full wait_on_polaris_and_keycloak_for_cloud_aws
 afon-cli.sh manage-stack delete aws-full
 ```
 With `afon.sh`, pass the same args positionally, eg `./afon.sh -a manage-stack setup aws-keycloak`.
@@ -236,14 +236,14 @@ Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_st
 ```shell
 afon-cli.sh manage-stack setup azure-polaris
 ```
-Steps: `delete_stacks_conflicting_with_azure_polaris` → `check_keycloak_answers` → `deploy_azure_polaris_stack` → `wait_on_emryspolarisazure_then_wait_on_emrysoauth` → `create_all_catalogs_for_cloud_azure`
+Steps: `delete_stacks_conflicting_with_azure_polaris` → `check_keycloak_answers` → `deploy_azure_polaris_stack` → `wait_on_polaris_and_keycloak_for_cloud_azure` → `create_all_catalogs_for_cloud_azure`
 
 ### Setup GCP Polaris only
 
 ```shell
 afon-cli.sh manage-stack setup gcp-polaris
 ```
-Steps: `delete_stacks_conflicting_with_gcp_polaris` → `check_keycloak_answers` → `deploy_gcp_polaris_stack` → `wait_on_emryspolarisgcp_then_wait_on_emrysoauth` → `create_all_catalogs_for_cloud_gcp`
+Steps: `delete_stacks_conflicting_with_gcp_polaris` → `check_keycloak_answers` → `deploy_gcp_polaris_stack` → `wait_on_polaris_and_keycloak_for_cloud_gcp` → `create_all_catalogs_for_cloud_gcp`
 
 ### Setup cross-cloud external catalogs (AWS + Azure)
 
