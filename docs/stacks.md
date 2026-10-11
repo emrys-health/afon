@@ -58,15 +58,16 @@ To run a scenario on a stack that is set up, ie what its components can be asked
 afon-cli.sh manage-stack run <stack-id> [<scenario> [<step>]]
 ```
 Without a `<scenario>` it lists those of the stack, and `<step>` resumes a failed run.  For example `aws-snowflake` has
-`reading-aws`, `reading-azure`, `reading-gcp` and `writing-azure`, which replace the `deploy-snowflake-*` commands:
+`reading-aws`, `reading-azure`, `reading-gcp` and `writing-azure`, which replace the `deploy-snowflake-*` commands.  Setting
+up the stack and running a scenario is the [flow](#run-a-flow-of-stacks) `snowflake-<scenario>`:
 ```shell
-afon-cli.sh manage-stack setup aws-snowflake --replace
-afon-cli.sh manage-stack run aws-snowflake reading-azure
+afon-cli.sh manage-stack run snowflake-reading-azure --replace
 ```
 
 The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*-stack`, are gone, as are those spanning two
 clouds: use `manage-stack`, eg `manage-stack delete <stack-id>`, or `manage-stack delete <cloud>-all` for every stack of a cloud,
-eg `aws-all`.  What spans stacks is a scenario, eg `manage-stack run aws-full external-azure`, run once the stacks it needs are set up.
+eg `aws-all`.  What spans stacks is a scenario, eg `manage-stack run aws-full external-azure`, run once the stacks it needs are set up,
+or a [flow](#run-a-flow-of-stacks), eg `manage-stack run cross-cloud-azure`, which sets them up first.
 
 ### Run a flow of stacks
 
@@ -247,7 +248,14 @@ Steps: `delete_stacks_conflicting_with_gcp_polaris` → `check_keycloak_answers`
 ### Setup cross-cloud external catalogs (AWS + Azure)
 
 To deploy AWS and Azure Polaris instances and configure AWS Polaris to federate to Azure Polaris for cross-cloud querying,
-set up both stacks, then run the scenario `external-azure` of the AWS stack:
+run the [flow](#run-a-flow-of-stacks) `cross-cloud-azure`, which sets up both stacks, then runs the scenario `external-azure`
+of the AWS stack:
+
+```shell
+afon-cli.sh manage-stack run cross-cloud-azure --replace
+```
+
+The same, one command at a time, resuming or re-running just the part needed:
 
 ```shell
 afon-cli.sh manage-stack setup aws-full --replace
@@ -414,20 +422,17 @@ afon-cli.sh manage-stack deploy azure-polaris
 # GCP Polaris (standalone)
 afon-cli.sh manage-stack deploy gcp-polaris
 
-# Cross-cloud external catalogs (AWS + Azure federation): set up both stacks, then run the scenario, as the flow
+# Cross-cloud external catalogs (AWS + Azure federation): the flow sets up both stacks, then runs the scenario
 afon-cli.sh manage-stack run cross-cloud-azure
-# or one at a time
-afon-cli.sh manage-stack setup aws-full
-afon-cli.sh manage-stack setup azure-polaris
-afon-cli.sh manage-stack run aws-full external-azure
 
 # Any flow, ie a named list of actions and scenarios: lists the flows without a name
 afon-cli.sh manage-stack run [<flow>]
 
-# Snowflake: set up the stack, then run a scenario, ie one of reading-aws, reading-azure, reading-gcp, writing-azure
-afon-cli.sh manage-stack setup aws-snowflake
-afon-cli.sh manage-stack run aws-snowflake reading-gcp
-afon-cli.sh manage-stack run aws-snowflake writing-azure
+# Snowflake: the flow sets up the stack, then runs a scenario, ie one of reading-aws, reading-azure, reading-gcp, writing-azure
+afon-cli.sh manage-stack run snowflake-reading-gcp
+afon-cli.sh manage-stack run snowflake-writing-azure
+# or, with the stack set up, the reading scenarios in a row
+afon-cli.sh manage-stack run snowflake-reading-all
 ```
 
 ## Deployment checklist

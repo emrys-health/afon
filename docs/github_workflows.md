@@ -2,6 +2,8 @@
 
 The [Stack AWS (Linux)](../.github/workflows/aws-stack-linux.yml) workflow runs `afon.sh` on the self-hosted Linux runner — ie
 `./afon.sh -a manage-stack <action> <stack-id> [<step>]` (see [manage a stack](stacks.md#manage-a-stack)).
+It runs one action on one stack; to set up several stacks and run scenarios in order, use a flow, see
+[run a flow of stacks](stacks.md#run-a-flow-of-stacks).
 
 Run it from the Actions tab: it is `workflow_dispatch` only, with an `action` dropdown
 (`deploy`/`setup`/`delete`), a `stack_id` dropdown (`aws-full`/`aws-keycloak`/`aws-polaris`/`aws-all`, defaulting to
