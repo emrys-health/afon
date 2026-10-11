@@ -26,6 +26,16 @@ afon-cli.sh manage-polaris-catalogs create aws -lc INFO
 ```
 This creates catalogs for `{aws,azure,gcp}` and their external/forbidden variants in a single call.
 
+Creating leaves any catalog that already exists as it is, with its roles and tables, so it is safe to rerun and logs no
+warnings for the catalogs that exist. To start again from scratch, recreate them, which deletes
+them all first:
+```shell
+afon-cli.sh manage-polaris-catalogs recreate aws -lc INFO
+```
+Deleting a catalog, with `delete` or `recreate`, deletes its roles first, as Polaris does not drop a catalog that has
+them, and its namespaces and tables, except for an external catalog, a federation to another Polaris whose namespaces
+and tables are left alone. The catalog is given by its id, as for creating it.
+
 To configure a single catalog, eg `azure_external`, for `azure` cloud:
 ```shell
 afon-cli.sh manage-polaris-catalogs create azure azure_external -lc INFO

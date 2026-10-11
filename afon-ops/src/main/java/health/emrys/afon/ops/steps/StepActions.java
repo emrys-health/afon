@@ -544,19 +544,19 @@ public class StepActions {
 
     public void deleteCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
         executeMainOf(ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.toString()});
+                new String[]{DELETE, cloud.toString(), catalog.id()});
     }
 
     public void deleteNamespaceFor(AfonCloud cloud, AfonCatalog catalog, String namespace) throws Exception {
         executeMainOf(
                 ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.toString(), namespace});
+                new String[]{DELETE, cloud.toString(), catalog.id(), namespace});
     }
 
     public void deleteTableFor(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName) throws Exception {
         executeMainOf(
                 ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.toString(), namespace, tableName});
+                new String[]{DELETE, cloud.toString(), catalog.id(), namespace, tableName});
     }
 
     public void registerTable(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, String metadata) throws Exception {

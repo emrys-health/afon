@@ -42,6 +42,14 @@ Afon's architecture has four layers:
 
 `CatalogConfigurer` builds on top of the `PolarisRestClient` to provide higher-level operations and the REST API URIs for creating catalogs with admin grants, configuring principal roles, and creating users.
 
+The `CatalogConfigurer` asks before it deletes or creates a catalog, catalog role, principal or principal role, with
+`RestClient.exists` (a 200 is present and a 404 absent, neither logged as a warning, and any other code is raised, never
+read as absent), and skips the call when there is nothing to do, returning a successful response so that its callers
+and the failure checks are unaffected. So rerunning the configuration leaves what exists as it is, and a warning is
+a real failure. Polaris answers the GET of a catalog role that is absent with a 500, so the roles of the catalog list
+are checked instead. A principal is created only if absent, which keeps its credentials; `recreatePrincipal` is for
+a test fixture that needs new ones.
+
 `PolarisCatalogManager` and `PolarisUserManager` build on top of the `CatalogConfigurer` to provide catalog and user specific configuration. 
 `PolarisUserManager` gives each user their own principal role (`<username>Principal`), which is granted the catalog role
 (`emrysrole4`) of only the catalogs `users-acl.csv` authorises the user for, so that no user can use a catalog authorised for another.

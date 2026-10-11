@@ -11,6 +11,7 @@ import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.apache.hc.core5.http.io.entity.BufferedHttpEntity;
 import org.apache.hc.core5.http.io.entity.StringEntity;
@@ -22,7 +23,9 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import static health.emrys.afon.rest.HttpResponses.contentOf;
 import static health.emrys.afon.rest.HttpResponses.logOutcome;
+import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -63,6 +66,21 @@ public class RestClient {
 
     public <T> T get(String path, String accessToken, HttpClientResponseHandler<T> handler) throws IOException {
         return execute(new HttpGet(url(path)), accessToken, handler);
+    }
+
+    /**
+     * Whether the path exists: a 200 is {@code true} and a 404 {@code false}, neither logged as a warning, as
+     * an absent item is an expected answer. Any other code (eg a 403 or 5xx) is raised, never read as absent.
+     *
+     * @throws IOException on any other response code
+     */
+    public boolean exists(String path, String accessToken) throws IOException {
+        return get(path, accessToken, response -> switch (response.getCode()) {
+            case HttpStatus.SC_OK -> true;
+            case HttpStatus.SC_NOT_FOUND -> false;
+            default -> throw new IOException(format("GET %s at %s, code: %s, response: %s",
+                path, baseUrl, response.getCode(), contentOf(response)));
+        });
     }
 
     public ClassicHttpResponse put(String path, String json, String accessToken) throws IOException {

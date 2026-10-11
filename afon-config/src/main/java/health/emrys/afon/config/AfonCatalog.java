@@ -86,6 +86,10 @@ public final class AfonCatalog {
     /**
      * The catalog's actual Polaris-facing name. Usually equal to {@link #id()}, but can diverge.
      */
+    public String name() {
+        return name;
+    }
+
     @Override
     public String toString() {
         return name;
