@@ -70,4 +70,5 @@ class ManageStackMainTest {
                                 .map(StackId::toString)
                                 .toList());
     }
+
 }

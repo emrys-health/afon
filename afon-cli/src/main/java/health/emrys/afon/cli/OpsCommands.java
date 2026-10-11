@@ -71,6 +71,13 @@ class OpsCommands {
         return commandsByName.get(command.toLowerCase());
     }
 
+    /**
+     * @return the kebab-case name of the command, eg {@code show-env} for {@code ShowEnvMain}
+     */
+    static String nameOf(Class<?> commandClass) {
+        return kebabCase(commandClass.getSimpleName());
+    }
+
     Set<String> names() {
         return commandNames;
     }

@@ -71,11 +71,8 @@
       </includes>
     </fileSet>
     <fileSet>
-      <directory>../docs</directory>
+      <directory>target/docs</directory>
       <outputDirectory>/docs</outputDirectory>
-      <includes>
-        <include>*.md</include>
-      </includes>
     </fileSet>
   </fileSets>
 </assembly>

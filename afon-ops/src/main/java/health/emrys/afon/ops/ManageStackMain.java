@@ -3,11 +3,13 @@ package health.emrys.afon.ops;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
+import health.emrys.afon.ops.docs.DocumentNames;
 import health.emrys.afon.ops.flow.FlowPlanFactory;
 import health.emrys.afon.ops.flow.FlowRunner;
 import health.emrys.afon.ops.flow.FlowStep;
 import health.emrys.afon.ops.flow.StackFlow;
 import health.emrys.afon.ops.flow.StackFlows;
+import health.emrys.afon.ops.help.CommandHelp;
 import health.emrys.afon.ops.plan.StackPlanFactory;
 import health.emrys.afon.ops.steps.StackAction;
 import health.emrys.afon.ops.steps.StepActions;
@@ -19,6 +21,7 @@ import org.slf4j.Logger;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static org.slf4j.LoggerFactory.getLogger;
@@ -130,8 +133,25 @@ public class ManageStackMain {
         System.out.println("    else they fail, naming them, before deleting any");
     }
 
+    /**
+     * Prints the generated doc of the args, eg {@code setup aws-full}, else the usage.
+     */
+    private void help(String[] args) {
+        Optional<String> doc = DocumentNames.forArgs(args).flatMap(CommandHelp::findGeneratedDoc);
+        if (doc.isPresent()) {
+            System.out.println(doc.get());
+            return;
+        }
+        printUsage();
+    }
+
     public static void main(String[] allArgs) {
         ManageStackMain manager = new ManageStackMain(new StackPlanFactory());
+        if (Arrays.stream(allArgs).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
+            manager.help(Arrays.stream(allArgs).filter(arg -> !arg.equals("-h") && !arg.equals("--help"))
+                               .toArray(String[]::new));
+            return;
+        }
         boolean replace = Arrays.asList(allArgs).contains(REPLACE);
         boolean dryRun = Arrays.asList(allArgs).contains(DRY_RUN);
         String[] args = Arrays.stream(allArgs).filter(arg -> !arg.equals(REPLACE) && !arg.equals(DRY_RUN))

@@ -101,7 +101,7 @@ public class StepActions {
      * @param stackNames the names of the selected stacks that are deployed, ie with a tofu state
      * @throws IllegalStateException naming the stacks refused, and why
      */
-    void checkNoRefusal(StackFilter filter, List<String> stackNames) {
+    protected void checkNoRefusal(StackFilter filter, List<String> stackNames) {
         List<StackFilter.Refusal> refusals = stackNames.stream().map(filter.refusal()).filter(Objects::nonNull).toList();
         if (refusals.isEmpty()) {
             return;
@@ -125,7 +125,7 @@ public class StepActions {
     /**
      * Returns the names of the stacks in the cloud selected by the filter, see {@link #stackNamesIn(AfonCloud)}.
      */
-    List<String> stackNamesIn(AfonCloud cloud, StackFilter filter) throws IOException {
+    protected List<String> stackNamesIn(AfonCloud cloud, StackFilter filter) throws IOException {
         return stackNamesIn(cloud).stream().filter(filter.selects()).toList();
     }
 
@@ -222,11 +222,11 @@ public class StepActions {
         }
     }
 
-    boolean exists(Path path) {
+    protected boolean exists(Path path) {
         return Files.exists(path);
     }
 
-    @NonNull Path stackDir(StackId stackId) throws IOException {
+    protected @NonNull Path stackDir(StackId stackId) throws IOException {
         checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
         Path stackDir = Path.of(ConfigUtils.stackDir(stackId));
         logger.info("Using stack dir {}", stackDir);
@@ -237,7 +237,7 @@ public class StepActions {
         return stackDir;
     }
 
-    void checkNotBrokenSymlink(Path path) throws IOException {
+    protected void checkNotBrokenSymlink(Path path) throws IOException {
         if (Files.isSymbolicLink(path) && !Files.exists(path)) {
             throw new IOException(String.format(
                 "%s is a symlink pointing to %s, which does not exist. Fix or recreate the symlink target.",
@@ -252,7 +252,7 @@ public class StepActions {
         tofuWithRetry(tofuDir, outputStream, maxAttempts, args);
     }
 
-    void deletePath(Path path) {
+    protected void deletePath(Path path) {
         if (!exists(path)) {
             return;
         }
@@ -264,7 +264,7 @@ public class StepActions {
         }
     }
 
-    void awsDescribeCertificate(String certArn, String region, OutputStream out) throws ManagedProcessException {
+    protected void awsDescribeCertificate(String certArn, String region, OutputStream out) throws ManagedProcessException {
         run("aws", null, out, "acm", "describe-certificate", "--certificate-arn", certArn,
                 "--region", region, "--query", "Certificate.Status", "--output", "text");
     }
@@ -569,7 +569,7 @@ public class StepActions {
                 new String[]{cloud.toString(), catalog.toString(), namespace, tableName});
     }
 
-    @NonNull String azureFirstFile(AfonPropertyProvider properties, String glob, boolean descendingOrder) {
+    public @NonNull String azureFirstFile(AfonPropertyProvider properties, String glob, boolean descendingOrder) {
         logger.info("Querying Azure for {}", glob);
         AzureReader reader = new AzureReader(properties);
         List<BlobItem> list = new ArrayList<>(reader.list(glob));
@@ -624,7 +624,7 @@ public class StepActions {
      * @param failure what to say if it doesn't, eg what to deploy first
      * @throws IllegalStateException if it doesn't answer, or not with one of the codes
      */
-    void checkAnswers(String url, String failure, Set<Integer> codes) throws InterruptedException {
+    protected void checkAnswers(String url, String failure, Set<Integer> codes) throws InterruptedException {
         logger.info("Checking {} answers", url);
         String problem;
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
@@ -674,7 +674,7 @@ public class StepActions {
     }
 
 
-    @NonNull String stepNameWaitOn(String domain) {
+    protected @NonNull String stepNameWaitOn(String domain) {
         return "wait_on_" + (domain.isBlank() ? "domain" : domain.substring(0, domain.indexOf('.')));
     }
 

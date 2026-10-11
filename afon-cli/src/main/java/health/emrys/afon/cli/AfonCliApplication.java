@@ -1,5 +1,6 @@
 package health.emrys.afon.cli;
 
+import health.emrys.afon.ops.help.CommandHelp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -11,6 +12,7 @@ import org.springframework.context.annotation.Bean;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.Set;
 
 import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
@@ -50,12 +52,27 @@ public class AfonCliApplication {
                 System.exit(1);
                 return;
             }
+            if (args.length > 1 && isHelp(args[1]) && printCommandHelp(target)) {
+                return;
+            }
             invoke(target, Arrays.copyOfRange(args, 1, args.length));
         };
     }
 
     private static boolean isHelp(String arg) {
         return "help".equalsIgnoreCase(arg) || "--help".equals(arg) || "-h".equals(arg);
+    }
+
+    /**
+     * Handles {@code afon-cli <command> -h} by printing the docs of the command, if it has any, see
+     * {@link CommandHelp}; otherwise the command is left to handle {@code -h} itself.
+     *
+     * @return whether the command had docs to print
+     */
+    private static boolean printCommandHelp(Class<?> target) {
+        Optional<String> help = CommandHelp.find(OpsCommands.nameOf(target));
+        help.ifPresent(System.out::println);
+        return help.isPresent();
     }
 
     /**

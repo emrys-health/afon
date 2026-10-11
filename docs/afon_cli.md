@@ -114,6 +114,13 @@ This works because `config` isn't itself a command, only a filter — if the fil
 this reports that instead. It does not apply to a real command name (eg `afon-cli.sh config-status -h` runs
 `config-status` with `-h` forwarded to it as a plain arg, rather than listing commands).
 
+A real command can have its own docs, kept in `afon-ops/src/main/resources/help/<command>.md`, which `-h` prints
+instead of running the command, eg:
+```shell
+afon-cli.sh validate-stack -h
+```
+A command without such docs still gets `-h` forwarded to it.
+
 For example, to run command with console logging:
 ```shell
 afon-cli.sh -lc INFO <command>
