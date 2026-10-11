@@ -46,6 +46,18 @@ public class Step {
             '}';
     }
 
+    /**
+     * Composes steps into one that runs them in order, under an explicit name (rather than the
+     * concatenation of the names of the steps, which grows unreadable).
+     */
+    public static Step sequence(String name, String description, Step... steps) {
+        return new Step(name, description, () -> {
+            for (Step step : steps) {
+                step.function.run();
+            }
+        });
+    }
+
     public Step andThen(Step other) {
         return new Step(
             String.format("%s_then_%s", this.name, other.name),
