@@ -82,7 +82,7 @@ The logging levels can be set via the `--logging` and `--logging-console` option
 
 The docs related to the operations (in module `afon-ops`) are generated and kept in sync as part of the build.  
 
-They can be found in `afon-docs/target/docs`.
+They can be found in `afon-ops/target/docs`.
 
 The generated docs are included in the `afon-distribution`.
 

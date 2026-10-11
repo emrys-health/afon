@@ -89,7 +89,6 @@
         <module>afon-trino</module>
         <module>afon-cdk</module>
         <module>afon-ops</module>
-        <module>afon-docs</module>
         <module>afon-theme</module>
     </modules>
 

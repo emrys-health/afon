@@ -32,6 +32,11 @@
             <version>3.3.2</version>
         </dependency>
         <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.22.0</version>
+        </dependency>
+        <dependency>
             <groupId>io.github.classgraph</groupId>
             <artifactId>classgraph</artifactId>
             <version>${classgraph.version}</version>
@@ -77,6 +82,44 @@
                             <commandlineArgs>${project.basedir}/src/main/codegen/GenerateScriptMains.java ${project.build.directory}/generated-sources/scripts-main</commandlineArgs>
                         </configuration>
                     </execution>
+                    <execution>
+                        <!-- Generates the docs of the ops commands in target/docs -->
+                        <id>generate-docs</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${java.home}/bin/java</executable>
+                            <commandlineArgs>${afon.jvm} ${afon.exec} -Dafon.logging.console=OFF -classpath %classpath
+                                health.emrys.afon.ops.docs.GenerateAllDocumentsMain</commandlineArgs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- Bundles the generated docs in the jar, to show with manage-stack <action> <stack-id> -h -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>bundle-generated-docs</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/docs</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.build.directory}/docs</directory>
+                                    <includes>
+                                        <include>*.md</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>
@@ -94,6 +137,27 @@
                             <sources>
                                 <source>${project.build.directory}/generated-sources/scripts-main</source>
                             </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- Packages the static docs and the generated ops docs as the docs zip, used by afon-distribution -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>package-docs</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>${basedir}/src/assembly/assembly-docs.xml</descriptor>
+                            </descriptors>
+                            <finalName>afon-ops-${project.version}</finalName>
+                            <appendAssemblyId>true</appendAssemblyId>
                         </configuration>
                     </execution>
                 </executions>

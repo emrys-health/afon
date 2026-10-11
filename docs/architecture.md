@@ -107,9 +107,9 @@ What spans stacks or clouds, eg Snowflake reading a catalog, or AWS federating t
 component plan (`ComponentPlan.scenarioSteps`) and run on a set up stack by `manage-stack run <stack-id> <scenario>`.  The other ops
 commands compose their steps from `StepOperations` directly.
 
-The corresponding `*Document` classes generate markdown documentation describing each step — this keeps documentation
-in lock-step with the actual deployment code.  The stack documents extend `AbstractStackDocument`, taking their steps
-from `StackPlanFactory`, so they list the steps that `manage-stack` runs.
+The documents in `ops.docs` generate markdown documentation describing each step — this keeps documentation
+in lock-step with the actual deployment code.  There is one generic document class per kind: `StackDocument` (an action on a stack), `ScenarioDocument` and `FlowDocument`.  `DocumentFinder` makes one of each from `StackPlanFactory` and `StackFlows`, so  a new stack, scenario or flow is documented with nothing written per document, and the docs list the steps that `manage-stack` runs.  
+They are bundled in the jar, to show with `manage-stack <action> <stack-id> -h`.
 
 ### Steps derived from the components
 
@@ -205,8 +205,7 @@ The flow, from the commands to the plan:
                        ▼                                                 │
   ┌──────────────────────────────────────────┐                           │
   │ StepActions.synthesiseStack              │                           │
-  │ (StepDocumentation prints the command    │                           │
-  │  `afon-cli.sh validate-stack <stack-id>`)│                           │
+  │ (`afon-cli.sh validate-stack <stack-id>`)│                           │
   └────────────────────┬─────────────────────┘                           │
                        │ validate(stackId, properties)                   │ validate(stackId, properties)
                        ▼                                                 ▼

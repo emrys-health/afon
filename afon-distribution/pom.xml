@@ -11,7 +11,7 @@
   <dependencies>
     <dependency>
       <groupId>${project.groupId}</groupId>
-      <artifactId>afon-docs</artifactId>
+      <artifactId>afon-ops</artifactId>
       <version>${project.version}</version>
     </dependency>
   </dependencies>
@@ -35,7 +35,7 @@
               <artifactItems>
                 <artifactItem>
                   <groupId>${project.groupId}</groupId>
-                  <artifactId>afon-docs</artifactId>
+                  <artifactId>afon-ops</artifactId>
                   <version>${project.version}</version>
                   <classifier>docs</classifier>
                   <type>zip</type>

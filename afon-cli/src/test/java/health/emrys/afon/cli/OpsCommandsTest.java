@@ -94,4 +94,21 @@ class OpsCommandsTest {
         assertThat(opsCommands.namesWithFilter("nonexistent")).isEmpty();
     }
 
+    @Test
+    void everyCommandHelpIsOfACommand() {
+        try (var scan = new io.github.classgraph.ClassGraph().acceptPaths("help").scan()) {
+            var helps = scan.getAllResources().getPaths().stream()
+                .map(path -> path.substring("help/".length(), path.length() - ".md".length())).toList();
+            assertThat(helps).isNotEmpty();
+            helps.forEach(help -> assertThat(opsCommands.names()).as("help of " + help).contains(help));
+        }
+    }
+
+    @Test
+    void commandsHaveHelpNamedAfterThem() {
+        assertThat(health.emrys.afon.ops.help.CommandHelp.find(OpsCommands.nameOf(health.emrys.afon.ops.ShowEnvMain.class)))
+            .get().asString().contains("show-env");
+        assertThat(health.emrys.afon.ops.help.CommandHelp.find("no-such-command")).isEmpty();
+    }
+
 }
