@@ -25,7 +25,7 @@ import java.util.Set;
  *   <li>{@link #certificates}: the certificates to be issued before the stack is deployed;</li>
  *   <li>{@link #waitsFor}: what to wait for once the stack is deployed;</li>
  *   <li>{@link #setupSteps}: what to configure when setting the stack up;</li>
- *   <li>{@link #runSteps}: the scenarios it can be asked to run on a stack that is set up, by {@code manage-stack run};</li>
+ *   <li>{@link #scenarioSteps}: the scenarios it can be asked to run on a stack that is set up, by {@code manage-stack run};</li>
  *   <li>{@link #label}: how it is called in messages.</li>
  * </ul>
  * Each is optional and the defaults bring nothing, which is right for components that are only infrastructure, eg the network
@@ -99,7 +99,7 @@ public interface ComponentPlan {
      * more than the stack, eg another cloud.  The steps are created when the scenario is run, not when it is listed.
      * A scenario may span components, eg a Spark write followed by a Snowflake read.  None by default.
      */
-    default Map<String, StepsProvider> runSteps(AfonCloud cloud) {
+    default Map<String, StepsProvider> scenarioSteps(AfonCloud cloud) {
         return Map.of();
     }
 }

@@ -68,6 +68,31 @@ The previous per-stack commands, `deploy-*-stack`, `setup-*-stack` and `delete-*
 clouds: use `manage-stack`, eg `manage-stack delete <stack-id>`, or `manage-stack delete <cloud>-all` for every stack of a cloud,
 eg `aws-all`.  What spans stacks is a scenario, eg `manage-stack run aws-full external-azure`, run once the stacks it needs are set up.
 
+### Run a flow of stacks
+
+A flow is a composed run: a named, ordered list of actions on stacks and scenarios, run in order with one command, stopping at the first failure.  `run` takes either a stack id and a scenario, or a flow name, which is never a stack id:
+```shell
+afon-cli.sh manage-stack run                                      # lists the flows and their items
+afon-cli.sh manage-stack run <flow> [<item>:<step>] [--replace] [--dry-run]
+```
+- `--replace` applies to every `deploy` and `setup` item;
+- `--dry-run` lists the steps of the whole flow, grouped by item, without running them;
+- `<item>:<step>` resumes from a step, as step names repeat across items.  A failed flow reports the step to resume from, and
+  the items that did not run, eg `afon-cli.sh manage-stack run cross-cloud-azure 2:deploy_complete_for_azure_polaris`.
+
+The flows are:
+- `aws-full-and-azure-polaris`: `setup aws-full`, `setup azure-polaris`;
+- `aws-keycloak-and-polaris`: `setup aws-keycloak`, `setup aws-polaris`;
+- `azure-and-gcp-polaris`: `setup azure-polaris`, `setup gcp-polaris`;
+- `cross-cloud-azure`: `setup aws-full`, `setup azure-polaris`, then `run aws-full external-azure`;
+- `snowflake-<scenario>`, ie `snowflake-reading-aws`, `snowflake-reading-azure`, `snowflake-reading-gcp` and
+  `snowflake-writing-azure`: `setup aws-snowflake`, then `run aws-snowflake <scenario>`;
+- `snowflake-reading-all`: just the three reading runs in a row, on an `aws-snowflake` that is already set up.
+
+They are defined in code, in `StackFlows`, and validated when loaded: the stacks, scenarios and actions must exist, a scenario
+runs on a stack no earlier item deleted (a flow may be just a chain of runs on stacks already set up), and a later item must not delete a stack an earlier one leaves running.
+Each flow has a generated document, under `flow_*.md`.
+
 ### Stacks side by side
 
 **NOTE:** Only AWS has more than one stack type for now, so only AWS stacks can run side by side: Azure and GCP each have a single stack type, `azure-polaris` and `gcp-polaris`, although the same rules apply to them.
@@ -389,10 +414,15 @@ afon-cli.sh manage-stack deploy azure-polaris
 # GCP Polaris (standalone)
 afon-cli.sh manage-stack deploy gcp-polaris
 
-# Cross-cloud external catalogs (AWS + Azure federation): set up both stacks, then run the scenario
+# Cross-cloud external catalogs (AWS + Azure federation): set up both stacks, then run the scenario, as the flow
+afon-cli.sh manage-stack run cross-cloud-azure
+# or one at a time
 afon-cli.sh manage-stack setup aws-full
 afon-cli.sh manage-stack setup azure-polaris
 afon-cli.sh manage-stack run aws-full external-azure
+
+# Any flow, ie a named list of actions and scenarios: lists the flows without a name
+afon-cli.sh manage-stack run [<flow>]
 
 # Snowflake: set up the stack, then run a scenario, ie one of reading-aws, reading-azure, reading-gcp, writing-azure
 afon-cli.sh manage-stack setup aws-snowflake

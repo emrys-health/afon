@@ -15,7 +15,7 @@ import static health.emrys.afon.config.AfonCloud.AZURE;
  * The {@link ComponentPlan} for the {@link SnowflakeComponent}, decorating its deployment:
  * it holds no domain name, needs no certificate and has nothing to wait for, as Snowflake runs outside of the stack.
  * It configures nothing when the stack is set up either, as what is run on Snowflake depends on the scenario, ie the
- * catalog it reads or the cloud it writes to, see {@link #runSteps}.
+ * catalog it reads or the cloud it writes to, see {@link #scenarioSteps}.
  */
 public class SnowflakePlan implements ComponentPlan {
 
@@ -33,7 +33,7 @@ public class SnowflakePlan implements ComponentPlan {
      * </ul>
      */
     @Override
-    public Map<String, StepsProvider> runSteps(AfonCloud cloud) {
+    public Map<String, StepsProvider> scenarioSteps(AfonCloud cloud) {
         if (cloud != AWS) {
             return Map.of();
         }

@@ -15,4 +15,11 @@ public interface DocumentMetadata {
 
     List<Step> steps(StepOperations stepOperations);
 
+    /**
+     * @return the heading of the section starting with the step, eg the item of a flow it belongs to, or {@code null} if none
+     */
+    default String sectionHeading(Step step) {
+        return null;
+    }
+
 }

@@ -31,7 +31,7 @@ public class SparkPlan implements ComponentPlan {
      * the Polaris of the {@code azure-polaris} stack, which must be set up too, hence the check that it answers.
      */
     @Override
-    public Map<String, StepsProvider> runSteps(AfonCloud cloud) {
+    public Map<String, StepsProvider> scenarioSteps(AfonCloud cloud) {
         if (cloud != AWS) {
             return Map.of();
         }

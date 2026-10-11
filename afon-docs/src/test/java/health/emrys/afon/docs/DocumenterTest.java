@@ -87,4 +87,26 @@ class DocumenterTest {
             .contains("- deploy_complete_for_aws_keycloak", "- setup_complete_for_aws_keycloak");
     }
 
+    @Test
+    void documentsAFlowWithItsStepsGroupedByItem() {
+        AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
+        String content = new Documenter(properties).getContent(new CrossCloudAzureViaAwsFlowDocument(properties));
+        assertThat(content)
+            .contains("afon-cli.sh manage-stack run cross-cloud-azure")
+            .contains("1. `setup aws-full`", "2. `setup azure-polaris`", "3. `run aws-full external-azure`")
+            .contains("    - 2:deploy_complete_for_azure_polaris")
+            .contains("## 1. setup aws-full", "## 2. setup azure-polaris", "## 3. run aws-full external-azure")
+            .contains("afon-cli.sh manage-stack run cross-cloud-azure 3:");
+        assertThat(content.indexOf("## 1. setup aws-full")).isLessThan(content.indexOf("## 2. setup azure-polaris"));
+    }
+
+    @Test
+    void everyFlowHasADocument() {
+        List<DocumentMetadata> documents = new DocumentFinder(new FilePropertyProvider("../templates/config")).findDocuments();
+        assertThat(documents.stream().filter(AbstractFlowDocument.class::isInstance)
+                            .map(document -> ((AbstractFlowDocument) document).flowName()))
+            .containsExactlyInAnyOrderElementsOf(
+                health.emrys.afon.ops.flow.StackFlows.all().stream().map(health.emrys.afon.ops.flow.StackFlow::name).toList());
+    }
+
 }

@@ -77,12 +77,12 @@ public class StackPlanFactory {
     }
 
     /**
-     * @return the actions supported by each stack, in the order of {@link StackAction}: every stack of
+     * @return the actions supported by each stack, those deriving their steps, see {@link StackAction#derivesSteps}, in the order of {@link StackAction}: every stack of
      * {@link StackDefinitions}, and {@code <cloud>-all}, which only deletes
      */
     public SortedMap<StackId, List<StackAction>> supportedActions() {
         SortedMap<StackId, List<StackAction>> supported = new TreeMap<>();
-        StackDefinitions.all().forEach(definition -> supported.put(definition.id(), Arrays.asList(StackAction.values())));
+        StackDefinitions.all().forEach(definition -> supported.put(definition.id(), StackAction.derivingSteps()));
         Arrays.stream(AfonCloud.values()).forEach(cloud -> supported.put(StackId.all(cloud), List.of(StackAction.DELETE)));
         return supported;
     }
@@ -104,9 +104,10 @@ public class StackPlanFactory {
         }
         List<StackComponent> components = StackDefinitions.get(stackId).componentsFor(ops.properties());
         return switch (action) {
-            case DELETE -> delete(stackId, ops);
-            case DEPLOY -> deploy(stackId, components, ops, replace, false);
-            case SETUP -> deploy(stackId, components, ops, replace, true);
+            case DELETE -> deleteSteps(stackId, ops);
+            case DEPLOY -> deploySteps(stackId, components, ops, replace, false);
+            case SETUP -> deploySteps(stackId, components, ops, replace, true);
+            case RUN -> throw new IllegalStateException("Unsupported action " + action);
         };
     }
 
@@ -121,7 +122,7 @@ public class StackPlanFactory {
             return scenarios;
         }
         for (StackComponent component : StackDefinitions.get(stackId).componentsFor(properties)) {
-            registry.of(component).runSteps(stackId.cloud()).forEach((name, steps) -> {
+            registry.of(component).scenarioSteps(stackId.cloud()).forEach((name, steps) -> {
                 if (scenarios.putIfAbsent(name, steps) != null) {
                     throw new IllegalStateException(String.format(
                         "Stack %s has more than one scenario named '%s'", stackId, name));
@@ -135,7 +136,7 @@ public class StackPlanFactory {
      * @return the steps of the scenario of the stack
      * @throws IllegalArgumentException if the stack has no such scenario
      */
-    public List<Step> runSteps(StackId stackId, String scenario, StepOperations ops) {
+    public List<Step> scenarioSteps(StackId stackId, String scenario, StepOperations ops) {
         StepsProvider steps = scenarios(stackId, ops.properties()).get(scenario);
         if (steps == null) {
             throw new IllegalArgumentException(String.format("Stack '%s' has no scenario '%s'", stackId, scenario));
@@ -143,7 +144,7 @@ public class StackPlanFactory {
         return steps.stepsUsing(ops);
     }
 
-    private List<Step> delete(StackId stackId, StepOperations ops) {
+    private List<Step> deleteSteps(StackId stackId, StepOperations ops) {
         StackFilter filter = new StackFilter(
             String.format("stack %s and the legacy stack", stackId),
             name -> name.equals(stackId.toString()) || name.equals(stackId.cloud().toString()));
@@ -153,8 +154,8 @@ public class StackPlanFactory {
     }
 
     // The steps are created in the order they run, as StepOperations logs as it creates them.
-    private List<Step> deploy(StackId stackId, List<StackComponent> components, StepOperations ops, boolean replace,
-                              boolean setup) {
+    private List<Step> deploySteps(StackId stackId, List<StackComponent> components, StepOperations ops, boolean replace,
+                                   boolean setup) {
         AfonCloud cloud = stackId.cloud();
         List<Step> steps = new ArrayList<>();
         steps.add(deleteConflicting(stackId, ops, replace));

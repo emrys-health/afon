@@ -10,6 +10,15 @@ catalog integration and iceberg table that reads through Polaris.  `manage-stack
 afon-cli.sh manage-stack setup aws-snowflake --replace
 ```
 
+Each scenario also has a [flow](stacks.md#run-a-flow-of-stacks) that sets up the stack and runs it, eg
+`afon-cli.sh manage-stack run snowflake-reading-aws --replace`: `snowflake-reading-aws`, `snowflake-reading-azure`,
+`snowflake-reading-gcp` and `snowflake-writing-azure`.  Once the stack is set up, the flow `snowflake-reading-all` runs
+the three reading scenarios in a row:
+
+```shell
+afon-cli.sh manage-stack run snowflake-reading-all
+```
+
 ## Read AWS data via AWS Polaris:**
 
 ```shell
