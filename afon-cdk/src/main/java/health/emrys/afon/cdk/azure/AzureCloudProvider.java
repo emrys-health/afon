@@ -1,8 +1,11 @@
 package health.emrys.afon.cdk.azure;
 
+import com.hashicorp.cdktf.Aspects;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
+import com.hashicorp.cdktf.IAspect;
+import com.hashicorp.cdktf.TerraformResource;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_client_config.DataAzurermClientConfig;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_dns_zone.DataAzurermDnsZone;
@@ -37,6 +40,7 @@ import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
 import health.emrys.afon.cdk.CachedTlsSecret;
 import health.emrys.afon.cdk.HttpsRoute;
+import health.emrys.afon.cdk.LogStorage;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -44,7 +48,9 @@ import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
+import software.constructs.IConstruct;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +81,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     private final        String                  providerRegistrations;
     private final        Map<String, String>     nodePoolConfig;
     private final        String                  keyVaultName;
+    private final        AfonPropertyProvider    properties;
     private              RoleAssignment          clusterAdminAssignment;
     private              KubernetesProvider      k8sProvider;
     private              HelmProvider            helmProvider;
@@ -83,6 +90,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
                               @NonNull String id,
                               AfonPropertyProvider properties) {
         super(scope, id);
+        this.properties          = properties;
         clusterName              = properties.getValue(AfonProperty.CLUSTER_NAME);
         resourceGroup            = properties.getValue(AZURE_RESOURCE_GROUP);
         subscriptionId           = properties.getValue(AZURE_SUBSCRIPTION);
@@ -93,6 +101,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         clientConfig = new DataAzurermClientConfig(this, "current");
         aksCluster   = createCluster(lookupResourceGroup());
         grantClusterAdmin();
+        Aspects.of(scope).add(new ClusterAdminAspect(clusterAdminAssignment));
     }
 
     public static AzureCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties) {
@@ -166,6 +175,38 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             .scope(aksCluster.getId())
             .provisioners(List.of(waitForRbac))
             .build());
+    }
+
+    /**
+     * Makes every resource acting on the cluster, ie that of the kubernetes and helm providers, and the commands running
+     * kubectl, wait for the cluster admin assignment, wherever it is created, as else any that does not name the cluster's
+     * dependables itself is created before the assignment has propagated and is refused ("User does not have access to the
+     * resource in Azure"), and, on destroy, is deleted after it is revoked.
+     */
+    static class ClusterAdminAspect implements IAspect {
+
+        private static final List<String> CLUSTER_RESOURCE_PREFIXES = List.of("kubernetes_", "helm_", "null_resource");
+
+        private final RoleAssignment clusterAdmin;
+
+        ClusterAdminAspect(RoleAssignment clusterAdmin) {
+            this.clusterAdmin = clusterAdmin;
+        }
+
+        @Override
+        public void visit(@NonNull IConstruct node) {
+            if (!(node instanceof TerraformResource resource) || resource == clusterAdmin
+                || CLUSTER_RESOURCE_PREFIXES.stream().noneMatch(resource.getTerraformResourceType()::startsWith)) {
+                return;
+            }
+            // the address of the resource, as a depends_on takes it, not the reference to it
+            String address = clusterAdmin.getTerraformResourceType() + "." + clusterAdmin.getFriendlyUniqueId();
+            List<String> dependsOn = new ArrayList<>(resource.getDependsOn() == null ? List.of() : resource.getDependsOn());
+            if (!dependsOn.contains(address)) {
+                dependsOn.add(address);
+                resource.setDependsOn(dependsOn);
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -416,6 +457,17 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             .type("local-exec")
             .build();
 
+        // Advanced Container Networking Services, whose security feature gives Cilium the DNS proxy that the FQDN
+        // network policies need (see NetworkConfig).  The azurerm provider pinned has no argument for it, so it is
+        // enabled on the cluster once created, which the provider then leaves alone.
+        LocalExecProvisioner enableAcns = LocalExecProvisioner
+            .builder()
+            .when("create")
+            .command(format("az aks update --resource-group %s --name %s --enable-acns",
+                            resourceGroup.getName(), clusterName))
+            .type("local-exec")
+            .build();
+
         return KubernetesCluster.Builder
             .create(this, "aks")
             .name(clusterName)
@@ -449,7 +501,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
                           .builder()
                           .create("20m")
                           .build())
-            .provisioners(List.of(updateCredentials))
+            .provisioners(List.of(updateCredentials, enableAcns))
             .build();
     }
 
@@ -548,6 +600,33 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     @Override
     public String clusterName() {
         return clusterName;
+    }
+
+    /**
+     * The logs are kept in the container of the "azure" catalog (see catalogs-azure.properties), in the storage
+     * account {@code AZURE_STORAGE_ACCOUNT}, with the access of {@code AZURE_CONNECTION_STRING}.
+     */
+    @Override
+    public LogStorage logStorage() {
+        String container        = properties.getCatalogProperty("AZURE_BUCKET_NAME", "azure");
+        String storageAccount   = properties.getValue(AZURE_STORAGE_ACCOUNT);
+        String connectionString = properties.getValue(AZURE_CONNECTION_STRING);
+        if (connectionString.isBlank()) {
+            // Loki would otherwise only fail at startup, after the rest of the stack is deployed
+            throw new IllegalArgumentException(
+                "AZURE_CONNECTION_STRING is not set, which the monitoring needs for Loki to write its logs to the storage account");
+        }
+        return new LogStorage("Blob", "azure", format("""
+            type: azure
+            bucketNames:
+              chunks: %1$s
+              ruler: %1$s
+              admin: %1$s
+            azure:
+              accountName: %2$s
+              connectionString: "%3$s"
+              useManagedIdentity: false
+            """, container, storageAccount, connectionString));
     }
 
     @Override

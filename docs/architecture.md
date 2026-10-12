@@ -169,7 +169,7 @@ The stacks, as composed by `StackDefinitions`:
 | `aws-full` | as `aws-trino`, then Monitoring |
 | `aws-snowflake` | as `aws-full`, then Snowflake, a query engine outside of the stack, so it deploys nothing |
 | `azure-polaris` | Polaris |
-| `azure-full` | Polaris, SparkOperator, Spark, Jupyter |
+| `azure-full` | The same as `aws-full`, always with its own Keycloak |
 | `gcp-polaris` | Polaris |
 
 **Synthesising a stack.** `ComposedStack.synthesise(StackId, AfonPropertyProvider)` is the only way into the CDKTF world, and it

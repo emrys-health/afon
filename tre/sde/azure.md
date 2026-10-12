@@ -14,7 +14,7 @@ Creating the Azure env involves an admin part, because the `az ad` commands (Ent
 principal management) are generally allowed to run only by a local admin.
 
 ```shell
-./afon.sh -a script -sp azure/create.sh [<as-admin>]
+./afon.sh -a script -sp azure/create.sh [<as-admin>] [<stack-id>]
 ```
 where `<as-admin>` is a boolean flag to indicate if you have the local admin rights.
 The flag is optional, and by default you'll run **without** admin rights.  

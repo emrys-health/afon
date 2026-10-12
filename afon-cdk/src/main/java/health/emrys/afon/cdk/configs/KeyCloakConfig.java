@@ -260,7 +260,7 @@ public class KeyCloakConfig extends Construct {
         dnsRecord = cloudProvider.exposeHttps(new HttpsRoute(
             "keycloak", properties.getValue(OIDC_DOMAIN_NAME), KEYCLOAK_SERVICE_NAME, KEYCLOAK_PORT,
             KEYCLOAK_INGRESS_NAME, new HealthCheck(HEALTH_READY_PATH, MANAGEMENT_PORT_NAME),
-            "keycloak-tls", false, List.of(), Optional.empty())).dnsRecord();
+            "keycloak-tls", true, List.of(), Optional.empty())).dnsRecord();
     }
 
     /**

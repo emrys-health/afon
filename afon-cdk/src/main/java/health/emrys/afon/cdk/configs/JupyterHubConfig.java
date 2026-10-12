@@ -603,7 +603,7 @@ public class JupyterHubConfig {
         platform.exposeHttps(new HttpsRoute(
             "jupyter", jupyterDomain(), PROXY_SERVICE_NAME, PROXY_PORT, JUPYTER_INGRESS_NAME,
             HealthCheck.onTrafficPort(JupyterMfaConfig.PING_PATH),
-            TLS_SECRET_NAME, false, List.of(), Optional.empty()));
+            TLS_SECRET_NAME, true, List.of(), Optional.empty()));
     }
 
     /**

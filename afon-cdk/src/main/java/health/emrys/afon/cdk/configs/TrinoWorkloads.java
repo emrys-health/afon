@@ -67,6 +67,8 @@ public class TrinoWorkloads {
         Map<String, Object> values = Map.of(
             "image", Map.of("tag", DockerImages.TRINO_IMAGE_TAG),
             "server", Map.of("workers", WORKERS), // Integer type
+            "coordinator", nodeSettings(),
+            "worker", nodeSettings(),
             "service", Map.of("type", "ClusterIP", "port", TRINO_PORT),
             "additionalCatalogs", catalogFiles(id.toString()));
 
@@ -85,6 +87,19 @@ public class TrinoWorkloads {
                        .values(List.of(valuesYaml))
                        .dependsOn(dependsOn)
                        .build();
+    }
+
+    /**
+     * What the coordinator and the workers need to start on a cluster with little to spare.  Without requests the pods
+     * are best-effort, so the JVM is starved of CPU by the pods that have them, and its startup is slower than the
+     * chart's startup probe allows, which restarts it, every time: the release then times out.  The probe's timeout and
+     * retries are those of a JVM that starts slowly, not of one that is hung.
+     */
+    private static Map<String, Object> nodeSettings() {
+        return Map.of(
+            "resources", Map.of("requests", Map.of("cpu", "500m", "memory", "1Gi")),
+            "startupProbe", Map.of("initialDelaySeconds", 10, "periodSeconds", 5, "timeoutSeconds", 10,
+                                   "failureThreshold", 60));
     }
 
     /**

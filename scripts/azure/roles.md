@@ -83,9 +83,13 @@ Roles required to store the certs (either by the **deployer** or by the admin):
   through Key Vault's own CA integration. Not needed for the `acme` path, and does **not** cover
   reading secrets.
 
-For each Polaris domain name, the two secrets stored for the TLS cert are:
+`issue-cert.sh` issues the cert of each domain name that is configured, ie not blank, of `AZURE_POLARIS_DOMAIN_NAME`,
+`AZURE_JUPYTER_DOMAIN_NAME` and `OIDC_DOMAIN_NAME`, and each of the stacks that deploy them restores its own.
+For `acme` the DNS zone of each domain name must be in the resource group.
+
+For each domain name, the two secrets stored for the TLS cert are:
 ```shell
-KEBAB_DOMAIN_NAME="${AZURE_POLARIS_DOMAIN_NAME//./-}"
+KEBAB_DOMAIN_NAME="${DOMAIN_NAME//./-}"
 AZURE_TLS_CRT_NAME="${KEBAB_DOMAIN_NAME}-tls-crt"
 AZURE_TLS_KEY_NAME="${KEBAB_DOMAIN_NAME}-tls-key"
 ```
@@ -94,7 +98,7 @@ AZURE_TLS_KEY_NAME="${KEBAB_DOMAIN_NAME}-tls-key"
 
 Role granted **to the app's service principal** (`APP_SP_ID`), by the **deployer**:
 
-- **DNS Zone Contributor** - DNS zone scope.
+- **DNS Zone Contributor** - DNS zone scope, of each domain name.
   Needed by `acme.sh`'s `dns_azure` hook to create/delete the `_acme-challenge` TXT record that
   proves domain ownership to Let's Encrypt. Not needed by `digicert`/`globalsign` - validation
   happens through the CA's own integration with Key Vault instead, never touching Azure DNS.

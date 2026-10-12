@@ -1,11 +1,30 @@
 source $AFON_ROOT/scripts/config/afon-source.sh azure
 source $AFON_ROOT/scripts/config/secret-source.sh azure
 
-AS_ADMIN="${1:-false}"
+# Args, in any order: whether to run as admin, true|false, and the id of the stack the env is created for, which decides
+# the DNS zones, one of azure-polaris, azure-full.  By default not as admin, for azure-polaris.
+AS_ADMIN=false
+STACK_ID=azure-polaris
+for ARG in "$@"; do
+  case "$ARG" in
+    true|false) AS_ADMIN="$ARG" ;;
+    azure-*) STACK_ID="$ARG" ;;
+    *) echo "-- Unknown argument '$ARG': expected true|false, or a stack id, eg azure-polaris or azure-full"; exit 1 ;;
+  esac
+done
+
+# The properties of the domain names whose DNS zones the stack needs: Polaris is always deployed, Jupyter and the
+# KeyCloak only by the stacks deploying them, ie azure-full, with its own KeyCloak.  azure-polaris uses the KeyCloak of
+# another stack, so needs no zone for OIDC_DOMAIN_NAME.
+case "$STACK_ID" in
+  azure-polaris) DOMAIN_PROPERTIES="AZURE_POLARIS_DOMAIN_NAME" ;;
+  azure-full)    DOMAIN_PROPERTIES="AZURE_POLARIS_DOMAIN_NAME AZURE_JUPYTER_DOMAIN_NAME OIDC_DOMAIN_NAME" ;;
+  *) echo "-- Unsupported stack '$STACK_ID': expected azure-polaris or azure-full"; exit 1 ;;
+esac
 APP_ID="${AZURE_APP_ID:-}"
 APP_SP_ID="${AZURE_SP_ID:-}"
 
-echo "- Creating env for subscription '$AZURE_SUBSCRIPTION'"
+echo "- Creating env for stack '$STACK_ID' for subscription '$AZURE_SUBSCRIPTION'"
 
 if [ "$AS_ADMIN" = "true" ]; then
   echo "- AS_ADMIN=true, running create-admin.sh"
@@ -49,12 +68,20 @@ fi
 
 echo "- Creating DNS zone"
 
-if az network dns zone show --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_POLARIS_DOMAIN_NAME -o none 2>/dev/null; then
-  echo "- DNS zone for domain name '$AZURE_POLARIS_DOMAIN_NAME' already exists, skipping"
-else
-  echo "- Creating DNS zone for domain name '$AZURE_POLARIS_DOMAIN_NAME'"
-  az network dns zone create --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_POLARIS_DOMAIN_NAME || exit 1
-fi
+# One zone per domain name the stack serves from the cluster, which must be set
+for DOMAIN_PROPERTY in $DOMAIN_PROPERTIES; do
+  DOMAIN_NAME="${!DOMAIN_PROPERTY:-}"
+  if [ -z "$DOMAIN_NAME" ]; then
+    echo "-- $DOMAIN_PROPERTY is not set, which stack '$STACK_ID' needs for its DNS zone"
+    exit 1
+  fi
+  if az network dns zone show --resource-group $AZURE_RESOURCE_GROUP --name $DOMAIN_NAME -o none 2>/dev/null; then
+    echo "- DNS zone for domain name '$DOMAIN_NAME' ($DOMAIN_PROPERTY) already exists, skipping"
+  else
+    echo "- Creating DNS zone for domain name '$DOMAIN_NAME' ($DOMAIN_PROPERTY)"
+    az network dns zone create --resource-group $AZURE_RESOURCE_GROUP --name $DOMAIN_NAME || exit 1
+  fi
+done
 
 # Storage
 

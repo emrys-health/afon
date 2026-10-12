@@ -1,11 +1,15 @@
 package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.ITerraformDependable;
+import com.hashicorp.cdktf.TerraformResource;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
+import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -25,18 +29,21 @@ public abstract class AbstractHttpsCloudProvider extends AbstractCloudProvider {
     @Override
     public synchronized HttpsExposure exposeHttps(HttpsRoute route) {
         if (nginx == null) {
-            // the Let's Encrypt account is that of the first route, as is the certificate to restore
-            nginx = new HttpsIngress(
-                stack(), configureHelm(), getDependables(), route.domainName(), nginxAnnotations(),
-                route.cacheCertificate() ? restoreCachedCertCommand(route) : Optional.empty());
-        } else if (route.cacheCertificate()) {
-            throw new IllegalStateException(String.format(
-                "Cannot cache the certificate of %s, as the nginx ingress controller is already installed: "
-                + "only the first route exposed can be cached", route.domainName()));
+            // the Let's Encrypt account is that of the first route
+            nginx = new HttpsIngress(stack(), configureHelm(), getDependables(), route.domainName(), nginxAnnotations());
+        }
+        List<TerraformResource> dependsOn = new ArrayList<>(route.dependsOn());
+        if (route.cacheCertificate()) {
+            // restored before the ingress is created, else cert-manager's ingress-shim would issue a new certificate
+            restoreCachedCertCommand(route).ifPresent(command -> dependsOn.add(
+                Resource.Builder.create(stack(), "restoreCachedCert-" + route.component())
+                                .dependsOn(List.of(nginx.certManager()))
+                                .provisioners(CdkUtils.uponCreateRun(command))
+                                .build()));
         }
         IngressV1 ingress = nginx.expose(
             route.domainName(), route.tlsSecretName(), route.service(), route.port(), route.ingressName(),
-            route.dependsOn(), route.ingressProvisioners());
+            dependsOn, route.ingressProvisioners());
         return new HttpsExposure(ingress, configureDns(ingress, route));
     }
 

@@ -22,8 +22,7 @@ import java.util.Optional;
  * @param tlsSecretName    the Kubernetes secret holding the TLS certificate, for platforms terminating TLS in the
  *                         cluster, ignored by those terminating it at their load balancer
  * @param cacheCertificate whether the certificate is cached in the cloud's secret store, to be restored rather than
- *                         issued anew, for platforms issuing them in the cluster.  Only the first route exposed on a
- *                         platform can be cached, as the platform installs what restores it only once
+ *                         issued anew, for platforms issuing them in the cluster
  * @param dependsOn        what the ingress must wait for, eg the service, for platforms where nothing else
  *                         guarantees it exists
  * @param ingressProvisioners the provisioners of the ingress, eg to remove its finalizers on destroy, for platforms

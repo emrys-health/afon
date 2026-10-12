@@ -42,20 +42,20 @@ public final class StackDefinitions {
         // Polaris uses the KeyCloak server at OIDC_DOMAIN_NAME, which the aws-keycloak stack deploys, so that both can
         // run side by side, while the stacks extending it deploy their own KeyCloak, unless AWS_KEYCLOAK_EXTERNAL is set
         add(new StackId(AWS, "polaris"), true, properties -> List.of(new PolarisComponent()));
-        add(new StackId(AWS, "jupyter"), true, StackDefinitions::awsJupyter);
-        add(new StackId(AWS, "spark"), true, properties -> concat(awsJupyter(properties), awsSpark()));
+        add(new StackId(AWS, "jupyter"), true, properties -> jupyter(isKeyCloakExternal(properties)));
+        add(new StackId(AWS, "spark"), true,
+            properties -> concat(jupyter(isKeyCloakExternal(properties)), spark()));
         add(new StackId(AWS, "trino"), true,
-            properties -> concat(awsJupyter(properties), awsSpark(), List.of(new TrinoComponent())));
-        add(new StackId(AWS, "full"), true, StackDefinitions::awsFull);
+            properties -> concat(jupyter(isKeyCloakExternal(properties)), spark(), List.of(new TrinoComponent())));
+        add(new StackId(AWS, "full"), true, properties -> full(isKeyCloakExternal(properties)));
         // Snowflake queries the catalogs of the full stack through its Polaris, so it holds what the full stack holds
         add(new StackId(AWS, "snowflake"), true,
-            properties -> concat(awsFull(properties), List.of(new SnowflakeComponent())));
+            properties -> concat(full(isKeyCloakExternal(properties)), List.of(new SnowflakeComponent())));
 
         // AZURE
         add(new StackId(AZURE, "polaris"), true, properties -> List.of(new PolarisComponent()));
-        // The operator only launches Spark in response to the resources of the Spark component
-        add(new StackId(AZURE, "full"), true, properties -> List.of(
-            new PolarisComponent(), new SparkOperatorComponent(), new SparkComponent(), new JupyterComponent()));
+        // The same as aws-full, always deploying its own KeyCloak, as there is no azure-keycloak stack
+        add(new StackId(AZURE, "full"), true, properties -> full(false));
 
         // GCP
         add(new StackId(GCP, "polaris"), true, properties -> List.of(new PolarisComponent()));
@@ -71,11 +71,11 @@ public final class StackDefinitions {
 
     /**
      * Polaris with JupyterHub and Guacamole behind the oauth2-proxy MFA gate, and the Spark operator the notebooks'
-     * Spark runs on, deploying its own KeyCloak, unless configured to use the one the aws-keycloak stack deploys.
+     * Spark runs on, deploying its own KeyCloak, unless configured to use another stack's.
      */
-    private static List<StackComponent> awsJupyter(AfonPropertyProvider properties) {
+    private static List<StackComponent> jupyter(boolean keyCloakExternal) {
         List<StackComponent> components = new ArrayList<>();
-        if (!isKeyCloakExternal(properties)) {
+        if (!keyCloakExternal) {
             components.add(new KeycloakComponent());
         }
         components.addAll(List.of(
@@ -84,13 +84,12 @@ public final class StackDefinitions {
         return components;
     }
 
-    private static List<StackComponent> awsFull(AfonPropertyProvider properties) {
-        return concat(awsJupyter(properties), awsSpark(), List.of(new TrinoComponent(),
-                                                                  new MonitoringComponent(),
-                                                                  new AwsLoggingComponent()));
+    private static List<StackComponent> full(boolean keyCloakExternal) {
+        return concat(jupyter(keyCloakExternal), spark(), List.of(new TrinoComponent(), new MonitoringComponent()));
     }
 
-    private static List<StackComponent> awsSpark() {
+    // The operator only launches Spark in response to the resources of the Spark component
+    private static List<StackComponent> spark() {
         return List.of(new SparkComponent(), new CrdCleanupComponent());
     }
 
