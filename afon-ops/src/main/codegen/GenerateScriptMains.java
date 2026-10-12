@@ -62,6 +62,7 @@ public class GenerateScriptMains {
         new ScriptEntry("azure", "AzureDestroyAdminMain", "azure/destroy-admin.sh"),
         new ScriptEntry("azure", "AzureDestroyMain", "azure/destroy.sh"),
         new ScriptEntry("azure", "AzureIssueCertMain", "azure/issue-cert.sh"),
+        new ScriptEntry("azure", "AzureKeycloakMain", "azure/keycloak.sh"),
         new ScriptEntry("azure", "AzureKeyvaultMain", "azure/keyvault.sh"),
         new ScriptEntry("azure", "AzureLoginAppMain", "azure/login-app.sh"),
         new ScriptEntry("azure", "AzureLoginMain", "azure/login.sh"),
@@ -88,6 +89,7 @@ public class GenerateScriptMains {
         new ScriptEntry("local", "LocalSetupMain", "local/setup.sh"),
         new ScriptEntry("local", "LocalVersionsMain", "local/versions.sh"),
 
+        new ScriptEntry("kube", "KubeEstimatorMain", "kube/estimator.sh"),
         new ScriptEntry("kube", "KubePodsMain", "kube/pods.sh"),
         new ScriptEntry("kube", "KubeLogsMain", "kube/logs.sh"),
         new ScriptEntry("kube", "KubePolarisDbMain", "kube/polaris-db.sh")

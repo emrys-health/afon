@@ -4,6 +4,33 @@ install_eksct_linux(){
   curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" && tar -xzf eksctl_Linux_amd64.tar.gz -C /tmp && sudo mv /tmp/eksctl /usr/local/bin && rm eksctl_Linux_amd64.tar.gz
 }
 
+# The architecture of the linux release binaries, ie amd64 or arm64
+linux_arch(){
+  case "$(uname -m)" in
+    x86_64) echo amd64 ;;
+    aarch64|arm64) echo arm64 ;;
+    *) echo "unsupported architecture $(uname -m)" >&2; return 1 ;;
+  esac
+}
+
+# mikefarah's yq, which the afon scripts use to read YAML.  The apt package of that name is another tool, a wrapper
+# around jq, so the release binary is installed instead.
+install_yq_linux(){
+  local arch
+  arch=$(linux_arch) || return 1
+  curl -sL -o /tmp/yq "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${arch}" && chmod +x /tmp/yq && sudo mv /tmp/yq /usr/local/bin/yq
+}
+
+# helm, which renders the charts of the stacks, eg for kube-estimator.  It is in no default apt repository,
+# so its latest release binary is installed, the version being that which the latest release page redirects to.
+install_helm_linux(){
+  local arch version
+  arch=$(linux_arch) || return 1
+  version=$(curl -sLI -o /dev/null -w '%{url_effective}' https://github.com/helm/helm/releases/latest | sed 's#.*/##')
+  curl -sL "https://get.helm.sh/helm-${version}-linux-${arch}.tar.gz" | tar -xz -C /tmp "linux-${arch}/helm" \
+    && sudo mv "/tmp/linux-${arch}/helm" /usr/local/bin/helm && rmdir "/tmp/linux-${arch}"
+}
+
 install_kubelogin(){
   az aks install-cli
 }
@@ -23,7 +50,9 @@ install_gke_auth_plugin_macos(){
 
 case $SETUP_OS in
   linux|GNU/Linux)
-    sudo apt install git gh openjdk-17-jdk maven docker tofu kubectl hubble
+    sudo apt install git gh openjdk-17-jdk maven docker tofu kubectl hubble jq
+    install_yq_linux
+    install_helm_linux
     if [ -z "$CLOUD" ]; then
       sudo apt install awscli
       install_eksct_linux
@@ -46,7 +75,7 @@ case $SETUP_OS in
     fi
     ;;
   macos|arm64)
-    brew install git gh openjdk@17 maven docker opentofu kubernetes-cli hubble
+    brew install git gh openjdk@17 maven docker opentofu kubernetes-cli hubble jq yq helm
     if [ -z "$CLOUD" ]; then
       brew install awscli eksctl
       brew install azure-cli

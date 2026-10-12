@@ -18,6 +18,7 @@ import java.util.function.Supplier;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.AWS_KEYCLOAK_EXTERNAL;
+import static health.emrys.afon.config.AfonProperty.AZURE_KEYCLOAK_EXTERNAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,6 +37,7 @@ class StackCompositionTest {
     void everyStackIsComposedCorrectlyWhetherOrNotItDeploysItsOwnKeyCloak() {
         for (String external : List.of("false", "true")) {
             properties.setValue(AWS_KEYCLOAK_EXTERNAL, external);
+            properties.setValue(AZURE_KEYCLOAK_EXTERNAL, external);
             for (StackDefinition definition : StackDefinitions.all()) {
                 assertThatCode(() -> definition.componentsFor(properties))
                     .as("%s with AWS_KEYCLOAK_EXTERNAL=%s", definition.id(), external)

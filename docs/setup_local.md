@@ -19,6 +19,9 @@ The following packages are installed:
 - docker
 - opentofu
 - kubernetes-cli
+- jq
+- yq (mikefarah's, which reads YAML)
+- helm
 - awscli eksctl
 - azure-cli kubelogin
 - google-cloud-cli gke-gcloud-auth-plugin

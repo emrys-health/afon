@@ -38,7 +38,7 @@ where:
 - `<action>` is one of `delete`, `deploy` or `setup`;
 - `<stack-id>` is `<cloud>-<stack-type>`, eg `aws-keycloak`, named as `validate-stack` lists the stacks.
   Every defined stack is listed: `aws-full`, `aws-keycloak`, `aws-polaris`, `aws-jupyter`, `aws-spark`, `aws-trino`,
-  `aws-snowflake`, `azure-full`, `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
+  `aws-snowflake`, `azure-full`, `azure-keycloak`, `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
 - `<step>`, if given, is the step from which to resume a failed run (see
   [Resume a failed stack deployment](#resume-a-failed-stack-deployment-from-a-specific-step));
 - `--replace`, if given, lets `deploy` and `setup` delete the other stacks conflicting with the stack, see
@@ -96,7 +96,7 @@ Each flow has a generated document, under `flow_*.md`.
 
 ### Stacks side by side
 
-**NOTE:** Only AWS has more than one stack type for now, so only AWS stacks can run side by side: Azure and GCP each have a single stack type, `azure-polaris` and `gcp-polaris`, although the same rules apply to them.
+**NOTE:** Only AWS and Azure have more than one stack type for now, so only their stacks can run side by side: GCP has a single stack type, `gcp-polaris`, although the same rules apply to it.  The AKS cluster, network and identity of an Azure stack are named `<stack-type>-<name>`, eg `keycloak-aks-vnet` and `keycloak-<CLUSTER_NAME>`, as on AWS, so the stacks of a resource group don't collide.
 
 Each stack has its own `tofu` state, so stacks run side by side, unless they conflict, ie they hold a common exclusive
 resource: the DNS record of a domain name, eg `OIDC_DOMAIN_NAME`, or the pinned egress IP `AWS_EGRESS_IP`, which only
@@ -124,6 +124,10 @@ stack of the cloud, and `delete` of any stack of the cloud deletes it too.  Like
 | `aws-polaris` | `AWS_POLARIS_DOMAIN_NAME`, `AWS_EGRESS_IP` | `aws-keycloak` |
 | `aws-full` | `OIDC_DOMAIN_NAME`, `AWS_POLARIS_DOMAIN_NAME`, `AWS_JUPYTER_DOMAIN_NAME`, `AWS_EGRESS_IP` | none |
 | `aws-full`, with `AWS_KEYCLOAK_EXTERNAL=true` | `AWS_POLARIS_DOMAIN_NAME`, `AWS_JUPYTER_DOMAIN_NAME`, `AWS_EGRESS_IP` | `aws-keycloak` |
+| `azure-keycloak` | `OIDC_DOMAIN_NAME` | `azure-polaris` |
+| `azure-polaris` | `AZURE_POLARIS_DOMAIN_NAME` | `azure-keycloak` |
+| `azure-full` | `OIDC_DOMAIN_NAME`, `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME` | none |
+| `azure-full`, with `AZURE_KEYCLOAK_EXTERNAL=true` | `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME` | `azure-keycloak` |
 
 The Polaris stacks, `aws-polaris`, `azure-polaris` and `gcp-polaris`, deploy no KeyCloak of their own, but use the
 KeyCloak server at `OIDC_DOMAIN_NAME`, which `aws-keycloak` deploys, so deploy (or set up) `aws-keycloak` first, eg:
@@ -137,6 +141,10 @@ The `aws-full` stack deploys its own KeyCloak, so it conflicts with both `aws-ke
 `AWS_KEYCLOAK_EXTERNAL=true` is set in `afon-aws.properties` (it is `false` when empty): it then uses the KeyCloak
 `aws-keycloak` deploys, like `aws-polaris`, so it runs side by side with `aws-keycloak`, and its `deploy` and `setup` likewise check first that KeyCloak answers.
 Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-keycloak` always gets a fresh one.
+
+On Azure it is the same with `azure-keycloak` and `AZURE_KEYCLOAK_EXTERNAL=true` in `afon-azure.properties` (it is `false` when empty):
+`azure-full` then uses the KeyCloak `azure-keycloak` deploys, so it runs side by side with it, and its `deploy` and `setup` check first that KeyCloak answers.
+The KeyCloak domain `OIDC_DOMAIN_NAME` must then have its DNS zone in the Azure resource group, which `afon-cli.sh azure-create false azure-keycloak` creates.
 
 ### Upgrading to per-stack state (one-off)
 
@@ -236,6 +244,10 @@ Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_st
 ```
 afon-cli.sh manage-stack setup azure-full
 ```
+
+**NOTE:** `azure-full` needs 4 nodes of the default size, not the 3 that are the default: set `AZURE_AKS_NODE_POOL=nodeCount:4` in
+`afon-azure.properties` first, else pods such as the Spark Connect driver stay Pending (`Insufficient cpu`).  Check with
+`afon-cli.sh kube-estimator azure-full 4`.
 `azure-full` has the same components as `aws-full`, including its own KeyCloak, served at `OIDC_DOMAIN_NAME`, which on Azure must be a domain
 whose DNS zone is in `AZURE_RESOURCE_GROUP`, like `AZURE_POLARIS_DOMAIN_NAME` and `AZURE_JUPYTER_DOMAIN_NAME`.  Its network policies
 need the cluster's Advanced Container Networking Services, which the stack enables, and its monitoring keeps the logs in the container of the
@@ -406,9 +418,35 @@ afon-cli.sh aws-vpcs <stack-type>  # the VPC of the stack of the type, eg keyclo
 
 And if all else fails, login to the [AWS VPC Console](https://eu-west-2.console.aws.amazon.com/vpcconsole/home?region=eu-west-2#vpcs:)
 
-### Azure 
 
-When Azure resource group is stuck:
+### Azure
+
+The Azure components of each stack are named from its stack type, like the AWS ones: its AKS cluster is `<stack-type>-<CLUSTER_NAME>`, eg
+`keycloak-emrys-cluster` for stack `azure-keycloak`, and its network and identity `<stack-type>-aks-vnet` and `<stack-type>-aks-identity`.
+Checking Polaris or KeyCloak needs no stack type either, as only one of the stacks serving each runs at a time: it is found by its AKS
+cluster in `AZURE_RESOURCE_GROUP`, unless given, eg `azure-polaris full` or `azure-keycloak keycloak`:
+```shell
+afon-cli.sh azure-polaris                    # is Polaris serving?
+afon-cli.sh azure-keycloak                   # is KeyCloak serving?
+```
+They check the same layers as on AWS.  The stacks serving KeyCloak are `azure-keycloak`, and `azure-full` unless `AZURE_KEYCLOAK_EXTERNAL=true`.
+
+#### Estimating the capacity of the cluster
+
+A pod is placed on a node by its CPU and memory *requests*, so one that no node has the requests left for stays Pending
+(`FailedScheduling: ... Insufficient cpu`) until the Helm release it belongs to times out, although the cluster is
+mostly idle.  Before deploying, estimate whether a stack fits on the nodes, from its synthesised plan and the requests
+of its pods and Helm charts, eg with the 4 nodes that `azure-full` needs, configured by `AZURE_AKS_NODE_POOL=nodeCount:4`:
+```shell
+afon-cli.sh validate-stack azure-full
+afon-cli.sh kube-estimator azure-full 4 Standard_D2s_v3
+```
+It lists the pods by what they request, where each would be placed, and which would stay Pending, in which case it exits 1.
+It also lists the pods that request nothing, which the scheduler counts as free although they use CPU and memory, so a stack that
+fits is still tighter than it looks.  `ALLOC_CPU` and `ALLOC_MEM` (m and Mi) give the allocatable resources of a node of a size
+it doesn't know.
+
+When the Azure resource group is stuck:
 
 ```shell
 az group delete --name afon_resource_group_aks --yes --no-wait

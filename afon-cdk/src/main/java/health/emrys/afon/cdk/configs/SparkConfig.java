@@ -36,6 +36,18 @@ public class SparkConfig extends Construct {
                     .builder()
                     .name("operatorConfiguration.log4j2\\.properties")
                     .value("rootLogger.level=DEBUG")
+                    .build(),
+                // The chart requests a whole CPU, which no node of a small cluster has left once the other pods have
+                // theirs, so the pod would stay Pending until the release times out.  The limits are the chart's.
+                ReleaseSet
+                    .builder()
+                    .name("operatorDeployment.operatorPod.operatorContainer.resources.requests.cpu")
+                    .value("250m")
+                    .build(),
+                ReleaseSet
+                    .builder()
+                    .name("operatorDeployment.operatorPod.operatorContainer.resources.requests.memory")
+                    .value("1Gi")
                     .build()))
             .dependsOn(eksDependOn) // Depend on EKS Auth
             .build();

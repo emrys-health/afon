@@ -1,5 +1,7 @@
 package health.emrys.afon.ops.steps;
 
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -43,9 +45,28 @@ class StepOperationsTest {
         void startStack(StackId stackId, OutputStream outputStream) {
             calls.add("start " + stackId);
         }
+
+        @Override
+        void checkAnswers(String url, String failure) {
+            calls.add("check " + url + ": " + failure);
+        }
     };
 
     private final StepOperations operations = new StepOperations(actions, properties);
+
+    @Test
+    void checkingKeyCloakAnswersSaysToSetUpTheKeyCloakStackOfTheCloudOrOfAnotherIfItHasNone() throws Throwable {
+        properties.setValue(AfonProperty.OIDC_DOMAIN_NAME, "oauth.example");
+
+        for (AfonCloud cloud : AfonCloud.values()) {
+            operations.checkKeyCloakAnswers(cloud).getFunction().run();
+        }
+
+        assertThat(calls).hasSize(3).allSatisfy(call -> assertThat(call).startsWith(
+            "check https://oauth.example/realms/master/.well-known/openid-configuration: Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first"))
+                         .satisfies(c -> assertThat(String.join("\n", c)).contains(
+                             "manage-stack setup aws-keycloak", "manage-stack setup azure-keycloak").doesNotContain("gcp-keycloak"));
+    }
 
     @Test
     void doesNotValidateStackWithoutTfStateBeforeDeletingIt() {

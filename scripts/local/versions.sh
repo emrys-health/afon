@@ -22,6 +22,12 @@ echo "### java" >> $VERSIONS_OUTPUT
 java --version >> $VERSIONS_OUTPUT
 echo "### mvn" >> $VERSIONS_OUTPUT
 mvn --version >> $VERSIONS_OUTPUT
+echo "### jq" >> $VERSIONS_OUTPUT
+jq --version >> $VERSIONS_OUTPUT
+echo "### yq" >> $VERSIONS_OUTPUT
+yq --version >> $VERSIONS_OUTPUT
+echo "### helm" >> $VERSIONS_OUTPUT
+helm version --short >> $VERSIONS_OUTPUT
 if [ -z "$CLOUD" ]; then
   echo "### aws" >> $VERSIONS_OUTPUT
   aws --version >> $VERSIONS_OUTPUT

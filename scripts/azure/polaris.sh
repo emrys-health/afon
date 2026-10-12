@@ -1,5 +1,11 @@
+# Optionally given the type of the stack serving Polaris, eg: afon-cli.sh azure-polaris [full]
+# Without it, the stack is found among the running stacks of the types serving Polaris, by their AKS clusters
+# <stack-type>-<CLUSTER_NAME>: as they all hold the DNS record of AZURE_POLARIS_DOMAIN_NAME, only one runs at a time.
+# These are azure-polaris and azure-full.
+STACK_TYPE_ARG="${1:-}"
 source $AFON_ROOT/scripts/config/afon-source.sh azure
 source $AFON_ROOT/scripts/kube/polaris-source.sh
+source $AFON_ROOT/scripts/azure/status-source.sh
 
 # Reports whether Polaris is up and serving on this env's Azure stack: login, AKS network, AKS cluster,
 # Polaris pod, ingress external IP, TLS secret, then real HTTPS requests, anonymous and as the Polaris admin.
@@ -8,27 +14,13 @@ source $AFON_ROOT/scripts/kube/polaris-source.sh
 status_require_domain AZURE_POLARIS_DOMAIN_NAME "$AZURE_POLARIS_DOMAIN_NAME"
 status_require az kubectl kubelogin curl
 
-echo "- Checking Polaris for cluster '$CLUSTER_NAME' at $STATUS_DOMAIN"
-
 status_require_login Azure azure-login az account get-access-token --output none
 
-if VNETS=$(az network vnet list --resource-group "$AZURE_RESOURCE_GROUP" --query "[?name=='aks-vnet'].name" --output tsv 2>"$STATUS_ERR"); then
-  status_check_network "AKS network" "$VNETS"
-else
-  status_cannot_verify "- Could not list the networks in resource group $AZURE_RESOURCE_GROUP:"
-fi
+azure_status_find_stack "$STACK_TYPE_ARG" polaris full
 
-status_get_credentials AKS "ResourceNotFound|could not be found|not found" \
-  az aks get-credentials --resource-group "$AZURE_RESOURCE_GROUP" --name "$CLUSTER_NAME" --file "$STATUS_KUBECONFIG"
+echo "- Checking Polaris for cluster '${STATUS_CLUSTER_NAME:-none}' at $STATUS_DOMAIN"
 
-# The cluster uses Azure RBAC, so kubectl needs the kubeconfig converted to use the az login, as the
-# AzureCloudProvider does when it deploys.
-if [ "$STATUS_CLUSTER_UP" = "true" ]; then
-  if ! kubelogin convert-kubeconfig -l azurecli --kubeconfig "$STATUS_KUBECONFIG" >/dev/null 2>"$STATUS_ERR"; then
-    status_cannot_verify "- Could not convert the AKS kubeconfig to use the az login:"
-  fi
-fi
-
+azure_status_check_cluster
 status_check_nodes
 status_check_pod app=polaris
 status_check_ingress polaris-ingress ip "external IP"
