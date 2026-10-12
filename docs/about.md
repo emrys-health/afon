@@ -6,7 +6,7 @@ Data remains where it is held. Afon connects it so it can be studied.
 
 The code in this repository is intended to be released under the Apache 2.0 licence.
 
-## Why it exists
+## Why does it exist
 
 Many research questions need data from more than one secure data environment (SDE). Each SDE runs its own stack, identity model, and approvals. A study that spans organisations usually means moving data, rebuilding pipelines, or not running the study at all.
 
