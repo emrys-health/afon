@@ -24,6 +24,7 @@ public final class ComponentPlanRegistry {
         registry.add(JupyterComponent.class, new JupyterPlan());
         registry.add(SparkComponent.class, new SparkPlan());
         registry.add(SnowflakeComponent.class, new SnowflakePlan());
+        registry.add(LoggingComponent.class, new ComponentPlan() {});
 
         // infrastructure with nothing to wait for or configure
         for (Class<? extends StackComponent> type : List.of(
