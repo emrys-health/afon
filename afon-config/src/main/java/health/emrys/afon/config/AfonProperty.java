@@ -49,6 +49,8 @@ public enum AfonProperty {
      * outlive the cluster.  Optional: no logs are shipped when unset.
      */
     AWS_POLARIS_LOG_BUCKET("AWS_POLARIS_LOG_BUCKET"),
+    /** S3 bucket that Gitea keeps its LFS objects, attachments, packages etc in, under {@code gitea/<cluster>/}. */
+    AWS_GITEA_BUCKET("AWS_GITEA_BUCKET"),
 
     // GCP
     /** Project the GCP stacks are deployed into, eg {@code afon-core}.  Required for the GCP stacks. */
@@ -65,6 +67,14 @@ public enum AfonProperty {
      * directly in the project {@link #GCP_PROJECT_ID}.
      */
     GCP_SECRETS_ENABLED("GCP_SECRETS_ENABLED"),
+    /** GCS bucket that Gitea keeps its LFS objects, attachments, packages etc in, under {@code gitea/<cluster>/}. */
+    GCP_GITEA_BUCKET("GCP_GITEA_BUCKET"),
+    /**
+     * HMAC key with which Gitea reaches {@link #GCP_GITEA_BUCKET}: Gitea has no GCS client of its own, so it goes
+     * through GCS' S3 compatible API, which only takes HMAC keys.
+     */
+    GCP_GITEA_HMAC_ACCESS_ID("GCP_GITEA_HMAC_ACCESS_ID"),
+    GCP_GITEA_HMAC_SECRET("GCP_GITEA_HMAC_SECRET"),
 
     // AZURE
     AZURE_SUBSCRIPTION("AZURE_SUBSCRIPTION"),
@@ -77,6 +87,11 @@ public enum AfonProperty {
     AZURE_JUPYTER_DOMAIN_NAME("AZURE_JUPYTER_DOMAIN_NAME"),
     AZURE_POLARIS_ALLOWED_CIDRS("AZURE_POLARIS_ALLOWED_CIDRS"),
     AZURE_STORAGE_ACCOUNT("AZURE_STORAGE_ACCOUNT"),
+    /**
+     * Blob container, of the storage account of {@link #AZURE_CONNECTION_STRING}, that Gitea keeps its LFS objects,
+     * attachments, packages etc in, under {@code gitea/<cluster>/}.
+     */
+    AZURE_GITEA_BUCKET("AZURE_GITEA_BUCKET"),
     AZURE_DATABRICKS_TOKEN("AZURE_DATABRICKS_TOKEN"),
 
     AZURE_GRANT_ROLES("AZURE_GRANT_ROLES"),
@@ -111,6 +126,15 @@ public enum AfonProperty {
     GUACAMOLE_DB_HOST("GUACAMOLE_DB_HOST"),
     GUACAMOLE_DB_USERNAME("GUACAMOLE_DB_USERNAME"),
     GUACAMOLE_DB_PASSWORD("GUACAMOLE_DB_PASSWORD"),
+
+    // Gitea (via GiteaConfig), whose metadata is kept in the Postgres database gitea_<cluster> at GITEA_DB_HOST
+    GITEA_DB_HOST("GITEA_DB_HOST"),
+    GITEA_DB_USERNAME("GITEA_DB_USERNAME"),
+    GITEA_DB_PASSWORD("GITEA_DB_PASSWORD"),
+    /** One of disable, require, verify-ca or verify-full.  Optional: {@code require} when unset. */
+    GITEA_DB_SSL_MODE("GITEA_DB_SSL_MODE"),
+    GITEA_ADMIN_USERNAME("GITEA_ADMIN_USERNAME"),
+    GITEA_ADMIN_PASSWORD("GITEA_ADMIN_PASSWORD"),
 
     // User that clients authenticate as, from users.csv
     USER_ID("USER_ID"),
