@@ -2,7 +2,7 @@ package health.emrys.afon.cdk;
 
 import health.emrys.afon.cdk.components.CrdCleanupComponent;
 import health.emrys.afon.cdk.components.JupyterComponent;
-import health.emrys.afon.cdk.components.LoggingComponent;
+import health.emrys.afon.cdk.aws.AwsLoggingComponent;
 import health.emrys.afon.cdk.components.MonitoringComponent;
 import health.emrys.afon.cdk.components.KeycloakComponent;
 import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
@@ -87,7 +87,7 @@ public final class StackDefinitions {
     private static List<StackComponent> awsFull(AfonPropertyProvider properties) {
         return concat(awsJupyter(properties), awsSpark(), List.of(new TrinoComponent(),
                                                                   new MonitoringComponent(),
-                                                                  new LoggingComponent()));
+                                                                  new AwsLoggingComponent()));
     }
 
     private static List<StackComponent> awsSpark() {

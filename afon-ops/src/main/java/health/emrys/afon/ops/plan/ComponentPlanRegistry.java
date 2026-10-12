@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.plan;
 
 import health.emrys.afon.cdk.StackComponent;
+import health.emrys.afon.cdk.aws.AwsLoggingComponent;
 import health.emrys.afon.cdk.components.*;
 
 import java.util.HashMap;
@@ -14,6 +15,7 @@ import java.util.Map;
  */
 public final class ComponentPlanRegistry {
 
+    public static final ComponentPlan NO_OP = new ComponentPlan() {};
     private final Map<Class<? extends StackComponent>, ComponentPlan> plans = new HashMap<>();
 
     public static ComponentPlanRegistry standard() {
@@ -24,7 +26,7 @@ public final class ComponentPlanRegistry {
         registry.add(JupyterComponent.class, new JupyterPlan());
         registry.add(SparkComponent.class, new SparkPlan());
         registry.add(SnowflakeComponent.class, new SnowflakePlan());
-        registry.add(LoggingComponent.class, new ComponentPlan() {});
+        registry.add(AwsLoggingComponent.class, NO_OP);
 
         // infrastructure with nothing to wait for or configure
         for (Class<? extends StackComponent> type : List.of(
