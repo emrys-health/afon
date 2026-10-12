@@ -32,6 +32,6 @@ status_check_nodes
 status_check_pod app=keycloak
 status_check_ingress keycloak-ingress hostname "load balancer"
 keycloak_check_https
-keycloak_check_realm
+keycloak_check_realm aws
 keycloak_check_authenticated aws
 status_report

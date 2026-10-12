@@ -77,6 +77,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     private final        String                  subscriptionId;
     private final        KubernetesCluster       aksCluster;
     private final        String                  clusterName;
+    private final        String                  stackType;
     private final        DataAzurermClientConfig clientConfig;
     private final        String                  providerRegistrations;
     private final        Map<String, String>     nodePoolConfig;
@@ -88,10 +89,12 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
 
     public AzureCloudProvider(@NonNull Construct scope,
                               @NonNull String id,
+                              @NonNull StackId stackId,
                               AfonPropertyProvider properties) {
         super(scope, id);
         this.properties          = properties;
-        clusterName              = properties.getValue(AfonProperty.CLUSTER_NAME);
+        stackType                = stackId.type();
+        clusterName              = clusterName(properties.getValue(AfonProperty.CLUSTER_NAME), stackId);
         resourceGroup            = properties.getValue(AZURE_RESOURCE_GROUP);
         subscriptionId           = properties.getValue(AZURE_SUBSCRIPTION);
         providerRegistrations    = properties.getValue(AZURE_RESOURCE_PROVIDER_REGISTRATIONS, "core");
@@ -102,10 +105,29 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         aksCluster   = createCluster(lookupResourceGroup());
         grantClusterAdmin();
         Aspects.of(scope).add(new ClusterAdminAspect(clusterAdminAssignment));
+        // not left to whichever component first needs it, as a stack of the KeyCloak alone creates kubernetes resources
+        // without any other asking for the provider
+        configureK8s();
     }
 
     public static AzureCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties) {
-        return new AzureCloudProvider(stack, stackId.cloud().toString(), properties);
+        return new AzureCloudProvider(stack, stackId.cloud().toString(), stackId, properties);
+    }
+
+    /**
+     * @return the cluster name of the stack, ie {@code <stack-type>-<clusterName>}, as for AWS, so that stacks of different
+     * types run side by side in the same resource group, eg {@code azure-keycloak} and {@code azure-polaris}
+     */
+    static String clusterName(String clusterName, StackId stackId) {
+        return stackId.type() + "-" + clusterName;
+    }
+
+    /**
+     * @return the name of a resource of the stack's network or identity, qualified by the stack type, as these are
+     * named in the resource group, which the stacks running side by side share
+     */
+    private String resourceName(String name) {
+        return stackType + "-" + name;
     }
 
     /**
@@ -251,7 +273,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         return new UserAssignedIdentity(
             this, "aks-identity", UserAssignedIdentityConfig
             .builder()
-            .name("aks-identity")
+            .name(resourceName("aks-identity"))
             .location(resourceGroup.getLocation())
             .resourceGroupName(resourceGroup.getName())
             .build());
@@ -267,7 +289,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             "aks-vnet",
             VirtualNetworkConfig
                 .builder()
-                .name("aks-vnet")
+                .name(resourceName("aks-vnet"))
                 .location(resourceGroup.getLocation())
                 .resourceGroupName(resourceGroup.getName())
                 .addressSpace(List.of(VNET_CIDR))
@@ -280,7 +302,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             "aks-subnet",
             SubnetConfig
                 .builder()
-                .name("aks-subnet")
+                .name(resourceName("aks-subnet"))
                 .resourceGroupName(resourceGroup.getName())
                 .virtualNetworkName(vnet.getName())
                 .addressPrefixes(List.of(SUBNET_CIDR))
@@ -403,7 +425,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         return new NetworkSecurityGroup(
             this, "aks-nsg", NetworkSecurityGroupConfig
             .builder()
-            .name("aks-nsg")
+            .name(resourceName("aks-nsg"))
             .location(resourceGroup.getLocation())
             .resourceGroupName(resourceGroup.getName())
             .securityRule(List.of(

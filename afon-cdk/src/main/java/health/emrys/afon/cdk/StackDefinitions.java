@@ -1,30 +1,13 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.cdk.components.CrdCleanupComponent;
-import health.emrys.afon.cdk.components.JupyterComponent;
-import health.emrys.afon.cdk.aws.AwsLoggingComponent;
-import health.emrys.afon.cdk.components.MonitoringComponent;
-import health.emrys.afon.cdk.components.KeycloakComponent;
-import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
-import health.emrys.afon.cdk.components.PolarisComponent;
-import health.emrys.afon.cdk.components.SnowflakeComponent;
-import health.emrys.afon.cdk.components.SparkComponent;
-import health.emrys.afon.cdk.components.SparkOperatorComponent;
-import health.emrys.afon.cdk.components.TrinoComponent;
+import health.emrys.afon.cdk.components.*;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.TreeMap;
+import java.util.*;
 
-import static health.emrys.afon.config.AfonCloud.AWS;
-import static health.emrys.afon.config.AfonCloud.AZURE;
-import static health.emrys.afon.config.AfonCloud.GCP;
-import static health.emrys.afon.config.AfonProperty.AWS_KEYCLOAK_EXTERNAL;
+import static health.emrys.afon.config.AfonCloud.*;
 
 /**
  * The stacks, each composed of {@link StackComponent}s that run on whatever cloud the stack is deployed to.  A stack
@@ -42,20 +25,21 @@ public final class StackDefinitions {
         // Polaris uses the KeyCloak server at OIDC_DOMAIN_NAME, which the aws-keycloak stack deploys, so that both can
         // run side by side, while the stacks extending it deploy their own KeyCloak, unless AWS_KEYCLOAK_EXTERNAL is set
         add(new StackId(AWS, "polaris"), true, properties -> List.of(new PolarisComponent()));
-        add(new StackId(AWS, "jupyter"), true, properties -> jupyter(isKeyCloakExternal(properties)));
+        add(new StackId(AWS, "jupyter"), true, properties -> jupyter(isKeyCloakExternal(AWS, properties)));
         add(new StackId(AWS, "spark"), true,
-            properties -> concat(jupyter(isKeyCloakExternal(properties)), spark()));
+            properties -> concat(jupyter(isKeyCloakExternal(AWS, properties)), spark()));
         add(new StackId(AWS, "trino"), true,
-            properties -> concat(jupyter(isKeyCloakExternal(properties)), spark(), List.of(new TrinoComponent())));
-        add(new StackId(AWS, "full"), true, properties -> full(isKeyCloakExternal(properties)));
+            properties -> concat(jupyter(isKeyCloakExternal(AWS, properties)), spark(), List.of(new TrinoComponent())));
+        add(new StackId(AWS, "full"), true, properties -> full(isKeyCloakExternal(AWS, properties)));
         // Snowflake queries the catalogs of the full stack through its Polaris, so it holds what the full stack holds
         add(new StackId(AWS, "snowflake"), true,
-            properties -> concat(full(isKeyCloakExternal(properties)), List.of(new SnowflakeComponent())));
+            properties -> concat(full(isKeyCloakExternal(AWS, properties)), List.of(new SnowflakeComponent())));
 
         // AZURE
+        // As on AWS, only the KeyCloak, which azure-polaris uses, and azure-full if AZURE_KEYCLOAK_EXTERNAL is set
+        add(new StackId(AZURE, "keycloak"), false, properties -> List.of(new KeycloakComponent()));
         add(new StackId(AZURE, "polaris"), true, properties -> List.of(new PolarisComponent()));
-        // The same as aws-full, always deploying its own KeyCloak, as there is no azure-keycloak stack
-        add(new StackId(AZURE, "full"), true, properties -> full(false));
+        add(new StackId(AZURE, "full"), true, properties -> full(isKeyCloakExternal(AZURE, properties)));
 
         // GCP
         add(new StackId(GCP, "polaris"), true, properties -> List.of(new PolarisComponent()));
@@ -103,12 +87,12 @@ public final class StackDefinitions {
     }
 
     /**
-     * @return whether the stacks otherwise deploying their own KeyCloak, eg {@code aws-full}, use instead the one at
-     * {@code OIDC_DOMAIN_NAME} that the {@code aws-keycloak} stack deploys, as configured by
-     * {@code AWS_KEYCLOAK_EXTERNAL}, {@code false} when unset
+     * @return whether the stacks of the cloud otherwise deploying their own KeyCloak, eg {@code aws-full}, use instead the
+     * one at {@code OIDC_DOMAIN_NAME} that the cloud's keycloak stack deploys, eg {@code aws-keycloak}, as configured by
+     * {@code <CLOUD>_KEYCLOAK_EXTERNAL}, {@code false} when unset or the cloud has no such property
      */
-    public static boolean isKeyCloakExternal(AfonPropertyProvider properties) {
-        return Boolean.parseBoolean(properties.getValue(AWS_KEYCLOAK_EXTERNAL, "false").trim());
+    public static boolean isKeyCloakExternal(AfonCloud cloud, AfonPropertyProvider properties) {
+        return Boolean.parseBoolean(properties.getCloudValue(cloud, "KEYCLOAK_EXTERNAL", "false").trim());
     }
 
     /**

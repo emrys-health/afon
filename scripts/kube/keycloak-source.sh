@@ -1,4 +1,4 @@
-# Shared by the <cloud>/keycloak.sh status scripts, at present only aws/keycloak.sh, which source it after
+# Shared by the <cloud>/keycloak.sh status scripts, ie aws/keycloak.sh and azure/keycloak.sh, which source it after
 # afon-source.sh.  Not run on its own.
 #
 # Adds to the layers of kube/status-source.sh the HTTPS requests to KeyCloak:
@@ -37,6 +37,7 @@ keycloak_check_https() {
   esac
 }
 
+# keycloak_check_realm <cloud>, eg aws, whose keycloak stack sets KeyCloak up, as named in the hint when it is not
 keycloak_check_realm() {
   if [ "$KEYCLOAK_ANSWERING" != "true" ]; then
     echo "- Skipping the realm check: KeyCloak did not answer"
@@ -50,7 +51,7 @@ keycloak_check_realm() {
       KEYCLOAK_REALM_FOUND=true
       ;;
     404)
-      status_failed "KeyCloak has no realm polaris: it is deployed but not set up, eg with: afon-cli.sh manage-stack setup aws-keycloak"
+      status_failed "KeyCloak has no realm polaris: it is deployed but not set up, eg with: afon-cli.sh manage-stack setup $1-keycloak"
       ;;
     *)
       status_failed "The realm polaris gave HTTP $code"

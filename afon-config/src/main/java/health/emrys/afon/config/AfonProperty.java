@@ -86,6 +86,11 @@ public enum AfonProperty {
     AZURE_CONNECTION_STRING("AZURE_CONNECTION_STRING"),
     AZURE_RESOURCE_PROVIDER_REGISTRATIONS("AZURE_RESOURCE_PROVIDER_REGISTRATIONS"),
     AZURE_AKS_NODE_POOL("AZURE_AKS_NODE_POOL"),
+    /**
+     * Whether the Azure stacks otherwise deploying their own KeyCloak, eg {@code azure-full}, use instead the one at
+     * {@code OIDC_DOMAIN_NAME} that the {@code azure-keycloak} stack deploys.  Optional: {@code false} when unset.
+     */
+    AZURE_KEYCLOAK_EXTERNAL("AZURE_KEYCLOAK_EXTERNAL"),
 
     // OIDC provider (client-facing; any IdentityProvider implementation)
     OIDC_DOMAIN_NAME("OIDC_DOMAIN_NAME"),

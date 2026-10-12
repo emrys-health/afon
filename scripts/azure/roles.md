@@ -131,4 +131,4 @@ the limit of weekly issuances of Let's Encrypt.
 | Property | Set where | Purpose |
 |---|---|---|
 | `AZURE_GRANT_ROLES` | `afon-azure.properties`, read by `rbac.sh` | Which role(s) count as "can manage role assignments". Optional, defaults to the three built-ins. |
-| `AZURE_AKS_NODE_POOL` | `afon-azure.properties`, read by `AzureCloudProvider` | AKS system node pool overrides (`vmSize`, `nodeCount`). Optional, defaults to `Standard_D2s_v3`/`3`. |
+| `AZURE_AKS_NODE_POOL` | `afon-azure.properties`, read by `AzureCloudProvider` | AKS system node pool overrides (`vmSize`, `nodeCount`). Optional, defaults to `Standard_D2s_v3`/`3`, but `azure-full` needs `nodeCount:4`. |

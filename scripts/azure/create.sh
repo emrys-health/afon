@@ -2,7 +2,7 @@ source $AFON_ROOT/scripts/config/afon-source.sh azure
 source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 # Args, in any order: whether to run as admin, true|false, and the id of the stack the env is created for, which decides
-# the DNS zones, one of azure-polaris, azure-full.  By default not as admin, for azure-polaris.
+# the DNS zones, one of azure-keycloak, azure-polaris, azure-full.  By default not as admin, for azure-polaris.
 AS_ADMIN=false
 STACK_ID=azure-polaris
 for ARG in "$@"; do
@@ -14,12 +14,19 @@ for ARG in "$@"; do
 done
 
 # The properties of the domain names whose DNS zones the stack needs: Polaris is always deployed, Jupyter and the
-# KeyCloak only by the stacks deploying them, ie azure-full, with its own KeyCloak.  azure-polaris uses the KeyCloak of
-# another stack, so needs no zone for OIDC_DOMAIN_NAME.
+# KeyCloak only by the stacks deploying them, ie azure-full, with its own KeyCloak, unless AZURE_KEYCLOAK_EXTERNAL is true,
+# as it then uses the one azure-keycloak deploys.  azure-polaris uses the KeyCloak of another stack, so needs no zone
+# for OIDC_DOMAIN_NAME.
 case "$STACK_ID" in
-  azure-polaris) DOMAIN_PROPERTIES="AZURE_POLARIS_DOMAIN_NAME" ;;
-  azure-full)    DOMAIN_PROPERTIES="AZURE_POLARIS_DOMAIN_NAME AZURE_JUPYTER_DOMAIN_NAME OIDC_DOMAIN_NAME" ;;
-  *) echo "-- Unsupported stack '$STACK_ID': expected azure-polaris or azure-full"; exit 1 ;;
+  azure-keycloak) DOMAIN_PROPERTIES="OIDC_DOMAIN_NAME" ;;
+  azure-polaris)  DOMAIN_PROPERTIES="AZURE_POLARIS_DOMAIN_NAME" ;;
+  azure-full)
+    DOMAIN_PROPERTIES="AZURE_POLARIS_DOMAIN_NAME AZURE_JUPYTER_DOMAIN_NAME"
+    if [ "$(echo "${AZURE_KEYCLOAK_EXTERNAL:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" != "true" ]; then
+      DOMAIN_PROPERTIES="$DOMAIN_PROPERTIES OIDC_DOMAIN_NAME"
+    fi
+    ;;
+  *) echo "-- Unsupported stack '$STACK_ID': expected azure-keycloak, azure-polaris or azure-full"; exit 1 ;;
 esac
 APP_ID="${AZURE_APP_ID:-}"
 APP_SP_ID="${AZURE_SP_ID:-}"

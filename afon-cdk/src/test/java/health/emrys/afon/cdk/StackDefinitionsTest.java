@@ -16,6 +16,7 @@ import java.util.List;
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonProperty.AWS_KEYCLOAK_EXTERNAL;
+import static health.emrys.afon.config.AfonProperty.AZURE_KEYCLOAK_EXTERNAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -58,15 +59,36 @@ class StackDefinitionsTest {
         assertThat(definition.components().apply(properties).get(0))
             .isNotSameAs(definition.components().apply(properties).get(0));
         assertThat(componentsOf("azure-full")).containsExactlyInAnyOrderElementsOf(componentsOf("aws-full"));
-        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "true");
-        assertThat(componentsOf("azure-full")).contains(KeycloakComponent.class, JupyterComponent.class);
     }
 
     @Test
-    void onlyKeycloakStackDoesNotPinEgressIp() {
+    void azureStacksDeployOwnKeyCloakUnlessExternal() {
+        assertThat(componentsOf("azure-keycloak")).containsExactly(KeycloakComponent.class);
+        properties.setValue(AZURE_KEYCLOAK_EXTERNAL, "false");
+        assertThat(componentsOf("azure-full")).contains(KeycloakComponent.class, JupyterComponent.class);
+        assertThat(componentsOf("azure-full").indexOf(KeycloakComponent.class))
+            .isLessThan(componentsOf("azure-full").indexOf(PolarisComponent.class));
+        properties.setValue(AZURE_KEYCLOAK_EXTERNAL, "true");
+        assertThat(componentsOf("azure-full")).doesNotContain(KeycloakComponent.class).contains(JupyterComponent.class);
+    }
+
+    @Test
+    void eachCloudHasItsOwnKeyCloakSwitch() {
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "true");
+        properties.setValue(AZURE_KEYCLOAK_EXTERNAL, "false");
+        assertThat(componentsOf("aws-full")).doesNotContain(KeycloakComponent.class);
+        assertThat(componentsOf("azure-full")).contains(KeycloakComponent.class);
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "false");
+        properties.setValue(AZURE_KEYCLOAK_EXTERNAL, "true");
+        assertThat(componentsOf("aws-full")).contains(KeycloakComponent.class);
+        assertThat(componentsOf("azure-full")).doesNotContain(KeycloakComponent.class);
+    }
+
+    @Test
+    void onlyKeycloakStacksDoNotPinEgressIp() {
         StackDefinitions.all().forEach(definition ->
             assertThat(definition.pinnedEgressIp()).as(definition.id().toString())
-                                                   .isEqualTo(!definition.id().equals(new StackId(AWS, "keycloak"))));
+                                                   .isEqualTo(!definition.id().type().equals("keycloak")));
         assertThat(StackDefinitions.find(new StackId(AZURE, "full"))).isPresent();
     }
 

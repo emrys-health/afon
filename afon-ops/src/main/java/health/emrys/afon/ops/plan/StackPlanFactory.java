@@ -161,7 +161,7 @@ public class StackPlanFactory {
         steps.add(deleteConflicting(stackId, ops, replace));
         // the KeyCloak the stack uses is another stack's, if it has none of its own: it must answer
         if (components.stream().noneMatch(KeycloakComponent.class::isInstance)) {
-            steps.add(ops.checkKeyCloakAnswers());
+            steps.add(ops.checkKeyCloakAnswers(cloud));
         }
         steps.add(ops.deployStack(stackId, certificates(components, cloud)));
         steps.add(wait(components, ops, cloud));

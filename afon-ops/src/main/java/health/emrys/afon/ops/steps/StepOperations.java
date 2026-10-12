@@ -2,6 +2,8 @@ package health.emrys.afon.ops.steps;
 
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.CloudStackValidator;
+import health.emrys.afon.cdk.StackDefinition;
+import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.*;
 import health.emrys.afon.ops.snowflake.SnowflakeStatements;
 import health.emrys.afon.ops.spark.SparkRunner;
@@ -96,14 +98,29 @@ public class StepOperations {
      * answers, so that a stack using it, eg {@code aws-polaris}, fails fast rather than when Polaris cannot discover it.
      * It asks for the discovery document of the {@code master} realm, as it always exists, unlike the Polaris realm,
      * which the setup steps create.
+     *
+     * @param cloud the cloud of the stack using the KeyCloak, whose keycloak stack the failure says to set up, eg
+     *              {@code azure-keycloak}, or that of another cloud if it has none, eg {@code aws-keycloak} for GCP
      */
-    public Step checkKeyCloakAnswers() {
+    public Step checkKeyCloakAnswers(AfonCloud cloud) {
         String url = KeyCloakConfigurer.urlFor(properties.getValue(OIDC_DOMAIN_NAME), "https")
                      + "/realms/master/.well-known/openid-configuration";
         return new Step("check_keycloak_answers",
                 format("check KeyCloak answers at %s", url),
-                () -> actions.checkAnswers(url,
-                    "Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first, eg: afon-cli.sh manage-stack setup aws-keycloak"));
+                () -> actions.checkAnswers(url, format(
+                    "Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first, eg: afon-cli.sh manage-stack setup %s",
+                    keyCloakStackFor(cloud))));
+    }
+
+    /**
+     * @return the keycloak stack of the cloud, if it has one, else the first one defined, which any cloud's stacks can use
+     */
+    private static StackId keyCloakStackFor(AfonCloud cloud) {
+        StackId own = new StackId(cloud, "keycloak");
+        return StackDefinitions.find(own).isPresent()
+               ? own
+               : StackDefinitions.all().stream().map(StackDefinition::id).filter(id -> id.type().equals("keycloak"))
+                                 .findFirst().orElse(own);
     }
 
     /**

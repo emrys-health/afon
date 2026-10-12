@@ -25,7 +25,7 @@ class DeterministicSynthesisTest {
 
     private static final List<String> STACKS = List.of(
         "aws-keycloak", "aws-polaris", "aws-jupyter", "aws-spark", "aws-trino", "aws-full", "aws-snowflake",
-        "azure-polaris", "azure-full", "gcp-polaris");
+        "azure-polaris", "azure-keycloak", "azure-full", "gcp-polaris");
 
     @Disabled
     @Test

@@ -168,8 +168,9 @@ The stacks, as composed by `StackDefinitions`:
 | `aws-trino` | as `aws-spark`, then Trino |
 | `aws-full` | as `aws-trino`, then Monitoring |
 | `aws-snowflake` | as `aws-full`, then Snowflake, a query engine outside of the stack, so it deploys nothing |
+| `azure-keycloak` | Keycloak |
 | `azure-polaris` | Polaris |
-| `azure-full` | The same as `aws-full`, always with its own Keycloak |
+| `azure-full` | The same as `aws-full`, with its own Keycloak unless `AZURE_KEYCLOAK_EXTERNAL` |
 | `gcp-polaris` | Polaris |
 
 **Synthesising a stack.** `ComposedStack.synthesise(StackId, AfonPropertyProvider)` is the only way into the CDKTF world, and it

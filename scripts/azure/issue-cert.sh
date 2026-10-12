@@ -138,6 +138,26 @@ install_acme() {
   fi
 }
 
+# iso_to_epoch <timestamp>: the seconds since the epoch of an ISO 8601 timestamp, eg 2026-10-12T16:34:00.251491+00:00,
+# as Azure gives them, for the systems where date cannot parse it the same way: GNU date reads it with -d, BSD date with -j -f
+iso_to_epoch() {
+  awk -v t="$1" 'BEGIN {
+    y = substr(t, 1, 4) + 0; m = substr(t, 6, 2) + 0; d = substr(t, 9, 2) + 0
+    hh = substr(t, 12, 2) + 0; mm = substr(t, 15, 2) + 0; ss = substr(t, 18, 2) + 0
+    offset = 0
+    if (match(substr(t, 20), /[+-][0-9][0-9]:[0-9][0-9]$/)) {
+      o = substr(t, 19 + RSTART, 6)
+      offset = (substr(o, 1, 1) == "-" ? -1 : 1) * (substr(o, 2, 2) * 3600 + substr(o, 5, 2) * 60)
+    }
+    # days since 1970-01-01 of the date, by the civil calendar algorithm
+    if (m <= 2) y--
+    era = int(y / 400); yoe = y - era * 400
+    doy = int((153 * ((m + 9) % 12) + 2) / 5) + d - 1
+    doe = yoe * 365 + int(yoe / 4) - int(yoe / 100) + doy
+    printf "%d\n", (era * 146097 + doe - 719468) * 86400 + hh * 3600 + mm * 60 + ss - offset
+  }'
+}
+
 # Needed only for acme's DNS-01 challenge: acme.sh's dns_azure hook creates/deletes the
 # _acme-challenge TXT record in the DNS zone to prove domain ownership to Let's Encrypt. The
 # digicert/globalsign path never touches Azure DNS - validation happens through the CA's own
@@ -152,7 +172,7 @@ grant_dns_zone_role() {
   if [ -n "$GRANTED_ON" ]; then
     echo "- Role DNS Zone Contributor already assigned on $DOMAIN_NAME, skipping"
     # A recent grant may still be propagating, which takes up to ten minutes or more, eg after a first attempt failed
-    GRANT_AGE="$(python3 -c "import sys,datetime as d; print(int((d.datetime.now(d.timezone.utc)-d.datetime.fromisoformat(sys.argv[1])).total_seconds()))" "$GRANTED_ON" 2>/dev/null || echo 99999)"
+    GRANT_AGE=$(( $(date +%s) - $(iso_to_epoch "$GRANTED_ON") ))
     if [ "$GRANT_AGE" -lt 1200 ]; then
       DNS_ZONE_ROLE_GRANTED=true
     fi
