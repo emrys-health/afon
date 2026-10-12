@@ -24,6 +24,7 @@ run the cloud create scripts:
 afon-cli.sh <cloud>-create [as-admin]
 ```
 where cloud is one of `{aws|azure|gcp}`.  On `azure` the boolean arg determines if you're running as admin.  If not, the script `azure/create-admin` must be run by an admin.   By default, `as-admin=false`.
+On `azure` it also takes the id of the stack the env is created for, which decides the DNS zones, in any order with the boolean arg: `azure-polaris`, by default, creates the zone of Polaris, and `azure-full`, with its own KeyCloak, those of Jupyter and `OIDC_DOMAIN_NAME` too, eg `afon-cli.sh azure-create false azure-full`.
 
 ## Destroy
 

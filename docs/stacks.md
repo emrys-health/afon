@@ -231,6 +231,16 @@ afon-cli.sh manage-stack setup aws-keycloak
 ```
 Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `configure_oidc_users_for_cloud_aws` → `setup_complete_for_aws_keycloak`
 
+### Setup Azure full stack
+
+```
+afon-cli.sh manage-stack setup azure-full
+```
+`azure-full` has the same components as `aws-full`, including its own KeyCloak, served at `OIDC_DOMAIN_NAME`, which on Azure must be a domain
+whose DNS zone is in `AZURE_RESOURCE_GROUP`, like `AZURE_POLARIS_DOMAIN_NAME` and `AZURE_JUPYTER_DOMAIN_NAME`.  Its network policies
+need the cluster's Advanced Container Networking Services, which the stack enables, and its monitoring keeps the logs in the container of the
+`azure` catalog, using `AZURE_CONNECTION_STRING`.
+
 ### Setup Azure Polaris only
 
 ```shell

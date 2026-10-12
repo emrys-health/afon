@@ -186,10 +186,10 @@ class StackPlanFactoryTest {
     @Test
     void stacksComposedOfComponentsAreManagedLikeTheOthers() {
         assertThat(derived(DEPLOY, "azure-full")).containsExactly(
-            deleteConflicting("azure-full"), "checkKeyCloakAnswers()", "deployStack(azure-full,[])",
+            deleteConflicting("azure-full"), "deployStack(azure-full,[])",
             "waitForPolarisAndKeycloakIn(azure)", "deployComplete(azure-full)");
         assertThat(derived(SETUP, "azure-full")).containsExactly(
-            deleteConflicting("azure-full"), "checkKeyCloakAnswers()", "deployStack(azure-full,[])",
+            deleteConflicting("azure-full"), "deployStack(azure-full,[])",
             "waitForPolarisAndKeycloakIn(azure)", "deployComplete(azure-full)", "configureOidcUsersFor(azure)",
             "createAllCatalogsFor(azure)", "configurePolarisUsersOnAllCatalogsFor(azure)", "setupComplete(azure-full)");
         // the Spark write is checked on AWS only, so far, and aws-trino has everything aws-full has but the monitoring, KeyCloak

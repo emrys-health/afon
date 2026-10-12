@@ -11,6 +11,8 @@ ISSUER="${1:-acme}"
 
 PROJECT_ID="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.properties}"
 ACME_HOME="${ACME_HOME:-$AFON_HOME/acme}"
+# The release of acme.sh fetched, rather than its master branch, which can be broken at any commit
+ACME_VERSION="${ACME_VERSION:-3.1.6}"
 
 require_domain_name() {
   if [ -z "$GCP_POLARIS_DOMAIN_NAME" ]; then
@@ -28,8 +30,8 @@ install_acme() {
     echo "- Fetching acme.sh to $ACME_HOME"
     mkdir -p "$ACME_HOME"
     FETCH_DIR="$(mktemp -d)"
-    curl -sL https://github.com/acmesh-official/acme.sh/archive/master.tar.gz | tar xz -C "$FETCH_DIR" || exit 1
-    cp -R "$FETCH_DIR"/acme.sh-master/. "$ACME_HOME/" || exit 1
+    curl -sfL "https://github.com/acmesh-official/acme.sh/archive/refs/tags/$ACME_VERSION.tar.gz" | tar xz -C "$FETCH_DIR" || exit 1
+    cp -R "$FETCH_DIR/acme.sh-$ACME_VERSION/." "$ACME_HOME/" || exit 1
     chmod +x "$ACME_HOME/acme.sh"
     rm -rf "$FETCH_DIR"
   fi

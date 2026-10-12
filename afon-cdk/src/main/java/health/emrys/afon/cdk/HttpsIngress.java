@@ -16,8 +16,8 @@ import java.util.Optional;
 /**
  * Exposes services over HTTPS with the nginx ingress controller, and cert-manager issuing the certificates from
  * Let's Encrypt, on any cloud whose load balancer is provisioned for the nginx controller's service, ie Azure and GCP.
- * What differs per cloud is passed in: the controller's service annotations and the cached certificate to restore,
- * if any, while the DNS record pointing at the {@link IngressV1} is the cloud's own to create.
+ * What differs per cloud is passed in: the controller's service annotations, while the DNS record pointing at the
+ * {@link IngressV1} is the cloud's own to create.
  * <p>
  * The nginx controller and cert-manager are installed once, and any number of services can then be
  * {@link #expose exposed}.
@@ -33,19 +33,16 @@ public class HttpsIngress {
      * @param certificateDomainName  the domain name of the Let's Encrypt account, eg that of Polaris
      * @param nginxAnnotations       the annotations of the controller's service, eg for the load balancer's health
      *                               probe, or {@code null} for none
-     * @param restoreCachedCertCommand the command restoring the cached certificate, run before the ingresses are
-     *                               created, see {@link CachedTlsSecret}, or empty to have it issued
      */
     public HttpsIngress(Construct scope,
                                    HelmProvider helm,
                                    List<ITerraformDependable> dependsOn,
                                    String certificateDomainName,
-                                   Map<String, String> nginxAnnotations,
-                                   Optional<String> restoreCachedCertCommand) {
+                                   Map<String, String> nginxAnnotations) {
         this.scope        = scope;
         this.nginxRelease = CdkHelper.installNginxIngress(scope, helm, dependsOn, nginxAnnotations);
         this.certManager  = CdkHelper.installCertManager(
-            scope, helm, dependsOn, certificateDomainName, restoreCachedCertCommand.stream().toList());
+            scope, helm, dependsOn, certificateDomainName, List.of());
     }
 
     public Release nginxRelease() {

@@ -57,9 +57,9 @@ class StackDefinitionsTest {
         StackDefinition definition = StackDefinitions.get(StackId.parse("azure-full"));
         assertThat(definition.components().apply(properties).get(0))
             .isNotSameAs(definition.components().apply(properties).get(0));
-        assertThat(componentsOf("azure-full")).containsExactly(
-            PolarisComponent.class, health.emrys.afon.cdk.components.SparkOperatorComponent.class, SparkComponent.class,
-            JupyterComponent.class);
+        assertThat(componentsOf("azure-full")).containsExactlyInAnyOrderElementsOf(componentsOf("aws-full"));
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "true");
+        assertThat(componentsOf("azure-full")).contains(KeycloakComponent.class, JupyterComponent.class);
     }
 
     @Test
