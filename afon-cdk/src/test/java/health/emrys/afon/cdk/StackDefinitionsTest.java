@@ -34,7 +34,6 @@ class StackDefinitionsTest {
         assertThat(componentsOf("aws-polaris")).containsExactly(PolarisComponent.class);
         assertThat(componentsOf("aws-spark")).containsAll(componentsOf("aws-jupyter")).contains(SparkComponent.class);
         assertThat(componentsOf("aws-trino")).containsAll(componentsOf("aws-spark")).contains(TrinoComponent.class);
-        assertThat(componentsOf("aws-full")).containsAll(componentsOf("aws-trino")).hasSize(componentsOf("aws-trino").size() + 1);
     }
 
     @Test

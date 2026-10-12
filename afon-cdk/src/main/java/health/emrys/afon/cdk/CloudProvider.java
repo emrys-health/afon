@@ -3,6 +3,7 @@ package health.emrys.afon.cdk;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
+import health.emrys.afon.config.AfonCloud;
 
 import java.util.List;
 import java.util.Map;
@@ -33,5 +34,9 @@ public interface CloudProvider {
     KubernetesProvider configureK8s();
 
     String getId();
+
+    default AfonCloud cloud() {
+        return AfonCloud.valueOf(getId().toUpperCase());
+    }
 
 }
