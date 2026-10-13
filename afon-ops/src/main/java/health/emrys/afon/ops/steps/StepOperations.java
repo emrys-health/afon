@@ -290,10 +290,21 @@ public class StepOperations {
         }
     }
 
+    /**
+     * Waits for the KeyCloak's DNS record, then for it to serve, ie answer the discovery document of its {@code master}
+     * realm: it is deployed without waiting for its pod to be ready, which takes minutes, and what follows, eg configuring the
+     * OIDC users, needs it up.
+     */
     public Step waitForKeyCloak() {
         long timeout = dnsWaitTimeout();
-        return actions.waitOnDNS(properties.getValue(OIDC_DOMAIN_NAME), timeout);
+        Step dns = actions.waitOnDNS(properties.getValue(OIDC_DOMAIN_NAME), timeout);
+        String url = KeyCloakConfigurer.urlFor(properties.getValue(OIDC_DOMAIN_NAME), "https")
+                + "/realms/master/.well-known/openid-configuration";
+        Step answers = actions.waitOnAnswer(url, timeout, KEYCLOAK_POLL_MILLIS);
+        return Step.sequence(dns.getName(), dns.getDescription() + ", then for it to answer", dns, answers);
     }
+
+    private static final long KEYCLOAK_POLL_MILLIS = 5_000;
 
     private long dnsWaitTimeout() {
         String defaultValue = "20m";

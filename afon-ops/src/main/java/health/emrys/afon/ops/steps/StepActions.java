@@ -626,21 +626,29 @@ public class StepActions {
      */
     protected void checkAnswers(String url, String failure, Set<Integer> codes) throws InterruptedException {
         logger.info("Checking {} answers", url);
-        String problem;
+        String problem = problemAnswering(url, codes);
+        if (problem == null) {
+            logger.info("{} answers", url);
+            return;
+        }
+        throw new IllegalStateException(format("%s %s. %s", url, problem, failure));
+    }
+
+    /**
+     * Asks the URL with a GET, without logging.
+     *
+     * @return why it did not answer with one of the codes, eg "answered 503", or null if it did
+     */
+    private String problemAnswering(String url, Set<Integer> codes) throws InterruptedException {
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
         try {
             HttpResponse<Void> response = client.send(
                 HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30)).GET().build(),
                 HttpResponse.BodyHandlers.discarding());
-            if (codes.contains(response.statusCode())) {
-                logger.info("{} answers", url);
-                return;
-            }
-            problem = "answered " + response.statusCode();
+            return codes.contains(response.statusCode()) ? null : "answered " + response.statusCode();
         } catch (IOException e) {
-            problem = "cannot be reached: " + e;
+            return "cannot be reached: " + e;
         }
-        throw new IllegalStateException(format("%s %s. %s", url, problem, failure));
     }
 
     public Step waitOnDNS(String domain, long timeout) {
@@ -673,6 +681,53 @@ public class StepActions {
                 });
     }
 
+
+    /**
+     * Waits until the URL answers a GET with 200, eg the discovery document of a KeyCloak that has just been deployed: its
+     * DNS record resolving does not mean it serves, as its pod takes minutes to be ready, answered meanwhile with 502 or 503
+     * by the ingress.  Gives up after the timeout, saying so, leaving whatever needs it to fail with its own error.
+     *
+     * @param pauseMs how long to wait between the requests
+     */
+    public Step waitOnAnswer(String url, long timeout, long pauseMs) {
+        return new Step(
+                stepNameWaitOnAnswer(url),
+                "wait until " + url + " answers",
+                () -> {
+                    long start = System.currentTimeMillis();
+                    long reported = -1; // when the last progress was logged: only the start, then each minute, not each request
+                    logger.info("Waiting for {} to answer (until timeout of {})", url, formatDuration(timeout));
+                    while (true) {
+                        String problem = problemAnswering(url, Set.of(200));
+                        long elapsed = System.currentTimeMillis() - start;
+                        if (problem == null) {
+                            logger.info("{} answers after {}", url, formatDuration(elapsed));
+                            return;
+                        }
+                        if (reported < 0 || elapsed - reported >= PROGRESS_LOG_MILLIS) {
+                            logger.info("Still waiting for it to answer after {}: it {}", formatDuration(elapsed), problem);
+                            reported = elapsed;
+                        }
+                        if (elapsed + pauseMs >= timeout) {
+                            logger.warn("Timed out waiting for {} to answer after {}: it {}", url, formatDuration(timeout), problem);
+                            return;
+                        }
+                        try {
+                            Thread.sleep(pauseMs);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                });
+    }
+
+    /** How often the wait for a URL to answer says it is still waiting. */
+    private static final long PROGRESS_LOG_MILLIS = 60_000;
+
+    protected @NonNull String stepNameWaitOnAnswer(String url) {
+        return "wait_on_answer_of_" + url.replaceFirst("^https?://", "").replaceAll("[^A-Za-z0-9]+", "_");
+    }
 
     protected @NonNull String stepNameWaitOn(String domain) {
         return "wait_on_" + (domain.isBlank() ? "domain" : domain.substring(0, domain.indexOf('.')));

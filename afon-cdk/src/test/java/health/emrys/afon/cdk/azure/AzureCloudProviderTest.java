@@ -20,7 +20,9 @@ class AzureCloudProviderTest {
                            .contains("kubectl create secret generic polaris-tls")
                            .contains("kubectl apply --server-side")
                            .contains("kubectl annotate secret polaris-tls")
-                           .contains("cert-manager.io/issuer-name=letsencrypt-prod");
+                           .contains("cert-manager.io/issuer-name=letsencrypt-prod")
+                           // so that cert-manager has the secret in its cache when it first checks the certificate
+                           .contains("kubectl label secret polaris-tls --overwrite controller.cert-manager.io/fao=true");
     }
 
 }
