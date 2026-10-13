@@ -43,7 +43,7 @@ public abstract class AbstractHttpsCloudProvider extends AbstractCloudProvider {
         }
         IngressV1 ingress = nginx.expose(
             route.domainName(), route.tlsSecretName(), route.service(), route.port(), route.ingressName(),
-            dependsOn, route.ingressProvisioners());
+            dependsOn, route.ingressProvisioners(), inboundCidrs(route));
         return new HttpsExposure(ingress, configureDns(ingress, route));
     }
 
@@ -64,6 +64,13 @@ public abstract class AbstractHttpsCloudProvider extends AbstractCloudProvider {
             throw new IllegalStateException("The nginx ingress controller is installed when the first route is exposed");
         }
         return nginx.nginxRelease();
+    }
+
+    /**
+     * @return the source CIDRs the route's ingress admits, or empty, the default, to admit all
+     */
+    protected List<String> inboundCidrs(HttpsRoute route) {
+        return List.of();
     }
 
     /**

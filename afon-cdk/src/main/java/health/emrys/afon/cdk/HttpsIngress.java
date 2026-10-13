@@ -59,6 +59,7 @@ public class HttpsIngress {
      * @param tlsSecretName   the Kubernetes secret holding the TLS certificate
      * @param dependsOn       what the ingress must also wait for, eg the service it routes to
      * @param provisioners    the ingress' provisioners, eg to remove its finalizers on destroy
+     * @param inboundCidrs    the source CIDRs the ingress admits, or empty to admit all
      * @return the ingress, whose load balancer address the DNS record must point at
      */
     public IngressV1 expose(String domainName,
@@ -67,10 +68,11 @@ public class HttpsIngress {
                             int port,
                             String ingressName,
                             List<? extends TerraformResource> dependsOn,
-                            Optional<List<LocalExecProvisioner>> provisioners) {
+                            Optional<List<LocalExecProvisioner>> provisioners,
+                            List<String> inboundCidrs) {
         List<TerraformResource> dependencies = new ArrayList<>(List.of(nginxRelease, certManager));
         dependencies.addAll(dependsOn);
         return new CdkHelper(scope, domainName, tlsSecretName, port, service, ingressName)
-            .createIngress(dependencies, provisioners);
+            .createIngress(dependencies, provisioners, inboundCidrs);
     }
 }

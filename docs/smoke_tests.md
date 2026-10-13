@@ -145,8 +145,8 @@ cloud, so the same file serves both:
 smoke/run-regression-suite.sh azure
 ```
 
-**NOTE:** the Polaris ingress is only restricted on AWS, by the ALB, to the TRE's egress IP, so on Azure the `network` test,
-which checks that Polaris cannot be reached from outside of the cluster, is expected to fail.
+**NOTE:** the `network` test, which checks that Polaris cannot be reached from outside of the cluster, passes on both clouds: the suite
+restricts the Polaris ingress first, see [the network test on AWS and Azure](#the-network-test-on-aws-and-azure).
 
 The first line of the suite file is the header `name|command|args`, and each other line a test: its
 name, its afon command, eg `network-smoke` for the ops class `NetworkSmokeMain`, and the command's args, if any,
@@ -192,15 +192,35 @@ setups, and whether `--env` is given or not, the suite:
 
 1. makes the env's full stack cluster of the `<cloud>` the current `kubectl` context, with the afon command
    `<cloud>-update-kube-config full`, leaving it so after the suite;
-2. on AWS only, restricts that cluster's Polaris ingress, as the network smoke test expects, by annotating `polaris-ingress` with
-   `alb.ingress.kubernetes.io/inbound-cidrs`. As `AwsCloudProvider` does for Polaris when `AWS_POLARIS_ALLOWED_CIDRS` is set, it
-   admits those CIDRs plus the cluster's egress IP. The egress IP is read from the cluster's NAT gateway, so that it is
-   right even if `AWS_EGRESS_IP` is stale, with a warning if they differ, falling back to `AWS_EGRESS_IP` if the NAT
-   gateway cannot be found. A redeploy undoes the annotation, which a freshly deployed stack does not have.  On Azure it is
-   skipped, with a warning.
+2. restricts that cluster's Polaris ingress, as the network smoke test expects:
+   - on AWS, by annotating `polaris-ingress` with `alb.ingress.kubernetes.io/inbound-cidrs`. As `AwsCloudProvider` does for
+     Polaris when `AWS_POLARIS_ALLOWED_CIDRS` is set, it admits those CIDRs plus the cluster's egress IP. The egress IP is read
+     from the cluster's NAT gateway, so that it is right even if `AWS_EGRESS_IP` is stale, with a warning if they differ,
+     falling back to `AWS_EGRESS_IP` if the NAT gateway cannot be found. A redeploy undoes the annotation, which a freshly
+     deployed stack does not have.
+   - on Azure, by annotating `polaris-ingress` with `nginx.ingress.kubernetes.io/whitelist-source-range`, and setting
+     `externalTrafficPolicy: Local` on the nginx controller's service, so that it sees the callers' IPs. As
+     `AzureCloudProvider` does when `AZURE_POLARIS_ALLOWED_CIDRS` is set, it admits those CIDRs plus the cluster's pod CIDR,
+     and the cluster's outbound IP, read from its load balancer, with a warning if it cannot be found. Needs `az` logged in.
 
-The network smoke test also checks the pods against the current `ALLOWED_DOMAINS_CSV`, that each name in it is reachable, so a
-stack deployed before the list changed fails it until it is redeployed, as its network policies hold the old list.
+#### The network test on AWS and Azure
+
+The `network` test (`network-smoke`) runs the same three checks on both clouds, but how the first is satisfied differs:
+
+| | AWS | Azure |
+|---|---|---|
+| Polaris ingress | ALB | nginx ingress controller, in the cluster, behind a public load balancer |
+| Restricted by | `alb.ingress.kubernetes.io/inbound-cidrs`, from `AWS_POLARIS_ALLOWED_CIDRS` | `nginx.ingress.kubernetes.io/whitelist-source-range`, from `AZURE_POLARIS_ALLOWED_CIDRS`, with `externalTrafficPolicy: Local` on the controller's service |
+| Always admitted | the cluster's egress IP (its NAT gateway) | the cluster's pod CIDR, and, by the suite, its outbound IP |
+| A caller outside of them | the ALB drops its packets: the call fails or times out | nginx answers with its own `403 Forbidden` page, without calling Polaris |
+| The test passes when | the call fails or times out | the call times out, or gets nginx's own 403; any other response, eg a 403 from Polaris, fails it |
+
+So on Azure a quick 403 is the expected outcome of check 1, not a failure, whereas on AWS any HTTP response is one.
+
+The other checks are cloud-neutral, as the network policies are the same. The Spark driver's allowed-domains check curls each name
+in the current `ALLOWED_DOMAINS_CSV`, except the Polaris and Jupyter names of the other clouds, which only resolve while their
+stack is deployed. So the test passes on either cloud whatever the other clouds' stacks, but a stack deployed before the list
+changed fails it until it is redeployed, as its network policies hold the old list.
 
 So the results only depend on the env's config and stacks, whoever runs the suite. All the selected tests are run, even if some fail. Their logging goes to the afon log file,
 `$AFON_HOME/logs/afon-core.log`, and to the console as set by `--logging-console`. The script ends with a summary, and

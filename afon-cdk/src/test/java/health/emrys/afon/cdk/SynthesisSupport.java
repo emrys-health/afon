@@ -61,7 +61,16 @@ public class SynthesisSupport {
      * @return the plan of the stack, as synthesised, ie as it goes to tofu
      */
     public static String synthesise(StackId stackId, Path outDir) throws IOException {
+        return synthesise(stackId, outDir, Map.of());
+    }
+
+    /**
+     * @param overrides config values set on top of the fixed ones, eg of an optional property the template leaves blank
+     * @return the plan of the stack, as synthesised, ie as it goes to tofu
+     */
+    public static String synthesise(StackId stackId, Path outDir, Map<String, String> overrides) throws IOException {
         Map<String, String> systemProperties = new TreeMap<>(FIXED_VALUES);
+        systemProperties.putAll(overrides);
         // the tofu state path is part of the plan
         systemProperties.put(AFON_CDKTF_PROPERTY, "/golden/cdktf");
         // what is read from the afon home, eg the users, is the template's, not the developer's own
