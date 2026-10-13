@@ -4,6 +4,10 @@
 #
 # usage: smoke/run-regression-suite.sh [--cli] [--env|-e <env>] [--setup <stacks> [--teardown]] [--suite|-s <file>]
 #                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--list|-l] [--help|-h]
+#                                      [<cloud>]
+#   <cloud>   the cloud of the full stack to run the tests against, aws or azure (default: aws), ie <cloud>-full.  The
+#             kubectl context is set to the cluster of that stack, with the afon command '<cloud>-update-kube-config
+#             full', and the tests are run with TRE_CLOUD=<cloud>, as the cloud of the stack hosting the TRE.
 #   --cli     runs the afon commands with afon-cli.sh, rather than afon.sh: that of the cli distribution in
 #             $AFON_CLI_DIR, if set, else in $AFON_HOME/cli.  Implied when the script runs from a cli distribution,
 #             eg as $AFON_CLI_DIR/smoke/run-regression-suite.sh, which, being independent of the source tree, has
@@ -21,7 +25,7 @@
 #             'manage-stack delete <stack>', whether the tests passed or failed, or a setup failed.  Never done if
 #             the script is interrupted, eg with Ctrl-C, which may stop a setup part way: the commands deleting the
 #             stacks are printed instead.
-#   --suite   the CSV file of the tests (default: smoke/regression-aws.csv)
+#   --suite   the CSV file of the tests (default: smoke/regression-full.csv)
 #   --tests   the comma-separated names of the tests to run (default: all), as listed by --list
 #   --logging-console
 #             the logging console level of every afon command, one of OFF|DEBUG|INFO|WARN|ERROR (default: that of
@@ -42,13 +46,14 @@
 # times and outcomes of its stack setups, tests and teardowns, and its summary, are also written, without any
 # logging, to smoke/target/regression/results-<yyyymmdd-hhmmss>.txt.
 #
-# The tests run against the AWS full stack's cluster: the Spark Connect tests read the azure and gcp catalogs
-# through its Spark Connect server.  After any setups, the current kubectl context is set to the AWS full stack
+# The tests run against the full stack's cluster of the <cloud>: the Spark Connect tests read the catalogs of the
+# clouds through its Spark Connect server.  After any setups, the current kubectl context is set to the full stack
 # cluster of the env, that of --env, if given, else that of the current config, with the afon command
-# 'aws-update-kube-config full', and left so.  Its Polaris ingress is then restricted, as the network smoke test
-# expects, to the AWS_POLARIS_ALLOWED_CIDRS of afon-aws.properties plus the cluster's egress IP, that of its NAT
-# gateway, or by default AWS_EGRESS_IP.  So the tests only depend on the env's config and stacks, however recently
-# deployed, whoever runs them.
+# '<cloud>-update-kube-config full', and left so.  On AWS its Polaris ingress is then restricted, as the network smoke
+# test expects, to the AWS_POLARIS_ALLOWED_CIDRS of afon-aws.properties plus the cluster's egress IP, that of its NAT
+# gateway, or by default AWS_EGRESS_IP.  Only AWS restricts it so far, so on Azure the network smoke test, which
+# checks that Polaris cannot be reached from outside of the cluster, fails.  So the tests only depend on the env's
+# config and stacks, however recently deployed, whoever runs them.
 # The env vars of afon.sh and afon-cli.sh apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
 #
 # As switching env re-points the shared $AFON_HOME symlinks, and the current context of the shared ~/.kube/config,
@@ -57,7 +62,7 @@
 set -euo pipefail
 
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEFAULT_SUITE_FILE="$AFON_ROOT/smoke/regression-aws.csv"
+DEFAULT_SUITE_FILE="$AFON_ROOT/smoke/regression-full.csv"
 OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
 # The dir of the results files, one per run, eg results-<yyyymmdd-hhmmss>.txt.
 RESULTS_DIR="$AFON_ROOT/smoke/target/regression"
@@ -114,6 +119,7 @@ start_results() {
   {
     echo "Regression suite run of $(date '+%Y-%m-%d %H:%M:%S')"
     echo "env: $(current_env)"
+    echo "cloud: $CLOUD (stack $CLOUD-full)"
     echo "suite: $SUITE_FILE"
     echo "tests: ${SELECTED:-all}"
     echo "stacks set up: ${SETUP:-none}${TEARDOWN:+, then torn down}"
@@ -185,7 +191,8 @@ afon_command() {
   if [ -n "$CLI" ]; then
     AFON_COMMAND=("$(cli_script)" "$command" "$@")
   else
-    AFON_COMMAND=("$AFON_ROOT/afon.sh" -q -a "$command")
+    # TRE_CLOUD, the cloud of the stack hosting the TRE, is that of the tests, whatever the config says
+    AFON_COMMAND=("$AFON_ROOT/afon.sh" -q -a "$command" -ee "TRE_CLOUD=$CLOUD")
     if [ $# -gt 0 ]; then
       AFON_COMMAND+=(-- "$@")
     fi
@@ -331,10 +338,10 @@ current_env() {
   esac
 }
 
-# Makes the AWS full stack cluster of the current env the current kubectl context, exiting if it fails.
+# Makes the full stack cluster of the $CLOUD of the current env the current kubectl context, exiting if it fails.
 update_kube_config() {
-  banner "Updating the kubectl context to the AWS full stack cluster of env $(current_env)"
-  if ! run_afon aws-update-kube-config full; then
+  banner "Updating the kubectl context to the $CLOUD full stack cluster of env $(current_env)"
+  if ! run_afon "$CLOUD-update-kube-config" full; then
     error "Failed to update the kubectl context for env $(current_env): not running the tests"
     exit 1
   fi
@@ -367,14 +374,19 @@ cluster_egress_ip() {
   fi
 }
 
-# Restricts the Polaris ingress of the current kubectl context to the CIDRs AwsCloudProvider admits when
-# AWS_POLARIS_ALLOWED_CIDRS is set: those CIDRs plus the cluster's egress IP, so that its pods calling Polaris by
+# On AWS only, as it is that of the ALB, restricts the Polaris ingress of the current kubectl context to the CIDRs
+# AwsCloudProvider admits when AWS_POLARIS_ALLOWED_CIDRS is set: those CIDRs plus the cluster's egress IP, so that its pods calling Polaris by
 # its public domain name are not locked out.  The egress IP is the one of the cluster's NAT gateway, as the
 # AWS_EGRESS_IP of afon-aws.properties may be stale, eg if the stack was deployed without it, or by default
 # AWS_EGRESS_IP if the NAT gateway cannot be found.  Exits if the annotation fails, and is skipped, with a
 # warning, if there is no egress IP.
 restrict_polaris_ingress() {
   local configured_ip egress_ip cidrs cidr
+  if [ "$CLOUD" != "aws" ]; then
+    warning "the Polaris ingress of the $CLOUD stack is not restricted, as only AWS's can be: the network smoke test," \
+            "which checks that Polaris cannot be reached from outside of the cluster, is expected to fail"
+    return
+  fi
   configured_ip=$(aws_property AWS_EGRESS_IP)
   egress_ip=$(cluster_egress_ip)
   if [ -z "$egress_ip" ]; then
@@ -510,6 +522,7 @@ LIST=
 LOGGING_CONSOLE=
 SELECTED=
 SUITE_FILE="$DEFAULT_SUITE_FILE"
+CLOUD=aws
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -531,11 +544,20 @@ while [[ $# -gt 0 ]]; do
       LIST=true; shift ;;
     --help|-h)
       usage; exit 0 ;;
-    *)
+    -*)
       error "Unknown option: $1"
       usage >&2; exit 1 ;;
+    *)
+      CLOUD=$(echo "$1" | tr '[:upper:]' '[:lower:]'); shift ;;
   esac
 done
+
+case "$CLOUD" in
+  aws|azure) ;;
+  *)
+    error "Unsupported cloud: $CLOUD, which should be aws or azure, the clouds of a full stack"
+    usage >&2; exit 1 ;;
+esac
 
 if [ -n "$TEARDOWN" ] && [ -z "$SETUP" ]; then
   error "Option --teardown requires --setup"
@@ -569,6 +591,9 @@ if [ -n "$CLI" ]; then
   echo "Running the afon commands with $(cli_script)"
   # Without afon-cli.sh's banner on every command, unless SPRING_MAIN_BANNER_MODE says otherwise.
   export SPRING_MAIN_BANNER_MODE="${SPRING_MAIN_BANNER_MODE:-off}"
+  # TRE_CLOUD, the cloud of the stack hosting the TRE, is that of the tests, whatever the config says: afon-cli.sh passes
+  # the NAME=VALUE pairs of AFON_ENVS to its java process as system properties, as does afon.sh with --exec-envs
+  export AFON_ENVS="${AFON_ENVS:+$AFON_ENVS }TRE_CLOUD=$CLOUD"
 fi
 
 if [ -n "$LOGGING_CONSOLE" ]; then

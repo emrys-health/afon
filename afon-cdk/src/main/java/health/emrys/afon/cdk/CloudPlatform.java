@@ -5,6 +5,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import health.emrys.afon.config.AfonCloud;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * What the components of a stack, eg Polaris or Jupyter, need of the cloud they are deployed to, so that a component
@@ -42,6 +43,16 @@ public interface CloudPlatform extends CloudProvider {
      */
     default boolean routesToNodePorts() {
         return false;
+    }
+
+    /**
+     * @return the Cilium labels, namespace included, selecting the pods of the ingress controller, if it runs in the cluster, else
+     * none, as on AWS, whose ALB is outside of it.  A pod calling what the ingress exposes, eg the Spark driver calling Polaris
+     * by its domain name, reaches the controller's pod, not an address outside of the cluster, as Cilium translates the address
+     * of the load balancer, which is that of a service of the cluster: the egress policy of the pod must allow it.
+     */
+    default Map<String, String> ingressPodLabels() {
+        return Map.of();
     }
 
     /**

@@ -34,6 +34,15 @@ public class CdkHelper {
     public static final String POLARIS_INGRESS_NAME = "polaris-ingress";
     /** Name of the cert-manager ClusterIssuer, which the ingress refers to and a restored TLS secret must be annotated with. */
     public static final String CLUSTER_ISSUER_NAME = "letsencrypt-prod";
+
+    /**
+     * The namespace of the nginx ingress controller, and the Cilium labels selecting its pods, which the pods that call what it
+     * exposes need to be allowed to reach, as the address of its load balancer is that of a service of the cluster.
+     */
+    public static final String NGINX_INGRESS_NAMESPACE = "ingress-nginx";
+    public static final Map<String, String> NGINX_INGRESS_POD_LABELS = Map.of(
+        "k8s:io.kubernetes.pod.namespace", NGINX_INGRESS_NAMESPACE,
+        "k8s:app.kubernetes.io/name", "ingress-nginx");
     public static final String JUPYTER_INGRESS_NAME = "jupyter-ingress";
     public static final String JUPYTER_SERVICE_NAME = "jupyter-web";
     public static final String SPARK_CONNECTOR_NAME = "spark-connector";
@@ -147,7 +156,7 @@ public class CdkHelper {
             .dependsOn(dependsOn)
             .name("nginx-ingress")
             .chart(CdkUtils.vendoredChart(construct, "nginxChart", "ingress-nginx-4.15.1.tgz"))
-            .namespace("ingress-nginx")
+            .namespace(NGINX_INGRESS_NAMESPACE)
             .createNamespace(true)
             .timeout(600)
             .atomic(true);

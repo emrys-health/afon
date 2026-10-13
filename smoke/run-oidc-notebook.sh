@@ -4,7 +4,8 @@
 # Jupyter pod would: via Spark Connect, with catalogs authenticated by the user's OIDC token.
 #
 # usage: smoke/run-oidc-notebook.sh [cloud]
-#   cloud  the cloud whose Polaris to use (default: aws), read from <CLOUD>_POLARIS_DOMAIN_NAME
+#   cloud  the cloud whose Polaris to use (default: aws), read from <CLOUD>_POLARIS_DOMAIN_NAME.  The notebook uses its
+#          catalogs <cloud> and <cloud>_forbidden, unless AFON_CATALOG and AFON_FORBIDDEN_CATALOG are set.
 #
 # The executed notebook, with its outputs, is written to smoke/target/<notebook name>, leaving the
 # original clean.
@@ -65,6 +66,10 @@ export OIDC_TOKEN
 export SPARK_REMOTE="sc://localhost:$SPARK_CONNECT_PORT"
 export POLARIS_DOMAIN_NAME="$POLARIS_HOST"
 export OIDC_DOMAIN_NAME="$OIDC_HOST"
+# The catalogs of the cloud, named <cloud> and <cloud>_forbidden, as the notebook defaults to those of AWS, which the
+# Polaris of another cloud has too, but without the table that the setup of its stack writes to its own catalog.
+export AFON_CATALOG="${AFON_CATALOG:-$(echo "$CLOUD" | tr '[:upper:]' '[:lower:]')}"
+export AFON_FORBIDDEN_CATALOG="${AFON_FORBIDDEN_CATALOG:-${AFON_CATALOG%%_*}_forbidden}"
 
 kubectl port-forward pod/spark-connector-0-driver "$SPARK_CONNECT_PORT:$SPARK_CONNECT_PORT" >/dev/null &
 PORT_FORWARD_PID=$!

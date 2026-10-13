@@ -427,23 +427,31 @@ public class StepOperations {
                 () -> actions.deleteTableFor(cloud, catalog, namespace, tableName));
     }
 
-    public Step runAwsSparkWritingTo(AfonCloud cloud) {
+    /**
+     * Spark writing the test table to the catalog of a cloud, through the Polaris of a cloud, which is that of the stack set up,
+     * eg Spark through the Azure Polaris of {@code azure-full} writes to its own catalog, {@code azure}, while the scenarios of
+     * Snowflake have the AWS one write to the catalogs of other clouds.  The Spark is the session of this process, not the
+     * cluster's: the Polaris decides where it logs in and where it writes.
+     *
+     * @param polarisCloud the cloud of the Polaris Spark goes through, whose users are configured on the catalog first
+     * @param catalogCloud the cloud whose catalog is written to
+     */
+    public Step runSparkWritingTo(AfonCloud polarisCloud, AfonCloud catalogCloud) {
+        return configureUsersThenRunSpark("Spark writing table",
+                polarisCloud, catalogOf(catalogCloud), polarisNamespaceExternal, polarisTableName, SparkTestWriter.class);
+    }
+
+    private AfonCatalog catalogOf(AfonCloud cloud) {
         switch (cloud) {
             case AWS:
-                return awsSparkWritingTo(afonCatalogs.aws(), polarisNamespaceExternal);
+                return afonCatalogs.aws();
             case AZURE:
-                return awsSparkWritingTo(afonCatalogs.azure(), polarisNamespaceExternal);
+                return afonCatalogs.azure();
             case GCP:
-                return awsSparkWritingTo(afonCatalogs.gcp(), polarisNamespaceExternal);
+                return afonCatalogs.gcp();
             default:
                 throw new RuntimeException("Unsupported cloud " + cloud);
         }
-    }
-
-    private Step awsSparkWritingTo(AfonCatalog catalog, String namespace) {
-        AfonCloud cloud = AWS;
-        return configureUsersThenRunSpark("Spark writing table",
-                cloud, catalog, namespace, polarisTableName, SparkTestWriter.class);
     }
 
     public @NonNull Step runAwsSparkDeferringToAzurePolarisHostingExternalCatalog() {

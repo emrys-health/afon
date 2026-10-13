@@ -245,9 +245,42 @@ public class StepActions {
         }
     }
 
+    /**
+     * Runs {@code tofu init}, and, only if that fails because the stack dir locks provider versions that the plan no longer
+     * pins, runs {@code tofu init -upgrade}.  A stack dir outlives the plans synthesised into it, and a newer plan may pin
+     * another version, eg of the azurerm provider, which {@code tofu init} then refuses with "locked provider ... does not match
+     * configured version constraint ...; must use tofu init -upgrade".  Every other failure, eg of the network, is not retried.
+     * Upgrading only then keeps a normal run free of the registry and of changes to the lock file.
+     *
+     * @return the exit value of the last {@code tofu init}
+     * @throws ManagedProcessException if it fails, as {@link #run} does for a process that exits with an error, with the output
+     *                                 of the process, stdout and stderr, in its message, which is where the mismatch is found
+     */
+    int tofuInit(Path tofuDir, OutputStream outputStream) throws ManagedProcessException {
+        try {
+            return run("tofu", tofuDir, outputStream, "init");
+        } catch (ManagedProcessException e) {
+            if (!isProviderLockMismatch(e.getMessage())) {
+                throw e;
+            }
+            logger.info("The providers locked in {} do not match those the plan pins, upgrading them", tofuDir);
+            return run("tofu", tofuDir, outputStream, "init", "-upgrade");
+        }
+    }
+
+    /**
+     * @return whether the output of {@code tofu init} says to run it with {@code -upgrade}, ie the lock file of the stack dir
+     * does not match the versions the plan pins.  The message may be wrapped by the terminal, boxed with {@code │}, or coloured,
+     * so those are ignored.
+     */
+    static boolean isProviderLockMismatch(String output) {
+        String plain = output.replaceAll("\u001B\\[[0-9;]*m", "").replaceAll("[│\\s]+", " ");
+        return plain.contains("init -upgrade");
+    }
+
     private void tofuDestroy(Path tofuDir, int maxAttempts, OutputStream outputStream) throws ManagedProcessException {
         logger.info("Executing tofu destroy in dir {}", tofuDir);
-        run("tofu", tofuDir, outputStream, "init");
+        tofuInit(tofuDir, outputStream);
         String[] args = List.of("destroy", "--auto-approve").toArray(new String[0]);
         tofuWithRetry(tofuDir, outputStream, maxAttempts, args);
     }
@@ -321,7 +354,7 @@ public class StepActions {
 
     private void tofuApply(Path tofuDir, List<String> bootstrapTargets, int maxAttempts, OutputStream outputStream) throws IOException {
         ensureKubeConfigExists();
-        if (run("tofu", tofuDir, outputStream, "init") != 0) {
+        if (tofuInit(tofuDir, outputStream) != 0) {
             throw new ManagedProcessException(format("tofu init failed in %s", tofuDir));
         }
         if (!bootstrapTargets.isEmpty()) {

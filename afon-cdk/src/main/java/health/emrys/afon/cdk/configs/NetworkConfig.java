@@ -100,6 +100,7 @@ public class NetworkConfig {
 
     private final TerraformStack      tfStack;
     private final List<AllowedDomain> allowedDomains;
+    private final Map<String, String> ingressPodLabels;
 
     /**
      * For debugging purposes only.
@@ -127,8 +128,18 @@ public class NetworkConfig {
     }
 
     public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties) {
-        this.tfStack   = tfStack;
-        allowedDomains = getAllowedDomainsFrom(properties);
+        this(tfStack, properties, Map.of());
+    }
+
+    /**
+     * @param ingressPodLabels the Cilium labels of the pods of the ingress controller, if it runs in the cluster, else none,
+     *                         see {@link health.emrys.afon.cdk.CloudPlatform#ingressPodLabels()}: the Spark driver is then
+     *                         allowed to reach them, as it reaches what they expose, eg Polaris, by its domain name
+     */
+    public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties, Map<String, String> ingressPodLabels) {
+        this.tfStack          = tfStack;
+        allowedDomains        = getAllowedDomainsFrom(properties);
+        this.ingressPodLabels = ingressPodLabels;
     }
 
     /**
@@ -162,25 +173,34 @@ public class NetworkConfig {
         networkPolicyFor(USER_POD_LABELS, egress);
         lockdownJupyterPods(USER_POD_LABELS, dependsOn);
 
-        lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of());
-        lockdownSpark(dependsOn, DRIVER_LABELS, "spark-driver", List.of(AllowedDomain.create(MASTER + "-svc")));
+        // only the driver calls what the ingress exposes, ie Polaris, so only it may reach the ingress controller
+        lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of(), Map.of());
+        lockdownSpark(dependsOn, DRIVER_LABELS, "spark-driver", List.of(AllowedDomain.create(MASTER + "-svc")), ingressPodLabels);
     }
 
     private void lockdownSpark(List<ITerraformDependable> dependsOn,
                                Map<String, String> labels,
                                String pod,
-                               List<AllowedDomain> additional
+                               List<AllowedDomain> additional,
+                               Map<String, String> ingressPodLabels
     ) {
         List<AllowedDomain> whitelist = new ArrayList();
         whitelist.addAll(additional);
         whitelist.addAll(allowedDomains);
-        Map<String, Object> manifest = sparkManifest(labels, pod, whitelist);
+        Map<String, Object> manifest = sparkManifest(labels, pod, whitelist, ingressPodLabels);
         createWhitelistFor(dependsOn, manifest, pod + "-policy");
     }
 
-    private static @NonNull Map<String, Object> sparkManifest(Map<String, String> labels,
-                                                              String pod,
-                                                              List<AllowedDomain> whitelist
+    /**
+     * @param ingressPodLabels the Cilium labels of the pods of the ingress controller, if it runs in the cluster, else empty:
+     *                         HTTPS is then allowed to them, as the addresses that the ingress exposes are those of its load
+     *                         balancer, which Cilium translates to its pods, so that the rule of the domain names, which
+     *                         matches an address outside of the cluster, never applies to them
+     */
+    static @NonNull Map<String, Object> sparkManifest(Map<String, String> labels,
+                                                      String pod,
+                                                      List<AllowedDomain> whitelist,
+                                                      Map<String, String> ingressPodLabels
     ) {
         List<Map<String, Object>> matchNames = new ArrayList<>();
 
@@ -194,7 +214,13 @@ public class NetworkConfig {
             "toFQDNs", matchNames
             );
 
-        Map<String, Object> manifest = createManifestFor(labels, pod, whitelist, List.of(sparkEndpoints, fqdns));
+        List<Map<String, Object>> extraEgress = new ArrayList<>(List.of(sparkEndpoints, fqdns));
+        if (!ingressPodLabels.isEmpty()) {
+            extraEgress.add(Map.of(
+                "toEndpoints", List.of(Map.of("matchLabels", ingressPodLabels)),
+                "toPorts", List.of(Map.of("ports", List.of(Map.of("port", "443", "protocol", "TCP"))))));
+        }
+        Map<String, Object> manifest = createManifestFor(labels, pod, whitelist, extraEgress);
         return manifest;
     }
 
