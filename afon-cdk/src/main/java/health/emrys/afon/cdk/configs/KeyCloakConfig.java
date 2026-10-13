@@ -11,6 +11,8 @@ import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.Deployment;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainer;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnv;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerReadinessProbe;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerReadinessProbeHttpGet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeConfigMap;
@@ -191,12 +193,29 @@ public class KeyCloakConfig extends Construct {
             .build();
 
         List<String> args = List.of("start");
+        // Without it the pod is behind its Service as soon as its container starts, but KeyCloak takes a minute or more
+        // to serve, so whatever asks it meanwhile, eg the setup of the OIDC users or Polaris discovering its issuer, is
+        // answered 502 by the ingress, or 503 "Bootstrap in progress" by KeyCloak itself.  A failing probe only keeps the
+        // pod out of the Service, it is never restarted for it, and the deployment is not rolled out until it passes.
+        DeploymentSpecTemplateSpecContainerReadinessProbe readinessProbe = DeploymentSpecTemplateSpecContainerReadinessProbe
+            .builder()
+            .httpGet(DeploymentSpecTemplateSpecContainerReadinessProbeHttpGet
+                         .builder()
+                         .path(HEALTH_READY_PATH)
+                         .port("" + KEYCLOAK_MANAGEMENT_PORT)
+                         .build())
+            .initialDelaySeconds(15)
+            .periodSeconds(5)
+            .timeoutSeconds(3)
+            .failureThreshold(36)
+            .build();
         DeploymentSpecTemplateSpecContainer keyCloak = DeploymentSpecTemplateSpecContainer
             .builder()
             .name(APP_NAME)
             .image(DockerImages.KEYCLOAK_IMAGE)
             .args(args)
             .env(envs)
+            .readinessProbe(readinessProbe)
             .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount
                                      .builder()
                                      .name("theme")

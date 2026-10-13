@@ -81,6 +81,12 @@ public class KeyCloakProvider implements IdentityProvider {
     private final String adminUsername;
     private final String adminPassword;
     private final String loginTheme;
+    /**
+     * How often, and how long apart, a token request failing with an I/O or server error is tried: up to five minutes, as
+     * a KeyCloak starting on a busy cluster has taken three minutes to be ready.
+     */
+    int  tokenAttempts    = 30;
+    long tokenRetryMillis = 10_000;
 
     /**
      * Creates a provider for token requests only ({@link #userToken}, {@link #clientToken}), which need no
@@ -231,12 +237,33 @@ public class KeyCloakProvider implements IdentityProvider {
         }
         String path = format("/realms/%s/protocol/openid-connect/token", realm);
         logger.info("Retrieving token from {}", path);
-        return restClient.postForm(path, Map.of(
+        Map<String, String> form = Map.of(
             "grant_type", "password",
             "client_id", "admin-cli",
             "username", username,
             "password", password
-        ), HttpResponses::parseAccessToken);
+        );
+        // A KeyCloak that has just started answers 5xx until it is ready, eg 502 or 503 from the ingress while its pod is
+        // not yet ready, or 503 "Bootstrap in progress. Retry in 10 seconds." from KeyCloak itself while its bootstrap admin
+        // is created, although its realms already answer.  I/O and server errors are therefore retried, while others, eg 401
+        // for bad credentials, fail at once, as they would again.
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return restClient.postForm(path, form, HttpResponses::parseAccessToken);
+            } catch (IOException e) {
+                if (attempt >= tokenAttempts) {
+                    throw e;
+                }
+                logger.warn("{} (attempt {}/{}), retrying in {}s", e.getMessage(), attempt, tokenAttempts,
+                            tokenRetryMillis / 1000);
+                try {
+                    Thread.sleep(tokenRetryMillis);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while waiting to retry the token request", interrupted);
+                }
+            }
+        }
     }
 
     /**

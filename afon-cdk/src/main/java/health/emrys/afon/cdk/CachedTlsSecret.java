@@ -9,6 +9,13 @@ import static java.lang.String.format;
  */
 public final class CachedTlsSecret {
 
+    /**
+     * The label of the secrets that cert-manager manages, which is all it caches of them.  A restored secret without it is
+     * not in the cache when the Certificate of the ingress is first checked, so cert-manager finds no secret and issues a
+     * new certificate, using up the quota of Let's Encrypt, although it labels the secret straight after.
+     */
+    static final String CERT_MANAGER_SECRET_LABEL = "controller.cert-manager.io/fao";
+
     private CachedTlsSecret() {
     }
 
@@ -46,7 +53,8 @@ public final class CachedTlsSecret {
                 cert-manager.io/issuer-name=%4$s \
                 cert-manager.io/issuer-kind=ClusterIssuer \
                 cert-manager.io/issuer-group=cert-manager.io
+              kubectl label secret %3$s --overwrite %5$s=true
             fi
-            """, fetchCertificate, fetchKey, tlsSecretName, CdkHelper.CLUSTER_ISSUER_NAME);
+            """, fetchCertificate, fetchKey, tlsSecretName, CdkHelper.CLUSTER_ISSUER_NAME, CERT_MANAGER_SECRET_LABEL);
     }
 }
