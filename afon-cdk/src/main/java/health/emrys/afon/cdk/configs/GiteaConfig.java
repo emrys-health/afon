@@ -13,6 +13,7 @@ import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ import static health.emrys.afon.config.AfonProperty.*;
  * <ul>
  *     <li>{@code GITEA_DB_HOST}, {@code GITEA_DB_USERNAME}, {@code GITEA_DB_PASSWORD}</li>
  *     <li>optionally {@code GITEA_DB_SSL_MODE}, defaulting to {@code require}</li>
+ *     <li>optionally {@code GITEA_STORAGE_SIZE}, the size of the repositories' volume, defaulting to {@code 10Gi}</li>
  *     <li>{@code GITEA_ADMIN_USERNAME}, {@code GITEA_ADMIN_PASSWORD}</li>
  *     <li>{@code CLUSTER_NAME}</li>
  *     <li>AWS: {@code AWS_GITEA_BUCKET}, {@code AWS_REGION}, {@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY}</li>
@@ -117,6 +119,14 @@ public class GiteaConfig {
     private String sslMode() {
         String sslMode = properties.getValue(GITEA_DB_SSL_MODE, "");
         return sslMode.isBlank() ? "require" : sslMode;
+    }
+
+    /**
+     * The size of the volume holding the git repositories.
+     */
+    String storageSize() {
+        String size = properties.getValue(GITEA_STORAGE_SIZE, "");
+        return size.isBlank() ? "10Gi" : size;
     }
 
     /**
@@ -214,7 +224,14 @@ public class GiteaConfig {
                 Map.of("name", "PGSSLMODE", "value", sslMode()),
                 Map.of("name", "GITEA_DB", "value", databaseName())));
 
+        // The chart's default resource-policy "keep" would leave the PVC, and so its cloud disk, behind on uninstall,
+        // outliving the cluster; a null value removes the key from the chart's defaults.
+        Map<String, Object> noResourcePolicy = new HashMap<>();
+        noResourcePolicy.put("helm.sh/resource-policy", null);
+
         Map<String, Object> values = Map.of(
+            // The repositories' volume, of the cluster's default StorageClass.
+            "persistence", Map.of("size", storageSize(), "annotations", noResourcePolicy),
             // A single replica on a ReadWriteOnce volume: the old pod must let go of it before the new one starts.
             "strategy", Map.of("type", "Recreate"),
             "preExtraInitContainers", List.of(createDatabase),
