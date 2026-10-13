@@ -193,6 +193,22 @@ This annotation triggers the ALB to add the constraint as it watches any change 
 This cannot be done with a Kubernetes `NetworkPolicy` `ipBlock`: the ALB terminates the client's
 connection and opens its own, so the Polaris pod only ever sees the ALB's or a node's VPC address.
 
+### Restricting who can reach Polaris (Azure)
+
+Set `AZURE_POLARIS_ALLOWED_CIDRS` in `afon-azure.properties` to a comma-separated list of CIDRs to only admit those callers to
+Polaris' nginx ingress (via its `nginx.ingress.kubernetes.io/whitelist-source-range` annotation).  The cluster's pod CIDR
+(`10.244.0.0/16`, that of the AKS overlay network) is added automatically, as pods calling Polaris by its public domain name
+reach the ingress from their own addresses.  Left empty, there are no restraints.
+
+The ingress controller can only tell the callers apart if the load balancer does not hide them: with the property set, the
+controller's service gets `externalTrafficPolicy: Local`, else the callers would all arrive from a node's address.
+
+You can also restrict a deployed cluster by hand, which a redeploy undoes:
+
+```shell
+kubectl annotate ingress polaris-ingress -n default --overwrite nginx.ingress.kubernetes.io/whitelist-source-range="203.0.113.7/32,10.244.0.0/16"
+```
+
 ## Logging & Monitoring
 
 ### Polaris logs in S3 (AWS)

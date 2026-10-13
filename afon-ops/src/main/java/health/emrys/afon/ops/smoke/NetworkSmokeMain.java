@@ -9,6 +9,7 @@ import health.emrys.afon.ops.kube.commands.CurlCommand;
 import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisRestClient;
+import health.emrys.afon.rest.HttpResponses;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
@@ -25,7 +26,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 import static health.emrys.afon.polaris.config.PolarisEndpoint.getPolarisEndpointFor;
 import static java.lang.String.format;
 
@@ -53,6 +53,17 @@ public class NetworkSmokeMain {
         return results;
     }
 
+    /**
+     * Calls Polaris from outside the cluster, which must not get through.  How a caller outside of the allowed CIDRs is
+     * stopped differs per cloud:
+     * <ul>
+     *   <li>AWS: the ALB's security group drops its packets, so the call fails or times out, and any HTTP response
+     *   means Polaris is reachable.</li>
+     *   <li>Azure: the nginx ingress controller, which runs in the cluster behind a public load balancer, accepts the
+     *   connection and answers with its own 403 page, without calling Polaris, see
+     *   {@link SmokeConfig#rejectedByIngress}.  That counts as stopped; any other response means Polaris is reachable.</li>
+     * </ul>
+     */
     private List<ExecResult> checkPolarisOnlyAccessibleFromCluster() throws Exception {
         SmokeConfig smokeConfig = new SmokeConfig(properties);
         AfonCloud         cloud         = smokeConfig.cloud();
@@ -64,24 +75,14 @@ public class NetworkSmokeMain {
                         polarisHost, smokeConfig.callTimeoutSeconds());
             HttpResponse response = getWithProgress(polarisClient, polarisHost, smokeConfig);
             int          httpCode = response.getCode(); // probably a 403 or 404 but that's not the point!
-            String       message  = format(
-                """
-                    Managed to make an HTTP call to %s. Received HTTP code %d. 
-                    Run this to make Polaris white list the TRE's IP address:
-                    
-                    kubectl annotate ingress polaris-ingress -n default --overwrite alb.ingress.kubernetes.io/inbound-cidrs=%s/32
-                    
-                    The EGRESS_IP of this cluster is configured in config/afon-aws.properties.
-                    
-                    If you want to add this machines IP address to that whitelist (danger, Will Robinson), get it via:
-                    
-                    curl -s https://ifconfig.me
-                    
-                    and add it to EGRESS_IPs (which are CSVs)
-                    """,
-                polarisHost,
-                httpCode,
-                smokeConfig.egressIP());
+            if (smokeConfig.rejectedByIngress(httpCode, HttpResponses.contentOf(response))) {
+                String msg = format("The ingress of %s rejected the call with HTTP code %d, as it should", polarisHost, httpCode);
+                logger.info(msg);
+                results.add(new ExecResult(0, msg, "", format("curl https://%s", polarisHost)));
+                return results;
+            }
+            String       message  = format("Managed to make an HTTP call to %s. Received HTTP code %d.%n%n%s",
+                                           polarisHost, httpCode, smokeConfig.polarisRestrictionAdvice());
             results.add(new ExecResult(-1, message, "", format("curl https://%s", polarisHost)));
         } catch (IOException x) {
             String msg = format("Was unable to talk to %s. Error = %s", polarisHost, x.getMessage());
@@ -177,8 +178,7 @@ public class NetworkSmokeMain {
 
     private List<ExecResult> checkCanSeeAllowedDomains(String pod) throws Exception {
         List<ExecResult> results = new ArrayList<>();
-        String allowedDomains = properties.getValue(ALLOWED_DOMAINS_CSV);
-        for (String domain : allowedDomains.split(",")) {
+        for (String domain : new SmokeConfig(properties).allowedDomains()) {
             CurlCommand command = new CurlCommand(client, pod, domain, true);
             results.addAll(command.run());
         }

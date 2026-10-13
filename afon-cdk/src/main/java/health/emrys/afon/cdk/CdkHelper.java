@@ -17,6 +17,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -161,12 +162,9 @@ public class CdkHelper {
             .timeout(600)
             .atomic(true);
         if (annotations != null && !annotations.isEmpty()) {
-            var releaseSetBuilder = ReleaseSet.builder();
-            annotations.forEach((name, value) -> {
-                releaseSetBuilder.name(name);
-                releaseSetBuilder.value(value);
-            });
-            builder.set(List.of(releaseSetBuilder.build()));
+            builder.set(annotations.entrySet().stream()
+                                   .map(entry -> ReleaseSet.builder().name(entry.getKey()).value(entry.getValue()).build())
+                                   .toList());
         }
         return builder.build();
     }
@@ -209,9 +207,22 @@ public class CdkHelper {
         this.ingressName     = ingressName;
     }
 
+    /** Restricts an nginx ingress to the given comma-separated source CIDRs; absent means open to all. */
+    public static final String WHITELIST_SOURCE_RANGE_ANNOTATION = "nginx.ingress.kubernetes.io/whitelist-source-range";
+
+    /**
+     * @param inboundCidrs the source CIDRs the ingress admits, or empty to admit all.  The controller can only tell
+     *                     the callers apart if its service preserves their IP, ie with {@code externalTrafficPolicy:
+     *                     Local}
+     */
     public IngressV1 createIngress(
         List<TerraformResource> dependencies,
-        Optional<List<LocalExecProvisioner>> ingressProvisioners) {
+        Optional<List<LocalExecProvisioner>> ingressProvisioners,
+        List<String> inboundCidrs) {
+        Map<String, String> annotations = new HashMap<>(Map.of("cert-manager.io/cluster-issuer", CLUSTER_ISSUER_NAME));
+        if (!inboundCidrs.isEmpty()) {
+            annotations.put(WHITELIST_SOURCE_RANGE_ANNOTATION, String.join(",", inboundCidrs));
+        }
         IngressV1SpecRuleHttpPathBackendServicePort port = IngressV1SpecRuleHttpPathBackendServicePort
             .builder()
             .number(this.port)
@@ -255,9 +266,7 @@ public class CdkHelper {
             .metadata(IngressV1Metadata
                           .builder()
                           .name(ingressName)
-                          .annotations(Map.of(
-                              "cert-manager.io/cluster-issuer", CLUSTER_ISSUER_NAME
-                          ))
+                          .annotations(annotations)
                           .build())
             .dependsOn(dependencies)
             .spec(nginxSpec)
