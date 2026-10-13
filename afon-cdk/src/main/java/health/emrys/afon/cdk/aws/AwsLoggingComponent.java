@@ -26,12 +26,11 @@ public class AwsLoggingComponent implements StackComponent {
                         AWS_POLARIS_LOG_BUCKET);
         } else {
             // Polaris depends on the log shipper so that, on destroy, it is gone before the shipper is.
-            AwsPolarisLogShipper.deploy(
-                context.stack(),
+            new AwsPolarisLogShipper(
                 (AwsCloudProvider) context.platform(),
-                context.platform().getDependables(),
                 logBucket,
-                properties.getValue(AfonProperty.AWS_REGION));
+                properties.getValue(AfonProperty.AWS_REGION))
+                .deploy(context.stack(), context.platform().getDependables());
         }
     }
 
