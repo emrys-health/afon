@@ -222,6 +222,23 @@ jobs:
           ./afon.sh -a build -bp -acceptance \
             --ba "-B -ntp -Dstyle.color=always"
 
+      - name: Check the plan is the same in each JVM
+        # Fails in minutes, rather than after the hour of the teardown and recreate, if tofu would replace what differs on every deploy.
+        # validate-stack synthesises each stack in three JVMs and compares the plans, giving the paths that differ and not their values.
+        if: ${{ inputs.action != 'delete' }}
+        env:
+          STACK_ID: ${{ inputs.stack_id }}
+        run: |
+          set -euo pipefail
+          if [ "$STACK_ID" == "aws-all" ]; then
+            STACKS="aws-keycloak aws-polaris aws-full"
+          else
+            STACKS="$STACK_ID"
+          fi
+          for STACK in $STACKS; do
+            ./afon.sh -a validate-stack "$STACK"
+          done
+
       - name: Run the AWS stack action
         env:
           ACTION: ${{ inputs.action }}

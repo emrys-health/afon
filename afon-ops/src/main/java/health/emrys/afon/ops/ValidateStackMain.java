@@ -2,27 +2,94 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
+import health.emrys.afon.ops.synth.DeterministicSynthesis;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Validates the config of a stack, via {@link CloudStackValidator}, by synthesising its plan from the config,
  * without deploying it.
  * The stack is given by its id, {@code <cloud>-<stack-type>}, eg {@code azure-polaris}, as defined in
  * {@link health.emrys.afon.cdk.StackDefinitions}.  With no stack, it lists the stacks.
+ * <p>
+ * It also checks that the plan is the same in each JVM, see {@link DeterministicSynthesis}: it synthesises the stack in
+ * {@code --runs} JVMs (by default {@link #DEFAULT_RUNS}) of their own, each of which is this command with {@link #SINGLE_RUN_PROPERTY}
+ * set, and fails if the plans differ.  With {@code --runs 1} it synthesises once, in this JVM, and checks nothing else.
  */
 public class ValidateStackMain {
 
+    /**
+     * System property set in the JVMs that synthesise once, rather than check the plan is deterministic
+     */
+    static final String SINGLE_RUN_PROPERTY = "afon.validate.single";
+    static final int DEFAULT_RUNS = 3;
+    private static final String RUNS_OPTION = "--runs";
+    private static final int RUN_TIMEOUT_MINUTES = 15;
+
+    /**
+     * @param stack the id of the stack, as given
+     * @param runs  the number of times to synthesise it, at least 1
+     */
+    record Arguments(String stack, int runs) {
+
+        /**
+         * @param args {@code <stack-id> [--runs <n>]}
+         * @return the arguments, or {@code null} if there are none
+         * @throws IllegalArgumentException if they are not as above
+         */
+        static Arguments parse(String[] args) {
+            if (args.length == 0) {
+                return null;
+            }
+            int runs = DEFAULT_RUNS;
+            if (args.length == 3 && RUNS_OPTION.equals(args[1])) {
+                try {
+                    runs = Integer.parseInt(args[2]);
+                } catch (NumberFormatException e) {
+                    runs = 0;
+                }
+                if (runs < 1) {
+                    throw new IllegalArgumentException(RUNS_OPTION + " must be a number of at least 1, not " + args[2]);
+                }
+            } else if (args.length != 1) {
+                throw new IllegalArgumentException("Usage: validate-stack <stack> [" + RUNS_OPTION + " <n>]");
+            }
+            return new Arguments(args[0], runs);
+        }
+    }
+
     public static void main(String[] args) {
         CloudStackValidator validator = new CloudStackValidator();
-        if (args.length != 1) {
+        Arguments arguments;
+        try {
+            arguments = Arguments.parse(args);
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+            return;
+        }
+        if (arguments == null) {
             printUsage(validator);
             return;
         }
-        StackId stack = validator.resolve(args[0]);
+        StackId stack = validator.resolve(arguments.stack());
         if (stack == null) {
-            System.out.println("Stack not found: " + args[0]);
+            System.out.println("Stack not found: " + arguments.stack());
             printUsage(validator);
             System.exit(1);
+            return;
+        }
+        if (System.getProperty(SINGLE_RUN_PROPERTY) == null && arguments.runs() > 1) {
+            checkDeterministic(validator, stack, arguments.runs());
             return;
         }
         String stackDir;
@@ -37,8 +104,64 @@ public class ValidateStackMain {
         System.out.printf("Validated stack %s by synthesising it into %s%n", stack, stackDir);
     }
 
+    private static void checkDeterministic(CloudStackValidator validator, StackId stack, int runs) {
+        List<String> differences;
+        try {
+            differences = DeterministicSynthesis.check(stack.toString(), Path.of(ConfigUtils.stacksDir()), runs,
+                                                       ValidateStackMain::synthesiseInNewJvm);
+        } catch (IOException | RuntimeException e) {
+            System.err.printf("Failed to validate stack %s: %s%n", stack, e.getMessage());
+            System.exit(1);
+            return;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.exit(1);
+            return;
+        }
+        if (!differences.isEmpty()) {
+            // the paths only, as the values are those of the config
+            System.err.printf("Stack %s does not synthesise to the same plan in each JVM, so tofu would replace what differs on every deploy:%n", stack);
+            differences.forEach(System.err::println);
+            System.exit(1);
+            return;
+        }
+        System.out.printf("Validated stack %s by synthesising it into %s, to the same plan in each of %d JVMs%n",
+                          stack, validator.stackDir(stack), runs);
+    }
+
+    /**
+     * Runs this command in a JVM of its own with the same flags, ie the system properties and the config, as this one, to synthesise once.
+     */
+    private static void synthesiseInNewJvm(String stack) throws IOException, InterruptedException {
+        List<String> command = new ArrayList<>();
+        command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
+        command.addAll(ManagementFactory.getRuntimeMXBean().getInputArguments());
+        command.add("-D" + SINGLE_RUN_PROPERTY + "=true");
+        String classPath = System.getProperty("java.class.path");
+        if (classPath.endsWith(".jar") && !classPath.contains(File.pathSeparator)) {
+            // run from the CLI jar, which finds the command by its name
+            command.addAll(List.of("-jar", classPath, "validate-stack"));
+        } else {
+            command.addAll(List.of("-cp", classPath, ValidateStackMain.class.getName()));
+        }
+        command.add(stack);
+        Path log = Files.createTempFile("afon-validate-stack", ".log");
+        try {
+            Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+            if (!process.waitFor(RUN_TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
+                process.destroyForcibly();
+                throw new IOException("Synthesis did not finish in " + RUN_TIMEOUT_MINUTES + " minutes");
+            }
+            if (process.exitValue() != 0) {
+                throw new IOException("Synthesis failed with exit " + process.exitValue() + ":\n" + Files.readString(log));
+            }
+        } finally {
+            Files.deleteIfExists(log);
+        }
+    }
+
     private static void printUsage(CloudStackValidator validator) {
-        System.out.println("Usage: validate-stack <stack>, where <stack> is one of:");
+        System.out.println("Usage: validate-stack <stack> [" + RUNS_OPTION + " <n>], where <stack> is one of:");
         validator.stackNames().forEach(name -> System.out.println("  " + name));
     }
 

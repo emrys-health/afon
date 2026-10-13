@@ -264,13 +264,10 @@ every stack in three separate JVMs and requires the same plan from each.
 3. Declare `requires()` and `after()`.
 4. Add it to the stacks in `StackDefinitions`.
 
-**Guarding the plans.** `DeterministicSynthesisTest` synthesises every stack from the template config in three JVMs and checks
-that the plans are identical, as `tofu` replaces whatever holds a string that differs between runs. The ids of the Terraform
-resources are in the state of the deployed stacks, so renaming one makes `tofu` destroy and recreate it: check the plans
-before and after a refactoring, with snapshots of the synthesised plans that are not kept in git:
+**Guarding the plans.** `validate-stack [--runs <n>]` synthesises the stack in `<n>` JVMs (defaulting to `3`), one after the other, and fails if the plans differ, giving the paths that differ but not their values, which may contain secrets. A plan must not depend on anything that differs from one JVM to the next, eg the iteration order of an immutable `Map.of`, as `tofu` replaces whatever holds a string that differs between runs, on every deploy. The `aws-stack-linux.yml` workflow runs it before it deploys. The ids of the Terraform resources are in the state of the deployed stacks, so renaming one makes `tofu` destroy and recreate it: check the plans before and after a refactoring, with snapshots of the synthesised plans that are not kept in git:
 
 ```shell
-./afon.sh -a validate-stack aws-keycloak          # synthesises the stack into the stacks dir, repeat for the stacks to check
+./afon.sh -a validate-stack aws-keycloak      # synthesises the stack into the stacks dir, repeat for the stacks to check
 ./afon.sh -a snapshot-stacks /tmp/plans-before
 # ... change the code ...
 ./afon.sh -a validate-stack aws-keycloak
@@ -278,11 +275,7 @@ before and after a refactoring, with snapshots of the synthesised plans that are
 ./afon.sh -a compare-stacks /tmp/plans-before /tmp/plans-after
 ```
 
-`snapshot-stacks <dir> [<stack-id>...]` copies to `<dir>/<stack-id>/cdk.tf.json` the plan of each stack that was synthesised, or of
-those given, and nothing else. It needs no source tree or git, so it runs the same with `afon-cli.sh`, on a deployed machine, and
-`compare-stacks` takes any two such dirs, or the stacks dirs themselves. It lists the resources that were added or removed
-(a renamed one is both, and `tofu` would destroy and recreate it), then the values that changed, with the long ones reduced to their hash,
-and exits 1 if the plans differ.
+`snapshot-stacks <dir> [<stack-id>...]` copies to `<dir>/<stack-id>/cdk.tf.json` the plan of each stack that was synthesised, or of those given, and nothing else. It needs no source tree or git, so it runs the same with `afon-cli.sh`, on a deployed machine, and `compare-stacks` takes any two such dirs, or the stacks dirs themselves. It lists the resources that were added or removed  (a renamed one is both, and `tofu` would destroy and recreate it), then the values that changed, with the long ones reduced to their hash, and exits 1 if the plans differ.
 
 ### Terraform-based deployment
 
