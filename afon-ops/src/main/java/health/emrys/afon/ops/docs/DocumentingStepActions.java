@@ -150,6 +150,14 @@ public class DocumentingStepActions extends StepActions {
     }
 
     @Override
+    public Step waitOnAnswer(String url, long timeout, long pauseMs) {
+        return new Step(stepNameWaitOnAnswer(url), "Wait until it answers", () -> {
+            out.println(format("Wait until `%s` answers, until timeout of %s.%n", url, DurationUtils.formatDuration(timeout)));
+            out.flush();
+        });
+    }
+
+    @Override
     protected @NonNull Path stackDir(StackId stackId) throws IOException {
         Path stackDir = Path.of(ConfigUtils.stackDir(stackId));
         out.println(format("""
