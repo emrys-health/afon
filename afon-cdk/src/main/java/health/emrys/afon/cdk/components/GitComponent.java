@@ -12,6 +12,6 @@ public class GitComponent implements StackComponent {
         GiteaConfig   gitea    = new GiteaConfig(context.properties(), platform.cloud());
         gitea.deploy(context.stack(),
                      platform.configureHelm(),
-                     platform.getDependables());
+                     platform.storageDependencies());
     }
 }

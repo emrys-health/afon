@@ -63,6 +63,14 @@ public interface CloudPlatform extends CloudProvider {
     }
 
     /**
+     * @return what a component with persistent volumes must wait for, so that its PVCs can be bound: by default the
+     * cluster's dependables, as most clusters come with a default StorageClass and its provisioner
+     */
+    default List<? extends ITerraformDependable> storageDependencies() {
+        return getDependables();
+    }
+
+    /**
      * Exposes the Spark master outside the cluster, for the platforms that do.  By default it is not exposed.
      *
      * @param dependsOn the cluster's dependables, including that the Spark operator is ready

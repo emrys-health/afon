@@ -133,6 +133,8 @@ public enum AfonProperty {
     GITEA_DB_PASSWORD("GITEA_DB_PASSWORD"),
     /** One of disable, require, verify-ca or verify-full.  Optional: {@code require} when unset. */
     GITEA_DB_SSL_MODE("GITEA_DB_SSL_MODE"),
+    /** Size of the volume holding Gitea's git repositories, eg {@code 20Gi}.  Optional: {@code 10Gi} when unset. */
+    GITEA_STORAGE_SIZE("GITEA_STORAGE_SIZE"),
     GITEA_ADMIN_USERNAME("GITEA_ADMIN_USERNAME"),
     GITEA_ADMIN_PASSWORD("GITEA_ADMIN_PASSWORD"),
 
