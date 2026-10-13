@@ -51,7 +51,9 @@ import software.constructs.Construct;
 import software.constructs.IConstruct;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -82,6 +84,9 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     private final        String                  providerRegistrations;
     private final        Map<String, String>     nodePoolConfig;
     private final        String                  keyVaultName;
+    /** The pod CIDR of an AKS overlay cluster, as left unset in its network profile. */
+    static final String POD_CIDR = "10.244.0.0/16";
+
     private final        AfonPropertyProvider    properties;
     private              RoleAssignment          clusterAdminAssignment;
     private              KubernetesProvider      k8sProvider;
@@ -658,10 +663,46 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
 
     @Override
     protected Map<String, String> nginxAnnotations() {
-        return Map.of(
-            "controller.service.annotations.service\\.beta\\" +
-            ".kubernetes\\.io/azure-load-balancer-health-probe" +
-            "-request-path", "/healthz");
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("controller.service.annotations.service\\.beta\\" +
+                   ".kubernetes\\.io/azure-load-balancer-health-probe" +
+                   "-request-path", "/healthz");
+        if (!allowedCidrs("polaris").isEmpty()) {
+            // else the load balancer SNATs the callers to a node's IP, and the ingress cannot tell them apart
+            values.put("controller.service.externalTrafficPolicy", "Local");
+        }
+        return values;
+    }
+
+    /**
+     * The source CIDRs admitted to the route's component, from {@code AZURE_<COMPONENT>_ALLOWED_CIDRS}.  Empty, ie
+     * open to all, if not set.
+     */
+    @Override
+    protected List<String> inboundCidrs(HttpsRoute route) {
+        return withPodCidr(allowedCidrs(route.component()));
+    }
+
+    /**
+     * The configured CIDRs plus the cluster's pod CIDR, as pods that call Polaris by its public domain name reach the ingress
+     * controller from their own IPs, Cilium translating the load balancer's address to the controller's pod.  Empty
+     * (no restriction) when nothing is configured.
+     */
+    static List<String> withPodCidr(List<String> cidrs) {
+        if (cidrs.isEmpty() || cidrs.contains(POD_CIDR)) {
+            return cidrs;
+        }
+        List<String> all = new ArrayList<>(cidrs);
+        all.add(POD_CIDR);
+        return all;
+    }
+
+    private List<String> allowedCidrs(String component) {
+        return parseCidrs(properties.getCloudValue(AZURE, component.toUpperCase() + "_ALLOWED_CIDRS", ""));
+    }
+
+    static List<String> parseCidrs(String csv) {
+        return Arrays.stream(csv.split(",")).map(String::trim).filter(cidr -> !cidr.isEmpty()).toList();
     }
 
     @Override
