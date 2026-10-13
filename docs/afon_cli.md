@@ -135,6 +135,7 @@ Run from the distribution, it runs its commands, the smoke tests' as well as tho
 with the distribution's `afon-cli.sh`, which resolves them as any other command, as if given `--cli`: the
 distribution, being independent of the source tree, has no `afon.sh`.
 ```shell
-$AFON_CLI_DIR/smoke/run-regression-suite.sh --env <env>
+$AFON_CLI_DIR/smoke/run-regression-suite.sh --env <env> [aws|azure]
 ```
-It runs the tests of `smoke/regression-aws.csv` by default, or those of another suite file given with `--suite`.
+It runs the tests of `smoke/regression-full.csv` by default, or those of another suite file given with `--suite`, against the
+full stack of the cloud given, `aws` by default.

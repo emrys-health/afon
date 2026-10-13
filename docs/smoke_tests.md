@@ -102,7 +102,10 @@ The notebook reads these environment variables, all optional apart from `OIDC_TO
 | `AFON_FORBIDDEN_CATALOG` | `aws_forbidden`                           |
 | `AFON_TABLE`             | `namespaceph.test_table`                  |
 
-`smoke/run-oidc-notebook.sh` sets the first four from your configuration.
+`smoke/run-oidc-notebook.sh` sets the first four from your configuration, and `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG` from the
+cloud it is given, eg `azure` and `azure_forbidden` for `smoke/run-oidc-notebook.sh azure`, unless they are set already.  The defaults
+in the table, `aws` and `aws_forbidden`, are those of the notebook when run on its own.  The table `AFON_TABLE` is written by the
+setup of the stack to the catalog of its own cloud, so it is not in the `aws` catalog of the Polaris of another cloud.
 
 ## Troubleshooting
 
@@ -121,11 +124,23 @@ The notebook reads these environment variables, all optional apart from `OIDC_TO
 
 ```shell
 smoke/run-regression-suite.sh [--cli] [--env <env>] [--setup <stacks> [--teardown]] [--suite <file>]
-                              [--tests <tests>] [--logging-console <level>] [--list]
+                              [--tests <tests>] [--logging-console <level>] [--list] [<cloud>]
 ```
 
-runs the tests listed in a suite file, by default [smoke/regression-aws.csv](../smoke/regression-aws.csv), in
-order, each as an afon command. Its first line is the header `name|command|args`, and each other line a test: its
+runs the tests listed in a suite file, by default [smoke/regression-full.csv](../smoke/regression-full.csv), in
+order, each as an afon command, against the full stack of the `<cloud>`, `aws` by default, or `azure`: it sets the kubectl
+context to the cluster of that stack, with the afon command `<cloud>-update-kube-config full`, and runs the tests with
+`TRE_CLOUD=<cloud>`, as the cloud of the stack hosting the TRE, whatever the config says.  The tests are not specific to a
+cloud, so the same file serves both:
+
+```shell
+smoke/run-regression-suite.sh azure
+```
+
+**NOTE:** the Polaris ingress is only restricted on AWS, by the ALB, to the TRE's egress IP, so on Azure the `network` test,
+which checks that Polaris cannot be reached from outside of the cluster, is expected to fail.
+
+The first line of the suite file is the header `name|command|args`, and each other line a test: its
 name, its afon command, eg `network-smoke` for the ops class `NetworkSmokeMain`, and the command's args, if any,
 separated by spaces. Fields are separated by `|`, rather than commas, so that args may contain commas. Blank lines and
 lines starting with `#` are ignored. For example:
@@ -188,7 +203,8 @@ very last line, after any teardown. For example:
 ```
 Regression suite run of yyyy-mm-dd hh:mm:ss 
 env: emrys
-suite: smoke/regression-aws.csv
+cloud: aws (stack aws-full)
+suite: smoke/regression-full.csv
 tests: all
 stacks set up: aws-full, then torn down
 commands run with: ./afon.sh

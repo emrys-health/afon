@@ -15,7 +15,7 @@ public class NetworkPoliciesComponent implements StackComponent {
 
     @Override
     public void deploy(StackContext context) {
-        new NetworkConfig(context.stack(), context.properties())
+        new NetworkConfig(context.stack(), context.properties(), context.platform().ingressPodLabels())
             .networkPolicies(SPARK_CONNECTOR_NAME, context.platform().getDependables());
     }
 }

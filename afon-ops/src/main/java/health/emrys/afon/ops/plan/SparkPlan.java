@@ -19,11 +19,11 @@ import static health.emrys.afon.config.AfonCloud.AZURE;
 public class SparkPlan implements ComponentPlan {
 
     /**
-     * The write through Spark is only checked on AWS so far.
+     * The write through Spark is checked on the cloud of the stack, through its Polaris, to its own catalog.
      */
     @Override
     public List<Step> setupSteps(StepOperations ops, AfonCloud cloud) {
-        return cloud == AWS ? List.of(ops.runAwsSparkWritingTo(cloud)) : List.of();
+        return List.of(ops.runSparkWritingTo(cloud, cloud));
     }
 
     /**

@@ -235,6 +235,13 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     // Providers
     // -------------------------------------------------------------------------
 
+    /**
+     * The exact version of the azurerm provider, newer than the one the bindings were generated for (4.34.0): the bindings,
+     * which are not published for later versions, only lack its newer arguments, eg {@code network_profile.advanced_networking}
+     * of {@code azurerm_kubernetes_cluster} (from 4.45.0), which are set as overrides.
+     */
+    static final String AZURERM_VERSION = "4.81.0";
+
     private void configureProviders() {
         NullProvider.Builder.create(this, "null").build();
         AzurermProvider.Builder
@@ -243,6 +250,10 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             .subscriptionId(subscriptionId)
             .resourceProviderRegistrations(providerRegistrations)
             .build();
+        TerraformStack.of(this).addOverride(
+            "terraform.required_providers.azurerm", Map.of(
+                "source", "hashicorp/azurerm",
+                "version", AZURERM_VERSION));
     }
 
     // -------------------------------------------------------------------------
@@ -479,18 +490,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             .type("local-exec")
             .build();
 
-        // Advanced Container Networking Services, whose security feature gives Cilium the DNS proxy that the FQDN
-        // network policies need (see NetworkConfig).  The azurerm provider pinned has no argument for it, so it is
-        // enabled on the cluster once created, which the provider then leaves alone.
-        LocalExecProvisioner enableAcns = LocalExecProvisioner
-            .builder()
-            .when("create")
-            .command(format("az aks update --resource-group %s --name %s --enable-acns",
-                            resourceGroup.getName(), clusterName))
-            .type("local-exec")
-            .build();
-
-        return KubernetesCluster.Builder
+        KubernetesCluster cluster = KubernetesCluster.Builder
             .create(this, "aks")
             .name(clusterName)
             .location(resourceGroup.getLocation())
@@ -523,8 +523,13 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
                           .builder()
                           .create("20m")
                           .build())
-            .provisioners(List.of(updateCredentials, enableAcns))
+            .provisioners(List.of(updateCredentials))
             .build();
+        // Advanced Container Networking Services, whose security feature gives Cilium the DNS proxy that the FQDN
+        // network policies need (see NetworkConfig).  The typed network profile of the provider bindings has no such block,
+        // but the azurerm version pinned (see AZURERM_VERSION) has, so it is set as an override of the synthesised one.
+        cluster.addOverride("network_profile.advanced_networking", Map.of("security_enabled", true));
+        return cluster;
     }
 
     // -------------------------------------------------------------------------

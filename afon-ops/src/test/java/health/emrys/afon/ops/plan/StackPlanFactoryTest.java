@@ -106,7 +106,7 @@ class StackPlanFactoryTest {
             deleteConflicting("aws-full"),
             "deployStack(aws-full,[AWS_KEYCLOAK_CERT_ARN, AWS_POLARIS_CERT_ARN, AWS_JUPYTER_CERT_ARN])",
             "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-full)", "configureOidcUsersFor(aws)",
-            "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "runAwsSparkWritingTo(aws)",
+            "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "runSparkWritingTo(aws,aws)",
             "setupComplete(aws-full)");
         for (String cloud : List.of("azure", "gcp")) {
             String stack = cloud + "-polaris";
@@ -192,13 +192,14 @@ class StackPlanFactoryTest {
         assertThat(derived(SETUP, "azure-full")).containsExactly(
             deleteConflicting("azure-full"), "deployStack(azure-full,[])",
             "waitForPolarisAndKeycloakIn(azure)", "deployComplete(azure-full)", "configureOidcUsersFor(azure)",
-            "createAllCatalogsFor(azure)", "configurePolarisUsersOnAllCatalogsFor(azure)", "setupComplete(azure-full)");
-        // the Spark write is checked on AWS only, so far, and aws-trino has everything aws-full has but the monitoring, KeyCloak
-        // included, so it checks no other
+            "createAllCatalogsFor(azure)", "configurePolarisUsersOnAllCatalogsFor(azure)", "runSparkWritingTo(azure,azure)",
+            "setupComplete(azure-full)");
+        // the Spark write is checked once on each stack with Spark, through the Polaris of its cloud to its own catalog, and
+        // aws-trino has everything aws-full has but the monitoring, KeyCloak included, so it checks no other
         assertThat(derived(SETUP, "aws-trino")).containsExactly(
             deleteConflicting("aws-trino"), "deployStack(aws-trino,[AWS_KEYCLOAK_CERT_ARN, AWS_POLARIS_CERT_ARN, AWS_JUPYTER_CERT_ARN])",
             "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-trino)", "configureOidcUsersFor(aws)",
-            "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "runAwsSparkWritingTo(aws)",
+            "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "runSparkWritingTo(aws,aws)",
             "setupComplete(aws-trino)");
     }
 
@@ -241,7 +242,7 @@ class StackPlanFactoryTest {
     @Test
     void scenarioStepsAreOnlyCreatedWhenRun() {
         assertThat(factory.scenarioSteps(StackId.parse("aws-snowflake"), "reading-azure", ops).stream().map(Step::getName).toList())
-            .hasSize(2).first().asString().startsWith("runAwsSparkWritingTo(azure)");
+            .hasSize(2).first().asString().startsWith("runSparkWritingTo(aws,azure)");
         assertThat(factory.scenarioSteps(StackId.parse("aws-snowflake"), "reading-aws", ops)).hasSize(1);
         assertThat(factory.scenarioSteps(StackId.parse("aws-snowflake"), "writing-azure", ops).stream().map(Step::getName).toList())
             .hasSize(4).first().asString().startsWith("snowflakeWritingTo(azure)");

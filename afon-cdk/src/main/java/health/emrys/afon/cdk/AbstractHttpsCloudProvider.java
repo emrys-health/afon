@@ -48,6 +48,14 @@ public abstract class AbstractHttpsCloudProvider extends AbstractCloudProvider {
     }
 
     /**
+     * The nginx ingress controller runs in the cluster.
+     */
+    @Override
+    public Map<String, String> ingressPodLabels() {
+        return CdkHelper.NGINX_INGRESS_POD_LABELS;
+    }
+
+    /**
      * @return the nginx ingress controller's release, once the first route is exposed, which a workload that needs the
      * cluster's data plane to be serving, eg Spark on Azure, can wait for
      */
