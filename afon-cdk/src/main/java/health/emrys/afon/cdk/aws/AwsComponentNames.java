@@ -30,7 +30,8 @@ public class AwsComponentNames {
         cluster = clusterName(properties.getValue(CLUSTER_NAME), stackId);
         region = properties.getValue(AWS_REGION);
         checkRoleNameLength(getClusterRoleName(), getNodeGroupRoleName(), getLoadBalancerRoleName(),
-                            getPolarisLogShipperRoleName(), getEbsCsiDriverRoleName());
+                            getPolarisLogShipperRoleName(), getEbsCsiDriverRoleName(),
+                            getSnapshotRoleName());
     }
 
     /**
@@ -135,5 +136,18 @@ public class AwsComponentNames {
 
     public String getEbsCsiDriverRoleName() {
         return "cdktf-eks-ebs-csi-role-" + cluster;
+    }
+
+    public String getSnapshotRoleName() {
+        return "cdktf-eks-dlm-role-" + cluster;
+    }
+
+    /**
+     * The {@code Name} tag of a volume that outlives the cluster, by which a cluster of the same name finds it again.
+     *
+     * @param name what the volume is for, eg {@code gitea}
+     */
+    public String getRetainedVolumeName(String name) {
+        return name + "-" + cluster;
     }
 }

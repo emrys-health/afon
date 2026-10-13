@@ -5,6 +5,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import health.emrys.afon.config.AfonCloud;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 
 /**
@@ -68,6 +69,20 @@ public interface CloudPlatform extends CloudProvider {
      */
     default List<? extends ITerraformDependable> storageDependencies() {
         return getDependables();
+    }
+
+    /**
+     * A volume that outlives the cluster: it is kept when the stack is destroyed, and a cluster of the same name binds
+     * the same volume again, so that what a workload keeps on it, eg Gitea's repositories, survives the cluster.
+     *
+     * @param name      what the volume is for, eg {@code gitea}, which names it apart from the cluster's other volumes
+     * @param size      its size, as Kubernetes quantities of GiB, eg {@code 10Gi}
+     * @param namespace the namespace of the claim
+     * @return the claim on the volume, or empty if the platform has no such volumes, as by default, when the workload
+     * falls back to a volume provisioned with the cluster, which goes with it
+     */
+    default Optional<RetainedVolumeClaim> retainedVolumeClaim(String name, String size, String namespace) {
+        return Optional.empty();
     }
 
     /**
