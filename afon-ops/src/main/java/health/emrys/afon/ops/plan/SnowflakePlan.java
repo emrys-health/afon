@@ -8,8 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static health.emrys.afon.config.AfonCloud.AWS;
-import static health.emrys.afon.config.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.*;
 
 /**
  * The {@link ComponentPlan} for the {@link SnowflakeComponent}, decorating its deployment:
@@ -41,10 +40,10 @@ public class SnowflakePlan implements ComponentPlan {
         scenarios.put("reading-aws", ops -> List.of(
             ops.snowflakeReadingViaAwsPolaris(ops.afonCatalogs().aws())));
         scenarios.put("reading-azure", ops -> List.of(
-            ops.runAwsSparkWritingTo(AZURE),
+            ops.runSparkWritingTo(AWS, AZURE),
             ops.snowflakeReadingViaAwsPolaris(ops.afonCatalogs().azure())));
         scenarios.put("reading-gcp", ops -> List.of(
-            ops.runAwsSparkWritingTo(AfonCloud.GCP),
+            ops.runSparkWritingTo(AWS, GCP),
             ops.snowflakeReadingViaAwsPolaris(ops.afonCatalogs().gcp())));
         scenarios.put("writing-azure", ops -> List.of(
             ops.snowflakeWritingTo(AZURE),

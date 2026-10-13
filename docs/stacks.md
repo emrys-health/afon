@@ -248,6 +248,12 @@ afon-cli.sh manage-stack setup azure-full
 **NOTE:** `azure-full` needs 4 nodes of the default size, not the 3 that are the default: set `AZURE_AKS_NODE_POOL=nodeCount:4` in
 `afon-azure.properties` first, else pods such as the Spark Connect driver stay Pending (`Insufficient cpu`).  Check with
 `afon-cli.sh kube-estimator azure-full 4`.
+
+**NOTE:** `azure-full` deploys the network policies, which limit what the notebooks and the Spark master and driver can resolve to
+`ALLOWED_DOMAINS_CSV`.  List the Azure names in it, in `afon.properties`: `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME` and
+`${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net`, as well as `OIDC_DOMAIN_NAME`, else Spark fails with `UnknownHostException:
+<polaris domain>: Temporary failure in name resolution`.  The policies are replaced when the list changes, on the next deploy.
+
 `azure-full` has the same components as `aws-full`, including its own KeyCloak, served at `OIDC_DOMAIN_NAME`, which on Azure must be a domain
 whose DNS zone is in `AZURE_RESOURCE_GROUP`, like `AZURE_POLARIS_DOMAIN_NAME` and `AZURE_JUPYTER_DOMAIN_NAME`.  Its network policies
 need the cluster's Advanced Container Networking Services, which the stack enables, and its monitoring keeps the logs in the container of the

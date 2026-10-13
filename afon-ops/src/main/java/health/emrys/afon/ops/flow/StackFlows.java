@@ -28,6 +28,9 @@ public final class StackFlows {
         add(StackFlow.of("aws-keycloak-and-polaris",
                 setup("aws-keycloak"),
                 setup("aws-polaris")));
+        add(StackFlow.of("azure-keycloak-and-polaris",
+                setup("azure-keycloak"),
+                setup("azure-polaris")));
         add(StackFlow.of("azure-and-gcp-polaris",
                 setup("azure-polaris"),
                 setup("gcp-polaris")));

@@ -196,13 +196,16 @@ public class KeyCloakConfig extends Construct {
         // Without it the pod is behind its Service as soon as its container starts, but KeyCloak takes a minute or more
         // to serve, so whatever asks it meanwhile, eg the setup of the OIDC users or Polaris discovering its issuer, is
         // answered 502 by the ingress, or 503 "Bootstrap in progress" by KeyCloak itself.  A failing probe only keeps the
-        // pod out of the Service, it is never restarted for it, and the deployment is not rolled out until it passes.
+        // pod out of the Service, it is never restarted for it.
+        // The probe asks for what the pod is for, ie to serve the realm, rather than for /health/ready, whose "Keycloak
+        // cluster health check" went DOWN on a single healthy instance a minute after its start, 503 from then on, so that
+        // the probe took a KeyCloak that served every request out of its Service.
         DeploymentSpecTemplateSpecContainerReadinessProbe readinessProbe = DeploymentSpecTemplateSpecContainerReadinessProbe
             .builder()
             .httpGet(DeploymentSpecTemplateSpecContainerReadinessProbeHttpGet
                          .builder()
-                         .path(HEALTH_READY_PATH)
-                         .port("" + KEYCLOAK_MANAGEMENT_PORT)
+                         .path("/realms/master")
+                         .port("" + KEYCLOAK_PORT)
                          .build())
             .initialDelaySeconds(15)
             .periodSeconds(5)

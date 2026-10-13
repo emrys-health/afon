@@ -105,12 +105,13 @@ The OIDC notebook test, against the cluster of the current `kubectl` context:
 smoke/run-oidc-notebook.sh [cloud]
 ```
 
-The regression suite, running the tests listed in [smoke/regression-aws.csv](../../smoke/regression-aws.csv), and
-optionally deploying the stacks first and tearing them down after:
+The regression suite, running the tests listed in [smoke/regression-full.csv](../../smoke/regression-full.csv) against the
+full stack of a cloud, `aws` by default, or `azure`, and optionally setting up the stacks first and tearing them down after:
 
 ```shell
 smoke/run-regression-suite.sh --list
-smoke/run-regression-suite.sh --env <env> --deploy aws-full,azure-polaris,gcp-polaris --teardown
+smoke/run-regression-suite.sh --env <env> --setup aws-full,azure-polaris,gcp-polaris --teardown
+smoke/run-regression-suite.sh --env <env> --setup azure-full --teardown azure
 ```
 
 **NOTE**: deploying stacks creates cloud resources, which incur costs.  Tear them down when done.

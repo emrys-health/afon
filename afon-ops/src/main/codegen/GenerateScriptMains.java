@@ -69,6 +69,7 @@ public class GenerateScriptMains {
         new ScriptEntry("azure", "AzurePolarisMain", "azure/polaris.sh"),
         new ScriptEntry("azure", "AzureRbacMain", "azure/rbac.sh"),
         new ScriptEntry("azure", "AzureRolesMain", "azure/roles.sh"),
+        new ScriptEntry("azure", "AzureUpdateKubeConfigMain", "azure/update-kube-config.sh"),
 
         new ScriptEntry("gcp", "GcpAccountMain", "gcp/account.sh"),
         new ScriptEntry("gcp", "GcpCreateIcebergEndpointMain", "gcp/create_iceberg_endpoint.sh"),

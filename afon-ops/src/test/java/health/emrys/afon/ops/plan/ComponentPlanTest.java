@@ -81,12 +81,12 @@ class ComponentPlanTest {
     }
 
     @Test
-    void sparkChecksItWritesThroughPolarisOnAwsOnly() {
+    void sparkChecksItWritesThroughThePolarisOfTheCloudToItsOwnCatalog() {
         SparkPlan spark = new SparkPlan();
 
-        assertThat(setupOf(spark, AWS)).containsExactly("runAwsSparkWritingTo(aws)");
-        assertThat(setupOf(spark, AZURE)).isEmpty();
-        assertThat(setupOf(spark, GCP)).isEmpty();
+        assertThat(setupOf(spark, AWS)).containsExactly("runSparkWritingTo(aws,aws)");
+        assertThat(setupOf(spark, AZURE)).containsExactly("runSparkWritingTo(azure,azure)");
+        assertThat(setupOf(spark, GCP)).containsExactly("runSparkWritingTo(gcp,gcp)");
         assertThat(spark.domains(AWS)).isEmpty();
     }
 
