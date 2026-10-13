@@ -54,6 +54,10 @@ public class SynthesisSupport {
             "JUPYTER_VNC_PASSWORD")) {
             values.put(name, "golden-" + name.toLowerCase().replace('_', '-'));
         }
+        // production code parses it, eg for Gitea's blob storage, so it must be well-formed
+        values.put("AZURE_CONNECTION_STRING",
+                   "DefaultEndpointsProtocol=https;AccountName=goldenafonstorage;AccountKey=golden-azure-account-key;"
+                   + "EndpointSuffix=core.windows.net");
         return values;
     }
 
