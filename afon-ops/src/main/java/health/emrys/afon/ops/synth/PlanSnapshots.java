@@ -88,6 +88,14 @@ public final class PlanSnapshots {
      * resource does not matter to tofu, so it does not count.
      */
     public static Comparison compare(Path before, Path after) throws IOException {
+        return compare(before, after, true);
+    }
+
+    /**
+     * As {@link #compare(Path, Path)}, but with the values left out of the report if {@code showValues} is false, ie
+     * only the paths that differ are given, as the plans of a stack hold its config, eg its secrets.
+     */
+    public static Comparison compare(Path before, Path after, boolean showValues) throws IOException {
         List<String> beforeStacks = synthesised(before);
         List<String> afterStacks = synthesised(after);
         if (beforeStacks.isEmpty() || afterStacks.isEmpty()) {
@@ -104,7 +112,7 @@ public final class PlanSnapshots {
                 continue;
             }
             List<String> changes = compareStack(flatten(before.resolve(stack).resolve(PLAN_FILE)),
-                                                flatten(after.resolve(stack).resolve(PLAN_FILE)));
+                                                flatten(after.resolve(stack).resolve(PLAN_FILE)), showValues);
             lines.add("== " + stack + ": " + (changes.isEmpty() ? "unchanged" : "CHANGED"));
             changes.stream().map(change -> "   " + change).forEach(lines::add);
             differs |= !changes.isEmpty();
@@ -113,7 +121,7 @@ public final class PlanSnapshots {
         return new Comparison(lines, differs);
     }
 
-    private static List<String> compareStack(Map<String, String> before, Map<String, String> after) {
+    private static List<String> compareStack(Map<String, String> before, Map<String, String> after, boolean showValues) {
         Set<String> beforeAddresses = addresses(before);
         Set<String> afterAddresses = addresses(after);
         List<String> changes = new ArrayList<>();
@@ -131,11 +139,11 @@ public final class PlanSnapshots {
             String was = before.get(path);
             String now = after.get(path);
             if (was == null) {
-                changes.add("  + " + path + " = " + now);
+                changes.add("  + " + path + (showValues ? " = " + now : ""));
             } else if (now == null) {
-                changes.add("  - " + path + " = " + was);
+                changes.add("  - " + path + (showValues ? " = " + was : ""));
             } else if (!was.equals(now)) {
-                changes.add("  ~ " + path + ": " + was + " -> " + now);
+                changes.add("  ~ " + path + (showValues ? ": " + was + " -> " + now : ""));
             }
         }
         return changes;

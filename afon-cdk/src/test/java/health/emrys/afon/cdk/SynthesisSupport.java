@@ -18,7 +18,7 @@ import static health.emrys.afon.config.ConfigUtils.AFON_HOME_PROPERTY;
 
 /**
  * Synthesises the plan of a stack from the template config, with fixed values for what it leaves blank, as
- * {@link DeterministicSynthesisTest} does.  It also runs on its own,
+ * the test of the determinism of the synthesis did.  It also runs on its own,
  * in a JVM of its own, to synthesise the plans of the stacks named by the args into the dir.
  */
 public class SynthesisSupport {
