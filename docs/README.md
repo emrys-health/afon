@@ -31,27 +31,27 @@ If you are looking to deploy the data fabric, the easiest way to do so is throug
 
 #### Set up
 
-- Setup local env: [setup](docs/setup_local.md)
-- CLI binary distribution: [cli](./docs/afon_cli.md)
-- Configure properties and users: [configuration](./docs/configuration.md)
-- Theming: [theme](./docs/theme.md)
+- Setup local env: [setup](./setup_local.md)
+- CLI binary distribution: [cli](./afon_cli.md)
+- Configure properties and users: [configuration](./configuration.md)
+- Theming: [theme](./theme.md)
 
 ## How to deploy
 
-- Cloud infrastructure: [cloud](./docs/cloud.md)
-- DNS Configuration: [dns_config](./docs/dns_config.md)
-- Deploying stacks: [stacks](./docs/stacks.md)
-- Deploy catalogs: [catalogs](./docs/catalogs.md)
+- Cloud infrastructure: [cloud](./cloud.md)
+- DNS Configuration: [dns_config](./dns_config.md)
+- Deploying stacks: [stacks](./stacks.md)
+- Deploy catalogs: [catalogs](./catalogs.md)
 
 ---
 ### How to use
 
-- Jupyter: [jupyter](./docs/jupyter.md)
-- Monitoring: [monitoring](./docs/monitoring.md)
-- Operations: [operations](./docs/operations.md)
-- Smoke tests: [smoke tests](./docs/smoke_tests.md)
-- Snowflake: [snowflake](./docs/snowflake.md)
-- Examples: [examples](./docs/examples.md)
+- Jupyter: [jupyter](./jupyter.md)
+- Monitoring: [monitoring](./monitoring.md)
+- Operations: [operations](./operations.md)
+- Smoke tests: [smoke tests](./smoke_tests.md)
+- Snowflake: [snowflake](./snowflake.md)
+- Examples: [examples](./examples.md)
 
 
 ## For a data provider 
@@ -59,26 +59,26 @@ If you are looking to deploy the data fabric, the easiest way to do so is throug
 
 #### Set up
 
-- Setup local env: [setup](docs/setup_local.md)
-- CLI binary distribution: [cli](./docs/afon_cli.md)
-- Configure properties and users: [configuration](./docs/configuration.md)
-- Theming: [theme](./docs/theme.md)
+- Setup local env: [setup](./setup_local.md)
+- CLI binary distribution: [cli](./afon_cli.md)
+- Configure properties and users: [configuration](./configuration.md)
+- Theming: [theme](./theme.md)
 
 ## How to deploy
 
-- Cloud infrastructure: [cloud](./docs/cloud.md)
-- DNS Configuration: [dns_config](./docs/dns_config.md)
-- Deploying stacks: [stacks](./docs/stacks.md)
-- Deploy catalogs: [catalogs](./docs/catalogs.md)
+- Cloud infrastructure: [cloud](./cloud.md)
+- DNS Configuration: [dns_config](./dns_config.md)
+- Deploying stacks: [stacks](./stacks.md)
+- Deploy catalogs: [catalogs](./catalogs.md)
 
 ---
 ### How to use
 
-- Jupyter: [jupyter](./docs/jupyter.md)
-- Monitoring: [monitoring](./docs/monitoring.md)
-- Operations: [operations](./docs/operations.md)
-- Smoke tests: [smoke tests](./docs/smoke_tests.md)
-- Snowflake: [snowflake](./docs/snowflake.md)
-- Examples: [examples](./docs/examples.md)
+- Jupyter: [jupyter](./jupyter.md)
+- Monitoring: [monitoring](./monitoring.md)
+- Operations: [operations](./operations.md)
+- Smoke tests: [smoke tests](./smoke_tests.md)
+- Snowflake: [snowflake](./snowflake.md)
+- Examples: [examples](./examples.md)
 
 
