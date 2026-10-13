@@ -75,6 +75,23 @@ class StepActionsTest {
     }
 
     @Test
+    void deletingStackKeepsWhatOutlivesIt() throws IOException {
+        Path stackDir = createDirs("stacks/aws-full").get(0);
+        Path tfState = createFiles("terraform.aws-full.tfstate").get(0);
+        Files.writeString(stackDir.resolve("cdk.tf.json"), """
+            {"resource": {
+              "aws_ebs_volume": {"retained_gitea_volume": {"lifecycle": {"prevent_destroy": true}}},
+              "aws_eks_cluster": {"cluster": {"lifecycle": {"prevent_destroy": false}}},
+              "helm_release": {"gitea": {}}
+            }}""");
+
+        actions.deleteStack(stackDir, tfState, 1, OutputStream.nullOutputStream());
+
+        assertThat(commands).containsExactly("tofu init",
+                                             "tofu destroy --auto-approve -exclude=aws_ebs_volume.retained_gitea_volume");
+    }
+
+    @Test
     void canDeleteStackWithoutTfStateWithoutRunningTofu() throws IOException {
         Path stackDir = createDirs("stacks/aws-keycloak").get(0);
 

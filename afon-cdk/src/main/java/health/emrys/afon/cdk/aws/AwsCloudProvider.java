@@ -3,6 +3,7 @@ package health.emrys.afon.cdk.aws;
 import com.hashicorp.cdktf.Aspects;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.TerraformStack;
+import health.emrys.afon.cdk.RetainedVolumeClaim;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformOutput;
@@ -138,6 +139,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     private       HelmProvider               helmProvider;
     private final List<ITerraformDependable> lbcIrsaDependables = new ArrayList<>();
     private       KubernetesProvider         k8sProvider;
+    /** The stack's {@code import} blocks, of the volumes {@link #retainedVolumeClaim} adopts if they exist. */
+    private final List<Map<String, String>>  retainedVolumeImports = new ArrayList<>();
+    private       IamRole                    snapshotRole;
 
     /**
      * @param pinnedEgressIp whether the egress IP is pinned to {@code AWS_EGRESS_IP}, if set, else a fresh one is
@@ -1506,6 +1510,35 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     private List<String> eksTokenArgs() {
         return List.of("eks", "get-token", "--cluster-name", clusterName, "--region", region);
+    }
+
+    @Override
+    public synchronized Optional<RetainedVolumeClaim> retainedVolumeClaim(String name, String size, String namespace) {
+        RetainedVolumeClaim claim = AwsRetainedVolume.create(
+            this, name, componentNames.getRetainedVolumeName(name), size, namespace,
+            // The zone of the first subnets, private and public, so that it has nodes.
+            region + "a", snapshotRole(), storageDependencies(), retainedVolumeImports);
+        // CDKTF has no import blocks, let alone conditional ones, so they are written to the stack as they are.
+        TerraformStack.of(this).addOverride("import", retainedVolumeImports);
+        return Optional.of(claim);
+    }
+
+    /** The role Data Lifecycle Manager snapshots the retained volumes as, one per stack. */
+    private IamRole snapshotRole() {
+        if (snapshotRole == null) {
+            snapshotRole = IamRole.Builder
+                .create(this, "snapshotRole")
+                .name(componentNames.getSnapshotRoleName())
+                .assumeRolePolicy("""
+                    {"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Principal": {"Service": "dlm.amazonaws.com"}, "Action": "sts:AssumeRole"}]}""")
+                .build();
+            IamRolePolicyAttachment.Builder
+                .create(this, "snapshotRolePolicy")
+                .role(snapshotRole.getName())
+                .policyArn("arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole")
+                .build();
+        }
+        return snapshotRole;
     }
 
     @Override
