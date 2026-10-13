@@ -47,11 +47,13 @@ import static health.emrys.afon.config.AfonProperty.*;
  */
 public class GiteaConfig {
 
-    static final String SECRET_NAME = "gitea-secrets";
+    static final         String SECRET_NAME = "gitea-secrets";
     private static final String CHART_FILE  = "gitea-12.7.0.tgz";
     private static final int    DB_PORT     = 5432;
 
-    /** Keys of {@link #SECRET_NAME}: the admin's, as the chart expects them, then app.ini sections, then Postgres'. */
+    /**
+     * Keys of {@link #SECRET_NAME}: the admin's, as the chart expects them, then app.ini sections, then Postgres'.
+     */
     private static final String ADMIN_USERNAME_KEY   = "username";
     private static final String ADMIN_PASSWORD_KEY   = "password";
     private static final String DATABASE_SECTION_KEY = "database";
@@ -59,11 +61,12 @@ public class GiteaConfig {
     private static final String DB_PASSWORD_KEY      = "db-password";
 
     private final AfonPropertyProvider properties;
-    private final AfonCloud cloud;
+    private final AfonCloud            cloud;
 
-    public GiteaConfig(@NonNull AfonPropertyProvider properties, @NonNull AfonCloud cloud) {
+    public GiteaConfig(@NonNull AfonPropertyProvider properties,
+                       @NonNull AfonCloud cloud) {
         this.properties = properties;
-        this.cloud = cloud;
+        this.cloud      = cloud;
     }
 
     /**
@@ -101,18 +104,24 @@ public class GiteaConfig {
                               .build();
     }
 
-    /** The Postgres database Gitea keeps its metadata in, one per cluster, as Postgres identifiers allow. */
+    /**
+     * The Postgres database Gitea keeps its metadata in, one per cluster, as Postgres identifiers allow.
+     */
     String databaseName() {
         return "gitea_" + properties.getValue(CLUSTER_NAME).replaceAll("[^A-Za-z0-9_]", "_");
     }
 
-    /** One of disable, require, verify-ca or verify-full, which Gitea and psql both take. */
+    /**
+     * One of disable, require, verify-ca or verify-full, which Gitea and psql both take.
+     */
     private String sslMode() {
         String sslMode = properties.getValue(GITEA_DB_SSL_MODE, "");
         return sslMode.isBlank() ? "require" : sslMode;
     }
 
-    /** Where, in the cloud's bucket, Gitea's blobs go. */
+    /**
+     * Where, in the cloud's bucket, Gitea's blobs go.
+     */
     String basePath() {
         return "gitea/" + properties.getValue(CLUSTER_NAME) + "/";
     }
@@ -143,7 +152,7 @@ public class GiteaConfig {
      * are both reached through Gitea's S3 client ({@code minio}), GCS by its S3 compatible API.
      */
     Map<String, String> storageSection() {
-        String bucket = properties.getCloudValue(cloud, "GITEA_BUCKET");
+        String              bucket  = properties.getCloudValue(cloud, "GITEA_BUCKET");
         Map<String, String> section = new LinkedHashMap<>();
         switch (cloud) {
             case AWS -> {
@@ -169,8 +178,8 @@ public class GiteaConfig {
             }
             case AZURE -> {
                 Map<String, String> connection = parseConnectionString(properties.getValue(AZURE_CONNECTION_STRING));
-                String account = required(connection, "AccountName");
-                String suffix = connection.getOrDefault("EndpointSuffix", "core.windows.net");
+                String              account    = required(connection, "AccountName");
+                String              suffix     = connection.getOrDefault("EndpointSuffix", "core.windows.net");
                 section.put("STORAGE_TYPE", "azureblob");
                 section.put("AZURE_BLOB_ENDPOINT", "https://" + account + ".blob." + suffix);
                 section.put("AZURE_BLOB_ACCOUNT_NAME", account);
@@ -225,14 +234,18 @@ public class GiteaConfig {
         return CdkUtils.toCanonicalJson(values);
     }
 
-    /** An app.ini section as the chart's additional config sources take it: one {@code KEY=value} per line. */
+    /**
+     * An app.ini section as the chart's additional config sources take it: one {@code KEY=value} per line.
+     */
     static String iniSection(Map<String, String> settings) {
         StringBuilder ini = new StringBuilder();
         settings.forEach((key, value) -> ini.append(key).append('=').append(value).append('\n'));
         return ini.toString();
     }
 
-    /** Azure's {@code Key=Value;...} storage connection string; values, eg base64 keys, may themselves hold '='. */
+    /**
+     * Azure's {@code Key=Value;...} storage connection string; values, eg base64 keys, may themselves hold '='.
+     */
     static Map<String, String> parseConnectionString(String connectionString) {
         Map<String, String> parts = new LinkedHashMap<>();
         for (String part : connectionString.split(";")) {
