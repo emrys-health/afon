@@ -27,6 +27,7 @@ public final class ComponentPlanRegistry {
         registry.add(SparkComponent.class, new SparkPlan());
         registry.add(SnowflakeComponent.class, new SnowflakePlan());
         registry.add(AwsLoggingComponent.class, NO_OP);
+        registry.add(GitComponent.class, NO_OP);
 
         // infrastructure with nothing to wait for or configure
         for (Class<? extends StackComponent> type : List.of(

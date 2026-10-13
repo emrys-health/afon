@@ -1,5 +1,17 @@
 package health.emrys.afon.cdk;
 
+import health.emrys.afon.cdk.components.CrdCleanupComponent;
+import health.emrys.afon.cdk.components.GitComponent;
+import health.emrys.afon.cdk.components.JupyterComponent;
+import health.emrys.afon.cdk.aws.AwsLoggingComponent;
+import health.emrys.afon.cdk.components.MonitoringComponent;
+import health.emrys.afon.cdk.components.KeycloakComponent;
+import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
+import health.emrys.afon.cdk.components.PolarisComponent;
+import health.emrys.afon.cdk.components.SnowflakeComponent;
+import health.emrys.afon.cdk.components.SparkComponent;
+import health.emrys.afon.cdk.components.SparkOperatorComponent;
+import health.emrys.afon.cdk.components.TrinoComponent;
 import health.emrys.afon.cdk.components.*;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -68,8 +80,12 @@ public final class StackDefinitions {
         return components;
     }
 
+
     private static List<StackComponent> full(boolean keyCloakExternal) {
-        return concat(jupyter(keyCloakExternal), spark(), List.of(new TrinoComponent(), new MonitoringComponent()));
+        return concat(jupyter(keyCloakExternal), spark(), List.of(new TrinoComponent(),
+                                                                  new MonitoringComponent(),
+                                                                  new AwsLoggingComponent(),
+                                                                  new GitComponent()));
     }
 
     // The operator only launches Spark in response to the resources of the Spark component
