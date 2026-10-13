@@ -85,6 +85,7 @@ The flows are:
 - `aws-full-and-azure-polaris`: `setup aws-full`, `setup azure-polaris`;
 - `aws-keycloak-and-polaris`: `setup aws-keycloak`, `setup aws-polaris`;
 - `azure-and-gcp-polaris`: `setup azure-polaris`, `setup gcp-polaris`;
+- `azure-keycloak-and-polaris`: `setup azure-keycloak`, `setup azure-polaris`;
 - `cross-cloud-azure`: `setup aws-full`, `setup azure-polaris`, then `run aws-full external-azure`;
 - `snowflake-<scenario>`, ie `snowflake-reading-aws`, `snowflake-reading-azure`, `snowflake-reading-gcp` and
   `snowflake-writing-azure`: `setup aws-snowflake`, then `run aws-snowflake <scenario>`;
