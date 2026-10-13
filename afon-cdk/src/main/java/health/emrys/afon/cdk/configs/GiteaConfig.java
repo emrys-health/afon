@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk.configs;
 
 import health.emrys.afon.cdk.CdkUtils;
+import health.emrys.afon.cdk.CloudPlatform;
 import health.emrys.afon.cdk.DockerImages;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
@@ -17,6 +18,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static health.emrys.afon.config.AfonProperty.*;
 
@@ -25,10 +27,13 @@ import static health.emrys.afon.config.AfonProperty.*;
  * a Postgres database and its blobs in the object storage of the configured {@link AfonCloud}: S3 on AWS, GCS on GCP
  * and Blob Storage on Azure.
  *
- * <p>Gitea serves git itself from a filesystem, so the bare repositories stay on the chart's persistent volume; what
+ * <p>Gitea serves git itself from a filesystem, so the bare repositories stay on a persistent volume: one that
+ * outlives the cluster where the platform has them, see {@link CloudPlatform#retainedVolumeClaim}, else the chart's,
+ * which goes with the cluster.  What
  * Gitea can put in object storage - LFS objects, attachments, packages, avatars, repository archives and Actions
  * logs and artifacts - goes under {@code gitea/<cluster>/} of the cloud's bucket, so that the stacks sharing a bucket
- * keep theirs apart.
+ * keep theirs apart.  The database, the bucket's path and the volume are all named after the same cluster name,
+ * eg {@code full-emrys-cluster}, so that a cluster of the same name finds all three again.
  *
  * <p>The database {@code gitea_<cluster>} is created, if absent, by an init container of the Gitea pod; Gitea then
  * creates and migrates its own schema.  The chart's bundled Postgres and Valkey are disabled: being a single replica,
@@ -40,7 +45,6 @@ import static health.emrys.afon.config.AfonProperty.*;
  *     <li>optionally {@code GITEA_DB_SSL_MODE}, defaulting to {@code require}</li>
  *     <li>optionally {@code GITEA_STORAGE_SIZE}, the size of the repositories' volume, defaulting to {@code 10Gi}</li>
  *     <li>{@code GITEA_ADMIN_USERNAME}, {@code GITEA_ADMIN_PASSWORD}</li>
- *     <li>{@code CLUSTER_NAME}</li>
  *     <li>AWS: {@code AWS_GITEA_BUCKET}, {@code AWS_REGION}, {@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY}</li>
  *     <li>GCP: {@code GCP_GITEA_BUCKET}, {@code GCP_REGION}, {@code GCP_GITEA_HMAC_ACCESS_ID},
  *     {@code GCP_GITEA_HMAC_SECRET}</li>
@@ -64,11 +68,17 @@ public class GiteaConfig {
 
     private final AfonPropertyProvider properties;
     private final AfonCloud            cloud;
+    private final String               clusterName;
 
+    /**
+     * @param clusterName the name of the cluster, eg {@code full-emrys-cluster}, see {@link CloudPlatform#clusterName()}
+     */
     public GiteaConfig(@NonNull AfonPropertyProvider properties,
-                       @NonNull AfonCloud cloud) {
-        this.properties = properties;
-        this.cloud      = cloud;
+                       @NonNull AfonCloud cloud,
+                       @NonNull String clusterName) {
+        this.properties  = properties;
+        this.cloud       = cloud;
+        this.clusterName = clusterName;
     }
 
     /**
@@ -76,11 +86,13 @@ public class GiteaConfig {
      *
      * @param scope        the CDKTF stack the release is scoped to.
      * @param helmProvider the Helm provider wired to the target cluster (Azure aliases its provider).
-     * @param dependsOn    must include the cluster's dependables (so the API server is reachable).
+     * @param dependsOn    must include the cluster's dependables (so the API server is reachable), and the claim if any.
+     * @param claim        the claim on the volume of the repositories, or empty for the chart to create its own
      */
     public Release deploy(@NonNull Construct scope,
                           @NonNull HelmProvider helmProvider,
-                          @NonNull List<? extends ITerraformDependable> dependsOn) {
+                          @NonNull List<? extends ITerraformDependable> dependsOn,
+                          @NonNull Optional<String> claim) {
         Secret secret = Secret.Builder
             .create(scope, "giteaSecrets")
             .metadata(SecretMetadata.builder()
@@ -101,7 +113,7 @@ public class GiteaConfig {
                               .namespace("default")
                               .atomic(true)
                               .timeout(600)
-                              .values(List.of(values()))
+                              .values(List.of(values(claim)))
                               .dependsOn(releaseDependsOn)
                               .build();
     }
@@ -110,7 +122,7 @@ public class GiteaConfig {
      * The Postgres database Gitea keeps its metadata in, one per cluster, as Postgres identifiers allow.
      */
     String databaseName() {
-        return "gitea_" + properties.getValue(CLUSTER_NAME).replaceAll("[^A-Za-z0-9_]", "_");
+        return "gitea_" + clusterName.replaceAll("[^A-Za-z0-9_]", "_");
     }
 
     /**
@@ -124,7 +136,7 @@ public class GiteaConfig {
     /**
      * The size of the volume holding the git repositories.
      */
-    String storageSize() {
+    public String storageSize() {
         String size = properties.getValue(GITEA_STORAGE_SIZE, "");
         return size.isBlank() ? "10Gi" : size;
     }
@@ -133,7 +145,7 @@ public class GiteaConfig {
      * Where, in the cloud's bucket, Gitea's blobs go.
      */
     String basePath() {
-        return "gitea/" + properties.getValue(CLUSTER_NAME) + "/";
+        return "gitea/" + clusterName + "/";
     }
 
     Map<String, String> secretData() {
@@ -205,7 +217,7 @@ public class GiteaConfig {
      * Values for the {@code gitea} chart.  The secret settings are not here, but in {@link #SECRET_NAME}, which the
      * chart merges into app.ini, picking only the app.ini sections out of it.
      */
-    String values() {
+    String values(Optional<String> claim) {
         Map<String, Object> createDatabase = Map.of(
             "name", "create-database",
             "image", DockerImages.POSTGRES_ALPINE_IMAGE,
@@ -224,14 +236,19 @@ public class GiteaConfig {
                 Map.of("name", "PGSSLMODE", "value", sslMode()),
                 Map.of("name", "GITEA_DB", "value", databaseName())));
 
-        // The chart's default resource-policy "keep" would leave the PVC, and so its cloud disk, behind on uninstall,
-        // outliving the cluster; a null value removes the key from the chart's defaults.
-        Map<String, Object> noResourcePolicy = new HashMap<>();
-        noResourcePolicy.put("helm.sh/resource-policy", null);
+        Map<String, Object> persistence = claim
+            .<Map<String, Object>>map(name -> Map.of("create", false, "claimName", name))
+            .orElseGet(() -> {
+                // The chart's default resource-policy "keep" would leave the PVC, and so its cloud disk, behind on
+                // uninstall, outliving the cluster; a null value removes the key from the chart's defaults.
+                Map<String, Object> noResourcePolicy = new HashMap<>();
+                noResourcePolicy.put("helm.sh/resource-policy", null);
+                return Map.of("size", storageSize(), "annotations", noResourcePolicy);
+            });
 
         Map<String, Object> values = Map.of(
-            // The repositories' volume, of the cluster's default StorageClass.
-            "persistence", Map.of("size", storageSize(), "annotations", noResourcePolicy),
+            // The repositories' volume: the claimed one, else one of the cluster's default StorageClass.
+            "persistence", persistence,
             // A single replica on a ReadWriteOnce volume: the old pod must let go of it before the new one starts.
             "strategy", Map.of("type", "Recreate"),
             "preExtraInitContainers", List.of(createDatabase),

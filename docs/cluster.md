@@ -209,6 +209,33 @@ You can also restrict a deployed cluster by hand, which a redeploy undoes:
 kubectl annotate ingress polaris-ingress -n default --overwrite nginx.ingress.kubernetes.io/whitelist-source-range="203.0.113.7/32,10.244.0.0/16"
 ```
 
+## Volumes that outlive the cluster (AWS)
+
+Gitea's repositories are kept on an EBS volume that is not destroyed with the stack, so that a cluster of the same
+name mounts the same volume again.  It is tagged `Name=gitea-<cluster>`, eg `gitea-full-emrys-cluster`, is in the
+zone `<AWS_REGION>a`, and is sized by `GITEA_STORAGE_SIZE` (default `10Gi`).  On deploy, the stack imports the
+volume of that name if there is one, else creates it.  Gitea's database `gitea_<cluster>` and its path
+`gitea/<cluster>/` in `AWS_GITEA_BUCKET` are named after the same cluster, so all three are found again together.
+
+`afon-cli.sh manage-stack delete` keeps the volume: it excludes every resource with `prevent_destroy` from
+`tofu destroy`.  A plain `tofu destroy` fails on it instead, rather than delete it.  To destroy the stack by hand:
+
+```shell
+tofu destroy -exclude=aws_ebs_volume.retained_gitea_volume
+```
+
+While the cluster runs, Data Lifecycle Manager snapshots the volume daily at 03:00 UTC and keeps the last 7.
+The snapshots outlive the cluster too, so those of earlier clusters stay until deleted.
+
+To grow the volume, raise `GITEA_STORAGE_SIZE` and redeploy, which grows the EBS volume in place, then grow its
+filesystem on the node running Gitea, as the volume is bound statically, outside the CSI driver's resizing:
+
+```shell
+kubectl debug node/<node> -it --image=ubuntu -- chroot /host resize2fs /dev/<device>
+```
+
+It cannot shrink.  To delete it for good, delete the stack, then `aws ec2 delete-volume --volume-id <id>`.
+
 ## Logging & Monitoring
 
 ### Polaris logs in S3 (AWS)

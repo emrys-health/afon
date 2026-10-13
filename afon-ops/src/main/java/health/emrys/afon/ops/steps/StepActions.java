@@ -281,7 +281,13 @@ public class StepActions {
     private void tofuDestroy(Path tofuDir, int maxAttempts, OutputStream outputStream) throws ManagedProcessException {
         logger.info("Executing tofu destroy in dir {}", tofuDir);
         tofuInit(tofuDir, outputStream);
-        String[] args = List.of("destroy", "--auto-approve").toArray(new String[0]);
+        List<String> destroy = new ArrayList<>(List.of("destroy", "--auto-approve"));
+        List<String> exclusions = retainedExclusions(tofuDir);
+        if (!exclusions.isEmpty()) {
+            logger.info("Keeping what outlives the stack: {}", exclusions);
+        }
+        destroy.addAll(exclusions);
+        String[] args = destroy.toArray(new String[0]);
         tofuWithRetry(tofuDir, outputStream, maxAttempts, args);
     }
 
@@ -515,6 +521,33 @@ public class StepActions {
                      + "proceeding with a single apply", config, e);
         }
         return targets;
+    }
+
+    /**
+     * Reads config file {@code cdk.tf.json} in the given stack dir and returns {@code -exclude=...} arguments for every
+     * resource with {@code prevent_destroy}, eg a volume that outlives the cluster, so that destroying the stack keeps
+     * them, while a plain {@code tofu destroy} fails rather than deletes them.  What they depend on is kept with them,
+     * what depends on them is destroyed.
+     *
+     * @throws IllegalStateException if the file cannot be read, as destroying without the exclusions would delete them
+     */
+    List<String> retainedExclusions(Path stackDir) {
+        List<String> exclusions = new ArrayList<>();
+        Path config = stackDir.resolve("cdk.tf.json");
+        if (!config.toFile().exists()) {
+            return exclusions;
+        }
+        try {
+            JsonNode resources = new ObjectMapper().readTree(config.toFile()).path("resource");
+            resources.fields().forEachRemaining(type -> type.getValue().fields().forEachRemaining(resource -> {
+                if (resource.getValue().path("lifecycle").path("prevent_destroy").asBoolean(false)) {
+                    exclusions.add("-exclude=" + type.getKey() + "." + resource.getKey());
+                }
+            }));
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not read " + config + " for what outlives the stack", e);
+        }
+        return exclusions;
     }
 
     public int run(String command, Path path, String... commands) throws ManagedProcessException {
