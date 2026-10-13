@@ -3,7 +3,7 @@
 The smoke tests check a deployed stack end to end, as a data scientist uses it: from a Jupyter notebook, through
 Spark Connect, to Polaris, authenticated with the user's own OIDC token.
 
-The smoke tests run against a real deployment (currently the AWS full stack), so they also cover the deployed Spark Connect server, Keycloak and the Polaris grants configured from `users-acl.csv`.
+The smoke tests run against a real deployment (the AWS or the Azure full stack), so they also cover the deployed Spark Connect server, Keycloak and the Polaris grants configured from `users-acl.csv`.
 They complement the [acceptance tests](acceptance_tests.md), which run against local containers.
 
 ## What is tested
@@ -30,13 +30,14 @@ exist before checking privileges, so reading a table in an empty catalog would n
 
 ## Requirements
 
-- A deployed AWS full stack, and a `kubectl` context pointing at its cluster.
-- In `$AFON_HOME/config` (default `~/.afon/config`): `AWS_POLARIS_DOMAIN_NAME`, `OIDC_DOMAIN_NAME`,
-  and `USER_ID`, naming one of the users in [users.csv](configuration.md), whose password is read from there.
+- A deployed full stack, `aws-full` or `azure-full`, and a `kubectl` context pointing at its cluster.
+- In `$AFON_HOME/config` (default `~/.afon/config`): `<CLOUD>_POLARIS_DOMAIN_NAME`, eg `AZURE_POLARIS_DOMAIN_NAME`,
+  `OIDC_DOMAIN_NAME`, and `USER_ID`, naming one of the users in [users.csv](configuration.md), whose password is read from there.
   The test runs as the `USER_ID` user, which you can check with `./afon.sh -a config-user`
   (see [config-user](configuration.md#command-config-user)).
-- [users-acl.csv](configuration.md) authorising the test user for `AFON_CATALOG` (default `aws`), but not for
-  `AFON_FORBIDDEN_CATALOG` (default `aws_forbidden`). Other users may be authorised for any catalog, as each user has
+- [users-acl.csv](configuration.md) authorising the test user for `AFON_CATALOG` (default `aws`, or the catalog of the
+  cloud given to `smoke/run-oidc-notebook.sh`, eg `azure`), but not for `AFON_FORBIDDEN_CATALOG` (default `aws_forbidden`, or
+  `<cloud>_forbidden`). Other users may be authorised for any catalog, as each user has
   their own Polaris principal role. For example, testing as `will`:
 
   ```
@@ -45,10 +46,10 @@ exist before checking privileges, so reading a table in an empty catalog would n
   will,aws:aws_trino:azure:gcp
   ```
 
-  After changing the ACL, apply it to Polaris:
+  After changing the ACL, apply it to Polaris of the cloud:
 
   ```shell
-  ./afon.sh -a configure-users aws all
+  ./afon.sh -a configure-users <cloud> all
   ```
 
 - `AFON_CATALOG` containing the table `AFON_TABLE` (default `namespaceph.test_table`, created at setup).
@@ -61,7 +62,8 @@ exist before checking privileges, so reading a table in an empty catalog would n
 smoke/run-oidc-notebook.sh [cloud]
 ```
 
-`cloud` defaults to `aws`, and selects the Polaris domain from `<CLOUD>_POLARIS_DOMAIN_NAME`. The script:
+`cloud` defaults to `aws`, and selects the Polaris domain from `<CLOUD>_POLARIS_DOMAIN_NAME` and the catalogs `<cloud>` and
+`<cloud>_forbidden`, eg `azure` and `azure_forbidden`. The script:
 
 1. reads `<CLOUD>_POLARIS_DOMAIN_NAME` and `OIDC_DOMAIN_NAME` from `$AFON_HOME/config/*.properties`, for the notebook;
 2. checks that OIDC provider is serving requests, with `./afon.sh -a check-oidc`, failing fast if it is not;
@@ -76,7 +78,7 @@ clean. The script exits non-zero if any check fails. The token is never printed.
 To get the same token yourself, eg to run the notebook some other way, use:
 
 ```shell
-./afon.sh -a show-oidc-token aws user
+./afon.sh -a show-oidc-token <cloud> user
 ```
 
 Without `user`, `show-oidc-token` gives the token of the Polaris admin (`POLARIS_ID`) instead, which is not what
@@ -112,13 +114,19 @@ setup of the stack to the catalog of its own cloud, so it is not in the `aws` ca
 - **`kubectl` fails with `Unauthorized`, or the port-forward cannot start**: check `kubectl config current-context`
   points at the stack's cluster. Do not source the secrets files into your shell before running: they also export
   cloud credentials, which change the identity `kubectl` uses.
-- **Check 1 fails**: the test user is not authorised for `AFON_CATALOG`, or the table does not exist.
+- **Check 1 fails**: the test user is not authorised for `AFON_CATALOG`, or the table does not exist.  With
+  `TABLE_OR_VIEW_NOT_FOUND` for ``test_catalog`.`namespaceph`.`test_table` `` the notebook is reading another catalog than
+  the one the stack's setup wrote the table to, which is that of its own cloud: run it through
+  `smoke/run-oidc-notebook.sh <cloud>`, or set `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG`.
+- **Spark fails with `UnknownHostException: <polaris domain>: Temporary failure in name resolution`**: the network policies
+  only let the Spark driver resolve the names in `ALLOWED_DOMAINS_CSV`, so list the Polaris and Jupyter domain names and the
+  storage account of the cloud there (see [Setup Azure full stack](stacks.md#setup-azure-full-stack)).
 - **Check 2 fails**: the Spark Connect server still registers catalogs of its own. The Spark Connect manifest is
   applied only when the stack is created, so a stack deployed before these changes keeps its old configuration until
   it is redeployed, or until the `SparkApplication` is re-applied (see *Problems starting Spark Connect* in the
   generated setup documents).
 - **Check 4 fails**: the test user is authorised for `AFON_FORBIDDEN_CATALOG`, either in `users-acl.csv` or because
-  the ACL has not been applied to Polaris since it changed (`./afon.sh -a configure-users aws all`).
+  the ACL has not been applied to Polaris since it changed (`./afon.sh -a configure-users <cloud> all`).
 
 ## Regression suite
 
@@ -178,17 +186,21 @@ independently of the source tree, and a test whose command is unknown fails.
   `OFF`.
 - `--list` lists the tests.
 
-The tests run against the AWS full stack's cluster: the Spark Connect tests read the Azure and GCP catalogs through its
-Spark Connect server, so they also need the Azure and GCP Polaris stacks. On every run, after any setups, and whether
-`--env` is given or not, the suite:
+The tests run against the full stack's cluster of the `<cloud>`: the Spark Connect tests read the catalogs of the clouds
+through its Spark Connect server, so they also need the Polaris stacks of the other clouds. On every run, after any
+setups, and whether `--env` is given or not, the suite:
 
-1. makes the env's AWS full stack cluster the current `kubectl` context, with the afon command
-   `aws-update-kube-config full`, leaving it so after the suite;
-2. restricts that cluster's Polaris ingress, as the network smoke test expects, by annotating `polaris-ingress` with
+1. makes the env's full stack cluster of the `<cloud>` the current `kubectl` context, with the afon command
+   `<cloud>-update-kube-config full`, leaving it so after the suite;
+2. on AWS only, restricts that cluster's Polaris ingress, as the network smoke test expects, by annotating `polaris-ingress` with
    `alb.ingress.kubernetes.io/inbound-cidrs`. As `AwsCloudProvider` does for Polaris when `AWS_POLARIS_ALLOWED_CIDRS` is set, it
    admits those CIDRs plus the cluster's egress IP. The egress IP is read from the cluster's NAT gateway, so that it is
    right even if `AWS_EGRESS_IP` is stale, with a warning if they differ, falling back to `AWS_EGRESS_IP` if the NAT
-   gateway cannot be found. A redeploy undoes the annotation, which a freshly deployed stack does not have.
+   gateway cannot be found. A redeploy undoes the annotation, which a freshly deployed stack does not have.  On Azure it is
+   skipped, with a warning.
+
+The network smoke test also checks the pods against the current `ALLOWED_DOMAINS_CSV`, that each name in it is reachable, so a
+stack deployed before the list changed fails it until it is redeployed, as its network policies hold the old list.
 
 So the results only depend on the env's config and stacks, whoever runs the suite. All the selected tests are run, even if some fail. Their logging goes to the afon log file,
 `$AFON_HOME/logs/afon-core.log`, and to the console as set by `--logging-console`. The script ends with a summary, and
