@@ -194,13 +194,25 @@ class StackPlanFactoryTest {
             "waitForPolarisAndKeycloakIn(azure)", "deployComplete(azure-full)", "configureOidcUsersFor(azure)",
             "createAllCatalogsFor(azure)", "configurePolarisUsersOnAllCatalogsFor(azure)", "runSparkWritingTo(azure,azure)",
             "setupComplete(azure-full)");
-        // the Spark write is checked once on each stack with Spark, through the Polaris of its cloud to its own catalog, and
-        // aws-trino has everything aws-full has but the monitoring, KeyCloak included, so it checks no other
-        assertThat(derived(SETUP, "aws-trino")).containsExactly(
-            deleteConflicting("aws-trino"), "deployStack(aws-trino,[AWS_KEYCLOAK_CERT_ARN, AWS_POLARIS_CERT_ARN, AWS_JUPYTER_CERT_ARN])",
-            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-trino)", "configureOidcUsersFor(aws)",
-            "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "runSparkWritingTo(aws,aws)",
-            "setupComplete(aws-trino)");
+    }
+
+    @Test
+    void stackAddedInYamlIsManagedAndConflictsLikeTheBundledOnes() {
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "false");
+        assertThat(derived(SETUP, "aws-lab")).first().isEqualTo(deleteConflicting("aws-lab"));
+        assertThat(derived(SETUP, "aws-lab")).contains("deployComplete(aws-lab)", "runSparkWritingTo(aws,aws)")
+                                              .last().isEqualTo("setupComplete(aws-lab)");
+        // it deploys its own Polaris and KeyCloak, so holds what the other stacks hold
+        assertThat(factory.conflicts(StackId.parse("aws-lab"), "aws-polaris", properties)).isTrue();
+        assertThat(factory.conflicts(StackId.parse("aws-lab"), "aws-keycloak", properties)).isTrue();
+        assertThat(factory.conflicts(StackId.parse("aws-polaris"), "aws-lab", properties)).isTrue();
+        // the KeyCloak is at OIDC_DOMAIN_NAME whatever the cloud, so it conflicts with the other clouds' stacks that deploy their own
+        assertThat(factory.conflicts(StackId.parse("aws-lab"), "azure-full", properties)).isTrue();
+        assertThat(factory.conflicts(StackId.parse("aws-lab"), "gcp-polaris", properties)).isFalse();
+        // with the KeyCloak of another stack, it no longer holds its domain
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "true");
+        assertThat(factory.conflicts(StackId.parse("aws-lab"), "aws-keycloak", properties)).isFalse();
+        assertThat(derived(DEPLOY, "aws-lab")).contains("checkKeyCloakAnswers(aws)");
     }
 
     @Test
@@ -219,7 +231,6 @@ class StackPlanFactoryTest {
         assertThat(factory.scenarios(StackId.parse("aws-snowflake"), properties).keySet())
             .containsExactly("external-azure", "reading-aws", "reading-azure", "reading-gcp", "writing-azure");
         assertThat(factory.scenarios(StackId.parse("aws-full"), properties).keySet()).containsExactly("external-azure");
-        assertThat(factory.scenarios(StackId.parse("aws-spark"), properties).keySet()).containsExactly("external-azure");
         // no Spark, so nothing to defer to the Azure Polaris
         assertThat(factory.scenarios(StackId.parse("aws-polaris"), properties)).isEmpty();
         assertThat(factory.scenarios(StackId.parse("aws-keycloak"), properties)).isEmpty();
@@ -269,7 +280,7 @@ class StackPlanFactoryTest {
     @Test
     void providesTheStepsOfEveryActionOnEveryStackDefinedAndOnlyDeletesEveryStackOfACloud() {
         assertThat(factory.supportedActions().keySet().stream().map(StackId::toString)).containsExactly(
-            "aws-all", "aws-full", "aws-jupyter", "aws-keycloak", "aws-polaris", "aws-snowflake", "aws-spark", "aws-trino",
+            "aws-all", "aws-full", "aws-keycloak", "aws-lab", "aws-polaris", "aws-snowflake",
             "azure-all", "azure-full", "azure-keycloak", "azure-polaris", "gcp-all", "gcp-polaris");
         factory.supportedActions().forEach((stackId, actions) -> assertThat(actions).as(stackId.toString())
             .isEqualTo(stackId.isAll() ? List.of(DELETE) : List.of(DELETE, DEPLOY, SETUP)));

@@ -1,5 +1,6 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
@@ -146,6 +147,14 @@ public class ManageStackMain {
     }
 
     public static void main(String[] allArgs) {
+        try {
+            StackDefinitions.checkLoads();
+        } catch (IllegalStateException e) {
+            // printed as well as logged, as the console logging may be off, eg in the CLI
+            System.err.println(e.getMessage());
+            System.exit(1);
+            return;
+        }
         ManageStackMain manager = new ManageStackMain(new StackPlanFactory());
         if (Arrays.stream(allArgs).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
             manager.help(Arrays.stream(allArgs).filter(arg -> !arg.equals("-h") && !arg.equals("--help"))

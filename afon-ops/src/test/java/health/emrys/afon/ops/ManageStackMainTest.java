@@ -25,8 +25,9 @@ class ManageStackMainTest {
     void canManageEveryStackDefined() {
         // including those that no command managed before, as they are made of components
         assertThat(manager.stepsProviderFor("deploy", "azure-full")).isNotNull();
-        assertThat(manager.stepsProviderFor("setup", "aws-jupyter")).isNotNull();
-        assertThat(manager.stepsProviderFor("delete", "aws-trino")).isNotNull();
+        assertThat(manager.stepsProviderFor("setup", "aws-keycloak")).isNotNull();
+        assertThat(manager.stepsProviderFor("setup", "aws-lab")).isNotNull();
+        assertThat(manager.stepsProviderFor("delete", "aws-snowflake")).isNotNull();
     }
 
     @Test

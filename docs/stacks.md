@@ -117,7 +117,7 @@ The [AWS stack workflow](github_workflows.md#stack-aws-workflow) always runs wit
 `delete` deletes just the stack, while `delete <cloud>-all`, eg `delete aws-all`, deletes every stack deployed in the cloud.  The legacy stack of a cloud, deployed before each stack had its own `tofu` state (see
 [upgrading to per-stack state](#upgrading-to-per-stack-state-one-off)), may be any stack, so it conflicts with every
 stack of the cloud, and `delete` of any stack of the cloud deletes it too.  Likewise, a stack not listed above, eg one deployed from
-`validate-stack aws-jupyter` and `tofu-apply`, conflicts with every stack of the cloud.
+`validate-stack aws-full` and `tofu-apply`, conflicts with every stack of the cloud.
 
 | Stack | Holds | Runs side by side with |
 |---|---|---|
@@ -191,6 +191,51 @@ of the same stack untouched, synthesise into another cdktf dir, eg `afon-cli.sh 
 
 A stack is a list of components, eg Polaris, Keycloak, Jupyter, Spark, Trino, deployed to its cloud: see
 [Stack composition](architecture.md#stack-composition) for what each stack is made of, and how to define a new one.
+
+### Define your own stacks
+
+The stacks are defined by `stacks.yaml`, bundled in the jar (`afon-cdk/src/main/resources/stacks.yaml`).  To define them
+differently, eg to drop a component from a stack or add a stack, put a `stacks.yaml` in the config dir (`$AFON_HOME/config`).
+It **replaces** the bundled one entirely, rather than adding to it, so start from a copy of it, which this exports to the config dir
+(without overwriting an existing file):
+```shell
+afon-cli.sh validate-stack --export-stacks
+```
+Then edit `$AFON_HOME/config/stacks.yaml`.  Nothing else needs to change:
+`validate-stack`, `manage-stack` and its docs (`manage-stack <action> <stack-id> -h`) take their stacks from it.
+
+Each stack is `<cloud>-<stack-type>`, and the ordered list of the components it deploys, each after those before it:
+```yaml
+stacks:
+  aws-lab:
+    pinnedEgressIp: true            # optional, default true (or as the stack it extends): holds AWS_EGRESS_IP, which only one running stack can
+    components:
+      - name: Keycloak              # deployed unless AWS_KEYCLOAK_EXTERNAL=true, ie the property <CLOUD>_KEYCLOAK_EXTERNAL
+        unless: KEYCLOAK_EXTERNAL   # or 'when', to deploy it only if the property is true
+      - Polaris
+      - Jupyter
+      - NetworkPolicies
+      - SparkOperator
+      - Spark
+      - CrdCleanup
+  aws-lab-trino:
+    extends: aws-lab                # starts with the components of aws-lab, which must be of the same cloud
+    components: [Trino]
+```
+The components are those of the code, eg `Polaris`, `Keycloak`, `Jupyter`, `Spark`, `Trino`; a file cannot define a new one.
+The stacks of a cloud are independent of those of the others.
+
+A stack is validated when loaded, and every command fails before doing anything, naming the file and the entry, if the file is not
+valid: a YAML syntax error, an unknown component, cloud or property, a malformed or repeated stack id, an `extends` of an unknown
+stack, of another cloud or in a cycle, or components composed wrongly (a component repeated, or missing one it needs before it).
+
+Try the new stack, which like the others conflicts with those holding the same domain names or egress IP:
+```shell
+afon-cli.sh validate-stack aws-lab        # synthesises its plan, and checks that it is the same in each JVM
+afon-cli.sh manage-stack setup aws-lab
+```
+`validate-stack` prints the components of the stack as the file defines them, for the config (those left out by a `when` or
+`unless` property are not listed), and without a stack lists the stacks of the file.
 
 ### Setup AWS full stack
 

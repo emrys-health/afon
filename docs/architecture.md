@@ -148,7 +148,7 @@ catalogs, configure the Polaris users, run the Spark write check, and report the
 A stack is a `StackId` (`<cloud>-<stack-type>`, eg `aws-full`) and the ordered list of components
 deployed to that cloud, as defined in `StackDefinitions`. `ComposedStack` builds it: it sets up the cloud's
 platform, then deploys each component in turn. Adding a stack, eg a subset of the components, or on another cloud, is
-adding an entry to `StackDefinitions`.
+adding an entry to `stacks.yaml`, which `StackDefinitions` loads at runtime.
 
 | Concept | What it is |
 |---|---|
@@ -157,20 +157,23 @@ adding an entry to `StackDefinitions`.
 | `CloudPlatform` | What a component needs of its cloud, implemented by the AWS, Azure and GCP providers. The cloud's cluster, and what is done differently per cloud, eg `exposeHttps(HttpsRoute)`: an ALB with a Route 53 record on AWS, the nginx ingress with cert-manager and a DNS record on Azure and GCP |
 | `StackDefinition` | The id of a stack and how to create its components from the config, checked by `componentsFor(properties)` |
 
+The stacks are defined in `afon-cdk/src/main/resources/stacks.yaml`, bundled in the jar. A stack may `extends` another of its cloud (stacks of different clouds are independent), `pinnedEgressIp` says whether it holds `AWS_EGRESS_IP`, and a component is listed by name (see
+`StackDefinitions.componentNames()`), optionally `when` or `unless` a boolean property of the stack's cloud, eg
+`unless: KEYCLOAK_EXTERNAL` for `<CLOUD>_KEYCLOAK_EXTERNAL`. To define the stacks differently, put a `stacks.yaml` in the config dir
+(`$AFON_HOME/config`), which replaces the bundled one entirely rather than adding to it, so start from a copy of it; a file that
+is not valid fails with a message naming the file and the problem.
+
 The stacks, as composed by `StackDefinitions`:
 
 | Stack | Components, in order |
 |---|---|
 | `aws-keycloak` | Keycloak |
 | `aws-polaris` | Polaris |
-| `aws-jupyter` | Keycloak (unless `AWS_KEYCLOAK_EXTERNAL`), Polaris, Jupyter, NetworkPolicies, SparkOperator |
-| `aws-spark` | as `aws-jupyter`, then Spark and CrdCleanup |
-| `aws-trino` | as `aws-spark`, then Trino |
-| `aws-full` | as `aws-trino`, then Monitoring |
+| `aws-full` | Keycloak (unless `AWS_KEYCLOAK_EXTERNAL`), Polaris, Jupyter, NetworkPolicies, SparkOperator, Spark, CrdCleanup, Trino, Monitoring, AwsLogging, Git |
 | `aws-snowflake` | as `aws-full`, then Snowflake, a query engine outside of the stack, so it deploys nothing |
 | `azure-keycloak` | Keycloak |
 | `azure-polaris` | Polaris |
-| `azure-full` | The same as `aws-full`, with its own Keycloak unless `AZURE_KEYCLOAK_EXTERNAL` |
+| `azure-full` | The components of `aws-full`, listed on their own, but for AwsLogging (AWS only), with its own Keycloak unless `AZURE_KEYCLOAK_EXTERNAL` |
 | `gcp-polaris` | Polaris |
 
 **Synthesising a stack.** `ComposedStack.synthesise(StackId, AfonPropertyProvider)` is the only way into the CDKTF world, and it
@@ -262,7 +265,7 @@ every stack in three separate JVMs and requires the same plan from each.
 2. If a cloud needs something new of its platform, add a method to `CloudPlatform` with a default that fails clearly on
    the clouds that don't implement it, as `logStorage()` does for the monitoring.
 3. Declare `requires()` and `after()`.
-4. Add it to the stacks in `StackDefinitions`.
+4. Add it to the component names in `StackDefinitions` and to the stacks in `stacks.yaml`.
 
 **Guarding the plans.** `validate-stack [--runs <n>]` synthesises the stack in `<n>` JVMs (defaulting to `3`), one after the other, and fails if the plans differ, giving the paths that differ but not their values, which may contain secrets. A plan must not depend on anything that differs from one JVM to the next, eg the iteration order of an immutable `Map.of`, as `tofu` replaces whatever holds a string that differs between runs, on every deploy. The `aws-stack-linux.yml` workflow runs it before it deploys. The ids of the Terraform resources are in the state of the deployed stacks, so renaming one makes `tofu` destroy and recreate it: check the plans before and after a refactoring, with snapshots of the synthesised plans that are not kept in git:
 

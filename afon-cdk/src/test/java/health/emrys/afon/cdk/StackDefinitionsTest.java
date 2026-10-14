@@ -1,7 +1,11 @@
 package health.emrys.afon.cdk;
 
 import health.emrys.afon.cdk.components.JupyterComponent;
+import health.emrys.afon.cdk.aws.AwsLoggingComponent;
+import health.emrys.afon.cdk.components.CrdCleanupComponent;
 import health.emrys.afon.cdk.components.KeycloakComponent;
+import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
+import health.emrys.afon.cdk.components.SparkOperatorComponent;
 import health.emrys.afon.cdk.components.PolarisComponent;
 import health.emrys.afon.cdk.components.SnowflakeComponent;
 import health.emrys.afon.cdk.components.SparkComponent;
@@ -10,8 +14,19 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ScanResult;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonCloud.AZURE;
@@ -33,8 +48,7 @@ class StackDefinitionsTest {
     void stacksExtendOneAnotherByComponents() {
         assertThat(componentsOf("aws-keycloak")).containsExactly(KeycloakComponent.class);
         assertThat(componentsOf("aws-polaris")).containsExactly(PolarisComponent.class);
-        assertThat(componentsOf("aws-spark")).containsAll(componentsOf("aws-jupyter")).contains(SparkComponent.class);
-        assertThat(componentsOf("aws-trino")).containsAll(componentsOf("aws-spark")).contains(TrinoComponent.class);
+        assertThat(componentsOf("aws-full")).contains(JupyterComponent.class, SparkComponent.class);
     }
 
     @Test
@@ -58,6 +72,9 @@ class StackDefinitionsTest {
         StackDefinition definition = StackDefinitions.get(StackId.parse("azure-full"));
         assertThat(definition.components().apply(properties).get(0))
             .isNotSameAs(definition.components().apply(properties).get(0));
+        // but for what is of AWS only
+        assertThat(componentsOf("azure-full")).containsExactlyInAnyOrderElementsOf(
+            componentsOf("aws-full").stream().filter(type -> !type.equals(AwsLoggingComponent.class)).toList());
     }
 
     @Test
@@ -95,5 +112,172 @@ class StackDefinitionsTest {
     void cannotGetUnknownStack() {
         assertThatThrownBy(() -> StackDefinitions.get(StackId.parse("gcp-full")))
             .isInstanceOf(IllegalArgumentException.class).hasMessage("No such stack: gcp-full");
+    }
+
+    private static List<String> namesOf(Map<StackId, StackDefinition> definitions, String stackId, AfonPropertyProvider properties) {
+        return definitions.get(StackId.parse(stackId)).componentsFor(properties).stream()
+                          .map(component -> component.getClass().getSimpleName()).toList();
+    }
+
+    @Test
+    void parsesStacksExtendingOthersWithConditionalComponents() {
+        Map<StackId, StackDefinition> definitions = StackDefinitions.parse("""
+            stacks:
+              aws-base:
+                pinnedEgressIp: false
+                components:
+                  - name: Keycloak
+                    unless: KEYCLOAK_EXTERNAL
+                  - Polaris
+              aws-more:
+                extends: aws-base
+                components: [Jupyter]
+              azure-more:
+                components:
+                  - Polaris
+                  - Jupyter
+                  - name: Trino
+                    when: KEYCLOAK_EXTERNAL
+            """, "test");
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "false");
+        properties.setValue(AZURE_KEYCLOAK_EXTERNAL, "true");
+        assertThat(namesOf(definitions, "aws-more", properties))
+            .containsExactly("KeycloakComponent", "PolarisComponent", "JupyterComponent");
+        assertThat(namesOf(definitions, "azure-more", properties))
+            .containsExactly("PolarisComponent", "JupyterComponent", "TrinoComponent");
+        assertThat(definitions.get(StackId.parse("aws-more")).pinnedEgressIp()).isFalse();
+        assertThat(definitions.keySet()).extracting(StackId::toString).containsExactly("aws-base", "aws-more", "azure-more");
+    }
+
+    @Test
+    void rejectsInvalidDefinitions() {
+        assertInvalid("stacks:\n  aws-x:\n    components: [Nonesuch]", "unknown component 'Nonesuch'");
+        assertInvalid("stacks:\n  aws-x:\n    extends: aws-y", "aws-x extends aws-y, which is not defined");
+        assertInvalid("stacks:\n  azure-x:\n    extends: aws-y\n  aws-y:\n    components: [Polaris]", "different clouds are independent");
+        assertInvalid("stacks:\n  aws-x:\n    extends: aws-y\n  aws-y:\n    extends: aws-x", "extends itself");
+        assertInvalid("stacks:\n  aws-x:\n    component: [Polaris]", "unknown 'component'");
+        assertInvalid("stacks:\n  mars-x:\n    components: [Polaris]", "unknown cloud 'mars'");
+        assertInvalid("stacks:\n  aws-x:\n    components:\n      - name: Polaris\n        when: A\n        unless: B", "both when and unless");
+        assertInvalid("stacks:\n  aws-x:\n    pinnedEgressIp: maybe", "true or false");
+        assertInvalid("nothing: here", "stacks");
+    }
+
+    private void assertInvalid(String yaml, String message) {
+        assertThatThrownBy(() -> StackDefinitions.parse(yaml, "bad.yaml"))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("bad.yaml").hasMessageContaining(message);
+    }
+
+    @Test
+    void everyComponentCanBeNamedInTheStacks() {
+        try (ScanResult scan = new ClassGraph().enableClassInfo().acceptPackages("health.emrys.afon.cdk").scan()) {
+            Set<String> expected = scan.getClassesImplementing(StackComponent.class.getName()).stream()
+                .filter(info -> !info.isAbstract() && !info.isInterface() && info.getSimpleName().endsWith("Component"))
+                .map(info -> info.getSimpleName().replaceFirst("Component$", "")).collect(Collectors.toSet());
+            assertThat(StackDefinitions.componentNames()).containsExactlyInAnyOrderElementsOf(expected);
+        }
+    }
+
+    @Test
+    void bundledStacksAreTheOnesDocumented() {
+        assertThat(StackDefinitions.load(null).keySet()).extracting(StackId::toString)
+            .containsExactly("aws-full", "aws-keycloak", "aws-polaris", "aws-snowflake", "azure-full", "azure-keycloak",
+                             "azure-polaris", "gcp-polaris");
+    }
+
+    @Test
+    void testStacksAreTheBundledOnesButForTheFullStacksHavingNoTrino() {
+        Map<StackId, StackDefinition> bundled = StackDefinitions.load(null);
+        // but for aws-lab, which they add
+        assertThat(StackDefinitions.all()).extracting(definition -> definition.id().toString())
+            .containsExactlyInAnyOrderElementsOf(Stream.concat(bundled.keySet().stream().map(StackId::toString), Stream.of("aws-lab")).toList());
+        StackDefinitions.all().stream().filter(definition -> !definition.id().toString().equals("aws-lab")).forEach(definition -> {
+            String id = definition.id().toString();
+            List<String> expected = namesOf(bundled, id, properties);
+            if (id.endsWith("-full") || id.equals("aws-snowflake")) {
+                assertThat(expected).as(id + " bundled").contains("TrinoComponent");
+                expected = expected.stream().filter(name -> !name.equals("TrinoComponent")).toList();
+            }
+            assertThat(componentNames(definition)).as(id).isEqualTo(expected);
+            assertThat(definition.pinnedEgressIp()).as(id).isEqualTo(bundled.get(definition.id()).pinnedEgressIp());
+        });
+    }
+
+    @Test
+    void stackCanBeAddedWithNoChangeOfCode() {
+        assertThat(StackDefinitions.find(StackId.parse("aws-lab"))).isPresent();
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "false");
+        assertThat(componentsOf("aws-lab")).containsExactly(KeycloakComponent.class, PolarisComponent.class, JupyterComponent.class,
+                                                          NetworkPoliciesComponent.class, SparkOperatorComponent.class,
+                                                          SparkComponent.class, CrdCleanupComponent.class);
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "true");
+        assertThat(componentsOf("aws-lab")).doesNotContain(KeycloakComponent.class).contains(SparkComponent.class);
+    }
+
+    @Test
+    void rejectsStacksDefinedMoreThanOnce() {
+        assertInvalid("stacks:\n  aws-x:\n    components: [Polaris]\n  aws-x:\n    components: [Git]", "aws-x");
+        assertInvalid("stacks:\n  aws-x:\n    components: [Polaris]\n  AWS-X:\n    components: [Git]", "aws-x is defined more than once");
+        assertInvalid("stacks:\n  aws-all:\n    components: [Polaris]", "stands for every stack of the cloud");
+        assertInvalid("stacks:\n  aws-x: [", "bad.yaml");
+    }
+
+    @Test
+    void stacksOfACloudHaveNoComponentOfAnother() {
+        // eg AwsLoggingComponent casts the platform to the AWS one, so cannot be deployed to Azure
+        for (StackDefinition definition : StackDefinitions.all()) {
+            String cloud = definition.id().cloud().toString();
+            definition.componentsFor(properties).forEach(component -> {
+                String name = component.getClass().getSimpleName();
+                for (String other : List.of("aws", "azure", "gcp")) {
+                    if (!other.equals(cloud) && name.toLowerCase().startsWith(other)) {
+                        throw new AssertionError(definition.id() + " has " + name + ", of the cloud " + other);
+                    }
+                }
+            });
+        }
+    }
+
+    @Test
+    void compositionOfStacksCanBeChanged() {
+        assertThat(componentsOf("aws-full")).doesNotContain(TrinoComponent.class).contains(SparkComponent.class);
+        assertThat(componentsOf("azure-full")).doesNotContain(TrinoComponent.class);
+        // aws-snowflake extends aws-full, so it follows
+        assertThat(componentsOf("aws-snowflake")).doesNotContain(TrinoComponent.class).contains(SnowflakeComponent.class);
+    }
+
+    private List<String> componentNames(StackDefinition definition) {
+        return definition.componentsFor(properties).stream().map(component -> component.getClass().getSimpleName()).toList();
+    }
+
+    @Test
+    void userFileInConfigDirReplacesTheBundledStacks(@TempDir Path configDir) throws IOException {
+        Path file = configDir.resolve(StackDefinitions.STACKS_FILE);
+        Files.writeString(file, "stacks:\n  aws-mine:\n    components: [Polaris, Git]\n");
+        Map<StackId, StackDefinition> definitions = StackDefinitions.load(file);
+        assertThat(definitions.keySet()).extracting(StackId::toString).containsExactly("aws-mine");
+        assertThat(namesOf(definitions, "aws-mine", properties)).containsExactly("PolarisComponent", "GitComponent");
+        assertThat(StackDefinitions.load(null).keySet()).hasSizeGreaterThan(1);
+    }
+
+    @Test
+    void bundledStacksCanBeExportedToTheConfigDirWithoutOverwriting(@TempDir Path dir) throws IOException {
+        Path configDir = dir.resolve("config");
+        Path file = StackDefinitions.exportBundled(configDir);
+        assertThat(file).isEqualTo(configDir.resolve(StackDefinitions.STACKS_FILE));
+        // what it exports is what is bundled, so the exported file defines the same stacks
+        assertThat(StackDefinitions.load(file).keySet()).isEqualTo(StackDefinitions.load(null).keySet());
+        Files.writeString(file, "mine");
+        assertThatThrownBy(() -> StackDefinitions.exportBundled(configDir))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("exists already");
+        assertThat(file).hasContent("mine");
+    }
+
+    @Test
+    void invalidUserFileFailsNamingIt(@TempDir Path configDir) throws IOException {
+        Path file = configDir.resolve(StackDefinitions.STACKS_FILE);
+        Files.writeString(file, "stacks:\n  aws-mine:\n    components: [Nonesuch]\n");
+        assertThatThrownBy(() -> StackDefinitions.load(file))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining(file.toString())
+            .hasMessageContaining("unknown component 'Nonesuch'");
     }
 }

@@ -60,6 +60,10 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+        </dependency>
+        <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
         </dependency>
@@ -129,6 +133,19 @@
                 </includes>
             </resource>
         </resources>
+        <plugins>
+            <plugin>
+                <!-- The unit tests define their stacks in a test file, so as not to depend on the stacks.yaml in
+                     the config dir, which the smoke and acceptance tests rely on. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <afon.stacks>${project.basedir}/src/test/resources/stacks-test.yaml</afon.stacks>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
     </build>
 
 </project>

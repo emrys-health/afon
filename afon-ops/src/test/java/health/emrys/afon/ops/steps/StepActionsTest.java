@@ -119,7 +119,7 @@ class StepActionsTest {
             "stacks conflicting with aws-polaris", name -> true,
             name -> switch (name) {
                 case "aws-polaris" -> null;
-                case "aws-jupyter" -> new StackFilter.Refusal("stack aws-jupyter is running, whose resources are unknown", null);
+                case "aws-unknown" -> new StackFilter.Refusal("stack aws-unknown is running, whose resources are unknown", null);
                 default -> new StackFilter.Refusal("stack " + name + " is running and already deploys Polaris at x (X)",
                                                    "afon-cli.sh manage-stack delete " + name);
             },
@@ -132,7 +132,7 @@ class StepActionsTest {
                 To deploy aws-polaris, delete it first:
                     afon-cli.sh manage-stack delete aws-full
                 or rerun with --replace to delete it as part of this run."""));
-        assertThatThrownBy(() -> actions.checkNoRefusal(filter, List.of("aws-jupyter")))
+        assertThatThrownBy(() -> actions.checkNoRefusal(filter, List.of("aws-unknown")))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageEndingWith("To deploy aws-polaris, rerun with --replace to delete it as part of this run.");
         assertThat(commands).isEmpty();
