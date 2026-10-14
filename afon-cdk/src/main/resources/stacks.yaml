@@ -1,0 +1,67 @@
+# The stacks, each the ordered list of the components deployed to its cloud, loaded by StackDefinitions.
+# A file of this name in the config dir ($AFON_HOME/config) replaces this one entirely, rather than adding to it.
+#
+# stacks:
+#   <cloud>-<stack-type>:           the stack id, eg aws-full
+#     extends: <stack id>           optional: starts with the components of this stack, of the same cloud
+#     pinnedEgressIp: true|false    optional: whether it holds the AWS_EGRESS_IP (default true, or as the extended stack)
+#     components:                   the components added, in order, each deployed after those before it
+#       - Polaris                   a component, by name, see StackDefinitions.componentNames()
+#       - name: Keycloak            a component only deployed if the property <CLOUD>_KEYCLOAK_EXTERNAL is not true
+#         unless: KEYCLOAK_EXTERNAL     (or, with 'when', only if it is true)
+stacks:
+  # AWS
+  # Only the KeyCloak, never holding the egress IP, which the Polaris stacks hold
+  aws-keycloak:
+    pinnedEgressIp: false
+    components: [Keycloak]
+  # Polaris uses the KeyCloak server at OIDC_DOMAIN_NAME, which the aws-keycloak stack deploys, so that both can
+  # run side by side, while the stacks extending it deploy their own KeyCloak, unless AWS_KEYCLOAK_EXTERNAL is set
+  aws-polaris:
+    components: [Polaris]
+  # Polaris with JupyterHub and Guacamole behind the oauth2-proxy MFA gate, the Spark operator the notebooks' Spark
+  # runs on (which only launches Spark in response to the resources of the Spark component), Trino and monitoring
+  aws-full:
+    components:
+      - name: Keycloak
+        unless: KEYCLOAK_EXTERNAL
+      - Polaris
+      - Jupyter
+      - NetworkPolicies
+      - SparkOperator
+      - Spark
+      - CrdCleanup
+      - Trino
+      - Monitoring
+      - AwsLogging
+      - Git
+  # Snowflake queries the catalogs of the full stack through its Polaris, so it holds what the full stack holds
+  aws-snowflake:
+    extends: aws-full
+    components: [Snowflake]
+
+  # AZURE
+  # As on AWS, only the KeyCloak, which azure-polaris uses, and azure-full if AZURE_KEYCLOAK_EXTERNAL is set
+  azure-keycloak:
+    pinnedEgressIp: false
+    components: [Keycloak]
+  azure-polaris:
+    components: [Polaris]
+  # No AwsLogging, which ships the Polaris logs to S3
+  azure-full:
+    components:
+      - name: Keycloak
+        unless: KEYCLOAK_EXTERNAL
+      - Polaris
+      - Jupyter
+      - NetworkPolicies
+      - SparkOperator
+      - Spark
+      - CrdCleanup
+      - Trino
+      - Monitoring
+      - Git
+
+  # GCP
+  gcp-polaris:
+    components: [Polaris]

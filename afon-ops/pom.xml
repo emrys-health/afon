@@ -65,6 +65,17 @@
     <build>
         <plugins>
             <plugin>
+                <!-- The unit tests define their stacks in a test file, so as not to depend on the stacks.yaml in
+                     the config dir, which the smoke and acceptance tests rely on. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <afon.stacks>${project.basedir}/../afon-cdk/src/test/resources/stacks-test.yaml</afon.stacks>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <plugin>
                 <!-- Generates the *Main shortcut command classes in health.emrys.afon.ops.scripts.*
                      from src/main/codegen/GenerateScriptMains.java, run as a single-file source
                      program (no compile step of its own needed). -->

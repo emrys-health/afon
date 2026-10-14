@@ -1,12 +1,12 @@
 package health.emrys.afon.cdk;
 
 import health.emrys.afon.cdk.azure.AzureLoggingComponent;
+import health.emrys.afon.cdk.aws.AwsLoggingComponent;
 import health.emrys.afon.cdk.components.CrdCleanupComponent;
 import health.emrys.afon.cdk.components.GitComponent;
 import health.emrys.afon.cdk.components.JupyterComponent;
-import health.emrys.afon.cdk.aws.AwsLoggingComponent;
-import health.emrys.afon.cdk.components.MonitoringComponent;
 import health.emrys.afon.cdk.components.KeycloakComponent;
+import health.emrys.afon.cdk.components.MonitoringComponent;
 import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
 import health.emrys.afon.cdk.components.PolarisComponent;
 import health.emrys.afon.cdk.components.SnowflakeComponent;
@@ -15,97 +15,249 @@ import health.emrys.afon.cdk.components.SparkOperatorComponent;
 import health.emrys.afon.cdk.components.TrinoComponent;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
+import org.slf4j.Logger;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Supplier;
 
-import static health.emrys.afon.config.AfonCloud.*;
+import static health.emrys.afon.config.ConfigUtils.configDir;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * The stacks, each composed of {@link StackComponent}s that run on whatever cloud the stack is deployed to.  A stack
  * is its {@link StackId}, eg {@code aws-full}, and the list of its components, so a new stack, eg of a different
- * subset of components, or on another cloud, is a new entry here.
+ * subset of components, or on another cloud, is a new entry in the YAML that defines them.
+ * <p>
+ * The stacks are loaded at runtime from {@code stacks.yaml}, bundled in the jar, unless the user has a file of that name in the
+ * config dir ({@link ConfigUtils#configDir()}), which replaces it entirely, not merged with it.  A stack may {@code extend} another
+ * of its cloud, to start with its components, and a component may be deployed {@code when} or {@code unless} a
+ * boolean property of the stack's cloud, eg {@code KEYCLOAK_EXTERNAL} for {@code <CLOUD>_KEYCLOAK_EXTERNAL}.  The
+ * components are those of {@link #componentNames()}.  A file that does not define the stacks correctly fails when
+ * they are first used, with a message naming the file and the problem.
  */
 public final class StackDefinitions {
 
-    private static final Map<StackId, StackDefinition> DEFINITIONS = new TreeMap<>();
+    /**
+     * The file in the config dir that replaces the bundled stacks.
+     */
+    public static final String STACKS_FILE = "stacks.yaml";
+
+    /**
+     * System property naming a stacks file to use instead of those of the config dir and the bundled ones, for the unit
+     * tests to define their own stacks.
+     */
+    public static final String STACKS_PROPERTY = "afon.stacks";
+    static final String DEFAULT_RESOURCE = "/stacks.yaml";
+
+    private static final Logger logger = getLogger(StackDefinitions.class);
+    private static final Map<String, Supplier<StackComponent>> COMPONENTS = new TreeMap<>();
 
     static {
-        // AWS
-        // Only the KeyCloak, never holding the egress IP, which the Polaris stacks hold
-        add(new StackId(AWS, "keycloak"), false, properties -> List.of(new KeycloakComponent()));
-        // Polaris uses the KeyCloak server at OIDC_DOMAIN_NAME, which the aws-keycloak stack deploys, so that both can
-        // run side by side, while the stacks extending it deploy their own KeyCloak, unless AWS_KEYCLOAK_EXTERNAL is set
-        add(new StackId(AWS, "polaris"), true, properties -> List.of(new PolarisComponent()));
-        add(new StackId(AWS, "jupyter"), true, properties -> jupyter(isKeyCloakExternal(AWS, properties)));
-        add(new StackId(AWS, "spark"), true,
-            properties -> concat(jupyter(isKeyCloakExternal(AWS, properties)), spark()));
-        add(new StackId(AWS, "trino"), true,
-            properties -> concat(jupyter(isKeyCloakExternal(AWS, properties)), spark(), List.of(new TrinoComponent())));
-        add(new StackId(AWS, "full"), true, properties -> full(AWS, properties));
-        // Snowflake queries the catalogs of the full stack through its Polaris, so it holds what the full stack holds
-        add(new StackId(AWS, "snowflake"), true,
-            properties -> concat(full(AWS, properties), List.of(new SnowflakeComponent())));
-
-        // AZURE
-        // As on AWS, only the KeyCloak, which azure-polaris uses, and azure-full if AZURE_KEYCLOAK_EXTERNAL is set
-        add(new StackId(AZURE, "keycloak"), false, properties -> List.of(new KeycloakComponent()));
-        add(new StackId(AZURE, "polaris"), true, properties -> List.of(new PolarisComponent()));
-        add(new StackId(AZURE, "full"), true, properties -> full(AZURE, properties));
-
-        // GCP
-        add(new StackId(GCP, "polaris"), true, properties -> List.of(new PolarisComponent()));
+        COMPONENTS.put("Keycloak", KeycloakComponent::new);
+        COMPONENTS.put("Polaris", PolarisComponent::new);
+        COMPONENTS.put("Jupyter", JupyterComponent::new);
+        COMPONENTS.put("NetworkPolicies", NetworkPoliciesComponent::new);
+        COMPONENTS.put("SparkOperator", SparkOperatorComponent::new);
+        COMPONENTS.put("Spark", SparkComponent::new);
+        COMPONENTS.put("CrdCleanup", CrdCleanupComponent::new);
+        COMPONENTS.put("Trino", TrinoComponent::new);
+        COMPONENTS.put("Monitoring", MonitoringComponent::new);
+        COMPONENTS.put("AzureLogging", AzureLoggingComponent::new);
+        COMPONENTS.put("AwsLogging", AwsLoggingComponent::new);
+        COMPONENTS.put("Git", GitComponent::new);
+        COMPONENTS.put("Snowflake", SnowflakeComponent::new);
     }
 
     private StackDefinitions() {
     }
 
-    private static void add(StackId id, boolean pinnedEgressIp,
-                            java.util.function.Function<AfonPropertyProvider, List<StackComponent>> components) {
-        DEFINITIONS.put(id, new StackDefinition(id, pinnedEgressIp, components));
+    private static Map<StackId, StackDefinition> loaded;
+    private static Path loadedFrom;
+
+    /**
+     * @return the stacks, loaded when first used, and again if the config dir has changed since, so that a file that
+     * fails to load fails each use, not only the first
+     */
+    private static synchronized Map<StackId, StackDefinition> definitions() {
+        String named = System.getProperty(STACKS_PROPERTY);
+        Path override = named != null && !named.isBlank() ? Path.of(named) : Path.of(configDir(), STACKS_FILE);
+        Path file = Files.isRegularFile(override) ? override : null;
+        if (file == null && named != null && !named.isBlank()) {
+            throw new IllegalStateException("Stack definitions not found: " + named + " (" + STACKS_PROPERTY + ")");
+        }
+        if (loaded == null || !Objects.equals(file, loadedFrom)) {
+            loaded = load(file);
+            loadedFrom = file;
+        }
+        return loaded;
     }
 
     /**
-     * Polaris with JupyterHub and Guacamole behind the oauth2-proxy MFA gate, and the Spark operator the notebooks'
-     * Spark runs on, deploying its own KeyCloak, unless configured to use another stack's.
+     * @param file the user's stacks file, or {@code null} for the bundled one
      */
-    private static List<StackComponent> jupyter(boolean keyCloakExternal) {
-        List<StackComponent> components = new ArrayList<>();
-        if (!keyCloakExternal) {
-            components.add(new KeycloakComponent());
+    static Map<StackId, StackDefinition> load(Path file) {
+        try {
+            if (file != null) {
+                logger.info("Loading stack definitions from {}, overriding the bundled {}", file, STACKS_FILE);
+                return parse(Files.readString(file, StandardCharsets.UTF_8), file.toString());
+            }
+            try (InputStream in = StackDefinitions.class.getResourceAsStream(DEFAULT_RESOURCE)) {
+                if (in == null) {
+                    throw new IllegalStateException("Stack definitions not found: " + DEFAULT_RESOURCE);
+                }
+                return parse(new String(in.readAllBytes(), StandardCharsets.UTF_8), DEFAULT_RESOURCE);
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot read stack definitions " + (file != null ? file : DEFAULT_RESOURCE)
+                                            + ": " + e.getMessage(), e);
         }
-        components.addAll(List.of(
-            new PolarisComponent(), new JupyterComponent(), new NetworkPoliciesComponent(),
-            new SparkOperatorComponent()));
-        return components;
     }
 
-
-    private static List<StackComponent> full(AfonCloud cloud, AfonPropertyProvider properties) {
-        boolean keyCloakExternal = isKeyCloakExternal(cloud, properties);
-        List<StackComponent>  components = new ArrayList<>(List.of(new TrinoComponent(),
-                                                                   new MonitoringComponent(),
-                                                                   new GitComponent()));
-        if (cloud == AWS) {
-            components.add(new AwsLoggingComponent());
-        } else if (cloud == AZURE) {
-            components.add(new AzureLoggingComponent());
-        }
-        return concat(jupyter(keyCloakExternal), spark(), components);
+    /**
+     * @return the names by which the stacks file refers to the components, ie their class names without {@code Component}
+     */
+    public static Set<String> componentNames() {
+        return Collections.unmodifiableSet(COMPONENTS.keySet());
     }
 
-    // The operator only launches Spark in response to the resources of the Spark component
-    private static List<StackComponent> spark() {
-        return List.of(new SparkComponent(), new CrdCleanupComponent());
+    /**
+     * A component of a stack, deployed if its property, when it has one, is {@code deployedIf}.
+     */
+    private record Entry(String name, Supplier<StackComponent> component, String property, boolean deployedIf) {
+        boolean isDeployed(AfonCloud cloud, AfonPropertyProvider properties) {
+            return property == null
+                   || Boolean.parseBoolean(properties.getCloudValue(cloud, property, "false").trim()) == deployedIf;
+        }
     }
 
-    @SafeVarargs
-    private static List<StackComponent> concat(List<StackComponent>... lists) {
-        List<StackComponent> all = new ArrayList<>();
-        for (List<StackComponent> list : lists) {
-            all.addAll(list);
+    private record Spec(StackId extended, Boolean pinnedEgressIp, List<Entry> entries) {
+    }
+
+    /**
+     * @param yaml   the content of the stacks file
+     * @param source the file's name, for messages
+     * @throws IllegalStateException if the stacks are not defined correctly
+     */
+    static Map<StackId, StackDefinition> parse(String yaml, String source) {
+        try {
+            Map<StackId, Spec> specs = new TreeMap<>();
+            LoaderOptions options = new LoaderOptions();
+            options.setAllowDuplicateKeys(false);
+            Map<String, Object> root = map(new Yaml(new SafeConstructor(options)).load(yaml), "the file", "stacks");
+            if (root.get("stacks") == null) {
+                throw new IllegalArgumentException("no 'stacks' defined");
+            }
+            Map<String, Object> stacks = map(root.get("stacks"), "stacks", "stack ids");
+            stacks.forEach((key, value) -> {
+                StackId id = StackId.parse(key);
+                if (id.isAll()) {
+                    throw new IllegalArgumentException(String.format("%s is not a stack, as %s stands for every stack of the cloud", key, id));
+                }
+                if (specs.put(id, spec(key, value)) != null) {
+                    throw new IllegalArgumentException(String.format("%s is defined more than once", id));
+                }
+            });
+            Map<StackId, StackDefinition> definitions = new TreeMap<>();
+            specs.keySet().forEach(id -> definitions.put(id, definition(id, specs)));
+            return definitions;
+        } catch (RuntimeException e) {
+            throw new IllegalStateException(String.format("Invalid stack definitions %s: %s", source, e.getMessage()), e);
         }
-        return all;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> map(Object value, String where, String expected) {
+        if (value == null) {
+            return Map.of();
+        }
+        if (!(value instanceof Map<?, ?> map)) {
+            throw new IllegalArgumentException(String.format("%s must be a map of %s", where, expected));
+        }
+        Map<String, Object> checked = new LinkedHashMap<>();
+        map.forEach((key, v) -> checked.put(String.valueOf(key), v));
+        return checked;
+    }
+
+    private static void onlyKeys(Map<String, Object> map, String where, String... allowed) {
+        List<String> permitted = List.of(allowed);
+        map.keySet().stream().filter(key -> !permitted.contains(key)).findFirst().ifPresent(key -> {
+            throw new IllegalArgumentException(String.format("%s has unknown '%s', expected one of %s", where, key, permitted));
+        });
+    }
+
+    private static Spec spec(String stack, Object value) {
+        Map<String, Object> map = map(value, stack, "extends, pinnedEgressIp and components");
+        onlyKeys(map, stack, "extends", "pinnedEgressIp", "components");
+        StackId extended = map.get("extends") == null ? null : StackId.parse(String.valueOf(map.get("extends")));
+        Object pinned = map.get("pinnedEgressIp");
+        if (pinned != null && !(pinned instanceof Boolean)) {
+            throw new IllegalArgumentException(stack + " pinnedEgressIp must be true or false");
+        }
+        Object components = map.get("components");
+        if (components != null && !(components instanceof List<?>)) {
+            throw new IllegalArgumentException(stack + " components must be a list");
+        }
+        List<Entry> entries = new ArrayList<>();
+        for (Object component : components == null ? List.of() : (List<?>) components) {
+            entries.add(entry(stack, component));
+        }
+        return new Spec(extended, (Boolean) pinned, entries);
+    }
+
+    private static Entry entry(String stack, Object value) {
+        Map<String, Object> map = value instanceof Map<?, ?>
+            ? map(value, stack + " component", "name, when and unless")
+            : new LinkedHashMap<>(Map.of("name", String.valueOf(value)));
+        onlyKeys(map, stack + " component", "name", "when", "unless");
+        String name = String.valueOf(map.get("name"));
+        Supplier<StackComponent> component = COMPONENTS.get(name);
+        if (component == null) {
+            throw new IllegalArgumentException(String.format("%s has unknown component '%s', expected one of %s",
+                                                             stack, name, COMPONENTS.keySet()));
+        }
+        if (map.containsKey("when") && map.containsKey("unless")) {
+            throw new IllegalArgumentException(String.format("%s component %s has both when and unless", stack, name));
+        }
+        boolean when = map.containsKey("when");
+        Object property = when ? map.get("when") : map.get("unless");
+        return new Entry(name, component, property == null ? null : String.valueOf(property), when);
+    }
+
+    private static StackDefinition definition(StackId id, Map<StackId, Spec> specs) {
+        List<Entry> entries = new ArrayList<>();
+        List<StackId> chain = new ArrayList<>();
+        for (StackId next = id; next != null; next = specs.get(next).extended()) {
+            if (chain.contains(next)) {
+                throw new IllegalArgumentException(String.format("%s extends itself, via %s", id, chain));
+            }
+            if (!chain.isEmpty() && next.cloud() != id.cloud()) {
+                throw new IllegalArgumentException(String.format(
+                    "%s extends %s, but stacks of different clouds are independent", id, next));
+            }
+            if (!specs.containsKey(next)) {
+                throw new IllegalArgumentException(String.format("%s extends %s, which is not defined", chain.get(chain.size() - 1), next));
+            }
+            chain.add(next);
+        }
+        // the extended stack first, and the stack decides over what it extends
+        Boolean decided = null;
+        for (int i = chain.size() - 1; i >= 0; i--) {
+            Spec spec = specs.get(chain.get(i));
+            entries.addAll(spec.entries());
+            decided = spec.pinnedEgressIp() != null ? spec.pinnedEgressIp() : decided;
+        }
+        return new StackDefinition(id, decided == null || decided, properties -> entries.stream()
+            .filter(entry -> entry.isDeployed(id.cloud(), properties)).map(entry -> entry.component().get()).toList());
     }
 
     /**
@@ -118,10 +270,53 @@ public final class StackDefinitions {
     }
 
     /**
+     * Writes the bundled stacks file to the config dir, for the user to edit, which then replaces the bundled one.
+     *
+     * @param configDir the dir to write {@link #STACKS_FILE} to, created if missing
+     * @return the file written
+     * @throws IllegalStateException if there is a file already, which is never overwritten, or it cannot be written
+     */
+    public static Path exportBundled(Path configDir) {
+        Path file = configDir.resolve(STACKS_FILE);
+        try (InputStream in = StackDefinitions.class.getResourceAsStream(DEFAULT_RESOURCE)) {
+            if (in == null) {
+                throw new IllegalStateException("Stack definitions not found: " + DEFAULT_RESOURCE);
+            }
+            if (Files.exists(file)) {
+                throw new IllegalStateException(String.format(
+                    "%s exists already, so is not overwritten: remove it first to export the bundled stacks again", file));
+            }
+            Files.createDirectories(configDir);
+            Files.write(file, in.readAllBytes());
+            return file;
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot write " + file + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * @return where the stacks are loaded from: the file in the config dir, else the bundled one
+     */
+    public static String source() {
+        definitions();
+        return loadedFrom != null ? loadedFrom.toString() : "bundled " + STACKS_FILE;
+    }
+
+    /**
+     * Loads the stacks if not yet loaded, for the commands to fail before doing anything if they are not valid.  The message
+     * names the file and the problem.
+     *
+     * @throws IllegalStateException if the stacks are not valid
+     */
+    public static void checkLoads() {
+        definitions();
+    }
+
+    /**
      * @return the definition of the stack, or empty if there is none
      */
     public static Optional<StackDefinition> find(StackId id) {
-        return Optional.ofNullable(DEFINITIONS.get(id));
+        return Optional.ofNullable(definitions().get(id));
     }
 
     /**
@@ -135,6 +330,6 @@ public final class StackDefinitions {
      * @return the stacks, in order of their ids
      */
     public static Collection<StackDefinition> all() {
-        return DEFINITIONS.values();
+        return definitions().values();
     }
 }

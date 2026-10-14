@@ -1,8 +1,10 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.CloudStackValidator;
+import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.synth.DeterministicSynthesis;
 
@@ -33,6 +35,7 @@ public class ValidateStackMain {
     static final String SINGLE_RUN_PROPERTY = "afon.validate.single";
     static final int DEFAULT_RUNS = 3;
     private static final String RUNS_OPTION = "--runs";
+    static final String EXPORT_OPTION = "--export-stacks";
     private static final int RUN_TIMEOUT_MINUTES = 15;
 
     /**
@@ -61,13 +64,26 @@ public class ValidateStackMain {
                     throw new IllegalArgumentException(RUNS_OPTION + " must be a number of at least 1, not " + args[2]);
                 }
             } else if (args.length != 1) {
-                throw new IllegalArgumentException("Usage: validate-stack <stack> [" + RUNS_OPTION + " <n>]");
+                throw new IllegalArgumentException("Usage: validate-stack <stack> [" + RUNS_OPTION + " <n>] | validate-stack " + EXPORT_OPTION);
             }
             return new Arguments(args[0], runs);
         }
     }
 
     public static void main(String[] args) {
+        if (args.length == 1 && EXPORT_OPTION.equals(args[0])) {
+            // before loading the stacks, as it is how to replace a file that is not valid
+            exportStacks();
+            return;
+        }
+        try {
+            StackDefinitions.checkLoads();
+        } catch (IllegalStateException e) {
+            // printed as well as logged, as the console logging may be off, eg in the CLI
+            System.err.println(e.getMessage());
+            System.exit(1);
+            return;
+        }
         CloudStackValidator validator = new CloudStackValidator();
         Arguments arguments;
         try {
@@ -88,13 +104,24 @@ public class ValidateStackMain {
             System.exit(1);
             return;
         }
+        AfonPropertyProvider properties = new OpsPropertyProvider();
+        if (System.getProperty(SINGLE_RUN_PROPERTY) == null) {
+            // before validating, as what the stack is made of helps to see why it fails; not in the JVMs of the further runs
+            try {
+                System.out.println(describe(stack, properties));
+            } catch (RuntimeException e) {
+                System.err.printf("Failed to validate stack %s: %s%n", stack, e);
+                System.exit(1);
+                return;
+            }
+        }
         if (System.getProperty(SINGLE_RUN_PROPERTY) == null && arguments.runs() > 1) {
             checkDeterministic(validator, stack, arguments.runs());
             return;
         }
         String stackDir;
         try {
-            stackDir = validator.validate(stack, new OpsPropertyProvider());
+            stackDir = validator.validate(stack, properties);
         } catch (RuntimeException e) {
             // printed as well as logged, as the console logging may be off, eg in the CLI
             System.err.printf("Failed to validate stack %s: %s%n", stack, e);
@@ -102,6 +129,26 @@ public class ValidateStackMain {
             return;
         }
         System.out.printf("Validated stack %s by synthesising it into %s%n", stack, stackDir);
+    }
+
+    private static void exportStacks() {
+        try {
+            Path file = StackDefinitions.exportBundled(Path.of(ConfigUtils.configDir()));
+            System.out.printf("Exported the bundled stacks to %s, which now replaces them: edit it to define the stacks differently%n", file);
+        } catch (RuntimeException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+        }
+    }
+
+    /**
+     * @return the components of the stack as defined in the stacks file, in the order they are deployed, for the config:
+     * those whose {@code when} or {@code unless} property does not apply are left out
+     */
+    static String describe(StackId stack, AfonPropertyProvider properties) {
+        List<String> names = StackDefinitions.get(stack).componentsFor(properties).stream()
+            .map(component -> component.getClass().getSimpleName().replaceFirst("Component$", "")).toList();
+        return String.format("Stack %s of %s has the components: %s", stack, StackDefinitions.source(), String.join(", ", names));
     }
 
     private static void checkDeterministic(CloudStackValidator validator, StackId stack, int runs) {
@@ -161,7 +208,7 @@ public class ValidateStackMain {
     }
 
     private static void printUsage(CloudStackValidator validator) {
-        System.out.println("Usage: validate-stack <stack> [" + RUNS_OPTION + " <n>], where <stack> is one of:");
+        System.out.println("Usage: validate-stack <stack> [" + RUNS_OPTION + " <n>] | validate-stack " + EXPORT_OPTION + ", where <stack> is one of:");
         validator.stackNames().forEach(name -> System.out.println("  " + name));
     }
 
