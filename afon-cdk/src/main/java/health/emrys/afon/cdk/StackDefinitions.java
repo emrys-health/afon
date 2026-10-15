@@ -57,6 +57,11 @@ public final class StackDefinitions {
      * tests to define their own stacks.
      */
     public static final String STACKS_PROPERTY = "afon.stacks";
+
+    /**
+     * The value of {@link #STACKS_PROPERTY} for only the bundled stacks, whatever the config dir has, eg for the build.
+     */
+    public static final String BUNDLED = "bundled";
     static final String DEFAULT_RESOURCE = "/stacks.yaml";
 
     private static final Logger logger = getLogger(StackDefinitions.class);
@@ -89,17 +94,33 @@ public final class StackDefinitions {
      * fails to load fails each use, not only the first
      */
     private static synchronized Map<StackId, StackDefinition> definitions() {
-        String named = System.getProperty(STACKS_PROPERTY);
-        Path override = named != null && !named.isBlank() ? Path.of(named) : Path.of(configDir(), STACKS_FILE);
-        Path file = Files.isRegularFile(override) ? override : null;
-        if (file == null && named != null && !named.isBlank()) {
-            throw new IllegalStateException("Stack definitions not found: " + named + " (" + STACKS_PROPERTY + ")");
-        }
+        Path file = stacksFile(System.getProperty(STACKS_PROPERTY), configDir());
         if (loaded == null || !Objects.equals(file, loadedFrom)) {
             loaded = load(file);
             loadedFrom = file;
         }
         return loaded;
+    }
+
+    /**
+     * @param named     the value of {@link #STACKS_PROPERTY}, if set
+     * @param configDir the config dir
+     * @return the stacks file to load, or {@code null} for the bundled one: that named, if any, else that of the config dir if
+     * there is one
+     * @throws IllegalStateException if the file named is not there
+     */
+    static Path stacksFile(String named, String configDir) {
+        if (named != null && !named.isBlank()) {
+            if (named.trim().equals(BUNDLED)) {
+                return null;
+            }
+            if (!Files.isRegularFile(Path.of(named))) {
+                throw new IllegalStateException("Stack definitions not found: " + named + " (" + STACKS_PROPERTY + ")");
+            }
+            return Path.of(named);
+        }
+        Path override = Path.of(configDir, STACKS_FILE);
+        return Files.isRegularFile(override) ? override : null;
     }
 
     /**

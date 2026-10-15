@@ -273,6 +273,21 @@ class StackDefinitionsTest {
     }
 
     @Test
+    void stacksFileIsTheOneNamedElseThatOfTheConfigDirElseTheBundledOne(@TempDir Path dir) throws IOException {
+        Path inConfigDir = Files.writeString(dir.resolve(StackDefinitions.STACKS_FILE), "stacks: {}");
+        Path named = Files.writeString(dir.resolve("named.yaml"), "stacks: {}");
+        String configDir = dir.toString();
+        assertThat(StackDefinitions.stacksFile(null, configDir)).isEqualTo(inConfigDir);
+        assertThat(StackDefinitions.stacksFile(" ", configDir)).isEqualTo(inConfigDir);
+        assertThat(StackDefinitions.stacksFile(named.toString(), configDir)).isEqualTo(named);
+        // only the bundled ones whatever the config dir has, as for the build
+        assertThat(StackDefinitions.stacksFile(StackDefinitions.BUNDLED, configDir)).isNull();
+        assertThat(StackDefinitions.stacksFile(null, dir.resolve("none").toString())).isNull();
+        assertThatThrownBy(() -> StackDefinitions.stacksFile(dir.resolve("none.yaml").toString(), configDir))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("none.yaml");
+    }
+
+    @Test
     void invalidUserFileFailsNamingIt(@TempDir Path configDir) throws IOException {
         Path file = configDir.resolve(StackDefinitions.STACKS_FILE);
         Files.writeString(file, "stacks:\n  aws-mine:\n    components: [Nonesuch]\n");

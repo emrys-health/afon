@@ -94,7 +94,8 @@
                         </configuration>
                     </execution>
                     <execution>
-                        <!-- Generates the docs of the ops commands in target/docs -->
+                        <!-- Generates the docs of the ops commands in target/docs, for only the bundled stacks, as the jar bundles them,
+                             whatever the stacks.yaml of the config dir of whoever builds -->
                         <id>generate-docs</id>
                         <phase>prepare-package</phase>
                         <goals>
@@ -102,7 +103,7 @@
                         </goals>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>${afon.jvm} ${afon.exec} -Dafon.logging.console=OFF -classpath %classpath
+                            <commandlineArgs>${afon.jvm} ${afon.exec} -Dafon.logging.console=OFF -Dafon.stacks=bundled -classpath %classpath
                                 health.emrys.afon.ops.docs.GenerateAllDocumentsMain</commandlineArgs>
                         </configuration>
                     </execution>

@@ -11,12 +11,12 @@
 #         unless: KEYCLOAK_EXTERNAL     (or, with 'when', only if it is true)
 stacks:
   # AWS
-  # Only the KeyCloak, never holding the egress IP, which the Polaris stacks hold
+  # Only the Keycloak, never holding the egress IP, which the Polaris stacks hold
   aws-keycloak:
     pinnedEgressIp: false
     components: [Keycloak]
-  # Polaris uses the KeyCloak server at OIDC_DOMAIN_NAME, which the aws-keycloak stack deploys, so that both can
-  # run side by side, while the stacks extending it deploy their own KeyCloak, unless AWS_KEYCLOAK_EXTERNAL is set
+  # Polaris uses the Keycloak server at OIDC_DOMAIN_NAME, which the aws-keycloak stack deploys, so that both can
+  # run side by side, while the stacks extending it deploy their own Keycloak, unless AWS_KEYCLOAK_EXTERNAL is set
   aws-polaris:
     components: [Polaris]
   # Polaris with JupyterHub and Guacamole behind the oauth2-proxy MFA gate, the Spark operator the notebooks' Spark
@@ -41,13 +41,12 @@ stacks:
     components: [Snowflake]
 
   # AZURE
-  # As on AWS, only the KeyCloak, which azure-polaris uses, and azure-full if AZURE_KEYCLOAK_EXTERNAL is set
+  # As on AWS, only the Keycloak, which azure-polaris uses, and azure-full if AZURE_KEYCLOAK_EXTERNAL is set
   azure-keycloak:
     pinnedEgressIp: false
     components: [Keycloak]
   azure-polaris:
     components: [Polaris]
-  # No AwsLogging, which ships the Polaris logs to S3
   azure-full:
     components:
       - name: Keycloak
