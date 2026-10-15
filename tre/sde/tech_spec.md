@@ -124,7 +124,7 @@ Then the Afon build env is set up locally for cloud <cloud>
 afon-cli.sh local-setup -c <cloud>
 ```
 
-The following packages are installed:
+The following packages are installed (list is not exhaustive):
 - git
 - jdk
 - maven
@@ -169,7 +169,7 @@ So that data can be encrypted over HTTPS.
 ```md
 Given no suitable domain currently exists for your environment <env>
 When the organisation purchases or designates a domain
-Then a Polaris domain such as `<env>polaris.click` is available.
+Then a Polaris domain such as `<env>polaris<cloud>.click` is available.
 ```
 
 **How to do it**
@@ -192,7 +192,7 @@ So that cloud-hosted traffic resolves correctly and can be served over HTTPS
 ```md
 Given a Polaris domain name is available
 When DNS records are configured
-Then `dig A <domain> +short` resolves to the expected IP address
+Then `dig +short A <domain>` resolves to the expected IP address
 ```
 
 **How to do it**
@@ -299,7 +299,7 @@ Then the URL https://<CLOUD_DOMAIN_NAME> loads with a valid TLS certificate and 
 **How to do it**
 
 ```shell
-afon-cli.sh deploy-<cloud>-polaris-stack
+afon-cli.sh manage-stack setup <cloud>-polaris
 ```
 
 ## Resourcing: technical
