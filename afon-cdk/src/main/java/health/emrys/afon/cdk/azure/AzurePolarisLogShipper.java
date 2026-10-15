@@ -84,7 +84,8 @@ public class AzurePolarisLogShipper extends PolarisLogShipper {
 
     /**
      * The shared key is Fluent Bit's {@code ${...}} environment variable, which is escaped so that Terraform does not
-     * take it for an interpolation of its own.
+     * take it for an interpolation of its own.  The database file is directly under {@code /var/log}, as SQLite does
+     * not create the directories of its file, and Fluent Bit opens it before it creates the buffer directory.
      */
     @Override
     protected String output() {
@@ -100,7 +101,7 @@ public class AzurePolarisLogShipper extends PolarisLogShipper {
                 blob_type blockblob
                 buffering_enabled On
                 buffer_dir /var/log/fluent-bit-polaris/azure-blob
-                database_file /var/log/fluent-bit-polaris/azure-blob.db
+                database_file /var/log/fluent-bit-polaris-azure-blob.db
                 compress_blob On
                 upload_file_size 50M
                 upload_timeout 30m
