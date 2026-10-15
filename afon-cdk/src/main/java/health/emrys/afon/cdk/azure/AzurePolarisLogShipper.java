@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import static health.emrys.afon.cdk.CdkUtils.escapeTerraformTemplate;
 import static java.lang.String.format;
 
 /**
@@ -81,9 +82,13 @@ public class AzurePolarisLogShipper extends PolarisLogShipper {
             """, SECRET_NAME, SECRET_KEY);
     }
 
+    /**
+     * The shared key is Fluent Bit's {@code ${...}} environment variable, which is escaped so that Terraform does not
+     * take it for an interpolation of its own.
+     */
     @Override
     protected String output() {
-        return format("""
+        return escapeTerraformTemplate(format("""
             [OUTPUT]
                 Name azure_blob
                 Match polaris.*
@@ -100,6 +105,6 @@ public class AzurePolarisLogShipper extends PolarisLogShipper {
                 upload_file_size 50M
                 upload_timeout 30m
                 path %s/%%Y/%%m/%%d/%%H%%M%%S-$UUID
-            """, storageAccount, container, prefix);
+            """, storageAccount, container, prefix));
     }
 }
