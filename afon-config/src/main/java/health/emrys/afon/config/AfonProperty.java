@@ -107,6 +107,7 @@ public enum AfonProperty {
      * {@code OIDC_DOMAIN_NAME} that the {@code azure-keycloak} stack deploys.  Optional: {@code false} when unset.
      */
     AZURE_KEYCLOAK_EXTERNAL("AZURE_KEYCLOAK_EXTERNAL"),
+    AZURE_POLARIS_LOG_BUCKET("AZURE_POLARIS_LOG_BUCKET"),
 
     // OIDC provider (client-facing; any IdentityProvider implementation)
     OIDC_DOMAIN_NAME("OIDC_DOMAIN_NAME"),
