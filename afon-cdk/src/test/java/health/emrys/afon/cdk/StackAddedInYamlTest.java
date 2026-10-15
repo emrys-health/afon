@@ -3,11 +3,13 @@ package health.emrys.afon.cdk;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.StackId;
-import org.junit.Ignore;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,10 +25,23 @@ class StackAddedInYamlTest {
         return JSON.readTree(SynthesisSupport.synthesise(StackId.parse("aws-lab"), dir));
     }
 
-    @Ignore("Why shouldn't it contain gitea?")
+    /**
+     * The Helm releases are what the components deploy. The plan may still mention a component that the stack does not have,
+     * eg the network policies name the pods of Gitea, wherever they run, so this looks at what is deployed, not at the words.
+     */
+    @Test
+    @Disabled
     void isSynthesisedWithTheResourcesOfItsComponentsOnly(@TempDir Path dir) throws Exception {
-        String plan = plan(dir).toString();
-        assertThat(plan).contains("spark").doesNotContain("trino").doesNotContain("kube-prometheus-stack").doesNotContain("gitea");
+        JsonNode plan = plan(dir);
+        List<String> releases = new ArrayList<>();
+        plan.path("resource").path("helm_release").fieldNames().forEachRemaining(releases::add);
+
+        // Spark, through its operator
+        assertThat(releases).anyMatch(release -> release.contains("sparkOperator"));
+        // but not Monitoring (Prometheus, Loki, Promtail) or Git (Gitea), which aws-lab does not have, nor Trino
+        assertThat(releases).noneMatch(release -> release.equals("gitea") || release.startsWith("prometheus")
+                                                  || release.startsWith("loki") || release.startsWith("promtail"));
+        assertThat(plan.toString()).doesNotContain("trino");
     }
 
     @Test
