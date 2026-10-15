@@ -65,6 +65,12 @@ import static health.emrys.afon.config.AfonProperty.*;
 public class GiteaConfig {
 
     static final         String SECRET_NAME = "gitea-secrets";
+    /** The labels the chart's Services select Gitea's pod on. */
+    public static final  Map<String, String> POD_LABELS = Map.of("app.kubernetes.io/name", "gitea",
+                                                                 "app.kubernetes.io/instance", "gitea");
+    /** The ports of the pod, which its Services, eg {@code gitea-http:3000}, target: the chart's defaults. */
+    public static final  String HTTP_PORT = "3000";
+    public static final  String SSH_PORT  = "2222";
     private static final String CHART_FILE  = "gitea-12.7.0.tgz";
     /** The image the chart runs, by its appVersion, which must be kept in step with {@link #CHART_FILE}. */
     private static final String GITEA_IMAGE = "docker.gitea.com/gitea:1.27.0-rootless";
