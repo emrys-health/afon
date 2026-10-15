@@ -59,7 +59,7 @@ stacks:
   azure-polaris:
     role: catalog
     components: [Polaris]
-  # No AwsLogging, which ships the Polaris logs to S3
+  # AzureLogging, not AwsLogging, which ships the Polaris logs
   azure-full:
     role: tre
     components:
@@ -72,6 +72,7 @@ stacks:
       - Spark
       - CrdCleanup
       - Monitoring
+      - AzureLogging
       - Git
 
   # GCP

@@ -183,7 +183,7 @@ The stacks, as composed by `StackDefinitions`:
 | `aws-snowflake` | as `aws-full`, then Snowflake, a query engine outside of the stack, so it deploys nothing |
 | `azure-keycloak` | Keycloak |
 | `azure-polaris` | Polaris |
-| `azure-full` | The components of `aws-full`, listed on their own, but for AwsLogging (AWS only), with its own Keycloak unless `AZURE_KEYCLOAK_EXTERNAL` |
+| `azure-full` | The components of `aws-full`, listed on their own, but with AzureLogging in place of AwsLogging, and with its own Keycloak unless `AZURE_KEYCLOAK_EXTERNAL` |
 | `gcp-polaris` | Polaris |
 
 **Synthesising a stack.** `ComposedStack.synthesise(StackId, AfonPropertyProvider)` is the only way into the CDKTF world, and it

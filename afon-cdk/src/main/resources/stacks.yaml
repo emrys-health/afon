@@ -66,6 +66,7 @@ stacks:
       - CrdCleanup
       - Trino
       - Monitoring
+      - AzureLogging
       - Git
 
   # GCP
