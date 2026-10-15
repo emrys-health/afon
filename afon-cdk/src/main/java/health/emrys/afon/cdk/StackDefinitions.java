@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import health.emrys.afon.cdk.azure.AzureLoggingComponent;
 import health.emrys.afon.cdk.components.CrdCleanupComponent;
 import health.emrys.afon.cdk.components.GitComponent;
 import health.emrys.afon.cdk.components.JupyterComponent;
@@ -12,7 +13,6 @@ import health.emrys.afon.cdk.components.SnowflakeComponent;
 import health.emrys.afon.cdk.components.SparkComponent;
 import health.emrys.afon.cdk.components.SparkOperatorComponent;
 import health.emrys.afon.cdk.components.TrinoComponent;
-import health.emrys.afon.cdk.components.*;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -42,16 +42,16 @@ public final class StackDefinitions {
             properties -> concat(jupyter(isKeyCloakExternal(AWS, properties)), spark()));
         add(new StackId(AWS, "trino"), true,
             properties -> concat(jupyter(isKeyCloakExternal(AWS, properties)), spark(), List.of(new TrinoComponent())));
-        add(new StackId(AWS, "full"), true, properties -> full(isKeyCloakExternal(AWS, properties)));
+        add(new StackId(AWS, "full"), true, properties -> full(AWS, properties));
         // Snowflake queries the catalogs of the full stack through its Polaris, so it holds what the full stack holds
         add(new StackId(AWS, "snowflake"), true,
-            properties -> concat(full(isKeyCloakExternal(AWS, properties)), List.of(new SnowflakeComponent())));
+            properties -> concat(full(AWS, properties), List.of(new SnowflakeComponent())));
 
         // AZURE
         // As on AWS, only the KeyCloak, which azure-polaris uses, and azure-full if AZURE_KEYCLOAK_EXTERNAL is set
         add(new StackId(AZURE, "keycloak"), false, properties -> List.of(new KeycloakComponent()));
         add(new StackId(AZURE, "polaris"), true, properties -> List.of(new PolarisComponent()));
-        add(new StackId(AZURE, "full"), true, properties -> full(isKeyCloakExternal(AZURE, properties)));
+        add(new StackId(AZURE, "full"), true, properties -> full(AZURE, properties));
 
         // GCP
         add(new StackId(GCP, "polaris"), true, properties -> List.of(new PolarisComponent()));
@@ -81,11 +81,17 @@ public final class StackDefinitions {
     }
 
 
-    private static List<StackComponent> full(boolean keyCloakExternal) {
-        return concat(jupyter(keyCloakExternal), spark(), List.of(new TrinoComponent(),
-                                                                  new MonitoringComponent(),
-                                                                  new AwsLoggingComponent(),
-                                                                  new GitComponent()));
+    private static List<StackComponent> full(AfonCloud cloud, AfonPropertyProvider properties) {
+        boolean keyCloakExternal = isKeyCloakExternal(cloud, properties);
+        List<StackComponent>  components = new ArrayList<>(List.of(new TrinoComponent(),
+                                                                   new MonitoringComponent(),
+                                                                   new GitComponent()));
+        if (cloud == AWS) {
+            components.add(new AwsLoggingComponent());
+        } else if (cloud == AZURE) {
+            components.add(new AzureLoggingComponent());
+        }
+        return concat(jupyter(keyCloakExternal), spark(), components);
     }
 
     // The operator only launches Spark in response to the resources of the Spark component
