@@ -2,6 +2,7 @@ package health.emrys.afon.ops.plan;
 
 import health.emrys.afon.cdk.StackComponent;
 import health.emrys.afon.cdk.aws.AwsLoggingComponent;
+import health.emrys.afon.cdk.azure.AzureLoggingComponent;
 import health.emrys.afon.cdk.components.*;
 
 import java.util.HashMap;
@@ -27,6 +28,7 @@ public final class ComponentPlanRegistry {
         registry.add(SparkComponent.class, new SparkPlan());
         registry.add(SnowflakeComponent.class, new SnowflakePlan());
         registry.add(AwsLoggingComponent.class, NO_OP);
+        registry.add(AzureLoggingComponent.class, NO_OP);
         registry.add(GitComponent.class, NO_OP);
 
         // infrastructure with nothing to wait for or configure
