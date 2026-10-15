@@ -1,6 +1,8 @@
 package health.emrys.afon.ops.docs;
 
+import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.cdk.azure.AzureCleanupHelper;
+import health.emrys.afon.cdk.components.SnowflakeComponent;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -30,7 +32,7 @@ public class ScenarioDocument extends AbstractDocument {
     private final String scenario;
 
     /**
-     * @param stackId  the stack the scenario is run on, eg {@code aws-full}
+     * @param stackId  the stack the scenario is run on
      * @param scenario the scenario of the stack, eg {@code external-azure}
      */
     public ScenarioDocument(AfonPropertyProvider properties, StackId stackId, String scenario) {
@@ -41,12 +43,12 @@ public class ScenarioDocument extends AbstractDocument {
     }
 
     /**
-     * @return the stacks to set up first, in order: those that the flow ending with the scenario sets up, eg {@code aws-full}
-     * and {@code azure-polaris} for {@code external-azure}, which needs the Azure Polaris too, else just the stack
+     * @return the stacks to set up first, in order: those that the flow ending with the scenario sets up, eg the AWS and Azure stacks
+     * for {@code external-azure}, which needs the Azure Polaris too, else just the stack
      */
     private static List<StackId> setupsOf(StackId stack, String scenario) {
         return StackFlows.all().stream()
-                         .filter(flow -> flow.items().get(flow.items().size() - 1).equals(FlowItem.run(stack.toString(), scenario)))
+                         .filter(flow -> flow.items().get(flow.items().size() - 1).equals(FlowItem.run(stack, scenario)))
                          .map(flow -> flow.items().stream().filter(item -> item.action() == StackAction.SETUP)
                                           .map(FlowItem::stackId).toList())
                          .filter(setups -> !setups.isEmpty())
@@ -65,7 +67,8 @@ public class ScenarioDocument extends AbstractDocument {
 
     @Override
     protected String getSupplementaryIntro() {
-        if (stack.toString().equals("aws-snowflake") && scenario.startsWith("reading-")) {
+        boolean withSnowflake = StackDefinitions.find(stack).map(definition -> definition.declares(SnowflakeComponent.class)).orElse(false);
+        if (withSnowflake && scenario.startsWith("reading-")) {
             return format(
                 """
                 ### Summary of this deployment
@@ -77,15 +80,16 @@ public class ScenarioDocument extends AbstractDocument {
                 We then point Snowflake at this Polaris running in our real estate and run a SF query against it.
                 """, scenario.substring("reading-".length()).toUpperCase());
         }
-        return switch (stack + " " + scenario) {
-            case "aws-snowflake writing-azure" ->
+        // the scenarios are those of the components, so are found by their names, not by the id of the stack
+        return switch (withSnowflake ? "snowflake " + scenario : scenario) {
+            case "snowflake writing-azure" ->
                 """
                 ## What it does
                 This e2e test has Snowflake writing to Azure blob storage, registering its
                 metadata with Polaris then running Spark against Polaris to see the same data.
 
                 """;
-            case "aws-full external-azure" ->
+            case "external-azure" ->
                 """
                 Spark, running locally, writes through the AWS Polaris to an external catalog hosted by the Azure Polaris:
                 - all the catalogs are in AWS plus the external one that talks to an Azure Polaris with an Azure catalog

@@ -50,7 +50,8 @@
 # clouds through its Spark Connect server.  After any setups, the current kubectl context is set to the full stack
 # cluster of the env, that of --env, if given, else that of the current config, with the afon command
 # '<cloud>-update-kube-config full', and left so.  Its Polaris ingress is then restricted, as the network smoke
-# test expects, which checks that Polaris cannot be reached from outside of the cluster.  On AWS to the
+# test expects, which checks that Polaris cannot be reached from outside of the cluster, and put back as a deploy
+# leaves it when the script exits, however it exits, so that the machine running it can reach Polaris again.  On AWS to the
 # AWS_POLARIS_ALLOWED_CIDRS of afon-aws.properties plus the cluster's egress IP, that of its NAT gateway, or by default
 # AWS_EGRESS_IP.  On Azure to the AZURE_POLARIS_ALLOWED_CIDRS of afon-azure.properties plus the cluster's pod CIDR, if
 # set, else to the cluster's pod CIDR and the cluster's outbound IP only, so that the pods can still reach it.  So the
@@ -413,6 +414,7 @@ restrict_aws_polaris_ingress() {
   done
   cidrs="$cidrs$egress_ip/32"
   banner "Restricting the Polaris ingress to $cidrs"
+  RESTRICTED_INGRESS_CONTEXT=$(kubectl config current-context)
   if ! kubectl annotate ingress polaris-ingress -n default --overwrite \
          "alb.ingress.kubernetes.io/inbound-cidrs=$cidrs"; then
     error "Failed to restrict the Polaris ingress: not running the tests"
@@ -468,6 +470,7 @@ restrict_azure_polaris_ingress() {
   fi
   cidrs="$cidrs$pod_cidr"
   banner "Restricting the Polaris ingress to $cidrs"
+  RESTRICTED_INGRESS_CONTEXT=$(kubectl config current-context)
   controller=$(kubectl get service -n ingress-nginx -l app.kubernetes.io/component=controller -o name 2>/dev/null \
                  | grep -v admission | head -1 || true)
   if [ -z "$controller" ] || ! kubectl patch "$controller" -n ingress-nginx --type merge \
@@ -482,6 +485,38 @@ restrict_azure_polaris_ingress() {
   fi
 }
 
+# Puts the Polaris ingress restricted by restrict_polaris_ingress back as a deploy leaves it, from the config, rather than
+# as it was before: a run that was killed may have left it restricted.  A deploy restricts it only if the property
+# AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS is set, to the CIDRs the suite has already applied, so it is
+# put back by removing the restriction if the property is not set, and left as it is if it is.  Does nothing if the
+# ingress was not restricted, or is gone, eg with --teardown after this.  It runs on exit, so it only warns on failure,
+# keeping the exit status of the script.
+restore_polaris_ingress() {
+  local context="$RESTRICTED_INGRESS_CONTEXT" annotation configured property
+  if [ -z "$context" ]; then
+    return 0
+  fi
+  RESTRICTED_INGRESS_CONTEXT=
+  case "$CLOUD" in
+    aws) annotation="alb.ingress.kubernetes.io/inbound-cidrs"; property=AWS_POLARIS_ALLOWED_CIDRS
+         configured=$(aws_property "$property") ;;
+    azure) annotation="nginx.ingress.kubernetes.io/whitelist-source-range"; property=AZURE_POLARIS_ALLOWED_CIDRS
+           configured=$(azure_property "$property") ;;
+    *) return 0 ;;
+  esac
+  if [ -n "$configured" ]; then
+    return 0
+  fi
+  if ! kubectl --context "$context" get ingress polaris-ingress -n default >/dev/null 2>&1; then
+    return 0
+  fi
+  banner "Removing the restriction of the Polaris ingress, as $property is not set"
+  if ! kubectl --context "$context" annotate ingress polaris-ingress -n default "$annotation-" >/dev/null; then
+    warning "failed to remove the restriction of the Polaris ingress: remove it with:" \
+            "kubectl --context $context annotate ingress polaris-ingress -n default $annotation-"
+  fi
+}
+
 # Sets up the comma-separated stacks $1, in order, exiting if any fails.  Each stack is recorded in SETUP_STACKS
 # before being set up, so that a stack whose setup failed part way is also handled by finish_stacks, which is run
 # on exit, however the script exits.
@@ -490,9 +525,6 @@ setup_stacks() {
   if [ -z "$1" ]; then
     return
   fi
-  trap finish_stacks EXIT
-  trap 'INTERRUPTED=true; exit 130' INT
-  trap 'INTERRUPTED=true; exit 143' TERM
   for stack in ${1//,/ }; do
     SETUP_STACKS+=("$stack")
     banner "Setting up stack $stack"
@@ -549,13 +581,15 @@ teardown_stacks() {
   return $failed
 }
 
-# The EXIT trap of setup_stacks, keeping the exit status, unless a teardown fails.  Never tears down the set up
+# The EXIT trap of the script, which first restores the Polaris ingress, then finishes any set up stacks, keeping the exit status, unless a teardown fails.  Never tears down the set up
 # stacks if the script was interrupted, as a setup may then have been stopped part way, with its tofu state still
 # locked, and a teardown would take as long as the setup: it only says how to delete them.  Else it tears them
 # down if --teardown is given, or says how to delete them.
 finish_stacks() {
   local status=$?
   trap - EXIT
+  # before any teardown, while the ingress is there
+  restore_polaris_ingress
   if [ ${#SETUP_STACKS[@]} -eq 0 ]; then
     exit $status
   fi
@@ -582,6 +616,8 @@ RESULTS_FILE=
 SETUP=
 SETUP_STACKS=()
 INTERRUPTED=
+# The kubectl context whose Polaris ingress was restricted, until it is restored, see restore_polaris_ingress
+RESTRICTED_INGRESS_CONTEXT=
 TEARDOWN=
 ENV=
 LIST=
@@ -669,6 +705,10 @@ fi
 cd "$AFON_ROOT"
 
 start_results
+# On every exit, however the script exits: restores the Polaris ingress, and finishes any set up stacks
+trap finish_stacks EXIT
+trap 'INTERRUPTED=true; exit 130' INT
+trap 'INTERRUPTED=true; exit 143' TERM
 setup_stacks "$SETUP"
 
 update_kube_config

@@ -15,8 +15,8 @@ public final class DocumentNames {
     }
 
     /**
-     * @return the file of the doc of the action on the stack, eg {@code setup_aws_full_stack.md}, or
-     * {@code delete_aws_stack.md} for {@code delete aws-all}
+     * @return the file of the doc of the action on the stack, eg {@code setup_<stack_id>_stack.md}, or
+     * {@code delete_<cloud>_stack.md} for {@code delete <cloud>-all}
      */
     public static String stack(StackAction action, StackId stackId) {
         return action + "_" + (stackId.isAll() ? stackId.cloud().name().toLowerCase() : snake(stackId.toString())) + "_stack.md";
@@ -37,8 +37,8 @@ public final class DocumentNames {
     }
 
     /**
-     * @param args the {@code manage-stack} args, without options, eg {@code setup aws-full}, {@code run cross-cloud-azure}
-     *             or {@code run aws-snowflake reading-azure}, each with the step to resume from, if any
+     * @param args the {@code manage-stack} args, without options, eg {@code setup <stack-id>}, {@code run <flow>}
+     *             or {@code run <stack-id> <scenario>}, each with the step to resume from, if any
      * @return the file of the doc of the args, if they name an action on a stack, a flow or a scenario
      */
     public static Optional<String> forArgs(String[] args) {

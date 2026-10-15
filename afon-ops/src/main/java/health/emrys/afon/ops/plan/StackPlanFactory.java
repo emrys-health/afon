@@ -46,10 +46,10 @@ import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
  * <p>
  * Stacks run side by side, unless they conflict, ie they hold a common exclusive resource, such as the DNS record of a domain
  * name, or the pinned egress IP, which only one running stack can hold, see {@link #heldResources}.  So deploying or setting up a
- * stack first deletes the stacks it conflicts with, eg deploying {@code aws-polaris} deletes {@code aws-full}, which also holds the
- * Polaris domain name, but not {@code aws-keycloak}.  It only deletes the stack itself, if running, unless told to replace the
+ * stack first deletes the stacks it conflicts with, eg deploying a stack with Polaris deletes the running stack that also holds the
+ * Polaris domain name, but not one that holds neither.  It only deletes the stack itself, if running, unless told to replace the
  * other conflicting stacks too, else it fails, naming them, before deleting any.
- * Deleting a stack deletes just that stack, and deleting {@code <cloud>-all}, eg {@code aws-all}, deletes every stack of the cloud.
+ * Deleting a stack deletes just that stack, and deleting {@code <cloud>-all} deletes every stack of the cloud.
  */
 public class StackPlanFactory {
 
@@ -217,7 +217,7 @@ public class StackPlanFactory {
 
     /**
      * @return why the conflicting stack named as given must not be deleted without replacing it, when deploying the
-     * stack, eg "stack aws-full is running and already holds the Polaris domain name emryspolaris.click (AWS_POLARIS_DOMAIN_NAME)",
+     * stack, eg "stack <stack-id> is running and already holds the Polaris domain name emryspolaris.click (AWS_POLARIS_DOMAIN_NAME)",
      * and how to delete it instead, or {@code null} if it may be, ie it is the stack itself, or holds nothing in common with it
      */
     StackFilter.Refusal refusal(StackId stackId, String stackName, AfonPropertyProvider properties) {
@@ -270,7 +270,7 @@ public class StackPlanFactory {
     }
 
     /**
-     * @return whether the stack deployed from a stack dir or tofu state named as given, eg {@code aws-full}, conflicts with
+     * @return whether the stack deployed from a stack dir or tofu state named as given, conflicts with
      * the stack, ie it is the same stack, or they hold a common exclusive resource.  The legacy stack, named as the cloud,
      * eg {@code aws}, and a stack that is not defined, may hold any resource, so conflict with every stack.
      */

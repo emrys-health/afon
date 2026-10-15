@@ -50,7 +50,7 @@ public interface ComponentPlan {
     enum Endpoint {KEYCLOAK, POLARIS}
 
     /**
-     * @return what the component is called in messages, eg "Polaris" in "stack aws-full is running and already deploys Polaris at
+     * @return what the component is called in messages, eg "Polaris" in "stack <stack-id> is running and already deploys Polaris at
      * polaris.example (AWS_POLARIS_DOMAIN_NAME)", which explains why a stack cannot be deployed beside another
      */
     default String label() {

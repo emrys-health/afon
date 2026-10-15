@@ -88,7 +88,7 @@ public class GcpCleanupHelper extends CleanupHelper {
 
     /**
      * Outputs the cleanup commands of the GCP stack, given the args {@code <stack-id> [<output-file>]},
-     * eg {@code gcp-polaris}, although the names of its components don't depend on its stack type.
+     * {@code <stack-id>}, although the names of its components don't depend on its stack type.
      */
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();

@@ -17,7 +17,7 @@ import java.util.Map;
 import static health.emrys.afon.config.ConfigUtils.afonHome;
 
 /**
- * Generates the CleanupHelper script for the given stack, eg {@code aws-keycloak}, into
+ * Generates the CleanupHelper script for the given stack, {@code <stack-id>}, into
  * {@code <afon.home>/<stack-id>-cleanup.sh}.
  */
 public class GenerateCleanupScriptMain {

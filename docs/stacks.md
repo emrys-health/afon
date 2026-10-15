@@ -91,9 +91,33 @@ The flows are:
   `snowflake-writing-azure`: `setup aws-snowflake`, then `run aws-snowflake <scenario>`;
 - `snowflake-reading-all`: just the three reading runs in a row, on an `aws-snowflake` that is already set up.
 
-They are defined in code, in `StackFlows`, and validated when loaded: the stacks, scenarios and actions must exist, a scenario
-runs on a stack no earlier item deleted (a flow may be just a chain of runs on stacks already set up), and a later item must not delete a stack an earlier one leaves running.
+They are defined in `stack-flows.yaml` (`afon-ops/src/main/resources/stack-flows.yaml`, bundled in the jar), and validated when
+used: the stacks, scenarios and actions must exist, a scenario runs on a stack no earlier item deleted (a flow may be just a chain
+of runs on stacks already set up), and a later item must not delete a stack an earlier one leaves running, by conflicting with it.
 Each flow has a generated document, under `flow_*.md`.
+
+#### Define your own flows
+
+A `stack-flows.yaml` in the config dir (`$AFON_HOME/config`) **replaces** the bundled one entirely, rather than adding to it, so
+start from a copy, which this exports there (without overwriting an existing file):
+```shell
+afon-cli.sh manage-stack run --export-flows
+```
+Each flow is a name, which is not the id of a stack, and a list of items, each one action (`delete`, `deploy`, `setup` or `run`)
+on a stack, and a `scenario` for `run`:
+```yaml
+flows:
+  my-flow:
+    - setup: {cloud: aws, role: tre}                 # the stack of the cloud with the role in stacks.yaml
+    - setup: {stack: aws-lab}                        # a stack by its id
+    - run: {cloud: aws, component: Snowflake, scenario: reading-aws}   # the stack of the cloud that deploys the component
+```
+A stack is named by its id (`stack`), or by a `cloud` with a `role` (`catalog`, `identity` or `tre`) or a `component` it deploys.
+The bundled flows name stacks by role or component, so that they work whatever the ids in `stacks.yaml`. A flow whose stacks
+`stacks.yaml` does not define cannot run: it is not listed, and running it fails, naming the missing stack. A file that is not valid, eg an unknown action, role, cloud or
+component, a `run` with no scenario, or a repeated flow, makes `manage-stack` fail before doing anything, naming the file and the
+flow. The generated documents (`flow_*.md`) are made when Afon is built, from the bundled flows only, so a flow of your own has none:
+list its steps with `manage-stack run <flow> --dry-run`.
 
 ### Stacks side by side
 
@@ -208,6 +232,7 @@ Each stack is `<cloud>-<stack-type>`, and the ordered list of the components it 
 ```yaml
 stacks:
   aws-lab:
+    role: tre                       # optional, see below: the role the stack plays in its cloud, if any
     pinnedEgressIp: true            # optional, default true (or as the stack it extends): holds AWS_EGRESS_IP, which only one running stack can
     components:
       - name: Keycloak              # deployed unless AWS_KEYCLOAK_EXTERNAL=true, ie the property <CLOUD>_KEYCLOAK_EXTERNAL
@@ -222,6 +247,14 @@ stacks:
     extends: aws-lab                # starts with the components of aws-lab, which must be of the same cloud
     components: [Trino]
 ```
+A stack may have a `role`, one of `catalog` (the catalog provider, eg Polaris), `identity` (the identity provider, eg KeyCloak)
+or `tre` (the trusted research environment, ie all the components).  The code that depends on what a stack is for, rather than on
+its id, looks for the stack of the cloud with the role: the flows of `manage-stack run` (eg `cross-cloud-azure` sets up the `tre`
+stack of AWS and the `catalog` stack of Azure), and the checks that say which stack to set up (eg for KeyCloak to answer).  So the
+ids are free to name as you like, but a cloud has at most one stack per role, and a flow whose stacks the file does not define
+cannot run.  A stack with no role, like `aws-lab`, is managed all the same; the `role` is not inherited by a stack that `extends`
+another.
+
 The components are those of the code, eg `Polaris`, `Keycloak`, `Jupyter`, `Spark`, `Trino`; a file cannot define a new one.
 The stacks of a cloud are independent of those of the others.
 
@@ -234,7 +267,7 @@ Try the new stack, which like the others conflicts with those holding the same d
 afon-cli.sh validate-stack aws-lab        # synthesises its plan, and checks that it is the same in each JVM
 afon-cli.sh manage-stack setup aws-lab
 ```
-`validate-stack` prints the components of the stack as the file defines them, for the config (those left out by a `when` or
+`validate-stack` prints the role of the stack, if it has one, and its components as the file defines them, for the config (those left out by a `when` or
 `unless` property are not listed), and without a stack lists the stacks of the file.
 
 ### Setup AWS full stack

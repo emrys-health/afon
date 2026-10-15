@@ -1,0 +1,59 @@
+# The flows that `manage-stack run <flow>` runs, ie named lists of actions and scenarios on stacks, loaded by StackFlows.
+# A file of this name in the config dir ($AFON_HOME/config) replaces this one entirely, rather than adding to it.
+# `manage-stack run --export-flows` writes this file there, to edit.
+#
+# flows:
+#   <flow>:                      the name of the flow, which is not the id of a stack
+#     - <action>:                one of delete, deploy, setup or run, each run in order
+#         <the stack>            one of:
+#           stack: <stack-id>        a stack by its id, as in stacks.yaml
+#           cloud: <cloud>           and role: catalog|identity|tre, the stack of the cloud with the role in stacks.yaml
+#           cloud: <cloud>           and component: <name>, the stack of the cloud that deploys the component, eg Snowflake
+#         scenario: <scenario>   for run only: the scenario to run on the stack, which must be set up
+#
+# Naming the stacks by role or component, rather than by id, lets stacks.yaml name them as it likes.
+# A flow needing a stack that stacks.yaml does not define cannot run: it is not listed, and running it fails, naming the stack.
+flows:
+  aws-full-and-azure-polaris:
+    - setup: {cloud: aws, role: tre}
+    - setup: {cloud: azure, role: catalog}
+
+  aws-keycloak-and-polaris:
+    - setup: {cloud: aws, role: identity}
+    - setup: {cloud: aws, role: catalog}
+
+  azure-keycloak-and-polaris:
+    - setup: {cloud: azure, role: identity}
+    - setup: {cloud: azure, role: catalog}
+
+  azure-and-gcp-polaris:
+    - setup: {cloud: azure, role: catalog}
+    - setup: {cloud: gcp, role: catalog}
+
+  cross-cloud-azure:
+    - setup: {cloud: aws, role: tre}
+    - setup: {cloud: azure, role: catalog}
+    - run: {cloud: aws, role: tre, scenario: external-azure}
+
+  # Snowflake queries the catalogs through the stack that deploys the Snowflake component, which has no role of its own
+  snowflake-reading-aws:
+    - setup: {cloud: aws, component: Snowflake}
+    - run: {cloud: aws, component: Snowflake, scenario: reading-aws}
+
+  snowflake-reading-azure:
+    - setup: {cloud: aws, component: Snowflake}
+    - run: {cloud: aws, component: Snowflake, scenario: reading-azure}
+
+  snowflake-reading-gcp:
+    - setup: {cloud: aws, component: Snowflake}
+    - run: {cloud: aws, component: Snowflake, scenario: reading-gcp}
+
+  snowflake-writing-azure:
+    - setup: {cloud: aws, component: Snowflake}
+    - run: {cloud: aws, component: Snowflake, scenario: writing-azure}
+
+  # just the runs, on the stack with Snowflake, which must be set up
+  snowflake-reading-all:
+    - run: {cloud: aws, component: Snowflake, scenario: reading-aws}
+    - run: {cloud: aws, component: Snowflake, scenario: reading-azure}
+    - run: {cloud: aws, component: Snowflake, scenario: reading-gcp}

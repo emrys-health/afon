@@ -72,6 +72,7 @@
                 <configuration>
                     <systemPropertyVariables>
                         <afon.stacks>${project.basedir}/../afon-cdk/src/test/resources/stacks-test.yaml</afon.stacks>
+                        <afon.stack-flows>bundled</afon.stack-flows>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
@@ -103,7 +104,7 @@
                         </goals>
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
-                            <commandlineArgs>${afon.jvm} ${afon.exec} -Dafon.logging.console=OFF -Dafon.stacks=bundled -classpath %classpath
+                            <commandlineArgs>${afon.jvm} ${afon.exec} -Dafon.logging.console=OFF -Dafon.stacks=bundled -Dafon.stack-flows=bundled -classpath %classpath
                                 health.emrys.afon.ops.docs.GenerateAllDocumentsMain</commandlineArgs>
                         </configuration>
                     </execution>

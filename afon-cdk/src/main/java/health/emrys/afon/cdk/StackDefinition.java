@@ -2,6 +2,8 @@ package health.emrys.afon.cdk;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
+import health.emrys.afon.config.StackRole;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.List;
@@ -10,17 +12,34 @@ import java.util.function.Function;
 
 /**
  * What a stack is composed of: the components deployed to its cloud, in order, as each may depend on those before it.
- * The components are those of the config, as which are deployed may depend on it, eg whether the stack deploys its own
- * KeyCloak.
  *
  * @param id             the stack, whose cloud it is deployed to
+ * @param role           the {@link StackRole} it plays in its cloud, or {@code null} if none
  * @param pinnedEgressIp for AWS, whether the stack's egress IP is pinned to {@code AWS_EGRESS_IP}, if set, which only
  *                       one running stack can hold, else the stack allocates its own
  * @param components     creates the components, new for each stack built as they hold what they deploy
+ * @param declared       the kinds of component it may deploy, ie that its definition lists, whatever the config
  */
 public record StackDefinition(StackId id,
+                              @Nullable StackRole role,
                               boolean pinnedEgressIp,
-                              Function<AfonPropertyProvider, List<StackComponent>> components) {
+                              Function<AfonPropertyProvider, List<StackComponent>> components,
+                              Set<Class<? extends StackComponent>> declared) {
+
+    /**
+     * A stack with no role, that declares nothing.
+     */
+    public StackDefinition(StackId id, boolean pinnedEgressIp,
+                           Function<AfonPropertyProvider, List<StackComponent>> components) {
+        this(id, null, pinnedEgressIp, components, Set.of());
+    }
+
+    /**
+     * @return whether the stack may deploy the kind of component, ie its definition lists it, although the config may leave it out
+     */
+    public boolean declares(Class<? extends StackComponent> type) {
+        return declared.contains(type);
+    }
 
     /**
      * @return the stack's components for the config, new for each call, checked to be composed correctly

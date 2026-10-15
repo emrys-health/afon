@@ -1,5 +1,9 @@
 package health.emrys.afon.ops.docs;
 
+import health.emrys.afon.cdk.StackDefinition;
+import health.emrys.afon.cdk.StackDefinitions;
+import health.emrys.afon.cdk.components.KeycloakComponent;
+import health.emrys.afon.cdk.components.PolarisComponent;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -18,7 +22,7 @@ import static java.lang.String.format;
 
 /**
  * The document of an action on a stack, run with {@code manage-stack <action> <stack-id>}, whose steps are those it runs,
- * provided by {@link StackPlanFactory}, eg {@code setup aws-keycloak}, or {@code delete aws-all}, which deletes every stack
+ * provided by {@link StackPlanFactory}, eg {@code setup <stack-id>}, or {@code delete <cloud>-all}, which deletes every stack
  * of the cloud.
  */
 public class StackDocument extends AbstractDocument {
@@ -73,11 +77,12 @@ public class StackDocument extends AbstractDocument {
     }
 
     private String populatedWith() {
-        return switch (stackId.type()) {
-            case "keycloak" -> ", populated with the realm, clients and users";
-            case "polaris", "full", "snowflake" -> ", populated with the test catalogs";
-            default -> "";
-        };
+        // by what the stack deploys, not by its id: the catalogs are in the Polaris, the realm in the KeyCloak
+        StackDefinition definition = StackDefinitions.get(stackId);
+        if (definition.declares(PolarisComponent.class)) {
+            return ", populated with the test catalogs";
+        }
+        return definition.declares(KeycloakComponent.class) ? ", populated with the realm, clients and users" : "";
     }
 
     @Override
@@ -164,8 +169,11 @@ public class StackDocument extends AbstractDocument {
         if (stackId.isAll()) {
             return "";
         }
-        return switch (stackId.toString()) {
-            case "gcp-polaris" -> format(
+        // GCP's, as the troubleshooting is of the cloud, whichever its stacks
+        if (stackId.cloud() != AfonCloud.GCP) {
+            return "";
+        }
+        return format(
                 """
 
                 ### Problems running `tofu destroy`?
@@ -190,8 +198,6 @@ public class StackDocument extends AbstractDocument {
                 gcloud compute instance-groups managed delete gke-spark-cluster-default-pool-XXX --zone europe-west2-a --project %1$s --quiet
                 ```
                 """, gcpProjectId());
-            default -> "";
-        };
     }
 
     /**

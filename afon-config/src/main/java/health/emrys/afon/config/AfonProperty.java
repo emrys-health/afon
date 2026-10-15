@@ -37,8 +37,8 @@ public enum AfonProperty {
     AWS_KEYCLOAK_CERT_ARN("AWS_KEYCLOAK_CERT_ARN"),
     AWS_KEYCLOAK_DNS_ZONE("AWS_KEYCLOAK_DNS_ZONE"),
     /**
-     * Whether the AWS stacks otherwise deploying their own KeyCloak, eg {@code aws-full}, use instead the one at
-     * {@code OIDC_DOMAIN_NAME} that the {@code aws-keycloak} stack deploys.  Optional: {@code false} when unset.
+     * Whether the AWS stacks otherwise deploying their own KeyCloak use instead the one at
+     * {@code OIDC_DOMAIN_NAME} that the identity stack of the cloud deploys.  Optional: {@code false} when unset.
      */
     AWS_KEYCLOAK_EXTERNAL("AWS_KEYCLOAK_EXTERNAL"),
     /** Elastic IP that all outbound cluster traffic egresses from.  Optional: a new one is allocated when unset. */
@@ -103,8 +103,8 @@ public enum AfonProperty {
     AZURE_RESOURCE_PROVIDER_REGISTRATIONS("AZURE_RESOURCE_PROVIDER_REGISTRATIONS"),
     AZURE_AKS_NODE_POOL("AZURE_AKS_NODE_POOL"),
     /**
-     * Whether the Azure stacks otherwise deploying their own KeyCloak, eg {@code azure-full}, use instead the one at
-     * {@code OIDC_DOMAIN_NAME} that the {@code azure-keycloak} stack deploys.  Optional: {@code false} when unset.
+     * Whether the Azure stacks otherwise deploying their own KeyCloak use instead the one at
+     * {@code OIDC_DOMAIN_NAME} that the identity stack of the cloud deploys.  Optional: {@code false} when unset.
      */
     AZURE_KEYCLOAK_EXTERNAL("AZURE_KEYCLOAK_EXTERNAL"),
     AZURE_POLARIS_LOG_BUCKET("AZURE_POLARIS_LOG_BUCKET"),
@@ -167,7 +167,7 @@ public enum AfonProperty {
     SPARK_CONNECT_URL("SPARK_CONNECT_URL"),
 
     ALLOWED_DOMAINS_CSV("ALLOWED_DOMAINS_CSV"),
-    /** The cloud of the stack hosting the TRE, eg {@code aws-full}, one of aws|azure|gcp.  Defaults to aws. */
+    /** The cloud of the stack hosting the TRE, one of aws|azure|gcp.  Defaults to aws. */
     TRE_CLOUD("TRE_CLOUD"),
     ;
 

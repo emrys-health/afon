@@ -11,7 +11,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Validates the config of a stack by synthesising its cdktf plan into {@code <afon.cdktf>/stacks/<stack-id>},
- * eg {@code aws-keycloak}, without deploying it, eg to check that the config dir has all the properties the stack needs.
+ * without deploying it, eg to check that the config dir has all the properties the stack needs.
  * It overwrites the synthesised plan of any previous deploy of the stack in that dir, but not the tofu state file
  * {@code <afon.cdktf>/terraform.<stack-id>.tfstate}, as it doesn't run tofu.
  * <p>
@@ -29,14 +29,14 @@ public class CloudStackValidator {
     }
 
     /**
-     * @return the stack names, in kebab case, ie their ids, eg {@code azure-polaris}
+     * @return the stack names, in kebab case, ie their ids, {@code <cloud>-<stack-type>}
      */
     public List<String> stackNames() {
         return stacks().stream().map(StackId::toString).toList();
     }
 
     /**
-     * Resolves a stack id, case-insensitively, eg "azure-polaris" or "AWS-Full".
+     * Resolves a stack id, case-insensitively, eg "<cloud>-<stack-type>" or "<CLOUD>-<STACK-TYPE>".
      *
      * @return the stack, or {@code null} if there is no such stack
      */

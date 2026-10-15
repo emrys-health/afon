@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -43,7 +44,7 @@ public class StepOperations {
     private final String polarisNamespaceExternal;
     private final String polarisTableName;
     /**
-     * The durations of the delete and deploy operations, by the stack they are for, eg {@code aws-full}, or
+     * The durations of the delete and deploy operations, by the stack they are for, or
      * {@code <cloud>-all} for deleting every stack of the cloud.
      */
     private final Map<StackId, Duration> deleteDurations = new TreeMap<>();
@@ -94,33 +95,35 @@ public class StepOperations {
     }
 
     /**
-     * Checks that the KeyCloak server at {@code OIDC_DOMAIN_NAME}, deployed by another stack, eg {@code aws-keycloak},
-     * answers, so that a stack using it, eg {@code aws-polaris}, fails fast rather than when Polaris cannot discover it.
+     * Checks that the KeyCloak server at {@code OIDC_DOMAIN_NAME}, deployed by another stack,
+     * answers, so that a stack using it fails fast rather than when Polaris cannot discover it.
      * It asks for the discovery document of the {@code master} realm, as it always exists, unlike the Polaris realm,
      * which the setup steps create.
      *
-     * @param cloud the cloud of the stack using the KeyCloak, whose keycloak stack the failure says to set up, eg
-     *              {@code azure-keycloak}, or that of another cloud if it has none, eg {@code aws-keycloak} for GCP
+     * @param cloud the cloud of the stack using the KeyCloak, whose identity stack the failure says to set up, or
+     *              that of another cloud if it has none
      */
     public Step checkKeyCloakAnswers(AfonCloud cloud) {
         String url = KeyCloakConfigurer.urlFor(properties.getValue(OIDC_DOMAIN_NAME), "https")
                      + "/realms/master/.well-known/openid-configuration";
         return new Step("check_keycloak_answers",
                 format("check KeyCloak answers at %s", url),
-                () -> actions.checkAnswers(url, format(
-                    "Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first, eg: afon-cli.sh manage-stack setup %s",
-                    keyCloakStackFor(cloud))));
+                () -> actions.checkAnswers(url, "Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first"
+                                                + setupCommandFor(identityStackFor(cloud))));
     }
 
     /**
-     * @return the keycloak stack of the cloud, if it has one, else the first one defined, which any cloud's stacks can use
+     * @return the stack of the cloud with the identity role, if it has one, else the first one defined of the clouds, which any
+     * cloud's stacks can use, or empty if there is none
      */
-    private static StackId keyCloakStackFor(AfonCloud cloud) {
-        StackId own = new StackId(cloud, "keycloak");
-        return StackDefinitions.find(own).isPresent()
-               ? own
-               : StackDefinitions.all().stream().map(StackDefinition::id).filter(id -> id.type().equals("keycloak"))
-                                 .findFirst().orElse(own);
+    private static Optional<StackId> identityStackFor(AfonCloud cloud) {
+        return StackDefinitions.withRole(cloud, StackRole.IDENTITY)
+                               .or(() -> StackDefinitions.all().stream().filter(d -> d.role() == StackRole.IDENTITY).findFirst())
+                               .map(StackDefinition::id);
+    }
+
+    private static String setupCommandFor(Optional<StackId> stack) {
+        return stack.map(id -> ", eg: afon-cli.sh manage-stack setup " + id).orElse("");
     }
 
     /**
@@ -129,11 +132,11 @@ public class StepOperations {
      */
     public Step checkPolarisAnswers(AfonCloud cloud) {
         String url = "https://" + properties.getCloudValue(cloud, "POLARIS_DOMAIN_NAME") + "/api/catalog/v1/config";
-        StackId polaris = new StackId(cloud, "polaris");
+        Optional<StackId> catalog = StackDefinitions.withRole(cloud, StackRole.CATALOG).map(StackDefinition::id);
         return new Step(format("check_polaris_answers_for_cloud_%s", cloud),
                 format("check Polaris answers at %s", url),
                 () -> actions.checkAnswers(url,
-                    format("Set up the %s Polaris stack first, eg: afon-cli.sh manage-stack setup %s", cloud, polaris),
+                    format("Set up the %s Polaris stack first", cloud) + setupCommandFor(catalog),
                     Set.of(200, 401, 403)));
     }
 
@@ -227,7 +230,7 @@ public class StepOperations {
     }
 
     /**
-     * @return the stack id as used in step names, eg {@code aws_full} for {@code aws-full}
+     * @return the stack id as used in step names, eg {@code <cloud>_<stack_type>} for {@code <stack-id>}
      */
     static String stepName(StackId stackId) {
         return stackId.toString().replace('-', '_');
@@ -429,7 +432,7 @@ public class StepOperations {
 
     /**
      * Spark writing the test table to the catalog of a cloud, through the Polaris of a cloud, which is that of the stack set up,
-     * eg Spark through the Azure Polaris of {@code azure-full} writes to its own catalog, {@code azure}, while the scenarios of
+     * eg Spark through the Azure Polaris of the Azure stack writes to its own catalog, {@code azure}, while the scenarios of
      * Snowflake have the AWS one write to the catalogs of other clouds.  The Spark is the session of this process, not the
      * cluster's: the Polaris decides where it logs in and where it writes.
      *
@@ -531,7 +534,7 @@ public class StepOperations {
     }
 
     /**
-     * @param stackId the stack deleted, eg {@code aws-full}, or {@code <cloud>-all} for every stack of the cloud
+     * @param stackId the stack deleted, or {@code <cloud>-all} for every stack of the cloud
      */
     public Step deleteComplete(StackId stackId) {
         return new Step(format("delete_complete_for_%s", stepName(stackId)),

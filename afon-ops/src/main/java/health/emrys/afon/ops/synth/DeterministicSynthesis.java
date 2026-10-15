@@ -1,5 +1,7 @@
 package health.emrys.afon.ops.synth;
 
+import health.emrys.afon.config.StackId;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,7 +27,7 @@ public final class DeterministicSynthesis {
      */
     @FunctionalInterface
     public interface Synthesiser {
-        void synthesise(String stack) throws IOException, InterruptedException;
+        void synthesise(StackId stack) throws IOException, InterruptedException;
     }
 
     private DeterministicSynthesis() {
@@ -40,7 +42,7 @@ public final class DeterministicSynthesis {
      * as the plans hold the config, or none if they are the same
      * @throws IOException if a synthesis fails
      */
-    public static List<String> check(String stack, Path stacksDir, int runs, Synthesiser synthesiser)
+    public static List<String> check(StackId stack, Path stacksDir, int runs, Synthesiser synthesiser)
             throws IOException, InterruptedException {
         if (runs < 2) {
             throw new IllegalArgumentException("At least two runs are needed to compare, not " + runs);
@@ -49,7 +51,8 @@ public final class DeterministicSynthesis {
         try {
             for (int run = 1; run <= runs; run++) {
                 synthesiser.synthesise(stack);
-                PlanSnapshots.snapshot(stacksDir, snapshots.resolve("run" + run), List.of(stack));
+                // the plan is in the stack dir named as the stack
+                PlanSnapshots.snapshot(stacksDir, snapshots.resolve("run" + run), List.of(stack.toString()));
             }
             List<String> differences = new java.util.ArrayList<>();
             for (int run = 2; run <= runs; run++) {
