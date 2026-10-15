@@ -170,6 +170,12 @@ will,all:!aws_forbidden:!azure_forbidden:!gcp_forbidden
 jane,all:!*_forbidden
 ```
 
+Gitea is given the users of `users.csv` every time its pod starts: those it lacks are created, and those it has get
+the password from `users.csv`, so a password changed in Gitea is reset by its next restart.  A user without an
+email is given `<username>@noreply.localhost`.  Users removed from `users.csv` stay in Gitea, with their repositories,
+until deleted there.  The admin, `GITEA_ADMIN_USERNAME`, is left to its own properties, even if in `users.csv`.  A
+change to `users.csv` takes effect on the next deploy, which restarts Gitea's pod.
+
 The configured user, which clients authenticate as (e.g. to get its OIDC token, or to run Spark), is named by the
 `USER_ID` property in `secret.properties` and must be one of the users in `users.csv`, whose password is read from there.
 
