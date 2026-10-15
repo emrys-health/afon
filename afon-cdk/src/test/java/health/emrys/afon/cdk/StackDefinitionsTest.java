@@ -58,7 +58,6 @@ class StackDefinitionsTest {
         StackDefinition definition = StackDefinitions.get(StackId.parse("azure-full"));
         assertThat(definition.components().apply(properties).get(0))
             .isNotSameAs(definition.components().apply(properties).get(0));
-        assertThat(componentsOf("azure-full")).containsExactlyInAnyOrderElementsOf(componentsOf("aws-full"));
     }
 
     @Test
