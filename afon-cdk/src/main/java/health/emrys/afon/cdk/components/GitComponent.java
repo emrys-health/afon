@@ -6,6 +6,7 @@ import health.emrys.afon.cdk.RetainedVolumeClaim;
 import health.emrys.afon.cdk.StackComponent;
 import health.emrys.afon.cdk.StackContext;
 import health.emrys.afon.cdk.configs.GiteaConfig;
+import health.emrys.afon.config.FileUserProvider;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +16,7 @@ public class GitComponent implements StackComponent {
     @Override
     public void deploy(StackContext context) {
         CloudPlatform platform = context.platform();
-        GiteaConfig   gitea    = new GiteaConfig(context.properties(), platform.cloud(), platform.clusterName());
+        GiteaConfig   gitea    = new GiteaConfig(context.properties(), new FileUserProvider(), platform.cloud(), platform.clusterName());
         // The repositories are kept on a volume that outlives the cluster, where the platform has them.
         Optional<RetainedVolumeClaim> claim = platform.retainedVolumeClaim("gitea", gitea.storageSize(), "default");
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.storageDependencies());

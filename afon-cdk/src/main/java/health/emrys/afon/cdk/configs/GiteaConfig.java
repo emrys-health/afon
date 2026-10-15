@@ -10,15 +10,22 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.AfonUserProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.*;
 
@@ -39,6 +46,10 @@ import static health.emrys.afon.config.AfonProperty.*;
  * creates and migrates its own schema.  The chart's bundled Postgres and Valkey are disabled: being a single replica,
  * Gitea keeps its sessions and cache in memory and its queues on its volume.
  *
+ * <p>Every start, after the chart has migrated the database and created the admin, an init container creates the
+ * users of {@code users.csv} that Gitea does not have, and sets the passwords of those it has to theirs.  Users
+ * removed from {@code users.csv} are left in Gitea, with their repositories.
+ *
  * <p>Requires properties:
  * <ul>
  *     <li>{@code GITEA_DB_HOST}, {@code GITEA_DB_USERNAME}, {@code GITEA_DB_PASSWORD}</li>
@@ -55,6 +66,10 @@ public class GiteaConfig {
 
     static final         String SECRET_NAME = "gitea-secrets";
     private static final String CHART_FILE  = "gitea-12.7.0.tgz";
+    /** The image the chart runs, by its appVersion, which must be kept in step with {@link #CHART_FILE}. */
+    private static final String GITEA_IMAGE = "docker.gitea.com/gitea:1.27.0-rootless";
+    /** Gitea requires an email, which {@code users.csv} does not; Gitea's own placeholder domain. */
+    private static final String NO_EMAIL_DOMAIN = "noreply.localhost";
     private static final int    DB_PORT     = 5432;
 
     /**
@@ -65,18 +80,23 @@ public class GiteaConfig {
     private static final String DATABASE_SECTION_KEY = "database";
     private static final String STORAGE_SECTION_KEY  = "storage";
     private static final String DB_PASSWORD_KEY      = "db-password";
+    private static final String USERS_KEY            = "users";
 
     private final AfonPropertyProvider properties;
+    private final AfonUserProvider     users;
     private final AfonCloud            cloud;
     private final String               clusterName;
 
     /**
+     * @param users       the users Gitea is given, from {@code users.csv}
      * @param clusterName the name of the cluster, eg {@code full-emrys-cluster}, see {@link CloudPlatform#clusterName()}
      */
     public GiteaConfig(@NonNull AfonPropertyProvider properties,
+                       @NonNull AfonUserProvider users,
                        @NonNull AfonCloud cloud,
                        @NonNull String clusterName) {
         this.properties  = properties;
+        this.users       = users;
         this.cloud       = cloud;
         this.clusterName = clusterName;
     }
@@ -155,7 +175,26 @@ public class GiteaConfig {
         data.put(DATABASE_SECTION_KEY, iniSection(databaseSection()));
         data.put(STORAGE_SECTION_KEY, iniSection(storageSection()));
         data.put(DB_PASSWORD_KEY, properties.getValue(GITEA_DB_PASSWORD));
+        data.put(USERS_KEY, usersList());
         return data;
+    }
+
+    /**
+     * The users, other than the admin, which the chart manages, one {@code username,email,password} per line: the
+     * password last, so that the shell reading it takes the rest of the line, whatever it holds.
+     */
+    String usersList() {
+        String admin = properties.getValue(GITEA_ADMIN_USERNAME);
+        return users.getUsers()
+                    .stream()
+                    .filter(user -> !user.username().equals(admin))
+                    .map(user -> user.username() + "," + email(user) + "," + user.password() + "\n")
+                    .collect(Collectors.joining());
+    }
+
+    private static String email(AfonUser user) {
+        String email = user.email();
+        return email == null || email.isBlank() ? user.username() + "@" + NO_EMAIL_DOMAIN : email;
     }
 
     Map<String, String> databaseSection() {
@@ -236,6 +275,36 @@ public class GiteaConfig {
                 Map.of("name", "PGSSLMODE", "value", sslMode()),
                 Map.of("name", "GITEA_DB", "value", databaseName())));
 
+        // Runs with the chart's configure-gitea, as it does, against the app.ini it leaves on the volume.
+        Map<String, Object> createUsers = Map.of(
+            "name", "create-users",
+            "image", GITEA_IMAGE,
+            "command", List.of("bash", "-c", """
+                set -euo pipefail
+                # The table's rows start with the user's id, unlike any log lines above it.
+                existing=$(gitea admin user list 2>/dev/null | awk '$1 ~ /^[0-9]+$/ {print $2}')
+                while IFS=, read -r username email password; do
+                  [ -n "$username" ] || continue
+                  if grep -qxF -- "$username" <<< "$existing"; then
+                    echo "Setting the password of $username"
+                    gitea admin user change-password --username "$username" --password "$password" --must-change-password=false
+                  else
+                    echo "Creating $username"
+                    gitea admin user create --username "$username" --email "$email" --password "$password" --must-change-password=false
+                  fi
+                done <<< "$GITEA_USERS"
+                """),
+            "env", List.of(
+                Map.of("name", "GITEA_APP_INI", "value", "/data/gitea/conf/app.ini"),
+                Map.of("name", "GITEA_CUSTOM", "value", "/data/gitea"),
+                Map.of("name", "GITEA_WORK_DIR", "value", "/data"),
+                Map.of("name", "GITEA_TEMP", "value", "/tmp/gitea"),
+                Map.of("name", "HOME", "value", "/data/gitea/git"),
+                Map.of("name", "GITEA_USERS", "valueFrom",
+                       Map.of("secretKeyRef", Map.of("name", SECRET_NAME, "key", USERS_KEY)))),
+            "volumeMounts", List.of(Map.of("name", "temp", "mountPath", "/tmp"),
+                                    Map.of("name", "data", "mountPath", "/data")));
+
         Map<String, Object> persistence = claim
             .<Map<String, Object>>map(name -> Map.of("create", false, "claimName", name))
             .orElseGet(() -> {
@@ -252,7 +321,11 @@ public class GiteaConfig {
             // A single replica on a ReadWriteOnce volume: the old pod must let go of it before the new one starts.
             "strategy", Map.of("type", "Recreate"),
             "preExtraInitContainers", List.of(createDatabase),
+            "postExtraInitContainers", List.of(createUsers),
             "gitea", Map.of(
+                // The pod reads the secret only when it starts, so it is restarted whenever the secret changes, eg
+                // users.csv.  A digest of all of it, whose other secrets keep the users' passwords from being guessed.
+                "podAnnotations", Map.of("checksum/" + SECRET_NAME, sha256Hex(secretData().toString())),
                 "admin", Map.of("existingSecret", SECRET_NAME),
                 "config", Map.of("server", Map.of("LFS_START_SERVER", true)),
                 "additionalConfigSources", List.of(Map.of("secret", Map.of(
@@ -266,6 +339,15 @@ public class GiteaConfig {
 
         // JSON is valid YAML; canonical so that Helm, diffing the values as text, sees no spurious change.
         return CdkUtils.toCanonicalJson(values);
+    }
+
+    private static String sha256Hex(String input) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                                                         .digest(input.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 
     /**
