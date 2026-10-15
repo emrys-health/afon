@@ -31,7 +31,7 @@ stacks:
       - Spark
       - CrdCleanup
       - Monitoring
-      - AwsLogging
+      - Logging
       - Git
   # A stack that is not bundled, composed here alone: the notebooks and Spark, but no Trino, Monitoring or Git
   aws-lab:
@@ -59,7 +59,6 @@ stacks:
   azure-polaris:
     role: catalog
     components: [Polaris]
-  # AzureLogging, not AwsLogging, which ships the Polaris logs
   azure-full:
     role: tre
     components:
@@ -72,7 +71,7 @@ stacks:
       - Spark
       - CrdCleanup
       - Monitoring
-      - AzureLogging
+      - Logging
       - Git
 
   # GCP

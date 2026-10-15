@@ -1,6 +1,5 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.cdk.aws.AwsLoggingComponent;
 import health.emrys.afon.cdk.components.*;
 import health.emrys.afon.config.*;
 import org.slf4j.Logger;

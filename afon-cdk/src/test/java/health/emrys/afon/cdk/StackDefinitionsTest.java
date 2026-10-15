@@ -1,7 +1,5 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.cdk.aws.AwsLoggingComponent;
-import health.emrys.afon.cdk.azure.AzureLoggingComponent;
 import health.emrys.afon.cdk.components.*;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
@@ -64,11 +62,8 @@ class StackDefinitionsTest {
         StackDefinition definition = StackDefinitions.get(StackId.parse("azure-full"));
         assertThat(definition.components().apply(properties).get(0))
             .isNotSameAs(definition.components().apply(properties).get(0));
-        // but for the logging, which is of each cloud
-        assertThat(componentsOf("azure-full")).containsExactlyInAnyOrderElementsOf(
-            componentsOf("aws-full").stream()
-                                    .<Class<?>>map(type -> type.equals(AwsLoggingComponent.class) ? AzureLoggingComponent.class : type)
-                                    .toList());
+        // the components of a cloud's full stack are the same, as each adapts to the cloud it is deployed to
+        assertThat(componentsOf("azure-full")).containsExactlyInAnyOrderElementsOf(componentsOf("aws-full"));
     }
 
     @Test
@@ -217,7 +212,7 @@ class StackDefinitionsTest {
 
     @Test
     void stacksOfACloudHaveNoComponentOfAnother() {
-        // eg AwsLoggingComponent casts the platform to the AWS one, so cannot be deployed to Azure
+        // eg a component named for AWS casts the platform to the AWS one, so cannot be deployed to Azure
         for (StackDefinition definition : StackDefinitions.all()) {
             String cloud = definition.id().cloud().toString();
             definition.componentsFor(properties).forEach(component -> {
