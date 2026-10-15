@@ -1,23 +1,10 @@
 package health.emrys.afon.cdk;
 
 import health.emrys.afon.cdk.aws.AwsLoggingComponent;
-import health.emrys.afon.cdk.components.CrdCleanupComponent;
-import health.emrys.afon.cdk.components.GitComponent;
-import health.emrys.afon.cdk.components.JupyterComponent;
-import health.emrys.afon.cdk.components.KeycloakComponent;
-import health.emrys.afon.cdk.components.MonitoringComponent;
-import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
-import health.emrys.afon.cdk.components.PolarisComponent;
-import health.emrys.afon.cdk.components.SnowflakeComponent;
-import health.emrys.afon.cdk.components.SparkComponent;
-import health.emrys.afon.cdk.components.SparkOperatorComponent;
-import health.emrys.afon.cdk.components.TrinoComponent;
+import health.emrys.afon.cdk.azure.AzureLoggingComponent;
+import health.emrys.afon.cdk.components.*;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.function.Supplier;
 
 /**
@@ -43,6 +30,7 @@ public final class StackComponents {
         COMPONENTS.put("Trino", TrinoComponent::new);
         COMPONENTS.put("Monitoring", MonitoringComponent::new);
         COMPONENTS.put("AwsLogging", AwsLoggingComponent::new);
+        COMPONENTS.put("AzureLogging", AzureLoggingComponent::new);
         COMPONENTS.put("Git", GitComponent::new);
         COMPONENTS.put("Snowflake", SnowflakeComponent::new);
     }

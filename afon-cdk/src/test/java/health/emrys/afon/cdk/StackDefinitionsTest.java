@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import health.emrys.afon.cdk.aws.AwsLoggingComponent;
+import health.emrys.afon.cdk.azure.AzureLoggingComponent;
 import health.emrys.afon.cdk.components.*;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
@@ -63,9 +64,11 @@ class StackDefinitionsTest {
         StackDefinition definition = StackDefinitions.get(StackId.parse("azure-full"));
         assertThat(definition.components().apply(properties).get(0))
             .isNotSameAs(definition.components().apply(properties).get(0));
-        // but for what is of AWS only
+        // but for the logging, which is of each cloud
         assertThat(componentsOf("azure-full")).containsExactlyInAnyOrderElementsOf(
-            componentsOf("aws-full").stream().filter(type -> !type.equals(AwsLoggingComponent.class)).toList());
+            componentsOf("aws-full").stream()
+                                    .<Class<?>>map(type -> type.equals(AwsLoggingComponent.class) ? AzureLoggingComponent.class : type)
+                                    .toList());
     }
 
     @Test
