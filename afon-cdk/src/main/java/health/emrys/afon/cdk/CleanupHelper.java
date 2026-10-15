@@ -9,7 +9,7 @@ import java.nio.file.Path;
 
 /**
  * Base class of the helpers generating the commands to clean up a stack, whose mains take the args
- * {@code <stack-id> [<output-file>]}, eg {@code aws-keycloak}.
+ * {@code <stack-id> [<output-file>]}.
  */
 public class CleanupHelper {
 

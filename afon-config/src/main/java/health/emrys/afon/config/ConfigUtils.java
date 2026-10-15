@@ -119,7 +119,7 @@ public class ConfigUtils {
     }
 
     /**
-     * Returns the stack dir located in {@link #stacksDir()}/{@link StackId}, eg {@code stacks/aws-keycloak}
+     * Returns the stack dir located in {@link #stacksDir()}/{@link StackId}, eg {@code stacks/<stack-id>}
      *
      * @param stackId the {@link StackId}
      * @return the stack dir
@@ -130,7 +130,7 @@ public class ConfigUtils {
 
     /**
      * Returns the tfState path located in {@link #afonCkdtf()}/terraform.{@link StackId}.tfstate,
-     * eg {@code terraform.aws-keycloak.tfstate}
+     * eg {@code terraform.<stack-id>.tfstate}
      *
      * @param stackId the {@link StackId}
      * @return the tfState path
@@ -141,7 +141,7 @@ public class ConfigUtils {
 
     /**
      * Returns the kubeconfig path located in {@link #afonCkdtf()}/kube/{@link StackId}.config,
-     * eg {@code kube/aws-keycloak.config}, which the stack's own kubectl and helm commands use,
+     * eg {@code kube/<stack-id>.config}, which the stack's own kubectl and helm commands use,
      * so that they never act on the cluster of another stack.
      *
      * @param stackId the {@link StackId}

@@ -26,7 +26,7 @@ import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 
 /**
  * A stack composed of the {@link StackComponent}s of its {@link StackDefinition}, deployed in order to the cloud of its
- * {@link StackId}, eg {@code aws-keycloak}, each taking the config of that cloud.  Each stack has its own plan dir
+ * {@link StackId}, each taking the config of that cloud.  Each stack has its own plan dir
  * {@link ConfigUtils#stackDir(StackId)} and tofu state {@link ConfigUtils#tfStatePath(StackId)}.
  */
 public class ComposedStack extends TerraformStack {
@@ -86,7 +86,7 @@ public class ComposedStack extends TerraformStack {
     }
 
     /**
-     * @param args the id of the stack, eg {@code aws-full}
+     * @param args the id of the stack, {@code <stack-id>}
      */
     public static void main(String[] args) {
         if (args.length != 1) {

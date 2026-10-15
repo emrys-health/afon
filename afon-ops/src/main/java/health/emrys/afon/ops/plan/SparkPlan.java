@@ -28,7 +28,7 @@ public class SparkPlan implements ComponentPlan {
 
     /**
      * The scenario {@code external-azure}, only on AWS so far: Spark writes through the AWS Polaris to the external catalog hosted by
-     * the Polaris of the {@code azure-polaris} stack, which must be set up too, hence the check that it answers.
+     * the Polaris of the Azure stack with the catalog role, which must be set up too, hence the check that it answers.
      */
     @Override
     public Map<String, StepsProvider> scenarioSteps(AfonCloud cloud) {

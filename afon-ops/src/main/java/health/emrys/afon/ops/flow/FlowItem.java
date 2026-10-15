@@ -6,8 +6,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * An item of a {@link StackFlow}: either an action on a stack, eg {@code setup aws-full}, or a scenario run on a stack,
- * eg {@code run aws-full external-azure}, as {@code manage-stack} runs them.
+ * An item of a {@link StackFlow}: either an action on a stack, eg {@code setup <stack-id>}, or a scenario run on a stack,
+ * eg {@code run <stack-id> <scenario>}, as {@code manage-stack} runs them.
  *
  * @param action   the action on the stack: {@code delete}, {@code deploy}, {@code setup} or {@code run}
  * @param stackId  the stack acted on
@@ -15,6 +15,25 @@ import org.jspecify.annotations.Nullable;
  */
 public record FlowItem(@NonNull StackAction action, @NonNull StackId stackId, @Nullable String scenario) {
 
+    public static FlowItem delete(StackId stackId) {
+        return new FlowItem(StackAction.DELETE, stackId, null);
+    }
+
+    public static FlowItem deploy(StackId stackId) {
+        return new FlowItem(StackAction.DEPLOY, stackId, null);
+    }
+
+    public static FlowItem setup(StackId stackId) {
+        return new FlowItem(StackAction.SETUP, stackId, null);
+    }
+
+    public static FlowItem run(StackId stackId, String scenario) {
+        return new FlowItem(StackAction.RUN, stackId, scenario);
+    }
+
+    /**
+     * The factories taking the stack as text parse it, for the stack ids given to {@code manage-stack}.
+     */
     public static FlowItem delete(String stackId) {
         return new FlowItem(StackAction.DELETE, StackId.parse(stackId), null);
     }
@@ -36,7 +55,7 @@ public record FlowItem(@NonNull StackAction action, @NonNull StackId stackId, @N
     }
 
     /**
-     * @return the item as the {@code manage-stack} args, eg {@code setup aws-full} or {@code run aws-full external-azure}
+     * @return the item as the {@code manage-stack} args, eg {@code setup <stack-id>} or {@code run <stack-id> <scenario>}
      */
     public String label() {
         return isRunnable() ? String.format("run %s %s", stackId, scenario) : String.format("%s %s", action, stackId);

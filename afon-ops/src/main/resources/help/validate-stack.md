@@ -1,7 +1,8 @@
 validate-stack
 
 Validates the config of a stack by synthesising its plan from the config, without deploying it.
-It first prints the components of the stack, in the order they are deployed, as defined in the stacks.yaml it is loaded from.
+It first prints the role of the stack, if it has one, and its components, in the order they are deployed, as defined in the
+stacks.yaml it is loaded from.
 It also checks that the plan is the same in each JVM: the stack is synthesised in three JVMs of their own, one after
 the other (--runs <n> sets how many, 3 by default; --runs 1 synthesises once, in this JVM, and checks no more),
 and the command fails, with the paths that differ (not their values, which are config), if the plans differ.

@@ -121,7 +121,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
 
     /**
      * @return the cluster name of the stack, ie {@code <stack-type>-<clusterName>}, as for AWS, so that stacks of different
-     * types run side by side in the same resource group, eg {@code azure-keycloak} and {@code azure-polaris}
+     * types run side by side in the same resource group
      */
     static String clusterName(String clusterName, StackId stackId) {
         return stackId.type() + "-" + clusterName;

@@ -9,15 +9,18 @@ stacks:
   # AWS
   # Only the KeyCloak, never holding the egress IP, which the Polaris stacks hold
   aws-keycloak:
+    role: identity
     pinnedEgressIp: false
     components: [Keycloak]
   # Polaris uses the KeyCloak server at OIDC_DOMAIN_NAME, which the aws-keycloak stack deploys, so that both can
   # run side by side, while the stacks extending it deploy their own KeyCloak, unless AWS_KEYCLOAK_EXTERNAL is set
   aws-polaris:
+    role: catalog
     components: [Polaris]
   # Polaris with JupyterHub and Guacamole behind the oauth2-proxy MFA gate, the Spark operator the notebooks' Spark
   # runs on (which only launches Spark in response to the resources of the Spark component), and monitoring (no Trino, unlike the bundled stacks)
   aws-full:
+    role: tre
     components:
       - name: Keycloak
         unless: KEYCLOAK_EXTERNAL
@@ -50,12 +53,15 @@ stacks:
   # AZURE
   # As on AWS, only the KeyCloak, which azure-polaris uses, and azure-full if AZURE_KEYCLOAK_EXTERNAL is set
   azure-keycloak:
+    role: identity
     pinnedEgressIp: false
     components: [Keycloak]
   azure-polaris:
+    role: catalog
     components: [Polaris]
   # No AwsLogging, which ships the Polaris logs to S3
   azure-full:
+    role: tre
     components:
       - name: Keycloak
         unless: KEYCLOAK_EXTERNAL
@@ -70,4 +76,5 @@ stacks:
 
   # GCP
   gcp-polaris:
+    role: catalog
     components: [Polaris]

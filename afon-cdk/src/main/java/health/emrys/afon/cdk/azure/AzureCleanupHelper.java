@@ -62,7 +62,7 @@ public class AzureCleanupHelper extends CleanupHelper {
 
     /**
      * Outputs the cleanup commands of the Azure stack, given the args {@code <stack-id> [<output-file>]},
-     * eg {@code azure-polaris}, although the names of its components don't depend on its stack type.
+     * {@code <stack-id>}, although the names of its components don't depend on its stack type.
      */
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();

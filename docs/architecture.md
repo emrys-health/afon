@@ -145,7 +145,15 @@ catalogs, configure the Polaris users, run the Spark write check, and report the
 
 ### Stack composition
 
-A stack is a `StackId` (`<cloud>-<stack-type>`, eg `aws-full`) and the ordered list of components
+**Stack id and stack name.** A *stack id* (`StackId`) is `<cloud>-<stack-type>`, eg `aws-full`, and always identifies a stack that
+`stacks.yaml` defines. A *stack name* is a `String` naming a stack dir (`stacks/<name>`) or tofu state
+(`terraform.<name>.tfstate`) found in the cdktf dir, which `manage-stack` looks at when it deletes stacks or checks for
+conflicts. It is usually the text of a stack id, but may also be the name of a cloud, eg `aws`, for the *legacy stack* that all the
+stacks of the cloud shared before they had their own state, or of a stack that is no longer defined, eg by the `stacks.yaml` in
+use. Neither can be managed as a stack, so each is treated as possibly any stack: it conflicts with every stack of the cloud,
+and its resources are unknown. Hence a name is parsed into a stack id only once it is known to be neither.
+
+A stack is a `StackId` and the ordered list of components
 deployed to that cloud, as defined in `StackDefinitions`. `ComposedStack` builds it: it sets up the cloud's
 platform, then deploys each component in turn. Adding a stack, eg a subset of the components, or on another cloud, is
 adding an entry to `stacks.yaml`, which `StackDefinitions` loads at runtime.
@@ -157,8 +165,10 @@ adding an entry to `stacks.yaml`, which `StackDefinitions` loads at runtime.
 | `CloudPlatform` | What a component needs of its cloud, implemented by the AWS, Azure and GCP providers. The cloud's cluster, and what is done differently per cloud, eg `exposeHttps(HttpsRoute)`: an ALB with a Route 53 record on AWS, the nginx ingress with cert-manager and a DNS record on Azure and GCP |
 | `StackDefinition` | The id of a stack and how to create its components from the config, checked by `componentsFor(properties)` |
 
-The stacks are defined in `afon-cdk/src/main/resources/stacks.yaml`, bundled in the jar. A stack may `extends` another of its cloud (stacks of different clouds are independent), `pinnedEgressIp` says whether it holds `AWS_EGRESS_IP`, and a component is listed by name (see
-`StackDefinitions.componentNames()`), optionally `when` or `unless` a boolean property of the stack's cloud, eg
+The stacks are defined in `afon-cdk/src/main/resources/stacks.yaml`, bundled in the jar. A stack may have a `role` (`StackRole`:
+`catalog`, `identity` or `tre`), which the flows and the ops checks look it up by (`StackDefinitions.withRole`), and not by id, so
+the code names no stack id: a flow also finds the stack deploying the Snowflake component with `StackDefinitions.declaring`. A stack may `extends` another of its cloud (stacks of different clouds are independent), `pinnedEgressIp` says whether it holds `AWS_EGRESS_IP`, and a component is listed by name (see
+`StackComponents.names()`), optionally `when` or `unless` a boolean property of the stack's cloud, eg
 `unless: KEYCLOAK_EXTERNAL` for `<CLOUD>_KEYCLOAK_EXTERNAL`. To define the stacks differently, put a `stacks.yaml` in the config dir
 (`$AFON_HOME/config`), which replaces the bundled one entirely rather than adding to it, so start from a copy of it; a file that
 is not valid fails with a message naming the file and the problem.

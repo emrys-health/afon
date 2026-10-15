@@ -15,12 +15,21 @@ class ValidateStackMainTest {
         FilePropertyProvider properties = new FilePropertyProvider("src/test/resources/config");
         properties.setValue(AfonProperty.AWS_KEYCLOAK_EXTERNAL, "false");
         assertThat(ValidateStackMain.describe(StackId.parse("aws-lab"), properties))
-            .startsWith("Stack aws-lab of ").contains("stacks-test.yaml")
-            .endsWith("has the components: Keycloak, Polaris, Jupyter, NetworkPolicies, SparkOperator, Spark, CrdCleanup");
+            .startsWith("Stack 'aws-lab' of ").contains("stacks-test.yaml")
+            .endsWith("has no role and components: Keycloak, Polaris, Jupyter, NetworkPolicies, SparkOperator, Spark, CrdCleanup");
         // the components that the config leaves out are not listed
         properties.setValue(AfonProperty.AWS_KEYCLOAK_EXTERNAL, "true");
         assertThat(ValidateStackMain.describe(StackId.parse("aws-lab"), properties))
-            .endsWith("has the components: Polaris, Jupyter, NetworkPolicies, SparkOperator, Spark, CrdCleanup");
+            .endsWith("has no role and components: Polaris, Jupyter, NetworkPolicies, SparkOperator, Spark, CrdCleanup");
+    }
+
+    @Test
+    void describesTheRoleOfTheStackIfItHasOne() {
+        FilePropertyProvider properties = new FilePropertyProvider("src/test/resources/config");
+        assertThat(ValidateStackMain.describe(StackId.parse("aws-keycloak"), properties))
+            .endsWith("has role 'identity' and components: Keycloak");
+        assertThat(ValidateStackMain.describe(StackId.parse("azure-polaris"), properties))
+            .endsWith("has role 'catalog' and components: Polaris");
     }
 
     @Test

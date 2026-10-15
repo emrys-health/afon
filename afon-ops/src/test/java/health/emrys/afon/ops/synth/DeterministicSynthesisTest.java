@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.synth;
 
+import health.emrys.afon.config.StackId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,13 +15,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DeterministicSynthesisTest {
 
-    private static final String STACK = "aws-keycloak";
+    private static final StackId STACK = StackId.parse("aws-keycloak");
 
     @TempDir
     Path stacksDir;
 
     private void plan(String json) throws IOException {
-        Files.writeString(Files.createDirectories(stacksDir.resolve(STACK)).resolve("cdk.tf.json"), json);
+        Files.writeString(Files.createDirectories(stacksDir.resolve(STACK.toString())).resolve("cdk.tf.json"), json);
     }
 
     @Test

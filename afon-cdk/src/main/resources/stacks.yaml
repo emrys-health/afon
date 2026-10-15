@@ -3,25 +3,29 @@
 #
 # stacks:
 #   <cloud>-<stack-type>:           the stack id, eg aws-full
+#     role: catalog|identity|tre    optional: the role the stack plays in its cloud, which code looks for it by, once per cloud
 #     extends: <stack id>           optional: starts with the components of this stack, of the same cloud
 #     pinnedEgressIp: true|false    optional: whether it holds the AWS_EGRESS_IP (default true, or as the extended stack)
 #     components:                   the components added, in order, each deployed after those before it
-#       - Polaris                   a component, by name, see StackDefinitions.componentNames()
+#       - Polaris                   a component, by name, see StackComponents.names()
 #       - name: Keycloak            a component only deployed if the property <CLOUD>_KEYCLOAK_EXTERNAL is not true
 #         unless: KEYCLOAK_EXTERNAL     (or, with 'when', only if it is true)
 stacks:
   # AWS
   # Only the Keycloak, never holding the egress IP, which the Polaris stacks hold
   aws-keycloak:
+    role: identity
     pinnedEgressIp: false
     components: [Keycloak]
   # Polaris uses the Keycloak server at OIDC_DOMAIN_NAME, which the aws-keycloak stack deploys, so that both can
   # run side by side, while the stacks extending it deploy their own Keycloak, unless AWS_KEYCLOAK_EXTERNAL is set
   aws-polaris:
+    role: catalog
     components: [Polaris]
   # Polaris with JupyterHub and Guacamole behind the oauth2-proxy MFA gate, the Spark operator the notebooks' Spark
   # runs on (which only launches Spark in response to the resources of the Spark component), Trino and monitoring
   aws-full:
+    role: tre
     components:
       - name: Keycloak
         unless: KEYCLOAK_EXTERNAL
@@ -43,11 +47,14 @@ stacks:
   # AZURE
   # As on AWS, only the Keycloak, which azure-polaris uses, and azure-full if AZURE_KEYCLOAK_EXTERNAL is set
   azure-keycloak:
+    role: identity
     pinnedEgressIp: false
     components: [Keycloak]
   azure-polaris:
+    role: catalog
     components: [Polaris]
   azure-full:
+    role: tre
     components:
       - name: Keycloak
         unless: KEYCLOAK_EXTERNAL
@@ -63,4 +70,5 @@ stacks:
 
   # GCP
   gcp-polaris:
+    role: catalog
     components: [Polaris]

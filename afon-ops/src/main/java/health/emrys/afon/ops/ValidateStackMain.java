@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.CloudStackValidator;
+import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
@@ -20,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Validates the config of a stack, via {@link CloudStackValidator}, by synthesising its plan from the config,
  * without deploying it.
- * The stack is given by its id, {@code <cloud>-<stack-type>}, eg {@code azure-polaris}, as defined in
+ * The stack is given by its id, {@code <cloud>-<stack-type>}, as defined in
  * {@link health.emrys.afon.cdk.StackDefinitions}.  With no stack, it lists the stacks.
  * <p>
  * It also checks that the plan is the same in each JVM, see {@link DeterministicSynthesis}: it synthesises the stack in
@@ -142,19 +143,22 @@ public class ValidateStackMain {
     }
 
     /**
-     * @return the components of the stack as defined in the stacks file, in the order they are deployed, for the config:
-     * those whose {@code when} or {@code unless} property does not apply are left out
+     * @return the role of the stack, if it has one, and its components, as defined in the stacks file, in the order they are
+     * deployed, for the config: those whose {@code when} or {@code unless} property does not apply are left out
      */
     static String describe(StackId stack, AfonPropertyProvider properties) {
-        List<String> names = StackDefinitions.get(stack).componentsFor(properties).stream()
+        StackDefinition definition = StackDefinitions.get(stack);
+        List<String> names = definition.componentsFor(properties).stream()
             .map(component -> component.getClass().getSimpleName().replaceFirst("Component$", "")).toList();
-        return String.format("Stack %s of %s has the components: %s", stack, StackDefinitions.source(), String.join(", ", names));
+        String role = definition.role() == null ? "no role" : "role '" + definition.role() + "'";
+        return String.format("Stack '%s' of %s has %s and components: %s",
+                             stack, StackDefinitions.source(), role, String.join(", ", names));
     }
 
     private static void checkDeterministic(CloudStackValidator validator, StackId stack, int runs) {
         List<String> differences;
         try {
-            differences = DeterministicSynthesis.check(stack.toString(), Path.of(ConfigUtils.stacksDir()), runs,
+            differences = DeterministicSynthesis.check(stack, Path.of(ConfigUtils.stacksDir()), runs,
                                                        ValidateStackMain::synthesiseInNewJvm);
         } catch (IOException | RuntimeException e) {
             System.err.printf("Failed to validate stack %s: %s%n", stack, e.getMessage());
@@ -179,7 +183,7 @@ public class ValidateStackMain {
     /**
      * Runs this command in a JVM of its own with the same flags, ie the system properties and the config, as this one, to synthesise once.
      */
-    private static void synthesiseInNewJvm(String stack) throws IOException, InterruptedException {
+    private static void synthesiseInNewJvm(StackId stack) throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.addAll(ManagementFactory.getRuntimeMXBean().getInputArguments());
@@ -191,7 +195,8 @@ public class ValidateStackMain {
         } else {
             command.addAll(List.of("-cp", classPath, ValidateStackMain.class.getName()));
         }
-        command.add(stack);
+        // the id as the command takes it
+        command.add(stack.toString());
         Path log = Files.createTempFile("afon-validate-stack", ".log");
         try {
             Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();

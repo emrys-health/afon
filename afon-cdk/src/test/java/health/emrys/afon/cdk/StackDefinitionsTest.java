@@ -1,23 +1,15 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.cdk.components.JupyterComponent;
 import health.emrys.afon.cdk.aws.AwsLoggingComponent;
-import health.emrys.afon.cdk.components.CrdCleanupComponent;
-import health.emrys.afon.cdk.components.KeycloakComponent;
-import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
-import health.emrys.afon.cdk.components.SparkOperatorComponent;
-import health.emrys.afon.cdk.components.PolarisComponent;
-import health.emrys.afon.cdk.components.SnowflakeComponent;
-import health.emrys.afon.cdk.components.SparkComponent;
-import health.emrys.afon.cdk.components.TrinoComponent;
+import health.emrys.afon.cdk.components.*;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
+import health.emrys.afon.config.StackRole;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,11 +17,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import static health.emrys.afon.config.AfonCloud.AWS;
-import static health.emrys.afon.config.AfonCloud.AZURE;
+import static health.emrys.afon.config.AfonCloud.*;
 import static health.emrys.afon.config.AfonProperty.AWS_KEYCLOAK_EXTERNAL;
 import static health.emrys.afon.config.AfonProperty.AZURE_KEYCLOAK_EXTERNAL;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -173,7 +164,7 @@ class StackDefinitionsTest {
             Set<String> expected = scan.getClassesImplementing(StackComponent.class.getName()).stream()
                 .filter(info -> !info.isAbstract() && !info.isInterface() && info.getSimpleName().endsWith("Component"))
                 .map(info -> info.getSimpleName().replaceFirst("Component$", "")).collect(Collectors.toSet());
-            assertThat(StackDefinitions.componentNames()).containsExactlyInAnyOrderElementsOf(expected);
+            assertThat(StackComponents.names()).containsExactlyInAnyOrderElementsOf(expected);
         }
     }
 
@@ -294,5 +285,44 @@ class StackDefinitionsTest {
         assertThatThrownBy(() -> StackDefinitions.load(file))
             .isInstanceOf(IllegalStateException.class).hasMessageContaining(file.toString())
             .hasMessageContaining("unknown component 'Nonesuch'");
+    }
+
+    @Test
+    void stacksAreFoundByTheirRoleAndTheComponentsTheyDeclare() {
+        assertThat(StackDefinitions.withRole(AWS, StackRole.TRE)).map(definition -> definition.id().toString()).contains("aws-full");
+        assertThat(StackDefinitions.withRole(AWS, StackRole.IDENTITY)).map(definition -> definition.id().toString()).contains("aws-keycloak");
+        assertThat(StackDefinitions.withRole(AZURE, StackRole.CATALOG)).map(definition -> definition.id().toString()).contains("azure-polaris");
+        assertThat(StackDefinitions.withRole(GCP, StackRole.IDENTITY)).isEmpty();
+        // a stack that extends another does not take its role
+        assertThat(StackDefinitions.get(StackId.parse("aws-snowflake")).role()).isNull();
+        assertThat(StackDefinitions.declaring(AWS, SnowflakeComponent.class)).map(definition -> definition.id().toString())
+                                                                               .contains("aws-snowflake");
+        assertThat(StackDefinitions.declaring(AZURE, SnowflakeComponent.class)).isEmpty();
+        // declared is what the definition lists, whatever the config leaves out
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "true");
+        assertThat(StackDefinitions.get(StackId.parse("aws-full")).declares(KeycloakComponent.class)).isTrue();
+        assertThat(componentsOf("aws-full")).doesNotContain(KeycloakComponent.class);
+    }
+
+    @Test
+    void parsesTheRoleOfAStackAndRejectsUnknownOrRepeatedOnes() {
+        Map<StackId, StackDefinition> definitions = StackDefinitions.parse(
+            "stacks:\n  aws-a:\n    role: tre\n    components: [Polaris]\n  azure-a:\n    role: tre\n    components: [Polaris]\n"
+            + "  aws-b:\n    extends: aws-a\n    components: [Git]\n", "test");
+        assertThat(definitions.get(StackId.parse("aws-a")).role()).isEqualTo(StackRole.TRE);
+        assertThat(definitions.get(StackId.parse("azure-a")).role()).isEqualTo(StackRole.TRE);
+        assertThat(definitions.get(StackId.parse("aws-b")).role()).isNull();
+        assertInvalid("stacks:\n  aws-x:\n    role: boss\n    components: [Polaris]", "unknown role 'boss'");
+        assertInvalid("stacks:\n  aws-x:\n    role: tre\n  aws-y:\n    role: tre", "aws-x and aws-y both have the role tre");
+    }
+
+    @Test
+    void bundledAndTestStacksHaveTheSameRoles() {
+        Map<StackId, StackDefinition> bundled = StackDefinitions.load(null);
+        StackDefinitions.all().forEach(definition -> {
+            if (bundled.containsKey(definition.id())) {
+                assertThat(definition.role()).as(definition.id().toString()).isEqualTo(bundled.get(definition.id()).role());
+            }
+        });
     }
 }

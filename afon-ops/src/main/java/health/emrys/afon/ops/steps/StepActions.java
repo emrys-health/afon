@@ -131,8 +131,11 @@ public class StepActions {
 
     /**
      * Returns the names of the stacks in the cloud, ie of the stack dirs and tofu states found in the cdktf dir,
-     * eg {@code aws-keycloak} for {@code stacks/aws-keycloak} or {@code terraform.aws-keycloak.tfstate},
+     * eg {@code <stack-id>} for {@code stacks/<stack-id>} or {@code terraform.<stack-id>.tfstate},
      * and {@code aws} for the legacy {@code stacks/aws} or {@code terraform.aws.tfstate}.
+     * <p>
+     * A name is not necessarily a stack id, see {@link StackId}: it may also be that of the cloud, for the legacy stack, or of a
+     * stack that is no longer defined.
      */
     List<String> stackNamesIn(AfonCloud cloud) throws IOException {
         return stackNamesIn(cloud, Path.of(ConfigUtils.afonCkdtf()));
@@ -140,7 +143,7 @@ public class StepActions {
 
     /**
      * @return the names of the stacks that are deployed, ie with a tofu state in the cdktf dir, eg
-     * {@code terraform.aws-keycloak.tfstate} for {@code aws-keycloak}, or {@code terraform.aws.tfstate} for the legacy
+     * {@code terraform.<stack-id>.tfstate} for {@code <stack-id>}, or {@code terraform.aws.tfstate} for the legacy
      * {@code aws}, rather than just a stack dir, eg left from synthesising a stack without deploying it
      */
     List<String> deployedStackNames(List<String> stackNames, Path cdktfDir) {
@@ -327,8 +330,7 @@ public class StepActions {
     }
 
     /**
-     * Starts the stack, attempting for a given number of retries, in the stack dir of its {@link StackId}, eg
-     * {@code aws-keycloak}, whose plan must have been synthesised there, see {@link #synthesiseStack}.
+     * Starts the stack, attempting for a given number of retries, in the stack dir of its {@link StackId}, whose plan must have been synthesised there, see {@link #synthesiseStack}.
      * @param outputStream the stream to which the tofu output is written
      * @throws Exception
      */

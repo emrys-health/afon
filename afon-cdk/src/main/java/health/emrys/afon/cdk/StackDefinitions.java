@@ -1,22 +1,9 @@
 package health.emrys.afon.cdk;
 
-import health.emrys.afon.cdk.azure.AzureLoggingComponent;
 import health.emrys.afon.cdk.aws.AwsLoggingComponent;
-import health.emrys.afon.cdk.components.CrdCleanupComponent;
-import health.emrys.afon.cdk.components.GitComponent;
-import health.emrys.afon.cdk.components.JupyterComponent;
-import health.emrys.afon.cdk.components.KeycloakComponent;
-import health.emrys.afon.cdk.components.MonitoringComponent;
-import health.emrys.afon.cdk.components.NetworkPoliciesComponent;
-import health.emrys.afon.cdk.components.PolarisComponent;
-import health.emrys.afon.cdk.components.SnowflakeComponent;
-import health.emrys.afon.cdk.components.SparkComponent;
-import health.emrys.afon.cdk.components.SparkOperatorComponent;
-import health.emrys.afon.cdk.components.TrinoComponent;
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.ConfigUtils;
-import health.emrys.afon.config.StackId;
+import health.emrys.afon.cdk.azure.AzureLoggingComponent;
+import health.emrys.afon.cdk.components.*;
+import health.emrys.afon.config.*;
 import org.slf4j.Logger;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -35,14 +22,14 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * The stacks, each composed of {@link StackComponent}s that run on whatever cloud the stack is deployed to.  A stack
- * is its {@link StackId}, eg {@code aws-full}, and the list of its components, so a new stack, eg of a different
+ * is its {@link StackId} and the list of its components, so a new stack, eg of a different
  * subset of components, or on another cloud, is a new entry in the YAML that defines them.
  * <p>
  * The stacks are loaded at runtime from {@code stacks.yaml}, bundled in the jar, unless the user has a file of that name in the
  * config dir ({@link ConfigUtils#configDir()}), which replaces it entirely, not merged with it.  A stack may {@code extend} another
  * of its cloud, to start with its components, and a component may be deployed {@code when} or {@code unless} a
  * boolean property of the stack's cloud, eg {@code KEYCLOAK_EXTERNAL} for {@code <CLOUD>_KEYCLOAK_EXTERNAL}.  The
- * components are those of {@link #componentNames()}.  A file that does not define the stacks correctly fails when
+ * components are those of {@link StackComponents}.  A file that does not define the stacks correctly fails when
  * they are first used, with a message naming the file and the problem.
  */
 public final class StackDefinitions {
@@ -65,23 +52,6 @@ public final class StackDefinitions {
     static final String DEFAULT_RESOURCE = "/stacks.yaml";
 
     private static final Logger logger = getLogger(StackDefinitions.class);
-    private static final Map<String, Supplier<StackComponent>> COMPONENTS = new TreeMap<>();
-
-    static {
-        COMPONENTS.put("Keycloak", KeycloakComponent::new);
-        COMPONENTS.put("Polaris", PolarisComponent::new);
-        COMPONENTS.put("Jupyter", JupyterComponent::new);
-        COMPONENTS.put("NetworkPolicies", NetworkPoliciesComponent::new);
-        COMPONENTS.put("SparkOperator", SparkOperatorComponent::new);
-        COMPONENTS.put("Spark", SparkComponent::new);
-        COMPONENTS.put("CrdCleanup", CrdCleanupComponent::new);
-        COMPONENTS.put("Trino", TrinoComponent::new);
-        COMPONENTS.put("Monitoring", MonitoringComponent::new);
-        COMPONENTS.put("AzureLogging", AzureLoggingComponent::new);
-        COMPONENTS.put("AwsLogging", AwsLoggingComponent::new);
-        COMPONENTS.put("Git", GitComponent::new);
-        COMPONENTS.put("Snowflake", SnowflakeComponent::new);
-    }
 
     private StackDefinitions() {
     }
@@ -145,23 +115,17 @@ public final class StackDefinitions {
     }
 
     /**
-     * @return the names by which the stacks file refers to the components, ie their class names without {@code Component}
-     */
-    public static Set<String> componentNames() {
-        return Collections.unmodifiableSet(COMPONENTS.keySet());
-    }
-
-    /**
      * A component of a stack, deployed if its property, when it has one, is {@code deployedIf}.
      */
-    private record Entry(String name, Supplier<StackComponent> component, String property, boolean deployedIf) {
+    private record Entry(String name, Supplier<StackComponent> component, Class<? extends StackComponent> type,
+                         String property, boolean deployedIf) {
         boolean isDeployed(AfonCloud cloud, AfonPropertyProvider properties) {
             return property == null
                    || Boolean.parseBoolean(properties.getCloudValue(cloud, property, "false").trim()) == deployedIf;
         }
     }
 
-    private record Spec(StackId extended, Boolean pinnedEgressIp, List<Entry> entries) {
+    private record Spec(StackId extended, StackRole role, Boolean pinnedEgressIp, List<Entry> entries) {
     }
 
     /**
@@ -190,6 +154,7 @@ public final class StackDefinitions {
             });
             Map<StackId, StackDefinition> definitions = new TreeMap<>();
             specs.keySet().forEach(id -> definitions.put(id, definition(id, specs)));
+            checkRolesAreUnique(definitions.values());
             return definitions;
         } catch (RuntimeException e) {
             throw new IllegalStateException(String.format("Invalid stack definitions %s: %s", source, e.getMessage()), e);
@@ -217,8 +182,14 @@ public final class StackDefinitions {
     }
 
     private static Spec spec(String stack, Object value) {
-        Map<String, Object> map = map(value, stack, "extends, pinnedEgressIp and components");
-        onlyKeys(map, stack, "extends", "pinnedEgressIp", "components");
+        Map<String, Object> map = map(value, stack, "extends, role, pinnedEgressIp and components");
+        onlyKeys(map, stack, "extends", "role", "pinnedEgressIp", "components");
+        StackRole role = null;
+        if (map.get("role") != null) {
+            String named = String.valueOf(map.get("role"));
+            role = StackRole.of(named).orElseThrow(() -> new IllegalArgumentException(String.format(
+                "%s has unknown role '%s', expected one of %s", stack, named, Arrays.toString(StackRole.values()))));
+        }
         StackId extended = map.get("extends") == null ? null : StackId.parse(String.valueOf(map.get("extends")));
         Object pinned = map.get("pinnedEgressIp");
         if (pinned != null && !(pinned instanceof Boolean)) {
@@ -232,7 +203,7 @@ public final class StackDefinitions {
         for (Object component : components == null ? List.of() : (List<?>) components) {
             entries.add(entry(stack, component));
         }
-        return new Spec(extended, (Boolean) pinned, entries);
+        return new Spec(extended, role, (Boolean) pinned, entries);
     }
 
     private static Entry entry(String stack, Object value) {
@@ -241,17 +212,15 @@ public final class StackDefinitions {
             : new LinkedHashMap<>(Map.of("name", String.valueOf(value)));
         onlyKeys(map, stack + " component", "name", "when", "unless");
         String name = String.valueOf(map.get("name"));
-        Supplier<StackComponent> component = COMPONENTS.get(name);
-        if (component == null) {
-            throw new IllegalArgumentException(String.format("%s has unknown component '%s', expected one of %s",
-                                                             stack, name, COMPONENTS.keySet()));
-        }
+        Supplier<StackComponent> component = StackComponents.find(name).orElseThrow(() ->
+            new IllegalArgumentException(String.format("%s has unknown component '%s', expected one of %s",
+                                                       stack, name, StackComponents.names())));
         if (map.containsKey("when") && map.containsKey("unless")) {
             throw new IllegalArgumentException(String.format("%s component %s has both when and unless", stack, name));
         }
         boolean when = map.containsKey("when");
         Object property = when ? map.get("when") : map.get("unless");
-        return new Entry(name, component, property == null ? null : String.valueOf(property), when);
+        return new Entry(name, component, component.get().getClass(), property == null ? null : String.valueOf(property), when);
     }
 
     private static StackDefinition definition(StackId id, Map<StackId, Spec> specs) {
@@ -277,13 +246,31 @@ public final class StackDefinitions {
             entries.addAll(spec.entries());
             decided = spec.pinnedEgressIp() != null ? spec.pinnedEgressIp() : decided;
         }
-        return new StackDefinition(id, decided == null || decided, properties -> entries.stream()
-            .filter(entry -> entry.isDeployed(id.cloud(), properties)).map(entry -> entry.component().get()).toList());
+        Set<Class<? extends StackComponent>> declared = new LinkedHashSet<>();
+        entries.forEach(entry -> declared.add(entry.type()));
+        // the role is the stack's own, not that of what it extends
+        return new StackDefinition(id, specs.get(id).role(), decided == null || decided, properties -> entries.stream()
+            .filter(entry -> entry.isDeployed(id.cloud(), properties)).map(entry -> entry.component().get()).toList(),
+            Collections.unmodifiableSet(declared));
+    }
+
+    private static void checkRolesAreUnique(Collection<StackDefinition> definitions) {
+        Map<String, StackId> byRole = new HashMap<>();
+        for (StackDefinition definition : definitions) {
+            if (definition.role() == null) {
+                continue;
+            }
+            StackId other = byRole.put(definition.id().cloud() + " " + definition.role(), definition.id());
+            if (other != null) {
+                throw new IllegalArgumentException(String.format(
+                    "%s and %s both have the role %s, which a cloud has once", other, definition.id(), definition.role()));
+            }
+        }
     }
 
     /**
-     * @return whether the stacks of the cloud otherwise deploying their own KeyCloak, eg {@code aws-full}, use instead the
-     * one at {@code OIDC_DOMAIN_NAME} that the cloud's keycloak stack deploys, eg {@code aws-keycloak}, as configured by
+     * @return whether the stacks of the cloud otherwise deploying their own KeyCloak use instead the
+     * one at {@code OIDC_DOMAIN_NAME} that the cloud's keycloak stack deploys, as configured by
      * {@code <CLOUD>_KEYCLOAK_EXTERNAL}, {@code false} when unset or the cloud has no such property
      */
     public static boolean isKeyCloakExternal(AfonCloud cloud, AfonPropertyProvider properties) {
@@ -331,6 +318,22 @@ public final class StackDefinitions {
      */
     public static void checkLoads() {
         definitions();
+    }
+
+    /**
+     * @return the stack of the cloud with the role, or empty if there is none
+     */
+    public static Optional<StackDefinition> withRole(AfonCloud cloud, StackRole role) {
+        return definitions().values().stream()
+                            .filter(definition -> definition.id().cloud() == cloud && definition.role() == role).findFirst();
+    }
+
+    /**
+     * @return the first stack of the cloud that may deploy the kind of component, in order of the ids, or empty if there is none
+     */
+    public static Optional<StackDefinition> declaring(AfonCloud cloud, Class<? extends StackComponent> type) {
+        return definitions().values().stream()
+                            .filter(definition -> definition.id().cloud() == cloud && definition.declares(type)).findFirst();
     }
 
     /**

@@ -219,7 +219,7 @@ public class AwsCleanupHelper extends CleanupHelper {
 
     /**
      * Outputs the cleanup commands of the AWS stack, given the args {@code <stack-id> [<output-file>]},
-     * eg {@code aws-keycloak}, as the names of its components depend on its stack type.
+     * {@code <stack-id>}, as the names of its components depend on its stack type.
      */
     public static void main(String[] args) {
         var properties = new FilePropertyProvider();

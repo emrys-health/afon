@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.cdk.StackDefinitions;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
@@ -19,6 +20,7 @@ import health.emrys.afon.ops.steps.StepRunner;
 import health.emrys.afon.ops.steps.StepsProvider;
 import org.slf4j.Logger;
 
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -36,8 +38,8 @@ import static org.slf4j.LoggerFactory.getLogger;
  * </pre>
  * <ul>
  *   <li>{@code <action>} is one of {@code delete}, {@code deploy} or {@code setup}, see {@link StackAction};</li>
- *   <li>{@code <stack-id>} is {@code <cloud>-<stack-type>}, eg {@code aws-keycloak}, see {@link StackId},
- *       or {@code <cloud>-all}, eg {@code aws-all}, to delete every stack of the cloud;</li>
+ *   <li>{@code <stack-id>} is {@code <cloud>-<stack-type>}, see {@link StackId},
+ *       or {@code <cloud>-all}, to delete every stack of the cloud;</li>
  *   <li>{@code <step>}, if given, is the step from which to resume, as for the other stack commands;</li>
  *   <li>{@code --replace}, if given, lets {@code deploy} and {@code setup} delete the other stacks conflicting with the
  *       stack, else they fail, naming them, before deleting any.</li>
@@ -65,6 +67,11 @@ public class ManageStackMain {
      */
     static final String DRY_RUN = "--dry-run";
 
+    /**
+     * The option, only to {@code run}, exporting the bundled flows to the config dir.
+     */
+    static final String EXPORT_FLOWS = "--export-flows";
+
     private final StackPlanFactory factory;
 
     ManageStackMain(StackPlanFactory factory) {
@@ -84,12 +91,32 @@ public class ManageStackMain {
      * {@code null} if the action or stack is unknown, or the action is not supported for the stack
      */
     StepsProvider stepsProviderFor(String action, String stackId, boolean replace) {
-        StackAction stackAction = StackAction.of(action);
-        if (stackAction == null) {
+        return stepsProviderFor(StackAction.of(action), parseStackId(stackId), replace);
+    }
+
+    /**
+     * @param action  the action, or {@code null} if it is unknown
+     * @param stackId the stack, or {@code null} if it is not a stack id
+     * @return the steps provider of the action on the stack, or {@code null} if either is {@code null}, or the stack is not
+     * defined, or the action is not supported for it
+     */
+    private StepsProvider stepsProviderFor(StackAction action, StackId stackId, boolean replace) {
+        if (action == null || stackId == null) {
             return null;
         }
         try {
-            return factory.stepsProviderFor(stackAction, StackId.parse(stackId), replace);
+            return factory.stepsProviderFor(action, stackId, replace);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * @return the stack id of the text, or {@code null} if it is not one
+     */
+    private static StackId parseStackId(String text) {
+        try {
+            return StackId.parse(text);
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -132,10 +159,12 @@ public class ManageStackMain {
         System.out.println("  resuming from the step, or lists the flows if none is given; " + DRY_RUN + " lists its steps without running them");
         System.out.println("  " + REPLACE + ", if given, lets deploy and setup delete the other stacks conflicting with the stack,");
         System.out.println("    else they fail, naming them, before deleting any");
+        System.out.println("Usage: manage-stack run " + EXPORT_FLOWS + ", which writes the bundled flows, stack-flows.yaml, to the config dir,");
+        System.out.println("  to define the flows differently: the file there replaces the bundled one");
     }
 
     /**
-     * Prints the generated doc of the args, eg {@code setup aws-full}, else the usage.
+     * Prints the generated doc of the args, eg {@code setup <stack-id>}, else the usage.
      */
     private void help(String[] args) {
         Optional<String> doc = DocumentNames.forArgs(args).flatMap(CommandHelp::findGeneratedDoc);
@@ -147,8 +176,14 @@ public class ManageStackMain {
     }
 
     public static void main(String[] allArgs) {
+        if (allArgs.length == 2 && StackAction.of(allArgs[0]) == StackAction.RUN && EXPORT_FLOWS.equals(allArgs[1])) {
+            // before loading the flows, as it is how to replace a file that is not valid
+            exportFlows();
+            return;
+        }
         try {
             StackDefinitions.checkLoads();
+            StackFlows.checkLoads();
         } catch (IllegalStateException e) {
             // printed as well as logged, as the console logging may be off, eg in the CLI
             System.err.println(e.getMessage());
@@ -176,16 +211,27 @@ public class ManageStackMain {
         manager.stack(args, replace);
     }
 
+    private static void exportFlows() {
+        try {
+            Path file = StackFlows.exportBundled(Path.of(ConfigUtils.configDir()));
+            System.out.printf("Exported the bundled flows to %s, which now replaces them: edit it to define the flows differently%n", file);
+        } catch (RuntimeException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+        }
+    }
+
     private void stack(String[] args, boolean replace) {
-        StepsProvider stepsProvider = stepsProviderFor(args[0], args[1], replace);
+        // parsed once, here at the edge
+        StackAction action = StackAction.of(args[0]);
+        StackId stackId = parseStackId(args[1]);
+        StepsProvider stepsProvider = stepsProviderFor(action, stackId, replace);
         if (stepsProvider == null) {
             System.out.printf("Unsupported action '%s' on stack '%s'%n", args[0], args[1]);
             printUsage();
             System.exit(1);
             return;
         }
-        StackAction action = StackAction.of(args[0]);
-        StackId stackId = StackId.parse(args[1]);
         if (action == StackAction.DELETE && stackId.isAll()) {
             // printed as well as logged, as the console logging may be off, eg in the CLI
             String warning = String.format("Deleting %s deletes every stack deployed in cloud %s", stackId, stackId.cloud());
@@ -226,6 +272,7 @@ public class ManageStackMain {
         printFlows();
         System.out.println("Stacks with scenarios, to run with: manage-stack run <stack-id> <scenario>");
         printStackScenarios(new OpsPropertyProvider());
+        System.out.println("To define the flows differently: manage-stack run " + EXPORT_FLOWS);
     }
 
     private void printFlows() {
@@ -235,10 +282,10 @@ public class ManageStackMain {
     }
 
     /**
-     * @return whether the name is that of a flow, rather than a stack id
+     * @return whether the name is that of a flow, rather than a stack id, even if the flow cannot run for want of a stack
      */
     boolean isFlow(String name) {
-        return StackFlows.find(name).isPresent();
+        return StackFlows.isDefined(name);
     }
 
     private void runFlow(String[] args, boolean replace, boolean dryRun) {
