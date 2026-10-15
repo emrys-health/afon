@@ -155,6 +155,7 @@ public class NetworkConfig {
         // just a podSelector is scoped to the policy's own namespace, so this is exactly "these two
         // pods in default, nothing else": Guacamole (streams the pod's VNC desktop) and the
         // JupyterHub hub (the single-user server must register with it or the spawn times out).
+        // Gitea is reachable too, on its own ports, see createGiteaEgressPolicy.
         // Everything else in the namespace -- Polaris, Keycloak, Trino, the monitoring stack, other
         // users' notebooks -- is dropped.
         // Guacamole is deliberately absent. guacd dials the notebook's VNC port, so the desktop
@@ -169,11 +170,10 @@ public class NetworkConfig {
             NetworkPolicySpecEgress.builder()
                                    .to(allowedNamespacePeers)
                                    .build(),
-            createSparkConnectorEgressPolicy(sparkConnectorName));
+            createSparkConnectorEgressPolicy(sparkConnectorName),
+            createGiteaEgressPolicy());
         networkPolicyFor(USER_POD_LABELS, egress);
-        lockdownJupyterPods(addMaps(USER_POD_LABELS,
-                                    Map.of("app", "gitea")),
-                            dependsOn);
+        lockdownJupyterPods(USER_POD_LABELS, dependsOn);
 
         // only the driver calls what the ingress exposes, ie Polaris, so only it may reach the ingress controller
         lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of(), Map.of());
@@ -432,6 +432,22 @@ public class NetworkConfig {
             .builder()
             .to(sparkConnectorPods)
             .ports(sparkConnectorPorts)
+            .build();
+    }
+
+    /**
+     * Egress to Gitea, over HTTP and SSH, so that notebooks can clone and push.  Selected on the labels the
+     * {@code gitea-http} and {@code gitea-ssh} Services select on: both are headless, so their names resolve to the
+     * pod's own address, and a ClusterIP would be translated to it before egress is evaluated anyway.  Being headless,
+     * {@code gitea-ssh} translates no ports either, so SSH is to {@code gitea-ssh:2222}, not the Service's 22.
+     */
+    private static @NonNull NetworkPolicySpecEgress createGiteaEgressPolicy() {
+        return NetworkPolicySpecEgress
+            .builder()
+            .to(List.of(podEgressTo(GiteaConfig.POD_LABELS)))
+            .ports(List.of(
+                NetworkPolicySpecEgressPorts.builder().protocol("TCP").port(GiteaConfig.HTTP_PORT).build(),
+                NetworkPolicySpecEgressPorts.builder().protocol("TCP").port(GiteaConfig.SSH_PORT).build()))
             .build();
     }
 
