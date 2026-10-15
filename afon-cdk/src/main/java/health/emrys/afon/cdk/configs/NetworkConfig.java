@@ -171,7 +171,9 @@ public class NetworkConfig {
                                    .build(),
             createSparkConnectorEgressPolicy(sparkConnectorName));
         networkPolicyFor(USER_POD_LABELS, egress);
-        lockdownJupyterPods(USER_POD_LABELS, dependsOn);
+        lockdownJupyterPods(addMaps(USER_POD_LABELS,
+                                    Map.of("app", "gitea")),
+                            dependsOn);
 
         // only the driver calls what the ingress exposes, ie Polaris, so only it may reach the ingress controller
         lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of(), Map.of());
