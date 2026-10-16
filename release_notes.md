@@ -1,5 +1,50 @@
 # Release Notes
 
+## 1.0-beta-7
+
+**Milestone:** [1.0-beta-7](https://github.com/emrys-health/afon-core/milestone/8)
+**Due:** 2026-10-16
+
+### Upgrade notes
+
+**IMPORTANT:** one-off steps when upgrading from 1.0-beta-6:
+
+- **Gitea in `tre` stacks ([#34](https://github.com/emrys-health/afon-core/issues/34)):** these stacks now deploy
+  Gitea (the `Git` component), which needs `GITEA_*` properties that your existing config does not have, so **add them before you
+  deploy or set the stack up again**, and rerun `afon-cli.sh aws-create tre` (or `azure-create tre`) to create the
+  bucket.  The [issue #34](https://github.com/emrys-health/afon-core/issues/34) lists the properties, their defaults and which are optional, and the password rules (including the 8-character minimum for the passwords in `users.csv`).  `config-init` never overwrites an existing config dir, so copy them from `templates/config` and check what is missing with `afon-cli.sh config-validate`.  A missing required property fails the deploy before anything is created, naming the property.
+- **New feature([#267](https://github.com/emrys-health/afon-core/issues/267)):** the stacks, and the flows run by `manage-stack run`, are now defined in `stacks.yaml` and `stack-flows.yaml`, bundled in the jar.  To define them differently, put a
+  file of the same name in the config dir (`$AFON_HOME/config`), which replaces the bundled one entirely;
+  `afon-cli.sh validate-stack --export-stacks` and `afon-cli.sh manage-stack run --export-flows` write a copy to start from.  A
+  stack may have a `role` (`catalog`, `identity` or `tre`), which the flows and the checks find it by, so a `stacks.yaml` of your
+  own needs a `role:` on the stacks they should find.  Wherever a stack is given, its id or its role works, eg
+  `manage-stack setup aws-tre` or `afon-cli.sh aws-create tre`.  See [Define your own stacks](docs/stacks.md#define-your-own-stacks) and [Define your own flows](docs/stacks.md#define-your-own-flows).
+- **Stack types replaced by ids or roles ([#292](https://github.com/emrys-health/afon-core/issues/292)):** the scripts that took
+  a stack **type** (`keycloak`, `polaris`, `full`) now take the **stack id** or its **role** (`identity`, `catalog` or `tre`), so
+  **replace the old argument in your own scripts and notes**:
+
+  | before                                                           | now                                                                                     |
+  |------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+  | `afon-cli.sh manage-stack [delete/deploy/setup] <cloud>-full`    | `afon-cli.sh manage-stack [delete/deploy/setup] <cloud>-tre` (or `<cloud>-full`)        |
+  | `afon-cli.sh manage-stack [delete/deploy/setup] <cloud>-polaris` | `afon-cli.sh manage-stack [delete/deploy/setup] <cloud>-catalog` (or `<cloud>-polaris`) |
+  | `afon-cli.sh validate-stack <cloud>-full`                        | `afon-cli.sh validate-stack  <cloud>-tre` (or `<cloud>-full`)                           |
+  | `afon-cli.sh <cloud>-cluster full`                               | `afon-cli.sh <cloud>-cluster tre` (or `<cloud>-full`)                                   |
+  | `afon-cli.sh <cloud>-update-kube-config full`                    | `afon-cli.sh <cloud>-update-kube-config tre` (or `<cloud>-full`)                        |
+
+  where `<cloud>=aws|azure`.  The stack ids, plan dirs, tofu state and resource names are **unchanged**, so existing
+  deployments carry on.  `aws-keycloak` and `aws-polaris` (the status commands, without a stack) now find the running stack
+  among the stacks that deploy Keycloak or Polaris in `stacks.yaml`.
+- **`aws-create` and `azure-create` work out what to create from `stacks.yaml` ([#267](https://github.com/emrys-health/afon-core/issues/267)):**
+  they resolve the stack by its id or its role, and create what the stack needs as `stacks.yaml` defines it: the DNS zone of each
+  domain that its components hold, and the Gitea bucket or container if it deploys Git
+  ([#34](https://github.com/emrys-health/afon-core/issues/34)).  Before, they replicated they logic based on the stack id.  No change for the
+  bundled stacks.  A stack of your own with `Git` needs `AWS_GITEA_BUCKET` or `AZURE_GITEA_BUCKET` set too, as `*-full` does. Eg:
+
+  | command | stack id | role |
+  |---|---|---|
+  | `afon-cli.sh aws-create <stack>` | `aws-full` | `tre` |
+  | `afon-cli.sh azure-create [true\|false] <stack>` | `azure-polaris` | `catalog` |
+
 ## 1.0-beta-6
 
 **Milestone:** [1.0-beta-6](https://github.com/emrys-health/afon-core/milestone/6)
