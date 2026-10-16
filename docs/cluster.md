@@ -240,7 +240,7 @@ It cannot shrink.  To delete it for good, delete the stack, then `aws ec2 delete
 
 ### Polaris logs in S3 (AWS)
 
-Set `AWS_POLARIS_LOG_BUCKET` to an existing S3 bucket to keep Polaris' logs after the pod, or the whole cluster,
+Set `AWS_POLARIS_LOG_BUCKET` to an S3 bucket, which `afon-cli.sh aws-create` creates if absent, to keep Polaris' logs after the pod, or the whole cluster,
 is gone.  A Fluent Bit DaemonSet (`fluent-bit-polaris-*` in `kube-system`) tails the console output of the Polaris
 containers and uploads it, at least every minute, as gzipped JSON lines (one per log line, with the pod's
 metadata) to:

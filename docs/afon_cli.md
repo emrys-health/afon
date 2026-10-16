@@ -86,8 +86,8 @@ The scripts accept the same `--cloud`/`-c`, `--config-env`, `--cdktf-env`, `--en
 either before the command name (handled by `afon-cli.sh` itself) or after it (handled by the script command
 directly); either way they're translated into the `AFON_*` env vars `afon-cli-scripts.sh` and the scripts expect.
 
-Anything else is forwarded as-is to the script, positionally — eg `afon-cli.sh azure-create true` to pass
-`AS_ADMIN=true`, or `afon-cli.sh config-export myconfig.zip` to pass the zip path `config/export.sh` expects.    
+Anything else is forwarded as-is to the script, positionally — eg `afon-cli.sh azure-create true azure-full` to pass
+`AS_ADMIN=true` and the stack id, or `afon-cli.sh config-export myconfig.zip` to pass the zip path `config/export.sh` expects.    
 
 To see the full command list, run: 
 ```shell

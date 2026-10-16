@@ -2,9 +2,10 @@ source $AFON_ROOT/scripts/config/afon-source.sh azure
 source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 # Args, in any order: whether to run as admin, true|false, and the id of the stack the env is created for, which decides
-# the DNS zones, one of azure-keycloak, azure-polaris, azure-full.  By default not as admin, for azure-polaris.
+# the DNS zones and storage, one of azure-keycloak, azure-polaris, azure-full, which is required, as what the env needs
+# depends on it.  By default not as admin.
 AS_ADMIN=false
-STACK_ID=azure-polaris
+STACK_ID=
 for ARG in "$@"; do
   case "$ARG" in
     true|false) AS_ADMIN="$ARG" ;;
@@ -12,6 +13,10 @@ for ARG in "$@"; do
     *) echo "-- Unknown argument '$ARG': expected true|false, or a stack id, eg azure-polaris or azure-full"; exit 1 ;;
   esac
 done
+if [ -z "$STACK_ID" ]; then
+  echo "-- Requires the id of the stack the env is created for: azure-create [true|false] <azure-keycloak|azure-polaris|azure-full>"
+  exit 1
+fi
 
 # The properties of the domain names whose DNS zones the stack needs: Polaris is always deployed, Jupyter and the
 # KeyCloak only by the stacks deploying them, ie azure-full, with its own KeyCloak, unless AZURE_KEYCLOAK_EXTERNAL is true,
@@ -105,6 +110,16 @@ fi
 
 ## Storage Buckets
 
+create_container_if_absent() {
+  local CONTAINER="$1"
+  if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $CONTAINER --auth-mode login --query exists -o tsv)" = "true" ]; then
+    echo "- Bucket '$CONTAINER' already exists, skipping"
+  else
+    echo "- Creating bucket '$CONTAINER'"
+    az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $CONTAINER --auth-mode login || exit 1
+  fi
+}
+
 # Reads AZURE_BUCKET_NAME_<id>/AZURE_ADMIN_GRANTS_<id>, echoing "" instead of erroring under
 # `set -u` if a catalog (eg a custom type with no bucket of its own) never defined one.
 bucket_of() {
@@ -128,13 +143,23 @@ for ID in "${CATALOG_IDS[@]}"; do
   if [ -z "$BUCKET" ]; then
     continue
   fi
-  if [ "$(az storage container exists --account-name $AZURE_STORAGE_ACCOUNT --name $BUCKET --auth-mode login --query exists -o tsv)" = "true" ]; then
-    echo "- Bucket '$BUCKET' already exists, skipping"
-  else
-    echo "- Creating bucket '$BUCKET'"
-    az storage container create --account-name $AZURE_STORAGE_ACCOUNT --name $BUCKET --auth-mode login || exit 1
-  fi
+  create_container_if_absent "$BUCKET"
 done
+
+# Gitea, deployed by azure-full, keeps its blobs in a container of its own, which it reaches with the account key of
+# AZURE_CONNECTION_STRING, so it needs no role assignment.
+if [ "$STACK_ID" = "azure-full" ]; then
+  if [ -z "${AZURE_GITEA_BUCKET:-}" ]; then
+    echo "-- AZURE_GITEA_BUCKET is not set, which stack '$STACK_ID' needs for Gitea's blob container"
+    exit 1
+  fi
+  create_container_if_absent "$AZURE_GITEA_BUCKET"
+fi
+
+# The container Polaris' logs are shipped to, if it is set: it is optional, so there is no logging of Polaris without it.
+if [ -n "${AZURE_POLARIS_LOG_BUCKET:-}" ]; then
+  create_container_if_absent "$AZURE_POLARIS_LOG_BUCKET"
+fi
 
 ## Role Assignment
 

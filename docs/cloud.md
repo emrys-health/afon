@@ -21,10 +21,10 @@ To create the cloud infrastructure, which includes storage buckets, IAM roles, s
 run the cloud create scripts:
 
 ```shell
-afon-cli.sh <cloud>-create [as-admin]
+afon-cli.sh <cloud>-create [as-admin] <stack-id>
 ```
 where cloud is one of `{aws|azure|gcp}`.  On `azure` the boolean arg determines if you're running as admin.  If not, the script `azure/create-admin` must be run by an admin.   By default, `as-admin=false`.
-On `azure` it also takes the id of the stack the env is created for, which decides the DNS zones, in any order with the boolean arg: `azure-polaris`, by default, creates the zone of Polaris, `azure-keycloak` that of `OIDC_DOMAIN_NAME`, and `azure-full` those of Polaris and Jupyter, and `OIDC_DOMAIN_NAME` too unless `AZURE_KEYCLOAK_EXTERNAL=true`, eg `afon-cli.sh azure-create false azure-full`.
+On `aws` and `azure` it requires the id of the stack the env is created for, which decides what it creates, in any order with the boolean arg: on `azure`, `azure-polaris` creates the DNS zone of Polaris, `azure-keycloak` that of `OIDC_DOMAIN_NAME`, and `azure-full` those of Polaris and Jupyter, and `OIDC_DOMAIN_NAME` too unless `AZURE_KEYCLOAK_EXTERNAL=true`; `aws-full` and `azure-full` also create the bucket or container of Gitea, `AWS_GITEA_BUCKET` or `AZURE_GITEA_BUCKET`, which must be set, and any stack the one of Polaris' logs, `AWS_POLARIS_LOG_BUCKET` or `AZURE_POLARIS_LOG_BUCKET`, if set, eg `afon-cli.sh azure-create false azure-full` or `afon-cli.sh aws-create aws-full`.
 
 ## Destroy
 
