@@ -1,5 +1,13 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
+# The id of the stack the env is created for, one of aws-keycloak, aws-polaris, aws-full, which is required, as what the
+# env needs depends on it, eg the bucket of Gitea, which aws-full deploys.
+STACK_ID="${1:-}"
+case "$STACK_ID" in
+  aws-*) ;;
+  *) echo "-- Requires the id of the stack the env is created for: aws-create <aws-keycloak|aws-polaris|aws-full>"; exit 1 ;;
+esac
+
 IFS=',' read -ra CATALOG_IDS <<< "$AWS_CATALOG_IDS"
 
 # Derives an IAM statement Sid fragment from a catalog id, eg "aws_forbidden" -> "AwsForbidden".
@@ -68,6 +76,21 @@ for ID in "${CATALOG_IDS[@]}"; do
       \"Resource\": \"arn:aws:s3:::$BUCKET/*\"
     }"
 done
+
+# Gitea, deployed by aws-full, keeps its blobs in a bucket of its own (which may be a catalog's), which it reaches with
+# AWS_ACCESS_KEY_ID, so it is not in the whitelist of the role.
+if [ "$STACK_ID" = "aws-full" ]; then
+  if [ -z "${AWS_GITEA_BUCKET:-}" ]; then
+    echo "-- AWS_GITEA_BUCKET is not set, which stack '$STACK_ID' needs for Gitea's bucket"
+    exit 1
+  fi
+  create_bucket_if_absent "$AWS_GITEA_BUCKET"
+fi
+
+# The bucket Polaris' logs are shipped to, if it is set: it is optional, so there is no logging of Polaris without it.
+if [ -n "${AWS_POLARIS_LOG_BUCKET:-}" ]; then
+  create_bucket_if_absent "$AWS_POLARIS_LOG_BUCKET"
+fi
 
 if aws iam get-role --role-name S3ReadWriteRole >/dev/null 2>&1; then
   echo "- Role S3ReadWriteRole already exists, skipping"

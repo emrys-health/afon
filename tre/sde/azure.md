@@ -15,11 +15,12 @@ principal management) are generally allowed to run only by a local admin.
 
 The scripts `azure/create.sh`, shipped as part of the CLI distribution can be executed via:
 ```shell
-afon-cli.sh azure-create [<as-admin>] [<stack-id>]
+afon-cli.sh azure-create [<as-admin>] <stack-id>
 ```
 where `<as-admin>` is a boolean flag to indicate if you have the local admin rights.
 The flag is optional, and by default you'll run **without** admin rights.  
-The `<stack-id>` is one of `azure-full|azure-keycloak|azure-polaris`.
+The `<stack-id>` is required, and one of `azure-full|azure-keycloak|azure-polaris`: it decides the DNS zones, and for `azure-full` the blob container `AZURE_GITEA_BUCKET` of Gitea, which are created.
+Whatever the stack, the blob container `AZURE_POLARIS_LOG_BUCKET` that Polaris' logs are shipped to is also created, if it is set.
 
 The script reads the afon config properties in `$AFON_HOME/config` (`afon.properties`, `afon-azure.properties` and `secret-azure.properties`) and executes the Azure CLI commands.
 
@@ -79,16 +80,15 @@ After all properties are set, switch to using env `xyz`:
 ```
 This simply creates a symlink `~/.afon/config` to `~/.afon/config-xyz`.   Thereafter, you don't need to specify the env any more.
 
-Next, login and set account subscription:
+Next, login, which also sets the account subscription:
 ```shell
 afon-cli.sh azure-login
-afon-cli.sh azure-account
 ```
-The `login.sh` logs in the user with the given `$AZURE_TENANT_ID`, while `account.sh` sets account to the `$AZURE_SUBSCRIPTION`.
+The `login.sh` logs in the user with the given `$AZURE_TENANT_ID` and then runs `account.sh`, which sets the account to the `$AZURE_SUBSCRIPTION`, so `azure-account` is only needed to select it again without logging in, eg when switching env.
 
 Finally, to create the env:
 ```shell
-afon-cli.sh azure-create [azure-full|azure-polaris]
+afon-cli.sh azure-create <azure-full|azure-keycloak|azure-polaris>
 ```
 
 Once the env is created, you can issue a TLS certificate for the Polaris domain name and store it in the Azure Key Vault (AKV)
