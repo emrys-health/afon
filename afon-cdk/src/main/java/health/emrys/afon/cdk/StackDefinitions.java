@@ -335,6 +335,22 @@ public final class StackDefinitions {
     }
 
     /**
+     * The stack that a user names: by its id, eg {@code aws-full}, or by its role in the cloud, as {@code <cloud>-<role>}, eg
+     * {@code aws-tre} for the stack of AWS with the role {@link StackRole#TRE}, so that commands taking a stack take either, as
+     * the scripts do, see {@code scripts/stack/needs-source.sh}.  A stack that is defined under that id always wins, so a stack
+     * called {@code aws-tre} is not mistaken for the one with the role.
+     *
+     * @return the id of the stack, or the id itself if it names no stack, for the caller to report, eg when no stack of the cloud
+     * has the role, or it stands for every stack of the cloud, eg {@code aws-all}
+     */
+    public static StackId resolve(StackId id) {
+        if (id.isAll() || definitions().containsKey(id)) {
+            return id;
+        }
+        return StackRole.of(id.type()).flatMap(role -> withRole(id.cloud(), role)).map(StackDefinition::id).orElse(id);
+    }
+
+    /**
      * @return the definition of the stack, or empty if there is none
      */
     public static Optional<StackDefinition> find(StackId id) {

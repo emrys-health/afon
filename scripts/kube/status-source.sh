@@ -22,7 +22,7 @@
 
 # What the script reports on, eg Polaris, set by the source of the subject
 STATUS_SUBJECT="${STATUS_SUBJECT:-the stack}"
-# The cluster the subject runs in, set where it isn't $CLUSTER_NAME, eg on AWS <stack-type>-<CLUSTER_NAME>
+# The cluster the subject runs in, set where it isn't $CLUSTER_NAME, eg on AWS <stack>-<CLUSTER_NAME>
 STATUS_CLUSTER_NAME="${STATUS_CLUSTER_NAME:-${CLUSTER_NAME:-}}"
 STATUS_OK=true
 STATUS_CLUSTER_UP=false

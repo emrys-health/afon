@@ -323,4 +323,43 @@ class StackDefinitionsTest {
             }
         });
     }
+
+    @Test
+    void stackIsNamedByItsIdOrByItsRoleInTheCloud() {
+        assertThat(StackDefinitions.resolve(StackId.parse("aws-tre"))).hasToString("aws-full");
+        assertThat(StackDefinitions.resolve(StackId.parse("AZURE-Catalog"))).hasToString("azure-polaris");
+        assertThat(StackDefinitions.resolve(StackId.parse("aws-identity"))).hasToString("aws-keycloak");
+        // a stack named by its id is itself, with or without a role
+        assertThat(StackDefinitions.resolve(StackId.parse("aws-full"))).hasToString("aws-full");
+        assertThat(StackDefinitions.resolve(StackId.parse("aws-lab"))).hasToString("aws-lab");
+        // otherwise as it is, for the caller to report: no stack of the cloud has the role, or it is not a role or a stack
+        assertThat(StackDefinitions.resolve(StackId.parse("gcp-identity"))).hasToString("gcp-identity");
+        assertThat(StackDefinitions.resolve(StackId.parse("aws-nonesuch"))).hasToString("aws-nonesuch");
+        assertThat(StackDefinitions.resolve(StackId.all(AWS))).isEqualTo(StackId.all(AWS));
+    }
+
+    @Test
+    void aStackDefinedUnderTheIdIsNotMistakenForTheOneWithTheRole(@TempDir Path dir) throws IOException {
+        String before = System.getProperty(StackDefinitions.STACKS_PROPERTY);
+        System.setProperty(StackDefinitions.STACKS_PROPERTY, Files.writeString(dir.resolve("mixed.yaml"), """
+            stacks:
+              aws-tre:
+                role: catalog
+                components: [Polaris]
+              aws-big:
+                role: tre
+                components: [Polaris, Git]
+            """).toString());
+        try {
+            assertThat(StackDefinitions.resolve(StackId.parse("aws-tre"))).hasToString("aws-tre");
+            assertThat(StackDefinitions.resolve(StackId.parse("aws-catalog"))).hasToString("aws-tre");
+            assertThat(StackDefinitions.resolve(StackId.parse("aws-big"))).hasToString("aws-big");
+        } finally {
+            if (before == null) {
+                System.clearProperty(StackDefinitions.STACKS_PROPERTY);
+            } else {
+                System.setProperty(StackDefinitions.STACKS_PROPERTY, before);
+            }
+        }
+    }
 }

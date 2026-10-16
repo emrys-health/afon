@@ -173,12 +173,12 @@ public class DocumentingStepActions extends StepActions {
     @Override
     protected List<String> stackNamesIn(AfonCloud cloud, StackFilter filter) {
         out.println(format("""
-                   For each of the %s in cloud `%s`, ie with a stack dir `%s/%s-<stack-type>` or tofu state
-                   `%s/terraform.%s-<stack-type>.tfstate`, or the legacy stack dir `%s` or tofu state `%s`:
+                   For each of the %s in cloud `%s`, ie with a stack dir `%s/%s-<name>` or tofu state
+                   `%s/terraform.%s-<name>.tfstate`, or the legacy stack dir `%s` or tofu state `%s`:
                    """, filter.description(), cloud, stacksDir(), cloud, ConfigUtils.afonCkdtf(), cloud,
                           legacyStackDir(cloud), legacyTfStatePath(cloud)));
         out.flush();
-        return List.of(cloud + "-<stack-type>");
+        return List.of(cloud + "-<name>");
     }
 
     @Override

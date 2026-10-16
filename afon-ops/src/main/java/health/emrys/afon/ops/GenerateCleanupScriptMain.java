@@ -1,5 +1,6 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.cdk.CleanupHelper;
 import health.emrys.afon.cdk.aws.AwsCleanupHelper;
 import health.emrys.afon.cdk.azure.AzureCleanupHelper;
@@ -66,7 +67,7 @@ public class GenerateCleanupScriptMain {
             logger.warn(usage);
             return;
         }
-        StackId stackId = StackId.parse(args[0]);
+        StackId stackId = StackDefinitions.resolve(StackId.parse(args[0]));
         var properties = new OpsPropertyProvider();
         new GenerateCleanupScriptMain(properties).generateCleanupScript(stackId);
     }

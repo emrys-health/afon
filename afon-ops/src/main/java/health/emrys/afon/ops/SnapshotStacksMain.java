@@ -1,6 +1,8 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.synth.PlanSnapshots;
 
 import java.io.IOException;
@@ -19,16 +21,29 @@ import java.util.List;
  */
 public class SnapshotStacksMain {
 
+    /**
+     * @return the id of the stack named by the arg, as an id or as {@code <cloud>-<role>}, see {@link StackDefinitions#resolve},
+     * or the arg as it is if it is neither, eg the name of a dir of the stacks dir that is not a stack of the stacks file
+     */
+    static String named(String arg) {
+        try {
+            return StackDefinitions.resolve(StackId.parse(arg)).toString();
+        } catch (IllegalArgumentException e) {
+            return arg;
+        }
+    }
+
     public static void main(String[] args) throws IOException {
         if (args.length < 1) {
-            System.out.println("Usage: snapshot-stacks <dir> [<stack-id>...]");
+            System.out.println("Usage: snapshot-stacks <dir> [<stack-id|role>...]");
             System.exit(1);
             return;
         }
         Path stacksDir = Path.of(ConfigUtils.stacksDir());
         List<String> stacks;
         try {
-            stacks = PlanSnapshots.snapshot(stacksDir, Path.of(args[0]), Arrays.asList(args).subList(1, args.length));
+            stacks = PlanSnapshots.snapshot(stacksDir, Path.of(args[0]),
+                                            Arrays.stream(args).skip(1).map(SnapshotStacksMain::named).toList());
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage() + ", synthesise it first, eg with validate-stack");
             System.exit(1);

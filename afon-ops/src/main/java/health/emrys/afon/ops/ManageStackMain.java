@@ -112,11 +112,12 @@ public class ManageStackMain {
     }
 
     /**
-     * @return the stack id of the text, or {@code null} if it is not one
+     * @return the id of the stack named by the text, as an id or as {@code <cloud>-<role>}, see {@link StackDefinitions#resolve},
+     * or {@code null} if it is neither
      */
     private static StackId parseStackId(String text) {
         try {
-            return StackId.parse(text);
+            return StackDefinitions.resolve(StackId.parse(text));
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -127,7 +128,7 @@ public class ManageStackMain {
      */
     StepsProvider runProviderFor(String stackId, String scenario, AfonPropertyProvider properties) {
         try {
-            return factory.scenarios(StackId.parse(stackId), properties).get(scenario);
+            return factory.scenarios(StackDefinitions.resolve(StackId.parse(stackId)), properties).get(scenario);
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -136,7 +137,7 @@ public class ManageStackMain {
     private void printScenarios(String stackId, AfonPropertyProvider properties) {
         Map<String, StepsProvider> scenarios;
         try {
-            scenarios = factory.scenarios(StackId.parse(stackId), properties);
+            scenarios = factory.scenarios(StackDefinitions.resolve(StackId.parse(stackId)), properties);
         } catch (IllegalArgumentException e) {
             scenarios = Map.of();
         }
@@ -151,6 +152,7 @@ public class ManageStackMain {
         System.out.println("  <stack-id> is one of, with its supported actions:");
         factory.supportedActions().forEach((stackId, actions) -> System.out.printf(
             "    %s: %s%n", stackId, actions.stream().map(StackAction::toString).collect(Collectors.joining(", "))));
+        System.out.println("    or <cloud>-<role>, the stack of the cloud with the role catalog, identity or tre, eg aws-tre");
         System.out.println("  <step>, if given, is the step from which to resume");
         System.out.println("Usage: manage-stack run <stack-id> [<scenario> [<step>]], which runs a scenario on a stack that is set up,");
         System.out.println("  or lists the scenarios of the stack, if none is given");

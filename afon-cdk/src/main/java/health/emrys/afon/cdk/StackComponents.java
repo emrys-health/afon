@@ -43,6 +43,15 @@ public final class StackComponents {
     }
 
     /**
+     * @return the name of the kind of component, by which the stacks file refers to it, or empty if it is not among them
+     */
+    public static Optional<String> nameOf(StackComponent component) {
+        return COMPONENTS.entrySet().stream()
+                         .filter(entry -> entry.getValue().get().getClass().equals(component.getClass()))
+                         .map(Map.Entry::getKey).findFirst();
+    }
+
+    /**
      * @return what creates the component with the name, or empty if there is none
      */
     public static Optional<Supplier<StackComponent>> find(String name) {

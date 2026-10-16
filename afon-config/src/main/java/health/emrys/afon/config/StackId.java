@@ -3,7 +3,7 @@ package health.emrys.afon.config;
 import org.jspecify.annotations.NonNull;
 
 /**
- * Identifies a stack as {@code <cloud>-<stack-type>}, named as {@code validate-stack}
+ * Identifies a stack as {@code <cloud>-<name>}, named as {@code validate-stack}
  * names the stacks.  Each stack has its own plan dir and tofu state, see {@link ConfigUtils#stackDir(StackId)}
  * and {@link ConfigUtils#tfStatePath(StackId)}.
  * <p>
@@ -23,13 +23,13 @@ public record StackId(@NonNull AfonCloud cloud, @NonNull String type) implements
     /**
      * Parses a stack id, case-insensitively.
      *
-     * @throws IllegalArgumentException if it isn't {@code <cloud>-<stack-type>}, with a known cloud
+     * @throws IllegalArgumentException if it isn't {@code <cloud>-<name>}, with a known cloud
      */
     public static StackId parse(String stackId) {
         int separator = stackId.indexOf('-');
         if (separator <= 0 || separator == stackId.length() - 1) {
             throw new IllegalArgumentException(
-                String.format("Stack id '%s' is not <cloud>-<stack-type>, eg aws-keycloak", stackId));
+                String.format("Stack id '%s' is not <cloud>-<name>, eg aws-keycloak", stackId));
         }
         String cloud = stackId.substring(0, separator);
         try {

@@ -1,14 +1,29 @@
 # Sourced by the tofu scripts, whose args ($@) are passed on to tofu, after the optional stack id, eg:
 #   afon-cli.sh tofu-plan aws-polaris -target=...
-# Each stack has its own dir stacks/<cloud>-<stack-type> and tofu state terraform.<cloud>-<stack-type>.tfstate,
+# Each stack has its own dir stacks/<cloud>-<name> and tofu state terraform.<cloud>-<name>.tfstate,
 # eg stacks/aws-keycloak, or the legacy stacks/<cloud> and terraform.<cloud>.tfstate shared by all the stacks
-# of the cloud.  If the first arg is the id of a stack with a dir, it is shifted off and tofu runs in that dir.
+# of the cloud.  If the first arg is the id of a stack with a dir, it is shifted off and tofu runs in that dir.  So it is if it is
+# <cloud>-<role>, eg aws-tre, the stack of the cloud with that role in stacks.yaml, if that has a dir, which is looked up by the
+# launcher, or by asking the ops command stack-needs, see scripts/stack/needs-source.sh.
 # Else tofu runs in the dir of the only stack of the cloud with a tofu state, else in the only dir of the cloud,
 # eg a stack synthesised but not yet applied.
 TOFU_DIR=
 if [ -n "${1:-}" ] && [[ "$1" != -* ]] && [ -d "$CDKTF_DIR/stacks/$1" ]; then
   TOFU_DIR="$CDKTF_DIR/stacks/$1"
   shift
+elif [ -n "${1:-}" ] && [[ "$1" =~ ^[A-Za-z]+-[A-Za-z0-9]+$ ]]; then
+  # not the id of a stack with a dir, but may be the role of one in its cloud, which is not an error if it is not: the arg is
+  # then one for tofu, as before
+  TOFU_ARG_LOWER=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+  case "$TOFU_ARG_LOWER" in
+    aws-*|azure-*|gcp-*)
+      source $AFON_ROOT/scripts/stack/needs-source.sh
+      unset AFON_STACK_ID
+      if stack_needs "${TOFU_ARG_LOWER%%-*}" "$TOFU_ARG_LOWER" >/dev/null 2>&1 && [ -d "$CDKTF_DIR/stacks/${AFON_STACK_ID:-/}" ]; then
+        TOFU_DIR="$CDKTF_DIR/stacks/$AFON_STACK_ID"
+        shift
+      fi ;;
+  esac
 fi
 TOFU_CLOUD="$CLOUD"
 if [ -z "$TOFU_CLOUD" ] || [ "$TOFU_CLOUD" == "ALL" ]; then

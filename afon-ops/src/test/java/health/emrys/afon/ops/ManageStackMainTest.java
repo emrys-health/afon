@@ -22,6 +22,20 @@ class ManageStackMainTest {
     }
 
     @Test
+    void canNameAStackByItsRoleInTheCloudAsWellAsByItsId() {
+        assertThat(manager.stepsProviderFor("setup", "aws-tre")).isNotNull();
+        assertThat(manager.stepsProviderFor("deploy", "AZURE-Catalog", true)).isNotNull();
+        assertThat(manager.stepsProviderFor("delete", "aws-identity")).isNotNull();
+        // no stack of gcp has the role identity
+        assertThat(manager.stepsProviderFor("setup", "gcp-identity")).isNull();
+        // the scenarios of the stack with the role are those of the stack: the snowflake stack has no role, the full one has none
+        AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
+        assertThat(manager.runProviderFor("aws-tre", "external-azure", properties) != null)
+            .isEqualTo(manager.runProviderFor("aws-full", "external-azure", properties) != null);
+        assertThat(manager.runProviderFor("aws-tre", "reading-azure", properties)).isNull();
+    }
+
+    @Test
     void canManageEveryStackDefined() {
         // including those that no command managed before, as they are made of components
         assertThat(manager.stepsProviderFor("deploy", "azure-full")).isNotNull();

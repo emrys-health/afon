@@ -1,12 +1,26 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
-# The id of the stack the env is created for, one of aws-keycloak, aws-polaris, aws-full, which is required, as what the
-# env needs depends on it, eg the bucket of Gitea, which aws-full deploys.
+# The stack the env is created for, given as its id, or its role in the cloud (identity, catalog or tre), which is required,
+# as what the env needs depends on it, eg the bucket of Gitea, which the stacks deploying Git need.  What the stack needs is
+# looked up in stacks.yaml and given as the AFON_STACK_* env vars: AFON_STACK_ID, AFON_STACK_ROLE, AFON_STACK_DOMAINS and
+# AFON_STACK_COMPONENTS, by the launcher when run by afon-cli.sh, see ScriptMain, else by asking the ops command stack-needs,
+# as when run by afon.sh, see scripts/stack/needs-source.sh.
 STACK_ID="${1:-}"
-case "$STACK_ID" in
-  aws-*) ;;
-  *) echo "-- Requires the id of the stack the env is created for: aws-create <aws-keycloak|aws-polaris|aws-full>"; exit 1 ;;
-esac
+if [ -z "$STACK_ID" ]; then
+  echo "-- Requires the stack the env is created for, by its id or role: aws-create <stack-id|identity|catalog|tre>"
+  exit 1
+fi
+source $AFON_ROOT/scripts/stack/needs-source.sh
+stack_needs aws "$STACK_ID" || exit 1
+STACK_ID="$AFON_STACK_ID"
+
+# Whether the stack deploys the kind of component, as named in stacks.yaml, eg Git.
+has_component() {
+  case " ${AFON_STACK_COMPONENTS:-} " in
+    *" $1 "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 IFS=',' read -ra CATALOG_IDS <<< "$AWS_CATALOG_IDS"
 
@@ -77,9 +91,9 @@ for ID in "${CATALOG_IDS[@]}"; do
     }"
 done
 
-# Gitea, deployed by aws-full, keeps its blobs in a bucket of its own (which may be a catalog's), which it reaches with
-# AWS_ACCESS_KEY_ID, so it is not in the whitelist of the role.
-if [ "$STACK_ID" = "aws-full" ]; then
+# Gitea, deployed by the stacks with Git, keeps its blobs in a bucket of its own (which may be a catalog's), which it reaches
+# with AWS_ACCESS_KEY_ID, so it is not in the whitelist of the role.
+if has_component Git; then
   if [ -z "${AWS_GITEA_BUCKET:-}" ]; then
     echo "-- AWS_GITEA_BUCKET is not set, which stack '$STACK_ID' needs for Gitea's bucket"
     exit 1

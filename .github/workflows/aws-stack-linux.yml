@@ -265,14 +265,14 @@ jobs:
         env:
           STACK_ID: ${{ inputs.stack_id }}
         run: |
-          # The cluster of each stack is named <stack-type>-<CLUSTER_NAME>, eg for stack_id aws-keycloak
+          # The command takes a stack by its id or its role: aws-all stands for the stacks with each of the roles
           if [ "$STACK_ID" == "aws-all" ]; then
-            STACK_TYPES="keycloak polaris full"
+            STACKS="identity catalog tre"
           else
-            STACK_TYPES="${STACK_ID#aws-}"
+            STACKS="$STACK_ID"
           fi
-          for STACK_TYPE in $STACK_TYPES; do
-            ./afon.sh -a aws-cluster "$STACK_TYPE"
+          for STACK in $STACKS; do
+            ./afon.sh -a aws-cluster "$STACK"
           done
           kubectl get pods -A
 

@@ -1,15 +1,19 @@
 # Shared by the AWS status scripts, eg aws/polaris.sh and aws/keycloak.sh, which source it after the source of
 # what they check, eg kube/polaris-source.sh.  Not run on its own.
 
-# aws_status_find_stack <stack type given, or empty> <stack types>...: sets STACK_CLUSTER_NAME, and so
-# STATUS_CLUSTER_NAME, to the cluster <stack-type>-<CLUSTER_NAME> of the stack of the given type, else of the one
-# running among the stack types, found by its EKS cluster: as they hold a common exclusive resource, eg a domain name,
-# only one of them runs at a time.  Reports FAILED if none runs, leaving STACK_CLUSTER_NAME empty, and could not
-# verify if more than one does.
+# aws_status_find_stack <stack id given, or empty> <stack ids>...: sets STACK_CLUSTER_NAME, and so
+# STATUS_CLUSTER_NAME, to the cluster <stack>-<CLUSTER_NAME> of the stack given, else of the one running among the
+# stacks, found by its EKS cluster: as they hold a common exclusive resource, eg a domain name, only one of them runs at a
+# time.  Reports FAILED if none runs, leaving STACK_CLUSTER_NAME empty, and could not verify if more than one does.
+# The launcher gives the stack, or else the stacks that can serve what the script checks, see ScriptMain.
 aws_status_find_stack() {
-  local given="$1" types clusters found="" type cluster
+  local given="$1" ids types="" clusters found="" type cluster id
   shift
-  types="$*"
+  ids="$*"
+  for id in $ids; do
+    types="$types ${id#aws-}"
+  done
+  types="${types# }"
   STACK_CLUSTER_NAME=
   if [ -n "$given" ]; then
     source $AFON_ROOT/scripts/aws/stack-source.sh "$given"
@@ -25,9 +29,9 @@ aws_status_find_stack() {
       done
     done
     case $(echo $found | wc -w | tr -d ' ') in
-      0) status_failed "No stack serving $STATUS_SUBJECT found, ie no EKS cluster <stack-type>-$CLUSTER_NAME, for stack types: $types" ;;
+      0) status_failed "No stack serving $STATUS_SUBJECT found, ie no EKS cluster <stack>-$CLUSTER_NAME, for stacks: ${ids:-none}" ;;
       1) STACK_CLUSTER_NAME=$(echo $found) ;;
-      *) status_cannot_verify "- More than one stack serving $STATUS_SUBJECT found:$found.  Give the stack type as argument, eg ${types%% *}" ;;
+      *) status_cannot_verify "- More than one stack serving $STATUS_SUBJECT found:$found.  Give the stack as argument, by its id or its role, eg ${ids%% *}" ;;
     esac
   fi
   STATUS_CLUSTER_NAME="$STACK_CLUSTER_NAME"

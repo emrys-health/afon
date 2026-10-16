@@ -18,7 +18,7 @@
 #   ./estimator.sh <stack-id|stack-dir> [<nodes>] [<vm-size>]
 #
 #   stack-id    The stack, eg azure-full, whose plan is in $CDKTF_DIR/stacks/<stack-id>, synthesised by validate-stack or
-#               deploy.  Or its dir.
+#               deploy.  Or <cloud>-<role>, eg azure-tre, if run by afon-cli.sh or afon.sh.  Or its dir.
 #   nodes       The number of nodes of the cluster.  Defaults to 3.
 #   vm-size     The size of the nodes, one of the ones known, see ALLOCATABLE below.  Defaults to Standard_D2s_v3.
 #
@@ -75,10 +75,26 @@ yaml_to_json() {
   esac
 }
 
+STACKS_DIR="${CDKTF_DIR:-${AFON_CDKTF:-$HOME/.afon/cdktf}}/stacks"
+# The stack may also be given as <cloud>-<role>, eg azure-tre, the stack of the cloud with the role in stacks.yaml, which is
+# looked up by the launcher, or by asking the ops command stack-needs, see scripts/stack/needs-source.sh: only if there is
+# one to ask, ie the script is run by afon-cli.sh or afon.sh, and the arg is not a dir or the id of a stack with a plan
+if [ ! -d "$STACK" ] && [ ! -d "$STACKS_DIR/$STACK" ] && [[ "$STACK" =~ ^[A-Za-z]+-[A-Za-z0-9]+$ ]] \
+   && [ -f "${AFON_ROOT:-/nonexistent}/scripts/stack/needs-source.sh" ]; then
+  STACK_LOWER=$(echo "$STACK" | tr '[:upper:]' '[:lower:]')
+  case "$STACK_LOWER" in
+    aws-*|azure-*|gcp-*)
+      source "$AFON_ROOT/scripts/stack/needs-source.sh"
+      unset AFON_STACK_ID
+      if stack_needs "${STACK_LOWER%%-*}" "$STACK_LOWER" >/dev/null 2>&1 && [ -n "${AFON_STACK_ID:-}" ]; then
+        STACK="$AFON_STACK_ID"
+      fi ;;
+  esac
+fi
 if [ -d "$STACK" ]; then
   STACK_DIR="$STACK"
 else
-  STACK_DIR="${CDKTF_DIR:-${AFON_CDKTF:-$HOME/.afon/cdktf}}/stacks/$STACK"
+  STACK_DIR="$STACKS_DIR/$STACK"
 fi
 if [ ! -f "$STACK_DIR/cdk.tf.json" ]; then
   echo "No plan at $STACK_DIR/cdk.tf.json: synthesise the stack first, eg: afon-cli.sh validate-stack $STACK" >&2

@@ -13,7 +13,7 @@ Usage:
   afon-cli.sh validate-stack <stack-id> [--runs <n>]
   afon-cli.sh validate-stack --export-stacks
 
-<stack-id> is <cloud>-<stack-type>, eg azure-polaris.  Without a stack id, lists the stacks.
+<stack-id> is <cloud>-<name>, eg azure-polaris.  Without a stack id, lists the stacks. It can also be <cloud>-<role>, the stack of the cloud with the role catalog, identity or tre in stacks.yaml, eg aws-tre, unless a stack is defined under that id.
 
 The stacks are those of the stacks.yaml in the config dir, if there is one, else of the one bundled in the jar.  If the file is
 not valid, the command fails, naming the file and the problem.

@@ -3,6 +3,9 @@ package health.emrys.afon.ops.scripts;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -30,9 +33,73 @@ import static java.lang.String.format;
 public class ScriptMain {
 
     private final String scriptPath;
+    private String stackCloud;
+    private String servingComponent;
 
     public ScriptMain(String scriptPath) {
         this.scriptPath = scriptPath;
+    }
+
+    /**
+     * For a script that takes a stack, given as its id or its role in the cloud, eg {@code tre}: the stack is found in the stacks
+     * file before the script runs, and what it needs is given to the script as {@code AFON_STACK_*} env vars, see
+     * {@link StackNeeds#env()}, so that the script need not know the stacks.  The argument given to the script is the id.
+     * (A script run by {@code afon.sh}, which has no JVM, asks the ops command {@code stack-needs} for the same, see
+     * {@code scripts/stack/needs-source.sh}.)
+     *
+     * @param cloud the cloud of the script, eg {@code aws}
+     * @return this
+     */
+    public ScriptMain takingStackOf(String cloud) {
+        this.stackCloud = cloud;
+        return this;
+    }
+
+    /**
+     * For a script that checks the stack serving a kind of component, eg Polaris, which it is given, or else finds among the
+     * running stacks that can serve it: the script is also given them, as {@code AFON_STACK_CANDIDATES}, the ids separated by
+     * spaces, when it is not given a stack.  Needs {@link #takingStackOf}.
+     *
+     * @param component the name of the component, as in the stacks file, eg {@code Polaris}
+     * @return this
+     */
+    public ScriptMain servingComponent(String component) {
+        this.servingComponent = component;
+        return this;
+    }
+
+    /**
+     * Finds the stack among the args of the script, ie the first that is not a boolean flag such as {@code true}, as
+     * {@code azure-create [true|false] <stack>} takes them in any order, and replaces it with the id of the stack.
+     *
+     * @param env receives what the stack needs
+     * @return the args, with the stack as an id, or unchanged if none of them is a stack, which the script reports
+     * @throws IllegalArgumentException if it is not a stack of the cloud that the stacks file defines
+     */
+    static List<String> withStackResolved(AfonCloud cloud, List<String> args, AfonPropertyProvider properties,
+                                          Map<String, String> env) {
+        return withStackResolved(cloud, args, properties, env, null);
+    }
+
+    /**
+     * As above and, if a component is given and none of the args is a stack, gives the stacks that serve it in
+     * {@code AFON_STACK_CANDIDATES}, see {@link #servingComponent}.
+     */
+    static List<String> withStackResolved(AfonCloud cloud, List<String> args, AfonPropertyProvider properties,
+                                          Map<String, String> env, String component) {
+        List<String> resolved = new ArrayList<>(args);
+        for (int i = 0; i < resolved.size(); i++) {
+            String arg = resolved.get(i);
+            if (arg.equals("true") || arg.equals("false")) {
+                continue;
+            }
+            StackNeeds needs = StackNeeds.resolve(cloud, arg, properties);
+            resolved.set(i, needs.id().toString());
+            env.putAll(needs.env());
+            return resolved;
+        }
+        env.putAll(StackNeeds.env(cloud, null, component, properties));
+        return resolved;
     }
 
     public void run(String... args) {
@@ -52,6 +119,11 @@ public class ScriptMain {
                 case "--env", "-e" -> env.put("AFON_ENV", value(args, ++i, arg));
                 default -> scriptArgs.add(arg);
             }
+        }
+
+        if (stackCloud != null) {
+            scriptArgs = withStackResolved(AfonCloud.valueOf(stackCloud.toUpperCase()), scriptArgs, new OpsPropertyProvider(), env,
+                                           servingComponent);
         }
 
         try {

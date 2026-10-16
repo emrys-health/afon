@@ -36,7 +36,10 @@ afon-cli.sh manage-stack <action> <stack-id> [<step>] [--replace]  # run without
 ```
 where:
 - `<action>` is one of `delete`, `deploy` or `setup`;
-- `<stack-id>` is `<cloud>-<stack-type>`, eg `aws-keycloak`, named as `validate-stack` lists the stacks.
+- `<stack-id>` is `<cloud>-<name>`, eg `aws-keycloak`, named as `validate-stack` lists the stacks. It can also be
+  `<cloud>-<role>`, the stack of the cloud with that role in `stacks.yaml` (`catalog`, `identity` or `tre`), eg `aws-tre`, unless a
+  stack is defined under that id, so that it works whatever the ids are. `validate-stack`, `generate-cleanup-script` and the other
+  commands taking a stack id accept it too, and so do the scripts (`aws-create`, `aws-cluster`, `tofu-plan`, the kube estimator and so on), which, as their name has the cloud, also take the role alone, eg `aws-create tre`.
   Every defined stack is listed: `aws-full`, `aws-keycloak`, `aws-polaris`, `aws-jupyter`, `aws-spark`, `aws-trino`,
   `aws-snowflake`, `azure-full`, `azure-keycloak`, `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
 - `<step>`, if given, is the step from which to resume a failed run (see
@@ -121,7 +124,7 @@ list its steps with `manage-stack run <flow> --dry-run`.
 
 ### Stacks side by side
 
-**NOTE:** Only AWS and Azure have more than one stack type for now, so only their stacks can run side by side: GCP has a single stack type, `gcp-polaris`, although the same rules apply to it.  The AKS cluster, network and identity of an Azure stack are named `<stack-type>-<name>`, eg `keycloak-aks-vnet` and `keycloak-<CLUSTER_NAME>`, as on AWS, so the stacks of a resource group don't collide.
+**NOTE:** Only AWS and Azure have more than one stack for now, so only their stacks can run side by side: GCP has a single stack, `gcp-polaris`, although the same rules apply to it.  The AKS cluster, network and identity of an Azure stack are named `<stack-type>-<name>`, eg `keycloak-aks-vnet` and `keycloak-<CLUSTER_NAME>`, as on AWS, so the stacks of a resource group don't collide.
 
 Each stack has its own `tofu` state, so stacks run side by side, unless they conflict, ie they hold a common exclusive
 resource: the DNS record of a domain name, eg `OIDC_DOMAIN_NAME`, or the pinned egress IP `AWS_EGRESS_IP`, which only
@@ -197,7 +200,7 @@ ls $AFON_CDKTF/*.tfstate
 ```
 A legacy `stacks/<cloud>` dir without a `terraform.<cloud>.tfstate`, eg left from synthesising a stack without
 deploying it, has nothing deployed, so it doesn't make `deploy` or `setup` fail: they just delete it.
-On AWS, the stacks now also name their components from `<stack-type>-<CLUSTER_NAME>` rather than `CLUSTER_NAME`, see
+On AWS, the stacks now also name their components from `<stack>-<CLUSTER_NAME>` rather than `CLUSTER_NAME`, see
 [AWS](#aws): the legacy stack keeps its old names until it is deleted, which its own plan and state take care of.
 The [AWS stack workflow](github_workflows.md#stack-aws-workflow) runs with `--replace`, so it deletes the legacy stack of its runner's cdktf dir on its first run, without failing.
 
@@ -228,7 +231,7 @@ afon-cli.sh validate-stack --export-stacks
 Then edit `$AFON_HOME/config/stacks.yaml`.  Nothing else needs to change:
 `validate-stack`, `manage-stack` and its docs (`manage-stack <action> <stack-id> -h`) take their stacks from it.
 
-Each stack is `<cloud>-<stack-type>`, and the ordered list of the components it deploys, each after those before it:
+Each stack is `<cloud>-<name>`, and the ordered list of the components it deploys, each after those before it:
 ```yaml
 stacks:
   aws-lab:
@@ -399,7 +402,7 @@ stack, and `delete <cloud>-all` deletes every stack deployed in the cloud, see [
 
 The afon-cdk module generates the Terraform plan using the cdktf API to manage the cloud environment and delegates it to tofu to execute it.   The afon-cdk module writes to the cdktf dir, which can be set either via option `--cdktf` in `afon.sh` or via env variable `AFON_CDKTF`.  It defaults to `$AFON_HOME/cdktf`.
 
-Each stack has its own cdktf plan and Terraform state, named by its stack id `<cloud>-<stack-type>`, eg `aws-keycloak`:
+Each stack has its own cdktf plan and Terraform state, named by its stack id `<cloud>-<name>`, eg `aws-keycloak`:
 the cdktf plan is written to `$AFON_CDKTF/stacks/<stack-id>` and the cdktf dir also holds the Terraform state files
 `$AFON_CDKTF/terraform.<stack-id>.tfstate`.
 
@@ -407,7 +410,7 @@ Each AWS stack also has its own kubeconfig `$AFON_CDKTF/kube/<stack-id>.config`,
 written when its EKS cluster is created and deleted with the stack.  All the kubectl and helm commands the stack runs,
 eg the cleanups when it is destroyed, use it via `KUBECONFIG`, so they only ever act on the stack's own cluster,
 whichever cluster your current kubectl context points at.  Creating the cluster also points your current kubectl context
-(`~/.kube/config`) at it, as `afon-cli.sh aws-update-kube-config <stack-type>` does, eg for the smoke tests.
+(`~/.kube/config`) at it, as `afon-cli.sh aws-update-kube-config <stack-id|role>` does, eg for the smoke tests.
 
 **NOTE:** Before each stack had its own, the stacks of a cloud shared the plan `$AFON_CDKTF/stacks/<cloud>` and state `$AFON_CDKTF/terraform.<cloud>.tfstate`, where `<cloud>={aws,azure,gcp}`.  A stack still deployed with these is the legacy stack of its cloud, see [upgrading to per-stack state](#upgrading-to-per-stack-state-one-off).
 
@@ -415,7 +418,8 @@ You can run tofu apply or destroy commands via
 ```shell
 afon-cli.sh tofu-{apply,destroy}
 ```
-Given a stack id as first arg, eg `afon-cli.sh tofu-plan aws-polaris`, they run in its stack dir.  Else they run in
+Given a stack id as first arg, eg `afon-cli.sh tofu-plan aws-polaris`, or its role in the cloud as `<cloud>-<role>`, eg `afon-cli.sh tofu-plan aws-tre`
+(looked up in `stacks.yaml` by `afon-cli.sh` and `afon.sh` alike), they run in its stack dir.  Else they run in
 the dir of the only stack deployed in the cloud given by `--cloud` (default `aws`), ie the stack dir with a Terraform
 state, else the only stack dir of the cloud.
 **NOTE:** The `ops.Deploy*Main` classes generate the plan and execute it without needing the `tofu-apply` execution.
@@ -472,15 +476,17 @@ You may need to run them multiple times for the VPC to disappear from your cloud
 
 ### AWS
 
-The AWS components of each stack are named from its cluster name `<stack-type>-<CLUSTER_NAME>`, eg
+The AWS components of each stack are named from its cluster name `<stack>-<CLUSTER_NAME>`, where `<stack>` is the stack id without the cloud, eg
 `keycloak-emrys-cluster` for stack `aws-keycloak`: its EKS cluster, its VPC `cdktf-eks-vpc-<cluster-name>`, its subnets,
-its IAM roles and so on.  So the AWS scripts acting on a stack are given its stack type, eg:
+its IAM roles and so on.  The AWS scripts acting on a stack are given the stack, either by its id, eg `aws-full`, or by its role
+in the cloud in `stacks.yaml`, ie `identity`, `catalog` or `tre`, which `afon-cli.sh` and `afon.sh` resolve to the stack and its cluster name, eg:
 ```shell
-afon-cli.sh aws-cluster keycloak             # is the EKS cluster up?
-afon-cli.sh aws-update-kube-config keycloak  # point kubectl at the EKS cluster
+afon-cli.sh aws-cluster identity             # is the EKS cluster up?
+afon-cli.sh aws-update-kube-config tre       # point kubectl at the EKS cluster
 ```
-Checking Polaris or KeyCloak needs no stack type, as only one of the stacks serving each runs at a time: it is found
-by its EKS cluster, unless given, eg `aws-polaris full` or `aws-keycloak keycloak`:
+Checking Polaris or KeyCloak needs no stack, as only one of the stacks serving each runs at a time: it is found
+by its EKS cluster among the stacks that deploy it, which `afon-cli.sh` and `afon.sh` take from `stacks.yaml`, unless given, eg `aws-polaris tre` or
+`aws-keycloak identity`:
 ```shell
 afon-cli.sh aws-polaris                      # is Polaris serving?
 afon-cli.sh aws-keycloak                     # is KeyCloak serving?
@@ -488,9 +494,9 @@ afon-cli.sh aws-keycloak                     # is KeyCloak serving?
 They check each layer in turn, one line each: the login, the stack's VPC and EKS cluster, its pod and ingress, then
 real HTTPS requests, anonymously and as the Polaris admin (`POLARIS_ID`).  For KeyCloak these are its master realm,
 which shows it serving, its realm `polaris`, which shows it set up, and a token for the Polaris admin.  The stacks
-serving KeyCloak are `aws-keycloak`, and `aws-full` unless `AWS_KEYCLOAK_EXTERNAL=true`.
+serving KeyCloak are those that deploy it, which the stacks with their own KeyCloak do not if `AWS_KEYCLOAK_EXTERNAL=true`.
 The IAM role names are limited to 64 chars, so `CLUSTER_NAME` must be short enough for
-`AmazonEKSLoadBalancerControllerRole<stack-type>-<CLUSTER_NAME>`, which a stack checks when it is synthesised.
+`AmazonEKSLoadBalancerControllerRole<stack>-<CLUSTER_NAME>`, which a stack checks when it is synthesised.
 
 **NOTE:** Before each stack had its own cluster name, the components were named from `CLUSTER_NAME` alone.
 
@@ -498,7 +504,7 @@ To check the AWS VPC has been destroyed:
 
 ```shell
 afon-cli.sh aws-vpcs             # the VPCs of every stack of this env, same as: afon-cli-scripts.sh aws/vpcs.sh
-afon-cli.sh aws-vpcs <stack-type>  # the VPC of the stack of the type, eg keycloak
+afon-cli.sh aws-vpcs <stack-id|role>  # the VPC of the stack, by its id or its role, eg identity
 ```
 
 And if all else fails, login to the [AWS VPC Console](https://eu-west-2.console.aws.amazon.com/vpcconsole/home?region=eu-west-2#vpcs:)
@@ -506,20 +512,20 @@ And if all else fails, login to the [AWS VPC Console](https://eu-west-2.console.
 
 ### Azure
 
-The Azure components of each stack are named from its stack type, like the AWS ones: its AKS cluster is `<stack-type>-<CLUSTER_NAME>`, eg
-`keycloak-emrys-cluster` for stack `azure-keycloak`, and its network and identity `<stack-type>-aks-vnet` and `<stack-type>-aks-identity`.
-So the Azure scripts acting on a stack are given its stack type, eg:
+The Azure components of each stack are named from its id, like the AWS ones: its AKS cluster is `<stack>-<CLUSTER_NAME>`, where `<stack>` is the stack id without the cloud, eg
+`keycloak-emrys-cluster` for stack `azure-keycloak`, and its network and identity `<stack>-aks-vnet` and `<stack>-aks-identity`.
+So the Azure scripts acting on a stack are given the stack, by its id or its role (`identity`, `catalog` or `tre`), as on AWS, eg:
 ```shell
-afon-cli.sh azure-cluster keycloak             # is the AKS cluster up?
-afon-cli.sh azure-update-kube-config keycloak  # point kubectl at the AKS cluster
+afon-cli.sh azure-cluster identity             # is the AKS cluster up?
+afon-cli.sh azure-update-kube-config tre       # point kubectl at the AKS cluster
 ```
-Checking Polaris or KeyCloak needs no stack type either, as only one of the stacks serving each runs at a time: it is found by its AKS
-cluster in `AZURE_RESOURCE_GROUP`, unless given, eg `azure-polaris full` or `azure-keycloak keycloak`:
+Checking Polaris or KeyCloak needs no stack either, as only one of the stacks serving each runs at a time: it is found by its AKS
+cluster in `AZURE_RESOURCE_GROUP` among the stacks that deploy it, unless given, eg `azure-polaris tre` or `azure-keycloak identity`:
 ```shell
 afon-cli.sh azure-polaris                    # is Polaris serving?
 afon-cli.sh azure-keycloak                   # is KeyCloak serving?
 ```
-They check the same layers as on AWS.  The stacks serving KeyCloak are `azure-keycloak`, and `azure-full` unless `AZURE_KEYCLOAK_EXTERNAL=true`.
+They check the same layers as on AWS.  The stacks serving KeyCloak are those that deploy it, which the stacks with their own KeyCloak do not if `AZURE_KEYCLOAK_EXTERNAL=true`.
 
 #### Estimating the capacity of the cluster
 
@@ -545,7 +551,7 @@ az group delete --name afon_resource_group_aks --yes --no-wait
 ## Summary of deployment commands
 
 ```shell
-# Any stack: <action>={delete|deploy|setup}, <stack-id>=<cloud>-<stack-type>, eg aws-keycloak
+# Any stack: <action>={delete|deploy|setup}, <stack-id>=<cloud>-<name>, eg aws-keycloak
 afon-cli.sh manage-stack <action> <stack-id>
 
 # AWS full stack (Keycloak + Polaris + Spark + Jupyter)
