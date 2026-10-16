@@ -3,5 +3,6 @@
 #catalogs are colon-separated catalog names for which the user is authorised:
 #  'all' authorises every catalog, a '!' prefix excludes a catalog, and '*' is a wildcard,
 #  e.g. all:!aws_forbidden or all:!*_forbidden. Exclusions win over inclusions.
-mauro,azure:azure_external
+mauro,all
 phil,all
+will,all:!*_forbidden

@@ -508,6 +508,11 @@ And if all else fails, login to the [AWS VPC Console](https://eu-west-2.console.
 
 The Azure components of each stack are named from its stack type, like the AWS ones: its AKS cluster is `<stack-type>-<CLUSTER_NAME>`, eg
 `keycloak-emrys-cluster` for stack `azure-keycloak`, and its network and identity `<stack-type>-aks-vnet` and `<stack-type>-aks-identity`.
+So the Azure scripts acting on a stack are given its stack type, eg:
+```shell
+afon-cli.sh azure-cluster keycloak             # is the AKS cluster up?
+afon-cli.sh azure-update-kube-config keycloak  # point kubectl at the AKS cluster
+```
 Checking Polaris or KeyCloak needs no stack type either, as only one of the stacks serving each runs at a time: it is found by its AKS
 cluster in `AZURE_RESOURCE_GROUP`, unless given, eg `azure-polaris full` or `azure-keycloak keycloak`:
 ```shell

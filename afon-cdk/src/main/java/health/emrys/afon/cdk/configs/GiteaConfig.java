@@ -23,6 +23,7 @@ import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -77,6 +78,11 @@ public class GiteaConfig {
     /** Gitea requires an email, which {@code users.csv} does not; Gitea's own placeholder domain. */
     private static final String NO_EMAIL_DOMAIN = "noreply.localhost";
     private static final int    DB_PORT     = 5432;
+    /**
+     * Gitea's default minimum length of a password, which it enforces on the users it creates, the admin too: its
+     * {@code create-users} init container fails otherwise, so the pod never starts and the release times out.
+     */
+    static final         int    MIN_PASSWORD_LENGTH = 8;
 
     /**
      * Keys of {@link #SECRET_NAME}: the admin's, as the chart expects them, then app.ini sections, then Postgres'.
@@ -177,7 +183,9 @@ public class GiteaConfig {
     Map<String, String> secretData() {
         Map<String, String> data = new LinkedHashMap<>();
         data.put(ADMIN_USERNAME_KEY, properties.getValue(GITEA_ADMIN_USERNAME));
-        data.put(ADMIN_PASSWORD_KEY, properties.getValue(GITEA_ADMIN_PASSWORD));
+        data.put(ADMIN_PASSWORD_KEY, checkedPassword(properties.getValue(GITEA_ADMIN_PASSWORD),
+                                                    "the Gitea admin " + properties.getValue(GITEA_ADMIN_USERNAME)
+                                                    + " (GITEA_ADMIN_PASSWORD)"));
         data.put(DATABASE_SECTION_KEY, iniSection(databaseSection()));
         data.put(STORAGE_SECTION_KEY, iniSection(storageSection()));
         data.put(DB_PASSWORD_KEY, properties.getValue(GITEA_DB_PASSWORD));
@@ -194,8 +202,22 @@ public class GiteaConfig {
         return users.getUsers()
                     .stream()
                     .filter(user -> !user.username().equals(admin))
-                    .map(user -> user.username() + "," + email(user) + "," + user.password() + "\n")
+                    .map(user -> user.username() + "," + email(user) + ","
+                                 + checkedPassword(user.password(), "user " + user.username() + " of users.csv") + "\n")
                     .collect(Collectors.joining());
+    }
+
+    /**
+     * @param password the password, which is never in the message
+     * @param owner    whose it is, for the message
+     * @throws IllegalArgumentException if it is shorter than {@link #MIN_PASSWORD_LENGTH}
+     */
+    private static String checkedPassword(String password, String owner) {
+        if (password == null || password.length() < MIN_PASSWORD_LENGTH) {
+            throw new IllegalArgumentException(String.format(
+                "The password of %s is not set or shorter than %d characters, which Gitea requires", owner, MIN_PASSWORD_LENGTH));
+        }
+        return password;
     }
 
     private static String email(AfonUser user) {
@@ -220,6 +242,11 @@ public class GiteaConfig {
      */
     Map<String, String> storageSection() {
         String              bucket  = properties.getCloudValue(cloud, "GITEA_BUCKET");
+        if (bucket.isBlank()) {
+            throw new IllegalArgumentException(cloud.toString().toUpperCase(Locale.ROOT)
+                                               + "_GITEA_BUCKET is not set, which Gitea needs for its storage, so create it with "
+                                               + cloud + "-create and set it");
+        }
         Map<String, String> section = new LinkedHashMap<>();
         switch (cloud) {
             case AWS -> {

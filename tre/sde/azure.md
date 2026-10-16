@@ -91,6 +91,15 @@ Finally, to create the env:
 afon-cli.sh azure-create <azure-full|azure-keycloak|azure-polaris>
 ```
 
+`azure-create` ends by checking that `AZURE_CONNECTION_STRING` is the connection string of the storage account, which it is not if the account was recreated, eg with its resource group, as it then has new keys.  Get the current one with:
+```shell
+az storage account show-connection-string --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_STORAGE_ACCOUNT --query connectionString -o tsv
+```
+and set it in `secret-azure.properties`.  Check it at any time with:
+```shell
+afon-cli.sh azure-check-storage
+```
+
 Once the env is created, you can issue a TLS certificate for the Polaris domain name and store it in the Azure Key Vault (AKV)
 
 Set in `afon-azure.properties`

@@ -200,5 +200,9 @@ fi
 
 warn_if_operational_identity_can_manage_roles $ASSIGNEE_ID
 
+# The account may have been recreated, which gives it new keys, so that the connection string of the config is stale: say so
+# now, not when what uses it fails to start.  It is also not set on the first run, as it is only known once the account exists.
+source $AFON_ROOT/scripts/azure/check-storage.sh || echo "-- Set AZURE_CONNECTION_STRING, then check it with: afon-cli.sh azure-check-storage"
+
 echo "Env created."
 
