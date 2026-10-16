@@ -51,7 +51,7 @@ public class SynthesisSupport {
             "POLARIS_DB_HOST", "POLARIS_DB_PASSWORD", "POLARIS_ID", "POLARIS_SECRET", "KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME",
             "KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD", "KEYCLOAK_DB_PASSWORD", "GUACAMOLE_DB_HOST", "GUACAMOLE_DB_USERNAME",
             "GUACAMOLE_DB_PASSWORD", "OAUTH2_CLIENT_ID", "OAUTH2_CLIENT_SECRET", "OAUTH2_COOKIE_SECRET",
-            "JUPYTER_VNC_PASSWORD")) {
+            "JUPYTER_VNC_PASSWORD", "GITEA_ADMIN_PASSWORD", "AWS_GITEA_BUCKET", "AZURE_GITEA_BUCKET", "GCP_GITEA_BUCKET")) {
             values.put(name, "golden-" + name.toLowerCase().replace('_', '-'));
         }
         // production code parses it, eg for Gitea's blob storage, so it must be well-formed

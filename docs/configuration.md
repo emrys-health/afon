@@ -170,6 +170,9 @@ will,all:!aws_forbidden:!azure_forbidden:!gcp_forbidden
 jane,all:!*_forbidden
 ```
 
+Setting up a stack gives KeyCloak the users of `users.csv`: those it lacks are created, and those it has get the password
+from `users.csv`, so a password changed in KeyCloak is reset by the next setup, as the KeyCloak database outlives the stacks.
+
 Gitea is given the users of `users.csv` every time its pod starts: those it lacks are created, and those it has get
 the password from `users.csv`, so a password changed in Gitea is reset by its next restart.  A user without an
 email is given `<username>@noreply.localhost`.  Users removed from `users.csv` stay in Gitea, with their repositories,

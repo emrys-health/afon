@@ -710,28 +710,48 @@ public class KeyCloakProvider implements IdentityProvider {
         // when the realm has duplicateEmailsAllowed=false. In the latter case the user is NOT created,
         // so silently treating the 409 as success (as postJson does) leaves logins failing with
         // user_not_found. Confirm the user really exists; if not, fail loudly with the likely cause.
-        if (code == HttpStatus.SC_CONFLICT && !userExists(adminToken, realm, user.username())) {
-            throw new IOException(format(
-                "Could not create KeyCloak user '%s' in realm '%s': HTTP 409 but no user with that "
-                + "username exists. The email '%s' is most likely already held by another user "
-                + "(realm duplicateEmailsAllowed=false).", user.username(), realm, user.email()));
+        if (code == HttpStatus.SC_CONFLICT) {
+            String id = userId(adminToken, realm, user.username());
+            if (id == null) {
+                throw new IOException(format(
+                    "Could not create KeyCloak user '%s' in realm '%s': HTTP 409 but no user with that "
+                    + "username exists. The email '%s' is most likely already held by another user "
+                    + "(realm duplicateEmailsAllowed=false).", user.username(), realm, user.email()));
+            }
+            // The POST leaves the credentials of an existing user as they were, eg those of an earlier setup, as the
+            // KeyCloak database outlives the stacks: users.csv is the source of truth, as it is for the clients' secrets.
+            resetPassword(adminToken, realm, id, user);
         }
         return response;
     }
 
     /**
-     * @return true if a user with exactly this username exists in the realm.
+     * Sets the password of an existing user, which is not temporary, as {@link #createUser} does for a new one.
      */
-    private boolean userExists(String adminToken, String realm, String username) throws IOException {
+    private void resetPassword(String adminToken, String realm, String userId, AfonUser user) throws IOException {
+        String json = mapper.writeValueAsString(Map.of("type", "password", "value", user.password(), "temporary", false));
+        HttpResponse reset = putJson(adminToken, format("/admin/realms/%s/users/%s/reset-password", realm, userId),
+                                     json, "the password of user " + user.username());
+        if (isFailure(reset)) {
+            throw new IOException(format("Could not set the password of the existing KeyCloak user '%s' in realm '%s': HTTP %d",
+                                         user.username(), realm, reset.getCode()));
+        }
+        logger.info("Set the password of the existing KeyCloak user {}", user.username());
+    }
+
+    /**
+     * @return the id of the user with exactly this username in the realm, or null if there is none.
+     */
+    private String userId(String adminToken, String realm, String username) throws IOException {
         String uri = format(
             "/admin/realms/%s/users?exact=true&username=%s",
             realm, URLEncoder.encode(username, StandardCharsets.UTF_8));
         return restClient.get(uri, adminToken, response -> {
             if (response.getCode() != HttpStatus.SC_OK) {
-                return false;
+                return null;
             }
             List<?> users = mapper.readValue(response.getEntity().getContent(), List.class);
-            return !users.isEmpty();
+            return users.isEmpty() ? null : (String) ((Map<?, ?>) users.get(0)).get("id");
         });
     }
 

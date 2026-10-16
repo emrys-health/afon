@@ -57,6 +57,8 @@ public class GenerateScriptMains {
 
         new ScriptEntry("azure", "AzureAccountPrincipalMain", "azure/account-principal.sh"),
         new ScriptEntry("azure", "AzureAccountMain", "azure/account.sh"),
+        new ScriptEntry("azure", "AzureCheckStorageMain", "azure/check-storage.sh"),
+        new ScriptEntry("azure", "AzureClusterMain", "azure/cluster.sh"),
         new ScriptEntry("azure", "AzureCreateAdminMain", "azure/create-admin.sh"),
         new ScriptEntry("azure", "AzureCreateMain", "azure/create.sh"),
         new ScriptEntry("azure", "AzureDestroyAdminMain", "azure/destroy-admin.sh"),

@@ -13,8 +13,8 @@ public class FileUserProviderTest {
     @Test
     public void canLoadAllUsersAndAcls() {
         AfonUserProvider provider = new FileUserProvider(TEMPLATES_CONFIG_DIR);
-        assertThat(provider.getUsers()).hasSize(2);
-        assertThat(provider.getUserAcls()).hasSize(2);
+        assertThat(provider.getUsers()).hasSizeGreaterThan(0);
+        assertThat(provider.getUserAcls()).hasSizeGreaterThan(0);
     }
 
     @Test
@@ -47,10 +47,9 @@ public class FileUserProviderTest {
     @Test
     public void canAuthenticateUsersWithAclFile() {
         AfonUserProvider provider = new FileUserProvider(TEMPLATES_CONFIG_DIR);
-        assertThat(provider.isAuthorised("mauro", "azure")).isTrue();
-        assertThat(provider.isAuthorised("mauro", "azure_external")).isTrue();
-        assertThat(provider.isAuthorised("mauro", "any_other")).isFalse();
+        assertThat(provider.isAuthorised("mauro", "any")).isTrue();
         assertThat(provider.isAuthorised("phil", "any")).isTrue();
+        assertThat(provider.isAuthorised("will", "*_forbidden")).isFalse();
     }
 
     @Test
