@@ -92,6 +92,6 @@ public class ComposedStack extends TerraformStack {
         if (args.length != 1) {
             throw new IllegalArgumentException("Usage: ComposedStack <stack-id>, eg aws-full");
         }
-        synthesise(StackId.parse(args[0]), new FilePropertyProvider());
+        synthesise(StackDefinitions.resolve(StackId.parse(args[0])), new FilePropertyProvider());
     }
 }

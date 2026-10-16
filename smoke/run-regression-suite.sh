@@ -7,7 +7,7 @@
 #                                      [<cloud>]
 #   <cloud>   the cloud of the full stack to run the tests against, aws or azure (default: aws), ie <cloud>-full.  The
 #             kubectl context is set to the cluster of that stack, with the afon command '<cloud>-update-kube-config
-#             full', and the tests are run with TRE_CLOUD=<cloud>, as the cloud of the stack hosting the TRE.
+#             tre', and the tests are run with TRE_CLOUD=<cloud>, as the cloud of the stack hosting the TRE.
 #   --cli     runs the afon commands with afon-cli.sh, rather than afon.sh: that of the cli distribution in
 #             $AFON_CLI_DIR, if set, else in $AFON_HOME/cli.  Implied when the script runs from a cli distribution,
 #             eg as $AFON_CLI_DIR/smoke/run-regression-suite.sh, which, being independent of the source tree, has
@@ -49,7 +49,7 @@
 # The tests run against the full stack's cluster of the <cloud>: the Spark Connect tests read the catalogs of the
 # clouds through its Spark Connect server.  After any setups, the current kubectl context is set to the full stack
 # cluster of the env, that of --env, if given, else that of the current config, with the afon command
-# '<cloud>-update-kube-config full', and left so.  Its Polaris ingress is then restricted, as the network smoke
+# '<cloud>-update-kube-config tre', ie the stack with the role tre, and left so.  Its Polaris ingress is then restricted, as the network smoke
 # test expects, which checks that Polaris cannot be reached from outside of the cluster, and put back as a deploy
 # leaves it when the script exits, however it exits, so that the machine running it can reach Polaris again.  On AWS to the
 # AWS_POLARIS_ALLOWED_CIDRS of afon-aws.properties plus the cluster's egress IP, that of its NAT gateway, or by default
@@ -343,7 +343,7 @@ current_env() {
 # Makes the full stack cluster of the $CLOUD of the current env the current kubectl context, exiting if it fails.
 update_kube_config() {
   banner "Updating the kubectl context to the $CLOUD full stack cluster of env $(current_env)"
-  if ! run_afon "$CLOUD-update-kube-config" full; then
+  if ! run_afon "$CLOUD-update-kube-config" tre; then
     error "Failed to update the kubectl context for env $(current_env): not running the tests"
     exit 1
   fi

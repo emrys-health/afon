@@ -20,9 +20,9 @@ public class CleanupHelper {
     protected static StackId stackIdOf(String[] args, AfonCloud cloud) {
         if (args.length == 0) {
             throw new IllegalArgumentException(String.format(
-                "Cleanup requires args: <stack-id> [<output-file>], eg %s-<stack-type>", cloud));
+                "Cleanup requires args: <stack-id> [<output-file>], eg %s-<name>", cloud));
         }
-        StackId stackId = StackId.parse(args[0]);
+        StackId stackId = StackDefinitions.resolve(StackId.parse(args[0]));
         if (stackId.cloud() != cloud) {
             throw new IllegalArgumentException(String.format("Stack %s is not in cloud %s", stackId, cloud));
         }

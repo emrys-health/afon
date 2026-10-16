@@ -1,10 +1,10 @@
-# Given the stack type, eg: afon-cli.sh azure-cluster keycloak
-STACK_TYPE_ARG="${1:-}"
+# Given the stack, by its id or its role (identity, catalog or tre), eg: afon-cli.sh azure-cluster identity
+STACK_ARG="${1:-}"
 source $AFON_ROOT/scripts/config/afon-source.sh azure
-source $AFON_ROOT/scripts/azure/stack-source.sh "$STACK_TYPE_ARG"
+source $AFON_ROOT/scripts/azure/stack-source.sh "$STACK_ARG"
 
-# Checks whether the AKS cluster of the stack of given type for given env is up, by asking the cluster
-# itself: can kubectl reach <stack-type>-$CLUSTER_NAME?  The tofu state is deliberately not read, as it
+# Checks whether the AKS cluster of the given stack for given env is up, by asking the cluster
+# itself: can kubectl reach <stack>-$CLUSTER_NAME?  The tofu state is deliberately not read, as it
 # may belong to a stack that someone else brought up (or that this env's $AFON_CDKTF never knew about).
 # Only the cluster is checked, not the other resources of the stack (network, identity, DNS records ...).
 # 'az aks show' is what locates the cluster, and it also tells a cluster that does not exist
@@ -12,7 +12,7 @@ source $AFON_ROOT/scripts/azure/stack-source.sh "$STACK_TYPE_ARG"
 # permissions, no network).  Uses a throwaway kubeconfig, so your current kubectl context is left alone.
 # Reports the status, so 'up' and 'down' are both a successful run: exit code 0 when the status was
 # established (the cluster is up: kubectl reaches it, or down: no such cluster), 2 when it could not be
-# verified, and 1 when no stack type is given.  Never reported as down unless proven, so an expired Azure session can't be mistaken for a
+# verified, and 1 when no stack is given.  Never reported as down unless proven, so an expired Azure session can't be mistaken for a
 # clean teardown.
 
 CLUSTER_KUBECONFIG=$(mktemp)

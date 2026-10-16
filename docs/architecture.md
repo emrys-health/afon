@@ -109,7 +109,7 @@ Executables are composed of reusable steps:
 - **`StepActions`** — low-level operations that actually execute commands (run Maven, run OpenTofu, call Polaris APIs)
 - **`StepRunner`** — executes a list of steps in order, with the ability to resume from a named step
 - **`StepsProvider`** — interface providing a step list
-- **`StackPlanFactory`** — the steps of each action (`delete`, `deploy`, `setup`) on each stack, keyed by stack id (`<cloud>-<stack-type>`, eg `aws-keycloak`), derived from the components of the stack (see [Steps derived from the components](#steps-derived-from-the-components)) and run by the `manage-stack` command
+- **`StackPlanFactory`** — the steps of each action (`delete`, `deploy`, `setup`) on each stack, keyed by stack id (`<cloud>-<name>`, eg `aws-keycloak`), derived from the components of the stack (see [Steps derived from the components](#steps-derived-from-the-components)) and run by the `manage-stack` command
 
 What spans stacks or clouds, eg Snowflake reading a catalog, or AWS federating to the Azure Polaris, is a scenario declared by the
 component plan (`ComponentPlan.scenarioSteps`) and run on a set up stack by `manage-stack run <stack-id> <scenario>`.  The other ops
@@ -145,7 +145,7 @@ catalogs, configure the Polaris users, run the Spark write check, and report the
 
 ### Stack composition
 
-**Stack id and stack name.** A *stack id* (`StackId`) is `<cloud>-<stack-type>`, eg `aws-full`, and always identifies a stack that
+**Stack id and stack name.** A *stack id* (`StackId`) is `<cloud>-<name>`, eg `aws-full`, and always identifies a stack that
 `stacks.yaml` defines. A *stack name* is a `String` naming a stack dir (`stacks/<name>`) or tofu state
 (`terraform.<name>.tfstate`) found in the cdktf dir, which `manage-stack` looks at when it deletes stacks or checks for
 conflicts. It is usually the text of a stack id, but may also be the name of a cloud, eg `aws`, for the *legacy stack* that all the

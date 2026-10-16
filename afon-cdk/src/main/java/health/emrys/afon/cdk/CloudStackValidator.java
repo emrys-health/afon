@@ -36,13 +36,14 @@ public class CloudStackValidator {
     }
 
     /**
-     * Resolves a stack id, case-insensitively, eg "<cloud>-<stack-type>" or "<CLOUD>-<STACK-TYPE>".
+     * Resolves a stack id, case-insensitively, eg "<cloud>-<stack-type>" or "<CLOUD>-<STACK-TYPE>", or the role of a stack in its
+     * cloud, as "<cloud>-<role>", see {@link StackDefinitions#resolve}.
      *
      * @return the stack, or {@code null} if there is no such stack
      */
     public StackId resolve(String name) {
         try {
-            StackId stackId = StackId.parse(name);
+            StackId stackId = StackDefinitions.resolve(StackId.parse(name));
             return StackDefinitions.find(stackId).isPresent() ? stackId : null;
         } catch (IllegalArgumentException e) {
             return null;

@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.docs;
 
+import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.flow.StackFlows;
 import health.emrys.afon.ops.steps.StackAction;
@@ -63,7 +64,7 @@ public final class DocumentNames {
 
     private static Optional<StackId> parse(String stackId) {
         try {
-            return Optional.of(StackId.parse(stackId));
+            return Optional.of(StackDefinitions.resolve(StackId.parse(stackId)));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }

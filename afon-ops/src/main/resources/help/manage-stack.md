@@ -14,7 +14,9 @@ Usage:
   setup    also configures it, eg the OIDC users and the Polaris catalogs
   delete   deletes the stack
 
-<stack-id> is <cloud>-<stack-type>, eg aws-keycloak, or <cloud>-all, eg aws-all, to delete every stack of the cloud.
+<stack-id> is <cloud>-<name>, eg aws-keycloak, or <cloud>-all, eg aws-all, to delete every stack of the cloud.
+  It can also be <cloud>-<role>, the stack of the cloud with the role catalog, identity or tre in stacks.yaml, eg aws-tre,
+  unless a stack is defined under that id.
   Not every action is supported by every stack: run 'afon-cli.sh manage-stack' without args to list the stacks
   with their actions, and the scenarios of each.
 

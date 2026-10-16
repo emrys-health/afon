@@ -18,7 +18,22 @@ import java.util.List;
  */
 public class GenerateScriptMains {
 
-    private record ScriptEntry(String subpackage, String className, String scriptPath) {
+    /**
+     * @param stackCloud       the cloud of the script, if it takes a stack, given as its id or its role in the cloud, in which
+     *                         case {@code ScriptMain} finds the stack and gives the script what it needs, as {@code AFON_STACK_*}
+     *                         env vars
+     * @param servingComponent the component, if the script checks the stack serving it, which it is given, else
+     *                         {@code ScriptMain} gives the stacks that can serve it, as {@code AFON_STACK_CANDIDATES}
+     */
+    private record ScriptEntry(String subpackage, String className, String scriptPath, String stackCloud,
+                               String servingComponent) {
+        ScriptEntry(String subpackage, String className, String scriptPath) {
+            this(subpackage, className, scriptPath, null, null);
+        }
+
+        ScriptEntry(String subpackage, String className, String scriptPath, String stackCloud) {
+            this(subpackage, className, scriptPath, stackCloud, null);
+        }
     }
 
     private static final List<ScriptEntry> SCRIPTS = List.of(
@@ -42,36 +57,36 @@ public class GenerateScriptMains {
         new ScriptEntry("tofu", "TofuStateMain", "tofu/state.sh"),
 
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
-        new ScriptEntry("aws", "AwsClusterMain", "aws/cluster.sh"),
+        new ScriptEntry("aws", "AwsClusterMain", "aws/cluster.sh", "aws"),
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),
-        new ScriptEntry("aws", "AwsCreateMain", "aws/create.sh"),
+        new ScriptEntry("aws", "AwsCreateMain", "aws/create.sh", "aws"),
         new ScriptEntry("aws", "AwsDestroyMain", "aws/destroy.sh"),
         new ScriptEntry("aws", "AwsIssueCertMain", "aws/issue-cert.sh"),
-        new ScriptEntry("aws", "AwsKeycloakMain", "aws/keycloak.sh"),
+        new ScriptEntry("aws", "AwsKeycloakMain", "aws/keycloak.sh", "aws", "Keycloak"),
         new ScriptEntry("aws", "AwsLoginMain", "aws/login.sh"),
         new ScriptEntry("aws", "AwsMountDataMain", "aws/mount-data.sh"),
-        new ScriptEntry("aws", "AwsPolarisMain", "aws/polaris.sh"),
+        new ScriptEntry("aws", "AwsPolarisMain", "aws/polaris.sh", "aws", "Polaris"),
         new ScriptEntry("aws", "AwsSnowflakeMain", "aws/snowflake.sh"),
-        new ScriptEntry("aws", "AwsUpdateKubeConfigMain", "aws/update-kube-config.sh"),
-        new ScriptEntry("aws", "AwsVpcsMain", "aws/vpcs.sh"),
+        new ScriptEntry("aws", "AwsUpdateKubeConfigMain", "aws/update-kube-config.sh", "aws"),
+        new ScriptEntry("aws", "AwsVpcsMain", "aws/vpcs.sh", "aws"),
 
         new ScriptEntry("azure", "AzureAccountPrincipalMain", "azure/account-principal.sh"),
         new ScriptEntry("azure", "AzureAccountMain", "azure/account.sh"),
         new ScriptEntry("azure", "AzureCheckStorageMain", "azure/check-storage.sh"),
-        new ScriptEntry("azure", "AzureClusterMain", "azure/cluster.sh"),
+        new ScriptEntry("azure", "AzureClusterMain", "azure/cluster.sh", "azure"),
         new ScriptEntry("azure", "AzureCreateAdminMain", "azure/create-admin.sh"),
-        new ScriptEntry("azure", "AzureCreateMain", "azure/create.sh"),
+        new ScriptEntry("azure", "AzureCreateMain", "azure/create.sh", "azure"),
         new ScriptEntry("azure", "AzureDestroyAdminMain", "azure/destroy-admin.sh"),
         new ScriptEntry("azure", "AzureDestroyMain", "azure/destroy.sh"),
         new ScriptEntry("azure", "AzureIssueCertMain", "azure/issue-cert.sh"),
-        new ScriptEntry("azure", "AzureKeycloakMain", "azure/keycloak.sh"),
+        new ScriptEntry("azure", "AzureKeycloakMain", "azure/keycloak.sh", "azure", "Keycloak"),
         new ScriptEntry("azure", "AzureKeyvaultMain", "azure/keyvault.sh"),
         new ScriptEntry("azure", "AzureLoginAppMain", "azure/login-app.sh"),
         new ScriptEntry("azure", "AzureLoginMain", "azure/login.sh"),
-        new ScriptEntry("azure", "AzurePolarisMain", "azure/polaris.sh"),
+        new ScriptEntry("azure", "AzurePolarisMain", "azure/polaris.sh", "azure", "Polaris"),
         new ScriptEntry("azure", "AzureRbacMain", "azure/rbac.sh"),
         new ScriptEntry("azure", "AzureRolesMain", "azure/roles.sh"),
-        new ScriptEntry("azure", "AzureUpdateKubeConfigMain", "azure/update-kube-config.sh"),
+        new ScriptEntry("azure", "AzureUpdateKubeConfigMain", "azure/update-kube-config.sh", "azure"),
 
         new ScriptEntry("gcp", "GcpAccountMain", "gcp/account.sh"),
         new ScriptEntry("gcp", "GcpCreateIcebergEndpointMain", "gcp/create_iceberg_endpoint.sh"),
@@ -122,11 +137,13 @@ public class GenerateScriptMains {
             public class %s {
 
                 public static void main(String[] args) {
-                    new ScriptMain("%s").run(args);
+                    new ScriptMain("%s")%s%s.run(args);
                 }
 
             }
-            """.formatted(entry.subpackage(), entry.className(), entry.scriptPath());
+            """.formatted(entry.subpackage(), entry.className(), entry.scriptPath(),
+                          entry.stackCloud() == null ? "" : ".takingStackOf(\"" + entry.stackCloud() + "\")",
+                          entry.servingComponent() == null ? "" : ".servingComponent(\"" + entry.servingComponent() + "\")");
         Files.writeString(packageDir.resolve(entry.className() + ".java"), source);
     }
 

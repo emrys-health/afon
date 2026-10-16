@@ -30,6 +30,14 @@ class CloudStackValidatorTest {
     }
 
     @Test
+    void canResolveStackByItsRoleInTheCloud() {
+        assertThat(validator.resolve("aws-tre")).isEqualTo(new StackId(AWS, "full"));
+        assertThat(validator.resolve("AZURE-CATALOG")).isEqualTo(new StackId(AZURE, "polaris"));
+        // no stack of gcp has the role, as for an unknown stack
+        assertThat(validator.resolve("gcp-identity")).isNull();
+    }
+
+    @Test
     void canGetStackDirFromStackId() {
         assertThat(validator.stackDir(new StackId(GCP, "polaris"))).isEqualTo(stackDir(new StackId(GCP, "polaris")));
     }

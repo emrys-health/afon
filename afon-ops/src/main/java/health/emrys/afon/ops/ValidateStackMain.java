@@ -215,6 +215,7 @@ public class ValidateStackMain {
     private static void printUsage(CloudStackValidator validator) {
         System.out.println("Usage: validate-stack <stack> [" + RUNS_OPTION + " <n>] | validate-stack " + EXPORT_OPTION + ", where <stack> is one of:");
         validator.stackNames().forEach(name -> System.out.println("  " + name));
+        System.out.println("or <cloud>-<role>, the stack of the cloud with the role catalog, identity or tre, eg aws-tre");
     }
 
 }

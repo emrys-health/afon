@@ -48,7 +48,7 @@ public class AwsComponentNames {
         for (String roleName : roleNames) {
             if (roleName.length() > MAX_ROLE_NAME_LENGTH) {
                 throw new IllegalArgumentException(format(
-                    "IAM role name '%s' is %d chars, more than the max %d: shorten %s, as the cluster name '%s' is <stack-type>-%s",
+                    "IAM role name '%s' is %d chars, more than the max %d: shorten %s, as the cluster name '%s' is <stack>-%s",
                     roleName, roleName.length(), MAX_ROLE_NAME_LENGTH, CLUSTER_NAME, cluster, CLUSTER_NAME));
             }
         }

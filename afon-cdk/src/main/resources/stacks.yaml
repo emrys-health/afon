@@ -2,7 +2,7 @@
 # A file of this name in the config dir ($AFON_HOME/config) replaces this one entirely, rather than adding to it.
 #
 # stacks:
-#   <cloud>-<stack-type>:           the stack id, eg aws-full
+#   <cloud>-<name>:           the stack id, eg aws-full
 #     role: catalog|identity|tre    optional: the role the stack plays in its cloud, which code looks for it by, once per cloud
 #     extends: <stack id>           optional: starts with the components of this stack, of the same cloud
 #     pinnedEgressIp: true|false    optional: whether it holds the AWS_EGRESS_IP (default true, or as the extended stack)

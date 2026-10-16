@@ -140,7 +140,7 @@ smoke/run-regression-suite.sh [--cli] [--env <env>] [--setup <stacks> [--teardow
 
 runs the tests listed in a suite file, by default [smoke/regression-full.csv](../smoke/regression-full.csv), in
 order, each as an afon command, against the full stack of the `<cloud>`, `aws` by default, or `azure`: it sets the kubectl
-context to the cluster of that stack, with the afon command `<cloud>-update-kube-config full`, and runs the tests with
+context to the cluster of that stack, with the afon command `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, and runs the tests with
 `TRE_CLOUD=<cloud>`, as the cloud of the stack hosting the TRE, whatever the config says.  The tests are not specific to a
 cloud, so the same file serves both:
 
@@ -194,7 +194,7 @@ through its Spark Connect server, so they also need the Polaris stacks of the ot
 setups, and whether `--env` is given or not, the suite:
 
 1. makes the env's full stack cluster of the `<cloud>` the current `kubectl` context, with the afon command
-   `<cloud>-update-kube-config full`, leaving it so after the suite;
+   `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, leaving it so after the suite;
 2. restricts that cluster's Polaris ingress, as the network smoke test expects:
    - on AWS, by annotating `polaris-ingress` with `alb.ingress.kubernetes.io/inbound-cidrs`. As `AwsCloudProvider` does for
      Polaris when `AWS_POLARIS_ALLOWED_CIDRS` is set, it admits those CIDRs plus the cluster's egress IP. The egress IP is read

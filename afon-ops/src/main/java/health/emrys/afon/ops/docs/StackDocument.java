@@ -147,7 +147,7 @@ public class StackDocument extends AbstractDocument {
 
     @Override
     public String getFurtherNotes() {
-        String stack = stackId.isAll() ? stackId.cloud() + "-<stack-type>" : stackId.toString();
+        String stack = stackId.isAll() ? stackId.cloud() + "-<name>" : stackId.toString();
         String repeat = stackId.cloud() == AfonCloud.AWS ? " (more than once if required)" : "";
         return format(
             """
