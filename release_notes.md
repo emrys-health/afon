@@ -45,6 +45,40 @@
   | `afon-cli.sh aws-create <stack>` | `aws-full` | `tre` |
   | `afon-cli.sh azure-create [true\|false] <stack>` | `azure-polaris` | `catalog` |
 
+### Closed Issues (31)
+
+- **configuration, api** — [#292](https://github.com/emrys-health/afon-core/issues/292) Resolve a stack by id or by role
+- [#291](https://github.com/emrys-health/afon-core/issues/291) Create/login scripts: mandatory stack id, Gitea and Polaris-log buckets, login selects the account
+- **security, devops, configuration** — [#283](https://github.com/emrys-health/afon-core/issues/283) Support whitelisting in Azure
+- **devops** — [#278](https://github.com/emrys-health/afon-core/issues/278) Check plan determinism in command `validate-stack`
+- **logging** — [#276](https://github.com/emrys-health/afon-core/issues/276) Azure Polaris logs to be persisted
+- **devops, configuration** — [#273](https://github.com/emrys-health/afon-core/issues/273) Support `azure-full` and `azure-keycloak` stacks
+- **devops** — [#272](https://github.com/emrys-health/afon-core/issues/272) Shorter readable names for composite setup steps
+- [#271](https://github.com/emrys-health/afon-core/issues/271) Provide per-command help docs
+- [#270](https://github.com/emrys-health/afon-core/issues/270) Replace the golden-plan test with on-demand snapshot-stacks / compare-stacks
+- **configuration, api** — [#269](https://github.com/emrys-health/afon-core/issues/269) Stack flows: a builder pattern for stack commands
+- **devops, configuration, api** — [#267](https://github.com/emrys-health/afon-core/issues/267) Define stacks and flows at runtime in YAML files
+- **configuration, api** — [#266](https://github.com/emrys-health/afon-core/issues/266) Drop the legacy per-stack ops commands and `StackStepsFactory`
+- **logging** — [#265](https://github.com/emrys-health/afon-core/issues/265) AWS Polaris logs to be persistant
+- **security, devops** — [#264](https://github.com/emrys-health/afon-core/issues/264) Authenticate GCP with Application Default Credentials
+- [#263](https://github.com/emrys-health/afon-core/issues/263) Rename local setup scripts to `local/` directory
+- **security** — [#262](https://github.com/emrys-health/afon-core/issues/262) Annotate the `polaris-tls` cert upon restore so cert-manager keeps the cached cert (GCP and Azure)
+- **security, configuration** — [#261](https://github.com/emrys-health/afon-core/issues/261) Support storing TLS certificates from CA in GCP
+- [#255](https://github.com/emrys-health/afon-core/issues/255) Rogue character in Polaris env var
+- [#252](https://github.com/emrys-health/afon-core/issues/252) Unquoted secrets - can't handle metacharacters
+- [#250](https://github.com/emrys-health/afon-core/issues/250) ALB health checks had never passed on any of the three ingresses
+- [#249](https://github.com/emrys-health/afon-core/issues/249) Non-deterministic Terraform.
+- **devops** — [#247](https://github.com/emrys-health/afon-core/issues/247) Add GitHub notifications to Slack channel `afon-ci` in case of failures
+- **devops** — [#246](https://github.com/emrys-health/afon-core/issues/246) Cleanup spurious error messages during Maven release
+- **configuration** — [#244](https://github.com/emrys-health/afon-core/issues/244) Make GCP_PROJECT_ID configurable
+- **documentation** — [#242](https://github.com/emrys-health/afon-core/issues/242) Add contributing guidelines for Afon as an open-source project
+- **security, tech debt** — [#239](https://github.com/emrys-health/afon-core/issues/239) Cleanup Polaris catalog and principal role setup, to avoid expected 404/409 WARNs
+- **configuration, api, tech debt** — [#181](https://github.com/emrys-health/afon-core/issues/181) Compose stacks from cloud-agnostic components
+- **configuration** — [#138](https://github.com/emrys-health/afon-core/issues/138) Remove Azure OAuth2 properties as obsolete
+- **devops, testing** — [#116](https://github.com/emrys-health/afon-core/issues/116) Create smoke test suite for regression testing against a deployed cluster
+- [#50](https://github.com/emrys-health/afon-core/issues/50) Hosted docs
+- [#34](https://github.com/emrys-health/afon-core/issues/34) Add Git component for researchers
+
 ## 1.0-beta-6
 
 **Milestone:** [1.0-beta-6](https://github.com/emrys-health/afon-core/milestone/6)
