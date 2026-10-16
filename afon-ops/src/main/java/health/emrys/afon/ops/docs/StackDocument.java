@@ -63,7 +63,7 @@ public class StackDocument extends AbstractDocument {
         if (stackId.isAll()) {
             return format("Deletes every stack of the %s cloud.", cloudName());
         }
-        String stack = format("the %s %s stack", cloudName(), stackId.type());
+        String stack = format("the stack `%s`", stackId);
         return switch (action) {
             case DELETE -> format("Deletes %s.", stack);
             case DEPLOY -> format("Deploys %s.", stack);

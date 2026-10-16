@@ -40,8 +40,8 @@ where:
   `<cloud>-<role>`, the stack of the cloud with that role in `stacks.yaml` (`catalog`, `identity` or `tre`), eg `aws-tre`, unless a
   stack is defined under that id, so that it works whatever the ids are. `validate-stack`, `generate-cleanup-script` and the other
   commands taking a stack id accept it too, and so do the scripts (`aws-create`, `aws-cluster`, `tofu-plan`, the kube estimator and so on), which, as their name has the cloud, also take the role alone, eg `aws-create tre`.
-  Every defined stack is listed: `aws-full`, `aws-keycloak`, `aws-polaris`, `aws-jupyter`, `aws-spark`, `aws-trino`,
-  `aws-snowflake`, `azure-full`, `azure-keycloak`, `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
+  Every defined stack is listed: with the bundled `stacks.yaml`, `aws-full`, `aws-keycloak`, `aws-polaris`, `aws-snowflake`,
+  `azure-full`, `azure-keycloak`, `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
 - `<step>`, if given, is the step from which to resume a failed run (see
   [Resume a failed stack deployment](#resume-a-failed-stack-deployment-from-a-specific-step));
 - `--replace`, if given, lets `deploy` and `setup` delete the other stacks conflicting with the stack, see
