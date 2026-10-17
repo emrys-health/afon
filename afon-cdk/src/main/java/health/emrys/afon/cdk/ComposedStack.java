@@ -14,6 +14,8 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
@@ -35,12 +37,13 @@ public class ComposedStack extends TerraformStack {
 
     private final StackContext context;
 
-    public ComposedStack(@NonNull Construct scope, @NonNull StackDefinition definition, AfonPropertyProvider properties) {
+    public ComposedStack(@NonNull Construct scope, @NonNull StackDefinition definition, AfonPropertyProvider properties,
+                         AfonUserProvider users) {
         super(scope, definition.id().toString());
         StackId       stackId  = definition.id();
         configureLocalBackend(stackId);
         CloudPlatform platform = platformOf(this, definition, properties);
-        context = new StackContext(this, stackId, platform, properties);
+        context = new StackContext(this, stackId, platform, properties, users);
         definition.componentsFor(properties).forEach(context::deploy);
         if (context.find(KeycloakComponent.class).isEmpty() && context.find(PolarisComponent.class).isPresent()) {
             logger.info("Stack {} deploys no KeyCloak, but uses the one at {} ({}), which the {}-keycloak stack deploys{}",
@@ -78,9 +81,9 @@ public class ComposedStack extends TerraformStack {
      * Synthesises the plan of the stack into its dir, see {@link health.emrys.afon.config.ConfigUtils#stackDir}, without
      * deploying it, eg to check that the config dir has all the properties the stack needs.
      */
-    public static ComposedStack synthesise(StackId stackId, AfonPropertyProvider properties) {
+    public static ComposedStack synthesise(StackId stackId, AfonPropertyProvider properties, AfonUserProvider users) {
         App app = new App(AppConfig.builder().outdir(ConfigUtils.afonCkdtf()).build());
-        ComposedStack stack = new ComposedStack(app, StackDefinitions.get(stackId), properties);
+        ComposedStack stack = new ComposedStack(app, StackDefinitions.get(stackId), properties, users);
         app.synth();
         return stack;
     }
@@ -92,6 +95,6 @@ public class ComposedStack extends TerraformStack {
         if (args.length != 1) {
             throw new IllegalArgumentException("Usage: ComposedStack <stack-id>, eg aws-full");
         }
-        synthesise(StackDefinitions.resolve(StackId.parse(args[0])), new FilePropertyProvider());
+        synthesise(StackDefinitions.resolve(StackId.parse(args[0])), new FilePropertyProvider(), new FileUserProvider());
     }
 }

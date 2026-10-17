@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.docs;
 
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -17,7 +18,7 @@ class DocumenterTest {
 
     private final AfonPropertyProvider properties =
         new FilePropertyProvider("src/test/resources/config", List.of("test", "secret"));
-    private final Documenter documenter = new Documenter(properties);
+    private final Documenter documenter = new Documenter(properties, new FileUserProvider());
 
     @Test
     void canRedactSecrets() {
@@ -46,7 +47,7 @@ class DocumenterTest {
 
     @Test
     void doesNotDocumentSecrets() {
-        String content = documenter.getContent(new StackDocument(properties, StackAction.DEPLOY, StackId.parse("aws-full")));
+        String content = documenter.getContent(new StackDocument(properties, new FileUserProvider(), StackAction.DEPLOY, StackId.parse("aws-full")));
         assertThat(content).contains("afon-cli.sh manage-stack deploy aws-full");
         assertThat(content).doesNotContain(properties.getValue(POLARIS_SECRET));
     }
@@ -55,8 +56,8 @@ class DocumenterTest {
     void documentsSnowflakeScenariosAsRunByManageStack() {
         // the scenarios read the catalogs, which the template config defines
         AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
-        Documenter documenter = new Documenter(properties);
-        String content = documenter.getContent(new ScenarioDocument(properties, StackId.parse("aws-snowflake"), "reading-azure"));
+        Documenter documenter = new Documenter(properties, new FileUserProvider());
+        String content = documenter.getContent(new ScenarioDocument(properties, new FileUserProvider(), StackId.parse("aws-snowflake"), "reading-azure"));
         assertThat(content)
             .contains("afon-cli.sh manage-stack setup aws-snowflake")
             .contains("afon-cli.sh manage-stack run aws-snowflake reading-azure")
@@ -64,13 +65,13 @@ class DocumenterTest {
             .contains("snowflake_reads_catalog_azure")
             .doesNotContain("deploy-snowflake");
         // the scenario spanning two stacks says to set up both
-        assertThat(documenter.getContent(new ScenarioDocument(properties, StackId.parse("aws-full"), "external-azure")))
+        assertThat(documenter.getContent(new ScenarioDocument(properties, new FileUserProvider(), StackId.parse("aws-full"), "external-azure")))
             .contains("afon-cli.sh manage-stack setup aws-full\nafon-cli.sh manage-stack setup azure-polaris")
             .contains("afon-cli.sh manage-stack run aws-full external-azure")
             .contains("- check_polaris_answers_for_cloud_azure")
             .contains("- create_catalog_azure_external_for_cloud_azure")
             .contains("answers with one of 200, 401, 403");
-        assertThat(documenter.getContent(new ScenarioDocument(properties, StackId.parse("aws-snowflake"), "writing-azure")))
+        assertThat(documenter.getContent(new ScenarioDocument(properties, new FileUserProvider(), StackId.parse("aws-snowflake"), "writing-azure")))
             .contains("afon-cli.sh manage-stack run aws-snowflake writing-azure")
             .contains("snowflake_writes_to_azure");
     }
@@ -78,21 +79,21 @@ class DocumenterTest {
     @Test
     void documentsEveryDocumentWithTheStepsManageStackRuns() {
         AfonPropertyProvider templates = new FilePropertyProvider("../templates/config");
-        List<DocumentMetadata> documents = new DocumentFinder(templates).findDocuments();
+        List<DocumentMetadata> documents = new DocumentFinder(templates, new FileUserProvider()).findDocuments();
         assertThat(documents).isNotEmpty();
         for (DocumentMetadata document : documents) {
-            assertThat(new Documenter(templates).getContent(document))
+            assertThat(new Documenter(templates, new FileUserProvider()).getContent(document))
                 .as(document.getClass().getSimpleName()).contains("The steps being run are:");
         }
         // the steps are those derived from the components of the stack, which report the deployment complete
-        assertThat(new Documenter(templates).getContent(new StackDocument(templates, StackAction.SETUP, StackId.parse("aws-keycloak"))))
+        assertThat(new Documenter(templates, new FileUserProvider()).getContent(new StackDocument(templates, new FileUserProvider(), StackAction.SETUP, StackId.parse("aws-keycloak"))))
             .contains("- deploy_complete_for_aws_keycloak", "- setup_complete_for_aws_keycloak");
     }
 
     @Test
     void documentsAFlowWithItsStepsGroupedByItem() {
         AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
-        String content = new Documenter(properties).getContent(new FlowDocument(properties, "cross-cloud-azure"));
+        String content = new Documenter(properties, new FileUserProvider()).getContent(new FlowDocument(properties, new FileUserProvider(), "cross-cloud-azure"));
         assertThat(content)
             .contains("afon-cli.sh manage-stack run cross-cloud-azure")
             .contains("1. `setup aws-full`", "2. `setup azure-polaris`", "3. `run aws-full external-azure`")
@@ -104,7 +105,7 @@ class DocumenterTest {
 
     @Test
     void everyFlowHasADocument() {
-        List<DocumentMetadata> documents = new DocumentFinder(new FilePropertyProvider("../templates/config")).findDocuments();
+        List<DocumentMetadata> documents = new DocumentFinder(new FilePropertyProvider("../templates/config"), new FileUserProvider()).findDocuments();
         assertThat(documents.stream().filter(FlowDocument.class::isInstance)
                             .map(document -> ((FlowDocument) document).flowName()))
             .containsExactlyInAnyOrderElementsOf(

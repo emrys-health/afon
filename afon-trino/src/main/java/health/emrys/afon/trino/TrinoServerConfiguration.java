@@ -1,8 +1,8 @@
 package health.emrys.afon.trino;
 
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.FileUserProvider;
 import org.jspecify.annotations.NonNull;
 
 import static health.emrys.afon.config.AfonProperty.*;
@@ -18,8 +18,8 @@ public class TrinoServerConfiguration {
     /**
      * Authenticates as the configured user, from users.csv, named by {@code USER_ID}.
      */
-    public TrinoServerConfiguration(AfonPropertyProvider properties, String polarisDomainName) {
-        this(properties, polarisDomainName, new FileUserProvider().getConfiguredUser(properties));
+    public TrinoServerConfiguration(AfonPropertyProvider properties, AfonUserProvider users, String polarisDomainName) {
+        this(properties, polarisDomainName, users.getConfiguredUser(properties));
     }
 
     public TrinoServerConfiguration(AfonPropertyProvider properties, String polarisDomainName, AfonUser user) {

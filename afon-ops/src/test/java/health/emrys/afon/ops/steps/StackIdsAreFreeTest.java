@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.steps;
 
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -73,7 +74,7 @@ class StackIdsAreFreeTest {
         protected void checkAnswers(String url, String failure, Set<Integer> codes) {
             calls.add(failure);
         }
-    }, properties);
+    }, properties, new FileUserProvider());
 
     @AfterEach
     void restoreStacks() {

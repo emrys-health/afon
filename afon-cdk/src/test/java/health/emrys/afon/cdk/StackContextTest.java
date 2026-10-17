@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class StackContextTest {
 
     private final StackId       stackId = new StackId(AWS, "full");
-    private final StackContext  context = new StackContext(null, stackId, null, null);
+    private final StackContext  context = new StackContext(null, stackId, null, null, null);
     private final List<String>  deployed = new ArrayList<>();
 
     class First implements StackComponent {

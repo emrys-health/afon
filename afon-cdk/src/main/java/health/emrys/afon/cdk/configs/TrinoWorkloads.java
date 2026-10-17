@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk.configs;
 
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.DockerImages;
@@ -43,8 +44,9 @@ public class TrinoWorkloads {
     private final AfonCatalogs afonCatalogs;
 
     public TrinoWorkloads(AfonPropertyProvider properties,
+                          AfonUserProvider users,
                           String polarisDomainName) {
-        this.trinoConfig = new TrinoServerConfiguration(properties, polarisDomainName);
+        this.trinoConfig = new TrinoServerConfiguration(properties, users, polarisDomainName);
         this.afonCatalogs = new AfonCatalogs(properties);
     }
 

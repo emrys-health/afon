@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.docs;
 
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
@@ -14,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DocumentFinderTest {
 
     private AfonPropertyProvider properties = new FilePropertyProvider("src/test/resources/config", List.of("test", "secret"));
-    private DocumentFinder finder = new DocumentFinder(properties);
+    private DocumentFinder finder = new DocumentFinder(properties, new FileUserProvider());
 
     @Test
     void canFindDocumentsOnlyForAws() {

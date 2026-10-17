@@ -1,5 +1,6 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
@@ -12,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ManageStackMainTest {
 
     private final StackPlanFactory factory = new StackPlanFactory();
-    private final ManageStackMain manager = new ManageStackMain(factory);
+    private final ManageStackMain manager = new ManageStackMain(factory, new FileUserProvider());
 
     @Test
     void canResolveActionOnStackCaseInsensitively() {

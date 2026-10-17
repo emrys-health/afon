@@ -314,10 +314,11 @@ public class StepActions {
     /**
      * Synthesises the plan of the stack into its stack dir, from the config.
      * @param properties the config, which the caller has already, so that every step is validated against the same
+     * @param users the users, which the caller has already
      * @throws RuntimeException if the stack fails to synthesise, eg because of a missing property
      */
-    protected void synthesiseStack(StackId stackId, AfonPropertyProvider properties) throws Exception {
-        new CloudStackValidator().validate(stackId, properties);
+    protected void synthesiseStack(StackId stackId, AfonPropertyProvider properties, AfonUserProvider users) throws Exception {
+        new CloudStackValidator().validate(stackId, properties, users);
     }
 
     /**

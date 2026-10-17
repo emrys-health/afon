@@ -27,7 +27,6 @@ import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.FileUserProvider;
 import org.slf4j.Logger;
 
 import java.net.URLEncoder;
@@ -151,7 +150,7 @@ public class JupyterHubConfig {
     private final   List<ITerraformDependable>    issuerDependencies;
     private final   String                        jupyterPassword;
     private final   List<GuacamoleConfig.Session> sessions;
-    private final   AfonUserProvider              userProvider = new FileUserProvider();
+    private final   AfonUserProvider              userProvider;
     protected final AfonPropertyProvider        properties;
 
     /**
@@ -165,11 +164,13 @@ public class JupyterHubConfig {
         TerraformStack stack,
         CloudPlatform platform,
         AfonPropertyProvider properties,
+        AfonUserProvider userProvider,
         List<ITerraformDependable> issuerDependencies) {
         this.stack           = stack;
         this.platform        = platform;
         this.issuerDependencies = List.copyOf(issuerDependencies);
         this.properties      = properties;
+        this.userProvider    = userProvider;
         this.jupyterPassword = properties.getValue(AfonProperty.JUPYTER_VNC_PASSWORD);
         // One Guacamole login per user, keyed by email; each streams that user's own pod desktop on
         // the single VNC port (each user now has their own pod rather than sharing ports on one).

@@ -4,6 +4,7 @@ import com.hashicorp.cdktf.App;
 import com.hashicorp.cdktf.AppConfig;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.StackId;
 
 import java.io.IOException;
@@ -83,7 +84,7 @@ public class SynthesisSupport {
         try {
             AfonPropertyProvider properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
             App app = new App(AppConfig.builder().outdir(outDir.toString()).build());
-            new ComposedStack(app, StackDefinitions.get(stackId), properties);
+            new ComposedStack(app, StackDefinitions.get(stackId), properties, new FileUserProvider());
             app.synth();
         } finally {
             systemProperties.keySet().forEach(System::clearProperty);

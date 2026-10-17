@@ -4,7 +4,6 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.spark.SparkClient;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -27,7 +26,7 @@ abstract public class SparkRunner {
         this.properties = properties;
     }
 
-    public static void parseAndExecute(SparkRunner app, AfonPropertyProvider properties, String[] args) {
+    public static void parseAndExecute(SparkRunner app, AfonPropertyProvider properties, AfonUserProvider users, String[] args) {
         try {
             if (args.length < 4) {
                 System.out.printf("""
@@ -54,7 +53,7 @@ abstract public class SparkRunner {
             if (args.length == 7) {
                 user = AfonUserProvider.createUser(args[5], args[6]);
             } else {
-                user = new FileUserProvider().getConfiguredUser(properties);
+                user = users.getConfiguredUser(properties);
             }
             SparkSession spark = new SparkClient(cloud, properties, user).sparkSession(catalogName);
             app.doRun(spark, catalogName, namespace, tableName, lines);

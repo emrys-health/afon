@@ -1,8 +1,8 @@
 package health.emrys.afon.spark;
 
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.FileUserProvider;
 
 import static health.emrys.afon.config.AfonProperty.*;
 
@@ -20,8 +20,8 @@ public class SparkWarehouseConfigFactory {
     /**
      * Creates a config authenticating as the configured user from users.csv, named by {@code USER_ID}.
      */
-    public SparkWarehouseConfig createConfig(AfonPropertyProvider properties) {
-        return createConfig(properties, new FileUserProvider().getConfiguredUser(properties));
+    public SparkWarehouseConfig createConfig(AfonPropertyProvider properties, AfonUserProvider users) {
+        return createConfig(properties, users.getConfiguredUser(properties));
     }
 
     public SparkWarehouseConfig createConfig(AfonPropertyProvider properties, AfonUser user) {

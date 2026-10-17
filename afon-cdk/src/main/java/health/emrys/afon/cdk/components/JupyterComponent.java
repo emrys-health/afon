@@ -30,7 +30,7 @@ public class JupyterComponent implements StackComponent {
                                                               .map(keycloak -> List.of(keycloak.dnsRecord()))
                                                               .orElse(List.of());
         JupyterHubConfig jupyter = new JupyterHubConfig(
-            context.stack(), platform, context.properties(), issuerDependencies);
+            context.stack(), platform, context.properties(), context.users(), issuerDependencies);
         // Every Service the hub deploy creates fires the cloud's mutating webhooks, if it has any, which the
         // service dependables wait for
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.getDependables());

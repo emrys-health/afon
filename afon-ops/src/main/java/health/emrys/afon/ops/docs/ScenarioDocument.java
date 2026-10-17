@@ -4,6 +4,7 @@ import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.cdk.azure.AzureCleanupHelper;
 import health.emrys.afon.cdk.components.SnowflakeComponent;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.flow.FlowItem;
@@ -35,8 +36,8 @@ public class ScenarioDocument extends AbstractDocument {
      * @param stackId  the stack the scenario is run on
      * @param scenario the scenario of the stack, eg {@code external-azure}
      */
-    public ScenarioDocument(AfonPropertyProvider properties, StackId stackId, String scenario) {
-        super(properties);
+    public ScenarioDocument(AfonPropertyProvider properties, AfonUserProvider users, StackId stackId, String scenario) {
+        super(properties, users);
         this.stack = stackId;
         this.scenario = scenario;
         this.setups = setupsOf(stackId, scenario);

@@ -4,6 +4,8 @@ import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.docs.DocumentNames;
 import health.emrys.afon.ops.flow.FlowPlanFactory;
@@ -73,9 +75,11 @@ public class ManageStackMain {
     static final String EXPORT_FLOWS = "--export-flows";
 
     private final StackPlanFactory factory;
+    private final AfonUserProvider users;
 
-    ManageStackMain(StackPlanFactory factory) {
+    ManageStackMain(StackPlanFactory factory, AfonUserProvider users) {
         this.factory = factory;
+        this.users = users;
     }
 
     /**
@@ -192,7 +196,7 @@ public class ManageStackMain {
             System.exit(1);
             return;
         }
-        ManageStackMain manager = new ManageStackMain(new StackPlanFactory());
+        ManageStackMain manager = new ManageStackMain(new StackPlanFactory(), new FileUserProvider());
         if (Arrays.stream(allArgs).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
             manager.help(Arrays.stream(allArgs).filter(arg -> !arg.equals("-h") && !arg.equals("--help"))
                                .toArray(String[]::new));
@@ -241,7 +245,7 @@ public class ManageStackMain {
             logger.warn(warning);
         }
         logger.info("Running {} on stack {}{}", action, stackId, replace ? ", replacing the conflicting stacks" : "");
-        new StepRunner().runUsing(stepsProvider, Arrays.copyOfRange(args, 2, args.length));
+        new StepRunner(users).runUsing(stepsProvider, Arrays.copyOfRange(args, 2, args.length));
     }
 
     private void run(String[] args, boolean replace, boolean dryRun) {
@@ -295,7 +299,7 @@ public class ManageStackMain {
         List<FlowStep> steps;
         try {
             StackFlow flow = StackFlows.get(args[1], factory, properties);
-            steps = new FlowPlanFactory(factory).steps(flow, new StepOperations(new StepActions(), properties), replace);
+            steps = new FlowPlanFactory(factory).steps(flow, new StepOperations(new StepActions(), properties, users), replace);
         } catch (IllegalArgumentException e) {
             System.out.println(e.getMessage());
             printFlows();
@@ -334,7 +338,7 @@ public class ManageStackMain {
             return;
         }
         logger.info("Running scenario {} on stack {}", args[2], args[1]);
-        new StepRunner().runUsing(stepsProvider, Arrays.copyOfRange(args, 3, args.length));
+        new StepRunner(users).runUsing(stepsProvider, Arrays.copyOfRange(args, 3, args.length));
     }
 
 

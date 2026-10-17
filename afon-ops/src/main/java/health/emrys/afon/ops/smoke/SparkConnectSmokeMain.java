@@ -1,5 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.*;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
@@ -37,10 +39,12 @@ public class SparkConnectSmokeMain {
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectSmokeMain.class);
 
     private final AfonPropertyProvider properties;
+    private final AfonUserProvider users;
     private final AfonCatalog catalog;
 
-    public SparkConnectSmokeMain(AfonPropertyProvider properties) {
+    public SparkConnectSmokeMain(AfonPropertyProvider properties, AfonUserProvider users) {
         this.properties = properties;
+        this.users = users;
         AfonCloud cloud = new SmokeConfig(properties).cloud();
         String polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
         this.properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
@@ -66,7 +70,7 @@ public class SparkConnectSmokeMain {
                     SmokeConfig.SPARK_CONNECTOR_POD,
                     15002,
                     15002)) {
-                SparkSession spark = readTable(new SparkConnectClient(properties));
+                SparkSession spark = readTable(new SparkConnectClient(properties, users));
                 logger.info("Test successful. About to close Spark session. Please wait for threads to die...");
                 spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
             }
@@ -79,7 +83,7 @@ public class SparkConnectSmokeMain {
 
     public static void main(String[] args) {
         AfonPropertyProvider properties = new OpsPropertyProvider();
-        new SparkConnectSmokeMain(properties).callSparkConnectorInCluster();
+        new SparkConnectSmokeMain(properties, new FileUserProvider()).callSparkConnectorInCluster();
     }
 
 }
