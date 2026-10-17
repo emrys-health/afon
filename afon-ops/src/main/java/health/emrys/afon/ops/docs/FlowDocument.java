@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.docs;
 
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.flow.FlowItem;
@@ -34,8 +35,8 @@ public class FlowDocument extends AbstractDocument {
     private final StackFlow flow;
     private final Map<Step, String> headings = new IdentityHashMap<>();
 
-    public FlowDocument(AfonPropertyProvider properties, String flowName) {
-        super(properties);
+    public FlowDocument(AfonPropertyProvider properties, AfonUserProvider users, String flowName) {
+        super(properties, users);
         this.flow = StackFlows.get(flowName, FACTORY, properties);
     }
 
@@ -98,7 +99,7 @@ public class FlowDocument extends AbstractDocument {
         StringBuilder out = new StringBuilder("The steps being run are:\n");
         List<FlowStep> steps = new FlowPlanFactory(FACTORY).steps(
             flow, new StepOperations(new DocumentingStepActions(java.io.OutputStream.nullOutputStream()),
-                                     properties), false);
+                                     properties, users), false);
         int current = 0;
         for (FlowStep step : steps) {
             if (step.itemIndex() != current) {

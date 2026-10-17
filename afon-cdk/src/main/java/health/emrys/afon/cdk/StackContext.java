@@ -2,6 +2,7 @@ package health.emrys.afon.cdk;
 
 import com.hashicorp.cdktf.TerraformStack;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.StackId;
 
 import java.util.LinkedHashMap;
@@ -18,13 +19,16 @@ public class StackContext {
     private final StackId                                     stackId;
     private final CloudPlatform                               platform;
     private final AfonPropertyProvider                        properties;
+    private final AfonUserProvider                            users;
     private final Map<Class<? extends StackComponent>, StackComponent> deployed = new LinkedHashMap<>();
 
-    public StackContext(TerraformStack stack, StackId stackId, CloudPlatform platform, AfonPropertyProvider properties) {
+    public StackContext(TerraformStack stack, StackId stackId, CloudPlatform platform, AfonPropertyProvider properties,
+                        AfonUserProvider users) {
         this.stack      = stack;
         this.stackId    = stackId;
         this.platform   = platform;
         this.properties = properties;
+        this.users      = users;
     }
 
     public TerraformStack stack() {
@@ -41,6 +45,10 @@ public class StackContext {
 
     public AfonPropertyProvider properties() {
         return properties;
+    }
+
+    public AfonUserProvider users() {
+        return users;
     }
 
     /**

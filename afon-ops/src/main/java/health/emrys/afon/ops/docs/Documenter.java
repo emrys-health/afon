@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.Redacter;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
@@ -24,9 +25,11 @@ public class Documenter {
     private static final Logger logger = getLogger(Documenter.class);
 
     private final AfonPropertyProvider properties;
+    private final AfonUserProvider users;
 
-    public Documenter(AfonPropertyProvider properties) {
+    public Documenter(AfonPropertyProvider properties, AfonUserProvider users) {
         this.properties = properties;
+        this.users = users;
     }
 
     public void generateDocuments(List<DocumentMetadata> documents) {
@@ -88,8 +91,8 @@ public class Documenter {
     }
 
      private void writeSteps(DocumentMetadata documentMetadata, OutputStream fos) {
-        List<Step> steps = documentMetadata.steps(new StepOperations(new DocumentingStepActions(fos), properties));
-        new StepRunner().runSteps(steps.stream().map(x -> decorating(x, fos, documentMetadata.sectionHeading(x))).toList());
+        List<Step> steps = documentMetadata.steps(new StepOperations(new DocumentingStepActions(fos), properties, users));
+        new StepRunner(users).runSteps(steps.stream().map(x -> decorating(x, fos, documentMetadata.sectionHeading(x))).toList());
     }
 
     private Step decorating(Step step, OutputStream outputStream, String sectionHeading) {

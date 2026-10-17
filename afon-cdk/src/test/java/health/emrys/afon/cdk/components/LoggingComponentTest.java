@@ -22,7 +22,7 @@ class LoggingComponentTest {
 
     private StackContext contextOf(StackId stackId) {
         // no platform: the component only needs it to ship logs
-        return new StackContext(null, stackId, null, properties);
+        return new StackContext(null, stackId, null, properties, null);
     }
 
     @Test

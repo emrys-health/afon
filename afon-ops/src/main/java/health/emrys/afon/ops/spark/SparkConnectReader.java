@@ -1,5 +1,7 @@
 package health.emrys.afon.ops.spark;
 
+import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.DefaultPropertyProvider;
@@ -23,15 +25,17 @@ public class SparkConnectReader {
 
     private static final Logger               logger = LoggerFactory.getLogger(SparkConnectReader.class);
     private final        AfonPropertyProvider properties;
+    private final        AfonUserProvider     users;
 
-    private SparkConnectReader(AfonPropertyProvider properties) {
+    private SparkConnectReader(AfonPropertyProvider properties, AfonUserProvider users) {
         this.properties = properties;
+        this.users = users;
     }
 
     public static void main(String[] args) {
         AfonPropertyProvider properties = new DefaultPropertyProvider();
         properties.setValue(AfonProperty.POLARIS_ENDPOINT, "westmidspolarisazure.click");
-        SparkConnectReader app = new SparkConnectReader(properties);
+        SparkConnectReader app = new SparkConnectReader(properties, new FileUserProvider());
         app.sparkLocalRead("westmids", "azure"); // this is fast
 //        app.sparkConnectRead("westmids", "azure"); // this is slow
     }
@@ -42,7 +46,7 @@ public class SparkConnectReader {
      * for this.
      */
     public void sparkConnectRead(String warehouse, String catalogName) throws IOException {
-        SparkConnectClient client = new SparkConnectClient(properties);
+        SparkConnectClient client = new SparkConnectClient(properties, users);
         SparkSession       spark  = client.sparkSession(warehouse, catalogName);
         readTable(warehouse, spark);
     }
@@ -65,7 +69,7 @@ public class SparkConnectReader {
         SparkSession.Builder builder = SparkSession.builder().config(new SparkConf().setMaster("local[2]").setAppName("Tests"));
 
         final StringBuffer   sb              = new StringBuffer();
-        SparkWarehouseConfig warehouseConfig = SparkWarehouseConfigFactory.getFactory().createConfig(properties);
+        SparkWarehouseConfig warehouseConfig = SparkWarehouseConfigFactory.getFactory().createConfig(properties, users);
         Map<String, String>  config          = warehouseConfig.sparkConfigs(warehouse, catalogName);
         config.entrySet()
               .forEach(entry -> {

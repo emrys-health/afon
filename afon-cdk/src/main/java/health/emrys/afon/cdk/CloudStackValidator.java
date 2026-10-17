@@ -2,6 +2,7 @@ package health.emrys.afon.cdk;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.StackId;
 import org.slf4j.Logger;
 
@@ -59,16 +60,16 @@ public class CloudStackValidator {
 
     /**
      * Validates the stack by synthesising its plan into {@link #stackDir(StackId)}, from the given config,
-     * which is that of the caller, eg the operations of the steps, rather than one read again.
+     * which is that of the caller, eg the operations of the steps, rather than one read again, and the users.
      *
      * @return the dir the stack was synthesised into
      * @throws RuntimeException if the stack fails to synthesise, eg because a property is missing
      */
-    public String validate(StackId stackId, AfonPropertyProvider properties) {
+    public String validate(StackId stackId, AfonPropertyProvider properties, AfonUserProvider users) {
         String stackDir = stackDir(stackId);
         logger.info("Validating stack {} by synthesising it into {}", stackId, stackDir);
         try {
-            ComposedStack.synthesise(stackId, properties);
+            ComposedStack.synthesise(stackId, properties, users);
         } catch (RuntimeException e) {
             logger.error("Failed to validate stack {}", stackId, e);
             throw e;

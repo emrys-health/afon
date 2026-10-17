@@ -2,6 +2,7 @@ package health.emrys.afon.ops.docs;
 
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
@@ -94,7 +95,7 @@ public class DocumentingStepActions extends StepActions {
     }
 
     @Override
-    protected void synthesiseStack(StackId stackId, AfonPropertyProvider properties) throws Exception {
+    protected void synthesiseStack(StackId stackId, AfonPropertyProvider properties, AfonUserProvider users) throws Exception {
         run("afon-cli.sh", null, "validate-stack", stackId.toString());
     }
 

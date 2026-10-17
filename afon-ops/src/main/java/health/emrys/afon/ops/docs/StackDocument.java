@@ -5,6 +5,7 @@ import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.cdk.components.KeycloakComponent;
 import health.emrys.afon.cdk.components.PolarisComponent;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.plan.StackPlanFactory;
@@ -33,8 +34,8 @@ public class StackDocument extends AbstractDocument {
     private final StackId stackId;
     private final StepsProvider stepsProvider;
 
-    public StackDocument(AfonPropertyProvider properties, StackAction action, StackId stackId) {
-        super(properties);
+    public StackDocument(AfonPropertyProvider properties, AfonUserProvider users, StackAction action, StackId stackId) {
+        super(properties, users);
         this.action = action;
         this.stackId = stackId;
         this.stepsProvider = FACTORY.stepsProviderFor(action, stackId, false);

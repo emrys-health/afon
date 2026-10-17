@@ -1,5 +1,7 @@
 package health.emrys.afon.ops.steps;
 
+import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -34,7 +36,7 @@ class StepOperationsTest {
 
     private final StepActions actions = new StepActions() {
         @Override
-        protected void synthesiseStack(StackId stackId, AfonPropertyProvider config) {
+        protected void synthesiseStack(StackId stackId, AfonPropertyProvider config, AfonUserProvider users) {
             calls.add("synthesise " + stackId + (config == properties ? " with the config of the operations" : " with another config"));
             if (synthesisFailure != null) {
                 throw synthesisFailure;
@@ -52,7 +54,7 @@ class StepOperationsTest {
         }
     };
 
-    private final StepOperations operations = new StepOperations(actions, properties);
+    private final StepOperations operations = new StepOperations(actions, properties, new FileUserProvider());
 
     @Test
     void checkingKeyCloakAnswersSaysToSetUpTheKeyCloakStackOfTheCloudOrOfAnotherIfItHasNone() throws Throwable {

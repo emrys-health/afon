@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
@@ -13,9 +14,11 @@ import static java.lang.String.join;
 public abstract class AbstractDocument implements DocumentMetadata {
 
     protected final AfonPropertyProvider properties;
+    protected final AfonUserProvider users;
 
-    protected AbstractDocument(AfonPropertyProvider properties) {
+    protected AbstractDocument(AfonPropertyProvider properties, AfonUserProvider users) {
         this.properties = properties;
+        this.users = users;
     }
 
     public String getDescription() {
@@ -51,7 +54,7 @@ public abstract class AbstractDocument implements DocumentMetadata {
      * The list of the steps being run, with how to resume from one.
      */
     protected String stepsBeingRun() {
-        StepOperations operations = new StepOperations(new DocumentingStepActions(OutputStream.nullOutputStream()), properties);
+        StepOperations operations = new StepOperations(new DocumentingStepActions(OutputStream.nullOutputStream()), properties, users);
         List<Step> steps = steps(operations);
         if (steps.size() == 0){
             return format("The document %s has no steps.", getClass().getName());

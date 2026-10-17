@@ -1,9 +1,9 @@
 package health.emrys.afon.spark.connect;
 
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
@@ -51,18 +51,18 @@ public class SparkConnectClient {
      * Authenticates as the configured user, from users.csv, named by {@link AfonProperty#USER_ID},
      * whose OIDC token is obtained from KeyCloak.
      */
-    public SparkConnectClient(AfonPropertyProvider properties) throws IOException {
-        this(properties, new FileUserProvider().getConfiguredUser(properties));
+    public SparkConnectClient(AfonPropertyProvider properties, AfonUserProvider users) throws IOException {
+        this(properties, users.getConfiguredUser(properties));
     }
 
     public SparkConnectClient(AfonPropertyProvider properties, AfonUser user) throws IOException {
-        this(properties, userToken(properties, user));
+        this(properties, user, userToken(properties, user));
     }
 
-    public SparkConnectClient(AfonPropertyProvider properties, String token) {
+    private SparkConnectClient(AfonPropertyProvider properties, AfonUser user, String token) {
         this.connectionString = properties.getValue(SPARK_CONNECT_URL, DEFAULT_SPARK_CONNECT_URL);
         logger.info("Using Polaris Endpoint {}", properties.getValue(POLARIS_ENDPOINT));
-        this.sparkConfig = SparkWarehouseConfigFactory.getFactory().createConfig(properties);
+        this.sparkConfig = SparkWarehouseConfigFactory.getFactory().createConfig(properties, user);
         this.token = token;
     }
 

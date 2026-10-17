@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.steps;
 
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -11,8 +12,8 @@ public class StepRunner {
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepRunner.class);
     private final StepOperations operations;
 
-    public StepRunner() {
-        this.operations = new StepOperations(new StepActions(), new OpsPropertyProvider());
+    public StepRunner(AfonUserProvider users) {
+        this.operations = new StepOperations(new StepActions(), new OpsPropertyProvider(), users);
     }
 
     /**

@@ -1,10 +1,10 @@
 package health.emrys.afon.spark;
 
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import org.apache.spark.SparkContext;
 import org.apache.spark.sql.SparkSession;
@@ -28,8 +28,8 @@ public class SparkClient {
     /**
      * Authenticates as the configured user, from users.csv, named by {@code USER_ID}.
      */
-    public SparkClient(AfonCloud cloud, AfonPropertyProvider properties) {
-        this(cloud, properties, new FileUserProvider().getConfiguredUser(properties));
+    public SparkClient(AfonCloud cloud, AfonPropertyProvider properties, AfonUserProvider users) {
+        this(cloud, properties, users.getConfiguredUser(properties));
     }
 
     public SparkClient(AfonCloud cloud, AfonPropertyProvider properties, AfonUser user) {

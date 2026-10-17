@@ -262,7 +262,7 @@ public class ContainerHelper {
         String keyCloakUrl       = tokenEndpoint(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL);
         logger.info("Trino sees Polaris as {} and KeyCloak as {}", polarisDomainName, keyCloakUrl);
         TrinoServerConfiguration trinoConfig = new KeyCloakTrinoServerConfiguration(
-                properties, polarisDomainName,
+                properties, new FileUserProvider(), polarisDomainName,
                 // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
             keyCloakUrl
         );

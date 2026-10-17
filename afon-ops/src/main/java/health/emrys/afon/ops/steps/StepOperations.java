@@ -39,6 +39,7 @@ public class StepOperations {
     private final StepActions actions;
 
     private final AfonPropertyProvider properties;
+    private final AfonUserProvider users;
     private final AfonCatalogs afonCatalogs;
     private final String polarisNamespace;
     private final String polarisNamespaceExternal;
@@ -50,9 +51,10 @@ public class StepOperations {
     private final Map<StackId, Duration> deleteDurations = new TreeMap<>();
     private final Map<StackId, Duration> deployDurations = new TreeMap<>();
 
-    public StepOperations(StepActions actions, AfonPropertyProvider properties) {
+    public StepOperations(StepActions actions, AfonPropertyProvider properties, AfonUserProvider users) {
         this.actions = actions;
         this.properties = properties;
+        this.users = users;
         this.polarisNamespace = properties.getValue(POLARIS_NAMESPACE);
         this.polarisNamespaceExternal = properties.getValue(POLARIS_NAMESPACE_EXTERNAL);
         this.polarisTableName = properties.getValue(POLARIS_TABLE_NAME);
@@ -145,7 +147,7 @@ public class StepOperations {
      */
     private void startStack(StackId stackId) throws Exception {
         timed(deployDurations, stackId, () -> {
-            actions.synthesiseStack(stackId, properties);
+            actions.synthesiseStack(stackId, properties, users);
             actions.startStack(stackId, tofuOutput());
         });
     }
@@ -172,7 +174,7 @@ public class StepOperations {
         }
         logger.info("Validating stack {} again before deleting it, so that its plan is current", stackId);
         try {
-            actions.synthesiseStack(stackId, properties);
+            actions.synthesiseStack(stackId, properties, users);
         } catch (Exception cause) {
             throw new IllegalStateException(String.format(
                 "Cannot delete stack %s, as it failed to validate against the current config: %s%n"

@@ -1,8 +1,8 @@
 package health.emrys.afon.trino;
 
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.FileUserProvider;
 import org.jspecify.annotations.NonNull;
 
 import static health.emrys.afon.security.SecurityUtils.KEYCLOAK_SCOPE;
@@ -28,9 +28,10 @@ public class KeyCloakTrinoServerConfiguration extends TrinoServerConfiguration {
      * Authenticates as the configured user, from users.csv, named by {@code USER_ID}.
      */
     public KeyCloakTrinoServerConfiguration(AfonPropertyProvider properties,
+                                            AfonUserProvider users,
                                             String polarisDomainName,
                                             String oauth2ServerUri) {
-        this(properties, polarisDomainName, oauth2ServerUri, new FileUserProvider().getConfiguredUser(properties));
+        this(properties, polarisDomainName, oauth2ServerUri, users.getConfiguredUser(properties));
     }
 
     public KeyCloakTrinoServerConfiguration(AfonPropertyProvider properties,
