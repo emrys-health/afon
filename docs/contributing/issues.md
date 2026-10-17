@@ -9,6 +9,8 @@ Every change starts from an issue, and every commit references one (see [pull re
   If one already covers it, add your details, or a 👍, there rather than opening a duplicate.
 - **Check the docs**, eg the troubleshooting sections of [smoke tests](../smoke_tests.md) and
   [operations](../operations.md), in case it is a known problem with a known fix.
+<!-- TODO: the advisory link below 404s until private vulnerability reporting is enabled (Settings > Advanced Security),
+     which is planned once the repo is made public.  The same link is in .github/ISSUE_TEMPLATE/config.yml -->
 - **Security vulnerabilities must not be reported in a public issue**: use GitHub's
   [private vulnerability reporting](https://github.com/emrys-health/afon-core/security/advisories/new) instead.
 - **Never include secrets** in an issue: credentials, tokens, passwords, keys, the content of `secret*.properties`

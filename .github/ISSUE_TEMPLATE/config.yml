@@ -1,0 +1,6 @@
+# TODO: the security link below 404s until private vulnerability reporting is enabled (Settings > Advanced Security)
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/emrys-health/afon-core/security/advisories/new
+    about: Do not report vulnerabilities in a public issue; use private vulnerability reporting.
