@@ -23,23 +23,23 @@ public interface AfonPropertyProvider {
     void setValue(AfonProperty property, String value);
 
     /**
-     * Reads the cloud's own property of a logical name, by the convention {@code <CLOUD>_<NAME>}, see
-     * {@link AfonProperty#forCloud(AfonCloud, String)}, eg {@code getCloudValue(AWS, "POLARIS_DOMAIN_NAME")} reads
+     * Reads the cloud's own property of a cloud-agnostic name, by the convention {@code <CLOUD>_<NAME>}, see
+     * {@link AfonCloudProperty#forCloud(AfonCloud)}, eg {@code getCloudValue(AWS, POLARIS_DOMAIN_NAME)} reads
      * {@code AWS_POLARIS_DOMAIN_NAME}.
      *
      * @throws IllegalArgumentException if the cloud has no property of that name, or it is not set
      */
-    default String getCloudValue(AfonCloud cloud, String logicalName) {
-        return getValue(AfonProperty.forCloud(cloud, logicalName).orElseThrow(() -> new IllegalArgumentException(String.format(
-            "No property %s_%s for the cloud %s", cloud.toString().toUpperCase(), logicalName, cloud))));
+    default String getCloudValue(AfonCloud cloud, AfonCloudProperty cloudProperty) {
+        return getValue(cloudProperty.forCloud(cloud).orElseThrow(() -> new IllegalArgumentException(String.format(
+            "No property %s_%s for the cloud %s", cloud.toString().toUpperCase(), cloudProperty.name(), cloud))));
     }
 
     /**
-     * As {@link #getCloudValue(AfonCloud, String)} but falls back to {@code defaultValue} when the cloud has no
+     * As {@link #getCloudValue(AfonCloud, AfonCloudProperty)} but falls back to {@code defaultValue} when the cloud has no
      * property of that name, or it is not set, as for properties that only some clouds have, or are optional.
      */
-    default String getCloudValue(AfonCloud cloud, String logicalName, String defaultValue) {
-        return AfonProperty.forCloud(cloud, logicalName)
+    default String getCloudValue(AfonCloud cloud, AfonCloudProperty cloudProperty, String defaultValue) {
+        return cloudProperty.forCloud(cloud)
                            .map(property -> getValue(property, defaultValue))
                            .orElse(defaultValue);
     }

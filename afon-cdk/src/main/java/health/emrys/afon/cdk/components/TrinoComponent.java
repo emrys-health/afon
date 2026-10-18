@@ -6,6 +6,7 @@ import health.emrys.afon.cdk.StackComponent;
 import com.hashicorp.cdktf.ITerraformDependable;
 import health.emrys.afon.cdk.CloudPlatform;
 import health.emrys.afon.cdk.configs.TrinoWorkloads;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonCatalogs;
 
 import java.util.ArrayList;
@@ -25,7 +26,7 @@ public class TrinoComponent implements StackComponent {
         // fires the cloud's mutating webhooks, if it has any, which the service dependables wait for.
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.getDependables());
         dependsOn.addAll(platform.getServiceDependables());
-        new TrinoWorkloads(context.properties(), context.users(), context.properties().getCloudValue(platform.cloud(), "POLARIS_DOMAIN_NAME"))
+        new TrinoWorkloads(context.properties(), context.users(), context.properties().getCloudValue(platform.cloud(), AfonCloudProperty.POLARIS_DOMAIN_NAME))
             .deploy(context.stack(), platform.configureHelm(),
                     cloudToCatalog(platform.cloud(), new AfonCatalogs(context.properties())), dependsOn);
     }

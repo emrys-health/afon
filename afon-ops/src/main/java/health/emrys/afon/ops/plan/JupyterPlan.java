@@ -2,6 +2,7 @@ package health.emrys.afon.ops.plan;
 
 import health.emrys.afon.cdk.components.JupyterComponent;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 
 import java.util.List;
@@ -21,11 +22,11 @@ public class JupyterPlan implements ComponentPlan {
 
     @Override
     public List<AfonProperty> domains(AfonCloud cloud) {
-        return List.of(AfonProperty.forCloud(cloud, "JUPYTER_DOMAIN_NAME").orElseThrow());
+        return List.of(AfonCloudProperty.JUPYTER_DOMAIN_NAME.forCloud(cloud).orElseThrow());
     }
 
     @Override
     public List<AfonProperty> certificates(AfonCloud cloud) {
-        return ComponentPlan.ofCloud(cloud, "JUPYTER_CERT_ARN");
+        return ComponentPlan.onAws(cloud, AfonProperty.AWS_JUPYTER_CERT_ARN);
     }
 }

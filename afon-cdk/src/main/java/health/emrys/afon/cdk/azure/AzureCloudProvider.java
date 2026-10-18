@@ -42,6 +42,7 @@ import health.emrys.afon.cdk.CachedTlsSecret;
 import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.cdk.LogStorage;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -698,7 +699,10 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     }
 
     private List<String> allowedCidrs(String component) {
-        return parseCidrs(properties.getCloudValue(AZURE, component.toUpperCase() + "_ALLOWED_CIDRS", ""));
+        // only Polaris has an allow-list; the other components are open to all
+        return component.equals("polaris")
+               ? parseCidrs(properties.getCloudValue(AZURE, AfonCloudProperty.POLARIS_ALLOWED_CIDRS, ""))
+               : List.of();
     }
 
     static List<String> parseCidrs(String csv) {

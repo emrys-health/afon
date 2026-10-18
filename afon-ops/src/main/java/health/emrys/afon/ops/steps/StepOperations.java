@@ -4,6 +4,7 @@ import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.*;
 import health.emrys.afon.ops.snowflake.SnowflakeStatements;
 import health.emrys.afon.ops.spark.SparkRunner;
@@ -133,7 +134,7 @@ public class StepOperations {
      * a call without it with 401.  It asks for the config of the catalog API, which it answers before any catalog exists.
      */
     public Step checkPolarisAnswers(AfonCloud cloud) {
-        String url = "https://" + properties.getCloudValue(cloud, "POLARIS_DOMAIN_NAME") + "/api/catalog/v1/config";
+        String url = "https://" + properties.getCloudValue(cloud, AfonCloudProperty.POLARIS_DOMAIN_NAME) + "/api/catalog/v1/config";
         Optional<StackId> catalog = StackDefinitions.withRole(cloud, StackRole.CATALOG).map(StackDefinition::id);
         return new Step(format("check_polaris_answers_for_cloud_%s", cloud),
                 format("check Polaris answers at %s", url),

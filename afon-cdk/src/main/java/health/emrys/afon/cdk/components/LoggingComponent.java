@@ -7,6 +7,7 @@ import health.emrys.afon.cdk.aws.AwsPolarisLogShipper;
 import health.emrys.afon.cdk.azure.AzureCloudProvider;
 import health.emrys.afon.cdk.azure.AzurePolarisLogShipper;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.slf4j.Logger;
 
@@ -37,7 +38,7 @@ public class LoggingComponent implements StackComponent {
                 "Stack %s cannot ship Polaris logs, not supported for cloud %s",
                 context.stackId(), cloud));
         }
-        String logBucket = properties.getCloudValue(cloud, "POLARIS_LOG_BUCKET", "").trim();
+        String logBucket = properties.getCloudValue(cloud, AfonCloudProperty.POLARIS_LOG_BUCKET, "").trim();
         if (logBucket.isEmpty()) {
             logger.info("Stack {} ships no Polaris logs, as {}_POLARIS_LOG_BUCKET is not set", context.stackId(),
                         cloud.toString().toUpperCase());

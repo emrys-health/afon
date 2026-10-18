@@ -1,7 +1,6 @@
 package health.emrys.afon.config;
 
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -196,18 +195,6 @@ public enum AfonProperty {
      */
     public String getValueFrom(Properties properties, String defaultValue) {
         return properties.getProperty(name, defaultValue);
-    }
-
-    /**
-     * The cloud's own property of a logical name, by the convention {@code <CLOUD>_<NAME>}, eg
-     * {@code AWS_POLARIS_DOMAIN_NAME} for the cloud {@link AfonCloud#AWS} and the name {@code POLARIS_DOMAIN_NAME}, so
-     * that what is deployed to any cloud takes the config of that cloud.
-     *
-     * @return the property, or empty if the cloud has none of that name
-     */
-    public static Optional<AfonProperty> forCloud(AfonCloud cloud, String logicalName) {
-        String name = cloud.toString().toUpperCase(Locale.ROOT) + "_" + logicalName;
-        return Arrays.stream(values()).filter(property -> property.name.equals(name)).findFirst();
     }
 
     public static Set<String> getAllNames() {

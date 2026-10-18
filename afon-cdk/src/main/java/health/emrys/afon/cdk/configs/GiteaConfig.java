@@ -9,6 +9,7 @@ import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
@@ -241,7 +242,7 @@ public class GiteaConfig {
      * are both reached through Gitea's S3 client ({@code minio}), GCS by its S3 compatible API.
      */
     Map<String, String> storageSection() {
-        String              bucket  = properties.getCloudValue(cloud, "GITEA_BUCKET");
+        String              bucket  = properties.getCloudValue(cloud, AfonCloudProperty.GITEA_BUCKET);
         if (bucket.isBlank()) {
             throw new IllegalArgumentException(cloud.toString().toUpperCase(Locale.ROOT)
                                                + "_GITEA_BUCKET is not set, which Gitea needs for its storage, so create it with "

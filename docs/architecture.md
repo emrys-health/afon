@@ -252,8 +252,8 @@ The flow, from the commands to the plan:
                  StepActions.startStack: tofu init, tofu apply
 ```
 
-**Config per cloud.** A component asks for the logical name of a property and gets the one of its cloud, by the
-convention `<CLOUD>_<NAME>`, eg `getCloudValue(cloud, "POLARIS_DOMAIN_NAME")` reads `AWS_POLARIS_DOMAIN_NAME` on AWS and
+**Config per cloud.** A component asks for the `AfonCloudProperty` (the cloud-agnostic name) of a property and gets the one of its cloud, by the
+convention `<CLOUD>_<NAME>`, eg `getCloudValue(cloud, POLARIS_DOMAIN_NAME)` reads `AWS_POLARIS_DOMAIN_NAME` on AWS and
 `AZURE_POLARIS_DOMAIN_NAME` on Azure. The properties are still declared in `AfonProperty`. A property the cloud does
 not have, eg the Route 53 zone on Azure, is an error, or the default when one is given.
 
