@@ -70,6 +70,7 @@ import health.emrys.afon.cdk.HttpsExposure;
 import health.emrys.afon.cdk.LogStorage;
 import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
@@ -1264,7 +1265,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
      */
     @Override
     public HttpsExposure exposeHttps(HttpsRoute route) {
-        String component = route.component().toUpperCase();
         // the construct ids are in the tofu state of the deployed stacks, so cannot be named alike
         String[] constructIds = switch (route.component()) {
             case "polaris" -> new String[]{"polaris-https-ingress", "IngressAliasRecord"};
@@ -1275,21 +1275,44 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         IngressV1 ingress = createHttpsIngress(
             constructIds[0],
             route.ingressName(),
-            properties.getCloudValue(AWS, component + "_CERT_ARN"),
+            properties.getValue(certArn(route.component())),
             route.domainName(),
             route.service(),
             route.port(),
             route.healthCheck(),
             getSubnetIds(),
-            polarisInboundCidrs(properties.getCloudValue(AWS, component + "_ALLOWED_CIDRS", "")));
+            polarisInboundCidrs(allowedCidrs(route.component())));
         Route53Record dnsRecord = configureDNS(
             constructIds[1],
-            properties.getCloudValue(AWS, component + "_DNS_ZONE"),
+            properties.getValue(dnsZone(route.component())),
             route.domainName(),
             getLbRelease(),
             ingress,
             route.ingressName());
         return new HttpsExposure(ingress, dnsRecord);
+    }
+
+    private static AfonProperty certArn(String component) {
+        return switch (component) {
+            case "polaris" -> AfonProperty.AWS_POLARIS_CERT_ARN;
+            case "jupyter" -> AfonProperty.AWS_JUPYTER_CERT_ARN;
+            case "keycloak" -> AfonProperty.AWS_KEYCLOAK_CERT_ARN;
+            default -> throw new IllegalArgumentException("No ACM certificate property for the component " + component);
+        };
+    }
+
+    private static AfonProperty dnsZone(String component) {
+        return switch (component) {
+            case "polaris" -> AfonProperty.AWS_POLARIS_DNS_ZONE;
+            case "jupyter" -> AfonProperty.AWS_JUPYTER_DNS_ZONE;
+            case "keycloak" -> AfonProperty.AWS_KEYCLOAK_DNS_ZONE;
+            default -> throw new IllegalArgumentException("No Route 53 zone property for the component " + component);
+        };
+    }
+
+    /** The allow-list of source CIDRs of the component, which only Polaris has; empty, ie open to all, for the others. */
+    private String allowedCidrs(String component) {
+        return component.equals("polaris") ? properties.getCloudValue(AWS, AfonCloudProperty.POLARIS_ALLOWED_CIDRS, "") : "";
     }
 
     /** The class the AWS load balancer controller gives the LoadBalancer services it provisions an NLB for. */

@@ -37,11 +37,11 @@ import java.util.Set;
 public interface ComponentPlan {
 
     /**
-     * @return the cloud's property of the logical name, or none if the cloud has none, eg the certificates of the ALBs, which
-     * only AWS has, so that a component can name them without asking which cloud it is
+     * @return the property if the cloud is AWS, none on the other clouds, eg the certificates of the ALBs, which only AWS has, so
+     * that a component can name them without asking which cloud it is
      */
-    static List<AfonProperty> ofCloud(AfonCloud cloud, String logicalName) {
-        return AfonProperty.forCloud(cloud, logicalName).map(List::of).orElse(List.of());
+    static List<AfonProperty> onAws(AfonCloud cloud, AfonProperty awsProperty) {
+        return cloud == AfonCloud.AWS ? List.of(awsProperty) : List.of();
     }
 
     /**
@@ -51,7 +51,7 @@ public interface ComponentPlan {
 
     /**
      * @return what the component is called in messages, eg "Polaris" in "stack <stack-id> is running and already deploys Polaris at
-     * polaris.example (AWS_POLARIS_DOMAIN_NAME)", which explains why a stack cannot be deployed beside another
+     * polaris.example.com", which explains why a stack cannot be deployed beside another
      */
     default String label() {
         return getClass().getSimpleName();
@@ -69,7 +69,7 @@ public interface ComponentPlan {
     /**
      * @return the properties of the certificates the component's HTTPS endpoint needs on the cloud, which must be issued
      * before the stack is deployed, eg the ACM certificate ARN of the ALB of the Polaris DNS record on AWS.  None by default, and
-     * on the clouds that issue them in the cluster, ie that have no such property, see {@link #ofCloud}.
+     * on the clouds that issue them in the cluster, ie that are not AWS, see {@link #onAws}.
      */
     default List<AfonProperty> certificates(AfonCloud cloud) {
         return List.of();

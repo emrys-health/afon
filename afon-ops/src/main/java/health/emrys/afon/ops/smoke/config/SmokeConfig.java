@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.smoke.config;
 
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 
 import java.util.Arrays;
@@ -55,7 +56,7 @@ public class SmokeConfig {
         Set<String> otherClouds = new HashSet<>();
         for (AfonCloud other : AfonCloud.values()) {
             if (other != cloud()) {
-                for (String name : List.of("POLARIS_DOMAIN_NAME", "JUPYTER_DOMAIN_NAME")) {
+                for (AfonCloudProperty name : List.of(AfonCloudProperty.POLARIS_DOMAIN_NAME, AfonCloudProperty.JUPYTER_DOMAIN_NAME)) {
                     otherClouds.add(properties.getCloudValue(other, name, "").trim().toLowerCase(Locale.ROOT));
                 }
             }

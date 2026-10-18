@@ -12,6 +12,7 @@ import health.emrys.afon.cdk.CloudPlatform;
 import health.emrys.afon.cdk.HealthCheck;
 import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.cdk.configs.PolarisConfig;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 
 import java.util.ArrayList;
@@ -43,7 +44,7 @@ public class PolarisComponent implements StackComponent {
     public void deploy(StackContext context) {
         CloudPlatform        platform   = context.platform();
         AfonPropertyProvider properties = context.properties();
-        domainName = properties.getCloudValue(platform.cloud(), "POLARIS_DOMAIN_NAME");
+        domainName = properties.getCloudValue(platform.cloud(), AfonCloudProperty.POLARIS_DOMAIN_NAME);
         if (platform.routesToNodePorts()) {
             deployBehindNodePort(context);
         } else {

@@ -2,6 +2,7 @@ package health.emrys.afon.ops.plan;
 
 import health.emrys.afon.cdk.components.PolarisComponent;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
@@ -27,7 +28,7 @@ public class PolarisPlan implements ComponentPlan {
 
     @Override
     public List<AfonProperty> domains(AfonCloud cloud) {
-        return List.of(AfonProperty.forCloud(cloud, "POLARIS_DOMAIN_NAME").orElseThrow());
+        return List.of(AfonCloudProperty.POLARIS_DOMAIN_NAME.forCloud(cloud).orElseThrow());
     }
 
     /**
@@ -35,7 +36,7 @@ public class PolarisPlan implements ComponentPlan {
      */
     @Override
     public List<AfonProperty> certificates(AfonCloud cloud) {
-        return ComponentPlan.ofCloud(cloud, "POLARIS_CERT_ARN");
+        return ComponentPlan.onAws(cloud, AfonProperty.AWS_POLARIS_CERT_ARN);
     }
 
     /**

@@ -23,6 +23,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
@@ -151,7 +152,7 @@ public class JupyterHubConfig {
     private final   String                        jupyterPassword;
     private final   List<GuacamoleConfig.Session> sessions;
     private final   AfonUserProvider              userProvider;
-    protected final AfonPropertyProvider        properties;
+    protected final AfonPropertyProvider          properties;
 
     /**
      * @param platform           the cloud to deploy to, whose own properties configure the hub, eg
@@ -635,7 +636,7 @@ public class JupyterHubConfig {
      * Public domain JupyterHub is served on; used to build the OIDC callback URL.
      */
     protected String jupyterDomain() {
-        return properties.getCloudValue(platform.cloud(), "JUPYTER_DOMAIN_NAME");
+        return properties.getCloudValue(platform.cloud(), AfonCloudProperty.JUPYTER_DOMAIN_NAME);
     }
 
     /**

@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * What the components of a stack, eg Polaris or Jupyter, need of the cloud they are deployed to, so that a component
  * is written once and works on any cloud, taking its config from the cloud's own properties, see
- * {@link health.emrys.afon.config.AfonPropertyProvider#getCloudValue(AfonCloud, String)}.
+ * {@link health.emrys.afon.config.AfonPropertyProvider#getCloudValue(AfonCloud, AfonCloudProperty)}.
  * <p>
  * On top of the {@link CloudProvider}, which is the cluster, a platform provides what is done differently per cloud
  * to run on it, eg exposing a service over HTTPS.

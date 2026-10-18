@@ -35,7 +35,7 @@ public class KeycloakPlan implements ComponentPlan {
      */
     @Override
     public List<AfonProperty> certificates(AfonCloud cloud) {
-        return ComponentPlan.ofCloud(cloud, "KEYCLOAK_CERT_ARN");
+        return ComponentPlan.onAws(cloud, AfonProperty.AWS_KEYCLOAK_CERT_ARN);
     }
 
     @Override

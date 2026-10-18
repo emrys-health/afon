@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk;
 
 import health.emrys.afon.cdk.components.*;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.*;
 import org.slf4j.Logger;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -116,7 +117,7 @@ public final class StackDefinitions {
      * A component of a stack, deployed if its property, when it has one, is {@code deployedIf}.
      */
     private record Entry(String name, Supplier<StackComponent> component, Class<? extends StackComponent> type,
-                         String property, boolean deployedIf) {
+                         AfonCloudProperty property, boolean deployedIf) {
         boolean isDeployed(AfonCloud cloud, AfonPropertyProvider properties) {
             return property == null
                    || Boolean.parseBoolean(properties.getCloudValue(cloud, property, "false").trim()) == deployedIf;
@@ -218,7 +219,16 @@ public final class StackDefinitions {
         }
         boolean when = map.containsKey("when");
         Object property = when ? map.get("when") : map.get("unless");
-        return new Entry(name, component, component.get().getClass(), property == null ? null : String.valueOf(property), when);
+        return new Entry(name, component, component.get().getClass(), property == null ? null : cloudProperty(stack, String.valueOf(property)), when);
+    }
+
+    private static AfonCloudProperty cloudProperty(String stack, String named) {
+        try {
+            return AfonCloudProperty.valueOf(named);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(String.format("%s has unknown property '%s', expected one of %s",
+                                                             stack, named, Arrays.toString(AfonCloudProperty.values())));
+        }
     }
 
     private static StackDefinition definition(StackId id, Map<StackId, Spec> specs) {
@@ -272,7 +282,7 @@ public final class StackDefinitions {
      * {@code <CLOUD>_KEYCLOAK_EXTERNAL}, {@code false} when unset or the cloud has no such property
      */
     public static boolean isKeyCloakExternal(AfonCloud cloud, AfonPropertyProvider properties) {
-        return Boolean.parseBoolean(properties.getCloudValue(cloud, "KEYCLOAK_EXTERNAL", "false").trim());
+        return Boolean.parseBoolean(properties.getCloudValue(cloud, AfonCloudProperty.KEYCLOAK_EXTERNAL, "false").trim());
     }
 
     /**
