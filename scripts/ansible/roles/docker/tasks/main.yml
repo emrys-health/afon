@@ -18,10 +18,21 @@
     state: present
     update_cache: true
 
-- name: Install the docker engine
+# The engine and its cli are pinned to the version in scripts/local/pinned.sh, ie the newest package version
+# starting with it (apt versions have an epoch and a release suffix, eg 5:29.9.1-1~ubuntu.26.04~resolute).
+- name: Install the docker engine {{ docker_version }}
   ansible.builtin.apt:
-    name: "{{ docker_packages }}"
+    name: "{{ docker_packages | map('regex_replace', '^(docker-ce(-cli)?)$', '\\1=5:' ~ docker_version ~ '*') | list }}"
     state: present
+    allow_downgrade: true
+
+- name: Hold the docker engine packages, so that upgrades leave them alone
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - docker-ce
+    - docker-ce-cli
 
 - name: Enable and start the docker daemon
   ansible.builtin.systemd_service:

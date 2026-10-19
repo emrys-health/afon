@@ -11,6 +11,8 @@ if [ "$CLOUD" == "ALL" ]; then
   CLOUD=
 fi
 
+source $AFON_ROOT/scripts/local/pinned.sh
+
 echo "## Local setup" > $VERSIONS_OUTPUT
 echo "### os" >> $VERSIONS_OUTPUT
 uname -a >> $VERSIONS_OUTPUT
@@ -52,4 +54,10 @@ if [ "$CLOUD" == "gcp" ]; then
   gcloud --version >> $VERSIONS_OUTPUT
   gke-gcloud-auth-plugin --version >> $VERSIONS_OUTPUT
 fi
+echo "### pinned" >> $VERSIONS_OUTPUT
+check_tool_versions $(pinned_tools) | tee -a $VERSIONS_OUTPUT
+PINNED_RC=${PIPESTATUS[0]}
 echo "Versions output written to $VERSIONS_OUTPUT"
+if [ $PINNED_RC -ne 0 ]; then
+  echo "Installed versions differ from the pinned ones (scripts/local/pinned.sh)"
+fi

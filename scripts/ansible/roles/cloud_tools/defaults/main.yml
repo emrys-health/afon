@@ -3,16 +3,15 @@
 # Not needed by the acceptance tests themselves — they use the cloud SDKs — but
 # required if the runner also drives the ops/tofu actions.
 install_awscli: true
-# azurecli fails on runner - excluding until issue sorted
-install_azurecli: false
+install_azurecli: true
 install_gcloud: true
 install_kubectl: true
 install_opentofu: true
 
-kubectl_version: "v1.32.1"
-opentofu_version: "1.11.6"
+# kubectl_version, opentofu_version, awscli_version, azurecli_version, gcloud_version are pinned in scripts/local/pinned.sh,
+# read by group_vars/github_runners.yml.
 
-awscli_url: "https://awscli.amazonaws.com/awscli-exe-linux-{{ tarball_arch }}.zip"
+awscli_url: "https://awscli.amazonaws.com/awscli-exe-linux-{{ tarball_arch }}-{{ awscli_version }}.zip"
 kubectl_url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/{{ apt_arch }}/kubectl"
 opentofu_url: >-
   https://github.com/opentofu/opentofu/releases/download/v{{ opentofu_version }}/tofu_{{ opentofu_version }}_linux_{{ apt_arch }}.zip

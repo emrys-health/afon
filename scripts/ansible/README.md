@@ -23,6 +23,14 @@ repository secrets pushed by [secrets.sh](../github/secrets.sh).
 | `github`      | installs and registers the actions runner via `runner.sh` — **off by default** | Registering acts on the repo on GitHub, not just on this host            |
 | `verify`      | runs each tool as the runner user, asserts the JDK version and the runner size | Same checks as the workflow's *Verify runner tooling* step               |
 
+## Pinned versions
+
+The versions of maven, docker (`docker-ce`, held with `dpkg_selections`), kubectl, tofu and the aws cli are not set here:
+they are read from the linux pins in [pinned.sh](../local/pinned.sh), which `afon-cli.sh local-setup` also uses, so that the
+runner and local setups are the same.  To change a version, change it there.  The `verify` role checks the installed
+versions against the pins and fails on a mismatch (`-e verify_pinned=false` to only report).
+The azure and gcloud clis (and the gke auth plugin) are installed from their apt repos at the pinned versions, and held.
+
 The workflow also provisions its own Temurin 17 through `actions/setup-java`; the JDK installed here
 is what you get when running the build on the runner by hand.
 
