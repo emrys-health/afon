@@ -1,5 +1,5 @@
 ---
-maven_version: "3.9.9"
+# maven_version is pinned in scripts/local/pinned.sh, read by group_vars/github_runners.yml.
 maven_install_dir: /opt
 maven_home: "{{ maven_install_dir }}/maven"
 maven_url: >-

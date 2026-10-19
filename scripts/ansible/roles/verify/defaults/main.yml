@@ -36,6 +36,10 @@ verify_gcloud_commands:
 # spec runs. Pass -e verify_resources=false to report without failing.
 verify_resources: true
 
+# Fail if an installed tool is at a different version than pinned in scripts/local/pinned.sh.
+# Pass -e verify_pinned=false to report without failing.
+verify_pinned: true
+
 # ~8GB of RAM. The default max heap is a quarter of that, which is what javac
 # and the forked test JVM get unless MAVEN_OPTS says otherwise.
 verify_min_memory_mb: 7500
