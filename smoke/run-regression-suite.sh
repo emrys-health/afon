@@ -49,13 +49,9 @@
 # The tests run against the full stack's cluster of the <cloud>: the Spark Connect tests read the catalogs of the
 # clouds through its Spark Connect server.  After any setups, the current kubectl context is set to the full stack
 # cluster of the env, that of --env, if given, else that of the current config, with the afon command
-# '<cloud>-update-kube-config tre', ie the stack with the role tre, and left so.  Its Polaris ingress is then restricted, as the network smoke
-# test expects, which checks that Polaris cannot be reached from outside of the cluster, and put back as a deploy
-# leaves it when the script exits, however it exits, so that the machine running it can reach Polaris again.  On AWS to the
-# AWS_POLARIS_ALLOWED_CIDRS of afon-aws.properties plus the cluster's egress IP, that of its NAT gateway, or by default
-# AWS_EGRESS_IP.  On Azure to the AZURE_POLARIS_ALLOWED_CIDRS of afon-azure.properties plus the cluster's pod CIDR, if
-# set, else to the cluster's pod CIDR and the cluster's outbound IP only, so that the pods can still reach it.  So the
-# tests only depend on the env's config and stacks, however recently deployed, whoever runs them.
+# '<cloud>-update-kube-config tre', ie the stack with the role tre, and left so.  The stacks are tested as deployed:
+# eg the network smoke test, which checks that Polaris cannot be reached from outside of the cluster, only passes if
+# the deploy restricted its ingress, ie with AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS set.
 # The env vars of afon.sh and afon-cli.sh apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
 #
 # As switching env re-points the shared $AFON_HOME symlinks, and the current context of the shared ~/.kube/config,
@@ -349,174 +345,6 @@ update_kube_config() {
   fi
 }
 
-# Prints property $1 of afon-aws.properties, without whitespace, or nothing if it is not set.
-aws_property() {
-  grep -h "^$1=" "${AFON_HOME:-$HOME/.afon}/config/afon-aws.properties" 2>/dev/null | tail -1 | cut -d= -f2- \
-    | tr -d '[:space:]' || true
-}
-
-# Prints the public IP of the NAT gateway of the cluster of the current kubectl context, the address all its
-# outbound traffic comes from, or nothing if it cannot be found, eg if the context is not an EKS cluster's.
-cluster_egress_ip() {
-  local context region cluster ip
-  context=$(kubectl config current-context 2>/dev/null || true)
-  # As written by 'aws eks update-kubeconfig': arn:aws:eks:<region>:<account>:cluster/<cluster>
-  case "$context" in
-    arn:aws:eks:*:cluster/*) ;;
-    *) return 0 ;;
-  esac
-  region=$(echo "$context" | cut -d: -f4)
-  cluster=$(echo "$context" | cut -d/ -f2)
-  # The NAT gateway is named after the cluster, see AwsComponentNames.getNatGatewayName.
-  ip=$(aws ec2 describe-nat-gateways --region "$region" \
-         --filter "Name=tag:Name,Values=cdktf-eks-nat-$cluster" Name=state,Values=available \
-         --query 'NatGateways[0].NatGatewayAddresses[0].PublicIp' --output text 2>/dev/null || true)
-  if [ -n "$ip" ] && [ "$ip" != "None" ]; then
-    echo "$ip"
-  fi
-}
-
-# Restricts the Polaris ingress of the current kubectl context, as the network smoke test expects, in the way of the
-# cloud: see restrict_aws_polaris_ingress and restrict_azure_polaris_ingress.  Exits if it fails.
-restrict_polaris_ingress() {
-  case "$CLOUD" in
-    aws) restrict_aws_polaris_ingress ;;
-    azure) restrict_azure_polaris_ingress ;;
-  esac
-}
-
-# Restricts the Polaris ingress to the CIDRs AwsCloudProvider admits when AWS_POLARIS_ALLOWED_CIDRS is set: those CIDRs
-# plus the cluster's egress IP, so that its pods calling Polaris by its public domain name are not locked out.  The egress
-# IP is the one of the cluster's NAT gateway, as the AWS_EGRESS_IP of afon-aws.properties may be stale, eg if the stack
-# was deployed without it, or by default AWS_EGRESS_IP if the NAT gateway cannot be found.  Exits if the annotation fails,
-# and is skipped, with a warning, if there is no egress IP.
-restrict_aws_polaris_ingress() {
-  local configured_ip egress_ip cidrs cidr
-  configured_ip=$(aws_property AWS_EGRESS_IP)
-  egress_ip=$(cluster_egress_ip)
-  if [ -z "$egress_ip" ]; then
-    warning "no NAT gateway found for kubectl context $(kubectl config current-context 2>/dev/null || true):" \
-            "using AWS_EGRESS_IP '$configured_ip'"
-    egress_ip="$configured_ip"
-  elif [ -n "$configured_ip" ] && [ "$configured_ip" != "$egress_ip" ]; then
-    warning "the cluster's egress IP $egress_ip is not AWS_EGRESS_IP $configured_ip: using $egress_ip." \
-            "Update AWS_EGRESS_IP for the stack to keep its egress IP across rebuilds"
-  fi
-  if [ -z "$egress_ip" ]; then
-    warning "no egress IP for the cluster: not restricting the Polaris ingress"
-    return
-  fi
-  cidrs=
-  for cidr in $(aws_property AWS_POLARIS_ALLOWED_CIDRS | tr ',' ' '); do
-    if [ "$cidr" != "$egress_ip/32" ]; then
-      cidrs="$cidrs$cidr,"
-    fi
-  done
-  cidrs="$cidrs$egress_ip/32"
-  banner "Restricting the Polaris ingress to $cidrs"
-  RESTRICTED_INGRESS_CONTEXT=$(kubectl config current-context)
-  if ! kubectl annotate ingress polaris-ingress -n default --overwrite \
-         "alb.ingress.kubernetes.io/inbound-cidrs=$cidrs"; then
-    error "Failed to restrict the Polaris ingress: not running the tests"
-    exit 1
-  fi
-}
-
-# Prints property $1 of afon-azure.properties, without whitespace, or nothing if it is not set.
-azure_property() {
-  grep -h "^$1=" "${AFON_HOME:-$HOME/.afon}/config/afon-azure.properties" 2>/dev/null | tail -1 | cut -d= -f2- \
-    | tr -d '[:space:]' || true
-}
-
-# Prints the outbound public IP of the cluster of the current kubectl context, the address all its outbound traffic comes
-# from, ie that of the first of the effective outbound IPs of its load balancer, or nothing if it cannot be found, eg if
-# the context is not an AKS cluster's.
-azure_cluster_outbound_ip() {
-  local cluster group ip_id ip
-  cluster=$(kubectl config current-context 2>/dev/null || true)
-  [ -n "$cluster" ] || return 0
-  group=$(az aks list --query "[?name=='$cluster'].resourceGroup | [0]" --output tsv 2>/dev/null || true)
-  [ -n "$group" ] || return 0
-  ip_id=$(az aks show --name "$cluster" --resource-group "$group" \
-            --query 'networkProfile.loadBalancerProfile.effectiveOutboundIPs[0].id' --output tsv 2>/dev/null || true)
-  [ -n "$ip_id" ] && [ "$ip_id" != "None" ] || return 0
-  ip=$(az network public-ip show --ids "$ip_id" --query ipAddress --output tsv 2>/dev/null || true)
-  if [ -n "$ip" ] && [ "$ip" != "None" ]; then
-    echo "$ip"
-  fi
-}
-
-# Restricts the Polaris ingress, an nginx one, to the AZURE_POLARIS_ALLOWED_CIDRS of afon-azure.properties, as
-# AzureCloudProvider does when it is set, plus the cluster's pod CIDR and outbound IP, so that its pods calling Polaris by
-# its public domain name are not locked out.  The callers' IPs are only seen by the controller if its service has
-# externalTrafficPolicy Local, which is set, if not already, as a redeploy with the property set does.  Exits if it fails.
-restrict_azure_polaris_ingress() {
-  local pod_cidr outbound_ip cidrs cidr controller
-  # as AzureCloudProvider.POD_CIDR
-  pod_cidr="10.244.0.0/16"
-  outbound_ip=$(azure_cluster_outbound_ip)
-  cidrs=
-  for cidr in $(azure_property AZURE_POLARIS_ALLOWED_CIDRS | tr ',' ' '); do
-    case ",$cidrs," in
-      *",$cidr,"*) ;;
-      *) cidrs="$cidrs$cidr," ;;
-    esac
-  done
-  if [ -z "$outbound_ip" ]; then
-    warning "no outbound IP found for kubectl context $(kubectl config current-context 2>/dev/null || true):" \
-            "restricting the Polaris ingress without it"
-  else
-    cidrs="$cidrs$outbound_ip/32,"
-  fi
-  cidrs="$cidrs$pod_cidr"
-  banner "Restricting the Polaris ingress to $cidrs"
-  RESTRICTED_INGRESS_CONTEXT=$(kubectl config current-context)
-  controller=$(kubectl get service -n ingress-nginx -l app.kubernetes.io/component=controller -o name 2>/dev/null \
-                 | grep -v admission | head -1 || true)
-  if [ -z "$controller" ] || ! kubectl patch "$controller" -n ingress-nginx --type merge \
-         -p '{"spec":{"externalTrafficPolicy":"Local"}}'; then
-    error "Failed to set externalTrafficPolicy Local on the ingress controller: not running the tests"
-    exit 1
-  fi
-  if ! kubectl annotate ingress polaris-ingress -n default --overwrite \
-         "nginx.ingress.kubernetes.io/whitelist-source-range=$cidrs"; then
-    error "Failed to restrict the Polaris ingress: not running the tests"
-    exit 1
-  fi
-}
-
-# Puts the Polaris ingress restricted by restrict_polaris_ingress back as a deploy leaves it, from the config, rather than
-# as it was before: a run that was killed may have left it restricted.  A deploy restricts it only if the property
-# AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS is set, to the CIDRs the suite has already applied, so it is
-# put back by removing the restriction if the property is not set, and left as it is if it is.  Does nothing if the
-# ingress was not restricted, or is gone, eg with --teardown after this.  It runs on exit, so it only warns on failure,
-# keeping the exit status of the script.
-restore_polaris_ingress() {
-  local context="$RESTRICTED_INGRESS_CONTEXT" annotation configured property
-  if [ -z "$context" ]; then
-    return 0
-  fi
-  RESTRICTED_INGRESS_CONTEXT=
-  case "$CLOUD" in
-    aws) annotation="alb.ingress.kubernetes.io/inbound-cidrs"; property=AWS_POLARIS_ALLOWED_CIDRS
-         configured=$(aws_property "$property") ;;
-    azure) annotation="nginx.ingress.kubernetes.io/whitelist-source-range"; property=AZURE_POLARIS_ALLOWED_CIDRS
-           configured=$(azure_property "$property") ;;
-    *) return 0 ;;
-  esac
-  if [ -n "$configured" ]; then
-    return 0
-  fi
-  if ! kubectl --context "$context" get ingress polaris-ingress -n default >/dev/null 2>&1; then
-    return 0
-  fi
-  banner "Removing the restriction of the Polaris ingress, as $property is not set"
-  if ! kubectl --context "$context" annotate ingress polaris-ingress -n default "$annotation-" >/dev/null; then
-    warning "failed to remove the restriction of the Polaris ingress: remove it with:" \
-            "kubectl --context $context annotate ingress polaris-ingress -n default $annotation-"
-  fi
-}
-
 # Sets up the comma-separated stacks $1, in order, exiting if any fails.  Each stack is recorded in SETUP_STACKS
 # before being set up, so that a stack whose setup failed part way is also handled by finish_stacks, which is run
 # on exit, however the script exits.
@@ -581,15 +409,13 @@ teardown_stacks() {
   return $failed
 }
 
-# The EXIT trap of the script, which first restores the Polaris ingress, then finishes any set up stacks, keeping the exit status, unless a teardown fails.  Never tears down the set up
+# The EXIT trap of the script, which finishes any set up stacks, keeping the exit status, unless a teardown fails.  Never tears down the set up
 # stacks if the script was interrupted, as a setup may then have been stopped part way, with its tofu state still
 # locked, and a teardown would take as long as the setup: it only says how to delete them.  Else it tears them
 # down if --teardown is given, or says how to delete them.
 finish_stacks() {
   local status=$?
   trap - EXIT
-  # before any teardown, while the ingress is there
-  restore_polaris_ingress
   if [ ${#SETUP_STACKS[@]} -eq 0 ]; then
     exit $status
   fi
@@ -616,8 +442,6 @@ RESULTS_FILE=
 SETUP=
 SETUP_STACKS=()
 INTERRUPTED=
-# The kubectl context whose Polaris ingress was restricted, until it is restored, see restore_polaris_ingress
-RESTRICTED_INGRESS_CONTEXT=
 TEARDOWN=
 ENV=
 LIST=
@@ -705,14 +529,13 @@ fi
 cd "$AFON_ROOT"
 
 start_results
-# On every exit, however the script exits: restores the Polaris ingress, and finishes any set up stacks
+# On every exit, however the script exits: finishes any set up stacks
 trap finish_stacks EXIT
 trap 'INTERRUPTED=true; exit 130' INT
 trap 'INTERRUPTED=true; exit 143' TERM
 setup_stacks "$SETUP"
 
 update_kube_config
-restrict_polaris_ingress
 
 # The results of the passed and failed tests, eg "test network passed in 02:11", recorded as they are, and printed
 # capitalised, as are those of the stacks, eg "stack aws-full set up in 17:01".
