@@ -148,8 +148,10 @@ cloud, so the same file serves both:
 smoke/run-regression-suite.sh azure
 ```
 
-**NOTE:** the `network` test, which checks that Polaris cannot be reached from outside of the cluster, passes on both clouds: the suite
-restricts the Polaris ingress first, see [the network test on AWS and Azure](#the-network-test-on-aws-and-azure).
+**NOTE:** the `network` test, which checks that Polaris cannot be reached from outside of the cluster, passes on both clouds if the stack's
+Polaris ingress is restricted, ie deployed with `AWS_POLARIS_ALLOWED_CIDRS` (`AZURE_POLARIS_ALLOWED_CIDRS` on Azure) set, see
+[the network test on AWS and Azure](#the-network-test-on-aws-and-azure). The suite changes nothing in the cluster: if the ingress is not
+restricted, it warns, and prints the `kubectl` commands that restrict it. `--restrict-polaris` runs them for the duration of the suite.
 
 The first line of the suite file is the header `name|command|args`, and each other line a test: its
 name, its afon command, eg `network-smoke` for the ops class `NetworkSmokeMain`, and the command's args, if any,
@@ -187,6 +189,9 @@ independently of the source tree, and a test whose command is unknown fails.
 - `--logging-console` sets the logging console level, one of `OFF|DEBUG|INFO|WARN|ERROR`, of every afon command the
   suite runs, by exporting `AFON_LOGGING_CONSOLE`. It defaults to that of `afon.sh`, `INFO`, or of `afon-cli.sh`,
   `OFF`.
+- `--restrict-polaris` restricts the Polaris ingress for the run, so that the `network` test passes on a stack whose deploy did not
+  restrict it. It changes the cluster, so it is opt-in, and it restores it on exit, see below. Ignored if no selected test is the
+  network smoke test.
 - `--list` lists the tests.
 
 The tests run against the full stack's cluster of the `<cloud>`: the Spark Connect tests read the catalogs of the clouds
@@ -195,25 +200,28 @@ setups, and whether `--env` is given or not, the suite:
 
 1. makes the env's full stack cluster of the `<cloud>` the current `kubectl` context, with the afon command
    `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, leaving it so after the suite;
-2. restricts that cluster's Polaris ingress, as the network smoke test expects:
-   - on AWS, by annotating `polaris-ingress` with `alb.ingress.kubernetes.io/inbound-cidrs`. As `AwsCloudProvider` does for
-     Polaris when `AWS_POLARIS_ALLOWED_CIDRS` is set, it admits those CIDRs plus the cluster's egress IP. The egress IP is read
-     from the cluster's NAT gateway, so that it is right even if `AWS_EGRESS_IP` is stale, with a warning if they differ,
-     falling back to `AWS_EGRESS_IP` if the NAT gateway cannot be found. A redeploy undoes the annotation, which a freshly
-     deployed stack does not have.
-   - on Azure, by annotating `polaris-ingress` with `nginx.ingress.kubernetes.io/whitelist-source-range`, and setting
-     `externalTrafficPolicy: Local` on the nginx controller's service, so that it sees the callers' IPs. As
-     `AzureCloudProvider` does when `AZURE_POLARIS_ALLOWED_CIDRS` is set, it admits those CIDRs plus the cluster's pod CIDR,
-     and the cluster's outbound IP, read from its load balancer, with a warning if it cannot be found. Needs `az` logged in.
+2. if a selected test is the network smoke test, checks, without changing the cluster, that the Polaris ingress of that cluster is
+   restricted, ie has the annotation `alb.ingress.kubernetes.io/inbound-cidrs` (AWS) or
+   `nginx.ingress.kubernetes.io/whitelist-source-range` (Azure), which on Azure only works with `externalTrafficPolicy: Local` on the
+   nginx controller's service, as that keeps the callers' IPs. If it is not, the suite warns that the `network` test is expected to
+   fail, and prints the `kubectl` commands that restrict the ingress, for you to run, with the CIDRs to restrict it to: the
+   configured ones, plus the cluster's own addresses, so that its pods calling Polaris by its public domain name are not locked out.
+   These are, on AWS, the cluster's egress IP, read from its NAT gateway, as `AWS_EGRESS_IP` may be stale, falling back to
+   `AWS_EGRESS_IP`; on Azure, the pod CIDR and the outbound IP, read from the cluster's load balancer (needs `az` logged in). The
+   commands only last until the next deploy, which is why the permanent fix is to deploy with the property set. The tests run either
+   way.
 
-   When the script exits, however it exits (it fails, is interrupted, or finishes), it puts the Polaris ingress back as a deploy
-   leaves it, from the config rather than from how it was before, as a run that was killed may have left it restricted. A deploy
-   restricts the ingress only if `AWS_POLARIS_ALLOWED_CIDRS` (or `AZURE_POLARIS_ALLOWED_CIDRS`) is set, to the CIDRs the suite has
-   just applied, so if it is set the ingress is left as it is, else the annotation is removed. So the machine running the suite
-   can reach Polaris again afterwards, which the restriction otherwise prevents (the status scripts, eg `afon-cli.sh aws-polaris`,
-   then fail to get a response). If removing the annotation fails the script warns, with the `kubectl` command to run, and keeps
-   its exit status; it does nothing if the ingress is gone, eg after `--teardown`. `externalTrafficPolicy: Local` on Azure is left
-   as it is, as a deploy with the property set also sets it.
+With `--restrict-polaris` the suite runs those commands itself instead, after recording in a new
+`smoke/target/regression/polaris-ingress-snapshot-<yyyymmdd-hhmmss>.txt`, named like the results files, how the ingress is: its
+annotation, present or absent, and on Azure the controller's `externalTrafficPolicy`. When the script exits, however it exits (it fails,
+is interrupted, or finishes), it restores exactly that, before any `--teardown`, whatever the properties say: a hand-restricted ingress gets
+its own list back, and an unrestricted one loses the annotation. It leaves the ingress alone if someone changed the annotation since the suite
+set it, and does nothing if the ingress is gone.
+
+The snapshot file is kept as a record of the run: the suite adds an `outcome=` line, `restored`, or `not restored` with the reason, and
+a `finished=` line. A file without an `outcome=` is **pending**: the run did not restore the ingress, because restoring failed (the script
+warns, and keeps its exit status), or because it was killed, eg with `kill -9`. The next run with `--restrict-polaris` restores every pending
+file first, oldest first, and stops if that fails.
 
 #### The network test on AWS and Azure
 
@@ -223,7 +231,7 @@ The `network` test (`network-smoke`) runs the same three checks on both clouds, 
 |---|---|---|
 | Polaris ingress | ALB | nginx ingress controller, in the cluster, behind a public load balancer |
 | Restricted by | `alb.ingress.kubernetes.io/inbound-cidrs`, from `AWS_POLARIS_ALLOWED_CIDRS` | `nginx.ingress.kubernetes.io/whitelist-source-range`, from `AZURE_POLARIS_ALLOWED_CIDRS`, with `externalTrafficPolicy: Local` on the controller's service |
-| Always admitted | the cluster's egress IP (its NAT gateway) | the cluster's pod CIDR, and, by the suite, its outbound IP |
+| Always admitted | the cluster's egress IP (its NAT gateway) | the cluster's pod CIDR, and, with `--restrict-polaris`, its outbound IP |
 | A caller outside of them | the ALB drops its packets: the call fails or times out | nginx answers with its own `403 Forbidden` page, without calling Polaris |
 | The test passes when | the call fails or times out | the call times out, or gets nginx's own 403; any other response, eg a 403 from Polaris, fails it |
 
@@ -232,29 +240,27 @@ So on Azure a quick 403 is the expected outcome of check 1, not a failure, where
 ##### The machine running the test must be outside the allowed CIDRs
 
 Check 1 calls Polaris **from the machine running the test**, and passes only if that call is stopped. So the machine's public
-address must not be among the CIDRs the suite applies, which are `AWS_POLARIS_ALLOWED_CIDRS` (`AZURE_POLARIS_ALLOWED_CIDRS` on
+address must not be among the CIDRs of the ingress, which are `AWS_POLARIS_ALLOWED_CIDRS` (`AZURE_POLARIS_ALLOWED_CIDRS` on
 Azure) plus the cluster's egress IP (AWS) or pod CIDR and outbound IP (Azure). If it is, Polaris answers the call and the test fails
 with `Managed to make an HTTP call to <polaris domain>. Received HTTP code <code>`, whatever that code is.
 
-What happens to the machine's own access to Polaris afterwards depends on whether the property is set:
+What happens to the machine's own access to Polaris afterwards depends on how the ingress is restricted:
 
-| | Property not set (the default) | Property set, without the machine's address | Property set, with the machine's address |
-|---|---|---|---|
-| During the suite | restricted to the cluster's egress IP | restricted to the property plus the cluster's egress IP | the same |
-| `network` test | passes | passes | **fails** |
-| After the suite | the suite removes the restriction, as a deploy leaves it: the machine can reach Polaris again | the ingress stays restricted, as a deploy leaves it: the machine cannot reach Polaris | the machine can reach Polaris |
+| | Not restricted | Restricted by the deploy, without the machine's address | With the machine's address | `--restrict-polaris` |
+|---|---|---|---|---|
+| `network` test | **fails**, with the commands to restrict it | passes | **fails** | passes |
+| During the suite | open | restricted | restricted, machine admitted | restricted to the cluster's own addresses plus the property |
+| After the suite | open, as before | restricted, as before | as before | as it was before the run |
 
-So to run the `network` test from a machine and still reach Polaris from it, leave `AWS_POLARIS_ALLOWED_CIDRS` (or the Azure
-one) unset, or without that machine's address. If a Polaris that should be reachable from your machine times out after a run,
-the ingress is still restricted: check `kubectl get ingress polaris-ingress -n default -o yaml` for the annotation
-`alb.ingress.kubernetes.io/inbound-cidrs` (AWS) or `nginx.ingress.kubernetes.io/whitelist-source-range` (Azure), and remove it,
-for example on AWS:
+So to run the `network` test from a machine and still reach Polaris from it afterwards, use `--restrict-polaris` on a stack that is
+not restricted, or leave the property unset or without that machine's address. If a Polaris that should be reachable from your machine
+times out after a run, check `kubectl get ingress polaris-ingress -n default -o yaml` for the annotation, and whether
+a `smoke/target/regression/polaris-ingress-snapshot-*.txt` has no `outcome=` line, which means a run did not restore it: the next run with
+`--restrict-polaris` does, or remove the annotation, for example on AWS:
 
 ```shell
 kubectl annotate ingress polaris-ingress -n default alb.ingress.kubernetes.io/inbound-cidrs-
 ```
-
-It is restored the same way when the suite exits, however it exits.
 
 The other checks are cloud-neutral, as the network policies are the same. The Spark driver's allowed-domains check curls each name
 in the current `ALLOWED_DOMAINS_CSV`, except the Polaris and Jupyter names of the other clouds, which only resolve while their

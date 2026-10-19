@@ -98,6 +98,8 @@ public class SmokeConfig {
                 curl -s https://ifconfig.me
 
                 and add it to EGRESS_IPs (which are CSVs)
+
+                smoke/run-regression-suite.sh aws --restrict-polaris restricts the ingress for the run, and restores it after.
                 """, properties.getValue(AWS_EGRESS_IP, "undefined"));
             case AZURE -> """
                 Set AZURE_POLARIS_ALLOWED_CIDRS in config/afon-azure.properties and redeploy, to make the ingress of Polaris
@@ -106,8 +108,8 @@ public class SmokeConfig {
 
                 kubectl annotate ingress polaris-ingress -n default --overwrite nginx.ingress.kubernetes.io/whitelist-source-range=<cidr>,<cidr>
 
-                The callers' IPs are only seen by the ingress controller if its service has externalTrafficPolicy Local,
-                which the redeploy sets.  smoke/run-regression-suite.sh azure restricts the ingress as the test expects.
+                The callers' IPs are only seen by the ingress controller if its service has externalTrafficPolicy Local, which the redeploy sets.  
+                smoke/run-regression-suite.sh azure --restrict-polaris does so for the run, and restores it after.
                 """;
             default -> "Polaris can only be restricted on AWS and Azure, not on " + cloud;
         };
