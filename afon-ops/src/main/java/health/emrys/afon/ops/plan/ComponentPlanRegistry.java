@@ -31,7 +31,7 @@ public final class ComponentPlanRegistry {
         // infrastructure with nothing to wait for or configure
         for (Class<? extends StackComponent> type : List.of(
             NetworkPoliciesComponent.class, SparkOperatorComponent.class, TrinoComponent.class,
-            CrdCleanupComponent.class, MonitoringComponent.class)) {
+            CrdCleanupComponent.class, MonitoringComponent.class, TetragonComponent.class)) {
             registry.add(type, new InfrastructurePlan());
         }
         return registry;

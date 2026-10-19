@@ -31,9 +31,10 @@ stacks:
       - Spark
       - CrdCleanup
       - Monitoring
+      - Tetragon
       - Logging
       - Git
-  # A stack that is not bundled, composed here alone: the notebooks and Spark, but no Trino, Monitoring or Git
+  # A stack that is not bundled, composed here alone: the notebooks and Spark, but no Trino, Monitoring, Tetragon or Git
   aws-lab:
     components:
       - name: Keycloak
@@ -71,6 +72,7 @@ stacks:
       - Spark
       - CrdCleanup
       - Monitoring
+      - Tetragon
       - Logging
       - Git
 

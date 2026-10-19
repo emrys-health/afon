@@ -18,8 +18,8 @@ public final class CrdCleanup {
     /**
      * API groups whose CRDs are removed by {@link #command()}: the ones registered by
      * the monitoring stack (kube-prometheus-stack and the Loki chart's grafana-agent-operator) and
-     * by Cilium. Helm never removes CRDs shipped in a chart's {@code crds/} directory, and the
-     * {@code cilium.io} ones are registered by the Cilium operator at runtime, so no release owns
+     * by Cilium and Tetragon. Helm never removes CRDs shipped in a chart's {@code crds/} directory, and the
+     * {@code cilium.io} ones are registered by the Cilium and Tetragon operators at runtime, so no release owns
      * them and they would otherwise be left behind. Everything else (the Spark operator's CRDs, the
      * AWS-managed {@code *.k8s.aws} ones, cert-manager, ...) is deliberately left alone.
      */

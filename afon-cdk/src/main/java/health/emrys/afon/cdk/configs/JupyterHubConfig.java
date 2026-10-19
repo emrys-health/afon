@@ -141,7 +141,7 @@ public class JupyterHubConfig {
     /**
      * Selector for the pods KubeSpawner spawns, matching the labels it stamps on them.
      */
-    protected static final Map<String, String> USER_POD_LABELS =
+    public static final Map<String, String> USER_POD_LABELS =
         Map.of(SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE);
 
     private static final String TLS_SECRET_NAME = "jupyter-secret";
