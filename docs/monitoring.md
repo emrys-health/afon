@@ -9,6 +9,7 @@ We currently have the following monitoring tools:
   - prometheus: running in the cloud as a grafana data source to capture metrics
 - hubble: running hubble-ui in the cloud to view network traffic
 - hubble-cli: running locally to query hubble
+- tetragon: running in the cloud to watch the processes of the Jupyter notebook pods, whose events are shipped to loki
 
 To set up monitoring tools, we assume AWS full stack has been deployed. 
 See [stacks](stacks.md) for details on deployment of the full stack.
@@ -68,6 +69,27 @@ Loki persists its logs to the bucket defined by `AWS_S3_BUCKET_NAME` in the [con
 Loki logs are stored in the cloud, eg
 ```shell
 aws s3 ls s3://emrys-afon-bucket/spark-cluster
+```
+
+### Tetragon
+
+The `Tetragon` component of the full stacks runs [Tetragon](https://tetragon.io) on every node, watching the notebook pods
+that JupyterHub spawns (those labelled `afon-role=jupyter-singleuser`): every process they exec, and its exit, with the pod,
+container, image, binary and arguments.  Only the events of those pods are exported, as JSON lines printed by the
+`export-stdout` container of the `tetragon` pods, which Promtail ships to Loki with the logs of the other pods.
+
+In Grafana, the events are queried with, eg
+```
+{app="tetragon", container="export-stdout"} | json | process_exec_process_pod_name=~"jupyter-.*"
+```
+and the processes a notebook runs listed with
+```
+{app="tetragon", container="export-stdout"} | json | line_format "{{.process_exec_process_pod_name}} {{.process_exec_process_binary}} {{.process_exec_process_arguments}}"
+```
+
+Locally, with the [tetra CLI](https://tetragon.io/docs/installation/tetra-cli/), the events of a node are followed with:
+```shell
+kubectl exec -ti -n default ds/tetragon -c tetragon -- tetra getevents -o compact --pods jupyter-
 ```
 
 ### Prometheus
