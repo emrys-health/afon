@@ -3,8 +3,8 @@
 # Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally setting them up first.
 #
 # usage: smoke/run-regression-suite.sh [--cli] [--env|-e <env>] [--setup <stacks> [--teardown]] [--suite|-s <file>]
-#                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--list|-l] [--help|-h]
-#                                      [<cloud>]
+#                                      [--tests|-t <tests>] [--restrict-polaris]
+#                                      [--logging-console|-lc <level>] [--list|-l] [--help|-h] [<cloud>]
 #   <cloud>   the cloud of the full stack to run the tests against, aws or azure (default: aws), ie <cloud>-full.  The
 #             kubectl context is set to the cluster of that stack, with the afon command '<cloud>-update-kube-config
 #             tre', and the tests are run with TRE_CLOUD=<cloud>, as the cloud of the stack hosting the TRE.
@@ -27,6 +27,14 @@
 #             stacks are printed instead.
 #   --suite   the CSV file of the tests (default: smoke/regression-full.csv)
 #   --tests   the comma-separated names of the tests to run (default: all), as listed by --list
+#   --restrict-polaris
+#             restricts the Polaris ingress for the run, for the network smoke test to pass on a stack whose deploy
+#             did not, see below.  Changes the cluster, so it is opt-in: it records how the ingress is, ie its
+#             annotation, and on Azure the ingress controller's externalTrafficPolicy, in
+#             smoke/target/regression/polaris-ingress-snapshot-<yyyymmdd-hhmmss>.txt, then restores exactly that on exit,
+#             before any teardown, whatever the properties say.  The file is kept as a record of the run, with the
+#             outcome of the restore.  A run killed before it restored, eg with kill -9, leaves a file without an
+#             outcome, which the next run restores first.  Not done if no test is the network smoke test.
 #   --logging-console
 #             the logging console level of every afon command, one of OFF|DEBUG|INFO|WARN|ERROR (default: that of
 #             afon.sh, INFO, or of afon-cli.sh, OFF).  Exported as AFON_LOGGING_CONSOLE, which it overrides.
@@ -51,7 +59,12 @@
 # cluster of the env, that of --env, if given, else that of the current config, with the afon command
 # '<cloud>-update-kube-config tre', ie the stack with the role tre, and left so.  The stacks are tested as deployed:
 # eg the network smoke test, which checks that Polaris cannot be reached from outside of the cluster, only passes if
-# the deploy restricted its ingress, ie with AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS set.
+# the deploy restricted its ingress, ie with AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS set.  The suite
+# changes nothing in the cluster, unless given --restrict-polaris: it only checks, before the tests, that the ingress is
+# restricted, and if it is not, warns that the network smoke test is expected to fail, and prints the kubectl commands
+# that restrict it for the cloud: the configured CIDRs plus the cluster's own addresses, ie its egress IP on AWS, or its
+# outbound IP and pod CIDR on Azure, with the ingress controller keeping the callers' IPs.  The machine running the
+# tests must not be among the CIDRs, else the call to Polaris from outside of the cluster gets through.
 # The env vars of afon.sh and afon-cli.sh apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
 #
 # As switching env re-points the shared $AFON_HOME symlinks, and the current context of the shared ~/.kube/config,
@@ -121,6 +134,11 @@ start_results() {
     echo "suite: $SUITE_FILE"
     echo "tests: ${SELECTED:-all}"
     echo "stacks set up: ${SETUP:-none}${TEARDOWN:+, then torn down}"
+    if [ -n "$RESTRICT_POLARIS" ]; then
+      echo "polaris ingress: restricted for the run, then restored"
+    else
+      echo "polaris ingress: as deployed"
+    fi
     if [ -n "$CLI" ]; then
       echo "commands run with: $(cli_script)"
     else
@@ -345,6 +363,388 @@ update_kube_config() {
   fi
 }
 
+# Prints property $1 of afon-aws.properties, without whitespace, or nothing if it is not set.
+aws_property() {
+  grep -h "^$1=" "$AFON_CONFIG_DIR/afon-aws.properties" 2>/dev/null | tail -1 | cut -d= -f2- \
+    | tr -d '[:space:]' || true
+}
+
+# Prints the public IP of the NAT gateway of the cluster of the current kubectl context, the address all its
+# outbound traffic comes from, or nothing if it cannot be found, eg if the context is not an EKS cluster's.
+cluster_egress_ip() {
+  local context region cluster ip
+  context=$(kubectl config current-context 2>/dev/null || true)
+  # As written by 'aws eks update-kubeconfig': arn:aws:eks:<region>:<account>:cluster/<cluster>
+  case "$context" in
+    arn:aws:eks:*:cluster/*) ;;
+    *) return 0 ;;
+  esac
+  region=$(echo "$context" | cut -d: -f4)
+  cluster=$(echo "$context" | cut -d/ -f2)
+  # The NAT gateway is named after the cluster, see AwsComponentNames.getNatGatewayName.
+  ip=$(aws ec2 describe-nat-gateways --region "$region" \
+         --filter "Name=tag:Name,Values=cdktf-eks-nat-$cluster" Name=state,Values=available \
+         --query 'NatGateways[0].NatGatewayAddresses[0].PublicIp' --output text 2>/dev/null || true)
+  if [ -n "$ip" ] && [ "$ip" != "None" ]; then
+    echo "$ip"
+  fi
+}
+
+# Prints property $1 of afon-azure.properties, without whitespace, or nothing if it is not set.
+azure_property() {
+  grep -h "^$1=" "$AFON_CONFIG_DIR/afon-azure.properties" 2>/dev/null | tail -1 | cut -d= -f2- \
+    | tr -d '[:space:]' || true
+}
+
+# Prints the outbound public IP of the cluster of the current kubectl context, the address all its outbound traffic comes
+# from, ie that of the first of the effective outbound IPs of its load balancer, or nothing if it cannot be found, eg if
+# the context is not an AKS cluster's.
+azure_cluster_outbound_ip() {
+  local cluster group ip_id ip
+  cluster=$(kubectl config current-context 2>/dev/null || true)
+  [ -n "$cluster" ] || return 0
+  group=$(az aks list --query "[?name=='$cluster'].resourceGroup | [0]" --output tsv 2>/dev/null || true)
+  [ -n "$group" ] || return 0
+  ip_id=$(az aks show --name "$cluster" --resource-group "$group" \
+            --query 'networkProfile.loadBalancerProfile.effectiveOutboundIPs[0].id' --output tsv 2>/dev/null || true)
+  [ -n "$ip_id" ] && [ "$ip_id" != "None" ] || return 0
+  ip=$(az network public-ip show --ids "$ip_id" --query ipAddress --output tsv 2>/dev/null || true)
+  if [ -n "$ip" ] && [ "$ip" != "None" ]; then
+    echo "$ip"
+  fi
+}
+
+# The pod CIDR of an AKS overlay cluster, as AzureCloudProvider.POD_CIDR
+AZURE_POD_CIDR="10.244.0.0/16"
+
+# The snapshots of the Polaris ingress that --restrict-polaris takes before changing it, one file per run,
+# polaris-ingress-snapshot-<yyyymmdd-hhmmss>.txt, like the results files, one key=value per line.  Kept in files rather
+# than in memory, so that a run killed before it restored the ingress, eg with kill -9, leaves what is needed to restore
+# it, which the next run does first.  They are kept after the restore as a record of the run, which gives the file an
+# outcome= line: only a file without one is still to be restored.  SNAPSHOT_FILE is that of this run, once it is taken.
+SNAPSHOT_PREFIX="$RESULTS_DIR/polaris-ingress-snapshot-"
+SNAPSHOT_FILE=
+
+# The config dir that aws_property and azure_property read the properties from.
+AFON_CONFIG_DIR="${AFON_HOME:-$HOME/.afon}/config"
+
+# Prints the annotation of the Polaris ingress that restricts who can call it, on the $CLOUD.
+polaris_annotation() {
+  case "$CLOUD" in
+    aws) echo "alb.ingress.kubernetes.io/inbound-cidrs" ;;
+    azure) echo "nginx.ingress.kubernetes.io/whitelist-source-range" ;;
+  esac
+}
+
+# Prints the state of annotation $1 of the Polaris ingress of kubectl context $2, as it is in the cluster: "present:<value>"
+# if it is set, even to the empty string, "absent" if it is not, "missing" if there is no Polaris ingress.
+ingress_annotation() {
+  local out
+  if ! out=$(kubectl --context "$2" get ingress polaris-ingress -n default \
+               -o go-template="{{range \$k, \$v := .metadata.annotations}}{{if eq \$k \"$1\"}}present:{{\$v}}{{end}}{{end}}" \
+               2>/dev/null); then
+    echo "missing"
+    return 0
+  fi
+  echo "${out:-absent}"
+}
+
+# Prints the nginx ingress controller service of kubectl context $1, as service/<name>, or nothing if it has none.
+controller_service() {
+  kubectl --context "$1" get service -n ingress-nginx -l app.kubernetes.io/component=controller -o name 2>/dev/null \
+    | grep -v admission | head -1 || true
+}
+
+# Prints the CIDRs that the Polaris ingress of the current kubectl context can be restricted to, for the network smoke
+# test to pass: those of AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS, as the deploy applies, plus the
+# cluster's own addresses, so that its pods calling Polaris by its public domain name are not locked out.  Prints nothing
+# if the cluster's address cannot be found on AWS.  Warns, to stderr, about what it could not find.
+restriction_cidrs() {
+  case "$CLOUD" in
+    aws) aws_restriction_cidrs ;;
+    azure) azure_restriction_cidrs ;;
+  esac
+}
+
+# On AWS the cluster's own address is its egress IP, that of the NAT gateway, as the AWS_EGRESS_IP of afon-aws.properties
+# may be stale, eg if the stack was deployed without it, or by default AWS_EGRESS_IP if the NAT gateway cannot be found.
+aws_restriction_cidrs() {
+  local configured_ip egress_ip cidrs cidr configured egress_source="the cluster's NAT gateway, with aws ec2"
+  configured_ip=$(aws_property AWS_EGRESS_IP)
+  configured=$(aws_property AWS_POLARIS_ALLOWED_CIDRS)
+  egress_ip=$(cluster_egress_ip)
+  if [ -z "$egress_ip" ]; then
+    egress_source="AWS_EGRESS_IP in $AFON_CONFIG_DIR/afon-aws.properties, as no NAT gateway was found"
+    warning "no NAT gateway found for kubectl context $(kubectl config current-context 2>/dev/null || true):" \
+            "using AWS_EGRESS_IP '$configured_ip'"
+    egress_ip="$configured_ip"
+  elif [ -n "$configured_ip" ] && [ "$configured_ip" != "$egress_ip" ]; then
+    warning "the cluster's egress IP $egress_ip is not AWS_EGRESS_IP $configured_ip: using $egress_ip." \
+            "Update AWS_EGRESS_IP for the stack to keep its egress IP across rebuilds"
+  fi
+  if [ -z "$egress_ip" ]; then
+    warning "no egress IP for the cluster"
+    return 0
+  fi
+  cidrs=
+  for cidr in $(echo "$configured" | tr ',' ' '); do
+    if [ "$cidr" != "$egress_ip/32" ]; then
+      cidrs="$cidrs$cidr,"
+    fi
+  done
+  # to stderr, as the CIDRs are what this prints to stdout
+  banner "Polaris ingress CIDRs, from:" >&2
+  echo "  configured: ${configured:-none} (AWS_POLARIS_ALLOWED_CIDRS in $AFON_CONFIG_DIR/afon-aws.properties)" >&2
+  echo "  egress IP: $egress_ip ($egress_source)" >&2
+  echo "$cidrs$egress_ip/32"
+}
+
+# On Azure the cluster's own addresses are its pod CIDR and its outbound IP.
+azure_restriction_cidrs() {
+  local outbound_ip cidrs cidr configured
+  outbound_ip=$(azure_cluster_outbound_ip)
+  configured=$(azure_property AZURE_POLARIS_ALLOWED_CIDRS)
+  cidrs=
+  for cidr in $(echo "$configured" | tr ',' ' '); do
+    case ",$cidrs," in
+      *",$cidr,"*) ;;
+      *) cidrs="$cidrs$cidr," ;;
+    esac
+  done
+  if [ -z "$outbound_ip" ]; then
+    warning "no outbound IP found for kubectl context $(kubectl config current-context 2>/dev/null || true):" \
+            "not including it"
+  else
+    cidrs="$cidrs$outbound_ip/32,"
+  fi
+  # to stderr, as the CIDRs are what this prints to stdout
+  banner "Polaris ingress CIDRs, from:" >&2
+  echo "  configured: ${configured:-none} (AZURE_POLARIS_ALLOWED_CIDRS in $AFON_CONFIG_DIR/afon-azure.properties)" >&2
+  echo "  outbound IP: ${outbound_ip:-not found} (the first effective outbound IP of the cluster's load balancer, with az)" >&2
+  echo "  pod CIDR: $AZURE_POD_CIDR (AZURE_POD_CIDR of this script, as AzureCloudProvider.POD_CIDR)" >&2
+  echo "$cidrs$AZURE_POD_CIDR"
+}
+
+# Prints the kubectl commands that restrict the Polaris ingress of kubectl context $1 to the CIDRs $2, for the $CLOUD.
+# On Azure the ingress controller must also keep the callers' IPs, which its load balancer otherwise hides.
+print_restrict_commands() {
+  local context="$1" cidrs="$2" controller
+  case "$CLOUD" in
+    aws)
+      echo "  kubectl --context $context annotate ingress polaris-ingress -n default --overwrite" \
+           "alb.ingress.kubernetes.io/inbound-cidrs=$cidrs" ;;
+    azure)
+      controller=$(controller_service "$context")
+      echo "  kubectl --context $context patch ${controller:-<the ingress-nginx controller service>} -n ingress-nginx" \
+           "--type merge -p '{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}'"
+      echo "  kubectl --context $context annotate ingress polaris-ingress -n default --overwrite" \
+           "nginx.ingress.kubernetes.io/whitelist-source-range=$cidrs" ;;
+  esac
+}
+
+# Whether a selected test of the suite is the network smoke test, which is what needs the Polaris ingress restricted.
+runs_network_smoke() {
+  local test_line
+  for test_line in "${TESTS[@]}"; do
+    if [ "$(test_field "$test_line" 2)" = "network-smoke" ] && is_selected "$(test_field "$test_line" 1)"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Checks, without changing the cluster, that the Polaris ingress of the current kubectl context is restricted, as the
+# network smoke test, which checks that Polaris cannot be reached from outside of the cluster, needs.  If it is not,
+# warns that the test is expected to fail, and prints the commands that restrict the ingress, for the user to run, or the
+# --restrict-polaris option, which runs them for the duration of the suite.  The tests run either way.
+check_polaris_ingress() {
+  local context annotation state controller policy cidrs
+  context=$(kubectl config current-context)
+  annotation=$(polaris_annotation)
+  state=$(ingress_annotation "$annotation" "$context")
+  case "$state" in
+    missing)
+      warning "no Polaris ingress in kubectl context $context: the network smoke test is expected to fail"
+      record "Polaris ingress: none found"
+      return 0 ;;
+    present:?*)
+      banner "The Polaris ingress is restricted to ${state#present:}"
+      record "Polaris ingress restricted to ${state#present:}"
+      if [ "$CLOUD" = "azure" ]; then
+        controller=$(controller_service "$context")
+        policy=
+        if [ -n "$controller" ]; then
+          policy=$(kubectl --context "$context" get "$controller" -n ingress-nginx \
+                     -o jsonpath='{.spec.externalTrafficPolicy}' 2>/dev/null || true)
+        fi
+        if [ "$policy" != "Local" ]; then
+          warning "the ingress controller does not keep the callers' IPs (externalTrafficPolicy '${policy:-unknown}'," \
+                  "not Local): its restriction is not effective, so the network smoke test is expected to fail"
+          echo "Set it with:"
+          echo "  kubectl --context $context patch ${controller:-<the ingress-nginx controller service>}" \
+               "-n ingress-nginx --type merge -p '{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}'"
+        fi
+      fi
+      return 0 ;;
+  esac
+  warning "the Polaris ingress is not restricted ($annotation is not set):"$'\n'"the network smoke test, which checks that" \
+          "Polaris cannot be reached from outside of the cluster, is expected to fail"
+  record "Polaris ingress: not restricted"
+  cidrs=$(restriction_cidrs)
+  echo "To restrict it, redeploy with $(echo "$CLOUD" | tr '[:lower:]' '[:upper:]')_POLARIS_ALLOWED_CIDRS set to the callers to admit (which must not include this machine)"
+  echo "or restrict the live ingress, until the next deploy, with:"
+  if [ -n "$cidrs" ]; then
+    print_restrict_commands "$context" "$cidrs"
+  fi
+  echo "or run the suite with --restrict-polaris, which restricts the ingress for the run and restores it after to its exact state."
+}
+
+# Prints the value of key $1 of the snapshot of the Polaris ingress.
+snapshot_value() {
+  grep "^$1=" "$SNAPSHOT_FILE" | head -1 | cut -d= -f2-
+}
+
+# Whether the snapshot file $1 is still to be restored, ie it has no outcome.
+snapshot_pending() {
+  [ -f "$1" ] && ! grep -q "^outcome=" "$1"
+}
+
+# Prints the snapshot files that are still to be restored, ie of runs that did not restore the ingress, oldest first.
+pending_snapshots() {
+  local file
+  for file in "${SNAPSHOT_PREFIX}"*.txt; do
+    if snapshot_pending "$file"; then
+      echo "$file"
+    fi
+  done
+}
+
+# Records in the snapshot file of the Polaris ingress what became of it, $1, once it has been restored, or is no longer to be:
+# the ingress is gone, or was changed since the suite restricted it.  The file is kept, as a record of the run, but is no
+# longer pending.
+record_snapshot_outcome() {
+  {
+    echo "outcome=$1"
+    echo "finished=$(date '+%Y-%m-%d %H:%M:%S')"
+  } >> "$SNAPSHOT_FILE"
+}
+
+# Puts the Polaris ingress back as the snapshot of --restrict-polaris recorded it, ie the annotation set to its recorded
+# value, or removed if it was not set, and, on Azure, the controller's externalTrafficPolicy as it was, whatever the
+# properties say.  Does nothing without a pending snapshot, ie one with no outcome.  If the annotation is no longer what the
+# suite set, someone changed it since, and it is left as it is.  The snapshot gets its outcome once the ingress is restored,
+# else is left pending for the next run to restore.  It runs on exit, so it only warns on failure, keeping the exit status of
+# the script.
+restore_polaris_ingress() {
+  local context annotation state controller policy applied current
+  if [ -z "$SNAPSHOT_FILE" ] || ! snapshot_pending "$SNAPSHOT_FILE"; then
+    return 0
+  fi
+  context=$(snapshot_value context)
+  annotation=$(snapshot_value annotation)
+  state=$(snapshot_value state)
+  controller=$(snapshot_value controller)
+  policy=$(snapshot_value policy)
+  applied=$(snapshot_value applied)
+  if ! kubectl --context "$context" get ingress polaris-ingress -n default >/dev/null 2>&1; then
+    # eg torn down since, so nothing to restore
+    record_snapshot_outcome "not restored, as the ingress is gone"
+    return 0
+  fi
+  current=$(ingress_annotation "$annotation" "$context")
+  if [ "$current" != "present:$applied" ] && [ "$current" != "$state" ]; then
+    warning "the Polaris ingress was changed since the suite restricted it (now $current, not present:$applied):" \
+            "not restoring it to $state"
+    record_snapshot_outcome "not restored, as the annotation was changed since the suite set it (now $current)"
+    return 0
+  fi
+  banner "Restoring the Polaris ingress of $context to how it was: $state"
+  case "$state" in
+    present:*)
+      if ! kubectl --context "$context" annotate ingress polaris-ingress -n default --overwrite \
+             "$annotation=${state#present:}" >/dev/null; then
+        warning "failed to restore the Polaris ingress: left pending in $SNAPSHOT_FILE, which the next run restores"
+        return 0
+      fi ;;
+    *)
+      if ! kubectl --context "$context" annotate ingress polaris-ingress -n default "$annotation-" >/dev/null; then
+        warning "failed to restore the Polaris ingress: left pending in $SNAPSHOT_FILE, which the next run restores"
+        return 0
+      fi ;;
+  esac
+  if [ -n "$controller" ] && [ -n "$policy" ]; then
+    if ! kubectl --context "$context" patch "$controller" -n ingress-nginx --type merge \
+           -p "{\"spec\":{\"externalTrafficPolicy\":\"$policy\"}}" >/dev/null; then
+      warning "failed to restore externalTrafficPolicy $policy of $controller: left pending in $SNAPSHOT_FILE, which the next run restores"
+      return 0
+    fi
+  fi
+  record_snapshot_outcome "restored"
+}
+
+# For --restrict-polaris: restricts the Polaris ingress of the current kubectl context to the restriction_cidrs, which the
+# network smoke test needs, for the run, first recording how it is in a new snapshot file, to restore it on exit with
+# restore_polaris_ingress, as a run killed before it did leaves the ingress restricted: the pending snapshots of those
+# runs are restored first.  Exits if the ingress cannot be restricted, and skips it, with a warning, if there are no CIDRs.
+restrict_polaris_ingress() {
+  local context annotation state controller= policy= cidrs pending
+  for pending in $(pending_snapshots); do
+    warning "a previous run did not restore the Polaris ingress: restoring it first, from $pending"
+    SNAPSHOT_FILE="$pending"
+    restore_polaris_ingress
+    if snapshot_pending "$pending"; then
+      error "Could not restore the Polaris ingress from $pending: not running the tests"
+      exit 1
+    fi
+  done
+  SNAPSHOT_FILE=
+  context=$(kubectl config current-context)
+  annotation=$(polaris_annotation)
+  state=$(ingress_annotation "$annotation" "$context")
+  if [ "$state" = "missing" ]; then
+    error "No Polaris ingress in kubectl context $context to restrict: not running the tests"
+    exit 1
+  fi
+  if [ "$CLOUD" = "azure" ]; then
+    controller=$(controller_service "$context")
+    if [ -z "$controller" ]; then
+      error "No ingress controller service in kubectl context $context: not running the tests"
+      exit 1
+    fi
+    policy=$(kubectl --context "$context" get "$controller" -n ingress-nginx \
+               -o jsonpath='{.spec.externalTrafficPolicy}' 2>/dev/null || true)
+  fi
+  cidrs=$(restriction_cidrs)
+  if [ -z "$cidrs" ]; then
+    warning "no CIDRs to restrict the Polaris ingress to: leaving it as it is"
+    return 0
+  fi
+  mkdir -p "$RESULTS_DIR"
+  SNAPSHOT_FILE="${SNAPSHOT_PREFIX}$(date +%Y%m%d-%H%M%S).txt"
+  {
+    echo "taken=$(date '+%Y-%m-%d %H:%M:%S')"
+    echo "context=$context"
+    echo "annotation=$annotation"
+    echo "state=$state"
+    echo "controller=$controller"
+    echo "policy=$policy"
+    echo "applied=$cidrs"
+  } > "$SNAPSHOT_FILE"
+  banner "Restricting the Polaris ingress of $context to $cidrs, to restore it as it is now ($state) on exit"
+  record "Polaris ingress restricted for the run to $cidrs, to be restored to $state, as recorded in $SNAPSHOT_FILE"
+  if [ "$CLOUD" = "azure" ]; then
+    if ! kubectl --context "$context" patch "$controller" -n ingress-nginx --type merge \
+           -p '{"spec":{"externalTrafficPolicy":"Local"}}'; then
+      error "Failed to set externalTrafficPolicy Local on the ingress controller: not running the tests"
+      exit 1
+    fi
+  fi
+  if ! kubectl --context "$context" annotate ingress polaris-ingress -n default --overwrite "$annotation=$cidrs"; then
+    error "Failed to restrict the Polaris ingress: not running the tests"
+    exit 1
+  fi
+}
+
 # Sets up the comma-separated stacks $1, in order, exiting if any fails.  Each stack is recorded in SETUP_STACKS
 # before being set up, so that a stack whose setup failed part way is also handled by finish_stacks, which is run
 # on exit, however the script exits.
@@ -416,6 +816,8 @@ teardown_stacks() {
 finish_stacks() {
   local status=$?
   trap - EXIT
+  # before any teardown, while the ingress is there
+  restore_polaris_ingress
   if [ ${#SETUP_STACKS[@]} -eq 0 ]; then
     exit $status
   fi
@@ -443,6 +845,7 @@ SETUP=
 SETUP_STACKS=()
 INTERRUPTED=
 TEARDOWN=
+RESTRICT_POLARIS=
 ENV=
 LIST=
 LOGGING_CONSOLE=
@@ -460,6 +863,8 @@ while [[ $# -gt 0 ]]; do
       require_value "$1" "${2:-}"; SETUP="$2"; shift 2 ;;
     --teardown)
       TEARDOWN=true; shift ;;
+    --restrict-polaris)
+      RESTRICT_POLARIS=true; shift ;;
     --suite|-s)
       require_value "$1" "${2:-}"; SUITE_FILE="$2"; shift 2 ;;
     --tests|-t)
@@ -536,6 +941,13 @@ trap 'INTERRUPTED=true; exit 143' TERM
 setup_stacks "$SETUP"
 
 update_kube_config
+if runs_network_smoke; then
+  if [ -n "$RESTRICT_POLARIS" ]; then
+    restrict_polaris_ingress
+  else
+    check_polaris_ingress
+  fi
+fi
 
 # The results of the passed and failed tests, eg "test network passed in 02:11", recorded as they are, and printed
 # capitalised, as are those of the stacks, eg "stack aws-full set up in 17:01".
