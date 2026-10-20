@@ -5,7 +5,7 @@
 #   <cloud>-<name>:           the stack id, eg aws-full
 #     role: catalog|identity|tre    optional: the role the stack plays in its cloud, which code looks for it by, once per cloud
 #     extends: <stack id>           optional: starts with the components of this stack, of the same cloud
-#     pinnedEgressIp: true|false    optional: whether it holds the AWS_EGRESS_IP (default true, or as the extended stack)
+#     pinnedEgressIp: true|false    optional: whether it holds the <CLOUD>_EGRESS_IP (default true, or as the extended stack)
 #     components:                   the components added, in order, each deployed after those before it
 #       - Polaris                   a component, by name, see StackComponents.names()
 #       - name: Keycloak            a component only deployed if the property <CLOUD>_KEYCLOAK_EXTERNAL is not true

@@ -127,7 +127,7 @@ list its steps with `manage-stack run <flow> --dry-run`.
 **NOTE:** Only AWS and Azure have more than one stack for now, so only their stacks can run side by side: GCP has a single stack, `gcp-polaris`, although the same rules apply to it.  The AKS cluster, network and identity of an Azure stack are named `<stack-type>-<name>`, eg `keycloak-aks-vnet` and `keycloak-<CLUSTER_NAME>`, as on AWS, so the stacks of a resource group don't collide.
 
 Each stack has its own `tofu` state, so stacks run side by side, unless they conflict, ie they hold a common exclusive
-resource: the DNS record of a domain name, eg `OIDC_DOMAIN_NAME`, or the pinned egress IP `AWS_EGRESS_IP`, which only
+resource: the DNS record of a domain name, eg `OIDC_DOMAIN_NAME`, or the pinned egress IP, `AWS_EGRESS_IP` or `AZURE_EGRESS_IP`, which only
 one running stack can hold.  So `deploy` and `setup` first delete the stacks deployed in the cloud that conflict with
 the stack, including the stack itself.  They only delete the stack itself, if deployed, unless given `--replace`:
 if any other stack conflicts, they fail before deleting any, saying what the other stack already deploys, eg
@@ -138,7 +138,7 @@ To deploy aws-polaris, delete it first:
 or rerun with --replace to delete it as part of this run.
 ```
 Only a deployed stack, ie with a `tofu` state, can make them fail: a conflicting stack dir without one, eg left from `validate-stack`, has nothing deployed, so they just delete it.
-The pinned egress IP `AWS_EGRESS_IP` is only held, and so only conflicts, when it is set.
+The pinned egress IP, `AWS_EGRESS_IP` or `AZURE_EGRESS_IP`, is only held, and so only conflicts, when it is set.
 The [AWS stack workflow](github_workflows.md#stack-aws-workflow) always runs with `--replace`.
 
 `delete` deletes just the stack, while `delete <cloud>-all`, eg `delete aws-all`, deletes every stack deployed in the cloud.  The legacy stack of a cloud, deployed before each stack had its own `tofu` state (see
@@ -153,9 +153,9 @@ stack of the cloud, and `delete` of any stack of the cloud deletes it too.  Like
 | `aws-full` | `OIDC_DOMAIN_NAME`, `AWS_POLARIS_DOMAIN_NAME`, `AWS_JUPYTER_DOMAIN_NAME`, `AWS_EGRESS_IP` | none |
 | `aws-full`, with `AWS_KEYCLOAK_EXTERNAL=true` | `AWS_POLARIS_DOMAIN_NAME`, `AWS_JUPYTER_DOMAIN_NAME`, `AWS_EGRESS_IP` | `aws-keycloak` |
 | `azure-keycloak` | `OIDC_DOMAIN_NAME` | `azure-polaris` |
-| `azure-polaris` | `AZURE_POLARIS_DOMAIN_NAME` | `azure-keycloak` |
-| `azure-full` | `OIDC_DOMAIN_NAME`, `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME` | none |
-| `azure-full`, with `AZURE_KEYCLOAK_EXTERNAL=true` | `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME` | `azure-keycloak` |
+| `azure-polaris` | `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_EGRESS_IP` | `azure-keycloak` |
+| `azure-full` | `OIDC_DOMAIN_NAME`, `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME`, `AZURE_EGRESS_IP` | none |
+| `azure-full`, with `AZURE_KEYCLOAK_EXTERNAL=true` | `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME`, `AZURE_EGRESS_IP` | `azure-keycloak` |
 
 The Polaris stacks, `aws-polaris`, `azure-polaris` and `gcp-polaris`, deploy no KeyCloak of their own, but use the
 KeyCloak server at `OIDC_DOMAIN_NAME`, which `aws-keycloak` deploys, so deploy (or set up) `aws-keycloak` first, eg:
@@ -168,7 +168,7 @@ Their `deploy` and `setup` check first that KeyCloak answers at `OIDC_DOMAIN_NAM
 The `aws-full` stack deploys its own KeyCloak, so it conflicts with both `aws-keycloak` and `aws-polaris`, unless
 `AWS_KEYCLOAK_EXTERNAL=true` is set in `afon-aws.properties` (it is `false` when empty): it then uses the KeyCloak
 `aws-keycloak` deploys, like `aws-polaris`, so it runs side by side with `aws-keycloak`, and its `deploy` and `setup` likewise check first that KeyCloak answers.
-Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-keycloak` always gets a fresh one.
+Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-keycloak` always gets a fresh one.  The same holds on Azure with `AZURE_EGRESS_IP`: `azure-keycloak` always gets an address from Azure.
 
 On Azure it is the same with `azure-keycloak` and `AZURE_KEYCLOAK_EXTERNAL=true` in `afon-azure.properties` (it is `false` when empty):
 `azure-full` then uses the KeyCloak `azure-keycloak` deploys, so it runs side by side with it, and its `deploy` and `setup` check first that KeyCloak answers.
@@ -236,7 +236,7 @@ Each stack is `<cloud>-<name>`, and the ordered list of the components it deploy
 stacks:
   aws-lab:
     role: tre                       # optional, see below: the role the stack plays in its cloud, if any
-    pinnedEgressIp: true            # optional, default true (or as the stack it extends): holds AWS_EGRESS_IP, which only one running stack can
+    pinnedEgressIp: true            # optional, default true (or as the stack it extends): holds <CLOUD>_EGRESS_IP, eg AWS_EGRESS_IP, which only one running stack can
     components:
       - name: Keycloak              # deployed unless AWS_KEYCLOAK_EXTERNAL=true, ie the property <CLOUD>_KEYCLOAK_EXTERNAL
         unless: KEYCLOAK_EXTERNAL   # or 'when', to deploy it only if the property is true

@@ -176,6 +176,47 @@ AWS_EGRESS_IP=<the allocated IP>
 The stack then looks that address up rather than managing it, so a destroy leaves it allocated (and
 still on the allow-list) for the next apply.
 
+#### Egress IP (Azure)
+
+By default Azure allocates the public IP that the outbound traffic of the AKS cluster leaves from, and it is released with the cluster,
+so a rebuild changes it.  To keep one address across rebuilds, so that a third party can allow-list the cluster once, create a Standard,
+static public IP in the resource group of the stack, outside it, with `azure-egress-ip`, which is idempotent and
+creates it in `AZURE_RESOURCE_GROUP` and `AZURE_REGION`:
+
+```shell
+afon-cli.sh azure-egress-ip create
+```
+
+(`afon-cli.sh azure-egress-ip show` prints it again, and `create <name>` or `show <name>` use a name other than the default
+`afon-egress-ip`.) It runs `az network public-ip create --sku Standard --allocation-method Static` and warns if an existing one
+is not Standard and static. The script never deletes it, as its address may be on somebody's allow-list.
+
+Set the address it prints in `afon-azure.properties`:
+
+```properties
+AZURE_EGRESS_IP=<the address>
+```
+
+The stack then makes that public IP the outbound IP of the cluster's load balancer, and reports it as the `egressIp` Terraform output.
+It does not manage it, so a destroy leaves it allocated (and still on the allow-list) for the next apply. Azure cannot look a public IP up
+by its address, so the stack lists those of `AZURE_RESOURCE_GROUP` and picks the one with the address: the plan fails if there is none there.
+The cluster's identity is granted Network Contributor on that public IP, which it needs to attach it.
+
+Only a stack that pins its egress IP uses the property, ie not `azure-keycloak`, as one public IP can serve one cluster's outbound traffic,
+so two stacks pinning it conflict, see [stacks side by side](stacks.md#stacks-side-by-side). Left empty, nothing changes.
+
+Setting it on a cluster that already runs changes its outbound IP, in place: `tofu plan` shows the cluster updated, not replaced, and
+the role assignment created. Check the plan before applying it, and expect the following after the apply:
+
+- The tunnel between the Kubernetes API server and the nodes reconnects, so `kubectl exec` and `logs` can fail for a minute or two with
+  `Expected HTTP 101 response but was '500 Internal Server Error'`. Anything run against the cluster straight after, eg the smoke tests,
+  can fail once for that reason: wait until the `konnectivity-agent` pods in `kube-system` stop restarting.
+- Connections that the workloads had open through the old address are dropped silently, so the pools of those holding long-lived ones to
+  an external service, eg Keycloak, Polaris and Guacamole to their database, can hang until they time out (Keycloak then answers `500`,
+  `Acquisition timeout while waiting for new connection`, and the Spark Connect test cannot get a token). Restart them:
+  `kubectl rollout restart deploy/keycloak-deployment deploy/polaris-deployment deploy/guacamole-deployment -n default`.
+- Whoever allow-lists the cluster's address, eg a firewall in front of a database, must switch to the new one.
+
 ### Restricting who can reach Polaris (AWS)
 
 Set `AWS_POLARIS_ALLOWED_CIDRS` to a comma-separated list of CIDRs to only admit those callers to
@@ -198,10 +239,29 @@ connection and opens its own, so the Polaris pod only ever sees the ALB's or a n
 Set `AZURE_POLARIS_ALLOWED_CIDRS` in `afon-azure.properties` to a comma-separated list of CIDRs to only admit those callers to
 Polaris' nginx ingress (via its `nginx.ingress.kubernetes.io/whitelist-source-range` annotation).  The cluster's pod CIDR
 (`10.244.0.0/16`, that of the AKS overlay network) is added automatically, as pods calling Polaris by its public domain name
-reach the ingress from their own addresses.  Left empty, there are no restraints.
+reach the ingress from their own addresses, and so is the pinned `AZURE_EGRESS_IP`, if set, like the egress IP on AWS.  Left empty, there are
+no restraints: the egress IP alone does not restrict Polaris.
 
 The ingress controller can only tell the callers apart if the load balancer does not hide them: with the property set, the
 controller's service gets `externalTrafficPolicy: Local`, else the callers would all arrive from a node's address.
+
+The machine running `afon-cli.sh manage-stack setup` must be able to call Polaris, as it configures the Polaris users and catalogs through
+its public endpoint, so it must be among the CIDRs, or the ingress unrestricted, while the Polaris steps run. The `network` smoke test needs
+the opposite: that same machine must be stopped. So a stack deployed with the property set cannot be set up from a machine outside of it:
+remove the restriction of the deployed cluster for the setup, then restore it. `kube-polaris-whitelist` shows, sets or removes the
+restriction of the cluster that kubectl points at, on `aws` or `azure`, until the next deploy or `tofu-apply`, which sets it as the
+config says:
+
+```shell
+afon-cli.sh azure-update-kube-config tre
+afon-cli.sh kube-polaris-whitelist azure show
+afon-cli.sh kube-polaris-whitelist azure remove                      # for setup to call Polaris from this machine
+afon-cli.sh manage-stack setup azure-full configure_oidc_users_for_cloud_azure   # resumes setup from the step that failed
+afon-cli.sh kube-polaris-whitelist azure set                         # the configured CIDRs plus the cluster's own addresses
+```
+
+`set` also sets `externalTrafficPolicy: Local` on Azure, which the restriction needs. It is the CIDRs that a deploy would apply, and the
+output says where each comes from. It refuses a cluster of the wrong kind for the cloud, eg the AKS one for `aws`.
 
 You can also restrict a deployed cluster by hand, which a redeploy undoes:
 

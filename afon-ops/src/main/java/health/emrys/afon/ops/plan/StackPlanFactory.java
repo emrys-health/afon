@@ -5,6 +5,7 @@ import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.cdk.components.KeycloakComponent;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -27,8 +28,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import static health.emrys.afon.config.AfonCloud.AWS;
-import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
 
 /**
  * Provides the steps for each action on each stack, derived from the {@link StackDefinition} of the stack and
@@ -289,7 +288,8 @@ public class StackPlanFactory {
 
     /**
      * @return the exclusive resources the stack holds: those of its components, eg the domain name of its Polaris, and the
-     * pinned egress IP on AWS if it pins it, ie the ones that are configured, as a stack without a pinned egress IP gets its own
+     * pinned egress IP, eg {@code AWS_EGRESS_IP}, if it pins it, ie the ones that are configured, as a stack without a pinned
+     * egress IP gets its own
      */
     public Set<AfonProperty> heldResources(StackId stackId, AfonPropertyProvider properties) {
         StackDefinition definition = StackDefinitions.get(stackId);
@@ -297,8 +297,9 @@ public class StackPlanFactory {
         for (StackComponent component : definition.componentsFor(properties)) {
             resources.addAll(registry.of(component).domains(stackId.cloud()));
         }
-        if (stackId.cloud() == AWS && definition.pinnedEgressIp()) {
-            resources.add(AWS_EGRESS_IP);
+        if (definition.pinnedEgressIp()) {
+            // the clouds that can pin it have the property, eg AWS_EGRESS_IP, the others none
+            AfonCloudProperty.EGRESS_IP.forCloud(stackId.cloud()).ifPresent(resources::add);
         }
         resources.removeIf(resource -> properties.getValue(resource, "").isBlank());
         return resources;

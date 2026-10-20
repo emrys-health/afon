@@ -84,6 +84,7 @@ public class GenerateScriptMains {
         new ScriptEntry("azure", "AzureLoginAppMain", "azure/login-app.sh"),
         new ScriptEntry("azure", "AzureLoginMain", "azure/login.sh"),
         new ScriptEntry("azure", "AzurePolarisMain", "azure/polaris.sh", "azure", "Polaris"),
+        new ScriptEntry("azure", "AzureEgressIpMain", "azure/egress-ip.sh"),
         new ScriptEntry("azure", "AzureRbacMain", "azure/rbac.sh"),
         new ScriptEntry("azure", "AzureRolesMain", "azure/roles.sh"),
         new ScriptEntry("azure", "AzureUpdateKubeConfigMain", "azure/update-kube-config.sh", "azure"),
@@ -110,7 +111,8 @@ public class GenerateScriptMains {
         new ScriptEntry("kube", "KubeEstimatorMain", "kube/estimator.sh"),
         new ScriptEntry("kube", "KubePodsMain", "kube/pods.sh"),
         new ScriptEntry("kube", "KubeLogsMain", "kube/logs.sh"),
-        new ScriptEntry("kube", "KubePolarisDbMain", "kube/polaris-db.sh")
+        new ScriptEntry("kube", "KubePolarisDbMain", "kube/polaris-db.sh"),
+        new ScriptEntry("kube", "KubePolarisWhitelistMain", "kube/polaris-whitelist.sh")
     );
 
     public static void main(String[] args) throws IOException {
