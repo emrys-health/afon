@@ -3,7 +3,7 @@
 #
 # The Polaris ingress is restricted to the CIDRs of AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS, as the deploy does, plus
 # the cluster's own addresses, so that the pods calling Polaris by its public domain name are not locked out: its egress IP on AWS, or
-# its outbound IP and pod CIDR on Azure.  It is the annotation of the ingress: alb.ingress.kubernetes.io/inbound-cidrs on AWS, and
+# its outbound IP and pod CIDR on Azure, or its pod range, node subnet and pinned egress IP on GCP.  It is the annotation of the ingress: alb.ingress.kubernetes.io/inbound-cidrs on AWS, and
 # nginx.ingress.kubernetes.io/whitelist-source-range on Azure, which only works with externalTrafficPolicy Local on the ingress
 # controller's service.
 #
@@ -81,7 +81,7 @@ azure_cluster_outbound_ip() {
 polaris_annotation() {
   case "$CLOUD" in
     aws) echo "alb.ingress.kubernetes.io/inbound-cidrs" ;;
-    azure) echo "nginx.ingress.kubernetes.io/whitelist-source-range" ;;
+    azure|gcp) echo "nginx.ingress.kubernetes.io/whitelist-source-range" ;;
   esac
 }
 
@@ -112,6 +112,7 @@ restriction_cidrs() {
   case "$CLOUD" in
     aws) aws_restriction_cidrs ;;
     azure) azure_restriction_cidrs ;;
+    gcp) gcp_restriction_cidrs ;;
   esac
 }
 
@@ -199,6 +200,40 @@ azure_restriction_cidrs() {
   echo "$cidrs$AZURE_POD_CIDR"
 }
 
+# The pod range and the node subnet of a GKE cluster, as GcpCloudProvider.POD_CIDR and NODE_CIDR
+GCP_POD_CIDR="10.20.0.0/16"
+GCP_NODE_CIDR="10.10.0.0/24"
+
+# Prints property $1 of afon-gcp.properties, without whitespace, or nothing if it is not set.
+gcp_property() {
+  grep -h "^$1=" "$AFON_CONFIG_DIR/afon-gcp.properties" 2>/dev/null | tail -1 | cut -d= -f2- \
+    | tr -d '[:space:]' || true
+}
+
+# On GCP the cluster's own addresses are its pod range, its node subnet and the pinned GCP_EGRESS_IP, if any: a cluster without
+# one has addresses that Google allocates, which are not looked up.
+gcp_restriction_cidrs() {
+  local egress_ip cidrs cidr configured own
+  egress_ip=$(gcp_property GCP_EGRESS_IP)
+  configured="${POLARIS_ALLOWED_CIDRS-$(gcp_property GCP_POLARIS_ALLOWED_CIDRS)}"
+  cidrs=
+  for cidr in $(echo "$configured" | tr ',' ' ') ${egress_ip:+$egress_ip/32} "$GCP_POD_CIDR" "$GCP_NODE_CIDR"; do
+    case ",$cidrs," in
+      *",$cidr,"*) ;;
+      *) cidrs="$cidrs$cidr," ;;
+    esac
+  done
+  if [ -z "$egress_ip" ]; then
+    warning "no GCP_EGRESS_IP in $AFON_CONFIG_DIR/afon-gcp.properties: not including the cluster's egress IP"
+  fi
+  # to stderr, as the CIDRs are what this prints to stdout
+  banner "Polaris ingress CIDRs, from:" >&2
+  echo "  configured: ${configured:-none} (GCP_POLARIS_ALLOWED_CIDRS in $AFON_CONFIG_DIR/afon-gcp.properties, unless given)" >&2
+  echo "  egress IP: ${egress_ip:-not found} (GCP_EGRESS_IP)" >&2
+  echo "  pod range and node subnet: $GCP_POD_CIDR, $GCP_NODE_CIDR (as GcpCloudProvider.POD_CIDR and NODE_CIDR)" >&2
+  echo "${cidrs%,}"
+}
+
 # Prints the kubectl commands that restrict the Polaris ingress of kubectl context $1 to the CIDRs $2, for the $CLOUD.
 # On Azure the ingress controller must also keep the callers' IPs, which its load balancer otherwise hides.
 print_restrict_commands() {
@@ -207,7 +242,7 @@ print_restrict_commands() {
     aws)
       echo "  kubectl --context $context annotate ingress polaris-ingress -n default --overwrite" \
            "alb.ingress.kubernetes.io/inbound-cidrs=$cidrs" ;;
-    azure)
+    azure|gcp)
       controller=$(controller_service "$context")
       echo "  kubectl --context $context patch ${controller:-<the ingress-nginx controller service>} -n ingress-nginx" \
            "--type merge -p '{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}'"

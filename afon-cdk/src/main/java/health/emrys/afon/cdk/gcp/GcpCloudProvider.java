@@ -42,6 +42,8 @@ import health.emrys.afon.config.StackId;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -70,11 +72,17 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     private static final Logger  logger             = org.slf4j.LoggerFactory.getLogger(GcpCloudProvider.class);
     private static final Pattern DNS_ZONE_NAME_RULE = Pattern.compile("[a-z]([-a-z0-9]*[a-z0-9])?");
     private static final int     DNS_ZONE_NAME_MAX  = 63;
+    /** The nodes' subnet, from which a pod's call to the ingress' public address can arrive, if it is translated on the node. */
+    static final String NODE_CIDR = "10.10.0.0/24";
+    /** The secondary range of the subnet that the pods get their addresses from. */
+    static final String POD_CIDR  = "10.20.0.0/16";
 
     private final ContainerCluster   gkeCluster;
     private final String             projectId;
     private final String             clusterName;
     private final boolean            secretsEnabled;
+    private final String             egressIp;
+    private final AfonPropertyProvider properties;
     private       KubernetesProvider k8sProvider;
     private       HelmProvider       helmProvider;
 
@@ -107,6 +115,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
      */
     GcpCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties, boolean pinnedEgressIp) {
         super(scope, id);
+        this.properties = properties;
         this.projectId = projectIdFrom(properties);
         this.secretsEnabled = Boolean.parseBoolean(properties.getValue(GCP_SECRETS_ENABLED, "false"));
         this.clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
@@ -136,7 +145,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
         ComputeSubnetworkConfig subnetworkConfig = ComputeSubnetworkConfig
             .builder()
             .name(subnetName)
-            .ipCidrRange("10.10.0.0/24")
+            .ipCidrRange(NODE_CIDR)
             .region(gcpRegion)
             .network(vpc.getName())
             // Enable IP Aliasing/VPC-native networking
@@ -145,7 +154,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
                 ComputeSubnetworkSecondaryIpRange
                     .builder()
                     .rangeName("pods")
-                    .ipCidrRange("10.20.0.0/16")
+                    .ipCidrRange(POD_CIDR)
                     .build(),
                 ComputeSubnetworkSecondaryIpRange
                     .builder()
@@ -181,7 +190,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
             .router(router.getName())
             .region(gcpRegion)
             .sourceSubnetworkIpRangesToNat("ALL_SUBNETWORKS_ALL_IP_RANGES");
-        String egressIp = pinnedEgressIp ? properties.getCloudValue(GCP, AfonCloudProperty.EGRESS_IP, "").trim() : "";
+        egressIp = pinnedEgressIp ? properties.getCloudValue(GCP, AfonCloudProperty.EGRESS_IP, "").trim() : "";
         if (egressIp.isEmpty()) {
             natConfig.natIpAllocateOption("AUTO_ONLY");
         } else {
@@ -345,7 +354,52 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
 
     @Override
     protected Map<String, String> nginxAnnotations() {
-        return null;
+        if (allowedCidrs("polaris").isEmpty()) {
+            return null;
+        }
+        // else the load balancer hides the callers behind a node's IP, and the ingress cannot tell them apart
+        return Map.of("controller.service.externalTrafficPolicy", "Local");
+    }
+
+    /**
+     * The source CIDRs admitted to the route's component, from {@code GCP_<COMPONENT>_ALLOWED_CIDRS}.  Empty, ie open to all,
+     * if not set.
+     */
+    @Override
+    protected List<String> inboundCidrs(HttpsRoute route) {
+        return withClusterCidrs(allowedCidrs(route.component()), egressIp);
+    }
+
+    /**
+     * The configured CIDRs plus the cluster's own addresses, as its pods that call Polaris by its public domain name reach the
+     * ingress controller from their own IPs, or from the node that translates the load balancer's address, or from the cluster's
+     * egress IP: the pod range, the node subnet, and the pinned egress IP, if any.  Empty (no restriction) when nothing is
+     * configured.
+     *
+     * @param egressIp the pinned egress IP, or empty if the cluster has none
+     */
+    static List<String> withClusterCidrs(List<String> cidrs, String egressIp) {
+        if (cidrs.isEmpty()) {
+            return cidrs;
+        }
+        List<String> all = new ArrayList<>(cidrs);
+        for (String own : egressIp.isEmpty() ? List.of(POD_CIDR, NODE_CIDR) : List.of(egressIp + "/32", POD_CIDR, NODE_CIDR)) {
+            if (!all.contains(own)) {
+                all.add(own);
+            }
+        }
+        return all;
+    }
+
+    private List<String> allowedCidrs(String component) {
+        // only Polaris has an allow-list; the other components are open to all
+        return component.equals("polaris")
+               ? parseCidrs(properties.getCloudValue(GCP, AfonCloudProperty.POLARIS_ALLOWED_CIDRS, ""))
+               : List.of();
+    }
+
+    static List<String> parseCidrs(String csv) {
+        return Arrays.stream(csv.split(",")).map(String::trim).filter(cidr -> !cidr.isEmpty()).toList();
     }
 
     @Override

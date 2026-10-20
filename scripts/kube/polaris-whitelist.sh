@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Shows, sets or removes the restriction of who can call the Polaris ingress of a cluster, live, ie by the annotation of its ingress,
 # which the next deploy, or `tofu-apply`, sets again as the config says.  It is how to let the machine running `setup` call Polaris
-# of a stack deployed with AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS, and how to restrict it again for the `network`
+# of a stack deployed with AWS_, AZURE_ or GCP_POLARIS_ALLOWED_CIDRS, and how to restrict it again for the `network`
 # smoke test, which needs the machine to be stopped:
 #   - the annotation is alb.ingress.kubernetes.io/inbound-cidrs on AWS, and nginx.ingress.kubernetes.io/whitelist-source-range on
 #     Azure, which only works with externalTrafficPolicy Local on the ingress controller's service, so `set` sets that too;
-#   - what is set is the CIDRs given, else the configured AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS, plus the
+#   - what is set is the CIDRs given, else the configured AWS_, AZURE_ or GCP_POLARIS_ALLOWED_CIDRS, plus the
 #     cluster's own addresses, as the deploy adds them, so that its pods calling Polaris by its public domain name are not locked out:
 #     its egress IP on AWS, or its outbound IP and pod CIDR on Azure.
 #
 # Usage:
-#   ./polaris-whitelist.sh <aws|azure> show
-#   ./polaris-whitelist.sh <aws|azure> set [<cidrs>]
-#   ./polaris-whitelist.sh <aws|azure> remove
+#   ./polaris-whitelist.sh <aws|azure|gcp> show
+#   ./polaris-whitelist.sh <aws|azure|gcp> set [<cidrs>]
+#   ./polaris-whitelist.sh <aws|azure|gcp> remove
 #
 #   show     prints how the ingress is restricted, if it is, and for Azure the traffic policy of the ingress controller.
 #   set      restricts it, to the comma-separated CIDRs given, eg 203.0.113.7/32,198.51.100.0/24, else the configured ones, plus
@@ -39,8 +39,8 @@ usage() {
 CLOUD=$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')
 ACTION="${2:-}"
 case "$CLOUD" in
-  aws|azure) ;;
-  *) echo "The cloud should be aws or azure, not '${1:-}'" >&2; usage; exit 1 ;;
+  aws|azure|gcp) ;;
+  *) echo "The cloud should be aws, azure or gcp, not '${1:-}'" >&2; usage; exit 1 ;;
 esac
 case "$ACTION" in
   show|remove) [ $# -le 2 ] || { echo "$ACTION takes no CIDRs" >&2; usage; exit 1; } ;;
@@ -65,6 +65,12 @@ case "$CLOUD" in
     case "$CONTEXT" in
       arn:aws:eks:*) ;;
       *) echo "The kubectl context '$CONTEXT' is not an EKS cluster: point kubectl at the AWS one, eg with 'afon-cli.sh aws-update-kube-config tre'" >&2
+         exit 1 ;;
+    esac ;;
+  gcp)
+    case "$CONTEXT" in
+      gke_*) ;;
+      *) echo "The kubectl context '$CONTEXT' is not a GKE cluster: point kubectl at the GCP one, eg with 'afon-cli.sh gcp-update-kube-config tre'" >&2
          exit 1 ;;
     esac ;;
   azure)
@@ -95,7 +101,7 @@ show() {
     present:)   echo "- The Polaris ingress has $ANNOTATION set to nothing" ;;
     *)          echo "- The Polaris ingress is not restricted: $ANNOTATION is not set" ;;
   esac
-  if [ "$CLOUD" = "azure" ]; then
+  if [ "$CLOUD" != "aws" ]; then
     POLICY=$(controller_policy)
     if [ "$POLICY" = "Local" ]; then
       echo "- The traffic policy of its ingress controller is Local, which keeps the callers' IPs"
@@ -128,7 +134,7 @@ case "$ACTION" in
       exit 1
     fi
     banner "Restricting the Polaris ingress of $CONTEXT to $CIDRS"
-    if [ "$CLOUD" = "azure" ]; then
+    if [ "$CLOUD" != "aws" ]; then
       kubectl --context "$CONTEXT" patch "$(controller_service "$CONTEXT")" -n ingress-nginx --type merge \
         -p '{"spec":{"externalTrafficPolicy":"Local"}}'
     fi
