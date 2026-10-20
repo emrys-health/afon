@@ -1,5 +1,6 @@
 name|command|args
 guacamole-db|guacamole-db-smoke|
+loki|loki-smoke|
 network|network-smoke|
 spark-connect|spark-connect-smoke|
 spark-gcs-read|spark-connect-gcs-read-smoke|
