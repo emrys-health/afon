@@ -19,6 +19,7 @@ import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
 import static health.emrys.afon.ops.kube.KubeClient.nameOfPod;
@@ -74,35 +76,38 @@ public class LokiSmokeMain {
 
                 checkPodIsWatched(localPort, jupyterPod);
 
-                /*
-  # Recent lines for one pod (default lookback is the last hour)
-  curl -s -G -H "X-Scope-OrgID: $TENANT" localhost:3100/loki/api/v1/query_range \
-    --data-urlencode 'query={namespace="default", pod="spark-connector-0-driver"}' \
-    --data-urlencode 'limit=20' | jq -r '.data.result[].values[][1]'
-
-                 */
-                HttpPost request = new HttpPost(format("http://localhost:%d/loki/api/v1/query_range", localPort));
-
-                request.setEntity(new UrlEncodedFormEntity(
-                    List.of(new BasicNameValuePair("query",
-                                                   format("{namespace=\"default\", pod=\"%s\"}", jupyterPod)),
-                            new BasicNameValuePair("limit", "20")),
-                    StandardCharsets.UTF_8
-                ));
-                Map logs = localCurl(request);
-                Map data = (Map) logs.get("data");
-                List<List> results = (List) data.get("result");
-                List values = (List) ((Map) results.get(0)).get("values");
-                Object lines = values.stream()
-                                     .map(x -> {
-                                          logger.info("{} is a {}", x, x.getClass().getName());
-                                          return x.toString();
-                                      })
-                                     .collect(Collectors.joining("\n"));
-                logger.info("lines = {}", lines);
+                checkPodLogs(localPort, jupyterPod);
             }
 
         }
+    }
+
+    private void checkPodLogs(int localPort, String jupyterPod) throws IOException {
+        HttpPost request = new HttpPost(format("http://localhost:%d/loki/api/v1/query_range", localPort));
+
+        request.setEntity(new UrlEncodedFormEntity(
+            List.of(new BasicNameValuePair("query",
+                                           format("{namespace=\"default\", pod=\"%s\"}", jupyterPod)),
+                    new BasicNameValuePair("limit", "20")),
+            StandardCharsets.UTF_8
+        ));
+        Map            logs       = localCurl(request);
+        Stream<String> lineStream = parseLoki(logs);
+        List<String>   lineList   = lineStream.toList();
+        if (lineList.isEmpty()) {
+            throw new RuntimeException(format("There are no logs for pod %s", jupyterPod));
+        }
+        String lineStr = lineList.stream().collect(Collectors.joining("\n"));
+        logger.info("lines = {}", lineStr);
+    }
+
+    private static @NonNull Stream<String> parseLoki(Map logs) {
+        Map        data    = (Map) logs.get("data");
+        List<List> results = (List) data.get("result");
+        List       values  = (List) ((Map) results.get(0)).get("values");
+        Stream<String> lineStream = values.stream()
+                                          .flatMap(x -> ((List<String>) x).stream());
+        return lineStream;
     }
 
     private void checkPodIsWatched(int localPort, String jupyterPod) throws IOException {
