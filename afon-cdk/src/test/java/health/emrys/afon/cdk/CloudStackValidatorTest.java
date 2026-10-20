@@ -17,7 +17,7 @@ class CloudStackValidatorTest {
     void canListStacks() {
         assertThat(validator.stackNames()).containsExactly(
             "aws-full", "aws-keycloak", "aws-lab", "aws-polaris", "aws-snowflake",
-            "azure-full", "azure-keycloak", "azure-polaris", "gcp-polaris");
+            "azure-full", "azure-keycloak", "azure-polaris", "gcp-keycloak", "gcp-polaris");
     }
 
     @Test
@@ -33,8 +33,9 @@ class CloudStackValidatorTest {
     void canResolveStackByItsRoleInTheCloud() {
         assertThat(validator.resolve("aws-tre")).isEqualTo(new StackId(AWS, "full"));
         assertThat(validator.resolve("AZURE-CATALOG")).isEqualTo(new StackId(AZURE, "polaris"));
+        assertThat(validator.resolve("gcp-identity")).isEqualTo(new StackId(GCP, "keycloak"));
         // no stack of gcp has the role, as for an unknown stack
-        assertThat(validator.resolve("gcp-identity")).isNull();
+        assertThat(validator.resolve("gcp-tre")).isNull();
     }
 
     @Test

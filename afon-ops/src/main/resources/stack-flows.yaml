@@ -26,6 +26,10 @@ flows:
     - setup: {cloud: azure, role: identity}
     - setup: {cloud: azure, role: catalog}
 
+  gcp-keycloak-and-polaris:
+    - setup: {cloud: gcp, role: identity}
+    - setup: {cloud: gcp, role: catalog}
+
   azure-and-gcp-polaris:
     - setup: {cloud: azure, role: catalog}
     - setup: {cloud: gcp, role: catalog}

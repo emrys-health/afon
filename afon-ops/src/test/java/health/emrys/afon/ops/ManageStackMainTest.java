@@ -27,8 +27,9 @@ class ManageStackMainTest {
         assertThat(manager.stepsProviderFor("setup", "aws-tre")).isNotNull();
         assertThat(manager.stepsProviderFor("deploy", "AZURE-Catalog", true)).isNotNull();
         assertThat(manager.stepsProviderFor("delete", "aws-identity")).isNotNull();
-        // no stack of gcp has the role identity
-        assertThat(manager.stepsProviderFor("setup", "gcp-identity")).isNull();
+        assertThat(manager.stepsProviderFor("setup", "gcp-identity")).isNotNull();
+        // no stack of gcp has the role tre
+        assertThat(manager.stepsProviderFor("setup", "gcp-tre")).isNull();
         // the scenarios of the stack with the role are those of the stack: the snowflake stack has no role, the full one has none
         AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
         assertThat(manager.runProviderFor("aws-tre", "external-azure", properties) != null)

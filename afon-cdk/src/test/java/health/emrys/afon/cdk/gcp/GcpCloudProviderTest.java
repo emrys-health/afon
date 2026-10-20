@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk.gcp;
 
+import health.emrys.afon.config.StackId;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,6 +12,12 @@ class GcpCloudProviderTest {
     void dnsZoneNameIsDomainNameWithDotsAsDashes() {
         assertThat(GcpCloudProvider.dnsZoneName("emryspolarisgcp2.click")).isEqualTo("emryspolarisgcp2-click");
         assertThat(GcpCloudProvider.dnsZoneName("polaris.emrys.example.com")).isEqualTo("polaris-emrys-example-com");
+    }
+
+    @Test
+    void clusterNameIsQualifiedByTheStackType() {
+        assertThat(GcpCloudProvider.clusterName("emrys", StackId.parse("gcp-polaris"))).isEqualTo("polaris-emrys");
+        assertThat(GcpCloudProvider.clusterName("emrys", StackId.parse("gcp-keycloak"))).isEqualTo("keycloak-emrys");
     }
 
     @Test

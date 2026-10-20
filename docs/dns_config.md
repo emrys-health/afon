@@ -167,7 +167,7 @@ Secret Manager Admin.  This is a one-off operation but can be repeated (idempote
 
 To store an existing PEM cert and key, and to inspect or remove the secrets:
 ```shell
-afon-cli.sh gcp-secrets store <cert.pem> <key.pem>
+afon-cli.sh gcp-secrets store <cert.pem> <key.pem> [<domain-name>]
 afon-cli.sh gcp-secrets {show|list|delete}
 ```
 On deploy, the `GcpCloudProvider` restores the secrets into the `polaris-tls` Kubernetes secret before cert-manager

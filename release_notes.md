@@ -13,6 +13,10 @@
   Gitea (the `Git` component), which needs `GITEA_*` properties that your existing config does not have, so **add them before you
   deploy or set the stack up again**, and rerun `afon-cli.sh aws-create tre` (or `azure-create tre`) to create the
   bucket.  The [issue #34](https://github.com/emrys-health/afon-core/issues/34) lists the properties, their defaults and which are optional, and the password rules (including the 8-character minimum for the passwords in `users.csv`).  `config-init` never overwrites an existing config dir, so copy them from `templates/config` and check what is missing with `afon-cli.sh config-validate`.  A missing required property fails the deploy before anything is created, naming the property.
+- **GCP stacks named by type:** `gcp-keycloak` is new, and the GKE cluster, VPC, subnet and router of a GCP stack are now named
+  `<stack-type>-<CLUSTER_NAME>`, as on AWS and Azure, so that the stacks run side by side.  **A `gcp-polaris` deployed by the previous
+  version has them named `<CLUSTER_NAME>`, and deploying with this one replaces them: delete it first, with the previous version.**
+  `gcp-create` now takes the stack, eg `gcp-create catalog`, and `gcp-issue-cert` issues the certs of every configured domain name.
 - **New feature([#267](https://github.com/emrys-health/afon-core/issues/267)):** the stacks, and the flows run by `manage-stack run`, are now defined in `stacks.yaml` and `stack-flows.yaml`, bundled in the jar.  To define them differently, put a
   file of the same name in the config dir (`$AFON_HOME/config`), which replaces the bundled one entirely;
   `afon-cli.sh validate-stack --export-stacks` and `afon-cli.sh manage-stack run --export-flows` write a copy to start from.  A

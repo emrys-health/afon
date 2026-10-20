@@ -39,8 +39,8 @@ class StackFlowsFileTest {
     void parsesTheBundledFlows() {
         Map<String, List<ItemSpec>> flows = StackFlowsFile.load(null);
         assertThat(flows.keySet()).containsExactly(
-            "aws-full-and-azure-polaris", "aws-keycloak-and-polaris", "azure-keycloak-and-polaris", "azure-and-gcp-polaris",
-            "cross-cloud-azure", "snowflake-reading-aws", "snowflake-reading-azure", "snowflake-reading-gcp",
+            "aws-full-and-azure-polaris", "aws-keycloak-and-polaris", "azure-keycloak-and-polaris", "gcp-keycloak-and-polaris",
+            "azure-and-gcp-polaris", "cross-cloud-azure", "snowflake-reading-aws", "snowflake-reading-azure", "snowflake-reading-gcp",
             "snowflake-writing-azure", "snowflake-reading-all");
         List<ItemSpec> cross = flows.get("cross-cloud-azure");
         assertThat(cross).extracting(ItemSpec::action).containsExactly(StackAction.SETUP, StackAction.SETUP, StackAction.RUN);
