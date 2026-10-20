@@ -61,6 +61,11 @@
         <hadoop.version>3.3.4</hadoop.version>
         <httpclient5-fluent.version>5.5</httpclient5-fluent.version>
         <polaris.version>1.6.0</polaris.version>
+        <!-- cdktf 0.21.0 depends on jsii-runtime as the range [1.112.0,2.0.0), so a fresh Maven repository resolves the newest
+             release, and 1.142.0 fails to read back the provisioners of a resource ("Unable to instantiate a new object for FQN
+             Object"), which breaks KubeConfigAspect.  1.112.0 is the lowest the range accepts, which cdktf 0.21.0 was built
+             against; 1.130.0 also works.  Keep it in step with the cdktf version. -->
+        <jsii.runtime.version>1.112.0</jsii.runtime.version>
         <!-- Kept in sync with the AWS SDK version pulled transitively by org.apache.polaris:polaris-core.
              Importing the BOM here (rather than per-module) ensures every software.amazon.awssdk
              artifact in the whole build - direct or transitive - resolves to one consistent version. -->
@@ -94,6 +99,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>software.amazon.jsii</groupId>
+                <artifactId>jsii-runtime</artifactId>
+                <version>${jsii.runtime.version}</version>
+            </dependency>
             <dependency>
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>bom</artifactId>

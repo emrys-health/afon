@@ -71,7 +71,13 @@ class AzurePolarisRestrictionTest {
     void cidrsAreParsedFromTheCsv() {
         assertThat(AzureCloudProvider.parseCidrs(" a/32 ,, b/24,")).containsExactly("a/32", "b/24");
         assertThat(AzureCloudProvider.parseCidrs("")).isEmpty();
-        assertThat(AzureCloudProvider.withPodCidr(List.of())).isEmpty();
-        assertThat(AzureCloudProvider.withPodCidr(List.of("a/32"))).containsExactly("a/32", AzureCloudProvider.POD_CIDR);
+        assertThat(AzureCloudProvider.withClusterCidrs(List.of(), "")).isEmpty();
+        assertThat(AzureCloudProvider.withClusterCidrs(List.of(), "20.1.2.3")).isEmpty();
+        assertThat(AzureCloudProvider.withClusterCidrs(List.of("a/32"), "")).containsExactly("a/32", AzureCloudProvider.POD_CIDR);
+        assertThat(AzureCloudProvider.withClusterCidrs(List.of("a/32"), "20.1.2.3"))
+            .containsExactly("a/32", "20.1.2.3/32", AzureCloudProvider.POD_CIDR);
+        // not repeated if it is already there
+        assertThat(AzureCloudProvider.withClusterCidrs(List.of("20.1.2.3/32", AzureCloudProvider.POD_CIDR), "20.1.2.3"))
+            .containsExactly("20.1.2.3/32", AzureCloudProvider.POD_CIDR);
     }
 }

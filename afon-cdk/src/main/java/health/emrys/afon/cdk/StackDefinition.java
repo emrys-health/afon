@@ -15,8 +15,9 @@ import java.util.function.Function;
  *
  * @param id             the stack, whose cloud it is deployed to
  * @param role           the {@link StackRole} it plays in its cloud, or {@code null} if none
- * @param pinnedEgressIp for AWS, whether the stack's egress IP is pinned to {@code AWS_EGRESS_IP}, if set, which only
- *                       one running stack can hold, else the stack allocates its own
+ * @param pinnedEgressIp whether the stack's egress IP is pinned to {@code <CLOUD>_EGRESS_IP}, eg {@code AWS_EGRESS_IP}, if
+ *                       set, which only one running stack can hold, else the stack allocates its own.  Only AWS and Azure can
+ *                       pin it so far, so it has no effect on GCP
  * @param components     creates the components, new for each stack built as they hold what they deploy
  * @param declared       the kinds of component it may deploy, ie that its definition lists, whatever the config
  */

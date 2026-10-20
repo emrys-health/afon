@@ -6,11 +6,15 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.IAspect;
 import com.hashicorp.cdktf.TerraformResource;
+import com.hashicorp.cdktf.TerraformIterator;
+import com.hashicorp.cdktf.TerraformOutput;
 import com.hashicorp.cdktf.TerraformStack;
+import com.hashicorp.cdktf.Token;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_client_config.DataAzurermClientConfig;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_dns_zone.DataAzurermDnsZone;
 import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecord;
 import com.hashicorp.cdktf.providers.azurerm.dns_a_record.DnsARecordConfig;
+import com.hashicorp.cdktf.providers.azurerm.data_azurerm_public_ips.DataAzurermPublicIps;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_resource_group.DataAzurermResourceGroup;
 import com.hashicorp.cdktf.providers.azurerm.data_azurerm_resource_group.DataAzurermResourceGroupConfig;
 import com.hashicorp.cdktf.providers.azurerm.kubernetes_cluster.*;
@@ -85,6 +89,8 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     private final        String                  providerRegistrations;
     private final        Map<String, String>     nodePoolConfig;
     private final        String                  keyVaultName;
+    /** The public IP address that the outbound traffic of the cluster egresses from, if pinned, else empty. */
+    private final        String                  egressIp;
     /** The pod CIDR of an AKS overlay cluster, as left unset in its network profile. */
     static final String POD_CIDR = "10.244.0.0/16";
 
@@ -93,10 +99,15 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     private              KubernetesProvider      k8sProvider;
     private              HelmProvider            helmProvider;
 
+    /**
+     * @param pinnedEgressIp whether the egress IP of the stack is pinned to {@code AZURE_EGRESS_IP}, if set, which only
+     *                       one running stack can hold, else Azure allocates one
+     */
     public AzureCloudProvider(@NonNull Construct scope,
                               @NonNull String id,
                               @NonNull StackId stackId,
-                              AfonPropertyProvider properties) {
+                              AfonPropertyProvider properties,
+                              boolean pinnedEgressIp) {
         super(scope, id);
         this.properties          = properties;
         stackType                = stackId.type();
@@ -106,6 +117,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         providerRegistrations    = properties.getValue(AZURE_RESOURCE_PROVIDER_REGISTRATIONS, "core");
         nodePoolConfig           = parseNodePoolConfig(properties.getValue(AZURE_AKS_NODE_POOL, ""));
         keyVaultName             = properties.getValue(AZURE_KEY_VAULT_NAME, "");
+        egressIp                 = pinnedEgressIp ? properties.getCloudValue(AZURE, AfonCloudProperty.EGRESS_IP, "").trim() : "";
         configureProviders();
         clientConfig = new DataAzurermClientConfig(this, "current");
         aksCluster   = createCluster(lookupResourceGroup());
@@ -116,8 +128,9 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         configureK8s();
     }
 
-    public static AzureCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties) {
-        return new AzureCloudProvider(stack, stackId.cloud().toString(), stackId, properties);
+    public static AzureCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties,
+                                               boolean pinnedEgressIp) {
+        return new AzureCloudProvider(stack, stackId.cloud().toString(), stackId, properties, pinnedEgressIp);
     }
 
     /**
@@ -475,7 +488,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
                                  .build())
             .build();
 
-        KubernetesClusterNetworkProfile networkProfile = KubernetesClusterNetworkProfile
+        KubernetesClusterNetworkProfile.Builder networkProfileBuilder = KubernetesClusterNetworkProfile
             .builder()
             .networkPlugin("azure")
             .loadBalancerSku("standard")
@@ -483,8 +496,34 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             .dnsServiceIp(DNS_SERVICE_IP)
             .networkPlugin("azure")
             .networkDataPlane("cilium")
-            .networkPluginMode("overlay")
-            .build();
+            .networkPluginMode("overlay");
+        List<RoleAssignment> egressIpAssignments = new ArrayList<>();
+        if (!egressIp.isEmpty()) {
+            // Everything the cluster sends to the internet leaves from one address a third party can put on an allow-list.
+            // AZURE_EGRESS_IP pins that address to a public IP created beforehand, which is what makes it survive a
+            // destroy/apply cycle, unlike the one Azure allocates when it is unset.
+            String egressIpId = lookupEgressIp(resourceGroup);
+            networkProfileBuilder.loadBalancerProfile(KubernetesClusterNetworkProfileLoadBalancerProfile
+                                                          .builder()
+                                                          .outboundIpAddressIds(List.of(egressIpId))
+                                                          .build());
+            // The cluster's identity must be allowed to join the public IP to its load balancer, which its role on the
+            // node subnet does not cover.
+            egressIpAssignments.add(new RoleAssignment(
+                this, "aks-identity-egress-ip-network-contributor", RoleAssignmentConfig
+                .builder()
+                .principalId(identity.getPrincipalId())
+                .roleDefinitionName("Network Contributor")
+                .scope(egressIpId)
+                .build()));
+            // Reported so the address can be handed to whoever maintains the allow-list
+            TerraformOutput.Builder
+                .create(this, "egressIp")
+                .value(egressIp)
+                .description("Public IP all outbound cluster traffic is seen to come from")
+                .build();
+        }
+        KubernetesClusterNetworkProfile networkProfile = networkProfileBuilder.build();
 
         LocalExecProvisioner updateCredentials = LocalExecProvisioner
             .builder()
@@ -525,6 +564,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
                           .identityIds(List.of(identity.getId()))
                           .build())
             .networkProfile(networkProfile)
+            .dependsOn(egressIpAssignments)
             .timeouts(KubernetesClusterTimeouts
                           .builder()
                           .create("20m")
@@ -536,6 +576,24 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         // but the azurerm version pinned (see AZURERM_VERSION) has, so it is set as an override of the synthesised one.
         cluster.addOverride("network_profile.advanced_networking", Map.of("security_enabled", true));
         return cluster;
+    }
+
+    /**
+     * Looks up, rather than manages, the public IP of {@code AZURE_EGRESS_IP}, so that a destroy cannot release an address
+     * that is still on somebody's allow-list.  Azure has no lookup by address, so the public IPs of the resource group are
+     * listed, and the one with the address is picked: the plan fails if there is none.
+     *
+     * @return the id of the public IP, resolved when the plan is applied
+     */
+    private String lookupEgressIp(DataAzurermResourceGroup resourceGroup) {
+        DataAzurermPublicIps publicIps = DataAzurermPublicIps.Builder
+            .create(this, "egress-ips")
+            .resourceGroupName(resourceGroup.getName())
+            .build();
+        TerraformIterator each = TerraformIterator.fromList(publicIps.getPublicIps());
+        List<String> ids       = Token.asList(each.pluckProperty("id"));
+        List<String> addresses = Token.asList(each.pluckProperty("ip_address"));
+        return Token.asString(Fn.element(Fn.matchkeys(ids, addresses, List.of(egressIp)), 0));
     }
 
     // -------------------------------------------------------------------------
@@ -681,20 +739,27 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
      */
     @Override
     protected List<String> inboundCidrs(HttpsRoute route) {
-        return withPodCidr(allowedCidrs(route.component()));
+        return withClusterCidrs(allowedCidrs(route.component()), egressIp);
     }
 
     /**
-     * The configured CIDRs plus the cluster's pod CIDR, as pods that call Polaris by its public domain name reach the ingress
-     * controller from their own IPs, Cilium translating the load balancer's address to the controller's pod.  Empty
-     * (no restriction) when nothing is configured.
+     * The configured CIDRs plus the cluster's own addresses, as its pods that call Polaris by its public domain name reach the
+     * ingress controller from their own IPs, Cilium translating the load balancer's address to the controller's pod, or from the
+     * cluster's egress IP: the pod CIDR, and the pinned egress IP, if any.  Empty (no restriction) when nothing is configured.
+     *
+     * @param egressIp the pinned egress IP, or empty if the cluster has none
      */
-    static List<String> withPodCidr(List<String> cidrs) {
-        if (cidrs.isEmpty() || cidrs.contains(POD_CIDR)) {
+    static List<String> withClusterCidrs(List<String> cidrs, String egressIp) {
+        if (cidrs.isEmpty()) {
             return cidrs;
         }
         List<String> all = new ArrayList<>(cidrs);
-        all.add(POD_CIDR);
+        if (!egressIp.isEmpty() && !all.contains(egressIp + "/32")) {
+            all.add(egressIp + "/32");
+        }
+        if (!all.contains(POD_CIDR)) {
+            all.add(POD_CIDR);
+        }
         return all;
     }
 

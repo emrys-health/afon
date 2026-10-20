@@ -43,6 +43,7 @@ class StackPlanFactoryTest {
         properties.setValue(AZURE_JUPYTER_DOMAIN_NAME, "jupyter-azure.example");
         properties.setValue(GCP_POLARIS_DOMAIN_NAME, "polaris-gcp.example");
         properties.setValue(AWS_EGRESS_IP, "");
+        properties.setValue(AZURE_EGRESS_IP, "");
         properties.setValue(AWS_KEYCLOAK_EXTERNAL, "false");
         properties.setValue(AZURE_KEYCLOAK_EXTERNAL, "false");
     }
@@ -367,6 +368,28 @@ class StackPlanFactoryTest {
             "afon-cli.sh manage-stack delete aws-full"));
         assertThat(filters.get(0).refusal().apply("aws-keycloak")).isNull();
         assertThat(filters.get(0).refusal().apply("aws").reason()).startsWith("the legacy stack aws");
+    }
+
+    @Test
+    void azureStacksPinningTheEgressIpConflictOnIt() {
+        List<StackFilter> filters = new ArrayList<>();
+        StepOperations recording = recordingFiltersIn(filters);
+        properties.setValue(AZURE_EGRESS_IP, "51.142.64.202");
+
+        factory.steps(DEPLOY, StackId.parse("azure-polaris"), recording, false);
+
+        // azure-full holds the same address as azure-polaris, besides what they deploy in common
+        assertThat(filters.get(0).refusal().apply("azure-full").reason())
+            .contains("and holds the pinned egress IP 51.142.64.202 (AZURE_EGRESS_IP)");
+        // a stack that does not pin it, or another cloud's, does not hold it
+        assertThat(filters.get(0).refusal().apply("azure-keycloak")).isNull();
+        assertThat(filters.get(0).refusal().apply("aws-full")).isNull();
+
+        // and an address that is not configured is not held
+        properties.setValue(AZURE_EGRESS_IP, "");
+        filters.clear();
+        factory.steps(DEPLOY, StackId.parse("azure-polaris"), recording, false);
+        assertThat(filters.get(0).refusal().apply("azure-full").reason()).doesNotContain("egress IP");
     }
 
     private static String deleteConflicting(String stackId) {

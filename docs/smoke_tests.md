@@ -207,7 +207,8 @@ setups, and whether `--env` is given or not, the suite:
    fail, and prints the `kubectl` commands that restrict the ingress, for you to run, with the CIDRs to restrict it to: the
    configured ones, plus the cluster's own addresses, so that its pods calling Polaris by its public domain name are not locked out.
    These are, on AWS, the cluster's egress IP, read from its NAT gateway, as `AWS_EGRESS_IP` may be stale, falling back to
-   `AWS_EGRESS_IP`; on Azure, the pod CIDR and the outbound IP, read from the cluster's load balancer (needs `az` logged in). The
+   `AWS_EGRESS_IP`; on Azure, the pod CIDR and the outbound IP, read from the cluster's load balancer (needs `az` logged in), falling back to
+   `AZURE_EGRESS_IP` if it is not found, and warning if the two differ, as on AWS. The
    commands only last until the next deploy, which is why the permanent fix is to deploy with the property set. The tests run either
    way.
 

@@ -85,6 +85,11 @@ public enum AfonProperty {
     AZURE_POLARIS_DOMAIN_NAME("AZURE_POLARIS_DOMAIN_NAME"),
     AZURE_JUPYTER_DOMAIN_NAME("AZURE_JUPYTER_DOMAIN_NAME"),
     AZURE_POLARIS_ALLOWED_CIDRS("AZURE_POLARIS_ALLOWED_CIDRS"),
+    /**
+     * Public IP address, of a Standard, static public IP created beforehand in {@link #AZURE_RESOURCE_GROUP}, that all outbound
+     * cluster traffic egresses from.  Optional: Azure allocates one when unset.
+     */
+    AZURE_EGRESS_IP("AZURE_EGRESS_IP"),
     AZURE_STORAGE_ACCOUNT("AZURE_STORAGE_ACCOUNT"),
     /**
      * Blob container, of the storage account of {@link #AZURE_CONNECTION_STRING}, that Gitea keeps its LFS objects,

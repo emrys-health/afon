@@ -363,59 +363,9 @@ update_kube_config() {
   fi
 }
 
-# Prints property $1 of afon-aws.properties, without whitespace, or nothing if it is not set.
-aws_property() {
-  grep -h "^$1=" "$AFON_CONFIG_DIR/afon-aws.properties" 2>/dev/null | tail -1 | cut -d= -f2- \
-    | tr -d '[:space:]' || true
-}
+# The reading of the Polaris ingress, and the CIDRs to restrict it to, shared with kube/polaris-whitelist.sh
+source "$AFON_ROOT/scripts/kube/polaris-whitelist-source.sh"
 
-# Prints the public IP of the NAT gateway of the cluster of the current kubectl context, the address all its
-# outbound traffic comes from, or nothing if it cannot be found, eg if the context is not an EKS cluster's.
-cluster_egress_ip() {
-  local context region cluster ip
-  context=$(kubectl config current-context 2>/dev/null || true)
-  # As written by 'aws eks update-kubeconfig': arn:aws:eks:<region>:<account>:cluster/<cluster>
-  case "$context" in
-    arn:aws:eks:*:cluster/*) ;;
-    *) return 0 ;;
-  esac
-  region=$(echo "$context" | cut -d: -f4)
-  cluster=$(echo "$context" | cut -d/ -f2)
-  # The NAT gateway is named after the cluster, see AwsComponentNames.getNatGatewayName.
-  ip=$(aws ec2 describe-nat-gateways --region "$region" \
-         --filter "Name=tag:Name,Values=cdktf-eks-nat-$cluster" Name=state,Values=available \
-         --query 'NatGateways[0].NatGatewayAddresses[0].PublicIp' --output text 2>/dev/null || true)
-  if [ -n "$ip" ] && [ "$ip" != "None" ]; then
-    echo "$ip"
-  fi
-}
-
-# Prints property $1 of afon-azure.properties, without whitespace, or nothing if it is not set.
-azure_property() {
-  grep -h "^$1=" "$AFON_CONFIG_DIR/afon-azure.properties" 2>/dev/null | tail -1 | cut -d= -f2- \
-    | tr -d '[:space:]' || true
-}
-
-# Prints the outbound public IP of the cluster of the current kubectl context, the address all its outbound traffic comes
-# from, ie that of the first of the effective outbound IPs of its load balancer, or nothing if it cannot be found, eg if
-# the context is not an AKS cluster's.
-azure_cluster_outbound_ip() {
-  local cluster group ip_id ip
-  cluster=$(kubectl config current-context 2>/dev/null || true)
-  [ -n "$cluster" ] || return 0
-  group=$(az aks list --query "[?name=='$cluster'].resourceGroup | [0]" --output tsv 2>/dev/null || true)
-  [ -n "$group" ] || return 0
-  ip_id=$(az aks show --name "$cluster" --resource-group "$group" \
-            --query 'networkProfile.loadBalancerProfile.effectiveOutboundIPs[0].id' --output tsv 2>/dev/null || true)
-  [ -n "$ip_id" ] && [ "$ip_id" != "None" ] || return 0
-  ip=$(az network public-ip show --ids "$ip_id" --query ipAddress --output tsv 2>/dev/null || true)
-  if [ -n "$ip" ] && [ "$ip" != "None" ]; then
-    echo "$ip"
-  fi
-}
-
-# The pod CIDR of an AKS overlay cluster, as AzureCloudProvider.POD_CIDR
-AZURE_POD_CIDR="10.244.0.0/16"
 
 # The snapshots of the Polaris ingress that --restrict-polaris takes before changing it, one file per run,
 # polaris-ingress-snapshot-<yyyymmdd-hhmmss>.txt, like the results files, one key=value per line.  Kept in files rather
@@ -424,123 +374,6 @@ AZURE_POD_CIDR="10.244.0.0/16"
 # outcome= line: only a file without one is still to be restored.  SNAPSHOT_FILE is that of this run, once it is taken.
 SNAPSHOT_PREFIX="$RESULTS_DIR/polaris-ingress-snapshot-"
 SNAPSHOT_FILE=
-
-# The config dir that aws_property and azure_property read the properties from.
-AFON_CONFIG_DIR="${AFON_HOME:-$HOME/.afon}/config"
-
-# Prints the annotation of the Polaris ingress that restricts who can call it, on the $CLOUD.
-polaris_annotation() {
-  case "$CLOUD" in
-    aws) echo "alb.ingress.kubernetes.io/inbound-cidrs" ;;
-    azure) echo "nginx.ingress.kubernetes.io/whitelist-source-range" ;;
-  esac
-}
-
-# Prints the state of annotation $1 of the Polaris ingress of kubectl context $2, as it is in the cluster: "present:<value>"
-# if it is set, even to the empty string, "absent" if it is not, "missing" if there is no Polaris ingress.
-ingress_annotation() {
-  local out
-  if ! out=$(kubectl --context "$2" get ingress polaris-ingress -n default \
-               -o go-template="{{range \$k, \$v := .metadata.annotations}}{{if eq \$k \"$1\"}}present:{{\$v}}{{end}}{{end}}" \
-               2>/dev/null); then
-    echo "missing"
-    return 0
-  fi
-  echo "${out:-absent}"
-}
-
-# Prints the nginx ingress controller service of kubectl context $1, as service/<name>, or nothing if it has none.
-controller_service() {
-  kubectl --context "$1" get service -n ingress-nginx -l app.kubernetes.io/component=controller -o name 2>/dev/null \
-    | grep -v admission | head -1 || true
-}
-
-# Prints the CIDRs that the Polaris ingress of the current kubectl context can be restricted to, for the network smoke
-# test to pass: those of AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS, as the deploy applies, plus the
-# cluster's own addresses, so that its pods calling Polaris by its public domain name are not locked out.  Prints nothing
-# if the cluster's address cannot be found on AWS.  Warns, to stderr, about what it could not find.
-restriction_cidrs() {
-  case "$CLOUD" in
-    aws) aws_restriction_cidrs ;;
-    azure) azure_restriction_cidrs ;;
-  esac
-}
-
-# On AWS the cluster's own address is its egress IP, that of the NAT gateway, as the AWS_EGRESS_IP of afon-aws.properties
-# may be stale, eg if the stack was deployed without it, or by default AWS_EGRESS_IP if the NAT gateway cannot be found.
-aws_restriction_cidrs() {
-  local configured_ip egress_ip cidrs cidr configured egress_source="the cluster's NAT gateway, with aws ec2"
-  configured_ip=$(aws_property AWS_EGRESS_IP)
-  configured=$(aws_property AWS_POLARIS_ALLOWED_CIDRS)
-  egress_ip=$(cluster_egress_ip)
-  if [ -z "$egress_ip" ]; then
-    egress_source="AWS_EGRESS_IP in $AFON_CONFIG_DIR/afon-aws.properties, as no NAT gateway was found"
-    warning "no NAT gateway found for kubectl context $(kubectl config current-context 2>/dev/null || true):" \
-            "using AWS_EGRESS_IP '$configured_ip'"
-    egress_ip="$configured_ip"
-  elif [ -n "$configured_ip" ] && [ "$configured_ip" != "$egress_ip" ]; then
-    warning "the cluster's egress IP $egress_ip is not AWS_EGRESS_IP $configured_ip: using $egress_ip." \
-            "Update AWS_EGRESS_IP for the stack to keep its egress IP across rebuilds"
-  fi
-  if [ -z "$egress_ip" ]; then
-    warning "no egress IP for the cluster"
-    return 0
-  fi
-  cidrs=
-  for cidr in $(echo "$configured" | tr ',' ' '); do
-    if [ "$cidr" != "$egress_ip/32" ]; then
-      cidrs="$cidrs$cidr,"
-    fi
-  done
-  # to stderr, as the CIDRs are what this prints to stdout
-  banner "Polaris ingress CIDRs, from:" >&2
-  echo "  configured: ${configured:-none} (AWS_POLARIS_ALLOWED_CIDRS in $AFON_CONFIG_DIR/afon-aws.properties)" >&2
-  echo "  egress IP: $egress_ip ($egress_source)" >&2
-  echo "$cidrs$egress_ip/32"
-}
-
-# On Azure the cluster's own addresses are its pod CIDR and its outbound IP.
-azure_restriction_cidrs() {
-  local outbound_ip cidrs cidr configured
-  outbound_ip=$(azure_cluster_outbound_ip)
-  configured=$(azure_property AZURE_POLARIS_ALLOWED_CIDRS)
-  cidrs=
-  for cidr in $(echo "$configured" | tr ',' ' '); do
-    case ",$cidrs," in
-      *",$cidr,"*) ;;
-      *) cidrs="$cidrs$cidr," ;;
-    esac
-  done
-  if [ -z "$outbound_ip" ]; then
-    warning "no outbound IP found for kubectl context $(kubectl config current-context 2>/dev/null || true):" \
-            "not including it"
-  else
-    cidrs="$cidrs$outbound_ip/32,"
-  fi
-  # to stderr, as the CIDRs are what this prints to stdout
-  banner "Polaris ingress CIDRs, from:" >&2
-  echo "  configured: ${configured:-none} (AZURE_POLARIS_ALLOWED_CIDRS in $AFON_CONFIG_DIR/afon-azure.properties)" >&2
-  echo "  outbound IP: ${outbound_ip:-not found} (the first effective outbound IP of the cluster's load balancer, with az)" >&2
-  echo "  pod CIDR: $AZURE_POD_CIDR (AZURE_POD_CIDR of this script, as AzureCloudProvider.POD_CIDR)" >&2
-  echo "$cidrs$AZURE_POD_CIDR"
-}
-
-# Prints the kubectl commands that restrict the Polaris ingress of kubectl context $1 to the CIDRs $2, for the $CLOUD.
-# On Azure the ingress controller must also keep the callers' IPs, which its load balancer otherwise hides.
-print_restrict_commands() {
-  local context="$1" cidrs="$2" controller
-  case "$CLOUD" in
-    aws)
-      echo "  kubectl --context $context annotate ingress polaris-ingress -n default --overwrite" \
-           "alb.ingress.kubernetes.io/inbound-cidrs=$cidrs" ;;
-    azure)
-      controller=$(controller_service "$context")
-      echo "  kubectl --context $context patch ${controller:-<the ingress-nginx controller service>} -n ingress-nginx" \
-           "--type merge -p '{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}'"
-      echo "  kubectl --context $context annotate ingress polaris-ingress -n default --overwrite" \
-           "nginx.ingress.kubernetes.io/whitelist-source-range=$cidrs" ;;
-  esac
-}
 
 # Whether a selected test of the suite is the network smoke test, which is what needs the Polaris ingress restricted.
 runs_network_smoke() {
@@ -596,6 +429,7 @@ check_polaris_ingress() {
   if [ -n "$cidrs" ]; then
     print_restrict_commands "$context" "$cidrs"
   fi
+  echo "or, with the same CIDRs: afon-cli.sh kube-polaris-whitelist $CLOUD set"
   echo "or run the suite with --restrict-polaris, which restricts the ingress for the run and restores it after to its exact state."
 }
 
