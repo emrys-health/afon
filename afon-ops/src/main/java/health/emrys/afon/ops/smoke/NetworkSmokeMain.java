@@ -2,6 +2,7 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
@@ -187,7 +188,7 @@ public class NetworkSmokeMain {
 
     public static void main(String[] args) throws Exception {
         int exitCode = 0;
-        AfonPropertyProvider properties = new OpsPropertyProvider();
+        AfonPropertyProvider properties = new FilePropertyProvider(); // please do not change this
         try (KubeClient client = new KubeClient(properties)) {
             NetworkSmokeMain app    = new NetworkSmokeMain(properties, client);
             List<ExecResult> results  = app.checkNetworkWithPods();
