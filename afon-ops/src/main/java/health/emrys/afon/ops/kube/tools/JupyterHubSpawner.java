@@ -32,6 +32,7 @@ import static health.emrys.afon.cdk.configs.JupyterHubConfig.HUB_LABELS;
 import static health.emrys.afon.cdk.configs.JupyterHubConfig.HUB_PORT;
 import static health.emrys.afon.config.AfonProperty.USER_ID;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
+import static java.lang.String.format;
 
 /**
  * Asks JupyterHub to spawn a user's single-user notebook pod via the hub's REST API, reached through a
@@ -81,6 +82,9 @@ public class JupyterHubSpawner {
         if (result.isSuccess()) {
             String token = result.stdout().strip();
             logger.info("JupyterHub Token: {}", token);
+            logger.warn(
+                format("Note that user with email '%s' will not have an OIDC token if they then login through Guacamole",
+                       email));
             String pod = spawn(email, Duration.ofMinutes(5), token);
             logger.info("Pod {} running", pod);
             return pod;
