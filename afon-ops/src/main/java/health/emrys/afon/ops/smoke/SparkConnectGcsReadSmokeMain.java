@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
@@ -119,7 +120,7 @@ public class SparkConnectGcsReadSmokeMain {
     }
 
     public static void main(final String[] args) {
-        AfonPropertyProvider properties = new OpsPropertyProvider();
+        AfonPropertyProvider properties = new FilePropertyProvider(); // please do not change this
         int exitCode = 0;
         try (KubeClient client = new KubeClient(properties)) {
             SparkConnectGcsReadSmokeMain app = new SparkConnectGcsReadSmokeMain(client, KUBERNETES_NAMESPACE);
