@@ -342,9 +342,6 @@ fi
 # All clouds are always stored, so that the config dir is restored whole.
 CLOUD=
 source $AFON_ROOT/scripts/config/config-files.sh
-# The generic catalogs.properties is not among the files listed by config-files.sh, but is needed just the same
-# as the catalogs-<cloud>.properties that are.
-CONFIG_FILES="$CONFIG_FILES catalogs.properties"
 
 case "$ACTION" in
   push|pull|delete)

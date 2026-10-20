@@ -4,9 +4,6 @@ if [ ! -d $CONFIG_DIR ]; then
   exit 1
 fi
 source $AFON_ROOT/scripts/config/config-files.sh
-# The generic catalogs.properties is not among the files listed by config-files.sh, but is needed just the same
-# as the catalogs-<cloud>.properties that are.
-CONFIG_FILES="$CONFIG_FILES catalogs.properties"
 echo "Validating config files in $CONFIG_DIR"
 # Missing files fail the validation, as a run cannot do without them.  Missing keys or values are only
 # warned about, as not every key is needed by every run (eg those of a cloud or feature not in use).
