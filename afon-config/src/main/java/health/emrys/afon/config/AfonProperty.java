@@ -61,6 +61,11 @@ public enum AfonProperty {
     GCP_POLARIS_DOMAIN_NAME("GCP_POLARIS_DOMAIN_NAME"),
     GCP_JUPYTER_DOMAIN_NAME("GCP_JUPYTER_DOMAIN_NAME"),
     /**
+     * Address of a regional, external static IP created beforehand in {@link #GCP_PROJECT_ID} and {@link #GCP_REGION}, that all
+     * outbound cluster traffic egresses from, through the Cloud NAT.  Optional: Google allocates the addresses when unset.
+     */
+    GCP_EGRESS_IP("GCP_EGRESS_IP"),
+    /**
      * Whether the Polaris TLS cert cached in Secret Manager is restored on deploy.  Defaults to false.
      * A plain switch, unlike {@link #AZURE_KEY_VAULT_NAME}: Secret Manager has no named vault, its secrets live
      * directly in the project {@link #GCP_PROJECT_ID}.

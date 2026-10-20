@@ -5,6 +5,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.TerraformOutput;
 import com.hashicorp.cdktf.providers.google.compute_network.ComputeNetwork;
 import com.hashicorp.cdktf.providers.google.compute_network.ComputeNetworkConfig;
 import com.hashicorp.cdktf.providers.google.compute_router.ComputeRouter;
@@ -15,6 +16,7 @@ import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetwork
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkConfig;
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkSecondaryIpRange;
 import com.hashicorp.cdktf.providers.google.container_cluster.*;
+import com.hashicorp.cdktf.providers.google.data_google_compute_addresses.DataGoogleComputeAddresses;
 import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZone;
 import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZoneConfig;
 import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSet;
@@ -33,6 +35,7 @@ import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
 import health.emrys.afon.cdk.CachedTlsSecret;
 import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
@@ -75,12 +78,34 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     private       KubernetesProvider k8sProvider;
     private       HelmProvider       helmProvider;
 
-    public static GcpCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties) {
-        NullProvider.Builder.create(stack, "null").build();
-        return new GcpCloudProvider(stack, stackId.cloud().toString(), properties);
+    /**
+     * Looks up, rather than manages, the static IP of {@code GCP_EGRESS_IP}, so that a destroy cannot release an address that
+     * is still on somebody's allow-list.  The Cloud NAT is given the link of the static IP, which is found among those of the
+     * project and region by its address, so the plan fails if there is none.
+     *
+     * @return the link of the static IP, resolved when the plan is applied
+     */
+    private String lookupEgressIp(String egressIp, String gcpRegion) {
+        DataGoogleComputeAddresses addresses = DataGoogleComputeAddresses.Builder
+            .create(this, "egress-ips")
+            .project(projectId)
+            .region(gcpRegion)
+            .filter(format("address = \"%s\"", egressIp))
+            .build();
+        return addresses.getAddresses().get(0).getSelfLink();
     }
 
-    GcpCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties) {
+    public static GcpCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties,
+                                             boolean pinnedEgressIp) {
+        NullProvider.Builder.create(stack, "null").build();
+        return new GcpCloudProvider(stack, stackId.cloud().toString(), properties, pinnedEgressIp);
+    }
+
+    /**
+     * @param pinnedEgressIp whether the egress IP of the stack is pinned to {@code GCP_EGRESS_IP}, if set, which only one
+     *                       running stack can hold, else Google allocates the addresses of its Cloud NAT
+     */
+    GcpCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties, boolean pinnedEgressIp) {
         super(scope, id);
         this.projectId = projectIdFrom(properties);
         this.secretsEnabled = Boolean.parseBoolean(properties.getValue(GCP_SECRETS_ENABLED, "false"));
@@ -150,15 +175,28 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
             .region(gcpRegion)
             .network(vpc.getName())
             .build());
-        new ComputeRouterNat(
-            this, "nat", ComputeRouterNatConfig
+        ComputeRouterNatConfig.Builder natConfig = ComputeRouterNatConfig
             .builder()
             .name("gke-nat")
             .router(router.getName())
             .region(gcpRegion)
-            .natIpAllocateOption("AUTO_ONLY")
-            .sourceSubnetworkIpRangesToNat("ALL_SUBNETWORKS_ALL_IP_RANGES")
-            .build());
+            .sourceSubnetworkIpRangesToNat("ALL_SUBNETWORKS_ALL_IP_RANGES");
+        String egressIp = pinnedEgressIp ? properties.getCloudValue(GCP, AfonCloudProperty.EGRESS_IP, "").trim() : "";
+        if (egressIp.isEmpty()) {
+            natConfig.natIpAllocateOption("AUTO_ONLY");
+        } else {
+            // Everything the cluster sends to the internet leaves from one address a third party can put on an allow-list.
+            // GCP_EGRESS_IP pins that address to a static IP created beforehand, which is what makes it survive a
+            // destroy/apply cycle, unlike the ones that Google allocates when it is unset.
+            natConfig.natIpAllocateOption("MANUAL_ONLY").natIps(List.of(lookupEgressIp(egressIp, gcpRegion)));
+            // Reported so the address can be handed to whoever maintains the allow-list
+            TerraformOutput.Builder
+                .create(this, "egressIp")
+                .value(egressIp)
+                .description("Public IP all outbound cluster traffic is seen to come from")
+                .build();
+        }
+        new ComputeRouterNat(this, "nat", natConfig.build());
 
         String gcloudCommand = format(
             "gcloud container clusters get-credentials %s --region %s --project %s",

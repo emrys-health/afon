@@ -81,8 +81,9 @@ RESULT="$(kubectl --context "$CONTEXT" -n "$NAMESPACE" exec "$POD_NAME" -- sh -c
   set -e
   ENV_FILE="/etc/app-secrets/'"$SECRET_KEY"'"
   JDBC_URL=$(grep -m1 "^export QUARKUS_DATASOURCE_JDBC_URL=" "$ENV_FILE" | sed -E "s/^export QUARKUS_DATASOURCE_JDBC_URL=\"?([^\"]*)\"?\$/\1/")
-  DB_USER=$(grep -m1 "^export QUARKUS_DATASOURCE_USERNAME=" "$ENV_FILE" | sed -E "s/^export QUARKUS_DATASOURCE_USERNAME=//")
-  export PGPASSWORD=$(grep -m1 "^export QUARKUS_DATASOURCE_PASSWORD=" "$ENV_FILE" | sed -E "s/^export QUARKUS_DATASOURCE_PASSWORD=//")
+  # the values are written with or without surrounding double quotes, eg the password is quoted and the username is not
+  DB_USER=$(grep -m1 "^export QUARKUS_DATASOURCE_USERNAME=" "$ENV_FILE" | sed -E "s/^export QUARKUS_DATASOURCE_USERNAME=//; s/^\"(.*)\"\$/\1/")
+  export PGPASSWORD=$(grep -m1 "^export QUARKUS_DATASOURCE_PASSWORD=" "$ENV_FILE" | sed -E "s/^export QUARKUS_DATASOURCE_PASSWORD=//; s/^\"(.*)\"\$/\1/")
 
   if [ -z "$JDBC_URL" ] || [ -z "$DB_USER" ] || [ -z "$PGPASSWORD" ]; then
     echo "Failed to find QUARKUS_DATASOURCE_* entries in $ENV_FILE"
@@ -92,7 +93,9 @@ RESULT="$(kubectl --context "$CONTEXT" -n "$NAMESPACE" exec "$POD_NAME" -- sh -c
   CONN=${JDBC_URL#jdbc:}
   echo "target=$CONN"
 
-  if ! psql "$CONN" -U "$DB_USER" -tAc "SELECT 1" >/dev/null 2>&1; then
+  if ! CONNECT_ERROR=$(psql "$CONN" -U "$DB_USER" -tAc "SELECT 1" 2>&1 >/dev/null); then
+    # what psql says, ie why it could not connect, eg the host, the SSL or the credentials: it never has the password in it
+    echo "$CONNECT_ERROR" | head -3 | sed "s/^/  psql: /"
     echo "Failed to connect to the database at $CONN"
     exit 1
   fi
@@ -109,7 +112,7 @@ RESULT="$(kubectl --context "$CONTEXT" -n "$NAMESPACE" exec "$POD_NAME" -- sh -c
   echo "- entities=$(psql "$CONN" -U "$DB_USER" -tAc "SELECT count(*) FROM ${SCHEMA}.entities")"
   echo "- root_principal=$(psql "$CONN" -U "$DB_USER" -tAc "SELECT count(*) FROM ${SCHEMA}.entities WHERE name='"'"'root'"'"'")"
   echo "- principal_auth_rows=$(psql "$CONN" -U "$DB_USER" -tAc "SELECT count(*) FROM ${SCHEMA}.principal_authentication_data")"
-' 2>&1)"
+' 2>&1)" || true # a failed check exits non-zero: set -e would stop the script here, before it can say what failed
 
 echo
 echo "$RESULT" | grep -v '^Failed' || true
