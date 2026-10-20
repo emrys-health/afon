@@ -355,6 +355,23 @@ public class StepOperations {
                 () -> actions.configureOidcUsersFor(cloud));
     }
 
+    public Step lockDownPolaris(AfonCloud cloud) {
+        switch (cloud) {
+            case AWS:
+                String[] args = format(
+                    "annotate ingress polaris-ingress -n default --overwrite alb.ingress.kubernetes.io/inbound-cidrs=%s/32",
+                    properties.getValue(AWS_EGRESS_IP)
+                    )
+                    .split(" ");
+                return new Step(format("lockdown_polaris_for_%s", cloud),
+                                "Polaris must be inaccessible from outside the cluster to be secure",
+                                () -> actions.run("kubectl", null, args));
+            default: // TODO lock down other clouds to prevent exfiltration risks. #297 should fix this
+                logger.warn(format("Don't know how to lock down Polaris for cloud %s", cloud));
+                return Step.NoOp;
+        }
+    }
+
     /**
      * Configures Polaris users on every catalog, for every user - must run after
      * {@link #createAllCatalogsFor} (the catalogs must exist) and after {@link #configureOidcUsersFor}
