@@ -8,8 +8,9 @@ public class Step {
 
     private static final Logger logger = getLogger(Step.class);
 
-    public static final Step NoOp = new Step(
-        "noop", "No operation", new ThrowableRunnable() {
+    public static final String NOOP_NAME = "noop";
+    public static final Step   NoOp      = new Step(
+        NOOP_NAME, "No operation", new ThrowableRunnable() {
         @Override
         public void run() {
             logger.debug("No operation");
@@ -26,24 +27,24 @@ public class Step {
         this.function    = function;
     }
 
-    public String getName(){
+    public String getName() {
         return name;
     }
 
-    public String getDescription(){
+    public String getDescription() {
         return description;
     }
 
-    public ThrowableRunnable getFunction(){
+    public ThrowableRunnable getFunction() {
         return function;
     }
 
     @Override
     public String toString() {
         return "Step{" +
-            "name='" + name + '\'' +
-            ", description='" + description + '\'' +
-            '}';
+               "name='" + name + '\'' +
+               ", description='" + description + '\'' +
+               '}';
     }
 
     /**
@@ -51,7 +52,8 @@ public class Step {
      * concatenation of the names of the steps, which grows unreadable).
      */
     public static Step sequence(String name, String description, Step... steps) {
-        return new Step(name, description, () -> {
+        return new Step(
+            name, description, () -> {
             for (Step step : steps) {
                 step.function.run();
             }

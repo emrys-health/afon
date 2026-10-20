@@ -19,12 +19,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static health.emrys.afon.config.AfonCloud.*;
@@ -356,20 +352,40 @@ public class StepOperations {
     }
 
     public Step lockDownPolaris(AfonCloud cloud) {
+        String          kubectlArgs  = "annotate ingress polaris-ingress -n default --overwrite ";
+        String          args         = null;
+        AfonProperty    cidrKey      = null;
         switch (cloud) {
             case AWS:
-                String[] args = format(
-                    "annotate ingress polaris-ingress -n default --overwrite alb.ingress.kubernetes.io/inbound-cidrs=%s/32",
-                    properties.getValue(AWS_EGRESS_IP)
-                    )
-                    .split(" ");
-                return new Step(format("lockdown_polaris_for_%s", cloud),
-                                "Polaris must be inaccessible from outside the cluster to be secure",
-                                () -> actions.run("kubectl", null, args));
+                cidrKey = AWS_EGRESS_IP;
+                args = kubectlArgs + "alb.ingress.kubernetes.io/inbound-cidrs=";
+                break;
+            case AZURE:
+                cidrKey = AZURE_POLARIS_ALLOWED_CIDRS;
+                args = kubectlArgs + "nginx.ingress.kubernetes.io/whitelist-source-range=";
+                break;
             default: // TODO lock down other clouds to prevent exfiltration risks. #297 should fix this
-                logger.warn(format("Don't know how to lock down Polaris for cloud %s", cloud));
+                logger.error(format("Don't know how to lock down Polaris for cloud %s", cloud));
                 return Step.NoOp;
         }
+        String cidrs = toCidrWithPrefix32(cidrKey);
+        if (cidrs == null) {
+            logger.error(format("No property defined for %s. Polaris will be insecure.", cidrKey));
+            return Step.NoOp;
+        }
+        final String[] params = (args + cidrs).split(" ");
+        return new Step(
+            format("lockdown_polaris_for_%s", cloud),
+            "Make Polaris inaccessible from outside the cluster for security reasons",
+            () -> actions.run("kubectl", null, params));
+    }
+
+    private String toCidrWithPrefix32(AfonProperty value) {
+        if (!properties.hasProperty(value)) {
+            return null;
+        }
+        String csv = properties.getValue(value, null);
+        return Arrays.stream(csv.split(",")).map(x -> x + "/32").collect(Collectors.joining(","));
     }
 
     /**

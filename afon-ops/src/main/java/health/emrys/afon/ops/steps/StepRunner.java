@@ -38,9 +38,11 @@ public class StepRunner {
     public void runSteps(List<Step> steps) {
         logger.info("Steps to run: {}", join(steps));
             for (Step step : steps) {
-                logger.info("Running step {}", step.getName());
                 try {
-                    step.getFunction().run();
+                    if (!Step.NOOP_NAME.equals(step.getName())) {
+                        logger.info("Running step {}", step.getName());
+                        step.getFunction().run();
+                    }
                 } catch (Exception e) {
                     logger.error("Failed running step "+step.getName(), e);
                     throw new RuntimeException(e);
