@@ -67,7 +67,7 @@ class StepOperationsTest {
         assertThat(calls).hasSize(3).allSatisfy(call -> assertThat(call).startsWith(
             "check https://oauth.example/realms/master/.well-known/openid-configuration: Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first"))
                          .satisfies(c -> assertThat(String.join("\n", c)).contains(
-                             "manage-stack setup aws-keycloak", "manage-stack setup azure-keycloak").doesNotContain("gcp-keycloak"));
+                             "manage-stack setup aws-keycloak", "manage-stack setup azure-keycloak", "manage-stack setup gcp-keycloak"));
     }
 
     @Test

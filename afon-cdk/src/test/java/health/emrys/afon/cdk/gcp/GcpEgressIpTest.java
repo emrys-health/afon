@@ -62,6 +62,14 @@ class GcpEgressIpTest {
     }
 
     @Test
+    void theKeycloakStackNeverHoldsThePinnedEgressIp(@TempDir Path dir) throws Exception {
+        JsonNode plan = JSON.readTree(SynthesisSupport.synthesise(StackId.parse("gcp-keycloak"), dir, PINNED));
+
+        assertThat(nat(plan).path("nat_ip_allocate_option").asText()).isEqualTo("AUTO_ONLY");
+        assertThat(plan.path("data").has("google_compute_addresses")).isFalse();
+    }
+
+    @Test
     void theEgressIpIsReported(@TempDir Path dir) throws Exception {
         JsonNode plan = plan(dir, PINNED);
 

@@ -1,5 +1,28 @@
 source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
+# The stack the env is created for, given as its id, or its role in the cloud (identity, catalog or tre), which decides the DNS
+# zones, and is required, as what the env needs depends on it.  What the stack needs is looked up in stacks.yaml and given as the
+# AFON_STACK_* env vars: AFON_STACK_ID, AFON_STACK_ROLE, AFON_STACK_DOMAINS and AFON_STACK_COMPONENTS, by the launcher when run by
+# afon-cli.sh, see ScriptMain, else by asking the ops command stack-needs, as when run by afon.sh, see scripts/stack/needs-source.sh.
+STACK_ID=
+for ARG in "$@"; do
+  case "$ARG" in
+    gcp-*|identity|catalog|tre) STACK_ID="$ARG" ;;
+    *) echo "-- Unknown argument '$ARG': expected a stack by its id or role"; exit 1 ;;
+  esac
+done
+if [ -z "$STACK_ID" ]; then
+  echo "-- Requires the stack the env is created for, by its id or role: gcp-create <stack-id|identity|catalog|tre>"
+  exit 1
+fi
+source $AFON_ROOT/scripts/stack/needs-source.sh
+stack_needs gcp "$STACK_ID" || exit 1
+STACK_ID="$AFON_STACK_ID"
+
+# The properties of the domain names whose DNS zones the stack needs: those that its components hold, which the launcher works
+# out from stacks.yaml, eg Polaris, Jupyter and the KeyCloak
+DOMAIN_PROPERTIES="$AFON_STACK_DOMAINS"
+
 PROJECT_ID="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.properties}"
 EXTERNAL_SA="external-sa@$PROJECT_ID.iam.gserviceaccount.com"
 BLIRC_SA="blirc-600159231093-i76b@gcp-sa-biglakerestcatalog.iam.gserviceaccount.com"
@@ -162,9 +185,9 @@ if [ "$GCP_SECRETS_ENABLED" = "true" ]; then
   fi
 fi
 
-# DNS zone, named after the domain name with its dots replaced by dashes, as GcpPolarisStack names it
+# DNS zone of each domain name the stack serves from the cluster, named after the domain name with its dots replaced by dashes,
+# as GcpCloudProvider names it
 
-DNS_ZONE="${GCP_POLARIS_DOMAIN_NAME//./-}"
 DNS_API="dns.googleapis.com"
 if gcloud services list --enabled --project=$PROJECT_ID --filter="config.name=$DNS_API" --format="value(config.name)" 2>/dev/null | grep -q "^$DNS_API$"; then
   echo "- API $DNS_API already enabled, skipping"
@@ -173,13 +196,21 @@ else
   gcloud services enable $DNS_API --project=$PROJECT_ID || exit 1
 fi
 
-if gcloud dns managed-zones describe $DNS_ZONE --project=$PROJECT_ID >/dev/null 2>&1; then
-  echo "- DNS zone '$DNS_ZONE' already exists, skipping"
-else
-  echo "- Creating DNS zone '$DNS_ZONE' for domain name '$GCP_POLARIS_DOMAIN_NAME'"
-  gcloud dns managed-zones create $DNS_ZONE --dns-name="$GCP_POLARIS_DOMAIN_NAME." --description="Polaris DNS zone" --project=$PROJECT_ID || exit 1
-fi
-echo "- Set the nameservers of '$GCP_POLARIS_DOMAIN_NAME' at the domain registrar to:"
-gcloud dns managed-zones describe $DNS_ZONE --project=$PROJECT_ID --format="value(nameServers)" | tr ';' '\n' | sed 's/^/    /'
+for DOMAIN_PROPERTY in $DOMAIN_PROPERTIES; do
+  DOMAIN_NAME="${!DOMAIN_PROPERTY:-}"
+  if [ -z "$DOMAIN_NAME" ]; then
+    echo "-- $DOMAIN_PROPERTY is not set, which stack '$STACK_ID' needs for its DNS zone"
+    exit 1
+  fi
+  DNS_ZONE="${DOMAIN_NAME//./-}"
+  if gcloud dns managed-zones describe $DNS_ZONE --project=$PROJECT_ID >/dev/null 2>&1; then
+    echo "- DNS zone '$DNS_ZONE' already exists, skipping"
+  else
+    echo "- Creating DNS zone '$DNS_ZONE' for domain name '$DOMAIN_NAME' ($DOMAIN_PROPERTY)"
+    gcloud dns managed-zones create $DNS_ZONE --dns-name="$DOMAIN_NAME." --description="$DOMAIN_PROPERTY DNS zone" --project=$PROJECT_ID || exit 1
+  fi
+  echo "- Set the nameservers of '$DOMAIN_NAME' at the domain registrar to:"
+  gcloud dns managed-zones describe $DNS_ZONE --project=$PROJECT_ID --format="value(nameServers)" | tr ';' '\n' | sed 's/^/    /'
+done
 
 echo "GCP env created."

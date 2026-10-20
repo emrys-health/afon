@@ -2,7 +2,8 @@ source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
 usage(){
   echo "Usage: ${BASH_SOURCE[0]} [acme]"
-  echo "Issue and stores in GCP Secret Manager the cert for the $GCP_POLARIS_DOMAIN_NAME."
+  echo "Issue and stores in GCP Secret Manager the cert of each domain name that is configured, ie not blank, of"
+  echo "GCP_POLARIS_DOMAIN_NAME, GCP_JUPYTER_DOMAIN_NAME and OIDC_DOMAIN_NAME."
   echo "The supported issuers are:"
   echo " - acme via Let's Encrypt (free - default)"
 }
@@ -14,9 +15,22 @@ ACME_HOME="${ACME_HOME:-$AFON_HOME/acme}"
 # The release of acme.sh fetched, rather than its master branch, which can be broken at any commit
 ACME_VERSION="${ACME_VERSION:-3.1.6}"
 
-require_domain_name() {
-  if [ -z "$GCP_POLARIS_DOMAIN_NAME" ]; then
-    echo "- GCP_POLARIS_DOMAIN_NAME is blank - set it in afon-gcp.properties before caching a cert"
+# The domain names to issue the certs of, those configured, without duplicates
+DOMAIN_NAMES=""
+for DOMAIN_PROPERTY in GCP_POLARIS_DOMAIN_NAME GCP_JUPYTER_DOMAIN_NAME OIDC_DOMAIN_NAME; do
+  DOMAIN_NAME="${!DOMAIN_PROPERTY:-}"
+  if [ -z "$DOMAIN_NAME" ]; then
+    echo "- $DOMAIN_PROPERTY is not set, skipping its cert"
+  else
+    case " $DOMAIN_NAMES " in
+      *" $DOMAIN_NAME "*) ;;
+      *) DOMAIN_NAMES="$DOMAIN_NAMES $DOMAIN_NAME" ;;
+    esac
+  fi
+done
+require_domain_names() {
+  if [ -z "$DOMAIN_NAMES" ]; then
+    echo "- No domain name is configured, nothing to issue: set them in afon-gcp.properties before caching a cert"
     exit 1
   fi
 }
@@ -47,27 +61,29 @@ issue_via_acme() {
 
   export CLOUDSDK_CORE_PROJECT=$PROJECT_ID
 
-  echo "- Requesting/renewing $GCP_POLARIS_DOMAIN_NAME via Let's Encrypt (DNS-01)"
-  # The CLI runs scripts under set -e, so capture the exit code without aborting on it
-  ACME_EXIT=0
-  "$ACME_HOME/acme.sh" --config-home "$ACME_HOME" --issue --dns dns_gcloud \
-    -d "$GCP_POLARIS_DOMAIN_NAME" \
-    --keylength 2048 \
-    --server letsencrypt \
-    --accountemail "admin@$GCP_POLARIS_DOMAIN_NAME" || ACME_EXIT=$?
-  # acme.sh exits 2 for "not yet due for renewal" - not an error, the cached cert is
-  # still valid and gets re-pushed below unchanged.
-  if [ $ACME_EXIT -ne 0 ] && [ $ACME_EXIT -ne 2 ]; then
-    echo "- acme.sh issue failed (exit $ACME_EXIT)"
-    exit 1
-  fi
+  for DOMAIN_NAME in $DOMAIN_NAMES; do
+    echo "- Requesting/renewing $DOMAIN_NAME via Let's Encrypt (DNS-01)"
+    # The CLI runs scripts under set -e, so capture the exit code without aborting on it
+    ACME_EXIT=0
+    "$ACME_HOME/acme.sh" --config-home "$ACME_HOME" --issue --dns dns_gcloud \
+      -d "$DOMAIN_NAME" \
+      --keylength 2048 \
+      --server letsencrypt \
+      --accountemail "admin@$DOMAIN_NAME" || ACME_EXIT=$?
+    # acme.sh exits 2 for "not yet due for renewal" - not an error, the cached cert is
+    # still valid and gets re-pushed below unchanged.
+    if [ $ACME_EXIT -ne 0 ] && [ $ACME_EXIT -ne 2 ]; then
+      echo "- acme.sh issue failed for $DOMAIN_NAME (exit $ACME_EXIT)"
+      exit 1
+    fi
 
-  CERT_DIR="$ACME_HOME/$GCP_POLARIS_DOMAIN_NAME"
-  # AFON_ROOT is a plain shell variable in the CLI, so pass it explicitly to the child script
-  AFON_ROOT="$AFON_ROOT" "$AFON_ROOT/scripts/gcp/secrets.sh" store "$CERT_DIR/fullchain.cer" "$CERT_DIR/$GCP_POLARIS_DOMAIN_NAME.key" || exit 1
+    CERT_DIR="$ACME_HOME/$DOMAIN_NAME"
+    # AFON_ROOT is a plain shell variable in the CLI, so pass it explicitly to the child script
+    AFON_ROOT="$AFON_ROOT" "$AFON_ROOT/scripts/gcp/secrets.sh" store "$CERT_DIR/fullchain.cer" "$CERT_DIR/$DOMAIN_NAME.key" "$DOMAIN_NAME" || exit 1
+  done
 }
 
-require_domain_name
+require_domain_names
 
 case "$ISSUER" in
   acme)

@@ -17,7 +17,7 @@ class SnapshotStacksMainTest {
     void whatIsNotAStackOfTheStacksFileIsLeftAsItIs() {
         // eg the dir of a stack synthesised with another stacks file, or the legacy stack of the cloud
         assertThat(SnapshotStacksMain.named("aws-nonesuch")).isEqualTo("aws-nonesuch");
-        assertThat(SnapshotStacksMain.named("gcp-identity")).isEqualTo("gcp-identity");
+        assertThat(SnapshotStacksMain.named("gcp-tre")).isEqualTo("gcp-tre");
         assertThat(SnapshotStacksMain.named("aws")).isEqualTo("aws");
     }
 }

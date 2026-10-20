@@ -30,7 +30,7 @@ class StackNeedsMainTest {
         assertThat(StackNeedsMain.lines(new String[]{"aws", "none", "Keycloak"}, properties))
             .containsExactly("AFON_STACK_CANDIDATES=aws-keycloak");
         assertThat(StackNeedsMain.lines(new String[]{"gcp", "none", "Keycloak"}, properties))
-            .containsExactly("AFON_STACK_CANDIDATES=");
+            .containsExactly("AFON_STACK_CANDIDATES=gcp-keycloak");
     }
 
     @Test
@@ -41,7 +41,7 @@ class StackNeedsMainTest {
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Usage: stack-needs");
         assertThatThrownBy(() -> StackNeedsMain.lines(new String[]{"mars", "tre"}, properties))
             .isInstanceOf(IllegalArgumentException.class).hasMessage("Unknown cloud 'mars', expected one of aws, azure or gcp");
-        assertThatThrownBy(() -> StackNeedsMain.lines(new String[]{"gcp", "identity"}, properties))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("No stack of gcp has the role 'identity'");
+        assertThatThrownBy(() -> StackNeedsMain.lines(new String[]{"gcp", "tre"}, properties))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("No stack of gcp has the role 'tre'");
     }
 }

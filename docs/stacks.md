@@ -18,6 +18,7 @@ To deploy a stack, using the CLI command, we run [manage-stack](#manage-a-stack)
 afon-cli.sh manage-stack deploy aws-full
 afon-cli.sh manage-stack deploy azure-polaris
 afon-cli.sh manage-stack deploy gcp-polaris
+afon-cli.sh manage-stack deploy gcp-keycloak
 ```
 
 **NOTE:** To run `manage-stack` you need to be logged in with the corresponding [cloud cli](cloud.md).
@@ -41,7 +42,7 @@ where:
   stack is defined under that id, so that it works whatever the ids are. `validate-stack`, `generate-cleanup-script` and the other
   commands taking a stack id accept it too, and so do the scripts (`aws-create`, `aws-cluster`, `tofu-plan`, the kube estimator and so on), which, as their name has the cloud, also take the role alone, eg `aws-create tre`.
   Every defined stack is listed: with the bundled `stacks.yaml`, `aws-full`, `aws-keycloak`, `aws-polaris`, `aws-snowflake`,
-  `azure-full`, `azure-keycloak`, `azure-polaris` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
+  `azure-full`, `azure-keycloak`, `azure-polaris`, `gcp-keycloak` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
 - `<step>`, if given, is the step from which to resume a failed run (see
   [Resume a failed stack deployment](#resume-a-failed-stack-deployment-from-a-specific-step));
 - `--replace`, if given, lets `deploy` and `setup` delete the other stacks conflicting with the stack, see
@@ -87,6 +88,7 @@ afon-cli.sh manage-stack run <flow> [<item>:<step>] [--replace] [--dry-run]
 The flows are:
 - `aws-full-and-azure-polaris`: `setup aws-full`, `setup azure-polaris`;
 - `aws-keycloak-and-polaris`: `setup aws-keycloak`, `setup aws-polaris`;
+- `gcp-keycloak-and-polaris`: `setup gcp-keycloak`, `setup gcp-polaris`;
 - `azure-and-gcp-polaris`: `setup azure-polaris`, `setup gcp-polaris`;
 - `azure-keycloak-and-polaris`: `setup azure-keycloak`, `setup azure-polaris`;
 - `cross-cloud-azure`: `setup aws-full`, `setup azure-polaris`, then `run aws-full external-azure`;
@@ -124,7 +126,7 @@ list its steps with `manage-stack run <flow> --dry-run`.
 
 ### Stacks side by side
 
-**NOTE:** Only AWS and Azure have more than one stack for now, so only their stacks can run side by side: GCP has a single stack, `gcp-polaris`, although the same rules apply to it.  The AKS cluster, network and identity of an Azure stack are named `<stack-type>-<name>`, eg `keycloak-aks-vnet` and `keycloak-<CLUSTER_NAME>`, as on AWS, so the stacks of a resource group don't collide.
+**NOTE:** The AKS cluster, network and identity of an Azure stack are named `<stack-type>-<name>`, eg `keycloak-aks-vnet` and `keycloak-<CLUSTER_NAME>`, as on AWS, so the stacks of a resource group don't collide.  The GKE cluster, VPC, subnet and router of a GCP stack are likewise named after the stack type, eg `keycloak-<CLUSTER_NAME>`, so the stacks of a project don't either.
 
 Each stack has its own `tofu` state, so stacks run side by side, unless they conflict, ie they hold a common exclusive
 resource: the DNS record of a domain name, eg `OIDC_DOMAIN_NAME`, or the pinned egress IP, `AWS_EGRESS_IP`, `AZURE_EGRESS_IP` or `GCP_EGRESS_IP`, which only
@@ -156,10 +158,11 @@ stack of the cloud, and `delete` of any stack of the cloud deletes it too.  Like
 | `azure-polaris` | `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_EGRESS_IP` | `azure-keycloak` |
 | `azure-full` | `OIDC_DOMAIN_NAME`, `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME`, `AZURE_EGRESS_IP` | none |
 | `azure-full`, with `AZURE_KEYCLOAK_EXTERNAL=true` | `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME`, `AZURE_EGRESS_IP` | `azure-keycloak` |
-| `gcp-polaris` | `GCP_POLARIS_DOMAIN_NAME`, `GCP_EGRESS_IP` | none |
+| `gcp-keycloak` | `OIDC_DOMAIN_NAME` | `gcp-polaris` |
+| `gcp-polaris` | `GCP_POLARIS_DOMAIN_NAME`, `GCP_EGRESS_IP` | `gcp-keycloak` |
 
 The Polaris stacks, `aws-polaris`, `azure-polaris` and `gcp-polaris`, deploy no KeyCloak of their own, but use the
-KeyCloak server at `OIDC_DOMAIN_NAME`, which `aws-keycloak` deploys, so deploy (or set up) `aws-keycloak` first, eg:
+KeyCloak server at `OIDC_DOMAIN_NAME`, which the keycloak stack of the cloud, eg `aws-keycloak`, deploys, so deploy (or set up) it first, eg:
 ```shell
 afon-cli.sh manage-stack setup aws-keycloak
 afon-cli.sh manage-stack setup aws-polaris
@@ -169,7 +172,7 @@ Their `deploy` and `setup` check first that KeyCloak answers at `OIDC_DOMAIN_NAM
 The `aws-full` stack deploys its own KeyCloak, so it conflicts with both `aws-keycloak` and `aws-polaris`, unless
 `AWS_KEYCLOAK_EXTERNAL=true` is set in `afon-aws.properties` (it is `false` when empty): it then uses the KeyCloak
 `aws-keycloak` deploys, like `aws-polaris`, so it runs side by side with `aws-keycloak`, and its `deploy` and `setup` likewise check first that KeyCloak answers.
-Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-keycloak` always gets a fresh one.  The same holds on Azure with `AZURE_EGRESS_IP`: `azure-keycloak` always gets an address from Azure.  On GCP `gcp-polaris`, its only stack, pins its egress IP to `GCP_EGRESS_IP`, if set.
+Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-keycloak` always gets a fresh one.  The same holds on Azure with `AZURE_EGRESS_IP`: `azure-keycloak` always gets an address from Azure.  On GCP `gcp-polaris` pins its egress IP to `GCP_EGRESS_IP`, if set, and `gcp-keycloak` always gets addresses from Google.
 
 On Azure it is the same with `azure-keycloak` and `AZURE_KEYCLOAK_EXTERNAL=true` in `afon-azure.properties` (it is `false` when empty):
 `azure-full` then uses the KeyCloak `azure-keycloak` deploys, so it runs side by side with it, and its `deploy` and `setup` check first that KeyCloak answers.
@@ -551,12 +554,18 @@ az group delete --name afon_resource_group_aks --yes --no-wait
 
 ### GCP
 
-GCP has a single stack, `gcp-polaris`, so its GKE cluster is named `<CLUSTER_NAME>` alone, with no stack type in front as on AWS and Azure.
-The scripts acting on a stack are given it all the same, by its id or its role (`catalog`), eg:
+The GKE cluster of a GCP stack is named `<stack-type>-<CLUSTER_NAME>`, eg `polaris-<CLUSTER_NAME>`, as on AWS and Azure, so that
+`gcp-keycloak` and `gcp-polaris` run side by side.  **NOTE:** a `gcp-polaris` deployed before the stacks were named so has a cluster, VPC,
+subnet and router named `<CLUSTER_NAME>` alone, which a deploy of the new code replaces: delete it with the previous version first.
+The scripts acting on a stack are given it by its id or its role (`identity` or `catalog`), eg:
 ```shell
 afon-cli.sh gcp-update-kube-config catalog     # point kubectl at the GKE cluster
 afon-cli.sh gcp-polaris                        # is Polaris serving?
+afon-cli.sh gcp-keycloak                       # is KeyCloak serving?
+afon-cli.sh gcp-create identity                # create the env (DNS zones, buckets, service accounts) for the stack
 ```
+`gcp-create` needs the stack, as the DNS zones it creates are those of the domain names the stack serves, and `gcp-issue-cert` issues
+the certs of every configured domain name (`GCP_POLARIS_DOMAIN_NAME`, `GCP_JUPYTER_DOMAIN_NAME` and `OIDC_DOMAIN_NAME`).
 `gcp-update-kube-config` needs `gke-gcloud-auth-plugin` for kubectl to reach the cluster, and warns if it is missing: install it with
 `afon-cli.sh local-setup -c gcp`.
 
@@ -574,6 +583,9 @@ afon-cli.sh manage-stack deploy aws-keycloak
 
 # Azure Polaris (standalone)
 afon-cli.sh manage-stack deploy azure-polaris
+
+# GCP Keycloak (standalone)
+afon-cli.sh manage-stack deploy gcp-keycloak
 
 # GCP Polaris (standalone)
 afon-cli.sh manage-stack deploy gcp-polaris

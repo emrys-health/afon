@@ -106,19 +106,28 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     public static GcpCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties,
                                              boolean pinnedEgressIp) {
         NullProvider.Builder.create(stack, "null").build();
-        return new GcpCloudProvider(stack, stackId.cloud().toString(), properties, pinnedEgressIp);
+        return new GcpCloudProvider(stack, stackId.cloud().toString(), stackId, properties, pinnedEgressIp);
+    }
+
+    /**
+     * @return the cluster name of the stack, ie {@code <stack-type>-<clusterName>}, as for AWS and Azure, so that stacks of
+     * different types run side by side in the same project
+     */
+    static String clusterName(String clusterName, StackId stackId) {
+        return stackId.type() + "-" + clusterName;
     }
 
     /**
      * @param pinnedEgressIp whether the egress IP of the stack is pinned to {@code GCP_EGRESS_IP}, if set, which only one
      *                       running stack can hold, else Google allocates the addresses of its Cloud NAT
      */
-    GcpCloudProvider(final Construct scope, final String id, AfonPropertyProvider properties, boolean pinnedEgressIp) {
+    GcpCloudProvider(final Construct scope, final String id, StackId stackId, AfonPropertyProvider properties,
+                     boolean pinnedEgressIp) {
         super(scope, id);
         this.properties = properties;
         this.projectId = projectIdFrom(properties);
         this.secretsEnabled = Boolean.parseBoolean(properties.getValue(GCP_SECRETS_ENABLED, "false"));
-        this.clusterName = properties.getValue(AfonProperty.CLUSTER_NAME);
+        this.clusterName = clusterName(properties.getValue(AfonProperty.CLUSTER_NAME), stackId);
         String gcpRegion = properties.getValue(AfonProperty.GCP_REGION);
         String vpcName     = "gke-private-vpc-" + clusterName;
         String subnetName  = "gke-private-subnet-" + clusterName;
@@ -250,6 +259,9 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
         com.hashicorp.cdktf.TerraformOutput.Builder.create(this, "gkeEndpoint")
                                                    .value(gkeCluster.getEndpoint())
                                                    .build();
+        // not left to whichever component first needs it, as a stack of the KeyCloak alone creates kubernetes resources
+        // without any other asking for the provider
+        configureK8s();
     }
 
     /**

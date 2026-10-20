@@ -184,6 +184,7 @@ The stacks, as composed by `StackDefinitions`:
 | `azure-keycloak` | Keycloak |
 | `azure-polaris` | Polaris |
 | `azure-full` | The same components as `aws-full`, listed on their own, with its own Keycloak unless `AZURE_KEYCLOAK_EXTERNAL` |
+| `gcp-keycloak` | Keycloak |
 | `gcp-polaris` | Polaris |
 
 **Synthesising a stack.** `ComposedStack.synthesise(StackId, AfonPropertyProvider)` is the only way into the CDKTF world, and it

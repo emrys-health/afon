@@ -77,6 +77,10 @@ stacks:
       - Git
 
   # GCP
+  gcp-keycloak:
+    role: identity
+    pinnedEgressIp: false
+    components: [Keycloak]
   gcp-polaris:
     role: catalog
     components: [Polaris]

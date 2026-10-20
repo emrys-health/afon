@@ -122,7 +122,7 @@ class StackPlanFactoryTest {
 
     @Test
     void deletesJustTheStackAndTheLegacyStackOrEveryStackOfTheCloud() {
-        for (String stack : List.of("aws-keycloak", "aws-polaris", "aws-full", "azure-keycloak", "azure-polaris", "gcp-polaris")) {
+        for (String stack : List.of("aws-keycloak", "aws-polaris", "aws-full", "azure-keycloak", "azure-polaris", "gcp-keycloak", "gcp-polaris")) {
             assertThat(derived(DELETE, stack)).as(stack).containsExactly(deleteStack(stack), "deleteComplete(" + stack + ")");
         }
         for (String cloud : List.of("aws", "azure", "gcp")) {
@@ -146,8 +146,11 @@ class StackPlanFactoryTest {
         // stacks of different clouds hold nothing in common
         assertThat(factory.conflicts(StackId.parse("azure-polaris"), "aws-full", properties)).isFalse();
         assertThat(factory.conflicts(StackId.parse("gcp-polaris"), "azure-polaris", properties)).isFalse();
+        // as on the other clouds, the KeyCloak and Polaris stacks of GCP run side by side
+        assertThat(factory.conflicts(StackId.parse("gcp-polaris"), "gcp-keycloak", properties)).isFalse();
+        assertThat(factory.conflicts(StackId.parse("gcp-keycloak"), "gcp-polaris", properties)).isFalse();
         // a stack conflicts with itself, the legacy stack of its cloud, and any stack that is not defined, as its resources are unknown
-        for (StackId stackId : List.of(keycloak, polaris, full, StackId.parse("azure-polaris"), StackId.parse("gcp-polaris"))) {
+        for (StackId stackId : List.of(keycloak, polaris, full, StackId.parse("azure-polaris"), StackId.parse("gcp-keycloak"), StackId.parse("gcp-polaris"))) {
             assertThat(factory.conflicts(stackId, stackId.toString(), properties)).as(stackId.toString()).isTrue();
             assertThat(factory.conflicts(stackId, stackId.cloud().toString(), properties)).as(stackId.toString()).isTrue();
             assertThat(factory.conflicts(stackId, stackId.cloud() + "-unknown", properties)).as(stackId.toString()).isTrue();
@@ -284,7 +287,7 @@ class StackPlanFactoryTest {
     void providesTheStepsOfEveryActionOnEveryStackDefinedAndOnlyDeletesEveryStackOfACloud() {
         assertThat(factory.supportedActions().keySet().stream().map(StackId::toString)).containsExactly(
             "aws-all", "aws-full", "aws-keycloak", "aws-lab", "aws-polaris", "aws-snowflake",
-            "azure-all", "azure-full", "azure-keycloak", "azure-polaris", "gcp-all", "gcp-polaris");
+            "azure-all", "azure-full", "azure-keycloak", "azure-polaris", "gcp-all", "gcp-keycloak", "gcp-polaris");
         factory.supportedActions().forEach((stackId, actions) -> assertThat(actions).as(stackId.toString())
             .isEqualTo(stackId.isAll() ? List.of(DELETE) : List.of(DELETE, DEPLOY, SETUP)));
 
@@ -398,8 +401,9 @@ class StackPlanFactoryTest {
     void theGcpStackHoldsTheEgressIpItPins() {
         properties.setValue(GCP_EGRESS_IP, "35.197.200.10");
 
-        // gcp-polaris is the only GCP stack, so it only conflicts with itself, but it holds the address like the stacks of the other clouds
+        // gcp-polaris holds the address like the stacks of the other clouds, but gcp-keycloak never does
         assertThat(factory.heldResources(StackId.parse("gcp-polaris"), properties)).contains(GCP_EGRESS_IP);
+        assertThat(factory.heldResources(StackId.parse("gcp-keycloak"), properties)).doesNotContain(GCP_EGRESS_IP);
         assertThat(factory.heldResources(StackId.parse("azure-polaris"), properties)).doesNotContain(GCP_EGRESS_IP);
 
         // and an address that is not configured is not held

@@ -1,4 +1,4 @@
-# Shared by the <cloud>/keycloak.sh status scripts, ie aws/keycloak.sh and azure/keycloak.sh, which source it after
+# Shared by the <cloud>/keycloak.sh status scripts, ie aws/keycloak.sh, azure/keycloak.sh and gcp/keycloak.sh, which source it after
 # afon-source.sh.  Not run on its own.
 #
 # Adds to the layers of kube/status-source.sh the HTTPS requests to KeyCloak:

@@ -1,26 +1,32 @@
 source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} <store|show|list|delete> [<cert.pem> <key.pem>]"
-  echo "Stores in GCP Secret Manager the TLS cert and key for the $GCP_POLARIS_DOMAIN_NAME."
-  echo " - store <cert.pem> <key.pem>: create or add a new version of the cert and key secrets"
-  echo " - show: show whether the cert and key secrets exist"
+  echo "Usage: ${BASH_SOURCE[0]} <store|show|list|delete> [<cert.pem> <key.pem>] [<domain-name>]"
+  echo "Stores in GCP Secret Manager the TLS cert and key for the domain name, by default $GCP_POLARIS_DOMAIN_NAME."
+  echo " - store <cert.pem> <key.pem> [<domain-name>]: create or add a new version of the cert and key secrets"
+  echo " - show [<domain-name>]: show whether the cert and key secrets exist"
   echo " - list: list the secrets in the project"
-  echo " - delete: delete the cert and key secrets"
+  echo " - delete [<domain-name>]: delete the cert and key secrets"
 }
 
 ACTION="${1:-}"
 
 PROJECT_ID="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.properties}"
 
+# The domain name of the cert: the last arg of store, or the only arg of show and delete, if given, else that of Polaris
+case "$ACTION" in
+  store) DOMAIN_NAME="${4:-$GCP_POLARIS_DOMAIN_NAME}" ;;
+  *)     DOMAIN_NAME="${2:-$GCP_POLARIS_DOMAIN_NAME}" ;;
+esac
+
 # Same naming convention as Azure's Key Vault secrets, which the stack's restore step reads from
-KEBAB_DOMAIN_NAME="${GCP_POLARIS_DOMAIN_NAME//./-}"
+KEBAB_DOMAIN_NAME="${DOMAIN_NAME//./-}"
 GCP_TLS_CRT_NAME="${KEBAB_DOMAIN_NAME}-tls-crt"
 GCP_TLS_KEY_NAME="${KEBAB_DOMAIN_NAME}-tls-key"
 
 require_domain_name() {
-  if [ -z "$GCP_POLARIS_DOMAIN_NAME" ]; then
-    echo "- GCP_POLARIS_DOMAIN_NAME is blank - set it in afon-gcp.properties"
+  if [ -z "$DOMAIN_NAME" ]; then
+    echo "- No domain name: set GCP_POLARIS_DOMAIN_NAME in afon-gcp.properties, or give it"
     exit 1
   fi
 }
@@ -65,7 +71,7 @@ case "$ACTION" in
       }
     fi
 
-    echo "- Caching $GCP_POLARIS_DOMAIN_NAME cert in Secret Manager of $PROJECT_ID"
+    echo "- Caching $DOMAIN_NAME cert in Secret Manager of $PROJECT_ID"
     store_secret "$GCP_TLS_CRT_NAME" "$CERT_PEM"
     store_secret "$GCP_TLS_KEY_NAME" "$KEY_PEM"
     echo "Cert secrets $GCP_TLS_CRT_NAME and $GCP_TLS_KEY_NAME cached in $PROJECT_ID"

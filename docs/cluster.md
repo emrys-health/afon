@@ -242,7 +242,7 @@ The stack then gives its Cloud NAT that static IP alone (`MANUAL_ONLY`, in place
 Terraform output. It does not manage it, so a destroy leaves it allocated (and still on the allow-list) for the next apply. The stack
 finds it among the static IPs of `GCP_PROJECT_ID` and `GCP_REGION` by its address, so the plan fails if there is none there.
 
-Only a stack that pins its egress IP uses the property, ie `gcp-polaris`, the only GCP stack, and one address serves one Cloud NAT, so two
+Only a stack that pins its egress IP uses the property, ie `gcp-polaris`, and one address serves one Cloud NAT, so two
 stacks pinning it would conflict, see [stacks side by side](stacks.md#stacks-side-by-side). Left empty, nothing changes.
 
 Setting it on a cluster that already runs changes the addresses its outbound traffic leaves from, which breaks the connections that are

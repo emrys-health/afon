@@ -67,6 +67,12 @@ class StackDefinitionsTest {
     }
 
     @Test
+    void gcpKeycloakStackDeploysOnlyKeyCloak() {
+        assertThat(componentsOf("gcp-keycloak")).containsExactly(KeycloakComponent.class);
+        assertThat(StackDefinitions.get(StackId.parse("gcp-keycloak")).pinnedEgressIp()).isFalse();
+    }
+
+    @Test
     void azureStacksDeployOwnKeyCloakUnlessExternal() {
         assertThat(componentsOf("azure-keycloak")).containsExactly(KeycloakComponent.class);
         properties.setValue(AZURE_KEYCLOAK_EXTERNAL, "false");
@@ -170,7 +176,7 @@ class StackDefinitionsTest {
     void bundledStacksAreTheOnesDocumented() {
         assertThat(StackDefinitions.load(null).keySet()).extracting(StackId::toString)
             .containsExactly("aws-full", "aws-keycloak", "aws-polaris", "aws-snowflake", "azure-full", "azure-keycloak",
-                             "azure-polaris", "gcp-polaris");
+                             "azure-polaris", "gcp-keycloak", "gcp-polaris");
     }
 
     @Test
@@ -290,7 +296,8 @@ class StackDefinitionsTest {
         assertThat(StackDefinitions.withRole(AWS, StackRole.TRE)).map(definition -> definition.id().toString()).contains("aws-full");
         assertThat(StackDefinitions.withRole(AWS, StackRole.IDENTITY)).map(definition -> definition.id().toString()).contains("aws-keycloak");
         assertThat(StackDefinitions.withRole(AZURE, StackRole.CATALOG)).map(definition -> definition.id().toString()).contains("azure-polaris");
-        assertThat(StackDefinitions.withRole(GCP, StackRole.IDENTITY)).isEmpty();
+        assertThat(StackDefinitions.withRole(GCP, StackRole.IDENTITY)).map(definition -> definition.id().toString()).contains("gcp-keycloak");
+        assertThat(StackDefinitions.withRole(GCP, StackRole.TRE)).isEmpty();
         // a stack that extends another does not take its role
         assertThat(StackDefinitions.get(StackId.parse("aws-snowflake")).role()).isNull();
         assertThat(StackDefinitions.declaring(AWS, SnowflakeComponent.class)).map(definition -> definition.id().toString())
@@ -333,7 +340,8 @@ class StackDefinitionsTest {
         assertThat(StackDefinitions.resolve(StackId.parse("aws-full"))).hasToString("aws-full");
         assertThat(StackDefinitions.resolve(StackId.parse("aws-lab"))).hasToString("aws-lab");
         // otherwise as it is, for the caller to report: no stack of the cloud has the role, or it is not a role or a stack
-        assertThat(StackDefinitions.resolve(StackId.parse("gcp-identity"))).hasToString("gcp-identity");
+        assertThat(StackDefinitions.resolve(StackId.parse("gcp-identity"))).hasToString("gcp-keycloak");
+        assertThat(StackDefinitions.resolve(StackId.parse("gcp-tre"))).hasToString("gcp-tre");
         assertThat(StackDefinitions.resolve(StackId.parse("aws-nonesuch"))).hasToString("aws-nonesuch");
         assertThat(StackDefinitions.resolve(StackId.all(AWS))).isEqualTo(StackId.all(AWS));
     }
