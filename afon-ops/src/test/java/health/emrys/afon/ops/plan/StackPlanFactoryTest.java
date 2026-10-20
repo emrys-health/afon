@@ -308,7 +308,7 @@ class StackPlanFactoryTest {
         assertThat(factory.conflicts(StackId.parse("aws-full"), "aws-keycloak", properties)).isFalse();
     }
 
-    @Ignore("brittle test")
+    @Test
     void azureStacksFollowTheSameRulesAsAwsOnesWithTheirOwnKeyCloakSwitch() {
         // azure-keycloak is only the KeyCloak, which azure-polaris uses
         assertThat(derived(DEPLOY, "azure-keycloak")).containsExactly(
@@ -316,7 +316,7 @@ class StackPlanFactoryTest {
             "deployComplete(azure-keycloak)");
         assertThat(derived(SETUP, "azure-keycloak")).containsExactly(
             deleteConflicting("azure-keycloak"), "deployStack(azure-keycloak,[])", "waitForKeyCloak()",
-            "deployComplete(azure-keycloak)", "configureOidcUsersFor(azure)", "setupComplete(azure-keycloak)");
+            "deployComplete(azure-keycloak)", "configureOidcUsersFor(azure)", "lockDownPolaris(azure)", "setupComplete(azure-keycloak)");
         // azure-full deploys its own KeyCloak, so conflicts with the stack that does, unless configured to use it
         assertThat(derived(DEPLOY, "azure-full")).noneMatch(step -> step.startsWith("checkKeyCloakAnswers("));
         assertThat(factory.conflicts(StackId.parse("azure-full"), "azure-keycloak", properties)).isTrue();
