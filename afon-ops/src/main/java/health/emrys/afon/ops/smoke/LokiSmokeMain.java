@@ -24,7 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -66,6 +68,9 @@ public class LokiSmokeMain {
 
             String jupyterPod = new JupyterHubSpawner(client).spawnWithJupyterToken(properties);
             logger.info("Started a Jupyter pod called: {}", jupyterPod);
+            // Loki only looks back an hour by default, and a pod that has been running a while may not have logged since
+            String start = startTimeOf(client, jupyterPod);
+            logger.info("Querying Loki for the logs of {} since it started at {}", jupyterPod, start);
 
             try (PortForwarder forward = new PortForwarder(client,
                                                            MonitoringComponent.MONITORING_NAMESPACE,
@@ -74,20 +79,37 @@ public class LokiSmokeMain {
                                                            3100)) {
                 int localPort = forward.localPort();
 
-                checkPodIsWatched(localPort, jupyterPod);
+                checkPodIsWatched(localPort, jupyterPod, start);
 
-                checkPodLogs(localPort, jupyterPod);
+                checkPodLogs(localPort, jupyterPod, start);
             }
 
         }
     }
 
-    private void checkPodLogs(int localPort, String jupyterPod) throws IOException {
+    /**
+     * @return the start time of the pod as RFC3339, which Loki accepts as a query's start, falling back to its creation
+     * time if it has not started yet
+     */
+    private static String startTimeOf(KubeClient client, String podName) throws ApiException {
+        V1Pod pod = client.listPodsBeginningWith(podName)
+                          .stream()
+                          .filter(x -> podName.equals(nameOfPod(x)))
+                          .findFirst()
+                          .orElseThrow(() -> new RuntimeException(format("No pod called %s", podName)));
+        OffsetDateTime started = pod.getStatus() != null && pod.getStatus().getStartTime() != null
+            ? pod.getStatus().getStartTime()
+            : pod.getMetadata().getCreationTimestamp();
+        return started.toInstant().toString();
+    }
+
+    private void checkPodLogs(int localPort, String jupyterPod, String start) throws IOException {
         HttpPost request = new HttpPost(format("http://localhost:%d/loki/api/v1/query_range", localPort));
 
         request.setEntity(new UrlEncodedFormEntity(
             List.of(new BasicNameValuePair("query",
                                            format("{namespace=\"default\", pod=\"%s\"}", jupyterPod)),
+                    new BasicNameValuePair("start", start),
                     new BasicNameValuePair("limit", "20")),
             StandardCharsets.UTF_8
         ));
@@ -115,8 +137,9 @@ public class LokiSmokeMain {
         return lineStream;
     }
 
-    private void checkPodIsWatched(int localPort, String jupyterPod) throws IOException {
-        String  url     = format("http://localhost:%d/loki/api/v1/label/pod/values", localPort);
+    private void checkPodIsWatched(int localPort, String jupyterPod, String start) throws IOException {
+        String  url     = format("http://localhost:%d/loki/api/v1/label/pod/values?start=%s",
+                                 localPort, URLEncoder.encode(start, StandardCharsets.UTF_8));
         HttpGet request = new HttpGet(url);
         Map     watched = localCurl(request);
         if (!"success".equals(watched.get("status"))) {
