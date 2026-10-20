@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.SynthesisSupport;
 import health.emrys.afon.config.StackId;
 import org.junit.Ignore;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -45,7 +44,6 @@ class NetworkPoliciesIngressTest {
     }
 
     @Test
-    @Disabled("Requires charts/tetragon-1.7.1.tgz")
     void notWhereTheIngressIsOutsideOfTheCluster(@TempDir Path dir) throws Exception {
         assertThat(policyOf("aws-full", "spark-driver", dir)).doesNotContain("ingress-nginx");
         assertThat(policyOf("aws-full", "spark-master", dir)).doesNotContain("ingress-nginx");
