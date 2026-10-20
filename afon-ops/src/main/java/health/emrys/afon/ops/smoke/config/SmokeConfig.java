@@ -111,7 +111,17 @@ public class SmokeConfig {
                 The callers' IPs are only seen by the ingress controller if its service has externalTrafficPolicy Local, which the redeploy sets.  
                 smoke/run-regression-suite.sh azure --restrict-polaris does so for the run, and restores it after.
                 """;
-            default -> "Polaris can only be restricted on AWS and Azure, not on " + cloud;
+            case GCP -> """
+                Set GCP_POLARIS_ALLOWED_CIDRS in config/afon-gcp.properties and redeploy, to make the ingress of Polaris
+                admit only those callers, or run this to restrict it now, with the cluster's pod range and node subnet so that
+                the pods still reach it:
+
+                kubectl annotate ingress polaris-ingress -n default --overwrite nginx.ingress.kubernetes.io/whitelist-source-range=<cidr>,<cidr>
+
+                The callers' IPs are only seen by the ingress controller if its service has externalTrafficPolicy Local, which the redeploy sets.
+                afon-cli.sh kube-polaris-whitelist gcp set does both.
+                """;
+            default -> "Polaris can only be restricted on AWS, Azure and GCP, not on " + cloud;
         };
     }
 

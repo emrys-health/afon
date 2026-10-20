@@ -96,8 +96,10 @@ class SmokeConfigTest {
     }
 
     @Test
-    void gcpAdviceDoesNotFail() {
-        assertThat(config("gcp").polarisRestrictionAdvice()).contains("not on gcp");
+    void gcpAdviceNamesTheIngressWhitelistAndNotAws() {
+        assertThat(config("gcp").polarisRestrictionAdvice())
+            .contains("GCP_POLARIS_ALLOWED_CIDRS").contains("nginx.ingress.kubernetes.io/whitelist-source-range")
+            .doesNotContain("alb.ingress").doesNotContain("afon-aws.properties");
     }
 
     @Test

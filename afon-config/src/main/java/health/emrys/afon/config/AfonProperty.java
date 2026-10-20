@@ -61,6 +61,11 @@ public enum AfonProperty {
     GCP_POLARIS_DOMAIN_NAME("GCP_POLARIS_DOMAIN_NAME"),
     GCP_JUPYTER_DOMAIN_NAME("GCP_JUPYTER_DOMAIN_NAME"),
     /**
+     * Comma-separated CIDRs admitted to Polaris' nginx ingress, plus the cluster's own addresses.  Optional: Polaris is open to
+     * all when unset.
+     */
+    GCP_POLARIS_ALLOWED_CIDRS("GCP_POLARIS_ALLOWED_CIDRS"),
+    /**
      * Address of a regional, external static IP created beforehand in {@link #GCP_PROJECT_ID} and {@link #GCP_REGION}, that all
      * outbound cluster traffic egresses from, through the Cloud NAT.  Optional: Google allocates the addresses when unset.
      */

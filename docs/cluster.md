@@ -301,6 +301,24 @@ You can also restrict a deployed cluster by hand, which a redeploy undoes:
 kubectl annotate ingress polaris-ingress -n default --overwrite nginx.ingress.kubernetes.io/whitelist-source-range="203.0.113.7/32,10.244.0.0/16"
 ```
 
+### Restricting who can reach Polaris (GCP)
+
+Set `GCP_POLARIS_ALLOWED_CIDRS` in `afon-gcp.properties` to a comma-separated list of CIDRs to only admit those callers to
+Polaris' nginx ingress (via its `nginx.ingress.kubernetes.io/whitelist-source-range` annotation), as on [Azure](#restricting-who-can-reach-polaris-azure).
+The cluster's own addresses are added automatically, as pods calling Polaris by its public domain name reach the ingress from them: the
+pod range (`10.20.0.0/16`), the node subnet (`10.10.0.0/24`), and the pinned `GCP_EGRESS_IP`, if set. Left empty, there are no restraints.
+
+With the property set, the controller's service gets `externalTrafficPolicy: Local`, else the load balancer would hide the callers behind
+a node's address. `kube-polaris-whitelist` shows, sets or removes the restriction of the cluster that kubectl points at, as it does for the
+other clouds, and the same caveats about running `setup` and the `network` smoke test from a machine apply:
+
+```shell
+afon-cli.sh gcp-update-kube-config tre
+afon-cli.sh kube-polaris-whitelist gcp show
+afon-cli.sh kube-polaris-whitelist gcp remove
+afon-cli.sh kube-polaris-whitelist gcp set
+```
+
 ## Volumes that outlive the cluster (AWS)
 
 Gitea's repositories are kept on an EBS volume that is not destroyed with the stack, so that a cluster of the same
