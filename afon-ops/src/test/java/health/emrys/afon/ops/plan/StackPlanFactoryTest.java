@@ -45,6 +45,7 @@ class StackPlanFactoryTest {
         properties.setValue(GCP_POLARIS_DOMAIN_NAME, "polaris-gcp.example");
         properties.setValue(AWS_EGRESS_IP, "");
         properties.setValue(AZURE_EGRESS_IP, "");
+        properties.setValue(GCP_EGRESS_IP, "");
         properties.setValue(AWS_KEYCLOAK_EXTERNAL, "false");
         properties.setValue(AZURE_KEYCLOAK_EXTERNAL, "false");
     }
@@ -391,6 +392,19 @@ class StackPlanFactoryTest {
         filters.clear();
         factory.steps(DEPLOY, StackId.parse("azure-polaris"), recording, false);
         assertThat(filters.get(0).refusal().apply("azure-full").reason()).doesNotContain("egress IP");
+    }
+
+    @Test
+    void theGcpStackHoldsTheEgressIpItPins() {
+        properties.setValue(GCP_EGRESS_IP, "35.197.200.10");
+
+        // gcp-polaris is the only GCP stack, so it only conflicts with itself, but it holds the address like the stacks of the other clouds
+        assertThat(factory.heldResources(StackId.parse("gcp-polaris"), properties)).contains(GCP_EGRESS_IP);
+        assertThat(factory.heldResources(StackId.parse("azure-polaris"), properties)).doesNotContain(GCP_EGRESS_IP);
+
+        // and an address that is not configured is not held
+        properties.setValue(GCP_EGRESS_IP, "");
+        assertThat(factory.heldResources(StackId.parse("gcp-polaris"), properties)).doesNotContain(GCP_EGRESS_IP);
     }
 
     private static String deleteConflicting(String stackId) {

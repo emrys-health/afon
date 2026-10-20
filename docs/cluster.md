@@ -217,6 +217,38 @@ the role assignment created. Check the plan before applying it, and expect the f
   `kubectl rollout restart deploy/keycloak-deployment deploy/polaris-deployment deploy/guacamole-deployment -n default`.
 - Whoever allow-lists the cluster's address, eg a firewall in front of a database, must switch to the new one.
 
+#### Egress IP (GCP)
+
+By default Google allocates the addresses that the outbound traffic of the GKE cluster leaves from, through its Cloud NAT, and they are
+released with it, so a rebuild changes them.  To keep one address across rebuilds, so that a third party can allow-list the cluster once,
+create a regional, external static IP in the project and region of the stack, outside it, with `gcp-egress-ip`, which is idempotent and
+creates it in `GCP_PROJECT_ID` and `GCP_REGION`:
+
+```shell
+afon-cli.sh gcp-egress-ip create
+```
+
+(`afon-cli.sh gcp-egress-ip show` prints it again, and `create <name>` or `show <name>` use a name other than the default
+`afon-egress-ip`.) It runs `gcloud compute addresses create` and warns if an existing one is not external. The script never deletes it, as
+its address may be on somebody's allow-list.
+
+Set the address it prints in `afon-gcp.properties`:
+
+```properties
+GCP_EGRESS_IP=<the address>
+```
+
+The stack then gives its Cloud NAT that static IP alone (`MANUAL_ONLY`, in place of `AUTO_ONLY`), and reports it as the `egressIp`
+Terraform output. It does not manage it, so a destroy leaves it allocated (and still on the allow-list) for the next apply. The stack
+finds it among the static IPs of `GCP_PROJECT_ID` and `GCP_REGION` by its address, so the plan fails if there is none there.
+
+Only a stack that pins its egress IP uses the property, ie `gcp-polaris`, the only GCP stack, and one address serves one Cloud NAT, so two
+stacks pinning it would conflict, see [stacks side by side](stacks.md#stacks-side-by-side). Left empty, nothing changes.
+
+Setting it on a cluster that already runs changes the addresses its outbound traffic leaves from, which breaks the connections that are
+open for a moment: check the plan before applying it, and restart what holds long-lived connections to an external service afterwards,
+as on [Azure](#egress-ip-azure). Whoever allow-lists the cluster's address must switch to the new one.
+
 ### Restricting who can reach Polaris (AWS)
 
 Set `AWS_POLARIS_ALLOWED_CIDRS` to a comma-separated list of CIDRs to only admit those callers to
