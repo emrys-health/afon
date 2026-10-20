@@ -23,6 +23,8 @@ import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
  */
 public class MonitoringComponent implements StackComponent {
 
+    public static final String MONITORING_NAMESPACE = "default";
+
     @Override
     public List<Class<? extends StackComponent>> requires() {
         return List.of(CrdCleanupComponent.class);
@@ -102,7 +104,7 @@ public class MonitoringComponent implements StackComponent {
             .chart(vendoredChart(stack, "prometheusChart", "kube-prometheus-stack-51.8.0.tgz"))
 
             // Reference the namespace created above
-            .namespace("default")
+            .namespace(MONITORING_NAMESPACE)
             .set(chartOverrides)
             // ServiceMonitors for the Cilium components are passed as values so
             // the chart renders them itself: same release as the CRDs, in the
@@ -167,7 +169,7 @@ public class MonitoringComponent implements StackComponent {
             .create(stack, "lokiRelease")
             .name("loki")
             .chart(vendoredChart(stack, "lokiChart", "loki-6.16.0.tgz"))
-            .namespace("default")
+            .namespace(MONITORING_NAMESPACE)
             .values(List.of(lokiValues(logStorage)))
             .timeout(600)
             .atomic(true)
@@ -190,7 +192,7 @@ public class MonitoringComponent implements StackComponent {
             .create(stack, "promtailRelease")
             .name("promtail")
             .chart(vendoredChart(stack, "promtailChart", "promtail-6.16.5.tgz"))
-            .namespace("default")
+            .namespace(MONITORING_NAMESPACE)
             .values(List.of(promtailValues(lokiTenant, logStorage.serviceName())))
             .timeout(600)
             .atomic(true)

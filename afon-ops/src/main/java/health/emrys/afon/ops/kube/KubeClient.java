@@ -15,6 +15,7 @@ import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.KubeConfig;
 import okhttp3.Dispatcher;
 import okhttp3.OkHttpClient;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.io.FileReader;
@@ -68,9 +69,21 @@ public class KubeClient implements AutoCloseable {
         return new CoreV1Api().listNamespacedService("default").execute().getItems();
     }
 
+    public List<V1Pod> listPodsBeginningWith(String prefix) throws ApiException {
+        return listPods()
+            .stream()
+            .filter(x -> nameOfPod(x).startsWith(prefix)
+        ).toList();
+    }
+
+    public static @Nullable String nameOfPod(V1Pod x) {
+        return x.getMetadata().getName();
+    }
+
     public List<V1Pod> listPods() throws ApiException {
         return new CoreV1Api().listNamespacedPod("default").execute().getItems();
     }
+
 
     /**
      * The equivalent of {@code kubectl exec -n <namespace> <pod> [-c <container>] -- <command...>}.
@@ -140,7 +153,7 @@ public class KubeClient implements AutoCloseable {
         return new CoreV1Api().listNamespacedPod(namespace).labelSelector(selector).execute().getItems().stream()
                               .filter(pod -> pod.getMetadata().getDeletionTimestamp() == null)
                               .filter(pod -> pod.getStatus() != null && "Running".equals(pod.getStatus().getPhase()))
-                              .map(pod -> pod.getMetadata().getName())
+                              .map(pod -> nameOfPod(pod))
                               .findFirst()
                               .orElseThrow(() -> new IllegalStateException(
                                       "No running pod for deployment " + namespace + "/" + deployment + " (" + selector + ")"));
