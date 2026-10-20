@@ -104,6 +104,11 @@ public class LokiSmokeMain {
     private static @NonNull Stream<String> parseLoki(Map logs) {
         Map        data    = (Map) logs.get("data");
         List<List> results = (List) data.get("result");
+        if (results.isEmpty()) {
+            String msg = format("No result in %s", data);
+            logger.error(msg);
+            throw new RuntimeException(msg);
+        }
         List       values  = (List) ((Map) results.get(0)).get("values");
         Stream<String> lineStream = values.stream()
                                           .flatMap(x -> ((List<String>) x).stream());
