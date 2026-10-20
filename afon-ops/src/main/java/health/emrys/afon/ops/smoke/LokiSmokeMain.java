@@ -1,6 +1,5 @@
 package health.emrys.afon.ops.smoke;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -38,7 +37,7 @@ import static java.lang.String.format;
 
 public class LokiSmokeMain {
 
-    static final Logger logger = LoggerFactory.getLogger(NetworkSmokeMain.class);
+    static final Logger logger = LoggerFactory.getLogger(LokiSmokeMain.class);
 
     private final AfonPropertyProvider properties;
     private final String               tenantId;
@@ -79,12 +78,30 @@ public class LokiSmokeMain {
                                                            3100)) {
                 int localPort = forward.localPort();
 
-                checkPodIsWatched(localPort, jupyterPod, start);
+                checkPodIsWatchedWithBackoff(localPort, jupyterPod, start);
 
                 checkPodLogs(localPort, jupyterPod, start);
             }
 
         }
+    }
+
+    private void checkPodIsWatchedWithBackoff(int localPort, String jupyterPod, String start) throws InterruptedException {
+        RuntimeException x          = null;
+        int              numRetries = 3;
+        for (int i = 1; i <= numRetries; i++) {
+            try {
+                checkPodIsWatched(localPort, jupyterPod, start);
+                return;
+            } catch (IOException e) {
+                x = new RuntimeException(e);
+                if (i < numRetries) {
+                    logger.error("Backing off before a retry. Sleeping...", e);
+                    Thread.sleep(i * 1000);
+                }
+            }
+        }
+        throw x;
     }
 
     /**
@@ -98,8 +115,8 @@ public class LokiSmokeMain {
                           .findFirst()
                           .orElseThrow(() -> new RuntimeException(format("No pod called %s", podName)));
         OffsetDateTime started = pod.getStatus() != null && pod.getStatus().getStartTime() != null
-            ? pod.getStatus().getStartTime()
-            : pod.getMetadata().getCreationTimestamp();
+                                 ? pod.getStatus().getStartTime()
+                                 : pod.getMetadata().getCreationTimestamp();
         return started.toInstant().toString();
     }
 
@@ -131,15 +148,15 @@ public class LokiSmokeMain {
             logger.error(msg);
             throw new RuntimeException(msg);
         }
-        List       values  = (List) ((Map) results.get(0)).get("values");
+        List values = (List) ((Map) results.get(0)).get("values");
         Stream<String> lineStream = values.stream()
                                           .flatMap(x -> ((List<String>) x).stream());
         return lineStream;
     }
 
     private void checkPodIsWatched(int localPort, String jupyterPod, String start) throws IOException {
-        String  url     = format("http://localhost:%d/loki/api/v1/label/pod/values?start=%s",
-                                 localPort, URLEncoder.encode(start, StandardCharsets.UTF_8));
+        String url = format("http://localhost:%d/loki/api/v1/label/pod/values?start=%s",
+                            localPort, URLEncoder.encode(start, StandardCharsets.UTF_8));
         HttpGet request = new HttpGet(url);
         Map     watched = localCurl(request);
         if (!"success".equals(watched.get("status"))) {
