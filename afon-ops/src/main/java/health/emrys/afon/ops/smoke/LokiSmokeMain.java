@@ -94,7 +94,7 @@ public class LokiSmokeMain {
                 List<List> results = (List) data.get("result");
                 List values = (List) ((Map) results.get(0)).get("values");
                 Object lines = values.stream()
-                                     .flatMap(x -> {
+                                     .map(x -> {
                                           logger.info("{} is a {}", x, x.getClass().getName());
                                           return x.toString();
                                       })
