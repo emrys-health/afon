@@ -55,7 +55,6 @@ public class PolarisPlan implements ComponentPlan {
     public List<Step> setupSteps(StepOperations ops, AfonCloud cloud) {
         return List.of(ops.configureOidcUsersFor(cloud),
                        ops.createAllCatalogsFor(cloud),
-                       ops.configurePolarisUsersOnAllCatalogsFor(cloud),
-                       ops.lockDownPolaris(cloud));
+                       ops.configurePolarisUsersOnAllCatalogsFor(cloud));
     }
 }
