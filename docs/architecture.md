@@ -1,24 +1,24 @@
 # Architecture overview
 
-Afon's architecture has four layers:
+Afon's architecture has these layers:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Query Engines                                          │
-│  (Spark / Snowflake / Trino)                            │
-└──────────────────────┬──────────────────────────────────┘
-                       │ REST API (Iceberg REST Catalog)
-┌──────────────────────▼──────────────────────────────────┐
-│  Apache Polaris                                         │
-│  (runs in Kubernetes, one per cloud)                    │
-│  - Catalog management (internal + federated/external)   │
-│  - Credential vending (short-lived tokens)              │
-│  - Metadata stored in external Postgres                 │
-└──────────────────────┬──────────────────────────────────┘
-                       │ Vended credentials
-┌──────────────────────▼──────────────────────────────────┐
-│  Cloud Storage                                          │
-│  (AWS S3 / GCP GCS / Azure Blob Storage)              │
+│  (Spark / Snowflake / Trino)                            │--+
+└──────────────────────┬──────────────────────────────────┘  |
+                       │ REST API (Iceberg REST Catalog)     |
+┌──────────────────────▼──────────────────────────────────┐  |
+│  Apache Polaris                                         │  |
+│  (runs in Kubernetes, zero/one per cloud)               │  | data
+│  - Catalog management (internal + federated/external)   │  | access
+│  - Credential vending (short-lived tokens)              │  |
+│  - Metadata stored in external Postgres                 │  |
+└──────────────────────┬──────────────────────────────────┘  |
+                       │ Vended credentials request          |
+┌──────────────────────▼──────────────────────────────────┐  |
+│  Cloud Storage                                          │  |
+│  (AWS S3 / GCP GCS / Azure Blob Storage)                │<-+
 │  - Iceberg table data files (Parquet)                   │
 │  - Iceberg metadata files (manifests, snapshots)        │
 └─────────────────────────────────────────────────────────┘
