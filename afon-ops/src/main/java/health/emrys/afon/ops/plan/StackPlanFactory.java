@@ -174,6 +174,7 @@ public class StackPlanFactory {
                 }
             }
             steps.addAll(setupSteps.values());
+            steps.add(ops.lockDownPolaris(cloud));
             steps.add(ops.setupComplete(stackId));
         }
         return steps;
