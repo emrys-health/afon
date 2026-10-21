@@ -357,7 +357,7 @@ public class StepOperations {
         AfonProperty    cidrKey      = null;
         switch (cloud) {
             case AWS:
-                cidrKey = AWS_EGRESS_IP;
+                cidrKey = AWS_POLARIS_ALLOWED_CIDRS;
                 args = kubectlArgs + "alb.ingress.kubernetes.io/inbound-cidrs=";
                 break;
             case AZURE:
