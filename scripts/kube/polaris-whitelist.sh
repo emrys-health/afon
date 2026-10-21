@@ -7,25 +7,34 @@
 #     Azure, which only works with externalTrafficPolicy Local on the ingress controller's service, so `set` sets that too;
 #   - what is set is the CIDRs given, else the configured AWS_, AZURE_ or GCP_POLARIS_ALLOWED_CIDRS, plus the
 #     cluster's own addresses, as the deploy adds them, so that its pods calling Polaris by its public domain name are not locked out:
-#     its egress IP on AWS, or its outbound IP and pod CIDR on Azure.
+#     its egress IP on AWS, or its outbound IP and pod CIDR on Azure;
+#   - with --caller, the address of this machine is added to those, which is how to let it call Polaris, eg to run the Polaris steps of
+#     `setup`, without taking the restriction off for everybody.  `set` again, without --caller, takes it off.
 #
 # Usage:
 #   ./polaris-whitelist.sh <aws|azure|gcp> show
-#   ./polaris-whitelist.sh <aws|azure|gcp> set [<cidrs>]
+#   ./polaris-whitelist.sh <aws|azure|gcp> set [--caller] [<cidrs>]
 #   ./polaris-whitelist.sh <aws|azure|gcp> remove
 #
 #   show     prints how the ingress is restricted, if it is, and for Azure the traffic policy of the ingress controller.
 #   set      restricts it, to the comma-separated CIDRs given, eg 203.0.113.7/32,198.51.100.0/24, else the configured ones, plus
-#            the cluster's own addresses.
+#            the cluster's own addresses.  With --caller, the IPv4 address of this machine, as https://ifconfig.me sees it, is added
+#            to those: to the CIDRs given, else to the configured ones.  `set` again, without --caller, takes it off, as it sets the
+#            list from the config, or from the CIDRs given, and not from the annotation as it is.
+#            It fails, changing nothing, if the address cannot be learnt.  Mind that it is the address of the route to the internet,
+#            so it is not what Polaris sees through a VPN or a proxy that routes to the cluster differently.
 #   remove   removes the restriction, so that Polaris can be called from anywhere, until the next deploy.
 #
 # Env vars:
-#   CONTEXT   kubectl context of the cluster (defaults to the current context), whose kind must be that of the cloud.
+#   CONTEXT         kubectl context of the cluster (defaults to the current context), whose kind must be that of the cloud.
+#   CALLER_IP_URL   the service that says the address it is called from (defaults to https://ifconfig.me).
 #
 # Examples:
 #   afon-cli.sh azure-update-kube-config tre
 #   afon-cli.sh kube-polaris-whitelist azure show
-#   afon-cli.sh kube-polaris-whitelist azure remove     # to run setup from this machine
+#   afon-cli.sh kube-polaris-whitelist azure set --caller  # to run setup from this machine, without taking the restriction off
+#   afon-cli.sh kube-polaris-whitelist azure set        # to take this machine off it again, and restrict it for the network smoke test
+#   afon-cli.sh kube-polaris-whitelist azure remove     # or to run setup from this machine, with the restriction off
 #   afon-cli.sh kube-polaris-whitelist azure set        # to restrict it again, for the network smoke test
 
 set -euo pipefail
@@ -43,10 +52,26 @@ case "$CLOUD" in
   *) echo "The cloud should be aws, azure or gcp, not '${1:-}'" >&2; usage; exit 1 ;;
 esac
 case "$ACTION" in
-  show|remove) [ $# -le 2 ] || { echo "$ACTION takes no CIDRs" >&2; usage; exit 1; } ;;
-  set) [ $# -le 3 ] || { usage; exit 1; } ;;
+  show|set|remove) ;;
   *) echo "The action should be show, set or remove, not '$ACTION'" >&2; usage; exit 1 ;;
 esac
+
+# what follows the action: for set, the option --caller and the CIDRs to restrict it to, in either order
+CALLER=
+GIVEN=
+HAVE_GIVEN=
+shift $(( $# < 2 ? $# : 2 ))
+for ARG in "$@"; do
+  case "$ARG" in
+    --caller) CALLER=true ;;
+    -*) echo "Unknown option: $ARG" >&2; usage; exit 1 ;;
+    *) [ -z "$HAVE_GIVEN" ] || { echo "Only one list of CIDRs may be given" >&2; usage; exit 1; }
+       GIVEN="$ARG"; HAVE_GIVEN=true ;;
+  esac
+done
+if [ "$ACTION" != "set" ] && { [ -n "$CALLER" ] || [ -n "$HAVE_GIVEN" ]; }; then
+  echo "$ACTION takes no CIDRs or options" >&2; usage; exit 1
+fi
 
 if ! command -v kubectl >/dev/null 2>&1; then
   echo "kubectl not found on PATH" >&2
@@ -87,6 +112,20 @@ if [ "$STATE" = "missing" ]; then
   exit 1
 fi
 
+CALLER_IP_URL="${CALLER_IP_URL:-https://ifconfig.me}"
+
+# Prints the IPv4 address of this machine, as CALLER_IP_URL sees it, or fails.  Asked for IPv4 only (curl -4): the Polaris domain names
+# only have IPv4 addresses, so that is the address a call to Polaris comes from, whereas a dual-stack machine is told its IPv6 one.
+caller_ip() {
+  local ip
+  ip="$(curl -4 -s --max-time 10 "$CALLER_IP_URL" 2>/dev/null | tr -d '[:space:]')" || true
+  if ! [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    echo "Could not learn the IPv4 address of this machine from $CALLER_IP_URL (got '${ip:-nothing}'): is it reachable over IPv4?" >&2
+    exit 1
+  fi
+  echo "$ip"
+}
+
 # Prints the traffic policy of the ingress controller, on Azure
 controller_policy() {
   local controller
@@ -118,14 +157,25 @@ case "$ACTION" in
     ;;
 
   set)
-    if [ $# -ge 3 ]; then
-      POLARIS_ALLOWED_CIDRS="$3"
+    if [ -n "$HAVE_GIVEN" ]; then
+      POLARIS_ALLOWED_CIDRS="$GIVEN"
       for CIDR in ${POLARIS_ALLOWED_CIDRS//,/ }; do
         if ! [[ "$CIDR" =~ ^[0-9a-fA-F:.]+/[0-9]+$ ]]; then
           echo "'$CIDR' is not a CIDR, eg 203.0.113.7/32" >&2
           exit 1
         fi
       done
+    fi
+    if [ -n "$CALLER" ]; then
+      # before anything is changed: if the address cannot be learnt, the ingress is left as it is
+      CALLER_CIDR="$(caller_ip)/32"
+      # added to the CIDRs given, else to those the config says
+      LISTED_CIDRS="${POLARIS_ALLOWED_CIDRS-$(configured_polaris_cidrs)}"
+      case ",$LISTED_CIDRS," in
+        *",$CALLER_CIDR,"*) echo "- This machine, $CALLER_CIDR, is already in the list" ;;
+        *) POLARIS_ALLOWED_CIDRS="${LISTED_CIDRS:+$LISTED_CIDRS,}$CALLER_CIDR"
+           echo "- Admitting this machine, $CALLER_CIDR, as $CALLER_IP_URL sees it" ;;
+      esac
     fi
     # the CIDRs the deploy would restrict it to, with the cluster's own addresses, which says where each comes from
     CIDRS=$(restriction_cidrs)
@@ -141,6 +191,10 @@ case "$ACTION" in
     kubectl --context "$CONTEXT" annotate ingress polaris-ingress -n default --overwrite "$ANNOTATION=$CIDRS"
     echo "- Until the next deploy, or tofu-apply, which sets it as the config says. This machine must not be among them for the" \
          "network smoke test, and must be for the Polaris steps of setup."
+    if [ -n "$CALLER" ]; then
+      echo "- Run the command again without --caller to take this machine off the list: Polaris is then restricted to the configured" \
+           "CIDRs and the cluster's own addresses"
+    fi
     ;;
 
   remove)

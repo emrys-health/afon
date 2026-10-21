@@ -287,10 +287,17 @@ config says:
 ```shell
 afon-cli.sh azure-update-kube-config tre
 afon-cli.sh kube-polaris-whitelist azure show
-afon-cli.sh kube-polaris-whitelist azure remove                      # for setup to call Polaris from this machine
+afon-cli.sh kube-polaris-whitelist azure set --caller                # for setup to call Polaris from this machine, and only from it
 afon-cli.sh manage-stack setup azure-full configure_oidc_users_for_cloud_azure   # resumes setup from the step that failed
-afon-cli.sh kube-polaris-whitelist azure set                         # the configured CIDRs plus the cluster's own addresses
+afon-cli.sh kube-polaris-whitelist azure set                         # the configured CIDRs plus the cluster's own addresses: this machine is off again
 ```
+
+`set --caller` adds the IPv4 address of this machine to the list that `set` would apply, ie to the CIDRs given, else to the configured ones, plus
+the cluster's own addresses. It asks `https://ifconfig.me` for the address (`CALLER_IP_URL` says another service), and fails, changing
+nothing, if it cannot learn one. It is the address of this machine's route to the internet: through a VPN or a proxy that reaches the cluster
+differently, Polaris sees another address, and the Polaris steps are still refused. `set` again, without `--caller`, takes the address off, as it
+builds the list from the config and not from the annotation as it is. `remove` is the alternative that opens Polaris to everybody, which
+leaves it open if the setup stops part way.
 
 `set` also sets `externalTrafficPolicy: Local` on Azure, which the restriction needs. It is the CIDRs that a deploy would apply, and the
 output says where each comes from. It refuses a cluster of the wrong kind for the cloud, eg the AKS one for `aws`.

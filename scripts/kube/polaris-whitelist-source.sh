@@ -210,6 +210,16 @@ gcp_property() {
     | tr -d '[:space:]' || true
 }
 
+# Prints the CIDRs that the config says to admit to the Polaris of the $CLOUD, ie AWS_, AZURE_ or GCP_POLARIS_ALLOWED_CIDRS, or nothing
+# if it is not set.
+configured_polaris_cidrs() {
+  case "$CLOUD" in
+    aws) aws_property AWS_POLARIS_ALLOWED_CIDRS ;;
+    azure) azure_property AZURE_POLARIS_ALLOWED_CIDRS ;;
+    gcp) gcp_property GCP_POLARIS_ALLOWED_CIDRS ;;
+  esac
+}
+
 # On GCP the cluster's own addresses are its pod range, its node subnet and the pinned GCP_EGRESS_IP, if any: a cluster without
 # one has addresses that Google allocates, which are not looked up.
 gcp_restriction_cidrs() {
