@@ -92,7 +92,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     /** The public IP address that the outbound traffic of the cluster egresses from, if pinned, else empty. */
     private final        String                  egressIp;
     /** The pod CIDR of an AKS overlay cluster, as left unset in its network profile. */
-    static final String POD_CIDR = "10.244.0.0/16";
+    public static final String POD_CIDR = "10.244.0.0/16";
 
     private final        AfonPropertyProvider    properties;
     private              RoleAssignment          clusterAdminAssignment;

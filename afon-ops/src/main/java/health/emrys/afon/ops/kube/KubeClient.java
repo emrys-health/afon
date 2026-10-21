@@ -65,6 +65,22 @@ public class KubeClient implements AutoCloseable {
         return clusterName;
     }
 
+    public ApiClient getApiClient() {
+        return apiClient;
+    }
+
+    /**
+     * @return the name of the current context of the kube config, ie that of the cluster that kubectl, and this client, act on
+     */
+    public String getContext() {
+        String kubeConfigPath = System.getProperty("user.home") + "/.kube/config";
+        try (FileReader reader = new FileReader(kubeConfigPath)) {
+            return KubeConfig.loadKubeConfig(reader).getCurrentContext();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read the kube config " + kubeConfigPath, e);
+        }
+    }
+
     public List<V1Service> listServices() throws ApiException {
         return new CoreV1Api().listNamespacedService("default").execute().getItems();
     }

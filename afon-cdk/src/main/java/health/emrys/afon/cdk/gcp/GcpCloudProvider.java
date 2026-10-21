@@ -73,9 +73,9 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     private static final Pattern DNS_ZONE_NAME_RULE = Pattern.compile("[a-z]([-a-z0-9]*[a-z0-9])?");
     private static final int     DNS_ZONE_NAME_MAX  = 63;
     /** The nodes' subnet, from which a pod's call to the ingress' public address can arrive, if it is translated on the node. */
-    static final String NODE_CIDR = "10.10.0.0/24";
+    public static final String NODE_CIDR = "10.10.0.0/24";
     /** The secondary range of the subnet that the pods get their addresses from. */
-    static final String POD_CIDR  = "10.20.0.0/16";
+    public static final String POD_CIDR  = "10.20.0.0/16";
 
     private final ContainerCluster   gkeCluster;
     private final String             projectId;

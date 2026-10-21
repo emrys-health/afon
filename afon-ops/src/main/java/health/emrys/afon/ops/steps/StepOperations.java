@@ -6,6 +6,8 @@ import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.*;
+import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.kube.tools.PolarisWhitelister;
 import health.emrys.afon.ops.snowflake.SnowflakeStatements;
 import health.emrys.afon.ops.spark.SparkRunner;
 import health.emrys.afon.ops.spark.SparkTestReader;
@@ -378,6 +380,25 @@ public class StepOperations {
             format("lockdown_polaris_for_%s", cloud),
             "Make Polaris inaccessible from outside the cluster for security reasons",
             () -> actions.run("kubectl", null, params));
+    }
+
+    /**
+     * Restricts the Polaris ingress of the cluster of the current kubectl context to the configured CIDRs and the cluster's own
+     * addresses, as {@code kube-polaris-whitelist <cloud> set [--caller]} does.
+     *
+     * @param withCaller whether to admit this machine too, to run the Polaris steps of setup from it; calling again without
+     *                   takes it off
+     */
+    public Step whitelistPolaris(AfonCloud cloud, boolean withCaller) {
+        return new Step(
+            format("whitelist_polaris_for_%s%s", cloud, withCaller ? "_with_caller" : ""),
+            withCaller ? "Admit this machine, besides the configured CIDRs, to Polaris"
+                       : "Restrict Polaris to the configured CIDRs and the cluster's own addresses",
+            () -> {
+                try (KubeClient client = new KubeClient(properties)) {
+                    new PolarisWhitelister(cloud, properties, client).set(withCaller, Optional.empty());
+                }
+            });
     }
 
     private String toCidrWithPrefix32(AfonProperty value) {
