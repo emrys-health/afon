@@ -360,7 +360,7 @@ public class StepOperations {
                 cidrKey = AWS_POLARIS_ALLOWED_CIDRS;
                 args = kubectlArgs + "alb.ingress.kubernetes.io/inbound-cidrs=";
                 break;
-            case AZURE:
+            case AZURE: // @Mauro is Azure not working at the moment? Comment this block out if so and we can chat
                 cidrKey = AZURE_POLARIS_ALLOWED_CIDRS;
                 args = kubectlArgs + "nginx.ingress.kubernetes.io/whitelist-source-range=";
                 break;
