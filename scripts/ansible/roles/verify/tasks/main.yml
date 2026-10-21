@@ -58,7 +58,7 @@
     cmd: |
       {{ lookup('ansible.builtin.file', afon_pinned_sh) }}
       PINNED_PLATFORM=linux
-      check_tool_versions git java mvn docker jq {{ '' if not (install_cloud_tools | bool) else 'tofu kubectl' ~ (' aws' if install_awscli | bool else '') ~ (' az' if install_azurecli | bool else '') ~ (' gcloud' if install_gcloud | bool else '') }}
+      check_tool_versions git java mvn docker jq {{ '' if not (install_cloud_tools | bool) else 'tofu kubectl yq helm hubble eksctl kubelogin' ~ (' aws' if install_awscli | bool else '') ~ (' az' if install_azurecli | bool else '') ~ (' gcloud' if install_gcloud | bool else '') }}
     executable: /bin/bash
   register: afon_pinned_check
   changed_when: false

@@ -17,19 +17,24 @@ repository secrets pushed by [secrets.sh](../github/secrets.sh).
 | `lvm`         | lays out extra volumes as LVM at the sizes you declare — **off until you name a device** | Puts the images, `~/.m2` and the workspace on their own filesystem instead of the cramped root |
 | `swap`        | a 4G swap file (EC2 ships with none)                                          | Stops a peak in javac or the test JVM taking the box down                |
 | `java`        | JDK 17 (`openjdk` by default, `temurin` optionally)                           | JDK 17 is enforced by the maven build                                    |
-| `maven`       | Maven from the Apache archive, linked as `/usr/local/bin/mvn`                 | `./afon.sh -a build -p acceptance`                                       |
+| `maven`       | Maven from apt, at the pinned version                                        | `./afon.sh -a build -p acceptance`                                       |
 | `docker`      | docker engine + buildx/compose plugins, runner user in the `docker` group     | The specs start KeyCloak, Polaris, Trino and Spark Connect via Testcontainers |
-| `cloud_tools` | aws, az, gcloud, kubectl, tofu — **off by default**                           | Only needed if the runner also drives the ops/tofu actions of `afon.sh`  |
+| `cloud_tools` | aws, az, gcloud (apt), kubectl, tofu, yq, helm, hubble, eksctl, kubelogin (release downloads) — **off by default** | Only needed if the runner also drives the ops/tofu actions of `afon.sh`  |
 | `github`      | installs and registers the actions runner via `runner.sh` — **off by default** | Registering acts on the repo on GitHub, not just on this host            |
 | `verify`      | runs each tool as the runner user, asserts the JDK version and the runner size | Same checks as the workflow's *Verify runner tooling* step               |
 
 ## Pinned versions
 
-The versions of maven, docker (`docker-ce`, held with `dpkg_selections`), kubectl, tofu and the aws cli are not set here:
-they are read from the linux pins in [pinned.sh](../local/pinned.sh), which `afon-cli.sh local-setup` also uses, so that the
-runner and local setups are the same.  To change a version, change it there.  The `verify` role checks the installed
-versions against the pins and fails on a mismatch (`-e verify_pinned=false` to only report).
-The azure and gcloud clis (and the gke auth plugin) are installed from their apt repos at the pinned versions, and held.
+The tool versions are not set here: they are read from the linux pins in [pinned.sh](../local/pinned.sh), which
+`afon-cli.sh local-setup` also uses, so that the runner and local setups are the same.  To change a version, change it there.
+The tools come from the same sources as in `local-setup`:
+- apt, at the pinned version (the newest apt version starting with it) and held with `dpkg_selections`: git, jq, java,
+  maven, docker (`docker-ce`, the engine and its cli), and the aws, azure and gcloud clis with the gke auth plugin.
+  The apt version of git has the epoch `1:`, which the `shell_tools` role spells out;
+- release downloads in `/usr/local/bin`, only if not already at the pinned version (`roles/cloud_tools/defaults/main.yml`
+  lists them): kubectl, tofu, yq, helm, hubble, eksctl, kubelogin.
+
+The `verify` role checks the installed versions against the pins and fails on a mismatch (`-e verify_pinned=false` to only report).
 
 The workflow also provisions its own Temurin 17 through `actions/setup-java`; the JDK installed here
 is what you get when running the build on the runner by hand.
@@ -180,9 +185,6 @@ re-registered.
 Site-level settings live in [group_vars/github_runners.yml](group_vars/github_runners.yml) — the
 runner user, the java flavour, the maven version and the cloud tools flag. Everything else is a role
 default under `roles/*/defaults/main.yml`, overridable with `-e`.
-
-The maven tarball is verified by TLS only; set `maven_checksum` to the `sha512:<hex>` value published
-alongside the tarball on `archive.apache.org` to pin it.
 
 ## Notes
 

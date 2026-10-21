@@ -1,10 +1,8 @@
 ---
 # Shell tooling used by afon.sh, scripts/config/*.sh and the workflow steps:
-#   git    - actions/checkout
 #   curl   - runner + actions downloads
 #   unzip  - afon.sh config-import / docs-export, tool installers
 #   perl   - scripts/config/validate.sh
-#   jq     - json wrangling in the ops scripts
 #   acl    - lets ansible drop privileges to the runner user cleanly
 #   libicu - required by the actions runner binary
 shell_tools_packages:
@@ -13,9 +11,7 @@ shell_tools_packages:
   - ca-certificates
   - coreutils
   - curl
-  - git
   - gnupg
-  - jq
   - libicu-dev
   - lsb-release
   - nodejs
@@ -29,3 +25,7 @@ shell_tools_packages:
 
 # Seconds an existing apt cache is considered fresh enough to reuse.
 apt_cache_valid_time: 3600
+
+# Installed separately, at the versions pinned in scripts/local/pinned.sh, and held:
+#   git - actions/checkout
+#   jq  - json wrangling in the ops scripts

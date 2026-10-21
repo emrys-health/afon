@@ -1,20 +1,12 @@
 ---
-# Mirrors the packages installed by `./afon.sh -a local-setup` (see docs/setup_local.md).
+# Mirrors the tools installed by `./afon.sh -a local-setup` (see docs/setup_local.md): the cloud clis from apt, at the versions
+# pinned in scripts/local/pinned.sh (read by group_vars/github_runners.yml), and the other tools as pinned release downloads.
 # Not needed by the acceptance tests themselves — they use the cloud SDKs — but
 # required if the runner also drives the ops/tofu actions.
 install_awscli: true
 install_azurecli: true
 install_gcloud: true
-install_kubectl: true
-install_opentofu: true
-
-# kubectl_version, opentofu_version, awscli_version, azurecli_version, gcloud_version are pinned in scripts/local/pinned.sh,
-# read by group_vars/github_runners.yml.
-
-awscli_url: "https://awscli.amazonaws.com/awscli-exe-linux-{{ tarball_arch }}-{{ awscli_version }}.zip"
-kubectl_url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/{{ apt_arch }}/kubectl"
-opentofu_url: >-
-  https://github.com/opentofu/opentofu/releases/download/v{{ opentofu_version }}/tofu_{{ opentofu_version }}_linux_{{ apt_arch }}.zip
+install_release_binaries: true
 
 azure_key_url: https://packages.microsoft.com/keys/microsoft.asc
 azure_keyring: /etc/apt/keyrings/microsoft.asc
@@ -23,3 +15,49 @@ azure_repo_url: https://packages.microsoft.com/repos/azure-cli/
 gcloud_key_url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
 gcloud_keyring: /etc/apt/keyrings/cloud.google.asc
 gcloud_repo_url: https://packages.cloud.google.com/apt
+
+# The release downloads, installed in /usr/local/bin unless already at the pinned version.
+#   check:  a command printing the version, which is looked for in its output
+#   kind:   raw (the binary itself), tgz or zip (an archive)
+#   member: the binary within the archive
+release_binaries:
+  - name: kubectl
+    version: "{{ kubectl_version }}"
+    check: kubectl version --client
+    url: "https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/{{ apt_arch }}/kubectl"
+    kind: raw
+  - name: tofu
+    version: "{{ opentofu_version }}"
+    check: tofu --version
+    url: "https://github.com/opentofu/opentofu/releases/download/v{{ opentofu_version }}/tofu_{{ opentofu_version }}_linux_{{ apt_arch }}.zip"
+    kind: zip
+    member: tofu
+  - name: yq
+    version: "{{ yq_version }}"
+    check: yq --version
+    url: "https://github.com/mikefarah/yq/releases/download/v{{ yq_version }}/yq_linux_{{ apt_arch }}"
+    kind: raw
+  - name: helm
+    version: "{{ helm_version }}"
+    check: helm version --short
+    url: "https://get.helm.sh/helm-v{{ helm_version }}-linux-{{ apt_arch }}.tar.gz"
+    kind: tgz
+    member: "linux-{{ apt_arch }}/helm"
+  - name: hubble
+    version: "{{ hubble_version }}"
+    check: hubble version
+    url: "https://github.com/cilium/hubble/releases/download/v{{ hubble_version }}/hubble-linux-{{ apt_arch }}.tar.gz"
+    kind: tgz
+    member: hubble
+  - name: eksctl
+    version: "{{ eksctl_version }}"
+    check: eksctl version
+    url: "https://github.com/eksctl-io/eksctl/releases/download/v{{ eksctl_version }}/eksctl_Linux_{{ apt_arch }}.tar.gz"
+    kind: tgz
+    member: eksctl
+  - name: kubelogin
+    version: "{{ kubelogin_version }}"
+    check: kubelogin --version
+    url: "https://github.com/Azure/kubelogin/releases/download/v{{ kubelogin_version }}/kubelogin-linux-{{ apt_arch }}.zip"
+    kind: zip
+    member: "bin/linux_{{ apt_arch }}/kubelogin"

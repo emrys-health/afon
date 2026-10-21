@@ -25,6 +25,7 @@
     name: "{{ docker_packages | map('regex_replace', '^(docker-ce(-cli)?)$', '\\1=5:' ~ docker_version ~ '*') | list }}"
     state: present
     allow_downgrade: true
+    allow_change_held_packages: true
 
 - name: Hold the docker engine packages, so that upgrades leave them alone
   ansible.builtin.dpkg_selections:

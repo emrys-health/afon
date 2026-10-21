@@ -1,12 +1,13 @@
 # The versions of the local tools that afon setups are known to work with, to make local setups reproducible.
-# Sourced by setup.sh, which installs these versions where the package manager allows it, and by versions.sh,
-# which checks the installed versions against them.
+# Sourced by setup.sh, which installs these versions from release downloads, except git, java, maven and the cloud clis, which
+# come from apt or brew, and by versions.sh, which checks the installed versions against them.
 # Pin to a prefix to allow any version under it, eg java 17 allows 17.0.20.1.
 # PINNED_<tool> applies to all platforms; PINNED_<tool>_linux or PINNED_<tool>_macos overrides it for that platform,
-# as apt and brew do not offer the same versions.
+# as apt and brew offer different versions of what they provide.
 
 PINNED_git=2.56
-PINNED_java=17
+PINNED_java=17.0.20
+PINNED_gh=2.103.0
 PINNED_mvn=3.10.0
 PINNED_docker=29.9.1
 PINNED_tofu=1.13.1
@@ -15,16 +16,21 @@ PINNED_jq=1.8.1
 PINNED_yq=4.54.1
 PINNED_helm=4.1.1
 PINNED_hubble=1.19.4
-PINNED_aws=2.37.9
+PINNED_aws=2.38.3
 PINNED_eksctl=0.231.0
 PINNED_az=2.90.0
 PINNED_gcloud=587.0.0
 PINNED_kubelogin=0.2.20
 
 # Linux (Ubuntu 26.04 resolute) overrides, where apt does not offer the common pin.
-# Not yet verified on linux: tofu, kubectl, hubble, aws, az, gcloud, as their apt repos were not configured.
 PINNED_git_linux=2.53
 PINNED_mvn_linux=3.9.12
+PINNED_aws_linux=2.31.35
+
+# macOS overrides, where brew does not offer the common pin.  Brew offers only the current version of a formula, and gcloud,
+# a cask which updates itself, cannot be pinned.
+PINNED_gcloud_macos=590.0.0
+PINNED_java_macos=17.0.21
 
 # The version pinned for the tool on this platform, or on the platform in PINNED_PLATFORM (linux or macos) if set,
 # eg by the ansible playbooks, which run on another platform than they provision.
@@ -42,12 +48,18 @@ pinned_version(){
   echo "${!var:-}"
 }
 
+# The java of JAVA_HOME if set, as brew's openjdk is keg-only, ie not on the PATH, otherwise the one on the PATH.
+installed_java(){
+  if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then "$JAVA_HOME/bin/java" "$@"; else java "$@"; fi
+}
+
 # The installed version of a tool, empty if not installed or not detectable.
 installed_version(){
   case "$1" in
+    gh) gh --version 2>/dev/null | head -1 | awk '{print $3}' ;;
     git) git --version 2>/dev/null | awk '{print $3}' ;;
-    java) java -version 2>&1 | head -1 | sed -E 's/.*"([^"]+)".*/\1/' ;;
-    mvn) mvn --version 2>/dev/null | head -1 | awk '{print $3}' ;;
+    java) installed_java -version 2>&1 | head -1 | sed -E 's/.*"([^"]+)".*/\1/' ;;
+    mvn) mvn -B --version 2>/dev/null | head -1 | sed $'s/\033\\[[0-9;]*m//g' | awk '{print $3}' ;;
     docker) docker --version 2>/dev/null | sed -E 's/.*version ([^,]+).*/\1/' ;;
     tofu) tofu --version 2>/dev/null | head -1 | sed 's/OpenTofu v//' ;;
     kubectl) kubectl version --client 2>/dev/null | head -1 | sed 's/.*v//' ;;
@@ -92,7 +104,7 @@ check_tool_versions(){
 
 # The tools relevant to the cloud targeted: all the clouds' if CLOUD is empty.
 pinned_tools(){
-  echo git java mvn docker tofu kubectl jq yq helm hubble
+  echo git java mvn gh docker tofu kubectl jq yq helm hubble
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then echo aws eksctl; fi
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "azure" ]; then echo az kubelogin; fi
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "gcp" ]; then echo gcloud; fi

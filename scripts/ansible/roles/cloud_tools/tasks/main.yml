@@ -1,31 +1,29 @@
 ---
-- name: Install the aws cli
+# Pinned to the version in scripts/local/pinned.sh, ie the newest apt version containing it, and held.
+- name: Install the aws cli {{ awscli_version }}
   when: install_awscli | bool
   block:
-    - name: Check whether the aws cli is already installed
-      ansible.builtin.command: aws --version
-      register: afon_aws_version
-      changed_when: false
-      failed_when: false
+    - name: Install awscli
+      ansible.builtin.apt:
+        name: "awscli={{ awscli_version }}*"
+        state: present
+        allow_downgrade: true
+        allow_change_held_packages: true
 
-    - name: Download and unpack the aws cli installer
-      ansible.builtin.unarchive:
-        src: "{{ awscli_url }}"
-        dest: /tmp
-        remote_src: true
-        creates: /tmp/aws/install
-      when: afon_aws_version.rc != 0 or ('aws-cli/' ~ awscli_version) not in afon_aws_version.stdout
+    - name: Hold awscli, so that upgrades leave it alone
+      ansible.builtin.dpkg_selections:
+        name: awscli
+        selection: hold
 
-    - name: Run the aws cli installer
-      ansible.builtin.command: /tmp/aws/install --update
-      register: afon_aws_install
-      changed_when: afon_aws_install.rc == 0
-      when: afon_aws_version.rc != 0 or ('aws-cli/' ~ awscli_version) not in afon_aws_version.stdout
-
-    - name: Remove the aws cli installer
+    # What an earlier version of this role installed with the aws installer, which would shadow the apt awscli.
+    - name: Remove the aws cli installed with the aws installer
       ansible.builtin.file:
-        path: /tmp/aws
+        path: "{{ item }}"
         state: absent
+      loop:
+        - /usr/local/bin/aws
+        - /usr/local/bin/aws_completer
+        - /usr/local/aws-cli
 
 - name: Install the azure cli
   when: install_azurecli | bool
@@ -53,6 +51,7 @@
         name: "azure-cli={{ azurecli_version }}*"
         state: present
         allow_downgrade: true
+        allow_change_held_packages: true
 
     - name: Hold azure-cli, so that upgrades leave it alone
       ansible.builtin.dpkg_selections:
@@ -87,6 +86,7 @@
           - "google-cloud-cli-gke-gcloud-auth-plugin={{ gcloud_version }}*"
         state: present
         allow_downgrade: true
+        allow_change_held_packages: true
 
     - name: Hold google-cloud-cli and its gke auth plugin, so that upgrades leave them alone
       ansible.builtin.dpkg_selections:
@@ -96,42 +96,10 @@
         - google-cloud-cli
         - google-cloud-cli-gke-gcloud-auth-plugin
 
-- name: Install kubectl {{ kubectl_version }}
-  when: install_kubectl | bool
-  block:
-    - name: Check the installed kubectl version
-      ansible.builtin.command: kubectl version --client
-      register: afon_kubectl_version
-      changed_when: false
-      failed_when: false
-
-    - name: Download kubectl
-      ansible.builtin.get_url:
-        url: "{{ kubectl_url }}"
-        dest: /usr/local/bin/kubectl
-        owner: root
-        group: root
-        mode: "0755"
-        force: true
-      when: "afon_kubectl_version.rc != 0 or ('Client Version: ' ~ kubectl_version) not in afon_kubectl_version.stdout"
-
-- name: Install opentofu {{ opentofu_version }}
-  when: install_opentofu | bool
-  block:
-    - name: Check the installed opentofu version
-      ansible.builtin.command: tofu --version
-      register: afon_tofu_version
-      changed_when: false
-      failed_when: false
-
-    - name: Download and unpack opentofu
-      ansible.builtin.unarchive:
-        src: "{{ opentofu_url }}"
-        dest: /usr/local/bin
-        remote_src: true
-        include:
-          - tofu
-        owner: root
-        group: root
-        mode: "0755"
-      when: afon_tofu_version.rc != 0 or ('OpenTofu v' ~ opentofu_version) not in afon_tofu_version.stdout
+- name: Install the release binaries
+  when: install_release_binaries | bool
+  ansible.builtin.include_tasks: release_binary.yml
+  loop: "{{ release_binaries }}"
+  loop_control:
+    loop_var: afon_bin
+    label: "{{ afon_bin.name }} {{ afon_bin.version }}"

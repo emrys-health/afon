@@ -9,6 +9,24 @@
     name: "{{ shell_tools_packages }}"
     state: present
 
+# The apt version of git has the epoch 1.
+- name: Install git {{ git_version }} and jq {{ jq_version }}
+  ansible.builtin.apt:
+    name:
+      - "git=1:{{ git_version }}*"
+      - "jq={{ jq_version }}*"
+    state: present
+    allow_downgrade: true
+    allow_change_held_packages: true
+
+- name: Hold git and jq, so that upgrades leave them alone
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - git
+    - jq
+
 - name: Create the apt keyrings dir used by the docker/cloud repos
   ansible.builtin.file:
     path: /etc/apt/keyrings

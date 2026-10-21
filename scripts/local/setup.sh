@@ -32,15 +32,22 @@ install_bin(){
   fi
 }
 
+# Sets the variables used by the download urls, which the caller declares local: ${version} (pinned for the tool), ${os}
+# (linux or darwin), ${Os} (capitalised), ${arch} (amd64 or arm64), ${arch2} (x86_64 or arm64) and ${arch3} (x86_64 or aarch64).
+release_vars(){
+  version=$(pinned_version "$1")
+  os=$(bin_os); arch=$(bin_arch) || return 1
+  Os="$(echo "${os:0:1}" | tr '[:lower:]' '[:upper:]')${os:1}"
+  if [ "$arch" == amd64 ]; then arch2=x86_64; arch3=x86_64; else arch2=arm64; arch3=aarch64; fi
+}
+
 # Installs the pinned release binary of the tool, unless it is already at the pinned version.
 #   $1 tool, $2 url, $3 kind of download: raw, tgz or zip, $4 the binary within the archive, if one
-# The url can use ${version}, ${os}, ${arch}, ${Os} (capitalised os) and ${arch2} (x86_64 or arm64), which are set here.
+# The url and the binary can use the variables set by release_vars.
 install_release_binary(){
-  local tool=$1 url=$2 kind=$3 member=${4:-} os arch version Os arch2 dir
+  local tool=$1 url=$2 kind=$3 member=${4:-} os arch version Os arch2 arch3 dir
   check_tool_version "$tool" >/dev/null && return 0
-  os=$(bin_os); arch=$(bin_arch) || return 1; version=$(pinned_version "$tool")
-  Os="$(echo "${os:0:1}" | tr '[:lower:]' '[:upper:]')${os:1}"
-  [ "$arch" == amd64 ] && arch2=x86_64 || arch2=arm64
+  release_vars "$tool" || return 1
   url=$(eval echo "$url")
   member=$(eval echo "$member")
   dir=$(mktemp -d)
@@ -52,6 +59,20 @@ install_release_binary(){
   local rc=$?
   rm -rf "$dir"
   return $rc
+}
+
+# The github cli.
+install_gh(){
+  local kind=tgz ext=tar.gz Os=linux
+  [ "$(bin_os)" == darwin ] && { kind=zip; ext=zip; Os=macOS; }
+  install_release_binary gh 'https://github.com/cli/cli/releases/download/v${version}/gh_${version}_'$Os'_${arch}.'$ext $kind 'gh_${version}_'$Os'_${arch}/bin/gh'
+}
+
+# The docker client.  The engine, ie docker desktop, colima or dockerd, is a prerequisite.
+install_docker(){
+  local path=linux
+  [ "$(bin_os)" == darwin ] && path=mac
+  install_release_binary docker 'https://download.docker.com/'$path'/static/stable/${arch3}/docker-${version}.tgz' tgz docker/docker
 }
 
 install_eksctl(){
@@ -82,7 +103,7 @@ install_hubble(){
   install_release_binary hubble 'https://github.com/cilium/hubble/releases/download/v${version}/hubble-${os}-${arch}.tar.gz' tgz hubble
 }
 
-# jq, from its release binary where brew would give another version than the pinned one.  On linux apt provides it.
+# jq, from its release binary.
 install_jq(){
   local jqos=$(bin_os)
   [ "$jqos" == darwin ] && jqos=macos
@@ -93,51 +114,6 @@ install_jq(){
 # latest version, and brew's kubelogin is another tool (int128's OIDC plugin), so Azure's pinned release binary is installed.
 install_kubelogin(){
   install_release_binary kubelogin 'https://github.com/Azure/kubelogin/releases/download/v${version}/kubelogin-${os}-${arch}.zip' zip 'bin/${os}_${arch}/kubelogin'
-}
-
-# The aws cli from its own installers, as the apt package lags well behind the pinned version and brew's is the current one.
-install_awscli(){
-  local version dir rc
-  check_tool_version aws >/dev/null && return 0
-  version=$(pinned_version aws)
-  dir=$(mktemp -d)
-  echo "Installing aws cli $version: this requires sudo, so you may be asked for your password"
-  if [ "$(bin_os)" == darwin ]; then
-    curl -fsSL -o "$dir/aws.pkg" "https://awscli.amazonaws.com/AWSCLIV2-${version}.pkg" && sudo installer -pkg "$dir/aws.pkg" -target /
-  else
-    curl -fsSL -o "$dir/aws.zip" "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m)-${version}.zip" \
-      && unzip -oq "$dir/aws.zip" -d "$dir" && sudo "$dir/aws/install" --update
-  fi
-  rc=$?
-  rm -rf "$dir"
-  return $rc
-}
-
-# The google cloud sdk on macos, from its pinned tarball, as brew offers only the current version.
-# On linux it is installed by apt, and the gke auth plugin, needed by kubectl to authenticate to GKE, from its own package,
-# since a gcloud installed by apt has its component manager disabled.
-install_gcloud_macos(){
-  local version arch sdk="${GCLOUD_HOME:-$HOME}/google-cloud-sdk"
-  check_tool_version gcloud >/dev/null && return 0
-  version=$(pinned_version gcloud)
-  arch=$(bin_arch) || return 1
-  [ "$arch" == amd64 ] && arch=x86_64 || arch=arm
-  curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${version}-darwin-${arch}.tar.gz" | tar -xz -C "$(dirname "$sdk")" \
-    && "$sdk/install.sh" --quiet --usage-reporting=false --path-update=false --command-completion=false \
-    && install_bin "$sdk/bin/gcloud" gcloud link
-}
-
-install_gke_auth_plugin_linux(){
-  apt_install_pinned google-cloud-cli-gke-gcloud-auth-plugin gcloud
-}
-
-install_gke_auth_plugin_macos(){
-  local sdk
-  gcloud components install gke-gcloud-auth-plugin --quiet || return 1
-  # The plugin is installed in the SDK's own bin dir, which is not on the PATH: kubectl and the afon scripts
-  # would not find it.
-  sdk=$(gcloud info --format='value(installation.sdk_root)')
-  install_bin "$sdk/bin/gke-gcloud-auth-plugin" gke-gcloud-auth-plugin link
 }
 
 # Installs the apt package at the version pinned for the tool, ie the newest available version starting with the pin,
@@ -164,18 +140,36 @@ brew_install_pinned(){
   local formula=$1 tool=$2
   brew install "$formula" || return 1
   if check_tool_version "$tool" >/dev/null; then
-    brew list --pinned | grep -qx "${formula##*/}" || brew pin "$formula"
+    brew list --pinned | grep -qx "${formula##*/}" || brew pin "$formula" 2>/dev/null || echo "WARNING: brew $formula cannot be pinned, as it is a cask" >&2
   else
     echo "WARNING: brew $formula is not at pinned version $(pinned_version "$tool"), not pinning it" >&2
   fi
 }
 
-# Installs each package of "package:tool" pairs with the given installer function.
-install_pinned(){
-  local installer=$1 pair; shift
-  for pair in "$@"; do
-    $installer "${pair%%:*}" "${pair##*:}"
-  done
+# git, java, maven and the cloud clis come from apt or brew; the cloud clis need python, which they bring with them.
+#   $1 apt package, $2 brew formula or cask, $3 tool
+install_package(){
+  case $SETUP_OS in
+    linux|GNU/Linux) apt_install_pinned "$1" "$3" ;;
+    macos|arm64) brew_install_pinned "$2" "$3" ;;
+  esac
+}
+
+# The gke auth plugin, needed by kubectl to authenticate to GKE, of the same version as gcloud: its own package on linux, as a gcloud
+# installed by apt has its component manager disabled, and a gcloud component on macos.
+install_gke_auth_plugin(){
+  local sdk
+  command -v gke-gcloud-auth-plugin >/dev/null && return 0
+  case $SETUP_OS in
+    linux|GNU/Linux) apt_install_pinned google-cloud-cli-gke-gcloud-auth-plugin gcloud ;;
+    macos|arm64)
+      gcloud components install gke-gcloud-auth-plugin --quiet || return 1
+      # brew links only gcloud, bq and gsutil into its bin dir, so the plugin, installed in the SDK's own bin dir, would not be on
+      # the PATH: kubectl and the afon scripts would not find it.
+      sdk=$(gcloud info --format='value(installation.sdk_root)')
+      install_bin "$sdk/bin/gke-gcloud-auth-plugin" gke-gcloud-auth-plugin link
+      ;;
+  esac
 }
 
 # Adds the apt repo, with its signing key, unless already there.  The list and keyring file names are the same as those of the
@@ -191,70 +185,67 @@ add_apt_repo(){
   sudo apt update
 }
 
-add_docker_repo_linux(){
-  add_apt_repo docker docker https://download.docker.com/linux/ubuntu/gpg https://download.docker.com/linux/ubuntu "$(lsb_release -cs) stable"
-}
-
 add_google_repo_linux(){
   add_apt_repo google-cloud-sdk cloud.google https://packages.cloud.google.com/apt/doc/apt-key.gpg https://packages.cloud.google.com/apt "cloud-sdk main"
 }
 
 add_azure_repo_linux(){
-  add_apt_repo azure-cli microsoft https://packages.microsoft.com/keys/microsoft.asc https://packages.microsoft.com/repos/azure-cli/ "$(lsb_release -cs) main"
+  add_apt_repo azure-cli microsoft https://packages.microsoft.com/keys/microsoft.asc https://packages.microsoft.com/repos/azure-cli/ "$(. /etc/os-release; echo $VERSION_CODENAME) main"
+}
+
+require_commands(){
+  local command missing=
+  for command in "$@"; do
+    command -v "$command" >/dev/null || missing="$missing $command"
+  done
+  if [ -n "$missing" ]; then
+    echo "ERROR: local-setup requires:$missing" >&2
+    return 1
+  fi
+}
+
+is_linux(){
+  [ "$(bin_os)" == linux ]
+}
+
+# The tools come from release downloads, with curl, except git, java, maven and the cloud clis, which come from apt or brew.
+setup_tools(){
+  install_package git git git
+  install_package openjdk-17-jdk openjdk@17 java
+  install_package maven maven mvn
+  install_gh
+  install_docker
+  install_jq
+  install_hubble
+  install_kubectl
+  install_tofu
+  install_yq
+  install_helm
+  if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then
+    install_package awscli awscli aws
+    install_eksctl
+  fi
+  if [ -z "$CLOUD" ] || [ "$CLOUD" == "azure" ]; then
+    is_linux && add_azure_repo_linux
+    install_package azure-cli azure-cli az
+    install_kubelogin
+  fi
+  if [ -z "$CLOUD" ] || [ "$CLOUD" == "gcp" ]; then
+    is_linux && add_google_repo_linux
+    install_package google-cloud-cli gcloud-cli gcloud
+    install_gke_auth_plugin
+  fi
 }
 
 case $SETUP_OS in
-  linux|GNU/Linux)
-    sudo apt install curl unzip lsb-release ca-certificates
-    add_docker_repo_linux
-    install_pinned apt_install_pinned gh:gh docker-ce:docker docker-ce-cli:docker git:git openjdk-17-jdk:java maven:mvn jq:jq
-    install_hubble
-    install_kubectl
-    install_tofu
-    install_yq
-    install_helm
-    if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then
-      install_awscli
-      install_eksctl
-    fi
-    if [ -z "$CLOUD" ] || [ "$CLOUD" == "azure" ]; then
-      add_azure_repo_linux
-      install_pinned apt_install_pinned azure-cli:az
-      install_kubelogin
-    fi
-    if [ -z "$CLOUD" ] || [ "$CLOUD" == "gcp" ]; then
-      add_google_repo_linux
-      install_pinned apt_install_pinned google-cloud-cli:gcloud
-      install_gke_auth_plugin_linux
-    fi
-    ;;
-  macos|arm64)
-    brew install gh
-    install_pinned brew_install_pinned docker:docker git:git openjdk@17:java maven:mvn
-    install_jq
-    install_hubble
-    install_kubectl
-    install_tofu
-    install_yq
-    install_helm
-    if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then
-      install_awscli
-      install_eksctl
-    fi
-    if [ -z "$CLOUD" ] || [ "$CLOUD" == "azure" ]; then
-      install_pinned brew_install_pinned azure-cli:az
-      install_kubelogin
-    fi
-    if [ -z "$CLOUD" ] || [ "$CLOUD" == "gcp" ]; then
-      install_gcloud_macos
-      install_gke_auth_plugin_macos
-    fi
+  linux|GNU/Linux|macos|arm64)
+    require_commands curl tar unzip && setup_tools
     ;;
   *)
     echo "Setup not supported for $SETUP_OS"
     ;;
 esac
 
-# Check the result against the pinned versions, as brew installs only its current ones.
+# Check the result against the pinned versions.
 echo "Checking installed versions against pinned ones (scripts/local/pinned.sh)"
 check_tool_versions $(pinned_tools) || echo "Some tools are missing or differ from the pinned versions: install the pinned versions manually."

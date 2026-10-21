@@ -12,24 +12,24 @@ To set up on a given OS, run:
 afon-cli.sh local-setup -c <cloud>
 ```
 
-The following packages are installed:
+Git, java, maven and the cloud clis are installed with apt (linux) or brew (macOS):
 - git
-- jdk
+- jdk (openjdk 17)
 - maven
-- docker
-- opentofu
-- kubernetes-cli
-- jq
-- yq
-- helm
-- awscli eksctl
-- azure-cli kubelogin
-- google-cloud-cli gke-gcloud-auth-plugin
+- awscli
+- azure-cli
+- google-cloud-cli gke-gcloud-auth-plugin (on linux Google's apt repo is added if missing)
+
+All the other tools are downloaded with `curl` (needing `curl`, `tar` and `unzip`):
+- gh
+- docker (the client only: the engine, ie Docker Desktop, Colima or dockerd, is a prerequisite)
+- opentofu, kubectl, hubble, jq, yq, helm
+- eksctl, kubelogin
 
 Of the cloud cli packages, only the ones relative to the `<cloud>` specified are installed.
 If no `<cloud>` is specified all are installed.
 
-**NOTE:** JDK 17 is currently enforced by the Maven build.
+**NOTE:** JDK 17 is currently enforced by the Maven build.  Brew's `openjdk@17` is keg-only, so it is not linked into the PATH: set `JAVA_HOME` to its location (`$(brew --prefix openjdk@17)`).
 
 To show what is currently installed, checked against the pinned versions:
 ```shell
@@ -37,21 +37,18 @@ afon-cli.sh local-versions -c <cloud>
 ```
 
 The tool versions are pinned in `scripts/local/pinned.sh`, to make local setups reproducible.
-`local-setup` installs the pinned version where it can:
-- apt: installs `package=<pinned version>` (the newest available version starting with the pin) and holds it with `apt-mark hold`.
-  Docker's, Google's and Azure's apt repos are added if missing;
-- brew: installs the formula and runs `brew pin` if it is at the pinned version, otherwise warns.
-  Brew only offers the current version of a formula, so use a versioned formula (eg `openjdk@17`) or a tap if an older one is needed;
-- release binaries, on both linux and macOS, for the tools that apt or brew do not offer at the pinned version:
-  kubectl, tofu, hubble, yq, helm, eksctl, kubelogin, the aws cli, and on macOS also jq and the google cloud sdk.
-  Each is installed in `/usr/local/bin` (override with `BIN_DIR`), only if not already at the pinned version.
-  A brew copy of the same tool earlier on the PATH shadows it: `local-setup` warns, so `brew uninstall` it.
+`local-setup` installs the pinned version of each tool, unless it is already at that version:
+- downloaded binaries are put in `/usr/local/bin` (override with `BIN_DIR`, using `sudo` if it is not writable);
+- apt packages are installed as `package=<pinned version>` and held with `apt-mark hold`;
+- brew formulae are pinned with `brew pin` once at the pinned version, otherwise a warning is printed, as brew only offers the
+  current version.  A cask, ie gcloud, cannot be pinned.
+
+Another copy of a tool earlier on the PATH, eg brew's, shadows the pinned one: `local-setup` warns, so remove it (eg `brew uninstall`).
 
 It ends by checking the installed versions against the pins.
 `local-versions` reports each tool as `OK`, `MISMATCH`, `MISSING` or `UNPINNED`.
-A pin is a version prefix, eg `17` for java matches any 17.x.
-As apt and brew offer different versions, a pin can be overridden per platform, eg `PINNED_git_linux`.
-On linux docker is installed as `docker-ce`, from Docker's apt repo.
+A pin is a version prefix, eg `17.0.20` for java matches any 17.0.20.x.
+A pin can be overridden per platform, eg `PINNED_git_linux`, as apt and brew offer different versions of git and the cloud clis.
 
 ## Docker 
 

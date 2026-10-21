@@ -1,0 +1,51 @@
+---
+# Installs one of the release_binaries, unless it already prints the pinned version.
+- name: Check the installed {{ afon_bin.name }} version
+  ansible.builtin.command: "{{ afon_bin.check }}"
+  register: afon_bin_version
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Install {{ afon_bin.name }} {{ afon_bin.version }}
+  when: afon_bin_version.rc != 0 or (afon_bin.version ~ '') not in (afon_bin_version.stdout ~ afon_bin_version.stderr)
+  block:
+    - name: Download {{ afon_bin.name }}
+      ansible.builtin.get_url:
+        url: "{{ afon_bin.url }}"
+        dest: "/usr/local/bin/{{ afon_bin.name }}"
+        owner: root
+        group: root
+        mode: "0755"
+        force: true
+      when: afon_bin.kind == 'raw'
+
+    - name: Download and unpack {{ afon_bin.name }}
+      when: afon_bin.kind != 'raw'
+      block:
+        - name: Create a dir to unpack {{ afon_bin.name }} in
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: afon-
+          register: afon_bin_dir
+
+        - name: Unpack {{ afon_bin.name }}
+          ansible.builtin.unarchive:
+            src: "{{ afon_bin.url }}"
+            dest: "{{ afon_bin_dir.path }}"
+            remote_src: true
+
+        - name: Install {{ afon_bin.name }}
+          ansible.builtin.copy:
+            src: "{{ afon_bin_dir.path }}/{{ afon_bin.member }}"
+            dest: "/usr/local/bin/{{ afon_bin.name }}"
+            remote_src: true
+            owner: root
+            group: root
+            mode: "0755"
+      always:
+        - name: Remove the dir {{ afon_bin.name }} was unpacked in
+          ansible.builtin.file:
+            path: "{{ afon_bin_dir.path }}"
+            state: absent
+          when: afon_bin_dir.path is defined

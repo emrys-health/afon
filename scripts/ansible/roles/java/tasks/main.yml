@@ -29,11 +29,20 @@
         name: "temurin-{{ java_major_version }}-jdk"
         state: present
 
-- name: Install the OpenJDK from the distro packages
+# Pinned to the version in scripts/local/pinned.sh, and held.
+- name: Install the OpenJDK {{ java_version }} from the distro packages
   when: java_distribution == 'openjdk'
   ansible.builtin.apt:
-    name: "openjdk-{{ java_major_version }}-jdk"
+    name: "openjdk-{{ java_major_version }}-jdk={{ java_version }}*"
     state: present
+    allow_downgrade: true
+    allow_change_held_packages: true
+
+- name: Hold the OpenJDK, so that upgrades leave it alone
+  when: java_distribution == 'openjdk'
+  ansible.builtin.dpkg_selections:
+    name: "openjdk-{{ java_major_version }}-jdk"
+    selection: hold
 
 - name: Resolve JAVA_HOME from the installed javac
   ansible.builtin.shell:

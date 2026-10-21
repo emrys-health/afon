@@ -1,36 +1,23 @@
 ---
-# The distro maven package lags well behind, so maven comes from the Apache
-# archive, unpacked under /opt and exposed on the default systemd PATH via
-# /usr/local/bin — which is how the runner service finds it.
-- name: Download and unpack maven {{ maven_version }}
-  ansible.builtin.unarchive:
-    src: "{{ maven_url }}"
-    dest: "{{ maven_install_dir }}"
-    remote_src: true
-    owner: root
-    group: root
-    checksum: "{{ maven_checksum | default(omit, true) }}"
-    creates: "{{ maven_install_dir }}/apache-maven-{{ maven_version }}/bin/mvn"
+# Maven comes from apt at the version pinned in scripts/local/pinned.sh, and held, as `afon-cli.sh local-setup` does on linux.
+- name: Install maven {{ maven_version }}
+  ansible.builtin.apt:
+    name: "maven={{ maven_version }}*"
+    state: present
+    allow_downgrade: true
+    allow_change_held_packages: true
 
-- name: Link {{ maven_home }} to the installed version
+- name: Hold maven, so that upgrades leave it alone
+  ansible.builtin.dpkg_selections:
+    name: maven
+    selection: hold
+
+# What an earlier version of this role installed from the Apache archive, which would shadow the apt maven.
+- name: Remove the maven installed from the Apache archive
   ansible.builtin.file:
-    src: "{{ maven_install_dir }}/apache-maven-{{ maven_version }}"
-    dest: "{{ maven_home }}"
-    state: link
-
-- name: Put mvn on the PATH
-  ansible.builtin.file:
-    src: "{{ maven_home }}/bin/mvn"
-    dest: /usr/local/bin/mvn
-    state: link
-
-- name: Export MAVEN_HOME for login shells
-  ansible.builtin.copy:
-    dest: /etc/profile.d/afon-maven.sh
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      # Managed by scripts/ansible/runner-setup.yml
-      export MAVEN_HOME={{ maven_home }}
-      export PATH="$MAVEN_HOME/bin:$PATH"
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/local/bin/mvn
+    - /opt/maven
+    - /etc/profile.d/afon-maven.sh
