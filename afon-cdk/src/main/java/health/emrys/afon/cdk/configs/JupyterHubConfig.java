@@ -144,6 +144,11 @@ public class JupyterHubConfig {
     public static final Map<String, String> USER_POD_LABELS =
         Map.of(SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE);
 
+    /**
+     * Label of the user's OIDC {@code sub}, stamped when any {@link #auditPodLabels audit label} is.
+     */
+    static final String AUDIT_USER_LABEL = "audit/user-id";
+
     private static final String TLS_SECRET_NAME = "jupyter-secret";
 
     private final   TerraformStack                stack;
@@ -461,7 +466,7 @@ public class JupyterHubConfig {
         String issuer = properties.getValue(AfonProperty.OIDC_ISSUER_URL);
         logger.info("login at: https://{}/", jupyterDomain());
         return """
-               import os, json, time
+               import os, json, re, time
                from urllib.request import urlopen
 
                def _discover(url, deadline_s=600, interval_s=5):
@@ -518,6 +523,11 @@ public class JupyterHubConfig {
                # Stamp every spawned pod so the egress NetworkPolicy (NetworkConfig) selects it. The
                # per-user guacamole-user label is added on top of this by the auth_state hook below.
                c.KubeSpawner.extra_labels = {'%14$s': '%15$s'}
+               # The workspace identity, for an auditor, if configured.
+               _AUDIT_LABELS = {%16$s}
+               c.KubeSpawner.extra_labels.update(_AUDIT_LABELS)
+               # A valid Kubernetes label value.
+               _LABEL_VALUE = re.compile('[A-Za-z0-9]([A-Za-z0-9._-]{0,61}[A-Za-z0-9])?')
                
                # --- OIDC login against the same provider oauth2-proxy uses. JupyterHub is the OAuth
                #     client itself (not DummyAuthenticator) so it can capture each user's token via
@@ -543,11 +553,18 @@ public class JupyterHubConfig {
                _GUAC_SLUGS = {%12$s}
                
                async def _on_spawn(spawner, auth_state):
+                   spawner.extra_labels = dict(spawner.extra_labels or {})
                    # Label the pod with the user's slug so their guac-vnc-<slug> Service selects it.
                    slug = _GUAC_SLUGS.get(spawner.user.name)
                    if slug:
-                       spawner.extra_labels = dict(spawner.extra_labels or {})
                        spawner.extra_labels['%8$s'] = slug
+                   # The sub rather than the email, as it is opaque to whoever can read the pod's labels.
+                   if _AUDIT_LABELS:
+                       sub = ((auth_state or {}).get('oauth_user') or {}).get('sub') or ''
+                       if _LABEL_VALUE.fullmatch(sub):
+                           spawner.extra_labels['%17$s'] = sub
+                       else:
+                           spawner.log.warning('No OIDC sub usable as a label for %%s', spawner.user.name)
                    # Inject the user's OIDC token, read by the Spark Connector and Polaris.
                    if auth_state:
                        spawner.environment['OIDC_TOKEN'] = auth_state.get('access_token', '')
@@ -563,7 +580,37 @@ public class JupyterHubConfig {
             pythonSetOf(userProvider.getUsers().stream().map(AfonUser::email).toList()),
             pythonSlugMap(),
             URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8),
-            SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE);
+            SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE,
+            pythonDictOf(auditPodLabels(properties)), AUDIT_USER_LABEL);
+    }
+
+    /**
+     * The labels identifying the workspace to an auditor, one per {@code AUDIT_*} property set.
+     */
+    static Map<String, String> auditPodLabels(AfonPropertyProvider properties) {
+        Map<String, AfonProperty> labelProperties = Map.of(
+            "audit/ae-id", AfonProperty.AUDIT_AE_ID,
+            "audit/project-id", AfonProperty.AUDIT_PROJECT_ID,
+            "audit/commissioning-organization-id", AfonProperty.AUDIT_COMMISSIONING_ORGANIZATION_ID,
+            "audit/tre-id", AfonProperty.AUDIT_TRE_ID);
+        Map<String, String> labels = new TreeMap<>();
+        labelProperties.forEach((label, property) -> {
+            String value = properties.getValue(property, "");
+            if (value != null && !value.isBlank()) {
+                labels.put(label, value);
+            }
+        });
+        return labels;
+    }
+
+    /**
+     * Renders a Python dict literal body (no braces): {@code 'a': '1', 'b': '2'}.
+     */
+    private static String pythonDictOf(Map<String, String> entries) {
+        return entries.entrySet().stream()
+                      .map(e -> "'" + e.getKey() + "': '" + e.getValue() + "'")
+                      .reduce((a, b) -> a + ", " + b)
+                      .orElse("");
     }
 
     /**
