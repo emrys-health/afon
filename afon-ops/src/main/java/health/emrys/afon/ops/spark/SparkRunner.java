@@ -1,9 +1,6 @@
 package health.emrys.afon.ops.spark;
 
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.config.*;
 import health.emrys.afon.spark.SparkClient;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -13,6 +10,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.*;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -75,6 +73,12 @@ abstract public class SparkRunner {
             .forEach(x -> {
                 lines.add(String.format("%s %s=%s", prepend, x.getKey(), x.getValue()));
             });
+        String users = new FileUserProvider()
+            .getUsers()
+            .stream()
+            .map( x-> x.email())
+            .collect(Collectors.joining(", "));
+        lines.add(String.format("%s Configured users: %s", prepend, users));
     }
 
     protected abstract void doRun(SparkSession spark, String catalogName, String namespace, String tableName, List<String> values);
