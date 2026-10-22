@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.kube;
 
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import io.kubernetes.client.Exec;
 import io.kubernetes.client.PortForward;
@@ -27,12 +28,14 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
+import static java.lang.String.format;
 
 public class KubeClient implements AutoCloseable {
 
@@ -65,6 +68,46 @@ public class KubeClient implements AutoCloseable {
         return clusterName;
     }
 
+    /**
+     * Checks that the current kubectl context is the cluster of the cloud, ie one of the kind of that cloud's, and named after
+     * {@code CLUSTER_NAME} as its stacks name theirs, <stack>-<CLUSTER_NAME>, as acting on another cluster is not what was asked: the
+     * context is not always what it is thought to be, eg after switching env.
+     *
+     * @throws IllegalStateException if it is not
+     */
+    public void requireContextOf(AfonCloud cloud) {
+        String context = getContext();
+        boolean eks = context.startsWith("arn:aws:eks:");
+        boolean gke = context.startsWith("gke_");
+        switch (cloud) {
+            case AWS -> {
+                if (!eks) {
+                    throw wrongContext(context, "is not an EKS cluster", "the AWS one, eg with 'afon-cli.sh aws-update-kube-config tre'");
+                }
+            }
+            case GCP -> {
+                if (!gke) {
+                    throw wrongContext(context, "is not a GKE cluster", "the GCP one, eg with 'afon-cli.sh gcp-update-kube-config tre'");
+                }
+            }
+            case AZURE -> {
+                if (eks || gke) {
+                    throw wrongContext(context, "is not an AKS cluster", "the Azure one, eg with 'afon-cli.sh azure-update-kube-config tre'");
+                }
+            }
+        }
+        // the cluster is named last: arn:aws:eks:<region>:<account>:cluster/<name>, gke_<project>_<region>_<name>, else the context
+        String cluster = context.substring(Math.max(context.lastIndexOf('/'), context.lastIndexOf('_')) + 1);
+        if (clusterName != null && !clusterName.isBlank() && !cluster.equals(clusterName) && !cluster.endsWith("-" + clusterName)) {
+            throw wrongContext(context, "is not a cluster of this env, ie named " + clusterName + " or <stack>-" + clusterName,
+                               "the cluster of the stack, as CLUSTER_NAME says");
+        }
+    }
+
+    private static IllegalStateException wrongContext(String context, String problem, String pointAt) {
+        return new IllegalStateException(format("The kubectl context '%s' %s: point kubectl at %s", context, problem, pointAt));
+    }
+
     public ApiClient getApiClient() {
         return apiClient;
     }
@@ -94,6 +137,17 @@ public class KubeClient implements AutoCloseable {
 
     public static @Nullable String nameOfPod(V1Pod x) {
         return x.getMetadata().getName();
+    }
+
+    /**
+     * @return the name of a running pod of the default namespace with the label, eg {@code app=polaris}
+     */
+    public Optional<String> runningPodWithLabel(String labelSelector) throws ApiException {
+        return new CoreV1Api().listNamespacedPod("default").labelSelector(labelSelector).execute().getItems().stream()
+                              .filter(pod -> pod.getStatus() != null && "Running".equals(pod.getStatus().getPhase()))
+                              .filter(pod -> pod.getMetadata().getDeletionTimestamp() == null)
+                              .map(KubeClient::nameOfPod)
+                              .findFirst();
     }
 
     public List<V1Pod> listPods() throws ApiException {

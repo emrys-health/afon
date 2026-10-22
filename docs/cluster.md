@@ -161,13 +161,18 @@ tofu output egressIp
 ```
 
 That IP is released again by `tofu destroy`, so the next deployment gets a different address.  To
-keep one address across rebuilds, allocate an Elastic IP outside the stack:
+keep one address across rebuilds, allocate an Elastic IP outside the stack with `aws-egress-ip`, which is idempotent and
+allocates it in `AWS_REGION`, tagged with the Name `afon-egress-ip`:
 
 ```shell
-aws ec2 allocate-address --domain vpc
+afon-cli.sh aws-egress-ip create
 ```
 
-and set it in `afon-aws.properties`:
+(`afon-cli.sh aws-egress-ip show` prints it again, and `create <name>` or `show <name>` use a name other than the default.) It runs
+`aws ec2 allocate-address --domain vpc` and warns if an existing one is not a VPC address, or is already associated. The script never
+releases it, as its address may be on somebody's allow-list.
+
+Set the address it prints in `afon-aws.properties`:
 
 ```properties
 AWS_EGRESS_IP=<the allocated IP>

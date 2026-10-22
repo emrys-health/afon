@@ -135,7 +135,9 @@ public class ManagePolarisCatalogsMain {
         }
         AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
         var properties = new OpsPropertyProvider();
-        properties.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, properties).getEndpoint());
+        // the endpoint of the cloud's Polaris, unless given, eg of a port-forward to its pod
+        properties.setValue(POLARIS_ENDPOINT, System.getProperty(POLARIS_ENDPOINT.getName(),
+                                                                 new PolarisEndpoint(cloud, properties).getEndpoint()));
 
         ManagePolarisCatalogsMain app = new ManagePolarisCatalogsMain(properties);
         try {

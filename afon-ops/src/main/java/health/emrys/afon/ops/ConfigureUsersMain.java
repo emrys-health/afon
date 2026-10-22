@@ -142,7 +142,9 @@ public class ConfigureUsersMain {
             }
         } else {
             // Only the Polaris users need the Polaris endpoint, the OIDC users don't
-            propertyProvider.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, propertyProvider).getEndpoint());
+            // the endpoint of the cloud's Polaris, unless given, eg of a port-forward to its pod
+            propertyProvider.setValue(POLARIS_ENDPOINT, System.getProperty(POLARIS_ENDPOINT.getName(),
+                                                                           new PolarisEndpoint(cloud, propertyProvider).getEndpoint()));
             try {
                 if ( catalogName.equalsIgnoreCase("all") ){
                    // Not glue: "all" never included it, and createAllCatalogs no longer creates it.

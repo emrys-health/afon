@@ -160,6 +160,11 @@ public enum AfonProperty {
     POLARIS_ID("POLARIS_ID"),
     POLARIS_SECRET("POLARIS_SECRET"),
     POLARIS_ENDPOINT("POLARIS_ENDPOINT"),
+    /**
+     * How the setup steps reach the REST API of Polaris: "https" (the default) through its public domain name, or "port-forward"
+     * through a tunnel to its pod, which needs no ingress access.
+     */
+    POLARIS_ACCESS("POLARIS_ACCESS"),
     POLARIS_DB_PASSWORD("POLARIS_DB_PASSWORD"),
     POLARIS_DB_HOST("POLARIS_DB_HOST"),
     POLARIS_NAMESPACE("POLARIS_NAMESPACE"),

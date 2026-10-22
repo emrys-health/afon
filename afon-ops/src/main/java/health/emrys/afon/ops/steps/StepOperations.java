@@ -6,8 +6,6 @@ import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.*;
-import health.emrys.afon.ops.kube.KubeClient;
-import health.emrys.afon.ops.kube.tools.PolarisWhitelister;
 import health.emrys.afon.ops.snowflake.SnowflakeStatements;
 import health.emrys.afon.ops.spark.SparkRunner;
 import health.emrys.afon.ops.spark.SparkTestReader;
@@ -32,6 +30,10 @@ import static health.emrys.afon.ops.steps.DurationUtils.parseDuration;
 import static java.lang.String.format;
 
 public class StepOperations {
+
+    /** The label of the Polaris pods, and the port that they listen on, see PolarisConfig */
+    private static final String POLARIS_POD_LABEL = "app=polaris";
+    private static final int    POLARIS_PORT      = 8181;
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
 
@@ -342,9 +344,39 @@ public class StepOperations {
     }
 
     public Step createAllCatalogsFor(AfonCloud cloud) {
-        return new Step(format("create_all_catalogs_for_cloud_%s", cloud),
+        return callingPolaris(cloud, format("create_all_catalogs_for_cloud_%s", cloud),
                 format("create all Polaris catalogs for cloud `%s`", cloud),
-                () -> actions.createAllCatalogsFor(cloud));
+                endpoint -> actions.createAllCatalogsFor(cloud, endpoint));
+    }
+
+    /**
+     * A step calling Polaris from this machine, ie not from the cluster, which the ingress may restrict: the action is given the
+     * endpoint of a port-forward to a Polaris pod if {@link AfonProperty#POLARIS_ACCESS} says so, else {@code null}, for the public
+     * domain name.
+     */
+    private Step callingPolaris(AfonCloud cloud, String name, String description, StepActions.PortForwardCall action) {
+        return new Step(name, description, () -> {
+            if (polarisViaPortForward()) {
+                actions.withPortForward(cloud, properties, POLARIS_POD_LABEL, POLARIS_PORT, action);
+            } else {
+                action.run(null);
+            }
+        });
+    }
+
+    /**
+     * Whether the steps reach Polaris through a tunnel to its pod, as {@link AfonProperty#POLARIS_ACCESS} says, instead of through
+     * its public domain name.
+     */
+    private boolean polarisViaPortForward() {
+        String access = properties.getValue(POLARIS_ACCESS, "https");
+        if (access == null || access.isBlank() || access.equalsIgnoreCase("https")) {
+            return false;
+        }
+        if (access.equalsIgnoreCase("port-forward")) {
+            return true;
+        }
+        throw new IllegalArgumentException(format("%s should be 'https' or 'port-forward', not '%s'", POLARIS_ACCESS, access));
     }
 
     public Step configureOidcUsersFor(AfonCloud cloud) {
@@ -394,11 +426,7 @@ public class StepOperations {
             format("whitelist_polaris_for_%s%s", cloud, withCaller ? "_with_caller" : ""),
             withCaller ? "Admit this machine, besides the configured CIDRs, to Polaris"
                        : "Restrict Polaris to the configured CIDRs and the cluster's own addresses",
-            () -> {
-                try (KubeClient client = new KubeClient(properties)) {
-                    new PolarisWhitelister(cloud, properties, client).set(withCaller, Optional.empty());
-                }
-            });
+            () -> actions.whitelistPolaris(cloud, withCaller, properties));
     }
 
     private String toCidrWithPrefix32(AfonProperty value) {
@@ -425,11 +453,9 @@ public class StepOperations {
     }
 
     private @NonNull Step configurePolarisUsers(AfonCloud cloud, AfonCatalog catalog) {
-        return new Step(format("configure_polaris_users_on_catalog_%s_for_cloud_%s", catalog, cloud),
+        return callingPolaris(cloud, format("configure_polaris_users_on_catalog_%s_for_cloud_%s", catalog, cloud),
                 format("configure Polaris users on catalog `%s` for cloud `%s`", catalog, cloud),
-                () -> {
-                    actions.configurePolarisUsersFor(cloud, catalog);
-                });
+                endpoint -> actions.configurePolarisUsersFor(cloud, catalog, endpoint));
     }
 
     public Step createExternalCatalogFor(AfonCloud cloud) {
@@ -536,11 +562,10 @@ public class StepOperations {
     }
 
     private @NonNull Step runSpark(String description, AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, Class<? extends SparkRunner> sparkRunner) {
-        return new Step(format("%s_spark_talks_to_catalog_%s", cloud, catalog),
+        // the Spark session is in-process, so it is this machine that calls Polaris
+        return callingPolaris(cloud, format("%s_spark_talks_to_catalog_%s", cloud, catalog),
                 format("%s `%s.%s.%s` on cloud `%s`", description, catalog, namespace, tableName, cloud),
-            () -> {
-                actions.runSpark(sparkRunner, cloud, catalog, namespace, tableName);
-            });
+                endpoint -> actions.runSpark(sparkRunner, cloud, catalog, namespace, tableName, endpoint));
     }
 
     public @NonNull Step snowflakeReadingViaAwsPolaris(AfonCatalog catalog) {

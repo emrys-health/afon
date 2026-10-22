@@ -12,6 +12,9 @@ import health.emrys.afon.config.*;
 import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
+import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.kube.tools.PolarisWhitelister;
+import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.spark.SparkRunner;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
@@ -577,23 +580,84 @@ public class StepActions {
         return p.exitValue();
     }
 
-    public void createAllCatalogsFor(AfonCloud cloud) {
+    @FunctionalInterface
+    public interface PortForwardCall {
+        /**
+         * @param endpoint where the pod is reached, ie {@code localhost:<port>} of the port-forward
+         */
+        void run(String endpoint) throws Exception;
+    }
+
+    /**
+     * Calls a pod through a port-forward, in the cluster of the current kubectl context, eg so that a service needs no access through
+     * its ingress, which may be restricted. The port-forward is closed when the call returns.
+     *
+     * @param cloud      the cloud whose cluster the current kubectl context must be
+     * @param properties the config, eg for the name of the cluster
+     * @param podLabel   the label selector of the pod to forward to, eg {@code app=polaris}: the first running pod with it
+     * @param podPort    the port that the pod listens on
+     * @param call       what to run with the endpoint of the port-forward
+     * @throws IllegalStateException if the current kubectl context is not the cluster of the cloud, or no pod has the label running
+     */
+    protected void withPortForward(AfonCloud cloud, AfonPropertyProvider properties, String podLabel, int podPort,
+                                   PortForwardCall call) throws Exception {
+        try (KubeClient client = new KubeClient(properties)) {
+            client.requireContextOf(cloud);
+            String pod = client.runningPodWithLabel(podLabel).orElseThrow(() -> new IllegalStateException(
+                format("No running pod with the label %s in the kubectl context '%s'", podLabel, client.getContext())));
+            try (PortForwarder forward = new PortForwarder(client, "default", pod, 0, podPort)) {
+                call.run("localhost:" + forward.localPort());
+            }
+        }
+    }
+
+    /**
+     * Restricts the Polaris ingress of the cluster of the current kubectl context, see {@link PolarisWhitelister}.
+     */
+    protected void whitelistPolaris(AfonCloud cloud, boolean withCaller, AfonPropertyProvider properties) throws Exception {
+        try (KubeClient client = new KubeClient(properties)) {
+            new PolarisWhitelister(cloud, properties, client).set(withCaller, Optional.empty());
+        }
+    }
+
+    /**
+     * @param polarisEndpoint the endpoint to call Polaris at, eg {@code localhost:54321} for a port-forward to its pod, or
+     *                        {@code null} for its public domain name
+     */
+    public void createAllCatalogsFor(AfonCloud cloud, String polarisEndpoint) throws Exception {
+        Properties overrides = polarisEndpointOverride(polarisEndpoint);
         try {
             executeMainOf(ManagePolarisCatalogsMain.class,
-                    new String[]{RECREATE, cloud.toString()});
+                    new String[]{RECREATE, cloud.toString()}, overrides);
         } catch (Exception e) {
-            logger.error(
-                    """
-                    Failed to delete and recreate all catalogs in Polaris for cloud `{}`.
-                    It may be because the certificates are not yet ready. 
-                    The hint is an error message such as:
-                    
-                    PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException:
-                    unable to find valid certification path to requested target
-                    
-                    If this is the case, try re-running this step.                         
-                    """, cloud, e);
+            logger.error("Failed to delete and recreate all catalogs in Polaris for cloud `{}`: {}{}",
+                         cloud, rootCauseOf(e), hintFor(e), e);
+            throw e;
         }
+    }
+
+    private static Throwable rootCauseOf(Throwable e) {
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        return root;
+    }
+
+    /**
+     * @return what to try for the failure, if it is one that is known, else nothing
+     */
+    private static String hintFor(Throwable e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause() == cause ? null : cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.contains("PKIX path building failed")) {
+                return """
+
+                       The certificate of Polaris is not trusted, which may be because it is not yet ready, if it is
+                       reached through its domain name: if so, try re-running this step.""";
+            }
+        }
+        return "";
     }
 
     public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
@@ -606,9 +670,21 @@ public class StepActions {
                 new String[]{cloud.toString()});
     }
 
-    public void configurePolarisUsersFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
+    /**
+     * @param polarisEndpoint the endpoint to call Polaris at, eg {@code localhost:54321} for a port-forward to its pod, or
+     *                        {@code null} for its public domain name
+     */
+    public void configurePolarisUsersFor(AfonCloud cloud, AfonCatalog catalog, String polarisEndpoint) throws Exception {
         executeMainOf(ConfigureUsersMain.class,
-                new String[]{cloud.toString(), catalog.toString()});
+                new String[]{cloud.toString(), catalog.toString()}, polarisEndpointOverride(polarisEndpoint));
+    }
+
+    private static Properties polarisEndpointOverride(String polarisEndpoint) {
+        Properties overrides = new Properties();
+        if (polarisEndpoint != null) {
+            overrides.setProperty(AfonProperty.POLARIS_ENDPOINT.getName(), polarisEndpoint);
+        }
+        return overrides;
     }
 
     public void deleteCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
@@ -633,9 +709,14 @@ public class StepActions {
                 new String[]{cloud.toString(), catalog.toString(), namespace, tableName, metadata});
     }
 
-    public void runSpark(Class<? extends SparkRunner> sparkRunner, AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName) throws Exception {
+    /**
+     * @param polarisEndpoint the endpoint to call Polaris at, eg {@code localhost:54321} for a port-forward to its pod, or
+     *                        {@code null} for its public domain name
+     */
+    public void runSpark(Class<? extends SparkRunner> sparkRunner, AfonCloud cloud, AfonCatalog catalog, String namespace,
+                         String tableName, String polarisEndpoint) throws Exception {
         executeMainOf(sparkRunner,
-                new String[]{cloud.toString(), catalog.toString(), namespace, tableName});
+                new String[]{cloud.toString(), catalog.toString(), namespace, tableName}, polarisEndpointOverride(polarisEndpoint));
     }
 
     public @NonNull String azureFirstFile(AfonPropertyProvider properties, String glob, boolean descendingOrder) {

@@ -3,6 +3,7 @@ package health.emrys.afon.spark;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.polaris.config.PolarisCredentials;
@@ -57,10 +58,10 @@ public class SparkClient {
     }
 
     private SparkWarehouseConfig createWarehouseConfig() {
-        logger.info("SparkConfig for Polaris endpoint {} and user {}",
-                credentials.getPolarisEndpoint(), user.username());
-        return SparkWarehouseConfigFactory.getFactory()
-                .createConfig(properties, credentials.getPolarisEndpoint(), user);
+        // the endpoint of the cloud's Polaris, unless given, eg of a port-forward to its pod
+        String endpoint = System.getProperty(AfonProperty.POLARIS_ENDPOINT.getName(), credentials.getPolarisEndpoint());
+        logger.info("SparkConfig for Polaris endpoint {} and user {}", endpoint, user.username());
+        return SparkWarehouseConfigFactory.getFactory().createConfig(properties, endpoint, user);
     }
 
 }

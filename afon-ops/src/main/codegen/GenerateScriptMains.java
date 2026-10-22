@@ -61,6 +61,7 @@ public class GenerateScriptMains {
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),
         new ScriptEntry("aws", "AwsCreateMain", "aws/create.sh", "aws"),
         new ScriptEntry("aws", "AwsDestroyMain", "aws/destroy.sh"),
+        new ScriptEntry("aws", "AwsEgressIpMain", "aws/egress-ip.sh"),
         new ScriptEntry("aws", "AwsIssueCertMain", "aws/issue-cert.sh"),
         new ScriptEntry("aws", "AwsKeycloakMain", "aws/keycloak.sh", "aws", "Keycloak"),
         new ScriptEntry("aws", "AwsLoginMain", "aws/login.sh"),

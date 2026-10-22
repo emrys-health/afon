@@ -133,7 +133,10 @@ public class PortForwarder implements AutoCloseable {
      */
     private void logErrors(InputStream podErrors) {
         try (podErrors) {
-            String errors = new String(podErrors.readAllBytes(), StandardCharsets.UTF_8);
+            byte[] bytes = podErrors.readAllBytes();
+            // the stream begins with the port, as two little-endian bytes, which is not an error
+            int start = bytes.length >= 2 && ((bytes[0] & 0xFF) | (bytes[1] & 0xFF) << 8) == remotePort ? 2 : 0;
+            String errors = new String(bytes, start, bytes.length - start, StandardCharsets.UTF_8);
             if (!errors.isBlank()) {
                 logger.warn("Port-forward error from {}/{}:{}: {}", namespace, pod, remotePort, errors);
             }

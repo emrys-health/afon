@@ -94,6 +94,21 @@ public class DocumentingStepActions extends StepActions {
         out.flush();
     }
 
+    /**
+     * Does not open a tunnel, but documents the call with a placeholder for the local port.
+     */
+    @Override
+    protected void withPortForward(AfonCloud cloud, AfonPropertyProvider properties, String podLabel, int podPort,
+                                   PortForwardCall call) throws Exception {
+        call.run(format("localhost:<port of the port-forward to the pod %s>", podLabel));
+    }
+
+    @Override
+    protected void whitelistPolaris(AfonCloud cloud, boolean withCaller, AfonPropertyProvider properties) throws ManagedProcessException {
+        run("afon-cli.sh", null, withCaller ? new String[]{"kube-polaris-whitelist", cloud.toString(), "set", "--caller"}
+                                            : new String[]{"kube-polaris-whitelist", cloud.toString(), "set"});
+    }
+
     @Override
     protected void synthesiseStack(StackId stackId, AfonPropertyProvider properties, AfonUserProvider users) throws Exception {
         run("afon-cli.sh", null, "validate-stack", stackId.toString());
