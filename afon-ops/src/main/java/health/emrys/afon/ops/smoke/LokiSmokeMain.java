@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import health.emrys.afon.cdk.components.MonitoringComponent;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
@@ -46,7 +47,7 @@ public class LokiSmokeMain {
         JsonMapper.builder().enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION).build();
 
     public static void main(String[] args) throws Exception {
-        AfonPropertyProvider properties = new OpsPropertyProvider();
+        AfonPropertyProvider properties = new FilePropertyProvider();
         LokiSmokeMain        app        = new LokiSmokeMain(properties);
         try {
             app.checkLoki(properties);
