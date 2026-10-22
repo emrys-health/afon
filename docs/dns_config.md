@@ -99,6 +99,19 @@ nameServers:
 ```
 Again, make a note.
 
+## Checking the name servers
+
+To show the name servers of the DNS zone of each domain name of a cloud, ie its Polaris and Jupyter domain names and
+`OIDC_DOMAIN_NAME`, and whether the registrar delegates the domain to them, as a public resolver sees it, run:
+```shell
+afon-cli.sh aws-dns-zones
+afon-cli.sh azure-dns-zones
+afon-cli.sh gcp-dns-zones
+```
+A domain that is not delegated to the zone of the cloud being deployed makes the deploy wait for its DNS record forever, eg when
+`OIDC_DOMAIN_NAME` is still delegated to another cloud's zone. The resolver can be changed with the env var `DNS_RESOLVER`
+(default `8.8.8.8`); it may still give the old name servers for a while after the registrar has changed them.
+
 ## Domain name registration
 
 Go to the DNS section of your domain registrar.
