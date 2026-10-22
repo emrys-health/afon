@@ -12,7 +12,7 @@ import java.util.Optional;
  * ALB and a Route 53 record on AWS, or via the nginx ingress controller and a DNS record on Azure and GCP.
  *
  * @param component        the component, eg {@code polaris} or {@code jupyter}, whose cloud-specific config the platform
- *                         reads by the convention {@code <CLOUD>_<COMPONENT>_<NAME>}, eg {@code AWS_POLARIS_CERT_ARN}
+ *                         reads by the convention {@code <CLOUD>_<COMPONENT>_<NAME>}, eg {@code AWS_POLARIS_ALLOWED_CIDRS}
  * @param domainName       the domain name the component is served at
  * @param service          the Kubernetes service routed to
  * @param port             the port of the service

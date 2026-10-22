@@ -309,11 +309,6 @@ public class StepActions {
         }
     }
 
-    protected void awsDescribeCertificate(String certArn, String region, OutputStream out) throws ManagedProcessException {
-        run("aws", null, out, "acm", "describe-certificate", "--certificate-arn", certArn,
-                "--region", region, "--query", "Certificate.Status", "--output", "text");
-    }
-
     /**
      * Synthesises the plan of the stack into its stack dir, from the config.
      * @param properties the config, which the caller has already, so that every step is validated against the same

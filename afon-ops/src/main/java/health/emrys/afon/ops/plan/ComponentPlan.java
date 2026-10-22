@@ -22,7 +22,6 @@ import java.util.Set;
  * The plan only adds, for each component the stack has:
  * <ul>
  *   <li>{@link #domains}: the exclusive resources it holds, which decide which stacks conflict;</li>
- *   <li>{@link #certificates}: the certificates to be issued before the stack is deployed;</li>
  *   <li>{@link #waitsFor}: what to wait for once the stack is deployed;</li>
  *   <li>{@link #setupSteps}: what to configure when setting the stack up;</li>
  *   <li>{@link #scenarioSteps}: the scenarios it can be asked to run on a stack that is set up, by {@code manage-stack run};</li>
@@ -35,14 +34,6 @@ import java.util.Set;
  * {@link ComponentPlanRegistry}, even if it brings nothing.
  */
 public interface ComponentPlan {
-
-    /**
-     * @return the property if the cloud is AWS, none on the other clouds, eg the certificates of the ALBs, which only AWS has, so
-     * that a component can name them without asking which cloud it is
-     */
-    static List<AfonProperty> onAws(AfonCloud cloud, AfonProperty awsProperty) {
-        return cloud == AfonCloud.AWS ? List.of(awsProperty) : List.of();
-    }
 
     /**
      * The endpoint a stack is waited for on, once deployed, which is when its DNS record has propagated.
@@ -63,15 +54,6 @@ public interface ComponentPlan {
      * None by default, ie it does not stop other stacks from running beside it.
      */
     default List<AfonProperty> domains(AfonCloud cloud) {
-        return List.of();
-    }
-
-    /**
-     * @return the properties of the certificates the component's HTTPS endpoint needs on the cloud, which must be issued
-     * before the stack is deployed, eg the ACM certificate ARN of the ALB of the Polaris DNS record on AWS.  None by default, and
-     * on the clouds that issue them in the cluster, ie that are not AWS, see {@link #onAws}.
-     */
-    default List<AfonProperty> certificates(AfonCloud cloud) {
         return List.of();
     }
 

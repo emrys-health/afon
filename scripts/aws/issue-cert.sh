@@ -1,27 +1,57 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} [all|keycloak|jupyter|polaris]"
+  echo "Usage: ${BASH_SOURCE[0]} [all|keycloak|jupyter|polaris] [--force]"
   echo "Requests a new ACM certificate (DNS validation) for the given stack's domain,"
-  echo "creates the validation CNAME in its Route53 hosted zone, and waits for ACM"
-  echo "to issue it. Domain and zone come from afon.properties/afon-aws.properties,"
+  echo "creates the validation CNAME in the Route53 hosted zone named after the domain,"
+  echo "and waits for ACM to issue it. The domains come from afon.properties/afon-aws.properties,"
   echo "same as the CDK stacks themselves use. Defaults to 'all'."
   echo ""
-  echo "Prints each new certificate's ARN - set it as the matching AWS_*_CERT_ARN"
-  echo "property in afon-aws.properties."
+  echo "A domain that already has an ISSUED certificate is skipped, so that this is safe to repeat, unless --force"
+  echo "requests a new one. ACM renews the certificates in use by itself, as long as their validation record stays."
+  echo ""
+  echo "Nothing needs to be configured with the result: the stacks look up the latest issued"
+  echo "certificate of their domain in ACM, and its hosted zone in Route53, when they are deployed."
 }
 
-NAME="${1:-all}"
+NAME="all"
+FORCE=false
+for ARG in "$@"; do
+  case "$ARG" in
+    --force) FORCE=true ;;
+    *)       NAME="$ARG" ;;
+  esac
+done
 
 # Issues one certificate: request, wait for the validation record, upsert its CNAME, then
 # block until ACM reports it issued. Exits (returning to the caller) rather than aborting the
 # whole script on failure, so 'all' can keep going and report the other domains' results too.
 issue_cert() {
-  local domain="$1" dns_zone="$2" property="$3"
+  local domain="$1" name="$2"
 
-  if [ -z "$domain" ] || [ -z "$dns_zone" ]; then
-    echo "- Domain/DNS zone for $property are blank - check afon.properties/afon-aws.properties"
+  if [ -z "$domain" ]; then
+    echo "- Domain name for $name is blank - check afon.properties/afon-aws.properties"
     return 1
+  fi
+
+  # The hosted zone is the one named after the domain, as the stacks look it up the same way
+  local dns_zone
+  dns_zone=$(aws route53 list-hosted-zones-by-name --dns-name "$domain" --max-items 1 \
+    --query "HostedZones[?Name=='$domain.'].Id | [0]" --output text) || return 1
+  if [ -z "$dns_zone" ] || [ "$dns_zone" = "None" ]; then
+    echo "- No Route53 hosted zone named $domain for $name - create it first, see docs/dns_config.md"
+    return 1
+  fi
+
+  # Skipped if the domain has an issued certificate, as the stacks look up the latest one: another would only replace it
+  if ! $FORCE; then
+    local existing
+    existing=$(aws acm list-certificates --certificate-statuses ISSUED --region "$AWS_REGION" \
+      --query "CertificateSummaryList[?DomainName=='$domain'].CertificateArn | [0]" --output text) || return 1
+    if [ -n "$existing" ] && [ "$existing" != "None" ]; then
+      echo "- $name certificate for $domain already issued: $existing, skipping (--force requests a new one)"
+      return 0
+    fi
   fi
 
   echo "- Requesting ACM certificate for $domain (DNS validation) in $AWS_REGION"
@@ -75,8 +105,8 @@ issue_cert() {
     return 1
   fi
 
-  echo "- $property issued: $cert_arn"
-  RESULTS+=("$property=$cert_arn")
+  echo "- $name certificate issued: $cert_arn"
+  RESULTS+=("$name=$cert_arn")
 }
 
 RESULTS=()
@@ -84,19 +114,19 @@ FAILED=()
 
 case "$NAME" in
   all)
-    issue_cert "$OIDC_DOMAIN_NAME"        "$AWS_KEYCLOAK_DNS_ZONE" "AWS_KEYCLOAK_CERT_ARN" || FAILED+=("AWS_KEYCLOAK_CERT_ARN")
-    issue_cert "$AWS_JUPYTER_DOMAIN_NAME" "$AWS_JUPYTER_DNS_ZONE"  "AWS_JUPYTER_CERT_ARN"  || FAILED+=("AWS_JUPYTER_CERT_ARN")
-    issue_cert "$AWS_POLARIS_DOMAIN_NAME" "$AWS_POLARIS_DNS_ZONE"  "AWS_POLARIS_CERT_ARN"  || FAILED+=("AWS_POLARIS_CERT_ARN")
+    issue_cert "$OIDC_DOMAIN_NAME" "keycloak" || FAILED+=("keycloak")
+    issue_cert "$AWS_JUPYTER_DOMAIN_NAME" "jupyter" || FAILED+=("jupyter")
+    issue_cert "$AWS_POLARIS_DOMAIN_NAME" "polaris" || FAILED+=("polaris")
     ;;
-  keycloak) issue_cert "$OIDC_DOMAIN_NAME"        "$AWS_KEYCLOAK_DNS_ZONE" "AWS_KEYCLOAK_CERT_ARN" || FAILED+=("AWS_KEYCLOAK_CERT_ARN") ;;
-  jupyter)  issue_cert "$AWS_JUPYTER_DOMAIN_NAME" "$AWS_JUPYTER_DNS_ZONE"  "AWS_JUPYTER_CERT_ARN"  || FAILED+=("AWS_JUPYTER_CERT_ARN") ;;
-  polaris)  issue_cert "$AWS_POLARIS_DOMAIN_NAME" "$AWS_POLARIS_DNS_ZONE"  "AWS_POLARIS_CERT_ARN"  || FAILED+=("AWS_POLARIS_CERT_ARN") ;;
+  keycloak) issue_cert "$OIDC_DOMAIN_NAME" "keycloak" || FAILED+=("keycloak") ;;
+  jupyter)  issue_cert "$AWS_JUPYTER_DOMAIN_NAME" "jupyter" || FAILED+=("jupyter") ;;
+  polaris)  issue_cert "$AWS_POLARIS_DOMAIN_NAME" "polaris" || FAILED+=("polaris") ;;
   *) usage; exit 1 ;;
 esac
 
 echo ""
 if [ ${#RESULTS[@]} -gt 0 ]; then
-  echo "Set these in afon-aws.properties:"
+  echo "Issued:"
   for result in "${RESULTS[@]}"; do
     echo "  $result"
   done

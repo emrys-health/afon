@@ -47,10 +47,6 @@ class ComponentPlanTest {
         assertThat(keycloak.domains(AWS)).containsExactly(OIDC_DOMAIN_NAME);
         assertThat(keycloak.waitsFor()).containsExactly(KEYCLOAK);
         assertThat(setupOf(keycloak, AWS)).containsExactly("configureOidcUsersFor(aws)");
-        // only AWS has certificates for its load balancers
-        assertThat(keycloak.certificates(AWS)).containsExactly(AWS_KEYCLOAK_CERT_ARN);
-        assertThat(keycloak.certificates(AZURE)).isEmpty();
-        assertThat(keycloak.certificates(GCP)).isEmpty();
     }
 
     @Ignore("brittle test")
@@ -65,18 +61,15 @@ class ComponentPlanTest {
         // the order matters: the catalogs need the OIDC users, and the Polaris users need the catalogs
         assertThat(setupOf(polaris, GCP)).containsExactly(
             "configureOidcUsersFor(gcp)", "createAllCatalogsFor(gcp)", "configurePolarisUsersOnAllCatalogsFor(gcp)");
-        assertThat(polaris.certificates(AWS)).containsExactly(AWS_POLARIS_CERT_ARN);
-        assertThat(polaris.certificates(AZURE)).isEmpty();
     }
 
     @Test
-    void jupyterHoldsTheDomainOfItsCloudAndNeedsItsCertificateOnAws() {
+    void jupyterHoldsTheDomainOfItsCloud() {
         JupyterPlan jupyter = new JupyterPlan();
 
         assertThat(jupyter.label()).isEqualTo("Jupyter");
         assertThat(jupyter.domains(AWS)).containsExactly(AWS_JUPYTER_DOMAIN_NAME);
         assertThat(jupyter.domains(AZURE)).containsExactly(AZURE_JUPYTER_DOMAIN_NAME);
-        assertThat(jupyter.certificates(AWS)).containsExactly(AWS_JUPYTER_CERT_ARN);
         assertThat(jupyter.waitsFor()).isEmpty();
         assertThat(setupOf(jupyter, AWS)).isEmpty();
     }
@@ -97,7 +90,6 @@ class ComponentPlanTest {
 
         for (AfonCloud cloud : AfonCloud.values()) {
             assertThat(infrastructure.domains(cloud)).isEmpty();
-            assertThat(infrastructure.certificates(cloud)).isEmpty();
             assertThat(setupOf(infrastructure, cloud)).isEmpty();
         }
         assertThat(infrastructure.waitsFor()).isEmpty();

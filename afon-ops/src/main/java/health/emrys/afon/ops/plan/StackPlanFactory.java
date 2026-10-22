@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,7 +38,7 @@ import java.util.TreeSet;
  * <ul>
  *   <li>{@code delete}: just the stack, and the legacy stack of its cloud; or every stack of the cloud for {@code <cloud>-all};</li>
  *   <li>{@code deploy}: delete the stacks conflicting with it, check the KeyCloak it uses if it has none of its own, deploy it,
- *       after the certificates its components need are issued, wait for what its components need, then report it complete;</li>
+ *       wait for what its components need, then report it complete;</li>
  *   <li>{@code setup}: as deploy, then what each component configures, in the order of the components, then report it complete.</li>
  * </ul>
  * <p>
@@ -162,7 +161,7 @@ public class StackPlanFactory {
         if (components.stream().noneMatch(KeycloakComponent.class::isInstance)) {
             steps.add(ops.checkKeyCloakAnswers(cloud));
         }
-        steps.add(ops.deployStack(stackId, certificates(components, cloud)));
+        steps.add(ops.deployStack(stackId));
         steps.add(wait(components, ops, cloud));
         steps.add(ops.deployComplete(stackId));
         if (setup) {
@@ -178,15 +177,6 @@ public class StackPlanFactory {
         }
         steps.add(ops.lockDownPolaris(cloud));
         return steps;
-    }
-
-    /**
-     * @return the properties of the certificates of the components' load balancers, which are issued before deploying the stack
-     */
-    private List<AfonProperty> certificates(List<StackComponent> components, AfonCloud cloud) {
-        Set<AfonProperty> certificates = new LinkedHashSet<>();
-        components.forEach(component -> certificates.addAll(registry.of(component).certificates(cloud)));
-        return List.copyOf(certificates);
     }
 
     /**

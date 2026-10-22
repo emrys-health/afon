@@ -32,14 +32,6 @@ public class PolarisPlan implements ComponentPlan {
     }
 
     /**
-     * The Polaris domain certificates, on the clouds that have the property, ie AWS.
-     */
-    @Override
-    public List<AfonProperty> certificates(AfonCloud cloud) {
-        return ComponentPlan.onAws(cloud, AfonProperty.AWS_POLARIS_CERT_ARN);
-    }
-
-    /**
      * Polaris does OIDC discovery against KeyCloak, its own or another stack's, so waits for it too.
      */
     @Override

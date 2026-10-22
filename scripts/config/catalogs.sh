@@ -197,7 +197,7 @@ for CLOUD in aws azure gcp; do
     continue
   fi
 
-  # _CATALOG_NAMES is what <CLOUD>_CATALOG_IDS was briefly called (see renames.sh) - a config already
+  # _CATALOG_NAMES is what <CLOUD>_CATALOG_IDS was briefly called (see updates.sh) - a config already
   # migrated under that name must not be migrated again.
   if [ -f "$CATALOGS_CLOUD_PROPS" ] && grep -qE "^${CLOUD_UPPER}_CATALOG_(IDS|NAMES)=" "$CATALOGS_CLOUD_PROPS"; then
     echo "- $CATALOGS_CLOUD_PROPS already defines the $CLOUD catalog ids, skipping $CLOUD (already migrated)"

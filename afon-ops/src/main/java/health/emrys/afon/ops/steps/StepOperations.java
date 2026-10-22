@@ -1,6 +1,5 @@
 package health.emrys.afon.ops.steps;
 
-import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
@@ -14,7 +13,6 @@ import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
-import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -185,21 +183,13 @@ public class StepOperations {
     }
 
     /**
-     * Deploys the stack, after checking that the certificates it needs are issued, if any, ie on AWS.
-     * Applies to any {@link StackId} defined in {@link health.emrys.afon.cdk.StackDefinitions}.
-     *
-     * @param certificates the properties of the ARNs of the ACM certificates the stack's load balancers use
+     * Deploys the stack.  Applies to any {@link StackId} defined in {@link health.emrys.afon.cdk.StackDefinitions}.
      */
-    public Step deployStack(StackId stackId, List<AfonProperty> certificates) {
+    public Step deployStack(StackId stackId) {
         logger.info(format("Deploying stack %s", stackId));
         return new Step(format("deploy_%s_stack", stepName(stackId)),
                 format("deploy stack %s", stackId),
-                () -> {
-                    if (!certificates.isEmpty()) {
-                        checkCertificatesIssued(certificates.toArray(new AfonProperty[0]));
-                    }
-                    startStack(stackId);
-                });
+                () -> startStack(stackId));
     }
 
     /**
@@ -237,43 +227,6 @@ public class StepOperations {
      */
     static String stepName(StackId stackId) {
         return stackId.toString().replace('-', '_');
-    }
-
-    /**
-     * Fails fast, before the slow {@code tofu apply} even starts, if any configured ACM
-     * certificate isn't actually {@code ISSUED}. Without this, a stale/dead cert (e.g. one
-     * stuck at {@code VALIDATION_TIMED_OUT}) only surfaces ~20 minutes into the apply, buried
-     * in a generic "Load Balancer is not ready yet" error from the ALB controller endlessly
-     * retrying {@code CreateListener} against a certificate AWS will never accept. Re-issue a
-     * failing one with {@code scripts/aws/issue-cert.sh}.
-     * <p>
-     * Only AWS has certificate properties for now, so the certificates are ACM's.
-     */
-    void checkCertificatesIssued(AfonProperty... certificates) throws ManagedProcessException {
-        String region = properties.getValue(AWS_REGION);
-
-        List<String> problems = new ArrayList<>();
-        for (AfonProperty property : certificates) {
-            String certificate = properties.getValue(property);
-            if (certificate == null || certificate.isBlank()) {
-                return;
-            }
-            String status = describeCertificateStatus(certificate, region);
-            if (!"ISSUED".equals(status)) {
-                problems.add(format("%s is %s, not ISSUED", property, status));
-            }
-        }
-        if (!problems.isEmpty()) {
-            throw new ManagedProcessException(
-                "ACM certificate(s) not ready for use - re-issue with scripts/aws/issue-cert.sh, "
-              + "update the property, then retry:\n" + String.join("\n", problems));
-        }
-    }
-
-    private String describeCertificateStatus(String certificate, String region) throws ManagedProcessException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        actions.awsDescribeCertificate(certificate, region, out);
-        return out.toString().trim();
     }
 
     public Step waitForPolarisAndKeycloakIn(AfonCloud cloud) {

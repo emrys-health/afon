@@ -30,14 +30,6 @@ public class KeycloakPlan implements ComponentPlan {
         return List.of(OIDC_DOMAIN_NAME);
     }
 
-    /**
-     * The Keycloak domain certificates, on the clouds that have the property, ie AWS.
-     */
-    @Override
-    public List<AfonProperty> certificates(AfonCloud cloud) {
-        return ComponentPlan.onAws(cloud, AfonProperty.AWS_KEYCLOAK_CERT_ARN);
-    }
-
     @Override
     public Set<Endpoint> waitsFor() {
         return Set.of(KEYCLOAK);

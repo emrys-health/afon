@@ -8,6 +8,7 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformOutput;
 import com.hashicorp.cdktf.TerraformResourceLifecycle;
+import com.hashicorp.cdktf.providers.aws.data_aws_acm_certificate.DataAwsAcmCertificate;
 import com.hashicorp.cdktf.providers.aws.data_aws_eip.DataAwsEip;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksCluster;
 import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster.DataAwsEksClusterConfig;
@@ -15,6 +16,7 @@ import com.hashicorp.cdktf.providers.aws.data_aws_eks_cluster_auth.DataAwsEksClu
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy.DataAwsIamPolicy;
 import com.hashicorp.cdktf.providers.aws.data_aws_lb.DataAwsLb;
 import com.hashicorp.cdktf.providers.aws.data_aws_lb.DataAwsLbConfig;
+import com.hashicorp.cdktf.providers.aws.data_aws_route53_zone.DataAwsRoute53Zone;
 import com.hashicorp.cdktf.providers.aws.eip.Eip;
 import com.hashicorp.cdktf.providers.aws.eks_addon.EksAddon;
 import com.hashicorp.cdktf.providers.aws.eks_access_entry.EksAccessEntry;
@@ -1258,8 +1260,11 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
 
     /**
-     * Exposes the component behind an ALB, whose ACM certificate, Route 53 zone and, optionally, allow-list of source
-     * CIDRs are configured by {@code AWS_<COMPONENT>_CERT_ARN}, {@code AWS_<COMPONENT>_DNS_ZONE} and
+     * Exposes the component behind an ALB, whose ACM certificate and Route 53 zone are looked up from the domain name, rather
+     * than configured, so that they cannot drift from what is in ACM and Route 53, nor be copied wrongly between envs: the
+     * certificate is the latest issued one for exactly the domain name, and the zone is the hosted zone named after it.  Both
+     * are read by Terraform when planning, so the plan fails early if either is missing, eg a certificate not issued yet,
+     * see {@code scripts/aws/issue-cert.sh}.  The allow-list of source CIDRs is configured by
      * {@code AWS_<COMPONENT>_ALLOWED_CIDRS}.  The ALB terminates TLS, so the route's TLS secret is not used, and the
      * destroy-time finalizers of the ingress are removed by the provider.
      */
@@ -1272,10 +1277,20 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             case "keycloak" -> new String[]{"keycloak-https-ingress", "KeyCloakAliasRecord"};
             default -> new String[]{route.component() + "-https-ingress", route.component() + "AliasRecord"};
         };
+        DataAwsAcmCertificate certificate = DataAwsAcmCertificate.Builder
+            .create(this, constructIds[0] + "Certificate")
+            .domain(route.domainName())
+            .statuses(List.of("ISSUED"))
+            .mostRecent(true)
+            .build();
+        DataAwsRoute53Zone zone = DataAwsRoute53Zone.Builder
+            .create(this, constructIds[1] + "Zone")
+            .name(route.domainName())
+            .build();
         IngressV1 ingress = createHttpsIngress(
             constructIds[0],
             route.ingressName(),
-            properties.getValue(certArn(route.component())),
+            certificate.getArn(),
             route.domainName(),
             route.service(),
             route.port(),
@@ -1284,30 +1299,12 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             polarisInboundCidrs(allowedCidrs(route.component())));
         Route53Record dnsRecord = configureDNS(
             constructIds[1],
-            properties.getValue(dnsZone(route.component())),
+            zone.getZoneId(),
             route.domainName(),
             getLbRelease(),
             ingress,
             route.ingressName());
         return new HttpsExposure(ingress, dnsRecord);
-    }
-
-    private static AfonProperty certArn(String component) {
-        return switch (component) {
-            case "polaris" -> AfonProperty.AWS_POLARIS_CERT_ARN;
-            case "jupyter" -> AfonProperty.AWS_JUPYTER_CERT_ARN;
-            case "keycloak" -> AfonProperty.AWS_KEYCLOAK_CERT_ARN;
-            default -> throw new IllegalArgumentException("No ACM certificate property for the component " + component);
-        };
-    }
-
-    private static AfonProperty dnsZone(String component) {
-        return switch (component) {
-            case "polaris" -> AfonProperty.AWS_POLARIS_DNS_ZONE;
-            case "jupyter" -> AfonProperty.AWS_JUPYTER_DNS_ZONE;
-            case "keycloak" -> AfonProperty.AWS_KEYCLOAK_DNS_ZONE;
-            default -> throw new IllegalArgumentException("No Route 53 zone property for the component " + component);
-        };
     }
 
     /** The allow-list of source CIDRs of the component, which only Polaris has; empty, ie open to all, for the others. */

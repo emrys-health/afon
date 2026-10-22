@@ -80,20 +80,6 @@ public class DocumentingStepActions extends StepActions {
         this.out = new PrintWriter(out);
     }
 
-    @Override
-    protected void awsDescribeCertificate(String certArn, String region, OutputStream stdOut) throws ManagedProcessException {
-        PrintWriter writer = new PrintWriter(stdOut);
-        writer.println("ISSUED");
-        writer.flush();
-        out.println(format("""
-                   If the cert is not issued, run:
-                   ```shell
-                   aws acm describe-certificate --certificate-arn %s --region %s --queryCertificate.Status --output text
-                   ```
-                   """, certArn, region));
-        out.flush();
-    }
-
     /**
      * Does not open a tunnel, but documents the call with a placeholder for the local port.
      */

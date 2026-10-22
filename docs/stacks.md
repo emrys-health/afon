@@ -311,7 +311,7 @@ afon-cli.sh manage-stack deploy aws-keycloak
 ```
 Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `deploy_complete_for_aws_keycloak`
 
-It requires the Keycloak properties (`OIDC_DOMAIN_NAME`, `KEYCLOAK_*`, `AWS_KEYCLOAK_DNS_ZONE`, `AWS_KEYCLOAK_CERT_ARN`)
+It requires the Keycloak properties (`OIDC_DOMAIN_NAME`, `KEYCLOAK_*`)
 and the AWS cluster properties, but none of the `AWS_POLARIS_*` properties.
 Once deployed, you can check the OIDC provider is ready with `afon-cli.sh check-oidc`.
 

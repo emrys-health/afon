@@ -182,6 +182,23 @@ change to `users.csv` takes effect on the next deploy, which restarts Gitea's po
 The configured user, which clients authenticate as (e.g. to get its OIDC token, or to run Spark), is named by the
 `USER_ID` property in `secret.properties` and must be one of the users in `users.csv`, whose password is read from there.
 
+### Command config-updates
+
+To update the config files to the current property names, run:
+```shell
+afon-cli.sh config-updates
+```
+It renames the properties that were renamed, and removes those that are no longer used (they are ignored if left), in every
+`*.properties` file of the config dir.  It works the same on a config env, ie `$AFON_HOME/config` a symlink to
+`config-<env>`, and on a standalone config dir: it says which it is updating, and never moves or relinks the dir.  A file that is a
+symlink, eg to a file shared by the envs, is updated in place through the link.
+
+A file is only touched if it changes, and then its previous contents are kept as `<file>.bak`, or `<file>.bak.<timestamp>` if
+there is already one, so that a backup of an earlier run is never overwritten.  It is safe to run more than once.
+
+**NOTE**: giving `--env` or `--config-env` (or setting `AFON_ENV`) switches the config dir first, like any other command, and moves a
+standalone `config` dir to `config-<env>`.  To update a standalone config dir, give none of them.
+
 ### Command config-user
 
 To update `secret.properties` to the current user config, if needed, and show the configured user:

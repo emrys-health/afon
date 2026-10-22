@@ -112,7 +112,7 @@ class StepOperationsTest {
 
     @Test
     void deploysStackFromAPlanSynthesisedFromTheConfigOfTheOperations() throws Exception {
-        operations.deployStack(StackId.parse("gcp-polaris"), List.of()).getFunction().run();
+        operations.deployStack(StackId.parse("gcp-polaris")).getFunction().run();
 
         assertThat(calls).containsExactly("synthesise gcp-polaris with the config of the operations", "start gcp-polaris");
     }

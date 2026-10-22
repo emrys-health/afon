@@ -43,7 +43,7 @@ public class GenerateScriptMains {
         new ScriptEntry("config", "ConfigValidateMain", "config/validate.sh"),
         new ScriptEntry("config", "ConfigExportMain", "config/export.sh"),
         new ScriptEntry("config", "ConfigImportMain", "config/import.sh"),
-        new ScriptEntry("config", "ConfigRenamesMain", "config/renames.sh"),
+        new ScriptEntry("config", "ConfigUpdatesMain", "config/updates.sh"),
         new ScriptEntry("config", "ConfigUserMain", "config/user.sh"),
         new ScriptEntry("config", "ConfigVaultMain", "config/vault.sh"),
 

@@ -13,6 +13,12 @@
   Gitea (the `Git` component), which needs `GITEA_*` properties that your existing config does not have, so **add them before you
   deploy or set the stack up again**, and rerun `afon-cli.sh aws-create tre` (or `azure-create tre`) to create the
   bucket.  The [issue #34](https://github.com/emrys-health/afon-core/issues/34) lists the properties, their defaults and which are optional, and the password rules (including the 8-character minimum for the passwords in `users.csv`).  `config-init` never overwrites an existing config dir, so copy them from `templates/config` and check what is missing with `afon-cli.sh config-validate`.  A missing required property fails the deploy before anything is created, naming the property.
+- **AWS DNS zones and certificates looked up, not configured:** `AWS_KEYCLOAK_DNS_ZONE`, `AWS_JUPYTER_DNS_ZONE`, `AWS_POLARIS_DNS_ZONE`
+  and `AWS_KEYCLOAK_CERT_ARN`, `AWS_JUPYTER_CERT_ARN`, `AWS_POLARIS_CERT_ARN` are gone from `afon-aws.properties`: a stack now looks up
+  the Route 53 hosted zone **named after** each domain name and the latest `ISSUED` ACM certificate for exactly that domain name, so
+  they cannot drift from what is in AWS.  **The properties are now ignored, so existing configs keep working; `afon-cli.sh config-updates` removes them.  Check that each domain name has a hosted zone
+  of its own name and an issued certificate** (`afon-cli.sh aws-issue-cert` issues them); a wildcard certificate is not matched.  See
+  [DNS configuration](docs/dns_config.md#aws).
 - **GCP stacks named by type:** `gcp-keycloak` is new, and the GKE cluster, VPC, subnet and router of a GCP stack are now named
   `<stack-type>-<CLUSTER_NAME>`, as on AWS and Azure, so that the stacks run side by side.  **A `gcp-polaris` deployed by the previous
   version has them named `<CLUSTER_NAME>`, and deploying with this one replaces them: delete it first, with the previous version.**

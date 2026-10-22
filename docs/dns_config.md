@@ -25,19 +25,32 @@ If you've bought your domain name through other domain registrars (e.g. GoDaddy)
 
 ### AWS
 
-For AWS, get the Zone ID for your domain by running:
+For AWS, create a Route 53 hosted zone **named after each domain name** (`OIDC_DOMAIN_NAME`, `AWS_POLARIS_DOMAIN_NAME` and
+`AWS_JUPYTER_DOMAIN_NAME`), and have the registrar, wherever the domain was bought, delegate to its nameservers.
+You can check that the zone is there by running:
 ```shell
-aws route53 list-hosted-zones-by-name
+aws route53 list-hosted-zones-by-name --dns-name $AWS_POLARIS_DOMAIN_NAME --max-items 1
 ```
-And then update the `AWS_XXX_DNS_ZONE` values in [configuration](configuration.md) accordingly.
-
-Note the `AWS_ZONE_ID` is for the ELB and the `AWS_XXX_DNS_ZONE` are for the DNS.
-Although they are lexically similar (thank AWS for that) they are unrelated concepts.
 
 This is sufficient for DNS but if you want to use https, you'll need to assign a certificate.
-In AWS, go to [AWS Certificate Manager](https://eu-west-2.console.aws.amazon.com/acm/certificates/list?region=eu-west-2) and `Request` a certificate for your domain.
-You then need to press the `Create Record in Route 53` button to prove you own it.
-Note that it might take a few minutes to propagate.
+To request one for each domain name in ACM, validated by a record in its hosted zone, and wait until it is issued, run:
+```shell
+afon-cli.sh aws-issue-cert
+```
+(or in the [AWS Certificate Manager](https://eu-west-2.console.aws.amazon.com/acm/certificates/list?region=eu-west-2) console `Request` a certificate for the
+domain, and press the `Create Record in Route 53` button to prove you own it.  Note that it might take a few minutes to propagate.)
+
+`aws-issue-cert`: a domain that already has an issued certificate is skipped, so it is safe to repeat; add `--force` to request a new one.
+
+There are no properties for the hosted zones or the certificates: when a stack is deployed, it looks up
+the hosted zone named after each domain name, and the latest `ISSUED` ACM certificate for exactly that domain name (a wildcard certificate is not matched).
+The deploy fails when planning, before anything is created, if either is missing.
+
+**NOTE**: unlike Azure and GCP, AWS does not store the certificate in a secrets manager.  There, cert-manager terminates TLS in the cluster
+and the cached certificate and key are restored into a Kubernetes secret, to avoid the weekly limit of Let's Encrypt.  On AWS the ALB terminates TLS with the
+ACM certificate, which is free, renews itself and is not secret, being only referred to by its ARN.  Looking up the
+ARN and the zone ID from AWS, rather than keeping copies of them in the config, means they cannot drift from what is in ACM and Route 53,
+nor be copied wrongly from one env to another.  The hosted zones must be in Route 53, whichever registrar the domains are registered with.
 
 ### Azure
 
