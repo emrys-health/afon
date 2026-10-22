@@ -41,10 +41,7 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
-import health.emrys.afon.cdk.CachedTlsSecret;
-import health.emrys.afon.cdk.HttpsRoute;
-import health.emrys.afon.cdk.LogStorage;
+import health.emrys.afon.cdk.*;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
@@ -766,7 +763,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     private List<String> allowedCidrs(String component) {
         // only Polaris has an allow-list; the other components are open to all
         return component.equals("polaris")
-               ? parseCidrs(properties.getCloudValue(AZURE, AfonCloudProperty.POLARIS_ALLOWED_CIDRS, ""))
+               ? new Whitelister(properties).polarisWhitelistCidr(AZURE)
                : List.of();
     }
 

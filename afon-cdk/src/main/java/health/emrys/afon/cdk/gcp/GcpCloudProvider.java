@@ -34,6 +34,7 @@ import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
 import health.emrys.afon.cdk.CachedTlsSecret;
 import health.emrys.afon.cdk.HttpsRoute;
+import health.emrys.afon.cdk.Whitelister;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
@@ -406,12 +407,8 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     private List<String> allowedCidrs(String component) {
         // only Polaris has an allow-list; the other components are open to all
         return component.equals("polaris")
-               ? parseCidrs(properties.getCloudValue(GCP, AfonCloudProperty.POLARIS_ALLOWED_CIDRS, ""))
+               ? new Whitelister(properties).polarisWhitelistCidr(GCP)
                : List.of();
-    }
-
-    static List<String> parseCidrs(String csv) {
-        return Arrays.stream(csv.split(",")).map(String::trim).filter(cidr -> !cidr.isEmpty()).toList();
     }
 
     @Override

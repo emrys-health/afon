@@ -9,12 +9,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GcpPolarisRestrictionTest {
 
     @Test
-    void cidrsAreParsedFromTheCsv() {
-        assertThat(GcpCloudProvider.parseCidrs(" a/32 ,, b/24,")).containsExactly("a/32", "b/24");
-        assertThat(GcpCloudProvider.parseCidrs("")).isEmpty();
-    }
-
-    @Test
     void nothingIsRestrictedWhenNothingIsConfigured() {
         assertThat(GcpCloudProvider.withClusterCidrs(List.of(), "")).isEmpty();
         assertThat(GcpCloudProvider.withClusterCidrs(List.of(), "34.1.2.3")).isEmpty();

@@ -3,7 +3,7 @@ package health.emrys.afon.cdk.aws;
 import com.hashicorp.cdktf.Aspects;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.TerraformStack;
-import health.emrys.afon.cdk.RetainedVolumeClaim;
+import health.emrys.afon.cdk.*;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformOutput;
@@ -63,12 +63,6 @@ import com.hashicorp.cdktf.providers.kubernetes.storage_class_v1.StorageClassV1;
 import com.hashicorp.cdktf.providers.kubernetes.storage_class_v1.StorageClassV1Metadata;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
-import health.emrys.afon.cdk.AbstractCloudProvider;
-import health.emrys.afon.cdk.KubeConfigAspect;
-import health.emrys.afon.cdk.HealthCheck;
-import health.emrys.afon.cdk.HttpsExposure;
-import health.emrys.afon.cdk.LogStorage;
-import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
@@ -1312,7 +1306,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     /** The allow-list of source CIDRs of the component, which only Polaris has; empty, ie open to all, for the others. */
     private String allowedCidrs(String component) {
-        return component.equals("polaris") ? properties.getCloudValue(AWS, AfonCloudProperty.POLARIS_ALLOWED_CIDRS, "") : "";
+        return component.equals("polaris") ? new Whitelister(properties).polarisWhitelistCidrCSV(AWS) : "";
     }
 
     /** The class the AWS load balancer controller gives the LoadBalancer services it provisions an NLB for. */
