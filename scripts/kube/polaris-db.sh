@@ -24,6 +24,9 @@
 
 set -euo pipefail
 
+AFON_ROOT="${AFON_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$AFON_ROOT/scripts/stack/docker-image-source.sh"
+
 NAMESPACE="${1:-default}"
 SECRET_NAME="${SECRET_NAME:-polaris-secret}"
 SECRET_KEY="${SECRET_KEY:-polaris_env.sh}"
@@ -40,6 +43,9 @@ if ! kubectl --context "$CONTEXT" -n "$NAMESPACE" get secret "$SECRET_NAME" >/de
   echo "Secret '$SECRET_NAME' not found in namespace '$NAMESPACE' - has Polaris been deployed here?" >&2
   exit 1
 fi
+
+# the image of the check pod, from docker-images.yaml
+CHECK_IMAGE="$(docker_image postgres-alpine)" || exit 1
 
 POD_NAME="polaris-db-check-$$-$(date +%s)"
 
@@ -60,7 +66,7 @@ spec:
   restartPolicy: Never
   containers:
     - name: polaris-db-check
-      image: postgres:16-alpine
+      image: $CHECK_IMAGE
       command: ["sleep", "300"]
       volumeMounts:
         - name: secret-volume

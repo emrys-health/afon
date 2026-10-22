@@ -1,0 +1,70 @@
+# The Docker images deployed or spun up in tests, loaded by DockerImages, the single source of their names and versions.
+# A file of this name in the config dir ($AFON_HOME/config) replaces this one entirely, rather than adding to it.
+#
+# images:
+#   <name>:                       the name the code looks the image up by, see DockerImages
+#     image: <repository>         the image, without the tag, eg quay.io/keycloak/keycloak
+#     tag: <tag>                  the tag, read as the string it is written as, eg 3.10; ${polaris.version} is the version of Polaris the project builds against
+#     digest: sha256:<hex>        optional: the digest the image is pinned to, which the tag then only documents
+#     category: first-party|upstream|third-party
+#                                 optional: where the image comes from; first-party are built by us, upstream are the
+#                                 images of the projects we deploy (Polaris, Keycloak, ...), third-party are the rest
+images:
+  # first-party
+  spark:
+    image: ph1ll1phenry/spark_jars_cp
+    tag: 4.0.1
+    category: first-party
+  pyspark-notebook:
+    image: ph1ll1phenry/pyspark-notebook
+    tag: x86_64-spark-4.0.1-vnc-clip-multi_pkg
+    category: first-party
+
+  # upstream
+  polaris:
+    image: apache/polaris
+    tag: ${polaris.version}
+    category: upstream
+  polaris-admin-tool:
+    image: apache/polaris-admin-tool
+    tag: ${polaris.version}
+    category: upstream
+  keycloak:
+    image: quay.io/keycloak/keycloak
+    tag: 26.6.3
+    category: upstream
+  trino:
+    # only the tag is used, the image being that of the vendored Helm chart, see TrinoWorkloads
+    image: trinodb/trino
+    tag: 481
+    category: upstream
+  jupyterhub-hub:
+    image: jupyterhub/k8s-hub
+    tag: 3.3.8
+    category: upstream
+  jupyterhub-proxy:
+    image: jupyterhub/configurable-http-proxy
+    tag: 4.6.1
+    category: upstream
+  guacamole:
+    image: guacamole/guacamole
+    tag: 1.5.5
+    category: upstream
+  guacd:
+    image: guacamole/guacd
+    tag: 1.5.5
+    category: upstream
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy
+    tag: v7.6.0
+    category: upstream
+
+  # third-party
+  curl:
+    image: curlimages/curl
+    tag: 8.11.1
+    category: third-party
+  postgres-alpine:
+    image: postgres
+    tag: 16-alpine
+    category: third-party

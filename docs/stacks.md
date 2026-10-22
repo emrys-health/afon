@@ -277,6 +277,40 @@ afon-cli.sh manage-stack setup aws-lab
 `validate-stack` prints the role of the stack, if it has one, and its components as the file defines them, for the config (those left out by a `when` or
 `unless` property are not listed), and without a stack lists the stacks of the file.
 
+### Define your own Docker images
+
+The Docker images that the stacks deploy (Polaris, Keycloak, Spark, JupyterHub, Guacamole, ...) are defined by `docker-images.yaml`,
+bundled in the jar (`afon-cdk/src/main/resources/docker-images.yaml`), so that a version bump or an image pinned by digest is a change
+of one file, not of the code.  As with the stacks, a `docker-images.yaml` in the config dir (`$AFON_HOME/config`) **replaces** the
+bundled one entirely, rather than adding to it, so start from a copy of it, which this exports to the config dir (without overwriting
+an existing file):
+```shell
+afon-cli.sh docker-image --export
+```
+Then edit `$AFON_HOME/config/docker-images.yaml`.  A file that is not valid, eg an unknown
+key or category, a malformed digest, or an image the code needs that it does not define, fails the commands that use it, naming the
+file and the problem.
+
+Each image is under the name the code looks it up by:
+```yaml
+images:
+  keycloak:
+    image: quay.io/keycloak/keycloak    # the repository, without the tag
+    tag: 26.6.3
+    digest: sha256:<64 hex digits>      # optional: pins the image, which is then pulled as image:tag@digest
+    category: upstream                  # optional: first-party, upstream or third-party
+  polaris:
+    image: apache/polaris
+    tag: ${polaris.version}             # the version of Polaris that the project builds against
+```
+The names are those of the bundled file, which the code needs all of; an entry of another name is accepted but nothing uses it.  The `trino` entry
+only sets the image tag, the image being that of the vendored Helm chart.
+
+A shell script that needs the reference of an image asks the ops command `docker-image <name>`, eg `afon-cli.sh docker-image postgres-alpine`
+prints `AFON_DOCKER_IMAGE=postgres:16-alpine`, as `scripts/stack/docker-image-source.sh` does for `kube-polaris-db`.  (Run by `afon.sh`,
+which has no JVM, the script asks it the same way, a Maven run, so a few seconds slower.)  The system property `afon.docker-images`
+names a file to use instead, or `bundled` for only the bundled one.
+
 ### Setup AWS full stack
 
 The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
