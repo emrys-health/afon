@@ -39,7 +39,7 @@ Open the Grafana UI at [http://localhost:3000](http://localhost:3000) and login 
 #### Save local Grafana config
 You can run your dockerized Grafana persisting the config each time with:
 ```shell
-docker run -d --name grafana -p 3000:3000 -v $LOCAL_GRAFANA_CONFIG_DIR:/var/lib/grafana grafana/grafana
+docker run -d --rm --name grafana -p 3000:3000 -v $LOCAL_GRAFANA_CONFIG_DIR:/var/lib/grafana grafana/grafana
 ```
 To save all the metadata files the first time:
 ```shell
