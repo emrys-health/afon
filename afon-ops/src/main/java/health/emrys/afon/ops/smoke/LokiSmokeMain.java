@@ -5,8 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import health.emrys.afon.cdk.components.MonitoringComponent;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
@@ -34,6 +32,7 @@ import java.util.stream.Stream;
 
 import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
 import static health.emrys.afon.ops.kube.KubeClient.nameOfPod;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static java.lang.String.format;
 
 public class LokiSmokeMain {
@@ -47,10 +46,9 @@ public class LokiSmokeMain {
         JsonMapper.builder().enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION).build();
 
     public static void main(String[] args) throws Exception {
-        AfonPropertyProvider properties = new FilePropertyProvider();
-        LokiSmokeMain        app        = new LokiSmokeMain(properties);
+        LokiSmokeMain app = new LokiSmokeMain(smokeTestProperties());
         try {
-            app.checkLoki(properties);
+            app.checkLoki();
         } catch (Exception e) {
             logger.error(e.getMessage());
             throw e;
@@ -62,7 +60,7 @@ public class LokiSmokeMain {
         this.tenantId   = "full-" + properties.getValue(CLUSTER_NAME); // I guess it always must be full(?)
     }
 
-    private void checkLoki(AfonPropertyProvider properties) throws Exception {
+    private void checkLoki() throws Exception {
         try (KubeClient client = new KubeClient(properties)) {
             V1Pod lokiPod = getLokiPod(client);
 

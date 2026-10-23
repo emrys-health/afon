@@ -1,13 +1,14 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.slf4j.Logger;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 
 /**
  * This needs the VM arg --add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED
@@ -46,7 +47,6 @@ public class SnowflakeQuerySmoke {
             return;
         }
         String tableName = args[0];
-        var properties = new FilePropertyProvider();
-        new SnowflakeQuerySmoke(properties).query(tableName);
+        new SnowflakeQuerySmoke(smokeTestProperties()).query(tableName);
     }
 }

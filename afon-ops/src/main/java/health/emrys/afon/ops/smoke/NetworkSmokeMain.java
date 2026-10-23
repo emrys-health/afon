@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static health.emrys.afon.polaris.config.PolarisEndpoint.getPolarisEndpointFor;
 import static java.lang.String.format;
 
@@ -188,7 +189,7 @@ public class NetworkSmokeMain {
 
     public static void main(String[] args) throws Exception {
         int exitCode = 0;
-        AfonPropertyProvider properties = new FilePropertyProvider(); // please do not change this
+        AfonPropertyProvider properties = smokeTestProperties();
         try (KubeClient client = new KubeClient(properties)) {
             NetworkSmokeMain app    = new NetworkSmokeMain(properties, client);
             List<ExecResult> results  = app.checkNetworkWithPods();

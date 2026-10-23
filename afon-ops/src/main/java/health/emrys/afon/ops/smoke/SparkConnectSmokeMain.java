@@ -1,9 +1,11 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FileUserProvider;
-import health.emrys.afon.config.*;
-import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
@@ -20,6 +22,7 @@ import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 
 /**
  * You need have some data in Polaris to run this, eg:
@@ -82,8 +85,7 @@ public class SparkConnectSmokeMain {
     }
 
     public static void main(String[] args) {
-        AfonPropertyProvider properties = new OpsPropertyProvider();
-        new SparkConnectSmokeMain(properties, new FileUserProvider()).callSparkConnectorInCluster();
+        new SparkConnectSmokeMain(smokeTestProperties(), new FileUserProvider()).callSparkConnectorInCluster();
     }
 
 }

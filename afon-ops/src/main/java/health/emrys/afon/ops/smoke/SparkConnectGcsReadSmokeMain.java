@@ -1,8 +1,5 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import org.apache.spark.sql.Dataset;
@@ -15,8 +12,7 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
-import static health.emrys.afon.ops.smoke.config.SmokeConfig.SPARK_CONNECTOR_POD;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.*;
 import static java.lang.String.format;
 
 /**
@@ -45,7 +41,7 @@ import static java.lang.String.format;
  * <p>The S3 version's remaining two settings have no GCS equivalent: path-style addressing is an S3
  * concept, and GCS is served from a single global endpoint, so there is no region for the client to
  * go looking for on the instance metadata service.
- *
+ * <p>
  * TODO check that PATH can indeed be seen outside the cluster
  */
 public class SparkConnectGcsReadSmokeMain {
@@ -120,13 +116,12 @@ public class SparkConnectGcsReadSmokeMain {
     }
 
     public static void main(final String[] args) {
-        AfonPropertyProvider properties = new FilePropertyProvider(); // please do not change this
         int exitCode = 0;
-        try (KubeClient client = new KubeClient(properties)) {
+        try (KubeClient client = new KubeClient(smokeTestProperties())) {
             SparkConnectGcsReadSmokeMain app = new SparkConnectGcsReadSmokeMain(client, KUBERNETES_NAMESPACE);
             Dataset<Row>                 df  = app.readTextThroughPortForwarder();
             if (df != null) {
-                String                   msg = format("Test failed. We should not have been allowed to read public bucket %s", PATH);
+                String msg = format("Test failed. We should not have been allowed to read public bucket %s", PATH);
                 logger.error(msg);
                 throw new Exception(msg);
             }

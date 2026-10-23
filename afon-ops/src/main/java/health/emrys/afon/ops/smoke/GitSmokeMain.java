@@ -2,7 +2,6 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.commands.PodCommand;
@@ -14,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static java.lang.String.format;
 
 public class GitSmokeMain {
@@ -21,8 +21,7 @@ public class GitSmokeMain {
     static final Logger logger = LoggerFactory.getLogger(GitSmokeMain.class);
 
     public static void main(String[] args) {
-        AfonPropertyProvider properties = new FilePropertyProvider();
-        GitSmokeMain         app        = new GitSmokeMain(properties);
+        GitSmokeMain         app        = new GitSmokeMain(smokeTestProperties());
         try {
             List<String> errors = app.checkGit();
             if (!errors.isEmpty()) {

@@ -1,8 +1,5 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import org.apache.spark.sql.Dataset;
@@ -15,8 +12,7 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
-import static health.emrys.afon.ops.smoke.config.SmokeConfig.SPARK_CONNECTOR_POD;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.*;
 import static java.lang.String.format;
 
 /**
@@ -100,8 +96,7 @@ public class SparkConnectS3ReadSmokeMain {
 
     public static void main(final String[] args) throws Exception {
         int exitCode = 0;
-        AfonPropertyProvider properties = new FilePropertyProvider(); // please do not change this
-        try (KubeClient client = new KubeClient(properties)) {
+        try (KubeClient client = new KubeClient(smokeTestProperties())) {
             new SparkConnectS3ReadSmokeMain(client, KUBERNETES_NAMESPACE).readTextViaPortForward();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);

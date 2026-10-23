@@ -3,6 +3,7 @@ package health.emrys.afon.ops.smoke.config;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -24,6 +25,14 @@ public class SmokeConfig {
     public static final AfonCloud DEFAULT_TRE_CLOUD = AfonCloud.AWS;
 
     private final AfonPropertyProvider properties;
+
+    /**
+     * This returns the exact properties (and only those properties) used in a real environment that has been deployed.
+     * It should otherwise be untainted.
+     */
+    public static AfonPropertyProvider smokeTestProperties() {
+        return new FilePropertyProvider();
+    }
 
     public SmokeConfig(AfonPropertyProvider properties) {
         this.properties = properties;

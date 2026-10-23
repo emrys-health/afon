@@ -2,13 +2,16 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.cdk.configs.GuacamoleConfig;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static java.lang.String.format;
 
 
@@ -47,8 +50,7 @@ public class GuacamoleDbSmokeMain {
 
     public static void main(String[] args) {
         int exitCode = 0;
-        AfonPropertyProvider properties = new FilePropertyProvider(); // please do not change this
-        var app = new GuacamoleDbSmokeMain(properties);
+        var app = new GuacamoleDbSmokeMain(smokeTestProperties());
         try {
             app.findAdmin();
         } catch (Exception e) {
