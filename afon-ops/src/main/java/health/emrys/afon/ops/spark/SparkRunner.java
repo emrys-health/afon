@@ -17,6 +17,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 abstract public class SparkRunner {
     private static final Logger logger = getLogger(SparkRunner.class);
+    public static final String CONFIGURED_USERS_KEY = "Configured users";
 
     private AfonPropertyProvider properties;
 
@@ -78,7 +79,7 @@ abstract public class SparkRunner {
             .stream()
             .map( x-> x.email())
             .collect(Collectors.joining(", "));
-        lines.add(String.format("%s Configured users: %s", prepend, users));
+        lines.add(String.format("%s %s: %s", prepend, CONFIGURED_USERS_KEY, users));
     }
 
     protected abstract void doRun(SparkSession spark, String catalogName, String namespace, String tableName, List<String> values);

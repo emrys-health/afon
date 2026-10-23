@@ -1,21 +1,19 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.AfonCatalog;
-import health.emrys.afon.config.AfonCatalogs;
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.config.*;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.connect.SparkConnectClient;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import static health.emrys.afon.config.AfonCatalog.catalogFor;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
@@ -23,6 +21,9 @@ import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNA
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
+import static health.emrys.afon.ops.spark.SparkRunner.CONFIGURED_USERS_KEY;
+import static health.emrys.afon.ops.spark.SparkTestWriter.LOG_COLUMN_NAME;
+import static java.lang.String.format;
 
 /**
  * You need have some data in Polaris to run this, eg:
@@ -42,24 +43,31 @@ public class SparkConnectSmokeMain {
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectSmokeMain.class);
 
     private final AfonPropertyProvider properties;
-    private final AfonUserProvider users;
-    private final AfonCatalog catalog;
+    private final AfonUserProvider     users;
+    private final AfonCatalog          catalog;
 
     public SparkConnectSmokeMain(AfonPropertyProvider properties, AfonUserProvider users) {
         this.properties = properties;
-        this.users = users;
-        AfonCloud cloud = new SmokeConfig(properties).cloud();
-        String polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
+        this.users      = users;
+        AfonCloud cloud           = new SmokeConfig(properties).cloud();
+        String    polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
         this.properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
         catalog = catalogFor(cloud, new AfonCatalogs(properties));
     }
 
     private SparkSession readTable(SparkConnectClient client) {
-        String warehouse = "test_warehouse";
-        SparkSession spark = client.sparkSession(warehouse, catalog.toString());
-        String tableFQN = String.format("%s.%s.%s", warehouse, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
+        String       warehouse = "test_warehouse";
+        SparkSession spark     = client.sparkSession(warehouse, catalog.toString());
+        String       tableFQN  = format("%s.%s.%s", warehouse, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
         logger.info("Reading table {}", tableFQN);
-        spark.sql(String.format("SELECT * FROM %s", tableFQN)).show(false);
+        Dataset<Row> dataset = spark.sql(format("SELECT * FROM %s", tableFQN));
+        dataset.show(false);
+        Row row = Arrays.stream((Object[]) dataset.collect())
+                        .map(r -> (Row) r)
+                        .filter(r -> r.getAs(LOG_COLUMN_NAME).toString().contains(CONFIGURED_USERS_KEY))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException(format("No %s in %s", CONFIGURED_USERS_KEY, tableFQN)));
+        logger.info(format("Users defined as: %s", row));
         return spark;
     }
 
@@ -68,11 +76,11 @@ public class SparkConnectSmokeMain {
         try {
             KubeClient client = new KubeClient(properties);
             try (PortForwarder session = new PortForwarder(
-                    client,
-                    KUBERNETES_NAMESPACE,
-                    SmokeConfig.SPARK_CONNECTOR_POD,
-                    15002,
-                    15002)) {
+                client,
+                KUBERNETES_NAMESPACE,
+                SmokeConfig.SPARK_CONNECTOR_POD,
+                15002,
+                15002)) {
                 SparkSession spark = readTable(new SparkConnectClient(properties, users));
                 logger.info("Test successful. About to close Spark session. Please wait for threads to die...");
                 spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown

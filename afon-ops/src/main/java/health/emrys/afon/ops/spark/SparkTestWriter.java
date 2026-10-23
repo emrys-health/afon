@@ -29,6 +29,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class SparkTestWriter extends SparkRunner {
 
     private static final Logger logger = getLogger(SparkTestWriter.class);
+    public static final String LOG_COLUMN_NAME = "value";
 
     public SparkTestWriter(AfonPropertyProvider properties) {
         super(properties);
@@ -39,7 +40,7 @@ public class SparkTestWriter extends SparkRunner {
 
         logger.info("Writing to table {}", tableFQN);
         StructType schema = new StructType(new StructField[]{
-                new StructField("value", DataTypes.StringType, false, Metadata.empty())
+                new StructField(LOG_COLUMN_NAME, DataTypes.StringType, false, Metadata.empty())
         });
         List<Row> rows = values.stream().map(v -> RowFactory.create(v)).toList();
         logger.info("Write values {}", values);
