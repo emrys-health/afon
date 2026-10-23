@@ -1,4 +1,5 @@
 name|command|args
+git|git-smoke|
 guacamole-db|guacamole-db-smoke|
 loki|loki-smoke|
 network|network-smoke|

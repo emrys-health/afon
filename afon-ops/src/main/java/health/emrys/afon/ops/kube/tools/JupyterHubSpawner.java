@@ -3,6 +3,7 @@ package health.emrys.afon.ops.kube.tools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.ops.kube.ExecResult;
@@ -11,6 +12,7 @@ import health.emrys.afon.ops.kube.commands.CliCommand;
 import health.emrys.afon.ops.kube.commands.DeployCommand;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 import static health.emrys.afon.cdk.configs.JupyterHubConfig.HUB_LABELS;
 import static health.emrys.afon.cdk.configs.JupyterHubConfig.HUB_PORT;
@@ -50,6 +53,7 @@ public class JupyterHubSpawner {
     private static final String USERNAME_ANNOTATION = "hub.jupyter.org/username";
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
+    private FileUserProvider users;
 
     public static void main(String[] args) throws Exception {
         FilePropertyProvider properties = new FilePropertyProvider();
@@ -71,6 +75,7 @@ public class JupyterHubSpawner {
     public JupyterHubSpawner(KubeClient client, String namespace) {
         this.client    = client;
         this.namespace = namespace;
+        users          = new FileUserProvider();
     }
 
     /**
@@ -124,13 +129,24 @@ public class JupyterHubSpawner {
         return pod;
     }
 
+    public static String toPassword(AfonUser x) {
+        return x.password();
+    }
+
+    public static String toEmail(AfonUser x) {
+        return x.email();
+    }
+
     private String findEmailFor(String username) throws Exception {
-        FileUserProvider users = new FileUserProvider();
+        return propertyOf(username, JupyterHubSpawner::toEmail);
+    }
+
+    public @NonNull String propertyOf(String username, Function<AfonUser, String> fn) {
         String email = users
             .getUsers()
             .stream()
             .filter(x -> x.username().equals(username))
-            .map(x -> x.email())
+            .map(fn)
             .findFirst()
             .orElseThrow(() -> new IllegalStateException("No user called " + username));
         return email;
