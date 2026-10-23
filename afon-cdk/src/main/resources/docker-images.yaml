@@ -5,7 +5,9 @@
 #   <name>:                       the name the code looks the image up by, see DockerImages
 #     image: <repository>         the image, without the tag, eg quay.io/keycloak/keycloak
 #     tag: <tag>                  the tag, read as the string it is written as, eg 3.10; ${polaris.version} is the version of Polaris the project builds against
-#     digest: sha256:<hex>        optional: the digest the image is pinned to, which the tag then only documents
+#     digest: sha256:<hex>        optional: the digest the image is pinned to, which the tag then only documents; the digest
+#                                 of the manifest list, so it holds for each platform
+#     unpinned: <reason>          optional: why it has no digest, which docker-image --pin then refuses to give it, and --verify says
 #     category: first-party|upstream|third-party
 #                                 optional: where the image comes from; first-party are built by us, upstream are the
 #                                 images of the projects we deploy (Polaris, Keycloak, ...), third-party are the rest
@@ -14,57 +16,75 @@ images:
   spark:
     image: ph1ll1phenry/spark_jars_cp
     tag: 4.0.1
+    digest: sha256:9d8c791931cf50b28d2d1b4a00bf625fd1b3fd30e9b38a69b9c09d29de1aee0f
     category: first-party
   pyspark-notebook:
     image: ph1ll1phenry/pyspark-notebook
     tag: x86_64-spark-4.0.1-vnc-clip-multi_pkg
+    digest: sha256:e70cd5ad0f92a62234d6251fbd21ab315ff78e94bec1e5261de4c8fed0b85204
     category: first-party
 
   # upstream
   polaris:
     image: apache/polaris
     tag: ${polaris.version}
+    unpinned: its tag is the version of Polaris the project builds against, which the digest of another version would outlive
     category: upstream
   polaris-admin-tool:
     image: apache/polaris-admin-tool
     tag: ${polaris.version}
+    unpinned: its tag is the version of Polaris the project builds against, which the digest of another version would outlive
     category: upstream
   keycloak:
     image: quay.io/keycloak/keycloak
     tag: 26.6.3
+    digest: sha256:9b0330756022422149aa6502eb2def8cd47c6e1b000c7c65cdb13e7c0133e992
     category: upstream
   trino:
-    # only the tag is used, the image being that of the vendored Helm chart, see TrinoWorkloads
     image: trinodb/trino
     tag: 481
+    unpinned: only its tag is used, the image being that of the vendored Helm chart, see TrinoWorkloads
+    category: upstream
+  gitea:
+    # the create-users container of the chart, in step with the appVersion of the chart, see GiteaConfig
+    image: docker.gitea.com/gitea
+    tag: 1.27.0-rootless
+    digest: sha256:414ba5b2b1163480e9ed4213a989cd798579cfa88582a2359303273009b2b852
     category: upstream
   jupyterhub-hub:
     image: jupyterhub/k8s-hub
     tag: 3.3.8
+    digest: sha256:a54eec964f9dfb747c53d62d5dadc27dcb6a7b956d76dd99e712c7f3b7f35e47
     category: upstream
   jupyterhub-proxy:
     image: jupyterhub/configurable-http-proxy
     tag: 4.6.1
+    digest: sha256:fd916f75415f1e7e813c5a18b34a6042a601604938ff8777b044447efb3bd819
     category: upstream
   guacamole:
     image: guacamole/guacamole
     tag: 1.5.5
+    digest: sha256:0f62f6d17ab379e46aa66874b2ff564dab856a6ef5e754a69cbb34c32d3e588a
     category: upstream
   guacd:
     image: guacamole/guacd
     tag: 1.5.5
+    digest: sha256:38232cae271361ef53db46faf5c49fe64049a1320a05b82c597425b69d6ce77e
     category: upstream
   oauth2-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy
     tag: v7.6.0
+    digest: sha256:dcb6ff8dd21bf3058f6a22c6fa385fa5b897a9cd3914c88a2cc2bb0a85f8065d
     category: upstream
 
   # third-party
   curl:
     image: curlimages/curl
     tag: 8.11.1
+    digest: sha256:c1fe1679c34d9784c1b0d1e5f62ac0a79fca01fb6377cdd33e90473c6f9f9a69
     category: third-party
   postgres-alpine:
     image: postgres
     tag: 16-alpine
+    digest: sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
     category: third-party

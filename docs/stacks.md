@@ -280,7 +280,7 @@ afon-cli.sh manage-stack setup aws-lab
 ### Define your own Docker images
 
 The Docker images that the stacks deploy (Polaris, Keycloak, Spark, JupyterHub, Guacamole, ...) are defined by `docker-images.yaml`,
-bundled in the jar (`afon-cdk/src/main/resources/docker-images.yaml`), so that a version bump or an image pinned by digest is a change
+bundled in the jar, so that a version bump or an image pinned by digest is a change
 of one file, not of the code.  As with the stacks, a `docker-images.yaml` in the config dir (`$AFON_HOME/config`) **replaces** the
 bundled one entirely, rather than adding to it, so start from a copy of it, which this exports to the config dir (without overwriting
 an existing file):
@@ -303,6 +303,30 @@ images:
     image: apache/polaris
     tag: ${polaris.version}             # the version of Polaris that the project builds against
 ```
+The bundled images are pinned by digest, so that what is pulled is what was pinned, not whatever the tag points to by then (the digest
+only fixes the content, it does not say who built it: that is what a signature is for).  The digest is that of the manifest list, so
+that it holds for each platform.  An image is pulled by its digest, the tag then only documenting it, so when bumping a tag, update the
+digest with it, or the old version is still pulled.  `docker-image --pin` looks up in the registries the digest that each tag points to
+and writes it to the file, leaving the rest of the file, comments included, as it is (it needs Docker and network access, and writes
+nothing if a lookup fails):
+```shell
+afon-cli.sh docker-image --pin keycloak       # after changing its tag: pins it, adding the digest if it has none
+afon-cli.sh docker-image --pin                # refreshes the digest of each image that has one
+```
+It pins the `docker-images.yaml` of the config dir, so export the bundled one to it first (`docker-image --export`), unless `--file` gives another.  An image that is not to be pinned says why under `unpinned`,
+eg `unpinned: only its tag is used, the image being that of the Helm chart`, in place of its `digest`: `--pin` refuses it with that reason, and
+`--verify` lists it as not checked with the reason.  `docker-image --verify` only checks, writing nothing, that the
+digest of each image that has one is that its tag points to now, and exits with 1, naming the images, if not: that is, if a tag was
+changed without its digest, or published again by its registry.  It checks the images in effect, or those of `--file`, or the named ones:
+```shell
+afon-cli.sh docker-image --verify
+afon-cli.sh docker-image --verify --report verify.md     # also writes a report, as Markdown, or as JSON if named *.json
+```
+The report is written even when the check fails, for a CI job to keep: it has the result, each image checked with its status
+(`ok`, `mismatch`, `unpinned` or `error`) and the pinned and registry digests, and the images not checked with the reason.
+The Polaris images are unpinned, as their tag is the version of Polaris the project builds against, which a pinned digest of another
+version would outlive, and so is the Trino one, only its tag being set, the image being that of the Helm chart.
+
 The names are those of the bundled file, which the code needs all of; an entry of another name is accepted but nothing uses it.  The `trino` entry
 only sets the image tag, the image being that of the vendored Helm chart.
 

@@ -21,12 +21,23 @@ class DockerImagesTest {
 
     @Test
     void bundledImagesKeepTheirReferences() {
-        assertThat(DockerImages.KEYCLOAK_IMAGE).isEqualTo("quay.io/keycloak/keycloak:26.6.3");
-        assertThat(DockerImages.SPARK_IMAGE).isEqualTo("ph1ll1phenry/spark_jars_cp:4.0.1");
-        assertThat(DockerImages.POSTGRES_ALPINE_IMAGE).isEqualTo("postgres:16-alpine");
+        assertThat(DockerImages.KEYCLOAK_IMAGE).startsWith("quay.io/keycloak/keycloak:26.6.3@sha256:");
+        assertThat(DockerImages.SPARK_IMAGE).startsWith("ph1ll1phenry/spark_jars_cp:4.0.1@sha256:");
+        assertThat(DockerImages.POSTGRES_ALPINE_IMAGE).startsWith("postgres:16-alpine@sha256:");
         assertThat(DockerImages.TRINO_IMAGE_TAG).isEqualTo("481");
+        assertThat(DockerImages.GITEA_IMAGE).startsWith("docker.gitea.com/gitea:1.27.0-rootless@sha256:");
         assertThat(DockerImages.POLARIS_IMAGE).isEqualTo("apache/polaris:" + DockerImages.POLARIS_VERSION);
         assertThat(DockerImages.POLARIS_ADMIN_TOOL_IMAGE).isEqualTo("apache/polaris-admin-tool:" + DockerImages.POLARIS_VERSION);
+    }
+
+    @Test
+    void imagesThatTheirTagFollowsAreNotPinned() {
+        // polaris is the version the project builds against, which a digest of another version would silently outlive
+        assertThat(DockerImages.POLARIS_IMAGE).isEqualTo("apache/polaris:" + DockerImages.POLARIS_VERSION);
+        assertThat(DockerImages.all().get("trino").digest()).isNull();
+        assertThat(DockerImages.all().values()).filteredOn(image -> image.digest() == null)
+            .extracting(DockerImageDefinitions.Definition::name).containsExactlyInAnyOrder("polaris", "polaris-admin-tool", "trino")
+            .allSatisfy(name -> assertThat(DockerImages.all().get(name).unpinned()).isNotBlank());
     }
 
     @Test
@@ -50,6 +61,13 @@ class DockerImagesTest {
     void pinnedImageReferenceHasTheDigest() {
         assertThat(parse("images:\n  p:\n    image: a/b\n    tag: '1'\n    digest: " + DIGEST + "\n").get("p").reference())
             .isEqualTo("a/b:1@" + DIGEST);
+    }
+
+    @Test
+    void anImageHasEitherADigestOrTheReasonItHasNone() {
+        assertThat(parse("images:\n  p: {image: a/b, tag: '1', unpinned: because}\n").get("p").unpinned()).isEqualTo("because");
+        assertThatThrownBy(() -> parse("images:\n  p: {image: a/b, tag: '1', unpinned: because, digest: " + DIGEST + "}\n"))
+            .hasMessageContaining("both a digest and the reason");
     }
 
     @Test

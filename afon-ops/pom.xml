@@ -73,6 +73,7 @@
                     <systemPropertyVariables>
                         <afon.stacks>${project.basedir}/../afon-cdk/src/test/resources/stacks-test.yaml</afon.stacks>
                         <afon.stack-flows>bundled</afon.stack-flows>
+                        <afon.docker-images>bundled</afon.docker-images>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

@@ -50,9 +50,9 @@ public final class DockerImageDefinitions {
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}]+)}");
 
     /**
-     * A Docker image, by its repository, tag and optionally the digest it is pinned to.
+     * A Docker image, by its repository, tag and optionally the digest it is pinned to, or else why it is not.
      */
-    public record Definition(String name, String image, String tag, String digest, String category) {
+    public record Definition(String name, String image, String tag, String digest, String category, String unpinned) {
 
         /**
          * @return the reference to pull the image by: {@code image:tag}, followed by {@code @digest} if pinned
@@ -96,9 +96,9 @@ public final class DockerImageDefinitions {
     }
 
     /**
-     * @param file the user's images file, or {@code null} for the bundled one
+     * @param file the images file, or {@code null} for the bundled one
      */
-    static Map<String, Definition> load(Path file, UnaryOperator<String> placeholders) {
+    public static Map<String, Definition> load(Path file, UnaryOperator<String> placeholders) {
         try {
             if (file != null) {
                 logger.info("Loading Docker images from {}, overriding the bundled {}", file, IMAGES_FILE);
@@ -180,8 +180,8 @@ public final class DockerImageDefinitions {
     }
 
     private static Definition definition(String name, Object value, UnaryOperator<String> placeholders) {
-        Map<String, Object> map = map(value, name, "image, tag, digest and category");
-        onlyKeys(map, name, "image", "tag", "digest", "category");
+        Map<String, Object> map = map(value, name, "image, tag, digest, category and unpinned");
+        onlyKeys(map, name, "image", "tag", "digest", "category", "unpinned");
         String image = required(map, name, "image");
         String tag = resolve(name, required(map, name, "tag"), placeholders);
         String digest = optional(map, "digest");
@@ -193,7 +193,11 @@ public final class DockerImageDefinitions {
             throw new IllegalArgumentException(String.format("%s has unknown category '%s', expected one of %s",
                                                              name, category, new TreeSet<>(CATEGORIES)));
         }
-        return new Definition(name, image, tag, digest, category);
+        String unpinned = optional(map, "unpinned");
+        if (digest != null && unpinned != null) {
+            throw new IllegalArgumentException(String.format("%s has both a digest and the reason it has none", name));
+        }
+        return new Definition(name, image, tag, digest, category, unpinned);
     }
 
     private static String optional(Map<String, Object> map, String key) {

@@ -142,6 +142,7 @@
                 <configuration>
                     <systemPropertyVariables>
                         <afon.stacks>${project.basedir}/src/test/resources/stacks-test.yaml</afon.stacks>
+                        <afon.docker-images>bundled</afon.docker-images>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

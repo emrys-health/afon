@@ -35,6 +35,8 @@ public final class DockerImages {
     public static final String SPARK_IMAGE               = reference("spark");
     public static final String PYSPARK_NOTEBOOK_IMAGE    = reference("pyspark-notebook");
 
+    public static final String GITEA_IMAGE               = reference("gitea");
+
     public static final String JUPYTERHUB_HUB_IMAGE      = reference("jupyterhub-hub");
     public static final String JUPYTERHUB_PROXY_IMAGE    = reference("jupyterhub-proxy");
 
@@ -60,6 +62,13 @@ public final class DockerImages {
      */
     public static Map<String, DockerImageDefinitions.Definition> all() {
         return IMAGES;
+    }
+
+    /**
+     * @return the value of the key in {@code versions.properties}, which the {@code ${key}} placeholders of the tags are, or {@code null}
+     */
+    public static String version(String key) {
+        return VERSIONS.getProperty(key);
     }
 
     private static DockerImageDefinitions.Definition definition(String name) {

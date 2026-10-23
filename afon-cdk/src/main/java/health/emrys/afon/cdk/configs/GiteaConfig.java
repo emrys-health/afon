@@ -74,8 +74,8 @@ public class GiteaConfig {
     public static final  String HTTP_PORT = "3000";
     public static final  String SSH_PORT  = "2222";
     private static final String CHART_FILE  = "gitea-12.7.0.tgz";
-    /** The image the chart runs, by its appVersion, which must be kept in step with {@link #CHART_FILE}. */
-    private static final String GITEA_IMAGE = "docker.gitea.com/gitea:1.27.0-rootless";
+    /** The image the chart runs, by its appVersion, which must be kept in step with {@link #CHART_FILE}: see {@code docker-images.yaml}. */
+    private static final String GITEA_IMAGE = DockerImages.GITEA_IMAGE;
     /** Gitea requires an email, which {@code users.csv} does not; Gitea's own placeholder domain. */
     private static final String NO_EMAIL_DOMAIN = "noreply.localhost";
     private static final int    DB_PORT     = 5432;
