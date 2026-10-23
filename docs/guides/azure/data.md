@@ -1,23 +1,23 @@
-# Azure SDE: end-to-end setup of `azure-polaris`
+# Azure Data Provider: end-to-end setup of `azure-polaris`
 
-Summary of the procedure to deploy the `azure-polaris` stack for an SDE: a Polaris catalog (Iceberg, synthetic data)
-reachable over HTTPS on AKS.  The common config and CLI steps are in [azure_config.md](azure_config.md).
+Summary of the procedure to deploy the `azure-polaris` stack for a Data Provider: a Polaris catalog (Iceberg, synthetic data)
+reachable over HTTPS on AKS.  The common config and CLI steps are in [config](config.md).
 
 `azure-polaris` deploys no KeyCloak of its own: it relies on the TRE's, served at `OIDC_DOMAIN_NAME`
-(from [azure-full](azure_tre.md), or a standalone `azure-keycloak`), and checks it answers before deploying.
+(from [azure-full](tre.md), or a standalone `azure-keycloak`), and checks it answers before deploying.
 
 ## Steps
 
-| # | Step | Where |
-|---|------|-------|
-| 1 | Install the CLI and local tools | [azure_config.md](azure_config.md): [§2](azure_config.md#2-install-the-afon-cli), [§3](azure_config.md#3-install-the-local-tools) |
-| 2 | Admin creates the Entra ID app (`create-admin.sh`) | [§4](azure_config.md#4-admin-part-the-entra-id-app) |
-| 3 | Register the Polaris domain, eg `<env>polarisazure.click` | below |
-| 4 | Create and fill the config; switch env; login | [§5](azure_config.md#5-create-and-fill-in-the-config), [§6](azure_config.md#6-login) |
-| 5 | Create the env: `afon-cli.sh azure-create azure-polaris` | [§9](azure_config.md#9-create-the-env-and-check-the-storage) |
-| 6 | Point the registrar at the Azure nameservers; issue the TLS cert | [§7](azure_config.md#7-dns-zones), [§8](azure_config.md#8-tls-certificate-in-the-key-vault) |
-| 7 | Deploy: `afon-cli.sh manage-stack setup azure-polaris` | below |
-| 8 | Whitelist the TRE's IP at the SDE | below |
+| # | Step                                                             | Where |
+|---|------------------------------------------------------------------|-------|
+| 1 | Install the CLI and local tools                                  | [config](config.md): [§2](config.md#2-install-the-afon-cli), [§3](config.md#3-install-the-local-tools) |
+| 2 | Admin creates the Entra ID app (`create-admin.sh`)               | [§4](config.md#4-admin-part-the-entra-id-app) |
+| 3 | Register the Polaris domain, eg `<env>polarisazure.click`        | below |
+| 4 | Create and fill the config; switch env; login                    | [§5](config.md#5-create-and-fill-in-the-config), [§6](config.md#6-login) |
+| 5 | Create the env: `afon-cli.sh azure-create azure-polaris`         | [§9](config.md#9-create-the-env-and-check-the-storage) |
+| 6 | Point the registrar at the Azure nameservers; issue the TLS cert | [§7](config.md#7-dns-zones), [§8](config.md#8-tls-certificate-in-the-key-vault) |
+| 7 | Deploy: `afon-cli.sh manage-stack setup azure-polaris`           | below |
+| 8 | Whitelist the TRE's IP at the Data Provider                      | below |
 
 ## Stack-specific config
 

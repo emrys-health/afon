@@ -1,12 +1,12 @@
 # Azure config and common setup
 
-The config and setup steps common to the Azure env of a TRE ([azure_tre.md](azure_tre.md), stack `azure-full`) and
-of an SDE ([azure_sde.md](azure_sde.md), stack `azure-polaris`).  Do these first, then follow the doc of your side.
+The config and setup steps common to the Azure env of a [TRE](tre.md) (stack `azure-full`) and
+of a [data provider](data.md) (stack `azure-polaris`).  Do these first, then follow the doc of your side.
 
 ## 1. Pre-requisites
 
-- An Azure subscription with the permissions to create the env's elements (see [roles](../scripts/azure/roles.md)).
-- A registered domain name for each endpoint the stack serves (see [DNS configuration](../docs/dns_config.md)), eg
+- An Azure subscription with the permissions to create the env's elements (see [roles](../../../scripts/azure/roles.md)).
+- A registered domain name for each endpoint the stack serves (see [DNS configuration](../../dns_config.md)), eg
   `<env>polarisazure.click`.  Its DNS zone is created by `azure-create`, after which the registrar's nameservers must
   be pointed at the Azure ones.
 - A Linux or macOS machine.
@@ -31,7 +31,7 @@ Installs git, jdk, maven, docker, opentofu, kubernetes-cli, `azure-cli` and `kub
 ## 4. Admin part: the Entra ID app
 
 The `az ad` commands (Entra ID app/service principal management) are generally allowed only to a local admin
-(role **Application Owner**, see [roles](../scripts/azure/roles.md)), so the admin part of the env creation,
+(role **Application Owner**, see [roles](../../../scripts/azure/roles.md)), so the admin part of the env creation,
 `azure/create-admin.sh`, is run by an admin, who passes the values on to the deployer for `secret-azure.properties`.
 
 We assume the admin and the deployer are different people: the admin runs this step, the deployer runs everything else
@@ -126,7 +126,7 @@ afon-cli.sh config-validate -c azure
 afon-cli.sh config-switch -e xyz
 ```
 Config can also be shared with `afon-cli.sh config-{import|export} <zip> -e xyz`.
-See [configuration](../docs/configuration.md) for all the properties.
+See [configuration](../../configuration.md) for all the properties.
 
 ## 6. Login
 
@@ -139,7 +139,7 @@ Use `azure-account` to select the subscription again without logging in, eg afte
 ## 7. DNS zones
 
 `azure-create` creates one DNS zone per domain the stack serves.  Afterwards, get the zone's nameservers
-and set them at the domain registrar (see [DNS configuration](../docs/dns_config.md)):
+and set them at the domain registrar (see [DNS configuration](../../dns_config.md)):
 ```shell
 az network dns zone show --name <domain> --resource-group $AZURE_RESOURCE_GROUP --query nameServers
 dig +short A <domain>

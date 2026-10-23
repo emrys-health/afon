@@ -1,23 +1,23 @@
 # Azure TRE: end-to-end setup of `azure-full`
 
 Summary of the procedure to deploy the `azure-full` stack for a TRE: KeyCloak, Polaris, Spark, Jupyter and Gitea
-on AKS, from which the TRE queries the SDEs' Polaris catalogs ([azure_sde.md](azure_sde.md)).  It mirrors the SDE doc;
-the common config and CLI steps are in [azure_config.md](azure_config.md), the stack details in [stacks](../docs/stacks.md).
+on AKS, from which the TRE queries the data providers' Polaris catalogs.  It mirrors the [data provider](data.md) doc;
+the common config and CLI steps are in [config](config.md), the stack details in [stacks](../../stacks.md).
 
-`azure-full` has its own KeyCloak at `OIDC_DOMAIN_NAME`, which the SDEs' `azure-polaris` stacks use.
+`azure-full` has its own KeyCloak at `OIDC_DOMAIN_NAME`, which the data providers' `azure-polaris` stacks use.
 
 ## Steps
 
-| # | Step | Where |
-|---|------|-------|
-| 1 | Install the CLI and local tools | [azure_config.md](azure_config.md): [§2](azure_config.md#2-install-the-afon-cli), [§3](azure_config.md#3-install-the-local-tools) |
-| 2 | Admin creates the Entra ID app (`create-admin.sh`) | [§4](azure_config.md#4-admin-part-the-entra-id-app) |
-| 3 | Register three domains: OIDC, Polaris and Jupyter | below |
-| 4 | Create and fill the config; switch env; login | [§5](azure_config.md#5-create-and-fill-in-the-config), [§6](azure_config.md#6-login) |
-| 5 | Create the env: `afon-cli.sh azure-create azure-full` | [§9](azure_config.md#9-create-the-env-and-check-the-storage) |
-| 6 | Point the registrar at the Azure nameservers; issue the TLS certs | [§7](azure_config.md#7-dns-zones), [§8](azure_config.md#8-tls-certificate-in-the-key-vault) |
-| 7 | Deploy: `afon-cli.sh manage-stack setup azure-full` | below |
-| 8 | Give the SDEs the TRE's IP to whitelist | below |
+| # | Step                                                              | Where |
+|---|-------------------------------------------------------------------|-------|
+| 1 | Install the CLI and local tools                                   | [config](config.md): [§2](config.md#2-install-the-afon-cli), [§3](config.md#3-install-the-local-tools) |
+| 2 | Admin creates the Entra ID app (`create-admin.sh`)                | [§4](config.md#4-admin-part-the-entra-id-app) |
+| 3 | Register three domains: OIDC, Polaris and Jupyter                 | below |
+| 4 | Create and fill the config; switch env; login                     | [§5](config.md#5-create-and-fill-in-the-config), [§6](config.md#6-login) |
+| 5 | Create the env: `afon-cli.sh azure-create azure-full`             | [§9](config.md#9-create-the-env-and-check-the-storage) |
+| 6 | Point the registrar at the Azure nameservers; issue the TLS certs | [§7](config.md#7-dns-zones), [§8](config.md#8-tls-certificate-in-the-key-vault) |
+| 7 | Deploy: `afon-cli.sh manage-stack setup azure-full`               | below |
+| 8 | Give the Data Providers the TRE's IP to whitelist                 | below |
 
 ## Stack-specific config
 
@@ -61,9 +61,9 @@ afon-cli.sh azure-polaris           # is Polaris serving?
 ```
 `https://$OIDC_DOMAIN_NAME`, `https://$AZURE_POLARIS_DOMAIN_NAME` and `https://$AZURE_JUPYTER_DOMAIN_NAME` must load with valid TLS certificates.
 
-## SDE whitelisting
+## Data Providers whitelisting
 
-The TRE's egress IP is what the SDEs add to their whitelist (`AZURE_POLARIS_ALLOWED_CIDRS`), see [#162](https://github.com/emrys-health/afon-core/issues/162).
+The TRE's egress IP is what the Data Providers add to their whitelist (`AZURE_POLARIS_ALLOWED_CIDRS`).
 
 ## Teardown
 
