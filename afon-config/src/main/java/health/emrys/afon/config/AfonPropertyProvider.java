@@ -75,7 +75,7 @@ public interface AfonPropertyProvider {
         String domain = getOidcDomainName(cloud);
         String issuer = getValue(AfonProperty.OIDC_ISSUER_URL).trim().replace(OIDC_DOMAIN_PLACEHOLDER, domain);
         String host = URI.create(issuer).getHost();
-        if (!domain.equals(host)) {
+        if (!domain.equalsIgnoreCase(host)) { // host names are case-insensitive
             throw new IllegalStateException(String.format(
                 "The OIDC issuer %s of %s is at %s, not at its OIDC domain name %s: use %s in OIDC_ISSUER_URL",
                 issuer, cloud, host, domain, OIDC_DOMAIN_PLACEHOLDER));

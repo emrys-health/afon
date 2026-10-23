@@ -14,7 +14,7 @@ class CloudPropertyProviderTest {
     static class Constants {
         public static final String OIDC_DOMAIN_NAME = "oauth.example";
         public static final String OIDC_ISSUER_URL = "https://[OIDC_DOMAIN_NAME]/realms/polaris";
-        public static final String AWS_OIDC_DOMAIN_NAME = "oauth.aws.example";
+        public static final String AWS_OIDC_DOMAIN_NAME = "aws.oauth.example";
         public static final String AWS_REGION = "eu-west-2";
     }
 
@@ -23,9 +23,9 @@ class CloudPropertyProviderTest {
     @Test
     void readsTheOidcDomainAndIssuerOfTheCloud() {
         AfonPropertyProvider aws = properties.forCloud(AWS);
-        assertThat(aws.getValue(OIDC_DOMAIN_NAME)).isEqualTo("oauth.aws.example");
-        assertThat(aws.getValue(OIDC_ISSUER_URL)).isEqualTo("https://oauth.aws.example/realms/polaris");
-        assertThat(aws.getProperties().getProperty("OIDC_DOMAIN_NAME")).isEqualTo("oauth.aws.example");
+        assertThat(aws.getValue(OIDC_DOMAIN_NAME)).isEqualTo("aws.oauth.example");
+        assertThat(aws.getValue(OIDC_ISSUER_URL)).isEqualTo("https://aws.oauth.example/realms/polaris");
+        assertThat(aws.getProperties().getProperty("OIDC_DOMAIN_NAME")).isEqualTo("aws.oauth.example");
     }
 
     @Test

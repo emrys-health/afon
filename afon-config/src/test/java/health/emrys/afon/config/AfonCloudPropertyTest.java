@@ -13,11 +13,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AfonCloudPropertyTest {
 
     static class Constants {
-        public static final String AWS_POLARIS_DOMAIN_NAME  = "polaris.aws.example";
-        public static final String AZURE_POLARIS_DOMAIN_NAME = "polaris.azure.example";
+        public static final String AWS_POLARIS_DOMAIN_NAME  = "aws.polaris.example";
+        public static final String AZURE_POLARIS_DOMAIN_NAME = "azure.polaris.example";
         public static final String OIDC_DOMAIN_NAME = "oauth.example";
         public static final String OIDC_ISSUER_URL = "https://[OIDC_DOMAIN_NAME]/realms/polaris";
-        public static final String AWS_OIDC_DOMAIN_NAME = "oauth.aws.example";
+        public static final String AWS_OIDC_DOMAIN_NAME = "aws.oauth.example";
         public static final String AZURE_OIDC_DOMAIN_NAME = " ";
     }
 
@@ -33,7 +33,7 @@ class AfonCloudPropertyTest {
     @Test
     void oidcDomainIsThatOfTheCloudWhenSetElseTheCloudNeutralOne() {
         assertThat(properties.getOidcDomainProperty(AWS)).isEqualTo(AfonProperty.AWS_OIDC_DOMAIN_NAME);
-        assertThat(properties.getOidcDomainName(AWS)).isEqualTo("oauth.aws.example");
+        assertThat(properties.getOidcDomainName(AWS)).isEqualTo("aws.oauth.example");
         // blank, and not declared
         assertThat(properties.getOidcDomainProperty(AZURE)).isEqualTo(AfonProperty.OIDC_DOMAIN_NAME);
         assertThat(properties.getOidcDomainName(AZURE)).isEqualTo("oauth.example");
@@ -42,7 +42,7 @@ class AfonCloudPropertyTest {
 
     @Test
     void oidcIssuerFollowsTheDomainOfTheCloud() {
-        assertThat(properties.getOidcIssuerUrl(AWS)).isEqualTo("https://oauth.aws.example/realms/polaris");
+        assertThat(properties.getOidcIssuerUrl(AWS)).isEqualTo("https://aws.oauth.example/realms/polaris");
         assertThat(properties.getOidcIssuerUrl(GCP)).isEqualTo("https://oauth.example/realms/polaris");
     }
 
@@ -51,13 +51,24 @@ class AfonCloudPropertyTest {
         AfonPropertyProvider mismatched = new ConstantsPropertyProvider(Mismatched.class);
         assertThatThrownBy(() -> mismatched.getOidcIssuerUrl(AWS))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("is at oauth.example, not at its OIDC domain name oauth.aws.example");
+            .hasMessageContaining("is at oauth.example, not at its OIDC domain name aws.oauth.example");
+    }
+
+    @Test
+    void oidcIssuerHostIsComparedToTheDomainIgnoringCase() {
+        AfonPropertyProvider mixedCase = new ConstantsPropertyProvider(MixedCase.class);
+        assertThat(mixedCase.getOidcIssuerUrl(GCP)).isEqualTo("https://OAuth.Example/realms/polaris");
+    }
+
+    static class MixedCase {
+        public static final String OIDC_DOMAIN_NAME = "oauth.example";
+        public static final String OIDC_ISSUER_URL = "https://OAuth.Example/realms/polaris";
     }
 
     static class Mismatched {
         public static final String OIDC_DOMAIN_NAME = "oauth.example";
         public static final String OIDC_ISSUER_URL = "https://oauth.example/realms/polaris";
-        public static final String AWS_OIDC_DOMAIN_NAME = "oauth.aws.example";
+        public static final String AWS_OIDC_DOMAIN_NAME = "aws.oauth.example";
     }
 
     @Test
@@ -68,8 +79,8 @@ class AfonCloudPropertyTest {
 
     @Test
     void readsValueOfCloud() {
-        assertThat(properties.getCloudValue(AWS, AfonCloudProperty.POLARIS_DOMAIN_NAME)).isEqualTo("polaris.aws.example");
-        assertThat(properties.getCloudValue(AZURE, AfonCloudProperty.POLARIS_DOMAIN_NAME)).isEqualTo("polaris.azure.example");
+        assertThat(properties.getCloudValue(AWS, AfonCloudProperty.POLARIS_DOMAIN_NAME)).isEqualTo("aws.polaris.example");
+        assertThat(properties.getCloudValue(AZURE, AfonCloudProperty.POLARIS_DOMAIN_NAME)).isEqualTo("azure.polaris.example");
     }
 
     @Test
@@ -83,7 +94,7 @@ class AfonCloudPropertyTest {
 
     @Test
     void defaultsValueOfCloudNotDeclaredOrNotSet() {
-        assertThat(properties.getCloudValue(AWS, AfonCloudProperty.POLARIS_DOMAIN_NAME, "default")).isEqualTo("polaris.aws.example");
+        assertThat(properties.getCloudValue(AWS, AfonCloudProperty.POLARIS_DOMAIN_NAME, "default")).isEqualTo("aws.polaris.example");
         assertThat(properties.getCloudValue(GCP, AfonCloudProperty.POLARIS_LOG_BUCKET, "default")).isEqualTo("default");
         assertThat(properties.getCloudValue(GCP, AfonCloudProperty.POLARIS_DOMAIN_NAME, "default")).isEqualTo("default");
     }
