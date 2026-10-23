@@ -62,7 +62,12 @@ public class SparkConnectSmokeMain {
         logger.info("Reading table {}", tableFQN);
         Dataset<Row> dataset = spark.sql(format("SELECT * FROM %s", tableFQN));
         dataset.show(false);
-        Object[] rows = (Object[])dataset.collect();
+        checkUsersHaveBeenRecorded(dataset, tableFQN);
+        return spark;
+    }
+
+    private static void checkUsersHaveBeenRecorded(Dataset<Row> dataset, String tableFQN) {
+        Object[] rows = (Object[]) dataset.collect();
         logger.info("{} has {} rows", tableFQN, rows.length);
         Row row = Arrays.stream(rows)
                         .map(r -> (Row) r)
@@ -70,7 +75,6 @@ public class SparkConnectSmokeMain {
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException(format("No %s in %s", CONFIGURED_USERS_KEY, tableFQN)));
         logger.info(format("Users defined as: %s", row));
-        return spark;
     }
 
     private void callSparkConnectorInCluster() {
