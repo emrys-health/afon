@@ -140,7 +140,30 @@ public class StackPlanFactory {
         if (steps == null) {
             throw new IllegalArgumentException(String.format("Stack '%s' has no scenario '%s'", stackId, scenario));
         }
-        return steps.stepsUsing(ops);
+        return admittingCaller(stackId, steps.stepsUsing(ops), ops);
+    }
+
+    /**
+     * The steps of a scenario, with, if some call Polaris from this machine through its domain name, which its ingress may restrict,
+     * the steps admitting this machine to the Polaris of the stack, restricting it again at the end, even if a step fails, as for the
+     * setup. Through a port-forward to its pod, there is nothing to admit, and a stack without Polaris has no ingress to restrict.
+     * Only the Polaris of the stack is admitted, ie in the cluster that kubectl points at: a scenario calling that of another cloud
+     * too, eg {@code external-azure}, needs this machine admitted to it, eg with {@code kube-polaris-whitelist}.
+     */
+    List<Step> admittingCaller(StackId stackId, List<Step> steps, StepOperations ops) {
+        if (ops.polarisViaPortForward() || steps.stream().noneMatch(Step::isCallingPolaris) || !hasPolaris(stackId, ops.properties())) {
+            return steps;
+        }
+        Step restrictPolaris = ops.whitelistPolaris(stackId.cloud(), false);
+        List<Step> admitting = new ArrayList<>();
+        admitting.add(ops.whitelistPolaris(stackId.cloud(), true).withCleanup(restrictPolaris));
+        admitting.addAll(steps);
+        admitting.add(restrictPolaris);
+        return admitting;
+    }
+
+    private static boolean hasPolaris(StackId stackId, AfonPropertyProvider properties) {
+        return StackDefinitions.get(stackId).componentsFor(properties).stream().anyMatch(PolarisComponent.class::isInstance);
     }
 
     private List<Step> deleteSteps(StackId stackId, StepOperations ops) {
@@ -166,11 +189,14 @@ public class StackPlanFactory {
         steps.add(wait(components, ops, cloud));
         steps.add(ops.deployComplete(stackId));
         boolean hasPolaris = components.stream().anyMatch(PolarisComponent.class::isInstance);
+        // however Polaris was reached, it ends restricted to the configured CIDRs and the cluster's own addresses, without this machine
+        Step restrictPolaris = hasPolaris ? ops.whitelistPolaris(cloud, false) : null;
         if (setup) {
             // Polaris is called from this machine, through its public domain name, which its ingress may restrict: admit it
-            // until the end. Through a port-forward to its pod, there is nothing to admit.
+            // until the end, which is restricted again even if a step fails, as if by a finally. Through a port-forward to its
+            // pod, there is nothing to admit.
             if (hasPolaris && !ops.polarisViaPortForward()) {
-                steps.add(ops.whitelistPolaris(cloud, true));
+                steps.add(ops.whitelistPolaris(cloud, true).withCleanup(restrictPolaris));
             }
             // in the order of the components, the first to ask for a step runs it
             Map<String, Step> setupSteps = new LinkedHashMap<>();
@@ -182,9 +208,8 @@ public class StackPlanFactory {
             steps.addAll(setupSteps.values());
             steps.add(ops.setupComplete(stackId));
         }
-        // however Polaris was reached, it ends restricted to the configured CIDRs and the cluster's own addresses, without this machine
         if (hasPolaris) {
-            steps.add(ops.whitelistPolaris(cloud, false));
+            steps.add(restrictPolaris);
         }
         return steps;
     }

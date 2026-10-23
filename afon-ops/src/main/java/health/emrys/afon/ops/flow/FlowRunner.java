@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.flow;
 
+import health.emrys.afon.ops.steps.Cleanups;
 import org.slf4j.Logger;
 
 import java.util.List;
@@ -39,13 +40,18 @@ public class FlowRunner {
         int start = resumeFrom == null ? 0 : indexOf(steps, resumeFrom);
         logger.info("Flow {}: steps to run: {}", flowName,
                     steps.subList(start, steps.size()).stream().map(FlowStep::qualifiedName).collect(Collectors.joining(" > ")));
+        Cleanups cleanups = new Cleanups();
         for (int i = start; i < steps.size(); i++) {
             FlowStep step = steps.get(i);
             logger.info("Running step {} of item {}", step.qualifiedName(), step.item());
             try {
+                cleanups.started(step.step());
                 step.step().getFunction().run();
+                cleanups.completed(step.step());
             } catch (Exception e) {
-                throw failure(flowName, steps, i, e);
+                FlowFailedException failure = failure(flowName, steps, i, e);
+                cleanups.runPending();
+                throw failure;
             }
         }
     }

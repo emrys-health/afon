@@ -683,9 +683,13 @@ public class StepActions {
         return "";
     }
 
-    public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
+    /**
+     * @param polarisEndpoint the endpoint to call Polaris at, eg {@code localhost:54321} for a port-forward to its pod, or
+     *                        {@code null} for its public domain name
+     */
+    public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog, String polarisEndpoint) throws Exception {
         executeMainOf(ManagePolarisCatalogsMain.class,
-                new String[]{CREATE, cloud.toString(), catalog.toString()});
+                new String[]{CREATE, cloud.toString(), catalog.toString()}, polarisEndpointOverride(polarisEndpoint));
     }
 
     public void configureOidcUsersFor(AfonCloud cloud) throws Exception {
@@ -710,9 +714,12 @@ public class StepActions {
         return overrides;
     }
 
-    public void deleteCatalogFor(AfonCloud cloud, AfonCatalog catalog) throws Exception {
+    /**
+     * @param polarisEndpoint as for {@link #createCatalogFor}
+     */
+    public void deleteCatalogFor(AfonCloud cloud, AfonCatalog catalog, String polarisEndpoint) throws Exception {
         executeMainOf(ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.id()});
+                new String[]{DELETE, cloud.toString(), catalog.id()}, polarisEndpointOverride(polarisEndpoint));
     }
 
     public void deleteNamespaceFor(AfonCloud cloud, AfonCatalog catalog, String namespace) throws Exception {
@@ -721,15 +728,25 @@ public class StepActions {
                 new String[]{DELETE, cloud.toString(), catalog.id(), namespace});
     }
 
-    public void deleteTableFor(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName) throws Exception {
+    /**
+     * @param polarisEndpoint as for {@link #createCatalogFor}
+     */
+    public void deleteTableFor(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, String polarisEndpoint)
+    throws Exception {
         executeMainOf(
                 ManagePolarisCatalogsMain.class,
-                new String[]{DELETE, cloud.toString(), catalog.id(), namespace, tableName});
+                new String[]{DELETE, cloud.toString(), catalog.id(), namespace, tableName}, polarisEndpointOverride(polarisEndpoint));
     }
 
-    public void registerTable(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, String metadata) throws Exception {
+    /**
+     * @param polarisEndpoint the endpoint to call Polaris at, eg {@code localhost:54321} for a port-forward to its pod, or
+     *                        {@code null} for its public domain name
+     */
+    public void registerTable(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName, String metadata,
+                              String polarisEndpoint) throws Exception {
         executeMainOf(RegisterPolarisTableMain.class,
-                new String[]{cloud.toString(), catalog.toString(), namespace, tableName, metadata});
+                new String[]{cloud.toString(), catalog.toString(), namespace, tableName, metadata},
+                polarisEndpointOverride(polarisEndpoint));
     }
 
     /**

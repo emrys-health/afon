@@ -64,7 +64,9 @@ public class RegisterPolarisTableMain {
         String namespace = args[2];
         String table = args[3];
         String metadata = args[4];
-        properties.setValue(POLARIS_ENDPOINT, new PolarisEndpoint(cloud, properties).getEndpoint());
+        // the endpoint of the cloud's Polaris, unless given, eg of a port-forward to its pod
+        properties.setValue(POLARIS_ENDPOINT, System.getProperty(POLARIS_ENDPOINT.getName(),
+                                                                 new PolarisEndpoint(cloud, properties).getEndpoint()));
         if (args.length > 5) {
             String polarisId = args[5];
             String polarisSecret = args[6];

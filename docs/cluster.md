@@ -274,10 +274,20 @@ addresses, without this machine. It does so for the deploy as well, and only for
 restricts Polaris even if no CIDRs are configured, to the cluster's own addresses alone. It replaces the former `lockdown_polaris_for_<cloud>`
 step.
 
+The scenarios of `manage-stack run <stack-id> <scenario>` do the same for their steps that call Polaris from this machine, eg creating or
+deleting a catalog or a table, registering a table, configuring the Polaris users, or Spark: they go through a port-forward, or, with
+`https`, the scenario starts with `whitelist_polaris_for_<cloud>_with_caller` and ends with `whitelist_polaris_for_<cloud>`, even if a step
+fails. A scenario with none of these steps, eg `reading-aws`, gets neither. Only the Polaris of the stack is covered, in the cluster that
+kubectl points at: a scenario calling the Polaris of another cloud as well, ie `external-azure`, which calls the Azure Polaris and the AWS one, cannot
+reach both through a port-forward, as it needs two kubectl contexts, and with `https` needs this machine admitted to the other one, eg with
+`kube-polaris-whitelist azure set --caller`. Run it with `POLARIS_ACCESS=https` and the other cloud's Polaris unrestricted, or admitted.
+
 The steps listed by `manage-stack setup <stack-id> -h` are those that the current config gives, `POLARIS_ACCESS` included, as the doc is
-generated when you ask for it. If a step fails with `https` after the admit step, this machine stays admitted until the setup is resumed and ends,
-or `kube-polaris-whitelist <cloud> set` is run. And resuming from a step after `whitelist_polaris_for_<cloud>_with_caller` does not admit it:
-resume from that step, or run `kube-polaris-whitelist <cloud> set --caller` first.
+generated when you ask for it. With `https`, if a step fails after the admit step started, `whitelist_polaris_for_<cloud>` is run before the failure
+is reported, as if by a `finally`, so this machine does not stay admitted (if that step fails too, it is logged, and the failure reported is
+that of the first). The setup does not survive being killed, though, eg with Ctrl-C: then run `kube-polaris-whitelist <cloud> set`. And resuming
+from a step after `whitelist_polaris_for_<cloud>_with_caller` does not admit it: resume from that step, or run
+`kube-polaris-whitelist <cloud> set --caller` first.
 
 The scripts checking Polaris, `afon-cli.sh aws-polaris`, `azure-polaris` and `gcp-polaris`, follow `POLARIS_ACCESS` too: by default they call
 Polaris through a port-forward, so they check Polaris itself, not its ingress, DNS record or certificate, which `POLARIS_ACCESS=https`

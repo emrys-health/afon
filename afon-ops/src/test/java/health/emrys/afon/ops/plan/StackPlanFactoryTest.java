@@ -136,10 +136,36 @@ class StackPlanFactoryTest {
             "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-polaris)", "whitelistPolaris(aws,true)",
             "configureOidcUsersFor(aws)", "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)",
             "setupComplete(aws-polaris)", "whitelistPolaris(aws,false)");
+        // the caller is taken off again even if a step fails in between, as if by a finally
+        Step admit = factory.steps(SETUP, StackId.parse("aws-polaris"), ops, false).stream()
+                            .filter(step -> step.getName().equals("whitelistPolaris(aws,true)")).findFirst().orElseThrow();
+        assertThat(admit.getCleanup().getName()).isEqualTo("whitelistPolaris(aws,false)");
         // no setup, no caller to admit
         assertThat(derived(DEPLOY, "aws-polaris")).doesNotContain("whitelistPolaris(aws,true)").endsWith("whitelistPolaris(aws,false)");
         // a stack without Polaris has no ingress to restrict
         assertThat(derived(SETUP, "aws-keycloak")).noneMatch(step -> step.startsWith("whitelistPolaris("));
+    }
+
+    @Test
+    void aScenarioCallingPolarisFromThisMachineAdmitsItIfPolarisIsReachedThroughItsDomainName() {
+        List<Step> scenario = List.of(new Step("calls", "calls", () -> {}).callingPolaris(), new Step("other", "other", () -> {}));
+        List<Step> unrelated = List.of(new Step("other", "other", () -> {}));
+        StackId stack = StackId.parse("aws-full");
+        // by default through a port-forward to the pod: nothing to admit
+        assertThat(names(factory.admittingCaller(stack, scenario, ops))).containsExactly("calls", "other");
+
+        properties.setValue(POLARIS_ACCESS, "https");
+        List<Step> admitting = factory.admittingCaller(stack, scenario, ops);
+        assertThat(names(admitting)).containsExactly("whitelistPolaris(aws,true)", "calls", "other", "whitelistPolaris(aws,false)");
+        // restricted again even if a step fails
+        assertThat(admitting.get(0).getCleanup().getName()).isEqualTo("whitelistPolaris(aws,false)");
+        // nothing calls Polaris from the machine, or the stack has no Polaris
+        assertThat(names(factory.admittingCaller(stack, unrelated, ops))).containsExactly("other");
+        assertThat(names(factory.admittingCaller(StackId.parse("aws-keycloak"), scenario, ops))).containsExactly("calls", "other");
+    }
+
+    private static List<String> names(List<Step> steps) {
+        return steps.stream().map(Step::getName).toList();
     }
 
     @Test

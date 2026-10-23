@@ -101,6 +101,40 @@ class StackFlowTest {
     }
 
     @Test
+    void aFailureRunsTheCleanupsOfTheStepsThatStartedButNotAfterTheyAreDoneNorOfThoseThatDidNot() {
+        List<String> ran = new ArrayList<>();
+        Step restrict = new Step("restrict", "restrict", () -> ran.add("restrict"));
+        Step admit = new Step("admit", "admit", () -> ran.add("admit")).withCleanup(restrict);
+        Step failing = new Step("fails", "fails", () -> {
+            throw new IllegalStateException("boom");
+        });
+        FlowRunner runner = new FlowRunner();
+
+        // item 1 is done: its cleanup ran as its last step, so item 2 failing does not run it again
+        List<FlowStep> steps = List.of(
+            new FlowStep(1, setup("aws-full"), admit), new FlowStep(1, setup("aws-full"), restrict),
+            new FlowStep(2, setup("azure-polaris"), failing));
+        assertThatThrownBy(() -> runner.run("f", steps, null)).isInstanceOf(FlowRunner.FlowFailedException.class).hasMessageContaining("2:fails");
+        assertThat(ran).containsExactly("admit", "restrict");
+
+        // the step after the one with the cleanup fails: it runs before the failure is reported
+        ran.clear();
+        List<FlowStep> failsAfterAdmit = List.of(
+            new FlowStep(1, setup("aws-full"), admit), new FlowStep(1, setup("aws-full"), failing),
+            new FlowStep(1, setup("aws-full"), restrict));
+        assertThatThrownBy(() -> runner.run("f", failsAfterAdmit, null)).isInstanceOf(FlowRunner.FlowFailedException.class);
+        assertThat(ran).containsExactly("admit", "restrict");
+
+        // resuming after the step with the cleanup, which therefore did not start: nothing to clean up before the failure
+        ran.clear();
+        List<FlowStep> resumed = List.of(
+            new FlowStep(1, setup("aws-full"), admit), new FlowStep(1, setup("aws-full"), failing),
+            new FlowStep(1, setup("aws-full"), restrict));
+        assertThatThrownBy(() -> runner.run("f", resumed, "1:fails")).isInstanceOf(FlowRunner.FlowFailedException.class);
+        assertThat(ran).isEmpty();
+    }
+
+    @Test
     void failureReportsItemsNotRunAndResumesFromTheQualifiedStepName() {
         List<String> ran = new ArrayList<>();
         boolean[] fail = {true};

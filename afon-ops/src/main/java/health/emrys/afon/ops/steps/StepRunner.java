@@ -37,14 +37,18 @@ public class StepRunner {
      */
     public void runSteps(List<Step> steps) {
         logger.info("Steps to run: {}", join(steps));
+            Cleanups cleanups = new Cleanups();
             for (Step step : steps) {
                 try {
                     if (!Step.NOOP_NAME.equals(step.getName())) {
                         logger.info("Running step {}", step.getName());
+                        cleanups.started(step);
                         step.getFunction().run();
+                        cleanups.completed(step);
                     }
                 } catch (Exception e) {
                     logger.error("Failed running step "+step.getName(), e);
+                    cleanups.runPending();
                     throw new RuntimeException(e);
                 }
             }

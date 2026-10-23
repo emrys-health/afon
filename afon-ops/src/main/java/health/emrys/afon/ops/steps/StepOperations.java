@@ -313,7 +313,7 @@ public class StepOperations {
             } else {
                 action.run(null);
             }
-        });
+        }).callingPolaris();
     }
 
     /**
@@ -385,15 +385,15 @@ public class StepOperations {
     }
 
     private @NonNull Step createCatalogFor(AfonCloud cloud, AfonCatalog catalog) {
-        return new Step(format("create_catalog_%s_for_cloud_%s", catalog, cloud),
+        return callingPolaris(cloud, format("create_catalog_%s_for_cloud_%s", catalog, cloud),
             format("create Polaris catalog `%s` for cloud `%s`", catalog, cloud),
-            () -> actions.createCatalogFor(cloud, catalog));
+            endpoint -> actions.createCatalogFor(cloud, catalog, endpoint));
     }
 
     private @NonNull Step deleteCatalogFor(AfonCloud cloud, AfonCatalog catalog) {
-        return new Step(format("delete_catalog_%s_for_cloud_%s", catalog, cloud),
+        return callingPolaris(cloud, format("delete_catalog_%s_for_cloud_%s", catalog, cloud),
                 format("delete Polaris catalog `%s` for cloud `%s`", catalog, cloud),
-                () -> actions.deleteCatalogFor(cloud, catalog));
+                endpoint -> actions.deleteCatalogFor(cloud, catalog, endpoint));
     }
 
     public Step deleteExternalPolarisTableFor(AfonCloud cloud) {
@@ -424,9 +424,9 @@ public class StepOperations {
     }
 
     private @NonNull Step deletePolarisTable(AfonCloud cloud, AfonCatalog catalog, String namespace, String tableName) {
-        return new Step(format("delete_table_%s.%s.%s_for_cloud_%s", catalog, namespace, tableName, cloud),
+        return callingPolaris(cloud, format("delete_table_%s.%s.%s_for_cloud_%s", catalog, namespace, tableName, cloud),
                 format("delete Polaris table `%s.%s.%s` for cloud `%s`", catalog, namespace, tableName, cloud),
-                () -> actions.deleteTableFor(cloud, catalog, namespace, tableName));
+                endpoint -> actions.deleteTableFor(cloud, catalog, namespace, tableName, endpoint));
     }
 
     /**
@@ -526,9 +526,9 @@ public class StepOperations {
     }
 
     private Step registerTableInAwsPolaris(AfonCatalog catalog, String namespace, String tableName, String metadata) {
-        return new Step(format("register_table_%s_in_aws_polaris", tableName),
+        return callingPolaris(AWS, format("register_table_%s_in_aws_polaris", tableName),
                 format("Register table `%s` in the AWS Polaris", tableName),
-                () -> actions.registerTable(AWS, catalog, namespace, tableName, metadata));
+                endpoint -> actions.registerTable(AWS, catalog, namespace, tableName, metadata, endpoint));
     }
 
     /**
