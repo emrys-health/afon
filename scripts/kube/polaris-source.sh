@@ -8,10 +8,10 @@
 #     shows the login path working, ie Keycloak issuing the token and Polaris accepting it.  It is skipped
 #     when Polaris did not answer or the admin credentials are not configured.
 #
-# By default the requests go through the public domain name, so they fail with a 403 from the ingress if it is restricted to
-# other callers, see AWS_/AZURE_/GCP_POLARIS_ALLOWED_CIDRS.  With POLARIS_ACCESS=port-forward they go through a kubectl
-# port-forward to the Polaris pod instead, as the setup steps do: it is then Polaris itself that is checked, without its
-# ingress, and its DNS record and certificate.
+# By default, or with POLARIS_ACCESS=port-forward, the requests go through a kubectl port-forward to the Polaris pod, as the setup
+# steps do: it is then Polaris itself that is checked, without its ingress, and its DNS record and certificate.  With
+# POLARIS_ACCESS=https they go through the public domain name, so they fail with a 403 from the ingress if it is restricted to
+# other callers, see AWS_/AZURE_/GCP_POLARIS_ALLOWED_CIDRS.
 
 STATUS_SUBJECT=Polaris
 source $AFON_ROOT/scripts/kube/status-source.sh
@@ -21,20 +21,16 @@ POLARIS_URL=""          # where Polaris is reached, see polaris_connect
 POLARIS_PORT=8181       # the port that the Polaris pods listen on
 STATUS_FORWARD_PID=""   # the kubectl port-forward process, if any
 
-# Sets POLARIS_URL, unless already set: the public https URL of the domain name or, with POLARIS_ACCESS=port-forward, the local
-# URL of a kubectl port-forward to the Polaris pod, which is stopped when the script exits.  Reports FAILED if there is none.
+# Sets POLARIS_URL, unless already set: the local URL of a kubectl port-forward to the Polaris pod, which is stopped when the script
+# exits, or, with POLARIS_ACCESS=https, the public https URL of the domain name.  Reports FAILED if there is none.
 polaris_connect() {
   if [ -n "$POLARIS_URL" ]; then
     return 0
   fi
-  case "${POLARIS_ACCESS:-https}" in
-    ""|https|HTTPS)
+  case "${POLARIS_ACCESS:-port-forward}" in
+    https|HTTPS)
       POLARIS_URL="https://$STATUS_DOMAIN"
-      if [ -n "${POLARIS_ACCESS:-}" ]; then
-        echo "- Reaching Polaris through its domain name ($POLARIS_URL), as POLARIS_ACCESS=$POLARIS_ACCESS"
-      else
-        echo "- Reaching Polaris through its domain name ($POLARIS_URL), as POLARIS_ACCESS defaults to https"
-      fi
+      echo "- Reaching Polaris through its domain name ($POLARIS_URL), as POLARIS_ACCESS=$POLARIS_ACCESS"
       ;;
     port-forward)
       status_need_cluster "port-forward" || return 0
@@ -53,7 +49,7 @@ polaris_connect() {
         port=$(sed -n 's/^Forwarding from 127\.0\.0\.1:\([0-9]*\) -> .*/\1/p' "$log" 2>/dev/null | head -1)
         if [ -n "$port" ]; then
           POLARIS_URL="http://localhost:$port"
-          echo "- Reaching Polaris through a port-forward to pod $pod ($POLARIS_URL), as POLARIS_ACCESS=port-forward"
+          echo "- Reaching Polaris through a port-forward to pod $pod ($POLARIS_URL), as POLARIS_ACCESS=${POLARIS_ACCESS:-port-forward (the default)}"
           return 0
         fi
         if ! kill -0 "$STATUS_FORWARD_PID" 2>/dev/null; then

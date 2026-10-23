@@ -18,7 +18,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static health.emrys.afon.config.AfonCloud.*;
@@ -321,13 +320,13 @@ public class StepOperations {
      * Whether the steps reach Polaris through a tunnel to its pod, as {@link AfonProperty#POLARIS_ACCESS} says, instead of through
      * its public domain name.
      */
-    private boolean polarisViaPortForward() {
-        String access = properties.getValue(POLARIS_ACCESS, "https");
-        if (access == null || access.isBlank() || access.equalsIgnoreCase("https")) {
-            return false;
-        }
-        if (access.equalsIgnoreCase("port-forward")) {
+    public boolean polarisViaPortForward() {
+        String access = properties.getValue(POLARIS_ACCESS, "port-forward");
+        if (access == null || access.isBlank() || access.equalsIgnoreCase("port-forward")) {
             return true;
+        }
+        if (access.equalsIgnoreCase("https")) {
+            return false;
         }
         throw new IllegalArgumentException(format("%s should be 'https' or 'port-forward', not '%s'", POLARIS_ACCESS, access));
     }
@@ -338,41 +337,13 @@ public class StepOperations {
                 () -> actions.configureOidcUsersFor(cloud));
     }
 
-    public Step lockDownPolaris(AfonCloud cloud) {
-        String          kubectlArgs  = "annotate ingress polaris-ingress -n default --overwrite ";
-        String          args         = null;
-        AfonProperty    cidrKey      = null;
-        switch (cloud) {
-            case AWS:
-                cidrKey = AWS_POLARIS_ALLOWED_CIDRS;
-                args = kubectlArgs + "alb.ingress.kubernetes.io/inbound-cidrs=";
-                break;
-            case AZURE: // @Mauro is Azure not working at the moment? Comment this block out if so and we can chat
-                cidrKey = AZURE_POLARIS_ALLOWED_CIDRS;
-                args = kubectlArgs + "nginx.ingress.kubernetes.io/whitelist-source-range=";
-                break;
-            default: // TODO lock down other clouds to prevent exfiltration risks. #297 should fix this
-                logger.error(format("Don't know how to lock down Polaris for cloud %s", cloud));
-                return Step.NoOp;
-        }
-        String cidrs = toCidrWithPrefix32(cidrKey);
-        if (cidrs == null) {
-            logger.error(format("No property defined for %s. Polaris will be insecure.", cidrKey));
-            return Step.NoOp;
-        }
-        final String[] params = (args + cidrs).split(" ");
-        return new Step(
-            format("lockdown_polaris_for_%s", cloud),
-            "Make Polaris inaccessible from outside the cluster for security reasons",
-            () -> actions.run("kubectl", null, params));
-    }
-
     /**
      * Restricts the Polaris ingress of the cluster of the current kubectl context to the configured CIDRs and the cluster's own
-     * addresses, as {@code kube-polaris-whitelist <cloud> set [--caller]} does.
+     * addresses, as {@code kube-polaris-whitelist <cloud> set [--caller]} does, so that Polaris is always restricted, whether or not
+     * the CIDRs are configured, unlike the deploy, which leaves it open if they are not.
      *
-     * @param withCaller whether to admit this machine too, to run the Polaris steps of setup from it; calling again without
-     *                   takes it off
+     * @param withCaller whether to admit this machine too, to run the Polaris steps of setup from it, which waits until Polaris
+     *                   answers it; calling again without takes it off
      */
     public Step whitelistPolaris(AfonCloud cloud, boolean withCaller) {
         return new Step(
@@ -380,14 +351,6 @@ public class StepOperations {
             withCaller ? "Admit this machine, besides the configured CIDRs, to Polaris"
                        : "Restrict Polaris to the configured CIDRs and the cluster's own addresses",
             () -> actions.whitelistPolaris(cloud, withCaller, properties));
-    }
-
-    private String toCidrWithPrefix32(AfonProperty value) {
-        if (!properties.hasProperty(value)) {
-            return null;
-        }
-        String csv = properties.getValue(value, null);
-        return Arrays.stream(csv.split(",")).map(x -> x + "/32").collect(Collectors.joining(","));
     }
 
     /**

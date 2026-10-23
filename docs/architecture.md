@@ -117,7 +117,7 @@ commands compose their steps from `StepOperations` directly.
 
 The documents in `ops.docs` generate markdown documentation describing each step — this keeps documentation
 in lock-step with the actual deployment code.  There is one generic document class per kind: `StackDocument` (an action on a stack), `ScenarioDocument` and `FlowDocument`.  `DocumentFinder` makes one of each from `StackPlanFactory` and `StackFlows`, so  a new stack, scenario or flow is documented with nothing written per document, and the docs list the steps that `manage-stack` runs.  
-They are bundled in the jar, to show with `manage-stack <action> <stack-id> -h`.
+They are bundled in the jar, but `manage-stack <action> <stack-id> -h` generates the document when it is asked, from the current config, so that its steps are those that the config gives, eg with `POLARIS_ACCESS`, and shows the bundled one only if it cannot (`Documenter.generate`).
 
 ### Steps derived from the components
 

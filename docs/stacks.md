@@ -587,7 +587,7 @@ cluster in `AZURE_RESOURCE_GROUP` among the stacks that deploy it, unless given,
 afon-cli.sh azure-polaris                    # is Polaris serving?
 afon-cli.sh azure-keycloak                   # is KeyCloak serving?
 ```
-They check the same layers as on AWS.  The stacks serving KeyCloak are those that deploy it, which the stacks with their own KeyCloak do not if `AZURE_KEYCLOAK_EXTERNAL=true`.
+They check the same layers as on AWS.  The stacks serving KeyCloak are those that deploy it, which the stacks with their own KeyCloak do not if `AZURE_KEYCLOAK_EXTERNAL=true`. Polaris is called through a port-forward to its pod, unless `POLARIS_ACCESS=https`, see [reaching Polaris from the setup steps](cluster.md#reaching-polaris-from-the-setup-steps).
 
 #### Estimating the capacity of the cluster
 

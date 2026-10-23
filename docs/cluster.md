@@ -254,6 +254,35 @@ Setting it on a cluster that already runs changes the addresses its outbound tra
 open for a moment: check the plan before applying it, and restart what holds long-lived connections to an external service afterwards,
 as on [Azure](#egress-ip-azure). Whoever allow-lists the cluster's address must switch to the new one.
 
+### Reaching Polaris from the setup steps
+
+The setup steps that call the REST API of Polaris **from the machine running them**, ie creating the catalogs, configuring the Polaris
+users and the Spark step, reach it in one of two ways, as `POLARIS_ACCESS` in `afon.properties` says:
+
+- `port-forward` (the default, also if the property is empty or omitted): through a `kubectl port-forward` to a Polaris pod, opened for
+  the step and closed after it, so the call comes from inside the cluster and needs no access through the ingress, however it is
+  restricted. The kubectl context must be the cluster of the stack: the step fails, before calling anything, if it is not of the kind of the
+  cloud (EKS, AKS or GKE) or is not named `CLUSTER_NAME` or `<stack>-CLUSTER_NAME`, so point it at the right one first, eg
+  `afon-cli.sh azure-update-kube-config tre`. Keycloak is still reached through its public domain name, which is not restricted.
+- `https`: through the public domain name of Polaris, as before. If its ingress is restricted, see the sections below, this machine must
+  be among the allowed addresses while the steps run, so the setup admits it: `whitelist_polaris_for_<cloud>_with_caller` runs after
+  `deploy_complete_for_<stack>`, adds the IPv4 address of this machine to the CIDRs, and waits (up to 2 minutes) until Polaris answers it,
+  as an ALB takes some time to apply the change.
+
+Whichever it is, the last step of the setup, `whitelist_polaris_for_<cloud>`, restricts Polaris to the configured CIDRs and the cluster's own
+addresses, without this machine. It does so for the deploy as well, and only for the stacks that have Polaris. Unlike the deploy, it
+restricts Polaris even if no CIDRs are configured, to the cluster's own addresses alone. It replaces the former `lockdown_polaris_for_<cloud>`
+step.
+
+The steps listed by `manage-stack setup <stack-id> -h` are those that the current config gives, `POLARIS_ACCESS` included, as the doc is
+generated when you ask for it. If a step fails with `https` after the admit step, this machine stays admitted until the setup is resumed and ends,
+or `kube-polaris-whitelist <cloud> set` is run. And resuming from a step after `whitelist_polaris_for_<cloud>_with_caller` does not admit it:
+resume from that step, or run `kube-polaris-whitelist <cloud> set --caller` first.
+
+The scripts checking Polaris, `afon-cli.sh aws-polaris`, `azure-polaris` and `gcp-polaris`, follow `POLARIS_ACCESS` too: by default they call
+Polaris through a port-forward, so they check Polaris itself, not its ingress, DNS record or certificate, which `POLARIS_ACCESS=https`
+checks, and then fail with a 403 if the ingress is restricted and the machine is not admitted.
+
 ### Restricting who can reach Polaris (AWS)
 
 Set `AWS_POLARIS_ALLOWED_CIDRS` to a comma-separated list of CIDRs to only admit those callers to
@@ -282,11 +311,12 @@ no restraints: the egress IP alone does not restrict Polaris.
 The ingress controller can only tell the callers apart if the load balancer does not hide them: with the property set, the
 controller's service gets `externalTrafficPolicy: Local`, else the callers would all arrive from a node's address.
 
-The machine running `afon-cli.sh manage-stack setup` must be able to call Polaris, as it configures the Polaris users and catalogs through
-its public endpoint, so it must be among the CIDRs, or the ingress unrestricted, while the Polaris steps run. The `network` smoke test needs
-the opposite: that same machine must be stopped. So a stack deployed with the property set cannot be set up from a machine outside of it:
-remove the restriction of the deployed cluster for the setup, then restore it. `kube-polaris-whitelist` shows, sets or removes the
-restriction of the cluster that kubectl points at, on `aws` or `azure`, until the next deploy or `tofu-apply`, which sets it as the
+With the default `POLARIS_ACCESS=port-forward`, the machine running `afon-cli.sh manage-stack setup` calls Polaris from inside the cluster, so it
+need not be among the CIDRs, see [Reaching Polaris from the setup steps](#reaching-polaris-from-the-setup-steps). With
+`POLARIS_ACCESS=https` it calls Polaris through its public endpoint, so it must be among the CIDRs, or the ingress unrestricted, while the Polaris
+steps run: the setup admits it for that time. The `network` smoke test needs the opposite: that same machine must be stopped.
+To do by hand what the setup does, eg to resume it from a later step, `kube-polaris-whitelist` shows, sets or removes the
+restriction of the cluster that kubectl points at, on `aws`, `azure` or `gcp`, until the next deploy or `tofu-apply`, which sets it as the
 config says:
 
 ```shell

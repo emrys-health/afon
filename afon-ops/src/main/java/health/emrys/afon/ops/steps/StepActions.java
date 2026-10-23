@@ -611,8 +611,36 @@ public class StepActions {
      */
     protected void whitelistPolaris(AfonCloud cloud, boolean withCaller, AfonPropertyProvider properties) throws Exception {
         try (KubeClient client = new KubeClient(properties)) {
+            client.requireContextOf(cloud);
             new PolarisWhitelister(cloud, properties, client).set(withCaller, Optional.empty());
         }
+        if (withCaller) {
+            waitUntilPolarisAdmitsCaller(cloud, properties);
+        }
+    }
+
+    private static final long ADMIT_TIMEOUT_MILLIS = 120_000;
+    private static final long ADMIT_POLL_MILLIS    = 5_000;
+
+    /**
+     * Waits for the change of the ingress to take effect, which the load balancer takes some time to apply, until Polaris answers
+     * this machine with something else than a 403, ie 200, or 401 to a call without authentication. Only warns if it still does not
+     * after a while: what follows then fails with the 403.
+     */
+    private void waitUntilPolarisAdmitsCaller(AfonCloud cloud, AfonPropertyProvider properties) throws InterruptedException {
+        String url = "https://" + properties.getCloudValue(cloud, AfonCloudProperty.POLARIS_DOMAIN_NAME) + "/api/catalog/v1/config";
+        long deadline = System.currentTimeMillis() + ADMIT_TIMEOUT_MILLIS;
+        String problem;
+        while ((problem = problemAnswering(url, Set.of(200, 401))) != null) {
+            if (System.currentTimeMillis() >= deadline) {
+                logger.warn("{} {} after {}s: this machine may not have been admitted to Polaris yet",
+                            url, problem, ADMIT_TIMEOUT_MILLIS / 1000);
+                return;
+            }
+            logger.info("Waiting for Polaris to admit this machine: {} {}", url, problem);
+            Thread.sleep(ADMIT_POLL_MILLIS);
+        }
+        logger.info("Polaris admits this machine: {} answers", url);
     }
 
     /**

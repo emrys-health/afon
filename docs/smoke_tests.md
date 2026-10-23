@@ -245,6 +245,11 @@ address must not be among the CIDRs of the ingress, which are `AWS_POLARIS_ALLOW
 Azure) plus the cluster's egress IP (AWS) or pod CIDR and outbound IP (Azure). If it is, Polaris answers the call and the test fails
 with `Managed to make an HTTP call to <polaris domain>. Received HTTP code <code>`, whatever that code is.
 
+`manage-stack setup` of a stack with Polaris always ends by restricting it without the machine that ran it (the last step,
+`whitelist_polaris_for_<cloud>`, which restores the restriction, whether or not the machine was admitted for the setup, see
+[reaching Polaris from the setup steps](cluster.md#reaching-polaris-from-the-setup-steps)), so the test passes after a setup, unless the
+machine's address is among the configured CIDRs.
+
 What happens to the machine's own access to Polaris afterwards depends on how the ingress is restricted:
 
 | | Not restricted | Restricted by the deploy, without the machine's address | With the machine's address | `--restrict-polaris` |

@@ -8,6 +8,7 @@ import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.docs.DocumentNames;
+import health.emrys.afon.ops.docs.Documenter;
 import health.emrys.afon.ops.flow.FlowPlanFactory;
 import health.emrys.afon.ops.flow.FlowRunner;
 import health.emrys.afon.ops.flow.FlowStep;
@@ -173,12 +174,28 @@ public class ManageStackMain {
      * Prints the generated doc of the args, eg {@code setup <stack-id>}, else the usage.
      */
     private void help(String[] args) {
-        Optional<String> doc = DocumentNames.forArgs(args).flatMap(CommandHelp::findGeneratedDoc);
+        Optional<String> doc = DocumentNames.forArgs(args).flatMap(this::helpDoc);
         if (doc.isPresent()) {
             System.out.println(doc.get());
             return;
         }
         printUsage();
+    }
+
+    /**
+     * @return the doc generated now from the config, so that its steps are those that are run, else the one bundled in the jar, which
+     * was generated from the config when it was packaged, if it could not be
+     */
+    private Optional<String> helpDoc(String filename) {
+        try {
+            Optional<String> generated = Documenter.generate(filename, new OpsPropertyProvider(), users);
+            if (generated.isPresent()) {
+                return generated;
+            }
+        } catch (RuntimeException e) {
+            logger.warn("Could not generate {} from the config, showing the one bundled: {}", filename, e.toString());
+        }
+        return CommandHelp.findGeneratedDoc(filename);
     }
 
     public static void main(String[] allArgs) {

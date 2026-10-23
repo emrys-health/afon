@@ -132,7 +132,10 @@ class StackFlowTest {
                 return new health.emrys.afon.config.AfonCatalogs(properties);
             }
             if (invocation.getMethod().getReturnType() == Step.class) {
-                return new Step(invocation.getMethod().getName(), "", () -> { });
+                // named by its arguments too, as steps that differ by them, eg whitelistPolaris(cloud, withCaller), are named differently
+                Object[] arguments = invocation.getArguments();
+                String name = invocation.getMethod().getName() + (arguments.length == 0 ? "" : java.util.Arrays.toString(arguments));
+                return new Step(name, "", () -> { });
             }
             return RETURNS_DEFAULTS.answer(invocation);
         };

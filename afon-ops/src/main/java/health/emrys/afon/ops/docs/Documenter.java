@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 import static java.lang.String.format;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -30,6 +31,20 @@ public class Documenter {
     public Documenter(AfonPropertyProvider properties, AfonUserProvider users) {
         this.properties = properties;
         this.users = users;
+    }
+
+    /**
+     * Generates the document now, from the config given, rather than reading the one bundled in the jar when it was packaged, whose
+     * steps depend on the config at the time, eg {@code POLARIS_ACCESS}, which can be different when it is run.
+     *
+     * @param filename the file of the document, eg {@code setup_azure_full_stack.md}, see {@link DocumentNames}
+     * @return the document, if there is one of the file
+     */
+    public static Optional<String> generate(String filename, AfonPropertyProvider properties, AfonUserProvider users) {
+        return new DocumentFinder(properties, users).findDocuments().stream()
+                                                    .filter(document -> document.getFilename().equals(filename))
+                                                    .findFirst()
+                                                    .map(document -> new Documenter(properties, users).getContent(document));
     }
 
     public void generateDocuments(List<DocumentMetadata> documents) {

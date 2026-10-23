@@ -4,6 +4,7 @@ import health.emrys.afon.cdk.StackComponent;
 import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.cdk.components.KeycloakComponent;
+import health.emrys.afon.cdk.components.PolarisComponent;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
@@ -164,7 +165,13 @@ public class StackPlanFactory {
         steps.add(ops.deployStack(stackId));
         steps.add(wait(components, ops, cloud));
         steps.add(ops.deployComplete(stackId));
+        boolean hasPolaris = components.stream().anyMatch(PolarisComponent.class::isInstance);
         if (setup) {
+            // Polaris is called from this machine, through its public domain name, which its ingress may restrict: admit it
+            // until the end. Through a port-forward to its pod, there is nothing to admit.
+            if (hasPolaris && !ops.polarisViaPortForward()) {
+                steps.add(ops.whitelistPolaris(cloud, true));
+            }
             // in the order of the components, the first to ask for a step runs it
             Map<String, Step> setupSteps = new LinkedHashMap<>();
             for (StackComponent component : components) {
@@ -175,7 +182,10 @@ public class StackPlanFactory {
             steps.addAll(setupSteps.values());
             steps.add(ops.setupComplete(stackId));
         }
-        steps.add(ops.lockDownPolaris(cloud));
+        // however Polaris was reached, it ends restricted to the configured CIDRs and the cluster's own addresses, without this machine
+        if (hasPolaris) {
+            steps.add(ops.whitelistPolaris(cloud, false));
+        }
         return steps;
     }
 
