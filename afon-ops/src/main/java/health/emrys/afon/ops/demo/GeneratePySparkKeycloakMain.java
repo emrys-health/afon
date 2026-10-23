@@ -1,11 +1,13 @@
 package health.emrys.afon.ops.demo;
 
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
+import health.emrys.afon.polaris.config.PolarisEndpoint;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 import health.emrys.afon.spark.SparkWarehouseConfigFactory;
 import org.jspecify.annotations.NonNull;
@@ -77,18 +79,21 @@ public class GeneratePySparkKeycloakMain {
     }
 
     public static void main(String[] args) {
-        if (args.length == 0) {
+        if (args.length == 0 || args.length > 2) {
             String usage = String.format("""
                                                             
                     Invalid arguments: '%s'
-                    usage:  %s requires argument: polaris-host
+                    usage:  %s requires arguments: cloud [polaris-host]
+                    where polaris-host defaults to the Polaris domain name of the cloud
                     """, String.join(" ", args), GeneratePySparkKeycloakMain.class.getSimpleName());
             logger.warn(usage);
             return;
         }
-        String polarisHost = args[0];
-        logger.info("Using {} as the Polaris host");
-        var properties = new OpsPropertyProvider();
+        AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
+        // as seen by the cloud, so that the code gets the token from the KeyCloak of its Polaris
+        AfonPropertyProvider properties = new OpsPropertyProvider().forCloud(cloud);
+        String polarisHost = args.length == 2 ? args[1] : new PolarisEndpoint(cloud, properties).getEndpoint();
+        logger.info("Using {} as the Polaris host", polarisHost);
         properties.setValue(POLARIS_ENDPOINT, polarisHost);
         new GeneratePySparkKeycloakMain(properties, new FileUserProvider()).generateAndSavePySparkCode();
     }

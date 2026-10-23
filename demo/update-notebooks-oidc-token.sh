@@ -4,8 +4,13 @@
 # session must register the Polaris catalogs it uses, authenticated with the user's OIDC token, which
 # JupyterHub injects into the pod as the OIDC_TOKEN environment variable.
 #
-# usage: demo/update-notebooks-oidc-token.sh [--catalogs <c1,c2,...>] [--dry-run] [notebook...]
+# usage: demo/update-notebooks-oidc-token.sh [--catalogs <c1,c2,...>] [--cloud <cloud>] [--dry-run] [notebook...]
 #   --catalogs  the Polaris catalogs to register in sessions that register none (default: aws,azure,gcp)
+#   --cloud     the cloud whose Polaris the sessions call, whose Polaris domain name, <CLOUD>_POLARIS_DOMAIN_NAME, and
+#               Keycloak domain name, <CLOUD>_OIDC_DOMAIN_NAME else OIDC_DOMAIN_NAME, are read from
+#               $AFON_HOME/config/*.properties (AFON_HOME defaults to ~/.afon) and written as the notebook's defaults.
+#               Each cloud may have a Keycloak of its own, so the token must come from that of the Polaris called.
+#               Values are read as written, so ${...} references in them are not expanded.
 #   --dry-run   report what would change, without writing
 #   notebook    the notebooks to update (default: demo/notebooks/*.ipynb)
 #
@@ -19,18 +24,21 @@
 # (eg aws_forbidden), or rewriting.
 #
 # The Polaris and Keycloak hosts are read from POLARIS_DOMAIN_NAME and OIDC_DOMAIN_NAME when the notebook
-# runs, defaulting to emryspolaris.click and emrysoauth.click.
+# runs, defaulting to those of --cloud, or to emryspolaris.click and emrysoauth.click without it.
 
 set -euo pipefail
 
 DEMO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AFON_HOME="${AFON_HOME:-$HOME/.afon}"
 CATALOGS="aws,azure,gcp"
+CLOUD=""
 DRY_RUN=false
 NOTEBOOKS=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --catalogs|-c) CATALOGS="$2"; shift 2 ;;
+    --cloud) CLOUD="$2"; shift 2 ;;
     --dry-run|-n) DRY_RUN=true; shift ;;
     --help|-h) sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -41,14 +49,36 @@ if [ ${#NOTEBOOKS[@]} -eq 0 ]; then
   NOTEBOOKS=("$DEMO_DIR"/notebooks/*.ipynb)
 fi
 
-python3 - "$CATALOGS" "$DRY_RUN" "${NOTEBOOKS[@]}" <<'PYTHON'
+prop() {
+  grep -h "^$1=" "$AFON_HOME"/config/*.properties 2>/dev/null | tail -1 | cut -d= -f2- || true
+}
+
+POLARIS_DOMAIN="emryspolaris.click"
+OIDC_DOMAIN="emrysoauth.click"
+if [ -n "$CLOUD" ]; then
+  CLOUD_PREFIX=$(echo "$CLOUD" | tr '[:lower:]' '[:upper:]')
+  POLARIS_DOMAIN=$(prop "${CLOUD_PREFIX}_POLARIS_DOMAIN_NAME")
+  # the Keycloak of the cloud: its own domain name if it has one, else the neutral one
+  OIDC_DOMAIN=$(prop "${CLOUD_PREFIX}_OIDC_DOMAIN_NAME")
+  if [ -z "${OIDC_DOMAIN//[[:space:]]/}" ]; then
+    OIDC_DOMAIN=$(prop OIDC_DOMAIN_NAME)
+  fi
+  if [ -z "$POLARIS_DOMAIN" ] || [ -z "$OIDC_DOMAIN" ]; then
+    echo "${CLOUD_PREFIX}_POLARIS_DOMAIN_NAME or ${CLOUD_PREFIX}_OIDC_DOMAIN_NAME / OIDC_DOMAIN_NAME is not set in $AFON_HOME/config" >&2
+    exit 1
+  fi
+fi
+
+python3 - "$CATALOGS" "$DRY_RUN" "$POLARIS_DOMAIN" "$OIDC_DOMAIN" "${NOTEBOOKS[@]}" <<'PYTHON'
 import json
 import re
 import sys
 
 catalogs = [c.strip() for c in sys.argv[1].split(",") if c.strip()]
 dry_run = sys.argv[2] == "true"
-notebooks = sys.argv[3:]
+polaris_domain = sys.argv[3]
+oidc_domain = sys.argv[4]
+notebooks = sys.argv[5:]
 
 SESSION = re.compile(
     r'^(?P<indent>[ \t]*)spark\s*=\s*SparkSession\.builder\.appName\((?P<app>"[^"]*"|\'[^\']*\')\)'
@@ -62,8 +92,8 @@ def session_code(indent, app, remote):
     code = f'''# The Spark Connect server has no catalogs of its own: each session registers the Polaris catalogs
 # it uses, authenticated with the user's OIDC token, which JupyterHub injects into the pod.
 OIDC_TOKEN = os.environ["OIDC_TOKEN"]
-POLARIS_DOMAIN_NAME = os.environ.get("POLARIS_DOMAIN_NAME", "emryspolaris.click")
-OIDC_DOMAIN_NAME = os.environ.get("OIDC_DOMAIN_NAME", "emrysoauth.click")
+POLARIS_DOMAIN_NAME = os.environ.get("POLARIS_DOMAIN_NAME", "{polaris_domain}")
+OIDC_DOMAIN_NAME = os.environ.get("OIDC_DOMAIN_NAME", "{oidc_domain}")
 
 
 def with_catalog(builder, name, warehouse=None):
