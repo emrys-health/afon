@@ -41,6 +41,8 @@ You can run your dockerized Grafana persisting the config each time with:
 ```shell
 docker run -d --rm --name grafana -p 3000:3000 -v $LOCAL_GRAFANA_CONFIG_DIR:/var/lib/grafana grafana/grafana
 ```
+You'll need to add `--network=host` on Linux or you won't be able to talk to any of the forwarded ports.
+
 To save all the metadata files the first time:
 ```shell
 docker cp YOUR_CONTAINER_ID:/var/lib/grafana $LOCAL_GRAFANA_CONFIG_DIR
