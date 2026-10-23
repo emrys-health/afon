@@ -62,7 +62,9 @@ public class SparkConnectSmokeMain {
         logger.info("Reading table {}", tableFQN);
         Dataset<Row> dataset = spark.sql(format("SELECT * FROM %s", tableFQN));
         dataset.show(false);
-        Row row = Arrays.stream((Object[]) dataset.collect())
+        Object[] rows = (Object[])dataset.collect();
+        logger.info("{} has {} rows", tableFQN, rows.length);
+        Row row = Arrays.stream(rows)
                         .map(r -> (Row) r)
                         .filter(r -> r.getAs(LOG_COLUMN_NAME).toString().contains(CONFIGURED_USERS_KEY))
                         .findFirst()
