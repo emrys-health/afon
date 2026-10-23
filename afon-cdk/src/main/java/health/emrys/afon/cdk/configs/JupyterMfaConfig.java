@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 
 import static health.emrys.afon.config.AfonProperty.OIDC_EMAIL_DOMAIN;
-import static health.emrys.afon.config.AfonProperty.OIDC_ISSUER_URL;
 import static java.lang.String.format;
 
 /**
@@ -50,6 +49,7 @@ public class JupyterMfaConfig {
                      List<ITerraformDependable> dependsOn,
                      AfonPropertyProvider properties,
                      List<String> upstreamUrls,
+                     String issuer,
                      String jupyterDomain,
                      String clientId,
                      String clientSecret,
@@ -67,8 +67,6 @@ public class JupyterMfaConfig {
                 "cookie-secret", cookieSecret
                         ))
             .build();
-
-        String issuer = properties.getValue(OIDC_ISSUER_URL);
 
         List<String> proxyArgs = new ArrayList<>(List.of(
             "--provider=oidc",

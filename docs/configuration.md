@@ -135,7 +135,7 @@ For example, in `afon.properties`:
 ```shell
 ENV_NAME=dev
 CLUSTER_NAME=${ENV_NAME}-cluster
-OIDC_ISSUER_URL=https://${ENV_NAME}-oauth.click/realms/polaris
+OIDC_DOMAIN_NAME=${ENV_NAME}-oauth.click
 ```
 And in `afon-aws.properties`:
 ```shell

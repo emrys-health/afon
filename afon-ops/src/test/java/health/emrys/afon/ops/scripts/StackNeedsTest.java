@@ -13,6 +13,8 @@ import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.config.AfonProperty.AWS_KEYCLOAK_EXTERNAL;
+import static health.emrys.afon.config.AfonProperty.AWS_OIDC_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperty.AZURE_OIDC_DOMAIN_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -81,6 +83,19 @@ class StackNeedsTest {
                        .containsEntry("AFON_STACK_DOMAINS", "OIDC_DOMAIN_NAME AWS_POLARIS_DOMAIN_NAME AWS_JUPYTER_DOMAIN_NAME");
         assertThat(" " + env.get("AFON_STACK_COMPONENTS") + " ").startsWith(" Keycloak Polaris Jupyter ").contains(" Git ");
         assertThat(StackNeeds.resolve(AWS, "aws-lab", properties).env()).containsEntry("AFON_STACK_ROLE", "");
+    }
+
+    @Test
+    void keycloakDomainIsThatOfTheCloudWhenItHasOneOfItsOwn() {
+        properties.setValue(AWS_KEYCLOAK_EXTERNAL, "false");
+        properties.setValue(AWS_OIDC_DOMAIN_NAME, "identity.example");
+        properties.setValue(AZURE_OIDC_DOMAIN_NAME, " ");
+        StackNeeds aws = StackNeeds.resolve(AWS, "tre", properties);
+
+        assertThat(aws.domains()).containsExactly("AWS_OIDC_DOMAIN_NAME", "AWS_POLARIS_DOMAIN_NAME", "AWS_JUPYTER_DOMAIN_NAME");
+        assertThat(aws.env()).containsEntry("AFON_STACK_DOMAINS", "AWS_OIDC_DOMAIN_NAME AWS_POLARIS_DOMAIN_NAME AWS_JUPYTER_DOMAIN_NAME");
+        // a blank one is no domain of its own, so the cloud keeps the neutral one
+        assertThat(StackNeeds.resolve(AZURE, "tre", properties).domains()).first().isEqualTo("OIDC_DOMAIN_NAME");
     }
 
     @Test

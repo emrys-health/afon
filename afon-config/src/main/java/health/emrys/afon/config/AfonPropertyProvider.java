@@ -1,5 +1,6 @@
 package health.emrys.afon.config;
 
+import java.net.URI;
 import java.util.Properties;
 
 /**
@@ -42,6 +43,52 @@ public interface AfonPropertyProvider {
         return cloudProperty.forCloud(cloud)
                            .map(property -> getValue(property, defaultValue))
                            .orElse(defaultValue);
+    }
+
+    /**
+     * @return the property holding the domain of the cloud's KeyCloak: the cloud's own, eg {@code AWS_OIDC_DOMAIN_NAME}, if it is
+     * set and not blank, else {@code OIDC_DOMAIN_NAME}.  The one place that holds this fallback.
+     */
+    default AfonProperty getOidcDomainProperty(AfonCloud cloud) {
+        return AfonCloudProperty.OIDC_DOMAIN_NAME.forCloud(cloud)
+                                                 .filter(property -> !getValue(property, "").isBlank())
+                                                 .orElse(AfonProperty.OIDC_DOMAIN_NAME);
+    }
+
+    /**
+     * @return the domain of the cloud's KeyCloak, see {@link #getOidcDomainProperty(AfonCloud)}
+     */
+    default String getOidcDomainName(AfonCloud cloud) {
+        return getValue(getOidcDomainProperty(cloud));
+    }
+
+    /** In an issuer URL, stands for the OIDC domain name of the cloud, eg {@code https://[OIDC_DOMAIN_NAME]/realms/polaris}. */
+    String OIDC_DOMAIN_PLACEHOLDER = "[OIDC_DOMAIN_NAME]";
+
+    /**
+     * @return the OIDC issuer URL of the cloud's KeyCloak: {@code OIDC_ISSUER_URL}, a template in which
+     * {@value #OIDC_DOMAIN_PLACEHOLDER} is replaced by the {@link #getOidcDomainName(AfonCloud) domain} of the cloud
+     * @throws IllegalStateException if the issuer is not at the domain of the cloud's KeyCloak, eg {@code OIDC_ISSUER_URL}
+     *                               names the domain of another cloud's KeyCloak
+     */
+    default String getOidcIssuerUrl(AfonCloud cloud) {
+        String domain = getOidcDomainName(cloud);
+        String issuer = getValue(AfonProperty.OIDC_ISSUER_URL).trim().replace(OIDC_DOMAIN_PLACEHOLDER, domain);
+        String host = URI.create(issuer).getHost();
+        if (!domain.equals(host)) {
+            throw new IllegalStateException(String.format(
+                "The OIDC issuer %s of %s is at %s, not at its OIDC domain name %s: use %s in OIDC_ISSUER_URL",
+                issuer, cloud, host, domain, OIDC_DOMAIN_PLACEHOLDER));
+        }
+        return issuer;
+    }
+
+    /**
+     * @return these properties as seen by a flow calling the Polaris of the cloud, see {@link CloudPropertyProvider}: its
+     * {@code OIDC_DOMAIN_NAME} and {@code OIDC_ISSUER_URL} are those of the cloud's KeyCloak
+     */
+    default AfonPropertyProvider forCloud(AfonCloud cloud) {
+        return new CloudPropertyProvider(this, cloud);
     }
 
     /**

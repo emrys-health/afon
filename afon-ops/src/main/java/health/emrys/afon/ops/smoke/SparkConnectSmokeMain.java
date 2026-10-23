@@ -47,10 +47,11 @@ public class SparkConnectSmokeMain {
     private final AfonCatalog          catalog;
 
     public SparkConnectSmokeMain(AfonPropertyProvider properties, AfonUserProvider users) {
-        this.properties = properties;
-        this.users      = users;
-        AfonCloud cloud           = new SmokeConfig(properties).cloud();
-        String    polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
+        AfonCloud cloud = new SmokeConfig(properties).cloud();
+        // as seen by the cloud, whose Polaris and KeyCloak the smoke test calls
+        this.properties = properties.forCloud(cloud);
+        this.users = users;
+        String polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
         this.properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
         catalog = catalogFor(cloud, new AfonCatalogs(properties));
     }

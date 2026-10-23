@@ -29,6 +29,8 @@ public enum AfonProperty {
     AWS_S3_ROLE_ARN("AWS_S3_ROLE_ARN"),
     AWS_POLARIS_DOMAIN_NAME("AWS_POLARIS_DOMAIN_NAME"),
     AWS_JUPYTER_DOMAIN_NAME("AWS_JUPYTER_DOMAIN_NAME"),
+    /** Domain of the KeyCloak that the AWS stacks deploy.  Optional: {@code OIDC_DOMAIN_NAME} when blank or unset. */
+    AWS_OIDC_DOMAIN_NAME("AWS_OIDC_DOMAIN_NAME"),
     /**
      * Whether the AWS stacks otherwise deploying their own KeyCloak use instead the one at
      * {@code OIDC_DOMAIN_NAME} that the identity stack of the cloud deploys.  Optional: {@code false} when unset.
@@ -54,6 +56,8 @@ public enum AfonProperty {
     GOOGLE_APPLICATION_CREDENTIALS("GOOGLE_APPLICATION_CREDENTIALS"),
     GCP_POLARIS_DOMAIN_NAME("GCP_POLARIS_DOMAIN_NAME"),
     GCP_JUPYTER_DOMAIN_NAME("GCP_JUPYTER_DOMAIN_NAME"),
+    /** Domain of the KeyCloak that the GCP stacks deploy.  Optional: {@code OIDC_DOMAIN_NAME} when blank or unset. */
+    GCP_OIDC_DOMAIN_NAME("GCP_OIDC_DOMAIN_NAME"),
     /**
      * Comma-separated CIDRs admitted to Polaris' nginx ingress, plus the cluster's own addresses.  Optional: Polaris is open to
      * all when unset.
@@ -88,6 +92,8 @@ public enum AfonProperty {
     AZURE_CA_PASSWORD("AZURE_CA_PASSWORD"),
     AZURE_POLARIS_DOMAIN_NAME("AZURE_POLARIS_DOMAIN_NAME"),
     AZURE_JUPYTER_DOMAIN_NAME("AZURE_JUPYTER_DOMAIN_NAME"),
+    /** Domain of the KeyCloak that the AZURE stacks deploy.  Optional: {@code OIDC_DOMAIN_NAME} when blank or unset. */
+    AZURE_OIDC_DOMAIN_NAME("AZURE_OIDC_DOMAIN_NAME"),
     AZURE_POLARIS_ALLOWED_CIDRS("AZURE_POLARIS_ALLOWED_CIDRS"),
     /**
      * Public IP address, of a Standard, static public IP created beforehand in {@link #AZURE_RESOURCE_GROUP}, that all outbound
@@ -120,6 +126,7 @@ public enum AfonProperty {
     // OIDC provider (client-facing; any IdentityProvider implementation)
     OIDC_DOMAIN_NAME("OIDC_DOMAIN_NAME"),
     OIDC_PROTOCOL("OIDC_PROTOCOL"),
+    /** Issuer URL of the KeyCloak of any cloud without its own.  Optional: derived from the domain name when unset. */
     OIDC_ISSUER_URL("OIDC_ISSUER_URL"),
     OIDC_EMAIL_DOMAIN("OIDC_EMAIL_DOMAIN"),
 

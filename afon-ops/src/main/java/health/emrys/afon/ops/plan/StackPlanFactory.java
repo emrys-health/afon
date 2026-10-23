@@ -223,7 +223,7 @@ public class StackPlanFactory {
         if (endpoints.contains(Endpoint.POLARIS)) {
             return ops.waitForPolarisAndKeycloakIn(cloud);
         }
-        return ops.waitForKeyCloak();
+        return ops.waitForKeyCloak(cloud);
     }
 
     /**
@@ -268,7 +268,7 @@ public class StackPlanFactory {
         Map<AfonProperty, String> deployed = new LinkedHashMap<>();
         for (StackComponent component : StackDefinitions.get(other).componentsFor(properties)) {
             ComponentPlan componentSteps = registry.of(component);
-            componentSteps.domains(other.cloud()).forEach(domain -> deployed.put(domain, componentSteps.label()));
+            componentSteps.domains(other.cloud(), properties).forEach(domain -> deployed.put(domain, componentSteps.label()));
         }
         List<String> deploys = new ArrayList<>();
         List<String> holds = new ArrayList<>();
@@ -321,7 +321,7 @@ public class StackPlanFactory {
         StackDefinition definition = StackDefinitions.get(stackId);
         Set<AfonProperty> resources = new TreeSet<>();
         for (StackComponent component : definition.componentsFor(properties)) {
-            resources.addAll(registry.of(component).domains(stackId.cloud()));
+            resources.addAll(registry.of(component).domains(stackId.cloud(), properties));
         }
         if (definition.pinnedEgressIp()) {
             // the clouds that can pin it have the property, eg AWS_EGRESS_IP, the others none

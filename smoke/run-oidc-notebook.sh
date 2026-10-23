@@ -10,10 +10,10 @@
 # The executed notebook, with its outputs, is written to smoke/target/<notebook name>, leaving the
 # original clean.
 #
-# Checks Keycloak is serving requests with './afon.sh -a check-oidc', then
+# Checks Keycloak is serving requests with './afon.sh -a check-oidc <cloud>', then
 # gets USER_ID's OIDC access token from Keycloak with './afon.sh -a show-oidc-token <cloud> user',
 # port-forwards the Spark Connect driver of the current kubectl context, then runs the notebook via
-# './afon.sh -a jupyter-execute'.  Also reads <CLOUD>_POLARIS_DOMAIN_NAME and OIDC_DOMAIN_NAME from
+# './afon.sh -a jupyter-execute'.  Also reads <CLOUD>_POLARIS_DOMAIN_NAME and <CLOUD>_OIDC_DOMAIN_NAME (else OIDC_DOMAIN_NAME) from
 # $AFON_HOME/config/*.properties (AFON_HOME defaults to ~/.afon), for the notebook.  Only those properties
 # are read, rather than sourcing the secrets: sourcing them would also export cloud credentials that change
 # the identity kubectl uses.  The token is never printed.
@@ -40,11 +40,13 @@ require() {
 
 CLOUD_PREFIX=$(echo "$CLOUD" | tr '[:lower:]' '[:upper:]')
 POLARIS_HOST=$(prop "${CLOUD_PREFIX}_POLARIS_DOMAIN_NAME")
-OIDC_HOST=$(prop OIDC_DOMAIN_NAME)
+# the KeyCloak of the cloud: its own domain name if it has one, else the neutral one
+OIDC_HOST=$(prop "${CLOUD_PREFIX}_OIDC_DOMAIN_NAME")
+OIDC_HOST="${OIDC_HOST:-$(prop OIDC_DOMAIN_NAME)}"
 require "${CLOUD_PREFIX}_POLARIS_DOMAIN_NAME" "$POLARIS_HOST"
-require OIDC_DOMAIN_NAME "$OIDC_HOST"
+require "${CLOUD_PREFIX}_OIDC_DOMAIN_NAME or OIDC_DOMAIN_NAME" "$OIDC_HOST"
 
-if ! "$AFON_ROOT/afon.sh" -a check-oidc >/dev/null; then
+if ! "$AFON_ROOT/afon.sh" -a check-oidc "$CLOUD" >/dev/null; then
   echo "OIDC provider at $OIDC_HOST is not ready" >&2
   exit 1
 fi

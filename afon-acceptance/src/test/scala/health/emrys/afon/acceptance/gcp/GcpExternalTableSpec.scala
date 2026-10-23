@@ -30,7 +30,7 @@ class GcpExternalTableSpec extends SpecPretifier with GivenWhenThen {
 
     // this gives:
     // Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials
-    val externalCatalog: ExternalPolarisCatalog = new ExternalPolarisCatalog(properties) {
+    val externalCatalog: ExternalPolarisCatalog = new ExternalPolarisCatalog(properties, AfonCloud.GCP) {
       override def catalogName(): String = FEDERATED_CATALOG_NAME
       override protected def bucketUri(): String = s"gs://$BUCKET"
       override protected def storageConfigInfo(): StorageConfigInfo = gcpCatalog.storageConfigInfo()

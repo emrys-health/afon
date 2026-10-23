@@ -34,7 +34,7 @@ public class SparkClient {
     }
 
     public SparkClient(AfonCloud cloud, AfonPropertyProvider properties, AfonUser user) {
-        this.properties = properties;
+        this.properties = properties.forCloud(cloud);
         this.credentials = new PolarisCredentials(cloud, properties);
         this.user = user;
     }

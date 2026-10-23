@@ -1,6 +1,7 @@
 package health.emrys.afon.polaris.catalogs;
 
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import org.jspecify.annotations.NonNull;
@@ -24,7 +25,7 @@ public class AwsExternalPolarisCatalog extends ExternalPolarisCatalog {
      * credentials, region and domain are fixed per cloud and read here directly.
      */
     public AwsExternalPolarisCatalog(AfonCatalog catalog, AfonPropertyProvider properties) {
-        super(properties);
+        super(properties, AfonCloud.AWS);
         this.catalogName = catalog.toString();
         this.bucketUrl = s3BucketUrl(catalog.bucketName());
         this.roleArn = properties.getValue(AWS_S3_ROLE_ARN);

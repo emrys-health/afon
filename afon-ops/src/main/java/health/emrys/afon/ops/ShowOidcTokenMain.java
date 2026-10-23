@@ -56,9 +56,9 @@ public class ShowOidcTokenMain {
             return;
         }
         var properties = new OpsPropertyProvider();
-        var app = new ShowOidcTokenMain(new KeyCloakProvider(properties.getValue(OIDC_DOMAIN_NAME)), properties,
-                                        new FileUserProvider());
         AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
+        var app = new ShowOidcTokenMain(new KeyCloakProvider(properties.getOidcDomainName(cloud)), properties,
+                                        new FileUserProvider());
         if (args.length == 2) {
             app.userToken(cloud);
         } else {

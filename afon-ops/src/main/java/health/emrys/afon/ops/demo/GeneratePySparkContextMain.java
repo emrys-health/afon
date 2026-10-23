@@ -40,7 +40,8 @@ public class GeneratePySparkContextMain {
     private final SparkWarehouseConfig polarisConfig;
     private final AfonCatalogs afonCatalogs;
 
-    public GeneratePySparkContextMain(AfonCloud cloud, AfonPropertyProvider properties, AfonUserProvider users) {
+    public GeneratePySparkContextMain(AfonCloud cloud, AfonPropertyProvider cloudNeutralProperties, AfonUserProvider users) {
+        AfonPropertyProvider properties = cloudNeutralProperties.forCloud(cloud);
         PolarisCredentials credentials = new PolarisCredentials(cloud, properties);
         polarisEndpoint = credentials.getPolarisEndpoint();
         polarisId = credentials.getPolarisId();

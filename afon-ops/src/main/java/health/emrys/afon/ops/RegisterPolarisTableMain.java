@@ -2,6 +2,7 @@ package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
 import health.emrys.afon.rest.HttpResponses;
@@ -58,8 +59,8 @@ public class RegisterPolarisTableMain {
             logger.warn(usage);
             return;
         }
-        var properties = new OpsPropertyProvider();
         AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
+        AfonPropertyProvider properties = new OpsPropertyProvider().forCloud(cloud);
         String catalog = new AfonCatalogs(properties).get(args[1]).toString();
         String namespace = args[2];
         String table = args[3];
@@ -74,7 +75,7 @@ public class RegisterPolarisTableMain {
             properties.setValue(POLARIS_ID, polarisId);
             properties.setValue(POLARIS_SECRET, polarisSecret);
         }
-        logger.info("OIDC domain: {}", properties.getValue(OIDC_DOMAIN_NAME));
+        logger.info("OIDC domain: {}", properties.getOidcDomainName(cloud));
         PolarisTableRegister register = new PolarisTableRegister(clientFactory().createClient(properties));
         RegisterPolarisTableMain app  = new RegisterPolarisTableMain(register);
         app.createNamespaceAndTable(catalog, namespace, table, metadata);

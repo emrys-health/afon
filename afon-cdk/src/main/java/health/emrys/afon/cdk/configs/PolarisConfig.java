@@ -272,7 +272,7 @@ public class PolarisConfig extends Construct {
             ? ""
             : format("export %s='%s'", GOOGLE_APPLICATION_CREDENTIALS.getName(), SECRETS_DIR + "/" + GCP_CREDENTIALS_FILE);
 
-        String kcConfig = kcExports(properties);
+        String kcConfig = kcExports(properties, deploymentCloud);
 
         String pgConfig = format(
             """
@@ -347,8 +347,8 @@ public class PolarisConfig extends Construct {
         }
     }
 
-    private static @NonNull String kcExports(AfonPropertyProvider properties) {
-        String kcHost = properties.getValue(OIDC_DOMAIN_NAME);
+    private static @NonNull String kcExports(AfonPropertyProvider properties, AfonCloud cloud) {
+        String kcHost = properties.getOidcDomainName(cloud);
         Map<String, String> kcProperties = KeyCloakHelper.polarisOidcEnv(
             KeyCloakConfigurer.internalRealmUrl(kcHost, "https"),
             properties.getValue(KEYCLOAK_DB_USERNAME),

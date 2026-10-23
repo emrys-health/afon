@@ -95,7 +95,7 @@ public class StepOperations {
     }
 
     /**
-     * Checks that the KeyCloak server at {@code OIDC_DOMAIN_NAME}, deployed by another stack,
+     * Checks that the KeyCloak server at the OIDC domain name of the cloud, deployed by another stack,
      * answers, so that a stack using it fails fast rather than when Polaris cannot discover it.
      * It asks for the discovery document of the {@code master} realm, as it always exists, unlike the Polaris realm,
      * which the setup steps create.
@@ -104,11 +104,12 @@ public class StepOperations {
      *              that of another cloud if it has none
      */
     public Step checkKeyCloakAnswers(AfonCloud cloud) {
-        String url = KeyCloakConfigurer.urlFor(properties.getValue(OIDC_DOMAIN_NAME), "https")
+        AfonProperty domainProperty = properties.getOidcDomainProperty(cloud);
+        String url = KeyCloakConfigurer.urlFor(properties.getValue(domainProperty), "https")
                      + "/realms/master/.well-known/openid-configuration";
         return new Step("check_keycloak_answers",
                 format("check KeyCloak answers at %s", url),
-                () -> actions.checkAnswers(url, "Deploy the KeyCloak stack at OIDC_DOMAIN_NAME first"
+                () -> actions.checkAnswers(url, "Deploy the KeyCloak stack at " + domainProperty.getName() + " first"
                                                 + setupCommandFor(identityStackFor(cloud))));
     }
 
@@ -231,7 +232,7 @@ public class StepOperations {
     public Step waitForPolarisAndKeycloakIn(AfonCloud cloud) {
         return Step.sequence(format("wait_on_polaris_and_keycloak_for_cloud_%s", cloud),
                 format("wait on DNS for Polaris and KeyCloak for cloud `%s`", cloud),
-                waitForPolaris(cloud), waitForKeyCloak());
+                waitForPolaris(cloud), waitForKeyCloak(cloud));
     }
 
     private Step waitForPolaris(AfonCloud cloud) {
@@ -252,11 +253,14 @@ public class StepOperations {
      * Waits for the KeyCloak's DNS record, then for it to serve, ie answer the discovery document of its {@code master}
      * realm: it is deployed without waiting for its pod to be ready, which takes minutes, and what follows, eg configuring the
      * OIDC users, needs it up.
+     *
+     * @param cloud the cloud of the KeyCloak, whose OIDC domain name it waits for
      */
-    public Step waitForKeyCloak() {
+    public Step waitForKeyCloak(AfonCloud cloud) {
         long timeout = dnsWaitTimeout();
-        Step dns = actions.waitOnDNS(properties.getValue(OIDC_DOMAIN_NAME), timeout);
-        String url = KeyCloakConfigurer.urlFor(properties.getValue(OIDC_DOMAIN_NAME), "https")
+        String domainName = properties.getOidcDomainName(cloud);
+        Step dns = actions.waitOnDNS(domainName, timeout);
+        String url = KeyCloakConfigurer.urlFor(domainName, "https")
                 + "/realms/master/.well-known/openid-configuration";
         Step answers = actions.waitOnAnswer(url, timeout, KEYCLOAK_POLL_MILLIS);
         return Step.sequence(dns.getName(), dns.getDescription() + ", then for it to answer", dns, answers);

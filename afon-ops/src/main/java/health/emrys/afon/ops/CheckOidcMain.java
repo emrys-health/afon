@@ -1,15 +1,15 @@
 package health.emrys.afon.ops;
 
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 
 import java.io.PrintStream;
 
-import static health.emrys.afon.config.AfonProperty.OIDC_DOMAIN_NAME;
 
 /**
- * Checks that the {@link IdentityProvider} at {@code OIDC_DOMAIN_NAME} is serving requests, eg before
+ * Checks that the {@link IdentityProvider} at the OIDC domain name of the cloud is serving requests, eg before
  * smoke/run-oidc-notebook.sh asks it for a token.  Exits non-zero if it is not.
  */
 public class CheckOidcMain {
@@ -38,7 +38,12 @@ public class CheckOidcMain {
     }
 
     public static void main(String[] args) {
-        String domainName = new OpsPropertyProvider().getValue(OIDC_DOMAIN_NAME);
+        if (args.length != 1) {
+            System.out.println("CheckOidcMain requires the argument: cloud");
+            return;
+        }
+        AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
+        String domainName = new OpsPropertyProvider().getOidcDomainName(cloud);
         if (!new CheckOidcMain(new KeyCloakProvider(domainName), domainName, System.out, System.err).check()) {
             System.exit(1);
         }

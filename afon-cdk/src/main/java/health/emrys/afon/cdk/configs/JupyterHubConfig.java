@@ -458,7 +458,7 @@ public class JupyterHubConfig {
      * is the real authentication gate — lets any username straight through.
      */
     private String jupyterhubConfigPy() {
-        String issuer = properties.getValue(AfonProperty.OIDC_ISSUER_URL);
+        String issuer = properties.getOidcIssuerUrl(platform.cloud());
         logger.info("login at: https://{}/", jupyterDomain());
         return """
                import os, json, time
@@ -626,6 +626,7 @@ public class JupyterHubConfig {
             deps,
             properties,
             MFA_UPSTREAMS,
+            properties.getOidcIssuerUrl(platform.cloud()),
             jupyterDomain(),
             properties.getValue(AfonProperty.OAUTH2_CLIENT_ID),
             properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET),

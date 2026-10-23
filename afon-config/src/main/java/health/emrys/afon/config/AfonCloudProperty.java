@@ -16,6 +16,7 @@ import java.util.Optional;
 public enum AfonCloudProperty {
     POLARIS_DOMAIN_NAME,
     JUPYTER_DOMAIN_NAME,
+    OIDC_DOMAIN_NAME,
     POLARIS_ALLOWED_CIDRS,
     EGRESS_IP,
     POLARIS_LOG_BUCKET,

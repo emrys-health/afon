@@ -1,6 +1,7 @@
 package health.emrys.afon.polaris.catalogs;
 
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.GcpStorageConfigInfo;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
@@ -24,7 +25,7 @@ public class GcpExternalPolarisCatalog extends ExternalPolarisCatalog {
      * service account and domain are fixed per cloud and read here directly.
      */
     public GcpExternalPolarisCatalog(AfonCatalog catalog, AfonPropertyProvider properties) {
-        super(properties);
+        super(properties, AfonCloud.GCP);
         this.catalogName    = catalog.toString();
         this.bucketUrl      = gsBucketUrl(catalog.bucketName());
         this.serviceAccount = properties.getValue(GCP_SERVICE_ACCOUNT);

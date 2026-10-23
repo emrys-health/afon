@@ -27,7 +27,8 @@ AZURE_POLARIS_DOMAIN_NAME=${ENV_NAME}polarisazure.click
 AZURE_POLARIS_LOG_BUCKET=<optional: container for Polaris logs>
 AZURE_POLARIS_ALLOWED_CIDRS=<optional: CIDRs admitted to Polaris, eg the TRE's IP>
 ```
-`afon.properties`: `OIDC_DOMAIN_NAME` and `OIDC_ISSUER_URL` of the TRE's KeyCloak.
+`afon.properties`: `OIDC_DOMAIN_NAME` of the TRE's KeyCloak (or `AZURE_OIDC_DOMAIN_NAME` in `afon-azure.properties`).  `OIDC_ISSUER_URL`
+needs no change, as it follows the domain name.
 
 If the DNS zone of `AZURE_POLARIS_DOMAIN_NAME` is not in your resource group, the stack can't serve it: `azure-create` makes it.
 

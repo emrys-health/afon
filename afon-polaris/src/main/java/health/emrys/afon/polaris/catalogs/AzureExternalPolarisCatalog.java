@@ -1,6 +1,7 @@
 package health.emrys.afon.polaris.catalogs;
 
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.apache.polaris.core.admin.model.StorageConfigInfo;
 import org.jspecify.annotations.NonNull;
@@ -23,7 +24,7 @@ public class AzureExternalPolarisCatalog extends ExternalPolarisCatalog {
      * credentials and domain are fixed per cloud and read here directly.
      */
     public AzureExternalPolarisCatalog(AfonCatalog catalog, AfonPropertyProvider properties) {
-        super(properties);
+        super(properties, AfonCloud.AZURE);
         this.catalogName        = catalog.toString();
         this.bucketUrl          = abfssBucketUrl(catalog.bucketName(), properties.getValue(AZURE_STORAGE_ACCOUNT));
         this.tenant             = properties.getValue(AZURE_TENANT_ID);

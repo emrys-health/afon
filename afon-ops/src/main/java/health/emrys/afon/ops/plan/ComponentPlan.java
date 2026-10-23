@@ -2,6 +2,7 @@ package health.emrys.afon.ops.plan;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
@@ -50,10 +51,10 @@ public interface ComponentPlan {
 
     /**
      * @return the properties of the domain names the component holds exclusively on the cloud, ie that only one running stack can
-     * serve, eg the one of the Polaris DNS record.  Stacks holding the same one conflict, so deploying one first deletes the other.
+     * serve, eg the one of the Polaris DNS record, as the config resolves them for the cloud.  Stacks holding the same one conflict, so deploying one first deletes the other.
      * None by default, ie it does not stop other stacks from running beside it.
      */
-    default List<AfonProperty> domains(AfonCloud cloud) {
+    default List<AfonProperty> domains(AfonCloud cloud, AfonPropertyProvider properties) {
         return List.of();
     }
 

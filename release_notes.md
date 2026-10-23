@@ -14,6 +14,10 @@
   - `afon-cli.sh config-updates` removes them.
 - **Check that each domain name has a hosted zone of its own name and an issued certificate before you deploy:**
   - `afon-cli.sh aws-issue-cert` issues the certificates, skips domain that already has one (`--force` requests a new one).
+- **Optional KeyCloak domain name per cloud ([#317](https://github.com/emrys-health/afon-core/issues/317)):**
+  - `AWS_`, `AZURE_` and `GCP_OIDC_DOMAIN_NAME`, blank by default, give a cloud a KeyCloak of its own; blank, the cloud uses `OIDC_DOMAIN_NAME`, so existing configs behave as before.
+  - `OIDC_ISSUER_URL` is now a template: set it to `https://[OIDC_DOMAIN_NAME]/realms/polaris` so that it follows the domain name of the cloud.  An issuer with another host fails the stack synthesis.
+  - `check-oidc` now takes the cloud: `afon-cli.sh check-oidc <cloud>`.
   - If a domain has several issued certificates, the latest is used.
 
 ## 1.0-beta-7

@@ -32,7 +32,7 @@ exist before checking privileges, so reading a table in an empty catalog would n
 
 - A deployed full stack, `aws-full` or `azure-full`, and a `kubectl` context pointing at its cluster.
 - In `$AFON_HOME/config` (default `~/.afon/config`): `<CLOUD>_POLARIS_DOMAIN_NAME`, eg `AZURE_POLARIS_DOMAIN_NAME`,
-  `OIDC_DOMAIN_NAME`, and `USER_ID`, naming one of the users in [users.csv](configuration.md), whose password is read from there.
+  `<CLOUD>_OIDC_DOMAIN_NAME` or else `OIDC_DOMAIN_NAME`, and `USER_ID`, naming one of the users in [users.csv](configuration.md), whose password is read from there.
   The test runs as the `USER_ID` user, which you can check with `./afon.sh -a config-user`
   (see [config-user](configuration.md#command-config-user)).
 - [users-acl.csv](configuration.md) authorising the test user for `AFON_CATALOG` (default `aws`, or the catalog of the
@@ -65,8 +65,8 @@ smoke/run-oidc-notebook.sh [cloud]
 `cloud` defaults to `aws`, and selects the Polaris domain from `<CLOUD>_POLARIS_DOMAIN_NAME` and the catalogs `<cloud>` and
 `<cloud>_forbidden`, eg `azure` and `azure_forbidden`. The script:
 
-1. reads `<CLOUD>_POLARIS_DOMAIN_NAME` and `OIDC_DOMAIN_NAME` from `$AFON_HOME/config/*.properties`, for the notebook;
-2. checks that OIDC provider is serving requests, with `./afon.sh -a check-oidc`, failing fast if it is not;
+1. reads `<CLOUD>_POLARIS_DOMAIN_NAME` and `<CLOUD>_OIDC_DOMAIN_NAME` (else `OIDC_DOMAIN_NAME`) from `$AFON_HOME/config/*.properties`, for the notebook;
+2. checks that OIDC provider is serving requests, with `./afon.sh -a check-oidc <cloud>`, failing fast if it is not;
 3. gets the OIDC access token of `USER_ID` from OIDC provider, with `./afon.sh -a show-oidc-token <cloud> user`;
 4. port-forwards `pod/spark-connector-0-driver` on port 15002, via the current `kubectl` context;
 5. runs the notebook with `./afon.sh -a jupyter-execute` (see [scripts/jupyter/execute.sh](../scripts/jupyter/execute.sh));

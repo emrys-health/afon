@@ -4,6 +4,7 @@ import health.emrys.afon.cdk.components.JupyterComponent;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonPropertyProvider;
 
 import java.util.List;
 
@@ -21,7 +22,7 @@ public class JupyterPlan implements ComponentPlan {
     }
 
     @Override
-    public List<AfonProperty> domains(AfonCloud cloud) {
+    public List<AfonProperty> domains(AfonCloud cloud, AfonPropertyProvider properties) {
         return List.of(AfonCloudProperty.JUPYTER_DOMAIN_NAME.forCloud(cloud).orElseThrow());
     }
 }

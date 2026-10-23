@@ -41,7 +41,7 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PO
  *
  * Requires properties:
  *
- * OIDC_DOMAIN_NAME
+ * OIDC_DOMAIN_NAME (or the OIDC domain name of the cloud, eg AWS_OIDC_DOMAIN_NAME)
  * OIDC_PROTOCOL
  * KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME
  * KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD
@@ -129,9 +129,8 @@ public class KeyCloakConfig extends Construct {
         // public scheme here. Configurable (defaulting to https) so the acceptance tests can run KeyCloak
         // over plain http.
         String protocol = properties.getValue(OIDC_PROTOCOL, "https");
-        String hostname = "https".equalsIgnoreCase(protocol)
-                          ? protocol + "://" + properties.getValue(OIDC_DOMAIN_NAME)
-                          : properties.getValue(OIDC_DOMAIN_NAME);
+        String domainName = properties.getOidcDomainName(cloudProvider.cloud());
+        String hostname = "https".equalsIgnoreCase(protocol) ? protocol + "://" + domainName : domainName;
 
         List<DeploymentSpecTemplateSpecContainerEnv> envs = new ArrayList<>();
         envs.add(envVar(ENV_KC_DB, properties.getValue(KEYCLOAK_DB)));
@@ -276,11 +275,11 @@ public class KeyCloakConfig extends Construct {
     }
 
     /**
-     * Exposes KeyCloak over HTTPS at {@code OIDC_DOMAIN_NAME}, and makes it resolvable.
+     * Exposes KeyCloak over HTTPS at the OIDC domain name of its cloud, and makes it resolvable.
      */
     public void configureHttpsAndDNS() {
         dnsRecord = cloudProvider.exposeHttps(new HttpsRoute(
-            "keycloak", properties.getValue(OIDC_DOMAIN_NAME), KEYCLOAK_SERVICE_NAME, KEYCLOAK_PORT,
+            "keycloak", properties.getOidcDomainName(cloudProvider.cloud()), KEYCLOAK_SERVICE_NAME, KEYCLOAK_PORT,
             KEYCLOAK_INGRESS_NAME, new HealthCheck(HEALTH_READY_PATH, MANAGEMENT_PORT_NAME),
             "keycloak-tls", true, List.of(), Optional.empty())).dnsRecord();
     }

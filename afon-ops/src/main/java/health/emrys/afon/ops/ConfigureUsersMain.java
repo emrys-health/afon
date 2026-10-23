@@ -117,7 +117,8 @@ public class ConfigureUsersMain {
 
         AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
         var    userProvider     = new FileUserProvider();
-        var    propertyProvider = new OpsPropertyProvider();
+        // as seen by the cloud, whose KeyCloak it configures and whose Polaris it calls
+        AfonPropertyProvider propertyProvider = new OpsPropertyProvider().forCloud(cloud);
         var app = new ConfigureUsersMain(userProvider, propertyProvider);
 
         if (catalogName == null) {

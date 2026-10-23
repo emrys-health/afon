@@ -25,7 +25,7 @@ If you've bought your domain name through other domain registrars (e.g. GoDaddy)
 
 ### AWS
 
-For AWS, create a Route 53 hosted zone **named after each domain name** (`OIDC_DOMAIN_NAME`, `AWS_POLARIS_DOMAIN_NAME` and
+For AWS, create a Route 53 hosted zone **named after each domain name** (`AWS_OIDC_DOMAIN_NAME`, else `OIDC_DOMAIN_NAME`, `AWS_POLARIS_DOMAIN_NAME` and
 `AWS_JUPYTER_DOMAIN_NAME`), and have the registrar, wherever the domain was bought, delegate to its nameservers.
 You can check that the zone is there by running:
 ```shell
@@ -102,7 +102,7 @@ Again, make a note.
 ## Checking the name servers
 
 To show the name servers of the DNS zone of each domain name of a cloud, ie its Polaris and Jupyter domain names and
-`OIDC_DOMAIN_NAME`, and whether the registrar delegates the domain to them, as a public resolver sees it, run:
+its OIDC domain name (`<CLOUD>_OIDC_DOMAIN_NAME`, else `OIDC_DOMAIN_NAME`), and whether the registrar delegates the domain to them, as a public resolver sees it, run:
 ```shell
 afon-cli.sh aws-dns-zones
 afon-cli.sh azure-dns-zones

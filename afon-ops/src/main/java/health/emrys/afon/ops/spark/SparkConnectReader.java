@@ -3,6 +3,7 @@ package health.emrys.afon.ops.spark;
 import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.DefaultPropertyProvider;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -33,7 +34,7 @@ public class SparkConnectReader {
     }
 
     public static void main(String[] args) {
-        AfonPropertyProvider properties = new DefaultPropertyProvider();
+        AfonPropertyProvider properties = new DefaultPropertyProvider().forCloud(AfonCloud.AZURE);
         properties.setValue(AfonProperty.POLARIS_ENDPOINT, "westmidspolarisazure.click");
         SparkConnectReader app = new SparkConnectReader(properties, new FileUserProvider());
         app.sparkLocalRead("westmids", "azure"); // this is fast

@@ -82,7 +82,7 @@ class StackPlanFactoryTest {
     @Test
     void deploysEachStackAfterDeletingTheStacksConflictingWithIt() {
         assertThat(derived(DEPLOY, "aws-keycloak")).containsExactly(
-            deleteConflicting("aws-keycloak"), "deployStack(aws-keycloak)", "waitForKeyCloak()",
+            deleteConflicting("aws-keycloak"), "deployStack(aws-keycloak)", "waitForKeyCloak(aws)",
             "deployComplete(aws-keycloak)");
         // a stack with Polaris ends with Polaris restricted, but admits nobody to it, as there is no setup
         assertThat(derived(DEPLOY, "aws-polaris")).containsExactly(
@@ -103,7 +103,7 @@ class StackPlanFactoryTest {
     @Test
     void setsUpEachStackAfterDeployingItInOrderOfTheComponents() {
         assertThat(derived(SETUP, "aws-keycloak")).containsExactly(
-            deleteConflicting("aws-keycloak"), "deployStack(aws-keycloak)", "waitForKeyCloak()",
+            deleteConflicting("aws-keycloak"), "deployStack(aws-keycloak)", "waitForKeyCloak(aws)",
             "deployComplete(aws-keycloak)", "configureOidcUsersFor(aws)", "setupComplete(aws-keycloak)");
         // Polaris is reached through a port-forward to its pod by default, so nobody is admitted to it, and it ends restricted
         assertThat(derived(SETUP, "aws-polaris")).containsExactly(
@@ -263,6 +263,11 @@ class StackPlanFactoryTest {
         // the KeyCloak is at OIDC_DOMAIN_NAME whatever the cloud, so it conflicts with the other clouds' stacks that deploy their own
         assertThat(factory.conflicts(StackId.parse("aws-lab"), "azure-full", properties)).isTrue();
         assertThat(factory.conflicts(StackId.parse("aws-lab"), "gcp-polaris", properties)).isFalse();
+        // with a KeyCloak domain of its own, the AWS stack no longer conflicts with the Azure one
+        properties.setValue(AWS_OIDC_DOMAIN_NAME, "oauth-aws.example");
+        assertThat(factory.conflicts(StackId.parse("aws-lab"), "azure-full", properties)).isFalse();
+        assertThat(factory.conflicts(StackId.parse("aws-lab"), "aws-keycloak", properties)).isTrue();
+        properties.setValue(AWS_OIDC_DOMAIN_NAME, "");
         // with the KeyCloak of another stack, it no longer holds its domain
         properties.setValue(AWS_KEYCLOAK_EXTERNAL, "true");
         assertThat(factory.conflicts(StackId.parse("aws-lab"), "aws-keycloak", properties)).isFalse();
@@ -347,10 +352,10 @@ class StackPlanFactoryTest {
     void azureStacksFollowTheSameRulesAsAwsOnesWithTheirOwnKeyCloakSwitch() {
         // azure-keycloak is only the KeyCloak, which azure-polaris uses
         assertThat(derived(DEPLOY, "azure-keycloak")).containsExactly(
-            deleteConflicting("azure-keycloak"), "deployStack(azure-keycloak)", "waitForKeyCloak()",
+            deleteConflicting("azure-keycloak"), "deployStack(azure-keycloak)", "waitForKeyCloak(azure)",
             "deployComplete(azure-keycloak)");
         assertThat(derived(SETUP, "azure-keycloak")).containsExactly(
-            deleteConflicting("azure-keycloak"), "deployStack(azure-keycloak)", "waitForKeyCloak()",
+            deleteConflicting("azure-keycloak"), "deployStack(azure-keycloak)", "waitForKeyCloak(azure)",
             "deployComplete(azure-keycloak)", "configureOidcUsersFor(azure)", "setupComplete(azure-keycloak)");
         // azure-full deploys its own KeyCloak, so conflicts with the stack that does, unless configured to use it
         assertThat(derived(DEPLOY, "azure-full")).noneMatch(step -> step.startsWith("checkKeyCloakAnswers("));

@@ -178,6 +178,26 @@ On Azure it is the same with `azure-keycloak` and `AZURE_KEYCLOAK_EXTERNAL=true`
 `azure-full` then uses the KeyCloak `azure-keycloak` deploys, so it runs side by side with it, and its `deploy` and `setup` check first that KeyCloak answers.
 The KeyCloak domain `OIDC_DOMAIN_NAME` must then have its DNS zone in the Azure resource group, which `afon-cli.sh azure-create false azure-keycloak` creates.
 
+### A KeyCloak domain name per cloud
+
+`OIDC_DOMAIN_NAME` in `afon.properties` is the domain name of the KeyCloak of every cloud, so the KeyCloak stacks of different
+clouds, eg `aws-keycloak` and `azure-keycloak`, conflict, and moving an env from one cloud to another means moving its DNS to the
+zone of the new cloud.  To give a cloud a KeyCloak of its own, set `<CLOUD>_OIDC_DOMAIN_NAME`, ie `AWS_OIDC_DOMAIN_NAME`,
+`AZURE_OIDC_DOMAIN_NAME` or `GCP_OIDC_DOMAIN_NAME`, in its `afon-<cloud>.properties`.  The domain name of a cloud is that property
+if it is set and not blank, else `OIDC_DOMAIN_NAME`, so existing configs behave as before.  Everything of the cloud then uses
+it: its KeyCloak stacks, which hold it, so those of two clouds with different domain names no longer conflict; the Polaris stacks that
+use that KeyCloak; the DNS zone and certificate of the cloud (each domain needs its own, eg on AWS a hosted zone named after it and
+an ACM certificate, see [DNS config](dns_config.md)); and the checks, `check-oidc <cloud>` and `show-oidc-token <cloud>`, and the
+status and smoke scripts.
+
+`OIDC_ISSUER_URL` is a template, in which `[OIDC_DOMAIN_NAME]` stands for the domain name of the cloud, so the issuer follows it.  The host of the issuer must be the domain name of the cloud, else the stack
+fails to synthesise.
+
+Each cloud's KeyCloak has its own users and tokens, so a client authenticates with the KeyCloak of the cloud hosting the Polaris it
+calls, whichever cloud it runs from: the ops commands, which take the cloud, and the smoke tests use the domain name of that cloud, and
+a federated (external) catalog, eg `azure_external` of the AWS Polaris, gets its token from the KeyCloak of the cloud hosting the remote
+Polaris, here Azure.  The users the flow authenticates as must therefore be configured in that KeyCloak too (`configure-users <cloud>`).
+
 ### Upgrading to per-stack state (one-off)
 
 Stacks used to be deployed per cloud: all the stacks of a cloud shared one plan `$AFON_CDKTF/stacks/<cloud>` and one `tofu` state `$AFON_CDKTF/terraform.<cloud>.tfstate`, eg `stacks/azure` and `terraform.azure.tfstate`.  They are now deployed per stack id, each with its own plan `stacks/<stack-id>` and state `terraform.<stack-id>.tfstate`, eg `stacks/azure-polaris` and `terraform.azure-polaris.tfstate`.
@@ -371,7 +391,7 @@ Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_st
 
 It requires the Keycloak properties (`OIDC_DOMAIN_NAME`, `KEYCLOAK_*`)
 and the AWS cluster properties, but none of the `AWS_POLARIS_*` properties.
-Once deployed, you can check the OIDC provider is ready with `afon-cli.sh check-oidc`.
+Once deployed, you can check the OIDC provider is ready with `afon-cli.sh check-oidc <cloud>`.
 
 ### Setup AWS Keycloak only
 

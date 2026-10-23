@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.snowflake;
 
 import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer;
 
@@ -41,7 +42,7 @@ public class SnowflakeStatements {
                         integrationName(catalog),
                         properties.getValue(AWS_POLARIS_DOMAIN_NAME),
                         catalog,
-                        oidcTokenEndpoint(properties),
+                        oidcTokenEndpoint(properties, AfonCloud.AWS),
                         properties.getValue(POLARIS_ID),
                         properties.getValue(POLARIS_SECRET),
                         KEYCLOAK_SCOPE),
@@ -86,9 +87,11 @@ public class SnowflakeStatements {
     /**
      * The token endpoint of KeyCloak, from which Snowflake gets its token for Polaris: Polaris, which defers to KeyCloak for
      * OAuth, returns HTTP 501 from its own token endpoint, so Snowflake cannot ask it for one.
+     *
+     * @param cloud the cloud whose Polaris Snowflake reads, and so whose KeyCloak authenticates it
      */
-    static String oidcTokenEndpoint(AfonPropertyProvider properties) {
-        return KeyCloakConfigurer.tokenEndpoint(properties.getValue(OIDC_DOMAIN_NAME), properties.getValue(OIDC_PROTOCOL, "https"));
+    static String oidcTokenEndpoint(AfonPropertyProvider properties, AfonCloud cloud) {
+        return KeyCloakConfigurer.tokenEndpoint(properties.getOidcDomainName(cloud), properties.getValue(OIDC_PROTOCOL, "https"));
     }
 
     public static String[] writingToAzure(AfonPropertyProvider properties) {

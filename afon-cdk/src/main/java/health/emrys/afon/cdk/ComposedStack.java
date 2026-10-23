@@ -47,7 +47,7 @@ public class ComposedStack extends TerraformStack {
         definition.componentsFor(properties).forEach(context::deploy);
         if (context.find(KeycloakComponent.class).isEmpty() && context.find(PolarisComponent.class).isPresent()) {
             logger.info("Stack {} deploys no KeyCloak, but uses the one at {} ({}), which the {}-keycloak stack deploys{}",
-                        stackId, properties.getValue(AfonProperty.OIDC_DOMAIN_NAME), AfonProperty.OIDC_DOMAIN_NAME,
+                        stackId, properties.getOidcDomainName(stackId.cloud()), properties.getOidcDomainProperty(stackId.cloud()),
                         stackId.cloud(), isKeyCloakExternal(stackId.cloud(), properties)
                         ? ", as configured by " + stackId.cloud().toString().toUpperCase() + "_KEYCLOAK_EXTERNAL=true" : "");
         }

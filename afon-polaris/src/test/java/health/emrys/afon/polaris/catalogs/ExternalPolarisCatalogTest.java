@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.junit.jupiter.api.Test;
@@ -60,5 +61,17 @@ class ExternalPolarisCatalogTest {
     @Test
     void gcpExternalCatalogGetsItsTokenFromKeyCloak() throws Exception {
         assertGetsItsTokenFromKeyCloak(oauthOf(GcpExternalPolarisCatalog::new, new AfonCatalogs(properties).get("gcp_external")));
+    }
+
+    @Test
+    void externalCatalogGetsItsTokenFromTheKeyCloakOfTheCloudHostingTheRemotePolaris() throws Exception {
+        properties.setValue(AZURE_OIDC_DOMAIN_NAME, "oauth-azure.example");
+        // the Polaris federating to it is that of AWS, whose KeyCloak is the neutral one
+        AfonPropertyProvider seenByAws = properties.forCloud(AfonCloud.AWS);
+        JsonNode oauth = new ObjectMapper().readTree(
+            new AzureExternalPolarisCatalog(new AfonCatalogs(properties).azureExternal(), seenByAws).catalogConfig())
+                                           .at("/connectionConfigInfo/authenticationParameters");
+        assertThat(oauth.get("tokenUri").asText()).isEqualTo("https://oauth-azure.example/realms/polaris/protocol/openid-connect/token");
+        assertGetsItsTokenFromKeyCloak(oauthOf(AwsExternalPolarisCatalog::new, new AfonCatalogs(properties).get("aws_external")));
     }
 }

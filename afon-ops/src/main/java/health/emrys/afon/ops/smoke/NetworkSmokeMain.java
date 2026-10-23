@@ -70,7 +70,7 @@ public class NetworkSmokeMain {
         SmokeConfig smokeConfig = new SmokeConfig(properties);
         AfonCloud         cloud         = smokeConfig.cloud();
         String            polarisHost   = getPolarisEndpointFor(cloud, properties);
-        PolarisRestClient polarisClient = PolarisRestClientFactory.clientFactory().createClient(properties, polarisHost);
+        PolarisRestClient polarisClient = PolarisRestClientFactory.clientFactory().createClient(properties.forCloud(cloud), polarisHost);
         List<ExecResult>  results = new ArrayList<>();
         try {
             logger.warn("About to call {}. Note that if whitelisting is turned on, this can take up to {}s",

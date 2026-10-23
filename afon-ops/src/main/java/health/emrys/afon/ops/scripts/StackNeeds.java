@@ -51,7 +51,7 @@ public record StackNeeds(StackId id, StackRole role, List<String> domains, List<
         List<String> components = new ArrayList<>();
         for (StackComponent component : definition.componentsFor(properties)) {
             components.add(StackComponents.nameOf(component).orElse(component.getClass().getSimpleName()));
-            plans.of(component).domains(cloud).stream().map(AfonProperty::getName).forEach(domains::add);
+            plans.of(component).domains(cloud, properties).stream().map(AfonProperty::getName).forEach(domains::add);
         }
         return new StackNeeds(definition.id(), definition.role(), List.copyOf(domains), List.copyOf(components));
     }

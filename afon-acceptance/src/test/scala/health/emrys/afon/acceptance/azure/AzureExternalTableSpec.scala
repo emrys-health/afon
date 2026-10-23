@@ -36,7 +36,7 @@ class AzureExternalTableSpec extends SpecPretifier with GivenWhenThen {
     val azureCatalogDef = AfonCatalog.adHoc("azure_unity_test", AfonCloud.AZURE, "internal", "unity-catalog-storage", true)
     val azureCatalog = new AzurePolarisCatalog(azureCatalogDef, properties)
 
-    val externalCatalog: ExternalPolarisCatalog = new ExternalPolarisCatalog(properties) {
+    val externalCatalog: ExternalPolarisCatalog = new ExternalPolarisCatalog(properties, AfonCloud.AZURE) {
       override def catalogName(): String = FEDERATED_CATALOG_NAME
       override protected def bucketUri(): String =
         "abfss://unity-catalog-storage@dbstorageipvnyon4atfem.dfs.core.windows.net/7405611337270626/__unitystorage/catalogs/92a89c86-f5de-4c3c-9fd0-2f0bc68b5888/tables/c8316ca8-4aa3-4b04-8248-fa560bba8463"

@@ -13,7 +13,8 @@ public class PolarisCredentials {
 
     public PolarisCredentials(AfonCloud cloud, AfonPropertyProvider properties) {
         this.cloud = cloud;
-        this.properties = properties;
+        // as seen by the cloud, so that the token is that of its KeyCloak
+        this.properties = properties.forCloud(cloud);
         this.accessToken = PolarisRestClientFactory.clientFactory().createClient(this.properties).getAccessToken();
     }
 
