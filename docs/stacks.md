@@ -347,6 +347,16 @@ The report is written even when the check fails, for a CI job to keep: it has th
 The Polaris images are unpinned, as their tag is the version of Polaris the project builds against, which a pinned digest of another
 version would outlive, and so is the Trino one, only its tag being set, the image being that of the Helm chart.
 
+The images that the Helm charts of the stacks pull are the charts' own, so they are not in the file.  `docker-image --charts` reports them,
+from the plans synthesised for the stacks (`validate-stack <stack-id>` makes one), so with the values the stack gives each chart, eg the
+Trino tag it overrides: it renders every chart with `helm template`, which needs helm installed but no cluster, and lists the images of
+each release, saying if each is pinned by digest, has a tag only or none, and which the file lists.  The images that only `helm test`
+pods use are counted, not listed.
+```shell
+afon-cli.sh docker-image --charts aws-full azure-full
+afon-cli.sh docker-image --charts --report charts.md      # the stacks that are synthesised, also as a report, JSON if named *.json
+```
+
 The names are those of the bundled file, which the code needs all of; an entry of another name is accepted but nothing uses it.  The `trino` entry
 only sets the image tag, the image being that of the vendored Helm chart.
 

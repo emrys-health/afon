@@ -4,8 +4,11 @@ import health.emrys.afon.cdk.DockerImageDefinitions;
 import health.emrys.afon.cdk.DockerImagePinner;
 import health.emrys.afon.cdk.DockerImages;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.ops.reports.ChartImageReport;
 import health.emrys.afon.ops.reports.DockerImageReport;
+import health.emrys.afon.ops.synth.ChartImages;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +29,7 @@ public class DockerImageMain {
 
     static final String EXPORT_OPTION = "--export";
     static final String PIN_OPTION = "--pin";
+    static final String CHARTS_OPTION = "--charts";
     static final String VERIFY_OPTION = "--verify";
     private static final String FILE_OPTION = "--file";
     private static final String REPORT_OPTION = "--report";
@@ -89,13 +93,77 @@ public class DockerImageMain {
      */
     static List<String> lines(String[] args) {
         if (args.length != 1) {
-            throw new IllegalArgumentException("Usage: docker-image <name|" + EXPORT_OPTION + "|" + PIN_OPTION + "|" + VERIFY_OPTION + " ...>, one of " + DockerImages.all().keySet());
+            throw new IllegalArgumentException("Usage: docker-image <name|" + EXPORT_OPTION + "|" + PIN_OPTION + "|" + VERIFY_OPTION + "|" + CHARTS_OPTION + " ...>, one of " + DockerImages.all().keySet());
         }
         var image = DockerImages.all().get(args[0]);
         if (image == null) {
             throw new IllegalArgumentException("Unknown image '" + args[0] + "', expected one of " + DockerImages.all().keySet());
         }
         return List.of(VARIABLE + "=" + image.reference());
+    }
+
+    /**
+     * Reports the images that the Helm charts of the stacks pull, from the plans that were synthesised for them.
+     *
+     * @return whether every release could be rendered
+     */
+    private static boolean charts(PinArguments arguments) {
+        try {
+            Process helm = new ProcessBuilder("helm", "version", "--short").redirectErrorStream(true).start();
+            helm.getInputStream().readAllBytes();
+            if (helm.waitFor() != 0) {
+                throw new IllegalStateException("helm does not run: it renders the charts");
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new IllegalStateException("helm is required to render the charts, and is not installed");
+        }
+        Path stacksDir = Path.of(ConfigUtils.stacksDir());
+        List<String> stacks = arguments.names();
+        if (stacks.isEmpty()) {
+            try (var dirs = java.nio.file.Files.list(stacksDir)) {
+                stacks = dirs.filter(dir -> java.nio.file.Files.isRegularFile(dir.resolve("cdk.tf.json")))
+                    .map(dir -> dir.getFileName().toString()).sorted().toList();
+            } catch (IOException e) {
+                stacks = List.of();
+            }
+        }
+        if (stacks.isEmpty()) {
+            throw new IllegalArgumentException("No stack is synthesised in " + stacksDir + ": synthesise the stacks first, eg with validate-stack <stack-id>");
+        }
+        List<ChartImages.Release> releases = new ArrayList<>();
+        for (String stack : stacks) {
+            try {
+                releases.addAll(ChartImages.inspect(stack, stacksDir.resolve(stack), ChartImages.helm()));
+            } catch (IOException e) {
+                throw new IllegalStateException(e.getMessage(), e);
+            }
+        }
+        var report = new ChartImageReport(stacks, releases, ChartImages.listedBy(DockerImages.all()), java.time.Instant.now());
+        String current = null;
+        for (ChartImages.Release release : releases) {
+            if (!release.stack().equals(current)) {
+                current = release.stack();
+                System.out.printf("== %s%n", current);
+            }
+            System.out.printf("%s (%s)%n", release.release(), release.chart());
+            if (release.error() != null) {
+                System.out.printf("    ERROR %s%n", release.error());
+            }
+            release.images().stream().filter(found -> !found.test()).forEach(found -> System.out.printf("    %s  %s%s%n", found.image(),
+                found.isPinned() ? "pinned" : found.tag() == null ? "NO TAG" : "latest".equals(found.tag()) ? "LATEST" : "tag only",
+                report.entries(false).stream().filter(entry -> entry.image().equals(found.image()) && entry.listedAs() != null).findFirst()
+                    .map(entry -> "  [in docker-images.yaml: " + entry.listedAs() + "]").orElse("")));
+        }
+        var entries = report.entries(false);
+        long tests = report.entries(true).size() - entries.size();
+        System.out.printf("%d images in %d releases of %d stacks, %d pinned by digest, %d only in helm test pods, %d releases not rendered%n",
+                          entries.size(), releases.size(), stacks.size(), entries.stream().filter(ChartImageReport.Entry::pinned).count(), tests,
+                          report.failed());
+        if (arguments.report() != null) {
+            report.write(arguments.report());
+            System.out.printf("Report written to %s%n", arguments.report());
+        }
+        return report.failed() == 0;
     }
 
     private static void pin(PinArguments arguments) {
@@ -151,6 +219,10 @@ public class DockerImageMain {
             }
             if (args.length >= 1 && VERIFY_OPTION.equals(args[0])) {
                 System.exit(verify(PinArguments.of(args, ConfigUtils.configDir(), false)) ? 0 : 1);
+                return;
+            }
+            if (args.length >= 1 && CHARTS_OPTION.equals(args[0])) {
+                System.exit(charts(PinArguments.of(args, ConfigUtils.configDir(), false)) ? 0 : 1);
                 return;
             }
             if (args.length >= 1 && PIN_OPTION.equals(args[0])) {

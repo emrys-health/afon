@@ -22,10 +22,18 @@ check fails, eg for a CI job to keep: the images checked with their status (ok, 
 the images not checked.  Like --pin, it needs Docker and network access.  It lists the images with no digest that it did not check, with the reason the file gives
 for them (the 'unpinned' key of the image), else that the file has no digest.
 
+--charts reports the images that the Helm charts of the stacks pull, which docker-images.yaml does not list, as they are the charts' own.
+It reads the helm releases of the plan synthesised for each stack (so with the values the stack gives them, eg an image tag it
+overrides) and renders each chart with helm template, which needs helm installed but no cluster.  For each release it lists the
+images, saying if each is pinned by digest, has only a tag or has none, and which are in docker-images.yaml.  The images only
+helm test pods use are counted, not listed.  With no stack ids, it takes the stacks that are synthesised (eg by validate-stack
+<stack-id>); --report <file> writes the same as JSON or Markdown, by the extension.  Exits with 1 if a release cannot be rendered.
+
 Usage:
   afon-cli.sh docker-image <name>
   afon-cli.sh docker-image --export
   afon-cli.sh docker-image --pin [--file <file>] [<name>...]
   afon-cli.sh docker-image --verify [--file <file>] [--report <file>] [<name>...]
+  afon-cli.sh docker-image --charts [--report <file>] [<stack-id>...]
 
 <name> is the name of an image of the file, eg postgres-alpine.
