@@ -22,7 +22,7 @@ class DockerImagesTest {
     @Test
     void bundledImagesKeepTheirReferences() {
         assertThat(DockerImages.KEYCLOAK_IMAGE).startsWith("quay.io/keycloak/keycloak:26.6.3@sha256:");
-        assertThat(DockerImages.SPARK_IMAGE).startsWith("ph1ll1phenry/spark_jars_cp:4.0.1@sha256:");
+        assertThat(DockerImages.SPARK_IMAGE).startsWith("emryshealth/spark_jars_cp:4.0.1@sha256:");
         assertThat(DockerImages.POSTGRES_ALPINE_IMAGE).startsWith("postgres:16-alpine@sha256:");
         assertThat(DockerImages.TRINO_IMAGE_TAG).isEqualTo("481");
         assertThat(DockerImages.GITEA_IMAGE).startsWith("docker.gitea.com/gitea:1.27.0-rootless@sha256:");

@@ -14,14 +14,14 @@
 images:
   # first-party
   spark:
-    image: ph1ll1phenry/spark_jars_cp
+    image: emryshealth/spark_jars_cp
     tag: 4.0.1
-    digest: sha256:9d8c791931cf50b28d2d1b4a00bf625fd1b3fd30e9b38a69b9c09d29de1aee0f
+    digest: sha256:b81ba045e8dc185f172867cc384d7e2a18fd0d639fdfc2477276694b9376cdd4
     category: first-party
   pyspark-notebook:
-    image: ph1ll1phenry/pyspark-notebook
+    image: emryshealth/pyspark-notebook
     tag: x86_64-spark-4.0.1-vnc-clip-multi_pkg
-    digest: sha256:e70cd5ad0f92a62234d6251fbd21ab315ff78e94bec1e5261de4c8fed0b85204
+    digest: sha256:6e1717857b2cc310f0f0fdadb851dbe3aef15221d2d7b0f1a16b88fdb07689c3
     category: first-party
 
   # upstream

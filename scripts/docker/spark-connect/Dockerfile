@@ -1,6 +1,6 @@
 # Build this with:
-# docker build -t ph1ll1phenry/spark_jars:4.0.1 .
-# docker push ph1ll1phenry/spark_jars:4.0.1
+# docker build -t emryshealth/spark_jars:4.0.1 .
+# docker push emryshealth/spark_jars:4.0.1
 
 # See SparkWorkloads.SPARK_IMAGE
 FROM apache/spark:4.0.1
