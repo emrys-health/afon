@@ -16,7 +16,7 @@ import static health.emrys.afon.config.AfonProperty.*;
 /**
  * Shows an OIDC access token from the {@link IdentityProvider}: of the Polaris admin client
  * ({@code POLARIS_ID}), or of the {@code USER_ID} user from users.csv, as JupyterHub injects into a user's pod
- * as {@code OIDC_TOKEN}, eg for smoke/run-oidc-notebook.sh.
+ * as {@code OIDC_TOKEN}, eg for scripts/smoke/notebook.sh.
  */
 public class ShowOidcTokenMain {
 

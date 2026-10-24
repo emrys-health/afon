@@ -6,7 +6,7 @@ Afon has three levels of tests, which differ in what they need to run, and so in
 |----------------------------|---------------------------------------------------------------------|---------------------------------------|---------------------------------------------|-----------------------------------|
 | [Unit](#unit-tests)        | A class or module in isolation                                      | Nothing external                      | JDK 17, Maven                               | Every contributor, on every change |
 | [Acceptance](#acceptance-tests) | Cross-cloud access via Polaris, including denial of forbidden access | Local containers and cloud storage    | Docker, configuration for all clouds        | Maintainers, contributors with cloud access |
-| [Smoke](#smoke-tests)      | A deployed stack end to end, as its users use it                    | A real deployment                     | A deployed stack, `kubectl`, configuration  | Maintainers, contributors with a deployment |
+| [Smoke](#smoke-test)      | A deployed stack end to end, as its users use it                    | A real deployment                     | A deployed stack, `kubectl`, configuration  | Maintainers, contributors with a deployment |
 
 Every contribution must pass the unit tests.  Whether it also needs acceptance or smoke tests depends on what it
 changes, see [which tests a change needs](#which-tests-a-change-needs).
@@ -99,19 +99,19 @@ See [smoke tests](../smoke_tests.md) for what is tested, the requirements and tr
 
 ### Running
 
-The OIDC notebook test, against the cluster of the current `kubectl` context:
+The notebooks of `scripts/smoke/notebooks.csv`, or those named after the cloud, eg `oidc`, against the cluster of the current `kubectl` context:
 
 ```shell
-smoke/run-oidc-notebook.sh [cloud]
+afon-cli.sh smoke-notebook <cloud>
 ```
 
-The regression suite, running the tests listed in [smoke/regression-full.csv](../../smoke/regression-full.csv) against the
+The regression suite, running the tests listed in [scripts/smoke/tests-full.csv](../../scripts/smoke/tests-full.csv) against the
 full stack of a cloud, `aws` by default, or `azure`, and optionally setting up the stacks first and tearing them down after:
 
 ```shell
-smoke/run-regression-suite.sh --list
-smoke/run-regression-suite.sh --env <env> --setup aws-full,azure-polaris,gcp-polaris --teardown
-smoke/run-regression-suite.sh --env <env> --setup azure-full --teardown azure
+afon-cli.sh smoke-test --list
+afon-cli.sh smoke-test --env <env> --setup aws-full,azure-polaris,gcp-polaris --teardown
+afon-cli.sh smoke-test --env <env> --setup azure-full --teardown azure
 ```
 
 **NOTE**: deploying stacks creates cloud resources, which incur costs.  Tear them down when done.

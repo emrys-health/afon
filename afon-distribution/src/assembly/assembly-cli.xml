@@ -48,22 +48,6 @@
       <fileMode>0755</fileMode>
     </fileSet>
     <fileSet>
-      <directory>../smoke</directory>
-      <outputDirectory>/smoke</outputDirectory>
-      <includes>
-        <include>*.sh</include>
-      </includes>
-      <fileMode>0755</fileMode>
-    </fileSet>
-    <fileSet>
-      <directory>../smoke</directory>
-      <outputDirectory>/smoke</outputDirectory>
-      <excludes>
-        <exclude>target/**</exclude>
-        <exclude>*.sh</exclude>
-      </excludes>
-    </fileSet>
-    <fileSet>
       <directory>../templates</directory>
       <outputDirectory>/templates</outputDirectory>
       <includes>

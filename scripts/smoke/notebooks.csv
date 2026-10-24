@@ -1,0 +1,2 @@
+name|file|description
+oidc|SparkConnectOidcTest.ipynb|Spark Connect with the user's OIDC token: the catalogs the user is, and is not, authorised for

@@ -1,4 +1,4 @@
-# Shared by smoke/run-regression-suite.sh and kube/polaris-whitelist.sh, which source it, to read and decide the restriction of the
+# Shared by scripts/smoke/test.sh and kube/polaris-whitelist.sh, which source it, to read and decide the restriction of the
 # Polaris ingress of a cluster, so that both do it the same way.  Not run on its own.
 #
 # The Polaris ingress is restricted to the CIDRs of AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS, as the deploy does, plus

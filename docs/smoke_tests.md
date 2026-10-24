@@ -12,7 +12,7 @@ The shared Spark Connect server registers no catalogs and holds no Polaris crede
 the catalogs it uses, authenticated with the user's OIDC token, and Polaris authorises that user through their own
 principal role (see [architecture](architecture.md#spark-integration)).
 
-The notebook [SparkConnectOidcTest.ipynb](../smoke/notebooks/SparkConnectOidcTest.ipynb) checks that, each check
+The notebook [SparkConnectOidcTest.ipynb](../scripts/smoke/notebooks/SparkConnectOidcTest.ipynb) checks that, each check
 being an assertion, so that the run fails on any regression:
 
 | Check                                                                                                                                                                   | Expected                                   |
@@ -36,7 +36,7 @@ exist before checking privileges, so reading a table in an empty catalog would n
   The test runs as the `USER_ID` user, which you can check with `./afon.sh -a config-user`
   (see [config-user](configuration.md#command-config-user)).
 - [users-acl.csv](configuration.md) authorising the test user for `AFON_CATALOG` (default `aws`, or the catalog of the
-  cloud given to `smoke/run-oidc-notebook.sh`, eg `azure`), but not for `AFON_FORBIDDEN_CATALOG` (default `aws_forbidden`, or
+  cloud given to `afon-cli.sh smoke-notebook`, eg `azure`), but not for `AFON_FORBIDDEN_CATALOG` (default `aws_forbidden`, or
   `<cloud>_forbidden`). Other users may be authorised for any catalog, as each user has
   their own Polaris principal role. For example, testing as `will`:
 
@@ -59,10 +59,16 @@ exist before checking privileges, so reading a table in an empty catalog would n
 ## Running from your machine
 
 ```shell
-smoke/run-oidc-notebook.sh [cloud]
+afon-cli.sh smoke-notebook <cloud>
+afon-cli.sh smoke-notebook <cloud> oidc
+afon-cli.sh smoke-notebook --list
 ```
 
-`cloud` defaults to `aws`, and selects the Polaris domain from `<CLOUD>_POLARIS_DOMAIN_NAME` and the catalogs `<cloud>` and
+which runs all the notebooks listed in `scripts/smoke/notebooks.csv`, or only those named, separated by spaces or commas, eg `oidc`. All are run even if some fail, and the command fails if any does. The names are those listed in [scripts/smoke/notebooks.csv](../scripts/smoke/notebooks.csv), the file of the notebooks, `name|file|description`, with the files in `scripts/smoke/notebooks`.  The notebooks are read from that file by default; `--notebooks <file>` reads those of another CSV file instead.
+
+The command can also be run with `./afon.sh -a smoke-notebook <cloud> oidc`.  It runs its afon commands with `afon.sh` from the source tree, else with the `afon-cli.sh` of the distribution it runs from, or of `AFON_CLI_DIR`.
+
+`cloud` is required, and selects the Polaris domain from `<CLOUD>_POLARIS_DOMAIN_NAME` and the catalogs `<cloud>` and
 `<cloud>_forbidden`, eg `azure` and `azure_forbidden`. The script:
 
 1. reads `<CLOUD>_POLARIS_DOMAIN_NAME` and `<CLOUD>_OIDC_DOMAIN_NAME` (else `OIDC_DOMAIN_NAME`) from `$AFON_HOME/config/*.properties`, for the notebook;
@@ -104,8 +110,8 @@ The notebook reads these environment variables, all optional apart from `OIDC_TO
 | `AFON_FORBIDDEN_CATALOG` | `aws_forbidden`                           |
 | `AFON_TABLE`             | `namespaceph.test_table`                  |
 
-`smoke/run-oidc-notebook.sh` sets the first four from your configuration, and `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG` from the
-cloud it is given, eg `azure` and `azure_forbidden` for `smoke/run-oidc-notebook.sh azure`, unless they are set already.  The defaults
+`afon-cli.sh smoke-notebook` sets the first four from your configuration, and `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG` from the
+cloud it is given, eg `azure` and `azure_forbidden` for `afon-cli.sh smoke-notebook azure oidc`, unless they are set already.  The defaults
 in the table, `aws` and `aws_forbidden`, are those of the notebook when run on its own.  The table `AFON_TABLE` is written by the
 setup of the stack to the catalog of its own cloud, so it is not in the `aws` catalog of the Polaris of another cloud.
 
@@ -117,7 +123,7 @@ setup of the stack to the catalog of its own cloud, so it is not in the `aws` ca
 - **Check 1 fails**: the test user is not authorised for `AFON_CATALOG`, or the table does not exist.  With
   `TABLE_OR_VIEW_NOT_FOUND` for ``test_catalog`.`namespaceph`.`test_table` `` the notebook is reading another catalog than
   the one the stack's setup wrote the table to, which is that of its own cloud: run it through
-  `smoke/run-oidc-notebook.sh <cloud>`, or set `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG`.
+  `afon-cli.sh smoke-notebook <cloud> oidc`, or set `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG`.
 - **Spark fails with `UnknownHostException: <polaris domain>: Temporary failure in name resolution`**: the network policies
   only let the Spark driver resolve the names in `ALLOWED_DOMAINS_CSV`, so list the Polaris and Jupyter domain names and the
   storage account of the cloud there (see [Setup Azure full stack](stacks.md#setup-azure-full-stack)).
@@ -134,19 +140,21 @@ setup of the stack to the catalog of its own cloud, so it is not in the `aws` ca
 ## Regression suite
 
 ```shell
-smoke/run-regression-suite.sh [--cli] [--env <env>] [--setup <stacks> [--teardown]] [--suite <file>]
-                              [--tests <tests>] [--logging-console <level>] [--list] [<cloud>]
+afon-cli.sh smoke-test [--cli] [--env <env>] [--setup <stacks> [--teardown]] [--suite <file>]
+                          [--tests <tests>] [--logging-console <level>] [--list] [<cloud>]
 ```
 
-runs the tests listed in a suite file, by default [smoke/regression-full.csv](../smoke/regression-full.csv), in
+runs the tests listed in a suite file, by default [scripts/smoke/tests-full.csv](../scripts/smoke/tests-full.csv), in
 order, each as an afon command, against the full stack of the `<cloud>`, `aws` by default, or `azure`: it sets the kubectl
 context to the cluster of that stack, with the afon command `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, and runs the tests with
 `TRE_CLOUD=<cloud>`, as the cloud of the stack hosting the TRE, whatever the config says.  The tests are not specific to a
 cloud, so the same file serves both:
 
 ```shell
-smoke/run-regression-suite.sh azure
+afon-cli.sh smoke-test azure
 ```
+
+It can also be run with `./afon.sh -a smoke-test azure`.
 
 **NOTE:** the `network` test, which checks that Polaris cannot be reached from outside of the cluster, passes on both clouds if the stack's
 Polaris ingress is restricted, ie deployed with `AWS_POLARIS_ALLOWED_CIDRS` (`AZURE_POLARIS_ALLOWED_CIDRS` on Azure) set, see
@@ -171,7 +179,7 @@ the source tree, as `afon.sh` exits zero on an unknown command. With `--cli`, `a
 independently of the source tree, and a test whose command is unknown fails.
 
 - `--cli` runs the afon commands with `afon-cli.sh`: that of the cli distribution in `$AFON_CLI_DIR`, if set, else in
-  `$AFON_HOME/cli`. It is implied when the suite runs from a cli distribution (see [Afon CLI](afon_cli.md#smoke-tests)),
+  `$AFON_HOME/cli`. It is implied when the suite runs from a cli distribution (see [Afon CLI](afon_cli.md#smoke-test)),
   which has no `afon.sh`, the default `afon-cli.sh` then being that of the distribution.
 - `--env` selects the config and cdktf envs, as `./afon.sh --env <env>` does, for every command the suite runs. As
   the env switch re-points the shared `$AFON_HOME/config` and `$AFON_HOME/cdktf` symlinks, do not run another afon
@@ -287,7 +295,7 @@ very last line, after any teardown. For example:
 Regression suite run of yyyy-mm-dd hh:mm:ss 
 env: emrys
 cloud: aws (stack aws-full)
-suite: smoke/regression-full.csv
+suite: scripts/smoke/tests-full.csv
 tests: all
 stacks set up: aws-full, then torn down
 commands run with: ./afon.sh

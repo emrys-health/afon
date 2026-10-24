@@ -157,25 +157,6 @@
                                 </configuration>
                             </execution>
                             <execution>
-                                <id>export-smoke</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>copy-resources</goal>
-                                </goals>
-                                <configuration>
-                                    <outputDirectory>${afon.cli.dir}/smoke</outputDirectory>
-                                    <changeDetection>content</changeDetection>
-                                    <resources>
-                                        <resource>
-                                            <directory>${project.basedir}/../smoke</directory>
-                                            <excludes>
-                                                <exclude>target/**</exclude>
-                                            </excludes>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                            <execution>
                                 <id>export-templates</id>
                                 <phase>package</phase>
                                 <goals>

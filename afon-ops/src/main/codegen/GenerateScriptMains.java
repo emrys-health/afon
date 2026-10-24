@@ -119,7 +119,10 @@ public class GenerateScriptMains {
         new ScriptEntry("kube", "KubePodsMain", "kube/pods.sh"),
         new ScriptEntry("kube", "KubeLogsMain", "kube/logs.sh"),
         new ScriptEntry("kube", "KubePolarisDbMain", "kube/polaris-db.sh"),
-        new ScriptEntry("kube", "KubePolarisWhitelistMain", "kube/polaris-whitelist.sh")
+        new ScriptEntry("kube", "KubePolarisWhitelistMain", "kube/polaris-whitelist.sh"),
+
+        new ScriptEntry("smoke", "SmokeNotebookMain", "smoke/notebook.sh"),
+        new ScriptEntry("smoke", "SmokeTestMain", "smoke/test.sh")
     );
 
     public static void main(String[] args) throws IOException {

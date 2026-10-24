@@ -10,7 +10,7 @@ import java.io.PrintStream;
 
 /**
  * Checks that the {@link IdentityProvider} at the OIDC domain name of the cloud is serving requests, eg before
- * smoke/run-oidc-notebook.sh asks it for a token.  Exits non-zero if it is not.
+ * scripts/smoke/notebook.sh asks it for a token.  Exits non-zero if it is not.
  */
 public class CheckOidcMain {
 

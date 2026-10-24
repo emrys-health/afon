@@ -2,7 +2,7 @@
 #
 # Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally setting them up first.
 #
-# usage: smoke/run-regression-suite.sh [--cli] [--env|-e <env>] [--setup <stacks> [--teardown]] [--suite|-s <file>]
+# usage: scripts/smoke/test.sh [--cli] [--env|-e <env>] [--setup <stacks> [--teardown]] [--suite|-s <file>]
 #                                      [--tests|-t <tests>] [--restrict-polaris]
 #                                      [--logging-console|-lc <level>] [--list|-l] [--help|-h] [<cloud>]
 #   <cloud>   the cloud of the full stack to run the tests against, aws or azure (default: aws), ie <cloud>-full.  The
@@ -10,7 +10,7 @@
 #             tre', and the tests are run with TRE_CLOUD=<cloud>, as the cloud of the stack hosting the TRE.
 #   --cli     runs the afon commands with afon-cli.sh, rather than afon.sh: that of the cli distribution in
 #             $AFON_CLI_DIR, if set, else in $AFON_HOME/cli.  Implied when the script runs from a cli distribution,
-#             eg as $AFON_CLI_DIR/smoke/run-regression-suite.sh, which, being independent of the source tree, has
+#             eg as $AFON_CLI_DIR/scripts/smoke/test.sh, which, being independent of the source tree, has
 #             no afon.sh: the default afon-cli.sh is then that of the distribution.  Each command <command> <args>
 #             is run as 'afon-cli.sh <command> <args>', or else as './afon.sh -a <command> -- <args>'.
 #   --env     the afon env, selecting both the config and cdktf envs, as for './afon.sh --env <env>':
@@ -25,7 +25,7 @@
 #             'manage-stack delete <stack>', whether the tests passed or failed, or a setup failed.  Never done if
 #             the script is interrupted, eg with Ctrl-C, which may stop a setup part way: the commands deleting the
 #             stacks are printed instead.
-#   --suite   the CSV file of the tests (default: smoke/regression-full.csv)
+#   --suite   the CSV file of the tests (default: scripts/smoke/tests-full.csv)
 #   --tests   the comma-separated names of the tests to run (default: all), as listed by --list
 #   --restrict-polaris
 #             restricts the Polaris ingress for the run, for the network smoke test to pass on a stack whose deploy
@@ -72,8 +72,9 @@
 
 set -euo pipefail
 
-AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEFAULT_SUITE_FILE="$AFON_ROOT/smoke/regression-full.csv"
+SCRIPT_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+DEFAULT_SUITE_FILE="$AFON_ROOT/scripts/smoke/tests-full.csv"
 OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
 # The dir of the results files, one per run, eg results-<yyyymmdd-hhmmss>.txt.
 RESULTS_DIR="$AFON_ROOT/smoke/target/regression"
@@ -238,7 +239,7 @@ is_ops_command() {
 }
 
 usage() {
-  sed -n '3,/^$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'
+  sed -n '3,/^$/p' "$SCRIPT_FILE" | sed '$d; s/^# \{0,1\}//'
 }
 
 # Reads the tests of the suite file $1 into TESTS, as its "<name>|<command>|<args>" lines, exiting if there are
