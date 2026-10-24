@@ -25,7 +25,7 @@ Unit tests live in each module's `src/test`, and run as part of the Maven build:
 To build all modules, running the unit tests but not the acceptance tests:
 
 ```shell
-./afon.sh -a build -bp -acceptance
+./afon.sh -a build -bp unit
 ```
 
 To run the tests of a single module, or a single test, with Maven directly:

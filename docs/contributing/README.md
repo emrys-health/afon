@@ -55,7 +55,7 @@ Unrelated refactoring, reformatting or dependency updates belong in their own is
 
 - **Tests**: new behaviour comes with tests, and bug fixes with a test that fails without the fix.
   See [testing](testing.md).
-- **The build passes**: `./afon.sh -a build -bp -acceptance` succeeds, with all unit tests passing.
+- **The build passes**: `./afon.sh -a build -bp unit` succeeds, with all unit tests passing.
 - **Consistency**: code follows the conventions of the code around it: naming, structure, formatting, comment
   density and idiom.  Like components should look and behave alike.
 - **Documentation**: any change of behaviour visible to users or operators (CLI actions, options, configuration

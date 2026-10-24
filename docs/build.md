@@ -45,7 +45,7 @@ cd afon-core
 To build all components without running acceptance tests:
 ```shell
 cd afon-core
-./afon.sh -a build -bp -acceptance
+./afon.sh -a build -bp unit
 ```
 
 See [afon_script](afon_script.md) for more details on options and [acceptance tests](acceptance_tests.md).
@@ -58,7 +58,7 @@ If you want to build with the configuration relative to single cloud:
 
 ```shell
 cd afon-core
-./afon.sh -a build -bp -acceptance -c <cloud>
+./afon.sh -a build -bp unit -c <cloud>
 ```
 
 **NOTE:** acceptance tests require the configuration for all clouds.

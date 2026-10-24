@@ -424,6 +424,10 @@
 
     <profiles>
         <profile>
+            <!-- Unit tests only: activating any profile switches off the activeByDefault acceptance profile -->
+            <id>unit</id>
+        </profile>
+        <profile>
             <id>acceptance</id>
             <activation>
                 <activeByDefault>true</activeByDefault>

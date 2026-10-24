@@ -8,7 +8,7 @@ Closes #123
 - Main change 2
 
 ## Testing
-- [ ] Unit tests added or updated, and `./afon.sh -a build -bp -acceptance` passes
+- [ ] Unit tests added or updated, and `./afon.sh -a build -bp unit` passes
 - [ ] Acceptance tests run, or not needed: (state which, and for which clouds)
 - [ ] Smoke tests run, or not needed: (state which, and against which stack)
 

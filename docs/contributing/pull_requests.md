@@ -68,7 +68,7 @@ Keep commits meaningful: one logical change each, building and passing the tests
 Before opening the PR, run at least the build with the unit tests:
 
 ```shell
-./afon.sh -a build -bp -acceptance
+./afon.sh -a build -bp unit
 ```
 
 and any other tests relevant to the change, as per [testing](testing.md).
@@ -106,7 +106,7 @@ Closes #123
 - Main change 2
 
 ## Testing
-- [ ] Unit tests added or updated, and `./afon.sh -a build -bp -acceptance` passes
+- [ ] Unit tests added or updated, and `./afon.sh -a build -bp unit` passes
 - [ ] Acceptance tests run, or not needed: (state which, and for which clouds)
 - [ ] Smoke tests run, or not needed: (state which, and against which stack)
 

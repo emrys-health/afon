@@ -214,12 +214,12 @@ jobs:
           ./afon.sh -a build -bg "clean package" -bp cli \
             -ba "-Dafon.cli.dir=/data/afon/cli -B -ntp -Dstyle.color=always"
 
-      - name: Build components without acceptance tests
+      - name: Build components with unit tests
         run: |
           set -euo pipefail
           # style.color=always because maven only colours a TTY, and a workflow step is a pipe.
           # The Actions log renders the escape codes, so the output reads as it does in a shell.
-          ./afon.sh -a build -bp -acceptance \
+          ./afon.sh -a build -bp unit \
             --ba "-B -ntp -Dstyle.color=always"
 
       - name: Check the plan is the same in each JVM
