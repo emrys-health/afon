@@ -112,6 +112,8 @@ public class GenerateScriptMains {
 
         new ScriptEntry("jupyter", "JupyterExecuteMain", "jupyter/execute.sh"),
 
+        new ScriptEntry("python", "PythonSetupMain", "python/setup.sh"),
+
         new ScriptEntry("local", "LocalSetupMain", "local/setup.sh"),
         new ScriptEntry("local", "LocalVersionsMain", "local/versions.sh"),
 

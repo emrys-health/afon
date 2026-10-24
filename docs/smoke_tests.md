@@ -55,6 +55,8 @@ exist before checking privileges, so reading a table in an empty catalog would n
 - `AFON_CATALOG` containing the table `AFON_TABLE` (default `namespaceph.test_table`, created at setup).
 - `curl`, `python3` and [uv](https://docs.astral.sh/uv/): the notebook runs in the common Python environment
   `scripts/python/.venv`, which is created and synced on first use (it includes `pyspark-client`).
+  `afon-cli.sh smoke-notebook` sets it up and checks it first, with `afon-cli.sh python-setup`, which can also be run on its own: it
+  fails early, saying so, if `uv` is not installed, or the env has no `python`, `jupyter` or the ipykernel `afon`.
 
 ## Running from your machine
 

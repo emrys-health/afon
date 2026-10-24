@@ -20,7 +20,8 @@
 # Each executed notebook, with its outputs, is written to smoke/target/<notebook file name>, leaving the
 # original clean.
 #
-# Checks Keycloak is serving requests with the afon command 'check-oidc <cloud>', then
+# Sets up and checks the python env with the afon command 'python-setup', checks Keycloak is serving requests with
+# 'check-oidc <cloud>', then
 # gets USER_ID's OIDC access token from Keycloak with 'show-oidc-token <cloud> user',
 # port-forwards the Spark Connect driver of the current kubectl context, then runs the notebook with
 # 'jupyter-execute'.  The commands are run with './afon.sh -a <command>', or, from a cli distribution, which has no
@@ -146,6 +147,12 @@ OIDC_HOST=$(prop "${CLOUD_PREFIX}_OIDC_DOMAIN_NAME")
 OIDC_HOST="${OIDC_HOST:-$(prop OIDC_DOMAIN_NAME)}"
 require "${CLOUD_PREFIX}_POLARIS_DOMAIN_NAME" "$POLARIS_HOST"
 require "${CLOUD_PREFIX}_OIDC_DOMAIN_NAME or OIDC_DOMAIN_NAME" "$OIDC_HOST"
+
+# the python env that runs the notebooks, set up and checked first: its failures are clearer here than in jupyter-execute
+if ! afon python-setup; then
+  echo "The python env is not ready: see above" >&2
+  exit 1
+fi
 
 if ! afon check-oidc "$CLOUD" >/dev/null; then
   echo "OIDC provider at $OIDC_HOST is not ready" >&2
