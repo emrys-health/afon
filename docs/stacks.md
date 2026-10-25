@@ -187,7 +187,7 @@ zone of the new cloud.  To give a cloud a KeyCloak of its own, set `<CLOUD>_OIDC
 if it is set and not blank, else `OIDC_DOMAIN_NAME`, so existing configs behave as before.  Everything of the cloud then uses
 it: its KeyCloak stacks, which hold it, so those of two clouds with different domain names no longer conflict; the Polaris stacks that
 use that KeyCloak; the DNS zone and certificate of the cloud (each domain needs its own, eg on AWS a hosted zone named after it and
-an ACM certificate, see [DNS config](dns_config.md)); and the checks, `check-oidc <cloud>` and `show-oidc-token <cloud>`, and the
+an ACM certificate, see [DNS config](dns_config.md)); and the checks, `check-oidc <cloud>`, which also shows a token with `--token`, and the
 status and smoke scripts.
 
 `OIDC_ISSUER_URL` is a template, in which `[OIDC_DOMAIN_NAME]` stands for the domain name of the cloud, so the issuer follows it.  The host of the issuer must be the domain name of the cloud, else the stack

@@ -18,7 +18,7 @@ import static java.lang.String.format;
  * from KeyCloak, via {@link IdentityProvider#clientToken}. The inherited catalog/management calls then
  * present it to Polaris as a bearer token, and {@link #getAccessToken()} retries it on transient failures.
  *
- * <p>To get the same token from the command line: {@code ./afon.sh -a show-oidc-token <cloud>}.
+ * <p>To get the same token from the command line: {@code ./afon.sh -a check-oidc <cloud> --token}.
  */
 public class KeyCloakPolarisRestClient extends PolarisRestClient {
 

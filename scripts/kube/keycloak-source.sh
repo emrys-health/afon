@@ -5,7 +5,7 @@
 #   - without credentials: the discovery document of the master realm, which KeyCloak always has, so its answering
 #     shows KeyCloak up and serving, then that of the realm polaris, which the setup of the stack creates, so its
 #     answering shows KeyCloak set up for Polaris;
-#   - as the Polaris admin: a token for the admin principal (POLARIS_ID and POLARIS_SECRET, as for show-oidc-token)
+#   - as the Polaris admin: a token for the admin principal (POLARIS_ID and POLARIS_SECRET, as for check-oidc --token)
 #     from the realm polaris, which shows the setup's clients in place, ie what Polaris and its clients log in with.
 #     It is skipped when the realm polaris did not answer or the admin credentials are not configured.
 

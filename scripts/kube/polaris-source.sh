@@ -4,7 +4,7 @@
 # Adds to the layers of kube/status-source.sh the HTTPS requests to Polaris:
 #   - without credentials: a healthy Polaris answers 401, which shows it is up and enforces authentication;
 #   - as the Polaris admin: a token for the admin principal (POLARIS_ID and POLARIS_SECRET, as for
-#     show-oidc-token) from Keycloak, then the list of the catalogs Polaris shows it.  Only this request
+#     check-oidc --token) from Keycloak, then the list of the catalogs Polaris shows it.  Only this request
 #     shows the login path working, ie Keycloak issuing the token and Polaris accepting it.  It is skipped
 #     when Polaris did not answer or the admin credentials are not configured.
 #

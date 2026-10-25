@@ -16,6 +16,9 @@ import static health.emrys.afon.config.AfonProperty.AZURE_JUPYTER_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperty.AZURE_POLARIS_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperty.GCP_JUPYTER_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperty.GCP_POLARIS_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperty.AWS_OIDC_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperty.AZURE_OIDC_DOMAIN_NAME;
+import static health.emrys.afon.config.AfonProperty.OIDC_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperty.TRE_CLOUD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,12 +34,17 @@ class SmokeConfigTest {
                                           + "pol-gcp.example,jup-gcp.example,store.blob.core.windows.net";
 
     private static SmokeConfig config(String treCloud) {
+        return config(treCloud, Map.of(), ALLOWED);
+    }
+
+    private static SmokeConfig config(String treCloud, Map<AfonProperty, String> extra, String allowed) {
         Map<AfonProperty, String> values = new HashMap<>(Map.of(
-            ALLOWED_DOMAINS_CSV, ALLOWED,
+            ALLOWED_DOMAINS_CSV, allowed,
             AWS_POLARIS_DOMAIN_NAME, "pol-aws.example", AWS_JUPYTER_DOMAIN_NAME, "jup-aws.example",
             AZURE_POLARIS_DOMAIN_NAME, "pol-az.example", AZURE_JUPYTER_DOMAIN_NAME, "jup-az.example",
             GCP_POLARIS_DOMAIN_NAME, "pol-gcp.example", GCP_JUPYTER_DOMAIN_NAME, "jup-gcp.example",
             AWS_EGRESS_IP, "203.0.113.9"));
+        values.putAll(extra);
         if (treCloud != null) {
             values.put(TRE_CLOUD, treCloud);
         }
@@ -80,6 +88,15 @@ class SmokeConfigTest {
     void onGcpAllowedDomainsExcludeThoseOfTheOtherClouds() {
         assertThat(config("gcp").allowedDomains())
             .containsExactly("oidc.example", "pol-gcp.example", "jup-gcp.example", "store.blob.core.windows.net");
+    }
+
+    @Test
+    void ownOidcDomainNamesExcludeTheGlobalOneAndThoseOfTheOtherClouds() {
+        SmokeConfig config = config("aws", Map.of(OIDC_DOMAIN_NAME, "oidc.example",
+                                                  AWS_OIDC_DOMAIN_NAME, "oidc-aws.example",
+                                                  AZURE_OIDC_DOMAIN_NAME, "oidc-az.example"),
+                                    "oidc.example,oidc-aws.example,oidc-az.example,pol-aws.example");
+        assertThat(config.allowedDomains()).containsExactly("oidc-aws.example", "pol-aws.example");
     }
 
     @Test

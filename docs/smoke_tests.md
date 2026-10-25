@@ -61,21 +61,21 @@ exist before checking privileges, so reading a table in an empty catalog would n
 ## Running from your machine
 
 ```shell
-afon-cli.sh smoke-notebook <cloud>
-afon-cli.sh smoke-notebook <cloud> oidc
+afon-cli.sh smoke-notebook [<cloud>]
+afon-cli.sh smoke-notebook [<cloud>] oidc
 afon-cli.sh smoke-notebook --list
 ```
 
 which runs all the notebooks listed in `scripts/smoke/notebooks.csv`, or only those named, separated by spaces or commas, eg `oidc`. All are run even if some fail, and the command fails if any does. The names are those listed in [scripts/smoke/notebooks.csv](../scripts/smoke/notebooks.csv), the file of the notebooks, `name|file|description`, with the files in `scripts/smoke/notebooks`.  The notebooks are read from that file by default; `--notebooks <file>` reads those of another CSV file instead.
 
-The command can also be run with `./afon.sh -a smoke-notebook <cloud> oidc`.  It runs its afon commands with `afon.sh` from the source tree, else with the `afon-cli.sh` of the distribution it runs from, or of `AFON_CLI_DIR`.
+The command can also be run with `./afon.sh -a smoke-notebook [<cloud>] oidc`.  It runs its afon commands with `afon.sh` from the source tree, else with the `afon-cli.sh` of the distribution it runs from, or of `AFON_CLI_DIR`.
 
-`cloud` is required, and selects the Polaris domain from `<CLOUD>_POLARIS_DOMAIN_NAME` and the catalogs `<cloud>` and
+`cloud` is `aws`, `azure` or `gcp` (default: `aws`), given first, and selects the Polaris domain from `<CLOUD>_POLARIS_DOMAIN_NAME` and the catalogs `<cloud>` and
 `<cloud>_forbidden`, eg `azure` and `azure_forbidden`. The script:
 
 1. reads `<CLOUD>_POLARIS_DOMAIN_NAME` and `<CLOUD>_OIDC_DOMAIN_NAME` (else `OIDC_DOMAIN_NAME`) from `$AFON_HOME/config/*.properties`, for the notebook;
 2. checks that OIDC provider is serving requests, with `./afon.sh -a check-oidc <cloud>`, failing fast if it is not;
-3. gets the OIDC access token of `USER_ID` from OIDC provider, with `./afon.sh -a show-oidc-token <cloud> user`;
+3. gets the OIDC access token of `USER_ID` from OIDC provider, with `./afon.sh -a check-oidc <cloud> --token user`;
 4. port-forwards `pod/spark-connector-0-driver` on port 15002, via the current `kubectl` context;
 5. runs the notebook with `./afon.sh -a jupyter-execute` (see [scripts/jupyter/execute.sh](../scripts/jupyter/execute.sh));
 6. stops the port-forward, whether the run passed or failed.
@@ -86,10 +86,10 @@ clean. The script exits non-zero if any check fails. The token is never printed.
 To get the same token yourself, eg to run the notebook some other way, use:
 
 ```shell
-./afon.sh -a show-oidc-token <cloud> user
+./afon.sh -a check-oidc <cloud> --token user
 ```
 
-Without `user`, `show-oidc-token` gives the token of the Polaris admin (`POLARIS_ID`) instead, which is not what
+Without `user`, `--token` gives the token of the Polaris admin (`POLARIS_ID`) instead, which is not what
 the smoke test needs: the admin is not one of the users whose access `users-acl.csv` configures.
 
 ## Running in JupyterHub

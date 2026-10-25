@@ -3,10 +3,10 @@
 # Runs a notebook in the afon python env, from this machine against a deployed stack, as a Jupyter pod would: via
 # Spark Connect, with catalogs authenticated by the user's OIDC token.
 #
-# usage: scripts/smoke/notebook.sh [--notebooks|-n <file>] <cloud> [<notebook>...]
+# usage: scripts/smoke/notebook.sh [--notebooks|-n <file>] [<cloud>] [<notebook>...]
 #        scripts/smoke/notebook.sh [--notebooks|-n <file>] --list|-l
-#   cloud     the cloud whose Polaris to use, read from <CLOUD>_POLARIS_DOMAIN_NAME.  The notebook may use the catalogs
-#             <cloud> and <cloud>_forbidden, set as AFON_CATALOG and AFON_FORBIDDEN_CATALOG, unless already set.
+#   cloud     the cloud whose Polaris to use, aws, azure or gcp (default: aws), read from <CLOUD>_POLARIS_DOMAIN_NAME.
+#             Given first, if at all.  The notebook may use the catalogs <cloud> and <cloud>_forbidden, set as AFON_CATALOG and AFON_FORBIDDEN_CATALOG, unless already set.
 #   notebook  the names of the notebooks to run, separated by spaces or commas, as listed by --list (default: all of them,
 #             in the order of the notebooks file).  All are run, even if some fail, and the script exits non-zero if any fails.
 #   --notebooks
@@ -22,7 +22,7 @@
 #
 # Sets up and checks the python env with the afon command 'python-setup', checks Keycloak is serving requests with
 # 'check-oidc <cloud>', then
-# gets USER_ID's OIDC access token from Keycloak with 'show-oidc-token <cloud> user',
+# gets USER_ID's OIDC access token from Keycloak with 'check-oidc <cloud> --token user',
 # port-forwards the Spark Connect driver of the current kubectl context, then runs the notebook with
 # 'jupyter-execute'.  The commands are run with './afon.sh -a <command>', or, from a cli distribution, which has no
 # afon.sh, with its afon-cli.sh, eg as 'afon-cli.sh smoke-notebook <cloud> <notebook>'.  Also reads
@@ -76,14 +76,14 @@ done
 if [ -n "$LIST" ]; then
   list_notebooks; exit 0
 fi
-CLOUD="${ARGS[0]:-}"
-if [ -z "$CLOUD" ]; then
-  usage >&2
-  exit 1
-fi
+# the cloud is the first arg if it is one, else aws, as for test.sh
+CLOUD=aws
+case "$(echo "${ARGS[0]:-}" | tr '[:upper:]' '[:lower:]')" in
+  aws|azure|gcp) CLOUD=$(echo "${ARGS[0]}" | tr '[:upper:]' '[:lower:]'); ARGS=(${ARGS[@]+"${ARGS[@]:1}"}) ;;
+esac
 # the names of the notebooks to run, from the args after the cloud, else all those of the notebooks file
 NAMES=()
-for arg in ${ARGS[@]+"${ARGS[@]:1}"}; do
+for arg in ${ARGS[@]+"${ARGS[@]}"}; do
   IFS=',' read -ra parts <<< "$arg"
   NAMES+=("${parts[@]}")
 done
@@ -161,11 +161,11 @@ fi
 echo "OIDC provider at $OIDC_HOST is ready"
 
 TOKEN_LINE="^Access token for user '\([^']*\)' on cloud '[^']*': "
-TOKEN_OUTPUT=$(afon show-oidc-token "$CLOUD" user 2>&1 || true)
+TOKEN_OUTPUT=$(afon check-oidc "$CLOUD" --token user 2>&1 || true)
 USER_ID=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n "s/${TOKEN_LINE}.*/\1/p" | tail -1)
 OIDC_TOKEN=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n "s/${TOKEN_LINE}//p" | tail -1)
 if [ -z "$OIDC_TOKEN" ]; then
-  echo "show-oidc-token gave no access token for USER_ID:" >&2
+  echo "check-oidc --token gave no access token for USER_ID:" >&2
   printf '%s\n' "$TOKEN_OUTPUT" | tail -20 >&2
   exit 1
 fi

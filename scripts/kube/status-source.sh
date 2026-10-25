@@ -163,7 +163,7 @@ status_check_tls() {
 }
 
 # Gets an access token from the Keycloak realm polaris, by the client credentials of the Polaris admin (POLARIS_ID and
-# POLARIS_SECRET, as for show-oidc-token), for the authenticated checks, writing it to $STATUS_DIR/token, and prints
+# POLARIS_SECRET, as for check-oidc --token), for the authenticated checks, writing it to $STATUS_DIR/token, and prints
 # one line: "OK|<POLARIS_ID>", "SKIPPED|<why>" or "FAILED|<message>".  Meant to be run in a subshell: it sources the
 # secrets, which must not be left in the script's environment, nor exported to the commands it runs later.  The
 # secret and the token only ever reach curl through files in $STATUS_DIR (a 700 dir, removed at exit), as an argument
