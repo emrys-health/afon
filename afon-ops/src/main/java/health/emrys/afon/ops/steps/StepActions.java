@@ -3,6 +3,7 @@ package health.emrys.afon.ops.steps;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
+import health.emrys.afon.ops.scripts.ProcessLogLevels;
 import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -563,6 +564,7 @@ public class StepActions {
         if (path != null) {
             pb.setWorkingDirectory(path.toFile());
         }
+        pb.setOutputStreamLogDispatcher(new ProcessLogLevels());
         pb.setDestroyOnShutdown(true)
           .addStdOut(stdOut)
           .addStdErr(System.err)

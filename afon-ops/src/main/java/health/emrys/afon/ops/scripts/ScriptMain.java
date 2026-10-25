@@ -133,6 +133,7 @@ public class ScriptMain {
                 pb.addArgument(scriptArg);
             }
             pb.getEnvironment().putAll(env);
+            pb.setOutputStreamLogDispatcher(new ProcessLogLevels());
             pb.setDestroyOnShutdown(true)
               .addStdOut(System.out)
               .addStdErr(System.err)
