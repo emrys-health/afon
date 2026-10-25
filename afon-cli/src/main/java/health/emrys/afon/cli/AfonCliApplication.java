@@ -101,12 +101,29 @@ public class AfonCliApplication {
         }
     }
 
+    /**
+     * @return the message of the failure that is relevant to the user, without its stack trace: that of the exception,
+     * unless it only wraps its cause, ie has no message or that of its cause, in which case that of the cause
+     */
+    static String userMessage(Throwable failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null && cause.getCause() != cause
+               && (cause.getMessage() == null || cause.getMessage().isBlank()
+                   || cause.getMessage().equals(cause.getCause().toString()))) {
+            cause = cause.getCause();
+        }
+        String message = cause.getMessage();
+        return message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
+    }
+
     private static void invoke(Class<?> target, String[] args) {
         try {
             Method main = target.getMethod("main", String[].class);
             main.invoke(null, (Object) args);
         } catch (InvocationTargetException e) {
             logger.error("Command {} failed", target.getSimpleName(), e.getCause());
+            // printed as well as logged, as the console logging may be off, eg by default in the CLI
+            System.err.println("Error: " + userMessage(e.getCause()));
             throw new RuntimeException(e.getCause());
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
