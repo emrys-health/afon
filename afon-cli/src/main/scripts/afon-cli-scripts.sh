@@ -81,9 +81,6 @@ if [ -n "$AFON_ENV" ]; then
 fi
 
 CLOUD="$AFON_CLOUD"
-if [ -n "$CLOUD" ]; then
-  echo "Using cloud $CLOUD"
-fi
 CDKTF_DIR="$AFON_CDKTF"
 CDKTF_ENV="$AFON_CDKTF_ENV"
 CONFIG_DIR="$AFON_HOME/config"

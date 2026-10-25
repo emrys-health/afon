@@ -3,12 +3,14 @@
 # Runs a notebook in the afon python env, from this machine against a deployed stack, as a Jupyter pod would: via
 # Spark Connect, with catalogs authenticated by the user's OIDC token.
 #
-# usage: scripts/smoke/notebook.sh [--notebooks|-n <file>] [<cloud>] [<notebook>...]
+# usage: scripts/smoke/notebook.sh [--env|-e <env>] [--notebooks|-n <file>] [<cloud>] [<notebook>...]
 #        scripts/smoke/notebook.sh [--notebooks|-n <file>] --list|-l
 #   cloud     the cloud whose Polaris to use, aws, azure or gcp (default: aws), read from <CLOUD>_POLARIS_DOMAIN_NAME.
 #             Given first, if at all.  The notebook may use the catalogs <cloud> and <cloud>_forbidden, set as AFON_CATALOG and AFON_FORBIDDEN_CATALOG, unless already set.
 #   notebook  the names of the notebooks to run, separated by spaces or commas, as listed by --list (default: all of them,
 #             in the order of the notebooks file).  All are run, even if some fail, and the script exits non-zero if any fails.
+#   --env     the afon env, as for './afon.sh --env <env>': the config read, and used by every afon command, is
+#             $AFON_HOME/config-<env>.  Exported as AFON_ENV.  Default: the AFON_ENV already set, else the current config.
 #   --notebooks
 #             the CSV file of the notebooks (default: scripts/smoke/notebooks.csv)
 #   --list    lists the notebooks and exits
@@ -27,7 +29,7 @@
 # 'jupyter-execute'.  The commands are run with './afon.sh -a <command>', or, from a cli distribution, which has no
 # afon.sh, with its afon-cli.sh, eg as 'afon-cli.sh smoke-notebook <cloud> <notebook>'.  Also reads
 # <CLOUD>_POLARIS_DOMAIN_NAME and <CLOUD>_OIDC_DOMAIN_NAME (else OIDC_DOMAIN_NAME) from
-# $AFON_HOME/config/*.properties (AFON_HOME defaults to ~/.afon), for the notebook.  Only those properties
+# $AFON_HOME/config/*.properties, or those of --env (AFON_HOME defaults to ~/.afon), for the notebook.  Only those properties
 # are read, rather than sourcing the secrets: sourcing them would also export cloud credentials that change
 # the identity kubectl uses.  The token is never printed.
 
@@ -68,6 +70,12 @@ while [ $# -gt 0 ]; do
         exit 1
       fi
       NOTEBOOKS_FILE="$2"; shift 2 ;;
+    --env|-e)
+      if [ -z "${2:-}" ]; then
+        echo "Option $1 requires a value" >&2
+        exit 1
+      fi
+      export AFON_ENV="$2"; shift 2 ;;
     --list|-l) LIST=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) ARGS+=("$1"); shift ;;
@@ -80,6 +88,7 @@ fi
 CLOUD=aws
 case "$(echo "${ARGS[0]:-}" | tr '[:upper:]' '[:lower:]')" in
   aws|azure|gcp) CLOUD=$(echo "${ARGS[0]}" | tr '[:upper:]' '[:lower:]'); ARGS=(${ARGS[@]+"${ARGS[@]:1}"}) ;;
+  *) echo "No cloud given, defaulting to $CLOUD" ;;
 esac
 # the names of the notebooks to run, from the args after the cloud, else all those of the notebooks file
 NAMES=()
@@ -129,13 +138,20 @@ afon() {
   fi
 }
 
+# the config of the afon env, if there is one, else the current config
+CONFIG_DIR="$AFON_HOME/config${AFON_ENV:+-$AFON_ENV}"
+if [ ! -d "$CONFIG_DIR" ]; then
+  echo "No config $CONFIG_DIR for the afon env '${AFON_ENV:-}'" >&2
+  exit 1
+fi
+
 prop() {
-  grep -h "^$1=" "$AFON_HOME"/config/*.properties 2>/dev/null | tail -1 | cut -d= -f2- || true
+  grep -h "^$1=" "$CONFIG_DIR"/*.properties 2>/dev/null | tail -1 | cut -d= -f2- || true
 }
 
 require() {
   if [ -z "$2" ]; then
-    echo "$1 is not set in $AFON_HOME/config" >&2
+    echo "$1 is not set in $CONFIG_DIR" >&2
     exit 1
   fi
 }
@@ -206,7 +222,7 @@ for i in "${!NOTEBOOKS[@]}"; do
   fi
 done
 if [ ${#FAILED[@]} -gt 0 ]; then
-  echo "${#FAILED[@]} of ${#NOTEBOOKS[@]} notebooks failed: ${FAILED[*]}" >&2
+  echo "Notebooks failed (${#FAILED[@]} of ${#NOTEBOOKS[@]}): ${FAILED[*]}" >&2
   exit 1
 fi
-echo "All ${#NOTEBOOKS[@]} notebooks passed"
+echo "All notebooks (${#NOTEBOOKS[@]}) passed"

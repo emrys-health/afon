@@ -687,6 +687,7 @@ LOGGING_CONSOLE=
 SELECTED=
 SUITE_FILE="$DEFAULT_SUITE_FILE"
 CLOUD=aws
+CLOUD_GIVEN=
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -714,10 +715,13 @@ while [[ $# -gt 0 ]]; do
       error "Unknown option: $1"
       usage >&2; exit 1 ;;
     *)
-      CLOUD=$(echo "$1" | tr '[:upper:]' '[:lower:]'); shift ;;
+      CLOUD=$(echo "$1" | tr '[:upper:]' '[:lower:]'); CLOUD_GIVEN=true; shift ;;
   esac
 done
 
+if [ -z "$CLOUD_GIVEN" ] && [ -z "$LIST" ]; then
+  echo "No cloud given, defaulting to $CLOUD"
+fi
 case "$CLOUD" in
   aws|azure) ;;
   *)

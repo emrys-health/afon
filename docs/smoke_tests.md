@@ -61,12 +61,14 @@ exist before checking privileges, so reading a table in an empty catalog would n
 ## Running from your machine
 
 ```shell
-afon-cli.sh smoke-notebook [<cloud>]
-afon-cli.sh smoke-notebook [<cloud>] oidc
+afon-cli.sh smoke-notebook [--env <env>] [<cloud>]
+afon-cli.sh smoke-notebook [--env <env>] [<cloud>] oidc
 afon-cli.sh smoke-notebook --list
 ```
 
 which runs all the notebooks listed in `scripts/smoke/notebooks.csv`, or only those named, separated by spaces or commas, eg `oidc`. All are run even if some fail, and the command fails if any does. The names are those listed in [scripts/smoke/notebooks.csv](../scripts/smoke/notebooks.csv), the file of the notebooks, `name|file|description`, with the files in `scripts/smoke/notebooks`.  The notebooks are read from that file by default; `--notebooks <file>` reads those of another CSV file instead.
+
+`--env` selects the afon env, so that the domain names, and the config used by every afon command it runs, are those of `$AFON_HOME/config-<env>`; it defaults to `AFON_ENV`, else the current config.
 
 The command can also be run with `./afon.sh -a smoke-notebook [<cloud>] oidc`.  It runs its afon commands with `afon.sh` from the source tree, else with the `afon-cli.sh` of the distribution it runs from, or of `AFON_CLI_DIR`.
 
