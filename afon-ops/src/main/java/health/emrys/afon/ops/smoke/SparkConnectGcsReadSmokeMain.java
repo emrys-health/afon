@@ -80,15 +80,26 @@ public class SparkConnectGcsReadSmokeMain {
             lines.show(false);
         } catch (Exception e) {
             if (isMissingConnector(e)) {
-                logger.warn(format("The driver has no GCS connector, so " +
-                                       "reading %s failed due to the classpath rather than access " +
-                                       "control. If this is because downloading packages is disabled, everything is OK",
-                                   PATH), e);
+                logger.info("Could not read {}: the driver has no GCS connector, so the read failed on the classpath "
+                            + "rather than on access control.  This is as expected where downloading packages is "
+                            + "disabled", PATH);
+            } else {
+                logger.info("Could not read {}: {}", PATH, rootMessage(e));
             }
+            logger.debug("Read of {} failed", PATH, e);
             lines = null;
         }
 
         return lines;
+    }
+
+    private static String rootMessage(Throwable t) {
+        Throwable root = t;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String message = root.getMessage();
+        return message == null ? root.getClass().getSimpleName() : message.lines().findFirst().orElse(message);
     }
 
     private static boolean isMissingConnector(Throwable t) {
