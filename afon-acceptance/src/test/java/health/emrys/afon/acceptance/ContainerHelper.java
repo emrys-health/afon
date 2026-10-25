@@ -18,10 +18,6 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.Reader;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -221,9 +217,8 @@ public class ContainerHelper {
             try {
                 trino = new GenericContainer<>("trinodb/trino@sha256:5b5e0a97f599a30a2e23c7c7061e4e4d546a914b4fad2a2a002998140ceb4006");
                 String catalogPath    = "/etc/trino/catalog";
-                String propertiesPath = trinoConfigPropertiesFile().getAbsolutePath();
-                logger.info("About to mount {}", propertiesPath);
-                trino.withFileSystemBind(propertiesPath, "/etc/trino/config.properties");
+                trino.withCopyToContainer(
+                    Transferable.of(trinoConfigPropertiesText().getBytes()), "/etc/trino/config.properties");
                 trino.setPortBindings(List.of("8090:8090"));
                 trino.withNetwork(network);
 //                trino.withLogConsumer(new Slf4jLogConsumer(logger));
@@ -243,16 +238,23 @@ public class ContainerHelper {
         }
     }
 
-    public static Properties trinoConfigProperties() throws IOException {
+    public static Properties trinoConfigProperties() {
         Properties props = new Properties();
-        try (Reader reader = Files.newBufferedReader(trinoConfigPropertiesFile().toPath())) {
-            props.load(reader);
-        }
+        props.setProperty("coordinator", "true");
+        props.setProperty("node-scheduler.include-coordinator", "true");
+        // Port 8090 (not Trino's usual 8080): in the acceptance test Trino runs in host network mode
+        // alongside KeyCloak, which occupies host port 8080.
+        props.setProperty("http-server.http.port", "8090");
+        props.setProperty("discovery.uri", "http://127.0.0.1:8090");
+        // This forces Trino to talk to itself over localhost instead of your LAN IP
+        props.setProperty("node.internal-address", "127.0.0.1");
         return props;
     }
 
-    private static File trinoConfigPropertiesFile() throws IOException {
-        return new FileFinder().fullPathOf("scripts/trino/config.properties");
+    private static String trinoConfigPropertiesText() {
+        StringBuilder text = new StringBuilder();
+        trinoConfigProperties().forEach((k, v) -> text.append(k).append('=').append(v).append('\n'));
+        return text.toString();
     }
 
     public static String trinoLocalConfig(
