@@ -89,6 +89,7 @@ config file, named after the file:
 | `catalogs-gcp.properties` | `CATALOGS_GCP_PROPERTIES` |
 | `users.csv`               | `USERS_CSV`               |
 | `users-acl.csv`           | `USERS_ACL_CSV`           |
+| `whitelist.yaml`          | `WHITELIST_YAML`          |
 
 base64 is used so that multi-line values such as `SNOWFLAKE_PRIVATE_KEY` and
 `GOOGLE_APPLICATION_CREDENTIALS` survive the round trip byte for byte.

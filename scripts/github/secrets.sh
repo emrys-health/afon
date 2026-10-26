@@ -21,6 +21,7 @@
 #      catalogs-aws.properties -> CATALOGS_AWS_PROPERTIES
 #      secret-azure.properties -> SECRET_AZURE_PROPERTIES
 #      users.csv               -> USERS_CSV
+#      whitelist.yaml          -> WHITELIST_YAML
 #    base64 is used so that multi-line values (SNOWFLAKE_PRIVATE_KEY, GOOGLE_APPLICATION_CREDENTIALS)
 #    survive the round trip byte for byte.  Empty files are skipped, as GitHub secrets cannot be empty.
 #

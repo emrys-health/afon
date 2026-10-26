@@ -80,6 +80,7 @@ jobs:
           CATALOGS_GCP_PROPERTIES: ${{ secrets.CATALOGS_GCP_PROPERTIES }}
           USERS_CSV: ${{ secrets.USERS_CSV }}
           USERS_ACL_CSV: ${{ secrets.USERS_ACL_CSV }}
+          WHITELIST_YAML: ${{ secrets.WHITELIST_YAML }}
         run: |
           set -euo pipefail
           CONFIG_DIR="$AFON_HOME/config"
@@ -114,6 +115,7 @@ jobs:
           write_config catalogs-gcp.properties   "$CATALOGS_GCP_PROPERTIES"
           write_config users.csv                 "$USERS_CSV"
           write_config users-acl.csv             "$USERS_ACL_CSV"
+          write_config whitelist.yaml          "$WHITELIST_YAML"
 
       - name: Validate afon config
         run: ./afon.sh -a config-validate
