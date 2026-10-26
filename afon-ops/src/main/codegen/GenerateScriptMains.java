@@ -110,6 +110,8 @@ public class GenerateScriptMains {
         new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
         new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),
 
+        new ScriptEntry("data", "DataSyntheticEhrMain", "data/synthetic-ehr.sh"),
+
         new ScriptEntry("jupyter", "JupyterExecuteMain", "jupyter/execute.sh"),
 
         new ScriptEntry("python", "PythonSetupMain", "python/setup.sh"),
