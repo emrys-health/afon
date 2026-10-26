@@ -13,8 +13,11 @@ import java.io.IOException;
 import java.sql.*;
 import java.util.Properties;
 
+import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
+import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static health.emrys.afon.trino.TrinoServerConfiguration.TOKEN_EXTRA_CREDENTIAL;
+import static java.lang.String.format;
 
 /**
  * To run against Kubernetes, run this first:
@@ -32,21 +35,20 @@ import static health.emrys.afon.trino.TrinoServerConfiguration.TOKEN_EXTRA_CREDE
 public class TrinoQuerySmoke {
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(TrinoQuerySmoke.class);
 
-    private final String   url;
-    private final AfonUser user;
-    private final String   token;
+    private final SmokeConfig config;
 
-    public TrinoQuerySmoke(String url, AfonUser user, String token) {
-        this.url   = url;
-        this.user  = user;
-        this.token = token;
+    public TrinoQuerySmoke() {
+        this.config = new SmokeConfig();
     }
 
-    public String query(String query) throws SQLException {
+
+    public String query(String url, String query, AfonUser user) throws SQLException, IOException {
         // 2. Set up connection properties (User is required by Trino)
         Properties properties = new Properties();
         properties.setProperty("user", user.username());
         // Trino calls Polaris with this token, as its catalogs have session=USER
+        String               token      = new KeyCloakProvider(config.getProperties().getOidcDomainName(config.cloud()))
+            .userToken(user.username(), user.password());
         properties.setProperty("extraCredentials", TOKEN_EXTRA_CREDENTIAL + ":" + token);
 
         logger.info("Connecting to Trino");
@@ -73,28 +75,23 @@ public class TrinoQuerySmoke {
      *             after running the mvn commands above
      */
     public static void main(String[] args) {
-        String url = "jdbc:trino://localhost:8080/aws/admin";
         try {
-            // for other clouds try:
-            // gcp.acceptancetests.smoketesttable260601231212
-            // or
-            // azure.acceptancetests.smoketesttable260601231212
-            String sql = "SELECT COUNT(*) FROM ";
-            if (args.length > 0) {
-                sql = sql + args[0];
-            } else {
-                sql = sql + OpsDefaults.POLARIS_NAMESPACE_EXTERNAL + "." + OpsDefaults.POLARIS_TABLE_NAME;
-            }
-            AfonPropertyProvider properties = smokeTestProperties();
-            AfonCloud            cloud      = new SmokeConfig(properties).cloud();
-            AfonUser             user       = new FileUserProvider().getConfiguredUser(properties);
-            String               token      = new KeyCloakProvider(properties.getOidcDomainName(cloud))
-                .userToken(user.username(), user.password());
-            String result = new TrinoQuerySmoke(url, user, token).query(sql);
-            System.out.println(result);
+            TrinoQuerySmoke app = new TrinoQuerySmoke();
+            app.checkCallingTrinoForAllUsers();
         } catch (SQLException | IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void checkCallingTrinoForAllUsers() throws IOException, SQLException {
+        String url = format("jdbc:trino://localhost:8080/%s/%s", config.cloud().toString(), POLARIS_NAMESPACE_EXTERNAL);
+        String sql = "SELECT COUNT(*) FROM " +  POLARIS_TABLE_NAME;
+        AfonPropertyProvider properties = config.getProperties();
+
+        AfonUser             user       = new FileUserProvider().getConfiguredUser(properties);
+
+        String result = new TrinoQuerySmoke().query(url, sql, user);
+        System.out.println(result);
     }
 
 }

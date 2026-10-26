@@ -41,6 +41,14 @@ public class SmokeConfig {
         this.whitelist = whitelist;
     }
 
+    public SmokeConfig() {
+        this(smokeTestProperties());
+    }
+
+    public AfonPropertyProvider getProperties() {
+        return properties;
+    }
+
     /**
      * @return the cloud of the stack hosting the TRE, from {@code TRE_CLOUD}, or {@link #DEFAULT_TRE_CLOUD} if it is
      * not set or empty

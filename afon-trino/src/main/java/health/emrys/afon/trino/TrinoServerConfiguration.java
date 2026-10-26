@@ -27,13 +27,6 @@ public class TrinoServerConfiguration {
     private final String polarisDomainName;
     private final AfonUser user;
 
-    /**
-     * Authenticates as the configured user, from users.csv, named by {@code USER_ID}.
-     */
-    public TrinoServerConfiguration(AfonPropertyProvider properties, AfonUserProvider users, String polarisDomainName) {
-        this(properties, polarisDomainName, users.getConfiguredUser(properties));
-    }
-
     public TrinoServerConfiguration(AfonPropertyProvider properties, String polarisDomainName, AfonUser user) {
         this.properties = properties;
         this.polarisDomainName = polarisDomainName;
