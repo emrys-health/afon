@@ -1,4 +1,5 @@
 name|command|args
+tetragon|tetragon-smoke|
 git|git-smoke|
 guacamole-db|guacamole-db-smoke|
 loki|loki-smoke|
