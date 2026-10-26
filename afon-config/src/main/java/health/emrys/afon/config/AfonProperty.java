@@ -190,6 +190,12 @@ public enum AfonProperty {
     ALLOWED_DOMAINS_CSV("ALLOWED_DOMAINS_CSV"),
     /** The cloud of the stack hosting the TRE, one of aws|azure|gcp.  Defaults to aws. */
     TRE_CLOUD("TRE_CLOUD"),
+
+    // The workspace identity, labelled on the notebook pods for an auditor. Optional, each label stamped only when set
+    AUDIT_AE_ID("AUDIT_AE_ID"),
+    AUDIT_PROJECT_ID("AUDIT_PROJECT_ID"),
+    AUDIT_COMMISSIONING_ORGANIZATION_ID("AUDIT_COMMISSIONING_ORGANIZATION_ID"),
+    AUDIT_TRE_ID("AUDIT_TRE_ID"),
     ;
 
     private final String name;
