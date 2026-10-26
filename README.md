@@ -1,84 +1,52 @@
 # Afon Documentation
 
-Afon is an open source implementation of a data fabric that enables secure connections between organisations holding sensitive data. It is designed to be cloud agnostic, modular and configurable based on researcher preferences and local technology stacks.
+Afon is an open source implementation of a data fabric that enables secure connections between organisations holding sensitive data. It is designed to be cloud-agnostic, modular and configurable based on researcher preferences and local technology stacks.
 
 This builds on existing work from across the UK health data ecosystem, including work by NHS England, The Data for R&D program, DARE UK, SeRP and Research Data Scotland.
 
 It was built to solve a gap in the health research data ecosystem; there is no mechanism that provides a simple, secure and compliant way for researchers to access and query row level data across multiple organisations.
 
+# Who is Afon for
 
+Afon is for TRE or Data Provider administrators and their support teams who want to deploy and manage a data fabric for a research project.
 
-# Who is this repo for
+Afon is also for members of the health data community who want to contribute to the project or learn more about how it works. See [contributing](docs/contributing/README.md) for how to report issues, propose changes and open pull requests.
 
-This repository is for SDE or TRE administrators and their support teams who want to deploy and manage a data fabric for a research project.
+In any project the infrastructure can be divided into the organisation hosting the central **TRE** (a hosted Trusted Research Environment), where a researcher will log in and analyse data, and the **Data Provider** organisations hosting the data that will be used by the researchers (a data partner).
 
-This repository is also for members of the health data community who want to contribute to the project or learn more about how it works.
-See [contributing](docs/contributing/README.md) for how to report issues, propose changes and open pull requests.
+The TRE host will be deploying the full Afon stack for the choice of IDE, query engine and cloud.
 
-In any project the infrastructure can be divided into the organisation hosting the central TRE (a host), where a researcher will log in and analyse data, and the organisations hosting the data that will be used by the researchers (a data partner).
-
-The host will be deploying the full Afon stack for the choice of IDE, query engine and cloud.
-
-A data partner can either host their own Polaris catalog (or compatible iceberg catalog) or use this repository to deploy one.
-
+A Data Provider partner can either host their own Polaris catalog (or compatible iceberg catalog) or use Afon to deploy one.
 
 # How to use this repository
 
-If you are looking to deploy the data fabric, the easiest way to do so is through the CLI.  We assume this is the default position.
+If you are looking to deploy the data fabric, the easiest way to do so is through the CLI (which does not require access to the source repo).  We assume this is the default position.
 
-## For a host 
+## Guides
 
+- [Guides](docs/guides/README.md)
 
-#### Set up
+## Setup and configuration
 
-- Setup local env: [setup](docs/setup_local.md)
-- CLI binary distribution: [cli](./docs/afon_cli.md)
-- Configure properties and users: [configuration](./docs/configuration.md)
-- Theming: [theme](./docs/theme.md)
-
-## How to deploy
-
-- Cloud infrastructure: [cloud](./docs/cloud.md)
-- DNS Configuration: [dns_config](./docs/dns_config.md)
-- Deploying stacks: [stacks](./docs/stacks.md)
-- Deploy catalogs: [catalogs](./docs/catalogs.md)
-
----
-### How to use
-
-- Jupyter: [jupyter](./docs/jupyter.md)
-- Monitoring: [monitoring](./docs/monitoring.md)
-- Operations: [operations](./docs/operations.md)
-- Smoke tests: [smoke tests](./docs/smoke_tests.md)
-- Snowflake: [snowflake](./docs/snowflake.md)
-- Examples: [examples](./docs/examples.md)
-
-
-## For a data provider 
-
-
-#### Set up
-
-- Setup local env: [setup](docs/setup_local.md)
-- CLI binary distribution: [cli](./docs/afon_cli.md)
-- Configure properties and users: [configuration](./docs/configuration.md)
-- Theming: [theme](./docs/theme.md)
+- [Entry points](./docs/afon_entry_points.md)
+- [CLI binary distribution](./docs/afon_cli.md)
+- [Setup local env](docs/setup_local.md)
+- [Configure properties and users](./docs/configuration.md)
+- [Theming](./docs/theme.md)
 
 ## How to deploy
 
-- Cloud infrastructure: [cloud](./docs/cloud.md)
-- DNS Configuration: [dns_config](./docs/dns_config.md)
-- Deploying stacks: [stacks](./docs/stacks.md)
-- Deploy catalogs: [catalogs](./docs/catalogs.md)
+- [Cloud infrastructure](./docs/cloud.md)
+- [DNS Configuration](./docs/dns_config.md)
+- [Deploying stacks](./docs/stacks.md)
+- [Configuring catalogs](./docs/catalogs.md)
 
----
-### How to use
+## How to use
 
-- Jupyter: [jupyter](./docs/jupyter.md)
-- Monitoring: [monitoring](./docs/monitoring.md)
-- Operations: [operations](./docs/operations.md)
-- Smoke tests: [smoke tests](./docs/smoke_tests.md)
-- Snowflake: [snowflake](./docs/snowflake.md)
-- Examples: [examples](./docs/examples.md)
-
+- [Jupyter](./docs/jupyter.md)
+- [Monitoring](./docs/monitoring.md)
+- [Operations](./docs/operations.md)
+- [Smoke Tests](./docs/smoke_tests.md)
+- [Snowflake](./docs/snowflake.md)
+- [Examples](./docs/examples.md)
 
