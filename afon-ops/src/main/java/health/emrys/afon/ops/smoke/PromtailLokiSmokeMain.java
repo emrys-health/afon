@@ -16,14 +16,14 @@ import static java.lang.String.format;
 /**
  * Checks that Promtail ships the logs of a Jupyter pod to Loki.
  */
-public class LokiSmokeMain {
+public class PromtailLokiSmokeMain {
 
-    static final Logger logger = LoggerFactory.getLogger(LokiSmokeMain.class);
+    static final Logger logger = LoggerFactory.getLogger(PromtailLokiSmokeMain.class);
 
     private final AfonPropertyProvider properties;
 
     public static void main(String[] args) throws Exception {
-        LokiSmokeMain app = new LokiSmokeMain(smokeTestProperties());
+        PromtailLokiSmokeMain app = new PromtailLokiSmokeMain(smokeTestProperties());
         try {
             app.checkLoki();
         } catch (Exception e) {
@@ -32,7 +32,7 @@ public class LokiSmokeMain {
         }
     }
 
-    public LokiSmokeMain(AfonPropertyProvider properties) {
+    public PromtailLokiSmokeMain(AfonPropertyProvider properties) {
         this.properties = properties;
     }
 

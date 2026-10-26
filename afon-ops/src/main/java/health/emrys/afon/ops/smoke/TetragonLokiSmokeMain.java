@@ -23,9 +23,9 @@ import static java.lang.String.format;
  * finding the event of it in the logs of Tetragon's {@code export-stdout} sidecar, which Promtail ships to Loki.
  * See {@code TetragonComponent}.
  */
-public class TetragonSmokeMain {
+public class TetragonLokiSmokeMain {
 
-    static final Logger logger = LoggerFactory.getLogger(TetragonSmokeMain.class);
+    static final Logger logger = LoggerFactory.getLogger(TetragonLokiSmokeMain.class);
 
     /**
      * The binary run in the Jupyter pod, as Tetragon reports it: the absolute path that the container exec'd
@@ -37,7 +37,7 @@ public class TetragonSmokeMain {
     private final AfonPropertyProvider properties;
 
     public static void main(String[] args) throws Exception {
-        TetragonSmokeMain app = new TetragonSmokeMain(smokeTestProperties());
+        TetragonLokiSmokeMain app = new TetragonLokiSmokeMain(smokeTestProperties());
         try {
             app.checkTetragon();
         } catch (Exception e) {
@@ -46,7 +46,7 @@ public class TetragonSmokeMain {
         }
     }
 
-    public TetragonSmokeMain(AfonPropertyProvider properties) {
+    public TetragonLokiSmokeMain(AfonPropertyProvider properties) {
         this.properties = properties;
     }
 
