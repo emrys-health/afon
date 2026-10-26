@@ -109,7 +109,7 @@ Afon uses two types configuration properties in the config dir:
 - [afon-azure.properties](../templates/config/afon-azure.properties)
 - [afon-gcp.properties](../templates/config/afon-gcp.properties)
 
-**`whitelist.yaml`**: the domain names that the TRE's notebooks and Spark may resolve, per cloud and per catalog.  It is required, as there is no default:
+**`whitelist.yaml`**: the domain names that the TRE's notebooks and Spark may resolve, per cloud and per catalog.  It is not mandatory yet: without it the deprecated `ALLOWED_DOMAINS_CSV` is used, if set, else no domains are allowed:
 
 - [whitelist.yaml](../templates/config/whitelist.yaml)
 

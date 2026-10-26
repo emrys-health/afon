@@ -12,6 +12,11 @@ for FILE in $CONFIG_FILES ; do {
   echo "$FILE"
   TEMPLATE=$AFON_ROOT/templates/config/$FILE
   CONFIG_FILE=$CONFIG_DIR/$FILE
+  if [ ! -f $CONFIG_FILE ] && [ "$FILE" = "whitelist.yaml" ] ; then
+     # not mandatory yet: without it the deprecated ALLOWED_DOMAINS_CSV is used, if set, else no domains are allowed
+     echo "Missing: $FILE (optional): run config-updates to create it from the deprecated ALLOWED_DOMAINS_CSV, or copy templates/config/$FILE"
+     continue
+  fi
   if [ ! -f $CONFIG_FILE ]; then
      echo "Missing: $FILE"
      MISSING=$((MISSING + 1))

@@ -141,7 +141,8 @@ jobs:
           write_config catalogs-gcp.properties   "$CATALOGS_GCP_PROPERTIES"
           write_config users.csv                 "$USERS_CSV"
           write_config users-acl.csv             "$USERS_ACL_CSV"
-          write_config whitelist.yaml          "$WHITELIST_YAML"
+          # not mandatory yet: without this secret the deprecated ALLOWED_DOMAINS_CSV is used, if set
+          if [ -n "$WHITELIST_YAML" ]; then write_config whitelist.yaml "$WHITELIST_YAML"; else echo "No secret for whitelist.yaml, skipped"; fi
 
       - name: Validate afon config
         run: ./afon.sh -a config-validate --home "$AFON_HOME"

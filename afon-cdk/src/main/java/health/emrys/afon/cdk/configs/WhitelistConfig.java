@@ -30,8 +30,8 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * The domain names that the TRE's notebooks, Spark master and Spark driver may resolve, read from {@code whitelist.yaml} in
- * the config dir ({@link ConfigUtils#configDir()}).  The file is required, as the list is a security control with no
- * default, except that if it is missing the deprecated {@code ALLOWED_DOMAINS_CSV} is used as the common domains.  It has a {@code common} section, for the domains of any cloud, and a section per cloud ({@code aws},
+ * the config dir ({@link ConfigUtils#configDir()}).  The file is not mandatory yet: if it is missing, the deprecated {@code ALLOWED_DOMAINS_CSV} is used as the
+ * common domains, or no domains are allowed if that is not set either.  It has a {@code common} section, for the domains of any cloud, and a section per cloud ({@code aws},
  * {@code azure}, {@code gcp}), each with:
  * <UL>
  * <LI>{@code domains}: the domain names, spelled out as RFC 1123 host names (so no wildcards)</LI>
@@ -97,15 +97,14 @@ public class WhitelistConfig {
     }
 
     /**
-     * @return the domains of the deprecated {@code ALLOWED_DOMAINS_CSV} as the common ones, if the property is set
-     * @throws IllegalStateException if it is not set either
+     * @return the domains of the deprecated {@code ALLOWED_DOMAINS_CSV} as the common ones, or none if it is not set either
      */
     private Map<String, Section> fallback(Path file) {
         List<String> csv = java.util.Arrays.stream(properties.getValue(AfonProperty.ALLOWED_DOMAINS_CSV, "").split(","))
                                            .map(String::trim).filter(domain -> !domain.isEmpty()).toList();
         if (csv.isEmpty()) {
-            throw new IllegalStateException(
-                "Whitelist not found: " + file + " (copy it from templates/config and list the allowed domains)");
+            logger.warn("{} not found and ALLOWED_DOMAINS_CSV not set: no domains are allowed, copy it from templates/config", file);
+            return Map.of();
         }
         logger.warn("{} not found: using the deprecated ALLOWED_DOMAINS_CSV, for all clouds", file);
         return Map.of(COMMON, new Section(csv, List.of()));

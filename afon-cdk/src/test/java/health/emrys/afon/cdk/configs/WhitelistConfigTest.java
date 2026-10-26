@@ -105,9 +105,8 @@ class WhitelistConfigTest {
     }
 
     @Test
-    void missingFileFails() {
-        assertThatThrownBy(() -> new WhitelistConfig(new FilePropertyProvider(dir.toString(), List.of()), dir.toString()))
-            .isInstanceOf(IllegalStateException.class).hasMessageContaining("whitelist.yaml");
+    void missingFileAndCsvAllowNoDomains() {
+        assertThat(new WhitelistConfig(new FilePropertyProvider(dir.toString(), List.of()), dir.toString()).domains()).isEmpty();
     }
 
     @Test
