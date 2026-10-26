@@ -80,6 +80,10 @@ public class TetragonComponent implements StackComponent {
               # the cluster_name of every event, to tell the clusters apart in Loki
               clusterName: %1$s
               enableK8sAPI: true
+              # every ancestor of a process, not only its parent, so that a command run under eg timeout, make or
+              # xargs is traced back to the notebook's kernel or terminal
+              processAncestors:
+                enabled: base
               # one JSON object per line, the filters within an object all having to match
               exportAllowList: |-
                 {"namespace":["default"],"labels":["%2$s"],"event_set":[%3$s]}
