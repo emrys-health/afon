@@ -1,7 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.cdk.components.MonitoringComponent;
-import health.emrys.afon.cdk.configs.TrinoWorkloads;
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.ops.kube.KubeClient;
@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.sql.*;
 import java.util.Properties;
 
-import static health.emrys.afon.cdk.CdkHelper.TRINO_SERVICE_NAME;
 import static health.emrys.afon.cdk.configs.TrinoWorkloads.TRINO_NAMESPACE;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
@@ -37,19 +36,30 @@ import static java.lang.String.format;
  * The query runs as the configured user, with a token from the KeyCloak of the {@code TRE_CLOUD}, which Trino passes on
  * to Polaris: Trino has no credentials of its own for queries.
  */
-public class TrinoQuerySmoke {
-    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(TrinoQuerySmoke.class);
+public class TrinoQuerySmokeMain {
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(TrinoQuerySmokeMain.class);
 
-    private final SmokeConfig config;
+    private final AfonCloud            cloud;
+    private final AfonPropertyProvider properties;
 
-    public TrinoQuerySmoke() {
-        this.config = new SmokeConfig();
+    public TrinoQuerySmokeMain(AfonCloud cloud, AfonPropertyProvider properties) {
+        this.cloud      = cloud;
+        this.properties = properties;
     }
 
+    public TrinoQuerySmokeMain() {
+        this(new SmokeConfig().cloud(), new SmokeConfig().getProperties());
+    }
 
-    public String query(String url, AfonUser user) throws SQLException, IOException {
-        String     query      = "SELECT COUNT(*) FROM " + POLARIS_TABLE_NAME;
-        Properties properties = trinoAccessPropertiesFor(user);
+    public String query(String url, AfonUser user, String query) throws SQLException, IOException {
+        String token = new KeyCloakProvider(properties.getOidcDomainName(cloud))
+            .userToken(user.username(), user.password());
+
+        return query(url, query, user, token);
+    }
+
+    public String query(String url, String query, AfonUser user, String token) throws SQLException, IOException {
+        Properties properties = trinoAccessPropertiesFor(user, token);
         logger.info("Executing {} against {}", query, url);
         try (Connection connection = DriverManager.getConnection(url, properties);
              Statement statement = connection.createStatement();
@@ -61,13 +71,11 @@ public class TrinoQuerySmoke {
         return "empty, like my life";
     }
 
-    private @NonNull Properties trinoAccessPropertiesFor(AfonUser user) throws IOException {
-        Properties properties = new Properties();
-        properties.setProperty("user", user.username());
-        String token = new KeyCloakProvider(config.getProperties().getOidcDomainName(config.cloud()))
-            .userToken(user.username(), user.password());
-        properties.setProperty("extraCredentials", TOKEN_EXTRA_CREDENTIAL + ":" + token);
-        return properties;
+    private @NonNull Properties trinoAccessPropertiesFor(AfonUser user, String token) throws IOException {
+        Properties cnxnProperties = new Properties();
+        cnxnProperties.setProperty("user", user.username());
+        cnxnProperties.setProperty("extraCredentials", TOKEN_EXTRA_CREDENTIAL + ":" + token);
+        return cnxnProperties;
     }
 
     /**
@@ -79,7 +87,7 @@ public class TrinoQuerySmoke {
      */
     public static void main(String[] args) {
         try {
-            TrinoQuerySmoke app = new TrinoQuerySmoke();
+            TrinoQuerySmokeMain app = new TrinoQuerySmokeMain();
             app.checkCallingTrinoForAllUsers();
         } catch (Exception e) {
             e.printStackTrace();
@@ -87,7 +95,7 @@ public class TrinoQuerySmoke {
     }
 
     private void checkCallingTrinoForAllUsers() throws Exception {
-        try (KubeClient client = new KubeClient(config.getProperties())) {
+        try (KubeClient client = new KubeClient(properties)) {
             V1Pod pod = client.getOnlyPodBegginingWith("trino-coordinator");
             try (PortForwarder forward = new PortForwarder(client,
                                                            TRINO_NAMESPACE,
@@ -97,11 +105,12 @@ public class TrinoQuerySmoke {
                 int localPort = forward.localPort();
                 String url = format("jdbc:trino://localhost:%d/%s/%s",
                                     localPort,
-                                    config.cloud().toString(),
+                                    cloud.toString(),
                                     POLARIS_NAMESPACE_EXTERNAL);
+                String query = "SELECT COUNT(*) FROM " + POLARIS_TABLE_NAME;
                 for (AfonUser user : new FileUserProvider().getUsers()) {
                     logger.info("Checking Trino access for {}", user.username());
-                    String result = query(url, user);
+                    String result = query(url, user, query);
                     System.out.println(result);
                 }
             }
