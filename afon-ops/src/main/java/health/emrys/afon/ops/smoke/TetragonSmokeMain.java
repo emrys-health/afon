@@ -77,35 +77,42 @@ public class TetragonSmokeMain {
      * @return the {@code process_exec} events of the command, the only lines of Tetragon carrying the marker other
      * than those of its {@code process_exit}
      */
-    private static List<JsonNode> execEventsOf(LokiClient loki, String jupyterPod, String marker, String start)
+    private static List<JsonNode> execEventsOf(LokiClient loki,
+                                               String jupyterPod,
+                                               String marker,
+                                               String start)
     throws Exception {
-        String       query  = format("{namespace=\"default\", container=\"export-stdout\"} |= \"%s\"", marker);
-        List<String> lines  = loki.queryRange(query, start, 20);
+        String         query  = format("{namespace=\"default\", container=\"export-stdout\"} |= \"%s\"", marker);
+        List<String>   lines  = loki.queryRange(query, start, 20);
         List<JsonNode> events = new ArrayList<>();
         for (String line : lines) {
             JsonNode event = MAPPER.readTree(line);
-            if (event.has("process_exec")) {
+            if (event.has("process_exec")) { // this must be a Tetragon event
                 events.add(event);
             }
         }
         if (events.isEmpty()) {
-            throw new RuntimeException(format("No Tetragon process_exec event in Loki for '%s' in pod %s. Lines = %s",
-                                              marker, jupyterPod, lines));
+            throw new RuntimeException(format(
+                "No Tetragon process_exec event in Loki for '%s' in pod %s. Lines = %s",
+                marker, jupyterPod, lines));
         }
         return events;
     }
 
-    private static void checkEvent(JsonNode event, String jupyterPod) {
+    private static void checkEvent(JsonNode event,
+                                   String jupyterPod) {
         JsonNode process = event.at("/process_exec/process");
         String   pod     = process.at("/pod/name").asText();
         String   binary  = process.at("/binary").asText();
         if (!jupyterPod.equals(pod)) {
-            throw new RuntimeException(format("Expected the event of pod %s but it was of '%s': %s",
-                                              jupyterPod, pod, event));
+            throw new RuntimeException(format(
+                "Expected the event of pod %s but it was of '%s': %s",
+                jupyterPod, pod, event));
         }
         if (!BINARY.equals(binary)) {
-            throw new RuntimeException(format("Expected the event of binary %s but it was of '%s': %s",
-                                              BINARY, binary, event));
+            throw new RuntimeException(format(
+                "Expected the event of binary %s but it was of '%s': %s",
+                BINARY, binary, event));
         }
     }
 }
