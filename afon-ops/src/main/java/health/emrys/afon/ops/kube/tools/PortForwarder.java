@@ -42,7 +42,7 @@ public class PortForwarder implements AutoCloseable {
 
     private static final String USAGE = "Usage: PortForwarder [-n namespace] <pod> <localPort>:<remotePort>";
 
-    private final KubeClient client;
+    private final KubeClient      client;
     private final String          namespace;
     private final String          pod;
     private final int             remotePort;
@@ -135,7 +135,7 @@ public class PortForwarder implements AutoCloseable {
         try (podErrors) {
             byte[] bytes = podErrors.readAllBytes();
             // the stream begins with the port, as two little-endian bytes, which is not an error
-            int start = bytes.length >= 2 && ((bytes[0] & 0xFF) | (bytes[1] & 0xFF) << 8) == remotePort ? 2 : 0;
+            int    start  = bytes.length >= 2 && ((bytes[0] & 0xFF) | (bytes[1] & 0xFF) << 8) == remotePort ? 2 : 0;
             String errors = new String(bytes, start, bytes.length - start, StandardCharsets.UTF_8);
             if (!errors.isBlank()) {
                 logger.warn("Port-forward error from {}/{}:{}: {}", namespace, pod, remotePort, errors);

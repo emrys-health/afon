@@ -1,21 +1,26 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.cdk.components.MonitoringComponent;
+import health.emrys.afon.cdk.configs.TrinoWorkloads;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.FileUserProvider;
-import health.emrys.afon.ops.config.OpsDefaults;
+import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
+import io.kubernetes.client.openapi.models.V1Pod;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.sql.*;
 import java.util.Properties;
 
+import static health.emrys.afon.cdk.CdkHelper.TRINO_SERVICE_NAME;
+import static health.emrys.afon.cdk.configs.TrinoWorkloads.TRINO_NAMESPACE;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
-import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
+import static health.emrys.afon.ops.kube.KubeClient.nameOfPod;
 import static health.emrys.afon.trino.TrinoServerConfiguration.TOKEN_EXTRA_CREDENTIAL;
 import static java.lang.String.format;
 
@@ -24,11 +29,11 @@ import static java.lang.String.format;
  * <pre>kubectl port-forward svc/trino 8080:8080</pre>
  * Populate the cloud Polaris with something like:
  * <pre>
- ./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "GCP acceptancetests smoketesttable260601231212 gs://emrys_afon_core/acceptancetests/smoketesttable260601231212/metadata/00000-0cf4c26f-668b-474c-9542-618d3fba2e19.metadata.json  emryspolaris.click"
- </pre>
+ * ./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "GCP acceptancetests smoketesttable260601231212 gs://emrys_afon_core/acceptancetests/smoketesttable260601231212/metadata/00000-0cf4c26f-668b-474c-9542-618d3fba2e19.metadata.json  emryspolaris.click"
+ * </pre>
  * or <pre>
- ./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AZURE acceptancetests smoketesttable260601231212 abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable260601231212/metadata/00001-ba11f3b6-6920-4007-9368-ab913506716f.metadata.json  emryspolaris.click"
- </pre>
+ * ./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AZURE acceptancetests smoketesttable260601231212 abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable260601231212/metadata/00001-ba11f3b6-6920-4007-9368-ab913506716f.metadata.json  emryspolaris.click"
+ * </pre>
  * The query runs as the configured user, with a token from the KeyCloak of the {@code TRE_CLOUD}, which Trino passes on
  * to Polaris: Trino has no credentials of its own for queries.
  */
@@ -42,29 +47,27 @@ public class TrinoQuerySmoke {
     }
 
 
-    public String query(String url, String query, AfonUser user) throws SQLException, IOException {
-        // 2. Set up connection properties (User is required by Trino)
-        Properties properties = new Properties();
-        properties.setProperty("user", user.username());
-        // Trino calls Polaris with this token, as its catalogs have session=USER
-        String               token      = new KeyCloakProvider(config.getProperties().getOidcDomainName(config.cloud()))
-            .userToken(user.username(), user.password());
-        properties.setProperty("extraCredentials", TOKEN_EXTRA_CREDENTIAL + ":" + token);
-
-        logger.info("Connecting to Trino");
-
-        // 4. Execute the query using try-with-resources
+    public String query(String url, AfonUser user) throws SQLException, IOException {
+        String     query      = "SELECT COUNT(*) FROM " + POLARIS_TABLE_NAME;
+        Properties properties = trinoAccessPropertiesFor(user);
         logger.info("Executing {} against {}", query, url);
         try (Connection connection = DriverManager.getConnection(url, properties);
              Statement statement = connection.createStatement();
              ResultSet resultSet = statement.executeQuery(query)) {
-
-            // 5. Iterate through the results
             if (resultSet.next()) {
                 return resultSet.getString(1);
             }
         }
         return "empty, like my life";
+    }
+
+    private @NonNull Properties trinoAccessPropertiesFor(AfonUser user) throws IOException {
+        Properties properties = new Properties();
+        properties.setProperty("user", user.username());
+        String token = new KeyCloakProvider(config.getProperties().getOidcDomainName(config.cloud()))
+            .userToken(user.username(), user.password());
+        properties.setProperty("extraCredentials", TOKEN_EXTRA_CREDENTIAL + ":" + token);
+        return properties;
     }
 
     /**
@@ -78,20 +81,31 @@ public class TrinoQuerySmoke {
         try {
             TrinoQuerySmoke app = new TrinoQuerySmoke();
             app.checkCallingTrinoForAllUsers();
-        } catch (SQLException | IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void checkCallingTrinoForAllUsers() throws IOException, SQLException {
-        String url = format("jdbc:trino://localhost:8080/%s/%s", config.cloud().toString(), POLARIS_NAMESPACE_EXTERNAL);
-        String sql = "SELECT COUNT(*) FROM " +  POLARIS_TABLE_NAME;
-        AfonPropertyProvider properties = config.getProperties();
-
-        AfonUser             user       = new FileUserProvider().getConfiguredUser(properties);
-
-        String result = new TrinoQuerySmoke().query(url, sql, user);
-        System.out.println(result);
+    private void checkCallingTrinoForAllUsers() throws Exception {
+        try (KubeClient client = new KubeClient(config.getProperties())) {
+            V1Pod pod = client.getOnlyPodBegginingWith("trino-coordinator");
+            try (PortForwarder forward = new PortForwarder(client,
+                                                           TRINO_NAMESPACE,
+                                                           nameOfPod(pod),
+                                                           0,
+                                                           8080)) {
+                int localPort = forward.localPort();
+                String url = format("jdbc:trino://localhost:%d/%s/%s",
+                                    localPort,
+                                    config.cloud().toString(),
+                                    POLARIS_NAMESPACE_EXTERNAL);
+                for (AfonUser user : new FileUserProvider().getUsers()) {
+                    logger.info("Checking Trino access for {}", user.username());
+                    String result = query(url, user);
+                    System.out.println(result);
+                }
+            }
+        }
     }
 
 }

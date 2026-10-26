@@ -47,13 +47,14 @@ public class TrinoWorkloads {
     /**
      * Chart version pinned for reproducibility; {@link #IMAGE_TAG} overrides its appVersion.
      */
-    private static final String CHART_VERSION = "1.42.2";
-    private static final int    WORKERS       = 2;
-    private static final int    TRINO_PORT    = 8080;
-    private static final String SECRET_NAME   = "trino-polaris";
+    private static final String CHART_VERSION   = "1.42.2";
+    private static final int    WORKERS         = 2;
+    private static final int    TRINO_PORT      = 8080;
+    private static final String SECRET_NAME     = "trino-polaris";
+    public static final  String TRINO_NAMESPACE = "default";
 
     private final TrinoServerConfiguration trinoConfig;
-    private final AfonCatalogs afonCatalogs;
+    private final AfonCatalogs             afonCatalogs;
 
     /**
      * @param oidcDomainName the domain of the KeyCloak that issues Polaris' tokens, as Polaris answers HTTP 501 from its
@@ -63,8 +64,8 @@ public class TrinoWorkloads {
                           AfonUserProvider users,
                           String polarisDomainName,
                           String oidcDomainName) {
-        this.trinoConfig = new KeyCloakTrinoServerConfiguration(properties, users, polarisDomainName,
-                                                                tokenEndpoint(oidcDomainName, "https"));
+        this.trinoConfig  = new KeyCloakTrinoServerConfiguration(properties, users, polarisDomainName,
+                                                                 tokenEndpoint(oidcDomainName, "https"));
         this.afonCatalogs = new AfonCatalogs(properties);
     }
 
@@ -97,7 +98,7 @@ public class TrinoWorkloads {
 
         Secret credential = Secret.Builder
             .create(scope, "trinoPolarisSecret")
-            .metadata(SecretMetadata.builder().name(SECRET_NAME).namespace("default").build())
+            .metadata(SecretMetadata.builder().name(SECRET_NAME).namespace(TRINO_NAMESPACE).build())
             .data(Map.of(CREDENTIAL_ENV, trinoConfig.credential()))
             .type("Opaque")
             .dependsOn(dependsOn)
@@ -115,7 +116,7 @@ public class TrinoWorkloads {
                        .provider(helmProvider)
                        .name("trino")
                        .chart(CdkUtils.vendoredChart(scope, "trinoChart", "trino-" + CHART_VERSION + ".tgz"))
-                       .namespace("default")
+                       .namespace(TRINO_NAMESPACE)
                        .atomic(true)
                        .timeout(600)
                        .values(List.of(valuesYaml))

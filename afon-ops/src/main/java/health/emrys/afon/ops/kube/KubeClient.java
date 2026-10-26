@@ -39,7 +39,7 @@ import static java.lang.String.format;
 
 public class KubeClient implements AutoCloseable {
 
-    static final Logger logger = org.slf4j.LoggerFactory.getLogger(KubeClient.class);
+    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(KubeClient.class);
     public static final Duration TIMEOUT = Duration.ofMinutes(5);
     private final String               clusterName;
     private final AfonPropertyProvider properties;
@@ -133,6 +133,15 @@ public class KubeClient implements AutoCloseable {
             .stream()
             .filter(x -> nameOfPod(x).startsWith(prefix)
         ).toList();
+    }
+
+    public V1Pod getOnlyPodBegginingWith(String prefix) throws ApiException {
+        List<V1Pod> pods = listPodsBeginningWith(prefix);
+        if (pods.size() != 1) {
+            throw new RuntimeException(format("No pod starting '%s'", prefix));
+        }
+        V1Pod pod = pods.get(0);
+        return pod;
     }
 
     public static @Nullable String nameOfPod(V1Pod x) {
