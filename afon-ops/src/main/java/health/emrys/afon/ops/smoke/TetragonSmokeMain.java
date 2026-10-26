@@ -1,5 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
@@ -7,6 +9,7 @@ import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,6 +26,13 @@ import static java.lang.String.format;
 public class TetragonSmokeMain {
 
     static final Logger logger = LoggerFactory.getLogger(TetragonSmokeMain.class);
+
+    /**
+     * The binary run in the Jupyter pod, as Tetragon reports it: the absolute path that the container exec'd
+     */
+    static final String BINARY = "/bin/echo";
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AfonPropertyProvider properties;
 
@@ -48,26 +58,54 @@ public class TetragonSmokeMain {
             String start = startTimeOf(client, jupyterPod);
 
             String     marker = "afon-tetragon-smoke-" + UUID.randomUUID();
-            ExecResult echo   = client.exec(jupyterPod, "/bin/echo", marker);
+            ExecResult echo   = client.exec(jupyterPod, BINARY, marker);
             if (!echo.isSuccess()) {
                 throw new RuntimeException(format("Could not run the command in %s: %s", jupyterPod, echo));
             }
 
             try (LokiClient loki = new LokiClient(client, properties)) {
-                List<String> events = withRetries(10, () -> eventsOf(loki, jupyterPod, marker, start));
-                logger.info("Tetragon events = {}", String.join("\n", events));
+                List<JsonNode> events = withRetries(10, () -> execEventsOf(loki, jupyterPod, marker, start));
+                for (JsonNode event : events) {
+                    checkEvent(event, jupyterPod);
+                }
+                logger.info("Tetragon events = {}", events);
             }
         }
     }
 
-    private static List<String> eventsOf(LokiClient loki, String jupyterPod, String marker, String start)
+    /**
+     * @return the {@code process_exec} events of the command, the only lines of Tetragon carrying the marker other
+     * than those of its {@code process_exit}
+     */
+    private static List<JsonNode> execEventsOf(LokiClient loki, String jupyterPod, String marker, String start)
     throws Exception {
-        String query = format("{namespace=\"default\", container=\"export-stdout\"} |= \"%s\" | json"
-                                  + " | process_exec_process_pod_name=\"%s\"", marker, jupyterPod);
-        List<String> events = loki.queryRange(query, start, 20);
+        String       query  = format("{namespace=\"default\", container=\"export-stdout\"} |= \"%s\"", marker);
+        List<String> lines  = loki.queryRange(query, start, 20);
+        List<JsonNode> events = new ArrayList<>();
+        for (String line : lines) {
+            JsonNode event = MAPPER.readTree(line);
+            if (event.has("process_exec")) {
+                events.add(event);
+            }
+        }
         if (events.isEmpty()) {
-            throw new RuntimeException(format("No Tetragon event in Loki for '%s' in pod %s", marker, jupyterPod));
+            throw new RuntimeException(format("No Tetragon process_exec event in Loki for '%s' in pod %s. Lines = %s",
+                                              marker, jupyterPod, lines));
         }
         return events;
+    }
+
+    private static void checkEvent(JsonNode event, String jupyterPod) {
+        JsonNode process = event.at("/process_exec/process");
+        String   pod     = process.at("/pod/name").asText();
+        String   binary  = process.at("/binary").asText();
+        if (!jupyterPod.equals(pod)) {
+            throw new RuntimeException(format("Expected the event of pod %s but it was of '%s': %s",
+                                              jupyterPod, pod, event));
+        }
+        if (!BINARY.equals(binary)) {
+            throw new RuntimeException(format("Expected the event of binary %s but it was of '%s': %s",
+                                              BINARY, binary, event));
+        }
     }
 }
