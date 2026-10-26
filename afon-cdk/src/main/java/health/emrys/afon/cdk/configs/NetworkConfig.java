@@ -11,14 +11,12 @@ import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkUtils.*;
 import static health.emrys.afon.cdk.configs.JupyterHubConfig.USER_POD_LABELS;
 import static health.emrys.afon.cdk.configs.SparkWorkloads.*;
-import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 import static java.lang.String.format;
 
 /**
@@ -122,8 +120,7 @@ public class NetworkConfig {
 
     private static @NonNull List<AllowedDomain> getAllowedDomainsFrom(AfonPropertyProvider properties) {
         final List<AllowedDomain> allowedDomains;
-        String                    csv = ALLOWED_DOMAINS_CSV.getValueFrom(properties.getProperties());
-        allowedDomains = Arrays.stream(csv.split(",")).map(x -> AllowedDomain.create(x)).toList();
+        allowedDomains = new WhitelistConfig(properties).domains().stream().map(AllowedDomain::create).toList();
         return allowedDomains;
     }
 

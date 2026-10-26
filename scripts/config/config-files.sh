@@ -8,4 +8,4 @@ else
   CONFIG_FILES="$CONFIG_FILES secret-aws.properties secret-azure.properties secret-gcp.properties"
   CONFIG_FILES="$CONFIG_FILES catalogs-aws.properties catalogs-azure.properties catalogs-gcp.properties"
 fi
-CONFIG_FILES="$CONFIG_FILES users.csv users-acl.csv"
+CONFIG_FILES="$CONFIG_FILES users.csv users-acl.csv whitelist.yaml"

@@ -1,18 +1,14 @@
 package health.emrys.afon.ops.smoke.config;
 
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
+import health.emrys.afon.cdk.configs.WhitelistConfig;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
-import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
 import static health.emrys.afon.config.AfonProperty.TRE_CLOUD;
 import static java.lang.String.format;
@@ -26,6 +22,7 @@ public class SmokeConfig {
     public static final AfonCloud DEFAULT_TRE_CLOUD = AfonCloud.AWS;
 
     private final AfonPropertyProvider properties;
+    private final WhitelistConfig whitelist;
 
     /**
      * This returns the exact properties (and only those properties) used in a real environment that has been deployed.
@@ -36,7 +33,12 @@ public class SmokeConfig {
     }
 
     public SmokeConfig(AfonPropertyProvider properties) {
+        this(properties, new WhitelistConfig(properties));
+    }
+
+    public SmokeConfig(AfonPropertyProvider properties, WhitelistConfig whitelist) {
         this.properties = properties;
+        this.whitelist = whitelist;
     }
 
     /**
@@ -58,33 +60,12 @@ public class SmokeConfig {
     }
 
     /**
-     * @return the allowed domains that the TRE cloud's pods must be able to reach: those of {@code ALLOWED_DOMAINS_CSV}
-     * except the Polaris, Jupyter and OIDC domain names of the other clouds, which only resolve while the stack of that cloud
-     * is deployed, so are not the TRE cloud's to reach.  {@code OIDC_DOMAIN_NAME} is only the TRE cloud's to reach if it is
-     * that of its KeyCloak, ie if the cloud has no OIDC domain name of its own.
+     * @return the allowed domains that the TRE cloud's pods must be able to reach: the common ones of {@code whitelist.yaml}
+     * and those of the TRE cloud's section, not those of the other clouds, which only resolve while the stack of that cloud
+     * is deployed, so are not the TRE cloud's to reach.
      */
     public List<String> allowedDomains() {
-        AfonCloud   treCloud    = cloud();
-        Set<String> otherClouds = new HashSet<>();
-        otherClouds.add(domain(AfonProperty.OIDC_DOMAIN_NAME));
-        for (AfonCloud other : AfonCloud.values()) {
-            if (other != treCloud) {
-                for (AfonCloudProperty name : List.of(AfonCloudProperty.POLARIS_DOMAIN_NAME, AfonCloudProperty.JUPYTER_DOMAIN_NAME)) {
-                    otherClouds.add(properties.getCloudValue(other, name, "").trim().toLowerCase(Locale.ROOT));
-                }
-                otherClouds.add(domain(properties.getOidcDomainProperty(other)));
-            }
-        }
-        otherClouds.remove(domain(properties.getOidcDomainProperty(treCloud)));
-        return Arrays.stream(properties.getValue(ALLOWED_DOMAINS_CSV, "").split(","))
-                     .map(String::trim)
-                     .filter(domain -> !domain.isEmpty())
-                     .filter(domain -> !otherClouds.contains(domain.toLowerCase(Locale.ROOT)))
-                     .toList();
-    }
-
-    private String domain(AfonProperty property) {
-        return properties.getValue(property, "").trim().toLowerCase(Locale.ROOT);
+        return whitelist.domains(cloud());
     }
 
     /**

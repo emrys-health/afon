@@ -1,10 +1,10 @@
 package health.emrys.afon.config;
 
+import health.emrys.afon.cdk.configs.WhitelistConfig;
 import org.junit.Test;
 
 import java.util.regex.Pattern;
 
-import static health.emrys.afon.config.AfonProperty.ALLOWED_DOMAINS_CSV;
 import static health.emrys.afon.config.ConfigUtils.afonCloud;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,7 +54,7 @@ public class CloudConfigTest {
     }
 
     private String[] whitelistedDomains() {
-        return properties.getValue(ALLOWED_DOMAINS_CSV, "").split(",");
+        return new WhitelistConfig(properties).domains().toArray(new String[0]);
     }
 
     private void checkPropertyIsWhitelisted(String propertyName, String catalogId) {

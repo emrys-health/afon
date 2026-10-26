@@ -109,6 +109,10 @@ Afon uses two types configuration properties in the config dir:
 - [afon-azure.properties](../templates/config/afon-azure.properties)
 - [afon-gcp.properties](../templates/config/afon-gcp.properties)
 
+**`whitelist.yaml`**: the domain names that the TRE's notebooks and Spark may resolve, per cloud and per catalog.  It is required, as there is no default:
+
+- [whitelist.yaml](../templates/config/whitelist.yaml)
+
 **`catalogs.properties`**: the properties containing catalogs configuration:
 
 - [catalogs.properties](../templates/config/catalogs.properties)
@@ -192,6 +196,12 @@ It renames the properties that were renamed, and removes those that are no longe
 `*.properties` file of the config dir.  It works the same on a config env, ie `$AFON_HOME/config` a symlink to
 `config-<env>`, and on a standalone config dir: it says which it is updating, and never moves or relinks the dir.  A file that is a
 symlink, eg to a file shared by the envs, is updated in place through the link.
+
+It also moves the domain names of the deprecated `ALLOWED_DOMAINS_CSV` of `afon.properties` to a new `whitelist.yaml` in the config dir,
+as its `common` domains, which are allowed on any cloud, so that the same names are allowed as before, and empties the property (its
+previous value is in the backup).  An existing `whitelist.yaml` is never overwritten: then the command only says so, and the names are
+to be added by hand.  Arrange the generated domains per cloud and catalog as in the [template](../templates/config/whitelist.yaml).
+Until then, `ALLOWED_DOMAINS_CSV` is still used if `whitelist.yaml` is missing.
 
 A file is only touched if it changes, and then its previous contents are kept as `<file>.bak`, or `<file>.bak.<timestamp>` if
 there is already one, so that a backup of an earlier run is never overwritten.  It is safe to run more than once.

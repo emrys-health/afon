@@ -129,8 +129,8 @@ setup of the stack to the catalog of its own cloud, so it is not in the `aws` ca
   the one the stack's setup wrote the table to, which is that of its own cloud: run it through
   `afon-cli.sh smoke-notebook <cloud> oidc`, or set `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG`.
 - **Spark fails with `UnknownHostException: <polaris domain>: Temporary failure in name resolution`**: the network policies
-  only let the Spark driver resolve the names in `ALLOWED_DOMAINS_CSV`, so list the Polaris and Jupyter domain names and the
-  storage account of the cloud there (see [Setup Azure full stack](stacks.md#setup-azure-full-stack)).
+  only let the Spark driver resolve the names in `whitelist.yaml`, so list the Polaris and Jupyter domain names and the
+  storage account of the cloud in its section there (see [Setup Azure full stack](stacks.md#setup-azure-full-stack)).
 - **Check 2 fails**: the Spark Connect server still registers catalogs of its own. The Spark Connect manifest is
   applied only when the stack is created, so a stack deployed before these changes keeps its old configuration until
   it is redeployed, or until the `SparkApplication` is re-applied (see *Problems starting Spark Connect* in the
@@ -281,7 +281,7 @@ kubectl annotate ingress polaris-ingress -n default alb.ingress.kubernetes.io/in
 ```
 
 The other checks are cloud-neutral, as the network policies are the same. The Spark driver's allowed-domains check curls each name
-in the current `ALLOWED_DOMAINS_CSV`, except the Polaris and Jupyter names of the other clouds, which only resolve while their
+in the common and TRE cloud sections of the current `whitelist.yaml`, not those of the other clouds, which only resolve while their
 stack is deployed. So the test passes on either cloud whatever the other clouds' stacks, but a stack deployed before the list
 changed fails it until it is redeployed, as its network policies hold the old list.
 

@@ -186,6 +186,7 @@ public enum AfonProperty {
     // Spark Connect
     SPARK_CONNECT_URL("SPARK_CONNECT_URL"),
 
+    /** Deprecated: used as the common domains only if {@code whitelist.yaml} is missing, see {@code WhitelistConfig} . */
     ALLOWED_DOMAINS_CSV("ALLOWED_DOMAINS_CSV"),
     /** The cloud of the stack hosting the TRE, one of aws|azure|gcp.  Defaults to aws. */
     TRE_CLOUD("TRE_CLOUD"),

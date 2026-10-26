@@ -32,15 +32,16 @@ AZURE_AKS_NODE_POOL=nodeCount:4
 `afon.properties`:
 ```shell
 OIDC_DOMAIN_NAME=<oidc domain>      # its DNS zone must be in AZURE_RESOURCE_GROUP too
-ALLOWED_DOMAINS_CSV=$OIDC_DOMAIN_NAME,$AZURE_POLARIS_DOMAIN_NAME,$AZURE_JUPYTER_DOMAIN_NAME,${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net
 ```
+`whitelist.yaml`: the `azure` section of the template already lists the OIDC, Polaris and Jupyter domain names and the storage
+account, so keep it (the entries of the clouds you do not deploy to are left out as their properties are not set).
 `secret.properties`: `KEYCLOAK_BOOTSTRAP_ADMIN_*`, `KEYCLOAK_DB_*` and `USER_ID`.
 `secret-azure.properties`: `AZURE_CONNECTION_STRING` is required (Loki keeps the monitoring logs in the `azure` catalog container).
 
 **Why these matter:**
 - `azure-full` needs **4 nodes** of the default size, else pods such as the Spark Connect driver stay Pending (`Insufficient cpu`).
   Check with `afon-cli.sh kube-estimator azure-full 4`.
-- The network policies limit what notebooks and Spark can resolve to `ALLOWED_DOMAINS_CSV`; missing names give
+- The network policies limit what notebooks and Spark can resolve to `whitelist.yaml`; missing names give
   `UnknownHostException: <polaris domain>: Temporary failure in name resolution`.  They use the cluster's Advanced Container
   Networking Services, which the stack enables.
 

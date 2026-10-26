@@ -424,8 +424,8 @@ afon-cli.sh manage-stack setup azure-full
 `afon-cli.sh kube-estimator azure-full 4`.
 
 **NOTE:** `azure-full` deploys the network policies, which limit what the notebooks and the Spark master and driver can resolve to
-`ALLOWED_DOMAINS_CSV`.  List the Azure names in it, in `afon.properties`: `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME` and
-`${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net`, as well as `OIDC_DOMAIN_NAME`, else Spark fails with `UnknownHostException:
+the domains of `whitelist.yaml`.  Its `azure` section, as in the template, lists the Azure names: the OIDC, Polaris and Jupyter domain
+names and `${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net`, else Spark fails with `UnknownHostException:
 <polaris domain>: Temporary failure in name resolution`.  The policies are replaced when the list changes, on the next deploy.
 
 `azure-full` has the same components as `aws-full`, including its own KeyCloak, served at `OIDC_DOMAIN_NAME`, which on Azure must be a domain
