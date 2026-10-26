@@ -15,7 +15,8 @@ import java.util.List;
 import static health.emrys.afon.config.ConfigUtils.cloudToCatalog;
 
 /**
- * Trino, reading the cloud's catalogs from Polaris at the cloud's {@code POLARIS_DOMAIN_NAME}.
+ * Trino, reading the cloud's catalogs from Polaris at the cloud's {@code POLARIS_DOMAIN_NAME}, with tokens from the cloud's
+ * KeyCloak.
  */
 public class TrinoComponent implements StackComponent {
 
@@ -26,7 +27,9 @@ public class TrinoComponent implements StackComponent {
         // fires the cloud's mutating webhooks, if it has any, which the service dependables wait for.
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.getDependables());
         dependsOn.addAll(platform.getServiceDependables());
-        new TrinoWorkloads(context.properties(), context.users(), context.properties().getCloudValue(platform.cloud(), AfonCloudProperty.POLARIS_DOMAIN_NAME))
+        new TrinoWorkloads(context.properties(), context.users(),
+                           context.properties().getCloudValue(platform.cloud(), AfonCloudProperty.POLARIS_DOMAIN_NAME),
+                           context.properties().getOidcDomainName(platform.cloud()))
             .deploy(context.stack(), platform.configureHelm(),
                     cloudToCatalog(platform.cloud(), new AfonCatalogs(context.properties())), dependsOn);
     }

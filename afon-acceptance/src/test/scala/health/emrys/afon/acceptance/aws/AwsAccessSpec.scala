@@ -1,10 +1,12 @@
 package health.emrys.afon.acceptance.aws
 
-import health.emrys.afon.acceptance.ContainerHelper.{trinoConfigProperties, trinoLocalConfig}
+import health.emrys.afon.acceptance.ContainerHelper.{KEYCLOAK_HOSTNAME, trinoConfigProperties, trinoLocalConfig}
 import health.emrys.afon.acceptance.{AbstractAccessSpec, AcceptanceTestConfig}
 import health.emrys.afon.acceptance.tags.{Access, Aws}
 import health.emrys.afon.ops.smoke.TrinoQuerySmoke
+import health.emrys.afon.config.FileUserProvider
 import health.emrys.afon.polaris.catalogs.PolarisCatalog
+import health.emrys.afon.security.keycloak.KeyCloakProvider
 
 @Aws
 @Access
@@ -32,7 +34,10 @@ class AwsAccessSpec extends AbstractAccessSpec {
       trinoHttp = trinoHttp.substring(trinoHttp.indexOf("//") + 2)
       val url = s"jdbc:trino://${trinoHttp}/"
       When(s"we connect to $url")
-      val smokeTest = new TrinoQuerySmoke(url)
+      val user = new FileUserProvider().getConfiguredUser(properties)
+      And(s"pass the token of user '${user.username()}', with which Trino calls Polaris")
+      val token = new KeyCloakProvider(KEYCLOAK_HOSTNAME).userToken(user.username(), user.password())
+      val smokeTest = new TrinoQuerySmoke(url, user, token)
       val sql = s"SELECT COUNT(*) FROM $tableName"
       And(s"execute SQL: ${formatSQL(sql)}")
       val result = smokeTest.query(sql)

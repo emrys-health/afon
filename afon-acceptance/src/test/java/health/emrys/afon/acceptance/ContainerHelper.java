@@ -219,6 +219,7 @@ public class ContainerHelper {
                 String catalogPath    = "/etc/trino/catalog";
                 trino.withCopyToContainer(
                     Transferable.of(trinoConfigPropertiesText().getBytes()), "/etc/trino/config.properties");
+                trino.withEnv(TrinoServerConfiguration.CREDENTIAL_ENV, trinoServerConfiguration(properties).credential());
                 trino.setPortBindings(List.of("8090:8090"));
                 trino.withNetwork(network);
 //                trino.withLogConsumer(new Slf4jLogConsumer(logger));
@@ -260,15 +261,18 @@ public class ContainerHelper {
     public static String trinoLocalConfig(
         AfonPropertyProvider properties,
         String catalog) {
+        return trinoServerConfiguration(properties).catalogProperties(catalog);
+    }
+
+    private static TrinoServerConfiguration trinoServerConfiguration(AfonPropertyProvider properties) {
         String polarisDomainName = "http://" + POLARIS_NETWORK_HOST + ":" + POLARIS_PORT;
         String keyCloakUrl       = tokenEndpoint(KEYCLOAK_ALIAS, KEYCLOACK_PROTOCOL);
         logger.info("Trino sees Polaris as {} and KeyCloak as {}", polarisDomainName, keyCloakUrl);
-        TrinoServerConfiguration trinoConfig = new KeyCloakTrinoServerConfiguration(
+        return new KeyCloakTrinoServerConfiguration(
                 properties, new FileUserProvider(), polarisDomainName,
                 // Trino runs in host network mode, so it reaches KeyCloak on the host at localhost:8080.
             keyCloakUrl
         );
-        return trinoConfig.catalogProperties(catalog);
     }
 
 }

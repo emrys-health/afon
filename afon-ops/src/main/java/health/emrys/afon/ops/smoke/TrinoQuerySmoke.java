@@ -1,10 +1,20 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.FileUserProvider;
 import health.emrys.afon.ops.config.OpsDefaults;
+import health.emrys.afon.ops.smoke.config.SmokeConfig;
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.slf4j.Logger;
 
+import java.io.IOException;
 import java.sql.*;
 import java.util.Properties;
+
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
+import static health.emrys.afon.trino.TrinoServerConfiguration.TOKEN_EXTRA_CREDENTIAL;
 
 /**
  * To run against Kubernetes, run this first:
@@ -16,24 +26,28 @@ import java.util.Properties;
  * or <pre>
  ./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AZURE acceptancetests smoketesttable260601231212 abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable260601231212/metadata/00001-ba11f3b6-6920-4007-9368-ab913506716f.metadata.json  emryspolaris.click"
  </pre>
- *
+ * The query runs as the configured user, with a token from the KeyCloak of the {@code TRE_CLOUD}, which Trino passes on
+ * to Polaris: Trino has no credentials of its own for queries.
  */
 public class TrinoQuerySmoke {
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(TrinoQuerySmoke.class);
 
-    private final String url;
+    private final String   url;
+    private final AfonUser user;
+    private final String   token;
 
-    public TrinoQuerySmoke(String url) {
-        this.url = url;
+    public TrinoQuerySmoke(String url, AfonUser user, String token) {
+        this.url   = url;
+        this.user  = user;
+        this.token = token;
     }
 
     public String query(String query) throws SQLException {
         // 2. Set up connection properties (User is required by Trino)
         Properties properties = new Properties();
-        properties.setProperty("user", "arbitrary");
-        // If your cluster requires SSL or Password authentication:
-        // properties.setProperty("password", "your_password");
-        // properties.setProperty("SSL", "true");
+        properties.setProperty("user", user.username());
+        // Trino calls Polaris with this token, as its catalogs have session=USER
+        properties.setProperty("extraCredentials", TOKEN_EXTRA_CREDENTIAL + ":" + token);
 
         logger.info("Connecting to Trino");
 
@@ -71,9 +85,14 @@ public class TrinoQuerySmoke {
             } else {
                 sql = sql + OpsDefaults.POLARIS_NAMESPACE_EXTERNAL + "." + OpsDefaults.POLARIS_TABLE_NAME;
             }
-            String result = new TrinoQuerySmoke(url).query(sql);
+            AfonPropertyProvider properties = smokeTestProperties();
+            AfonCloud            cloud      = new SmokeConfig(properties).cloud();
+            AfonUser             user       = new FileUserProvider().getConfiguredUser(properties);
+            String               token      = new KeyCloakProvider(properties.getOidcDomainName(cloud))
+                .userToken(user.username(), user.password());
+            String result = new TrinoQuerySmoke(url, user, token).query(sql);
             System.out.println(result);
-        } catch (SQLException e) {
+        } catch (SQLException | IOException e) {
             e.printStackTrace();
         }
     }

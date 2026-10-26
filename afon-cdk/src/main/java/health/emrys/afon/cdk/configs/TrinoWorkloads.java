@@ -7,17 +7,24 @@ import health.emrys.afon.cdk.DockerImages;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
+import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
+import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.trino.KeyCloakTrinoServerConfiguration;
 import health.emrys.afon.trino.TrinoServerConfiguration;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.tokenEndpoint;
+import static health.emrys.afon.trino.TrinoServerConfiguration.CREDENTIAL_ENV;
 
 /**
  * Cloud-agnostic deployment of Trino via its official Helm chart — the counterpart to
@@ -30,6 +37,10 @@ import java.util.Map;
  * {@link AfonCloud}, all pointing at the same Polaris host with {@code warehouse} set
  * to the cloud's Polaris catalog name. They are passed through the chart's {@code
  * additionalCatalogs} value, so the chart's default {@code tpch}/{@code tpcds} catalogs remain.
+ *
+ * <p>The catalog files hold no credentials (see {@link TrinoServerConfiguration}): the credential with which each
+ * catalog starts is in the {@code Secret} {@value #SECRET_NAME}, which the pods read as {@code CREDENTIAL_ENV}, and
+ * the token for each query, which Trino passes on to Polaris, comes from the client.
  */
 public class TrinoWorkloads {
 
@@ -39,14 +50,21 @@ public class TrinoWorkloads {
     private static final String CHART_VERSION = "1.42.2";
     private static final int    WORKERS       = 2;
     private static final int    TRINO_PORT    = 8080;
+    private static final String SECRET_NAME   = "trino-polaris";
 
     private final TrinoServerConfiguration trinoConfig;
     private final AfonCatalogs afonCatalogs;
 
+    /**
+     * @param oidcDomainName the domain of the KeyCloak that issues Polaris' tokens, as Polaris answers HTTP 501 from its
+     *                       own token endpoint
+     */
     public TrinoWorkloads(AfonPropertyProvider properties,
                           AfonUserProvider users,
-                          String polarisDomainName) {
-        this.trinoConfig = new TrinoServerConfiguration(properties, users, polarisDomainName);
+                          String polarisDomainName,
+                          String oidcDomainName) {
+        this.trinoConfig = new KeyCloakTrinoServerConfiguration(properties, users, polarisDomainName,
+                                                                tokenEndpoint(oidcDomainName, "https"));
         this.afonCatalogs = new AfonCatalogs(properties);
     }
 
@@ -72,12 +90,26 @@ public class TrinoWorkloads {
             "coordinator", nodeSettings(),
             "worker", nodeSettings(),
             "service", Map.of("type", "ClusterIP", "port", TRINO_PORT),
+            "env", List.of(Map.of(
+                "name", CREDENTIAL_ENV,
+                "valueFrom", Map.of("secretKeyRef", Map.of("name", SECRET_NAME, "key", CREDENTIAL_ENV)))),
             "additionalCatalogs", catalogFiles(id.toString()));
+
+        Secret credential = Secret.Builder
+            .create(scope, "trinoPolarisSecret")
+            .metadata(SecretMetadata.builder().name(SECRET_NAME).namespace("default").build())
+            .data(Map.of(CREDENTIAL_ENV, trinoConfig.credential()))
+            .type("Opaque")
+            .dependsOn(dependsOn)
+            .build();
+        List<ITerraformDependable> releaseDependsOn = new ArrayList<>(dependsOn);
+        releaseDependsOn.add(credential);
 
         // JSON is valid YAML, so a JSON serializer produces a values document Helm
         // accepts — avoiding a YAML dependency while keeping the multi-line catalog strings.
-        // Canonical (key-sorted) so the values string, which Helm diffs as text, is stable.
-        String valuesYaml = CdkUtils.toCanonicalJson(values);
+        // Canonical (key-sorted) so the values string, which Helm diffs as text, is stable.  Escaped, as the catalogs'
+        // ${ENV:...} are Trino's, not Terraform's.
+        String valuesYaml = CdkUtils.escapeTerraformTemplate(CdkUtils.toCanonicalJson(values));
 
         Release.Builder.create(scope, "trino")
                        .provider(helmProvider)
@@ -87,7 +119,7 @@ public class TrinoWorkloads {
                        .atomic(true)
                        .timeout(600)
                        .values(List.of(valuesYaml))
-                       .dependsOn(dependsOn)
+                       .dependsOn(releaseDependsOn)
                        .build();
     }
 
