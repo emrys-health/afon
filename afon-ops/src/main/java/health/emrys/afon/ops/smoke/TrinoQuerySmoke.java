@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.ops.config.OpsDefaults;
 import org.slf4j.Logger;
 
 import java.sql.*;
@@ -37,6 +38,7 @@ public class TrinoQuerySmoke {
         logger.info("Connecting to Trino");
 
         // 4. Execute the query using try-with-resources
+        logger.info("Executing {} against {}", query, url);
         try (Connection connection = DriverManager.getConnection(url, properties);
              Statement statement = connection.createStatement();
              ResultSet resultSet = statement.executeQuery(query)) {
@@ -57,7 +59,7 @@ public class TrinoQuerySmoke {
      *             after running the mvn commands above
      */
     public static void main(String[] args) {
-        String url = "jdbc:trino://localhost:8080/";
+        String url = "jdbc:trino://localhost:8080/aws/admin";
         try {
             // for other clouds try:
             // gcp.acceptancetests.smoketesttable260601231212
@@ -67,7 +69,7 @@ public class TrinoQuerySmoke {
             if (args.length > 0) {
                 sql = sql + args[0];
             } else {
-                sql = sql + "aws.namespaceph.test_table";
+                sql = sql + OpsDefaults.POLARIS_NAMESPACE_EXTERNAL + "." + OpsDefaults.POLARIS_TABLE_NAME;
             }
             String result = new TrinoQuerySmoke(url).query(sql);
             System.out.println(result);
