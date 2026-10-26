@@ -2,7 +2,8 @@
 # they use must be listed.  It is a security control, so there is no default: keep only what your deployment needs.
 #
 # A section per cloud (aws, azure, gcp) lists what that cloud's stack needs, and "common" what any cloud needs.  Each has:
-#   domains:  domain names, spelled out (no URLs).  A name with * is a pattern, where * stands for one label.
+#   domains:  domain names, spelled out, one per entry, RFC 1123 compliant host names
+#             (no URLs, no wildcards).
 #   catalogs: (clouds only) templates expanded once for each catalog of the cloud that has a bucket.
 #
 # ${NAME} is replaced by the value of that property.  In a cloud's section, ${POLARIS_DOMAIN_NAME}, ${JUPYTER_DOMAIN_NAME}

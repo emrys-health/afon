@@ -34,7 +34,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  * default, except that if it is missing the deprecated {@code ALLOWED_DOMAINS_CSV} is used as the common domains.  It has a {@code common} section, for the domains of any cloud, and a section per cloud ({@code aws},
  * {@code azure}, {@code gcp}), each with:
  * <UL>
- * <LI>{@code domains}: the domain names, spelled out or, with {@code *}, patterns (see {@code NetworkConfig})</LI>
+ * <LI>{@code domains}: the domain names, spelled out as RFC 1123 host names (so no wildcards)</LI>
  * <LI>{@code catalogs}: templates expanded once for each catalog of the cloud that has a bucket, eg the bucket's endpoint</LI>
  * </UL>
  * as in
@@ -272,6 +272,10 @@ public class WhitelistConfig {
             if (!(item instanceof String string) || string.isBlank()) {
                 throw new IllegalStateException(
                     "Invalid whitelist " + source + ": " + where + " must only have domain names, not '" + item + "'");
+            }
+            if (string.contains("*")) {
+                throw new IllegalStateException(
+                    "Invalid whitelist " + source + ": " + where + " must not have wildcards, spell out '" + string + "'");
             }
             strings.add(string.trim());
         }

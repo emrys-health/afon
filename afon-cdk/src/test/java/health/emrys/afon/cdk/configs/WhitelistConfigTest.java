@@ -129,6 +129,12 @@ class WhitelistConfigTest {
     }
 
     @Test
+    void wildcardsFail() {
+        assertThatThrownBy(() -> whitelist("aws:\n  domains:\n    - \"*.example.com\"\n"))
+            .hasMessageContaining("must not have wildcards");
+    }
+
+    @Test
     void domainsThatAreNotAListFail() {
         assertThatThrownBy(() -> whitelist("aws:\n  domains: a.example\n"))
             .hasMessageContaining("aws.domains must be a list");
