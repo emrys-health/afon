@@ -23,7 +23,7 @@ public class PolarisRestClient extends RestClient {
     public PolarisRestClient(String endpoint, String clientId, String clientSecret) {
         super(endpoint);
         this.clientId     = clientId;
-        this.clientSecret = ***REMOVED***
+        this.clientSecret = clientSecret;
     }
 
     public static @NonNull String tokensURI(String endpoint) {

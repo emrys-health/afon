@@ -41,7 +41,7 @@ class GcpExternalTableSpec extends SpecPretifier with GivenWhenThen {
       override protected def createCatalog(): ExternalCatalog = {
         val bucketProperties = CatalogProperties.builder().setDefaultBaseLocation(bucketUri()).build()
         val clientId     = s"my-vendable-sa@${properties.getValue(GCP_PROJECT_ID)}.iam.gserviceaccount.com" // from GCP props
-        val clientSecret = ***REMOVED***
+        val clientSecret = properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)
         val authenticationParameters =
           new OAuthClientCredentialsParameters(
             "https://oauth2.googleapis.com/token", // this throws "Malformed request: unsupported_grant_type: Invalid grant_type: client_credentials"

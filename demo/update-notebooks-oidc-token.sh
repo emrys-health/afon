@@ -18,7 +18,8 @@
 #   - replaces a session created with no catalogs, ie a line like
 #       spark = SparkSession.builder.appName("test").remote("sc://...").getOrCreate()
 #     with one registering --catalogs, each authenticated with OIDC_TOKEN;
-#   - replaces a hard-coded token, ie OIDC_TOKEN = """eyJ...""", with OIDC_TOKEN = os.environ["OIDC_TOKEN"].
+#   - replaces a hard-coded token, ie OIDC_TOKEN = """eyJ...""" (or its ***REMOVED_JWT*** scrubbed placeholder),
+#     with OIDC_TOKEN = os.environ["OIDC_TOKEN"].
 # Sessions that already register catalogs are left alone, as is everything else, including cell outputs.
 # Re-running it changes nothing more.  Review the result: a notebook may need other catalogs than --catalogs
 # (eg aws_forbidden), or rewriting.
@@ -83,7 +84,7 @@ notebooks = sys.argv[5:]
 SESSION = re.compile(
     r'^(?P<indent>[ \t]*)spark\s*=\s*SparkSession\.builder\.appName\((?P<app>"[^"]*"|\'[^\']*\')\)'
     r'\.remote\((?P<remote>"[^"]*"|\'[^\']*\')\)\.getOrCreate\(\)[ \t]*$', re.M)
-HARD_CODED_TOKEN = re.compile(r'OIDC_TOKEN\s*=\s*(?:"""|\'\'\'|"|\')eyJ[^"\']*(?:"""|\'\'\'|"|\')')
+HARD_CODED_TOKEN = re.compile(r'OIDC_TOKEN\s*=\s*(?:"""|\'\'\'|"|\')(?:eyJ|\*\*\*REMOVED_JWT\*\*\*)[^"\']*(?:"""|\'\'\'|"|\')')
 COMMENTED_ENV_TOKEN = re.compile(r'^[ \t]*#\s*OIDC_TOKEN\s*=\s*os\.environ\["OIDC_TOKEN"\][ \t]*\n', re.M)
 
 

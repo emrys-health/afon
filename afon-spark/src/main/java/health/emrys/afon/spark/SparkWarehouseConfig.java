@@ -33,7 +33,7 @@ public class SparkWarehouseConfig {
         this.host = host;
         this.protocol = protocol;
         this.clientId = clientId;
-        this.clientSecret = ***REMOVED***
+        this.clientSecret = clientSecret;
         this.afonCatalogs = afonCatalogs;
     }
 

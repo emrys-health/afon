@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class KeyCloakSparkWarehouseConfigTest {
 
     private static final String CLIENT_ID     = "a_client";
-    private static final String CLIENT_SECRET = "***REMOVED***";
+    private static final String CLIENT_SECRET = "a_secret";
 
     private final SparkWarehouseConfig config = new KeyCloakSparkWarehouseConfig(properties(),
                                                          AfonUserProvider.createUser(CLIENT_ID, CLIENT_SECRET));

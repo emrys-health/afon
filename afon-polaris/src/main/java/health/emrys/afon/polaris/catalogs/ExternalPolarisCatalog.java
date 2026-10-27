@@ -27,7 +27,7 @@ abstract public class ExternalPolarisCatalog extends PolarisCatalog {
      */
     protected ExternalPolarisCatalog(AfonPropertyProvider properties, AfonCloud remoteCloud) {
         clientId = properties.getValue(POLARIS_ID);
-        clientSecret = ***REMOVED***
+        clientSecret = properties.getValue(POLARIS_SECRET);
         tokenUri = KeyCloakConfigurer.tokenEndpoint(properties.getOidcDomainName(remoteCloud), properties.getValue(OIDC_PROTOCOL, "https"));
     }
 

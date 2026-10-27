@@ -4,7 +4,7 @@
     {
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": "arn:aws:iam::123456789012:role/GlueIcebergRole"
+      "Resource": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/GlueIcebergRole"
     }
   ]
 }

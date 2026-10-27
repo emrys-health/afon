@@ -54,13 +54,13 @@ and add the Glue role for all the tests to pass:
 aws iam put-user-policy \
     --user-name saemrys \
     --policy-name Allow-AssumeRole-GlueIcebergRole \
-    --policy-document file://glue-iceberg-assume-role.json
+    --policy-document "$(sed "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/" glue-iceberg-assume-role.json)"
 ```
 
 
 Finally, give `saemrys` the right permissions. Note that `saemrys` is a string inside `trust-policy.json`.
 ```shell
 aws iam attach-role-policy        --role-name S3ReadWriteRoleSA --policy-arn  arn:aws:iam::$AWS_ACCOUNT_ID:policy/AfonBucketWhiteList
-aws iam update-assume-role-policy --role-name S3ReadWriteRoleSA --policy-document file://trust-policy.json
+aws iam update-assume-role-policy --role-name S3ReadWriteRoleSA --policy-document "$(sed "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/" trust-policy.json)"
 ```
 You may need to `unalias aws` if you're using the Dockerized `aws` executable.

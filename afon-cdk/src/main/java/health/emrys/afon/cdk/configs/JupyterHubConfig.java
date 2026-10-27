@@ -537,7 +537,7 @@ public class JupyterHubConfig {
                _oidc = _discover(_issuer + '/.well-known/openid-configuration')
                c.JupyterHub.authenticator_class = 'generic-oauth'
                c.GenericOAuthenticator.client_id = os.environ['OAUTH_CLIENT_ID']
-               c.GenericOAuthenticator.client_secret = ***REMOVED***'OAUTH_CLIENT_SECRET']
+               c.GenericOAuthenticator.client_secret = os.environ['OAUTH_CLIENT_SECRET']
                c.GenericOAuthenticator.oauth_callback_url = 'https://%10$s%7$shub/oauth_callback'
                c.GenericOAuthenticator.authorize_url = _oidc['authorization_endpoint']
                c.GenericOAuthenticator.token_url = _oidc['token_endpoint']

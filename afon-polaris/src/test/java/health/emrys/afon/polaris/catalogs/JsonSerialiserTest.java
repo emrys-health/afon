@@ -16,14 +16,18 @@ public class JsonSerialiserTest {
     @Test
     public void testPrincipalDeserialization() throws IOException {
         String name = "myprincipalName";
+        String clientId = "a_client_id";
+        String clientSecret = "a_client_secret";
         var json = String.format(""" 
-                   {"principal":{"name":"%s","clientId":"2bd68e998ec145a1","properties":{},"createTimestamp":1780656452136,"lastUpdateTimestamp":1780656452136,"entityVersion":1},"credentials":{"clientId":"2bd68e998ec145a1","clientSecret":"***REMOVED***"}}
-                   """, name);
+                   {"principal":{"name":"%s","clientId":"%s","properties":{},"createTimestamp":1700000000000,"lastUpdateTimestamp":1700000000000,"entityVersion":1},"credentials":{"clientId":"%s","clientSecret":"%s"}}
+                   """, name, clientId, clientId, clientSecret);
         var result = jsonSerialiser.fromJson(
             new ByteArrayInputStream(json.getBytes()),
             PrincipalWithCredentials.class);
         assertNotNull(result);
         assertEquals(name, result.getPrincipal().getName());
+        assertEquals(clientId, result.getCredentials().getClientId());
+        assertEquals(clientSecret, result.getCredentials().getClientSecret());
     }
 
 }

@@ -1,10 +1,10 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
-if aws iam get-role --role-name S3ReadWriteRoleSA >/dev/null 2>&1 && aws iam list-attached-role-policies --role-name S3ReadWriteRoleSA --query "AttachedPolicies[?PolicyArn=='arn:aws:iam::123456789012:policy/AfonBucketWhiteList'].PolicyArn" --output text | grep -q AfonBucketWhiteList; then
-  echo "- Detaching policy arn:aws:iam::123456789012:policy/AfonBucketWhiteList from S3ReadWriteRoleSA"
-  aws iam detach-role-policy --role-name S3ReadWriteRoleSA --policy-arn arn:aws:iam::123456789012:policy/AfonBucketWhiteList
+if aws iam get-role --role-name S3ReadWriteRoleSA >/dev/null 2>&1 && aws iam list-attached-role-policies --role-name S3ReadWriteRoleSA --query "AttachedPolicies[?PolicyArn=='arn:aws:iam::$AWS_ACCOUNT_ID:policy/AfonBucketWhiteList'].PolicyArn" --output text | grep -q AfonBucketWhiteList; then
+  echo "- Detaching policy arn:aws:iam::$AWS_ACCOUNT_ID:policy/AfonBucketWhiteList from S3ReadWriteRoleSA"
+  aws iam detach-role-policy --role-name S3ReadWriteRoleSA --policy-arn arn:aws:iam::$AWS_ACCOUNT_ID:policy/AfonBucketWhiteList
 else
-  echo "- Policy arn:aws:iam::123456789012:policy/AfonBucketWhiteList not attached to S3ReadWriteRoleSA, skipping"
+  echo "- Policy arn:aws:iam::$AWS_ACCOUNT_ID:policy/AfonBucketWhiteList not attached to S3ReadWriteRoleSA, skipping"
 fi
 
 if aws iam get-role --role-name S3ReadWriteRole >/dev/null 2>&1 && aws iam list-attached-role-policies --role-name S3ReadWriteRole --query "AttachedPolicies[?PolicyArn=='arn:aws:iam::aws:policy/AfonBucketWhiteList'].PolicyArn" --output text | grep -q AfonBucketWhiteList; then

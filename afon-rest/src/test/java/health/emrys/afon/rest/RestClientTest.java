@@ -117,7 +117,7 @@ class RestClientTest {
         assertThat(authorization.get()).isNull();
         assertThat(customHeader.get()).isEqualTo("a_value");
         assertThat(contentType.get()).startsWith("application/x-www-form-urlencoded");
-        assertThat(requestBody.get()).isEqualTo("grant_type=client_credentials&client_secret=***REMOVED***");
+        assertThat(requestBody.get()).isEqualTo("grant_type=client_credentials&client_secret=a%26b%3Dc");
         assertThat(body).isEqualTo("{\"name\":\"a_name\"}");
     }
 

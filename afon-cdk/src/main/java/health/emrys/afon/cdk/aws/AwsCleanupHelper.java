@@ -196,7 +196,7 @@ public class AwsCleanupHelper extends CleanupHelper {
                aws iam delete-role --role-name  $ROLE_NAME
             } done
             
-            aws iam delete-policy --policy-arn arn:aws:iam::123456789012:policy/%s
+            aws iam delete-policy --policy-arn arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):policy/%s
             
             aws --region %s secretsmanager  delete-secret --secret-id %s --force-delete-without-recovery
             

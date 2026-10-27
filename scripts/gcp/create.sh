@@ -79,14 +79,6 @@ else
 fi
 
 ## Cross-SA impersonation grants
-
-if gcloud iam service-accounts get-iam-policy $GCP_SERVICE_ACCOUNT --flatten="bindings[].members" --filter="bindings.role=roles/iam.serviceAccountTokenCreator AND bindings.members=TODO_REPLACE" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
-  echo "- Role iam.serviceAccountTokenCreator already granted to TODO_REPLACE on $GCP_SERVICE_ACCOUNT, skipping"
-else
-  echo "- Granting iam.serviceAccountTokenCreator on $GCP_SERVICE_ACCOUNT to TODO_REPLACE"
-  gcloud iam service-accounts add-iam-policy-binding $GCP_SERVICE_ACCOUNT --member="user:TODO_REPLACE" --role="roles/iam.serviceAccountTokenCreator" || exit 1
-fi
-
 if gcloud iam service-accounts get-iam-policy $EXTERNAL_SA --flatten="bindings[].members" --filter="bindings.role=roles/iam.serviceAccountTokenCreator AND bindings.members=serviceAccount:$GCP_SERVICE_ACCOUNT" --format="value(bindings.members)" 2>/dev/null | grep -q .; then
   echo "- Role iam.serviceAccountTokenCreator already granted to $GCP_SERVICE_ACCOUNT on $EXTERNAL_SA, skipping"
 else
