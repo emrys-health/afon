@@ -68,7 +68,7 @@ To set up the webhook, or to replace it:
    the shell history:
 
    ```bash
-   gh secret set SLACK_WEBHOOK_URL --repo emrys-health/afon-core
+   gh secret set SLACK_WEBHOOK_URL --repo emrys-health/afon
    ```
 
 **NOTE**: anyone with the webhook URL can post to the channel, so keep it in the secret only.  To post to another

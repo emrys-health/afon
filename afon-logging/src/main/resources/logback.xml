@@ -13,7 +13,7 @@
   <property name="CONSOLE_LEVEL" value="${afon.logging.console:-INFO}" />
 
   <appender name="FILE_CORE" class="ch.qos.logback.core.FileAppender">
-    <file>${DIR}/afon-core.log</file>
+    <file>${DIR}/afon.log</file>
     <append>true</append>
     <encoder>
       <pattern>%yellow(%date{ISO8601}) | %highlight(%level) | %cyan(%logger{36}) - %highlight(%msg%n%ex{full})</pattern>

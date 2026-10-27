@@ -9,7 +9,7 @@
         </repository>
         <repository>
           <id>github-maven-packages</id>
-          <url>https://maven.pkg.github.com/emrys-health/afon-core</url>
+          <url>https://maven.pkg.github.com/emrys-health/afon</url>
           <snapshots>
             <enabled>true</enabled>
           </snapshots>

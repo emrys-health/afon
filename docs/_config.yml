@@ -22,5 +22,5 @@ back_to_top_text: "Back to top"
 # Link shown in the top-right of every page — replace with your repository URL
 aux_links:
   "View on GitHub":
-    - "https://github.com/emrys-health/afon-core"
+    - "https://github.com/emrys-health/afon"
 aux_links_new_tab: true

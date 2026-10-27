@@ -169,7 +169,7 @@ cd scripts/ansible && ansible-playbook runner-setup.yml --tags github -e github_
 Registration tokens expire after an hour, so the role mints one per run with `gh` on your machine —
 the same tool [secrets.sh](../github/secrets.sh) needs, and no GitHub credential ever reaches the
 runner. To use one from
-[the runners page](https://github.com/emrys-health/afon-core/settings/actions/runners/new) instead,
+[the runners page](https://github.com/emrys-health/afon/settings/actions/runners/new) instead,
 pass `-e github_runner_token=...`.
 
 The runner reports as `github_runner_name`, defaulting to the inventory host's short name — set it to

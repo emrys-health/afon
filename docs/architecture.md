@@ -93,7 +93,7 @@ Runtime properties are loaded via the `AfonPropertyProvider`.
 All known properties are defined as `AfonProperty` enum, in which each property knows its own name and can extract its value from a `Properties` object.  
 
 The `FilePropertyProvider` loads the properties from the properties files in the config dir.
-The config dir is defined relative to the `afon.home` system property. If this is not set, it will default to the top-level dir of the afon-core project.  System properties can override any property value.
+The config dir is defined relative to the `afon.home` system property. If this is not set, it will default to the top-level dir of the afon project.  System properties can override any property value.
 
 The `DefaultPropertyProvider` decorates the `FilePropertyProvider` allows the specification of a number of classes which can
 contain property defaults as constants, ie public static `String` fields where the name and value of the field map to the name and value of the `AfonProperty`.  The `DefaultPropertyProvider` will use the defaults defined in the constants classes if the property is not found by the `FilePropertyProvider`.   The loading of the constants classes is done at runtime.

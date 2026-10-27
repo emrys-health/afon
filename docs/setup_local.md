@@ -58,7 +58,7 @@ cd scripts/docker/afon
 docker build -t emryshealth/afon .
 ```
 
-To run the Docker container, link your afon-core dir to $HOME/afon-core and use following docker command:
+To run the Docker container, link your afon dir to $HOME/afon and use following docker command:
 ```shell
-ln -s <your afon-core dir> $HOME/afon-core
-docker run -it -v $HOME/.kube:$HOME/.kube -v $HOME/.config/gcloud:$HOME/.config/gcloud -v $HOME/.azure:$HOME/.azure -v $HOME/.aws:$HOME/.aws  -v $HOME/afon-core/:$HOME/afon-core  -v $HOME/.m2:$HOME/.m2 -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) -e HOST_USER=$(whoami)  emryshealth/afon
+ln -s <your afon dir> $HOME/afon
+docker run -it -v $HOME/.kube:$HOME/.kube -v $HOME/.config/gcloud:$HOME/.config/gcloud -v $HOME/.azure:$HOME/.azure -v $HOME/.aws:$HOME/.aws  -v $HOME/afon/:$HOME/afon  -v $HOME/.m2:$HOME/.m2 -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) -e HOST_USER=$(whoami)  emryshealth/afon

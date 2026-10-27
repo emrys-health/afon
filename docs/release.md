@@ -33,7 +33,7 @@ and only the distribution CLI is uploaded to the "Afon Distribution" share drive
 ## Release notes
 
 Before preparing the tag, `release.sh` updates [release_notes.md](../release_notes.md) with the closed issues of the
-GitHub [milestone](https://github.com/emrys-health/afon-core/milestones) titled after the release version,
+GitHub [milestone](https://github.com/emrys-health/afon/milestones) titled after the release version,
 and commits it if changed.  Issues still open in the milestone are not included.  The milestone must therefore exist before releasing, and the `gh` CLI must be
 authenticated with a token holding the `repo` scope.
 

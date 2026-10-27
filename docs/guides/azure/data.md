@@ -50,7 +50,7 @@ afon-cli.sh azure-polaris           # is Polaris serving?
 ## Network whitelisting
 
 To limit token exfiltration, restrict who reaches Polaris with `AZURE_POLARIS_ALLOWED_CIDRS` (the cluster's pod CIDR is
-added automatically) and whitelist the TRE's IP, see [#162](https://github.com/emrys-health/afon-core/issues/162).
+added automatically) and whitelist the TRE's IP, see [#162](https://github.com/emrys-health/afon/issues/162).
 
 ## Teardown
 

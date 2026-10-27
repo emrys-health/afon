@@ -136,7 +136,7 @@ The action drives the GitHub CLI, so it needs:
 
 The target repo does not depend on the current dir, so the action works from any dir, including the cli dir that
 `afon-cli.sh` runs from.  It is the first of: option `--repo <owner/repo>`, env variable `GH_REPO`, else
-`emrys-health/afon-core`, and is reported as `Using repo ...`.  A fork needs to give its own.
+`emrys-health/afon`, and is reported as `Using repo ...`.  A fork needs to give its own.
 
 The quickest check that the login, scopes and repo access are fine is the read-only action `list`:
 ```shell

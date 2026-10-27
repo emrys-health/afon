@@ -49,7 +49,7 @@
 # Fields are separated by '|', so that args may contain commas. Blank lines and lines starting with '#' are ignored.
 #
 # Each test is run as an afon command, and passes if it exits zero.  All the tests are run, even if some fail.
-# Their logging goes to the afon log file, $AFON_HOME/logs/afon-core.log, and to the console as set by
+# Their logging goes to the afon log file, $AFON_HOME/logs/afon.log, and to the console as set by
 # --logging-console.  The script exits non-zero if any test fails.  The results of each run, ie its settings, the
 # times and outcomes of its stack setups, tests and teardowns, and its summary, are also written, without any
 # logging, to smoke/target/regression/results-<yyyymmdd-hhmmss>.txt.
@@ -180,7 +180,7 @@ record() {
 
 # Prints the afon log file, which logback.xml writes to in afon home.
 afon_log_file() {
-  echo "${AFON_HOME:-$HOME/.afon}/logs/afon-core.log"
+  echo "${AFON_HOME:-$HOME/.afon}/logs/afon.log"
 }
 
 # Whether the script runs from a cli distribution, ie its parent dir has afon-cli.sh, but no afon.sh, as the

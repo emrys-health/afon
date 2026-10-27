@@ -286,7 +286,7 @@ stack is deployed. So the test passes on either cloud whatever the other clouds'
 changed fails it until it is redeployed, as its network policies hold the old list.
 
 So the results only depend on the env's config and stacks, whoever runs the suite. All the selected tests are run, even if some fail. Their logging goes to the afon log file,
-`$AFON_HOME/logs/afon-core.log`, and to the console as set by `--logging-console`. The script ends with a summary, and
+`$AFON_HOME/logs/afon.log`, and to the console as set by `--logging-console`. The script ends with a summary, and
 exits non-zero if any test failed.
 
 The results of each run are also written to `smoke/target/regression/results-<yyyymmdd-hhmmss>.txt`, without any

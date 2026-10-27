@@ -8,7 +8,7 @@
 #   ansible-playbook runner-setup.yml --tags github -e github_install_runner=true
 github_install_runner: false
 
-github_runner_repo: emrys-health/afon-core
+github_runner_repo: emrys-health/afon
 github_runner_url: "https://github.com/{{ github_runner_repo }}"
 github_runner_version: "2.336.0"
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prints the Afon core log, ${AFON_HOME}/logs/afon-core.log, to stdout so it can be piped
+# Prints the Afon core log, ${AFON_HOME}/logs/afon.log, to stdout so it can be piped
 # to whatever is needed.  The log is coloured with ANSI codes, which can be stripped to read,
 # grep or copy it as plain text.
 #
@@ -12,7 +12,7 @@
 
 usage(){
   echo "Usage: ${BASH_SOURCE[0]} [<ansi>]"
-  echo "Prints ${AFON_HOME:-$HOME/.afon}/logs/afon-core.log."
+  echo "Prints ${AFON_HOME:-$HOME/.afon}/logs/afon.log."
   echo "ansi: true|false, whether to keep the ANSI codes.  Defaults to true."
 }
 
@@ -30,7 +30,7 @@ case "$ANSI" in
     exit 1 ;;
 esac
 
-LOG_FILE="${AFON_HOME:-$HOME/.afon}/logs/afon-core.log"
+LOG_FILE="${AFON_HOME:-$HOME/.afon}/logs/afon.log"
 
 if [ ! -f "$LOG_FILE" ]; then
   echo "Log file not found: $LOG_FILE" >&2

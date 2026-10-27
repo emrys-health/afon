@@ -24,7 +24,7 @@ What you expected to happen.
 What actually happened, including the full error message.
 
 ## Logs
-Relevant extract of `$AFON_HOME/logs/afon-core.log`, or of the console output, with secrets redacted.
+Relevant extract of `$AFON_HOME/logs/afon.log`, or of the console output, with secrets redacted.
 
 <details><summary>Log</summary>
 

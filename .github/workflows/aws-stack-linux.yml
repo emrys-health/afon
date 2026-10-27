@@ -283,7 +283,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          # afon-core.log is the full run log (logback writes it under $AFON_HOME/logs). It
+          # afon.log is the full run log (logback writes it under $AFON_HOME/logs). It
           # carries configuration values, so the artifact is as sensitive as the config itself —
           # it is visible to anyone with read access to this repo.
           name: afon-stack-aws-logs-${{ github.run_id }}

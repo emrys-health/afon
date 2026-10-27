@@ -40,7 +40,7 @@
 # repo, and using environments in a private repo requires a paid plan.  The bundle also requires openssl with
 # PBKDF2 support (OpenSSL 1.1.1+ or LibreSSL 3.1+).  See docs/acceptance_tests.md, section gh prerequisites.
 #
-# The repo is --repo, else env variable GH_REPO, else emrys-health/afon-core.  It does not depend on the current dir.
+# The repo is --repo, else env variable GH_REPO, else emrys-health/afon.  It does not depend on the current dir.
 set -euo pipefail
 
 usage(){
@@ -101,7 +101,7 @@ ensure_environment(){
 }
 
 # The repo whose workflows use the secrets, as in scripts/github/runner.sh.
-DEFAULT_REPO="emrys-health/afon-core"
+DEFAULT_REPO="emrys-health/afon"
 BUNDLE_VARIABLE="AFON_CONFIG_BUNDLE"
 # GitHub variables are limited to 48 KB.
 BUNDLE_MAX_BYTES=48000

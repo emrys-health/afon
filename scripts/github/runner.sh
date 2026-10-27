@@ -7,8 +7,8 @@
 # so has to be supplied per run:
 #
 #   RUNNER_TOKEN   registration token from
-#                  https://github.com/emrys-health/afon-core/settings/actions/runners/new
-#                  (or: gh api --method POST /repos/emrys-health/afon-core/actions/runners/registration-token)
+#                  https://github.com/emrys-health/afon/settings/actions/runners/new
+#                  (or: gh api --method POST /repos/emrys-health/afon/actions/runners/registration-token)
 #   RUNNER_ARGS    extra config.sh flags, e.g. '--unattended --name linux-ec2 --replace'
 #   RUNNER_DIR     where the runner is installed.  Defaults to './actions-runner'
 #   RUNNER_URL     the repo to register with
@@ -51,7 +51,7 @@ SERVICE="${2:-status}"
 VERSION="${VERSION:-2.336.0}"
 
 RUNNER_DIR="${RUNNER_DIR:-actions-runner}"
-RUNNER_URL="${RUNNER_URL:-https://github.com/emrys-health/afon-core}"
+RUNNER_URL="${RUNNER_URL:-https://github.com/emrys-health/afon}"
 RUNNER_TOKEN="${RUNNER_TOKEN:-}"
 RUNNER_ARGS="${RUNNER_ARGS:-}"
 RUNNER_SHA256="${RUNNER_SHA256:-04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d}"

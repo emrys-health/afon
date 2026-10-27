@@ -12,12 +12,12 @@ feature, and that it is assigned to you.
 
 ### 2. Fork and clone
 
-External contributors work on a fork of [afon-core](https://github.com/emrys-health/afon-core):
+External contributors work on a fork of [afon](https://github.com/emrys-health/afon):
 
 ```shell
-gh repo fork emrys-health/afon-core --clone
-cd afon-core
-git remote -v   # origin is your fork, upstream is emrys-health/afon-core
+gh repo fork emrys-health/afon --clone
+cd afon
+git remote -v   # origin is your fork, upstream is emrys-health/afon
 ```
 
 or fork via the GitHub web UI and clone your fork.  Maintainers with write access may branch in the main repo instead.
@@ -86,7 +86,7 @@ git push --force-with-lease
 ### 8. Open the pull request
 
 ```shell
-gh pr create --repo emrys-health/afon-core --base main
+gh pr create --repo emrys-health/afon --base main
 ```
 
 or via the GitHub web UI.  Use the [description template](#pull-request-description) below.

@@ -6,7 +6,7 @@
     <packaging>pom</packaging>
     <description>Afon Core provides the infrastructure required to enable secure cross cloud querying</description>
     <inceptionYear>2025</inceptionYear>
-    <url>https://github.com/emrys-health/afon-core</url>
+    <url>https://github.com/emrys-health/afon</url>
 
     <licenses>
         <license>
@@ -17,9 +17,9 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:git://github.com/emrys-health/afon-core.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/emrys-health/afon-core.git</developerConnection>
-        <url>https://github.com/emrys-health/afon-core.git</url>
+        <connection>scm:git:git://github.com/emrys-health/afon.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/emrys-health/afon.git</developerConnection>
+        <url>https://github.com/emrys-health/afon.git</url>
         <tag>HEAD</tag>
     </scm>
 
@@ -77,7 +77,7 @@
         <!-- distribution -->
         <!-- Skip maven deploy until RM setup-->
         <maven.deploy.skip>true</maven.deploy.skip>
-        <github.packages.url>https://maven.pkg.github.com/emrys-health/afon-core</github.packages.url>
+        <github.packages.url>https://maven.pkg.github.com/emrys-health/afon</github.packages.url>
         <sonatype.nexus.url>https://s01.oss.sonatype.org</sonatype.nexus.url>
     </properties>
 

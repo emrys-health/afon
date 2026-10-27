@@ -1,13 +1,13 @@
 # Build from source
 
-Code is hosted on the GitHub [afon-core](https://github.com/emrys-health/afon-core) project.
+Code is hosted on the GitHub [afon](https://github.com/emrys-health/afon) project.
 We assume read-only access to the project has been granted.
 
 ## Clone 
 
 To clone project:
 ```shell
-git clone https://github.com/emrys-health/afon-core.git
+git clone https://github.com/emrys-health/afon.git
 ```
 
 ## Git hooks
@@ -32,19 +32,19 @@ We assume [setup](setup_local.md) has been done.
 
 To build all components, running acceptance tests:
 ```shell
-cd afon-core
+cd afon
 ./afon.sh -a build
 ```
 
 The acceptance build profile is active by default but can be explicitly activated as well:
 ```shell
-cd afon-core
+cd afon
 ./afon.sh -a build -bp acceptance
 ```
 
 To build all components without running acceptance tests:
 ```shell
-cd afon-core
+cd afon
 ./afon.sh -a build -bp unit
 ```
 
@@ -57,7 +57,7 @@ The build requires the [configuration](configuration.md) to be setup.
 If you want to build with the configuration relative to single cloud:
 
 ```shell
-cd afon-core
+cd afon
 ./afon.sh -a build -bp unit -c <cloud>
 ```
 
@@ -112,7 +112,7 @@ can be exported for use outside the maven build and source checkout.
 
 ### GitHub Workflows
 
-The [GitHub Workflows](https://github.com/emrys-health/afon-core/actions) are run on a Linux Runner.
+The [GitHub Workflows](https://github.com/emrys-health/afon/actions) are run on a Linux Runner.
 
 To set up the runner via ansible:
 ```shell

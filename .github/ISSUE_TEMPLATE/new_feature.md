@@ -22,7 +22,7 @@ The problem this feature solves, and who has it.  Why can it not be solved with 
 
 ## Proposed solution
 How you think the feature could work: the components involved, any new CLI actions, configuration properties or
-stacks, and how it fits the [architecture](https://github.com/emrys-health/afon-core/blob/main/docs/architecture.md).
+stacks, and how it fits the [architecture](https://github.com/emrys-health/afon/blob/main/docs/architecture.md).
 
 ## Acceptance criteria
 - [ ] Criterion 1
@@ -31,7 +31,7 @@ stacks, and how it fits the [architecture](https://github.com/emrys-health/afon-
 
 ## Testing
 How the feature can be tested: which unit tests, whether it needs acceptance tests (against local containers) or
-smoke tests (against a deployed stack).  See [testing](https://github.com/emrys-health/afon-core/blob/main/docs/contributing/testing.md).
+smoke tests (against a deployed stack).  See [testing](https://github.com/emrys-health/afon/blob/main/docs/contributing/testing.md).
 
 ## Impact
 - Clouds affected: (aws / azure / gcp / all)

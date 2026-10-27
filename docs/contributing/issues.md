@@ -1,18 +1,18 @@
 # Creating issues
 
-Issues are tracked on GitHub, in the [afon-core issues](https://github.com/emrys-health/afon-core/issues).
+Issues are tracked on GitHub, in the [afon issues](https://github.com/emrys-health/afon/issues).
 Every change starts from an issue, and every commit references one (see [pull requests](pull_requests.md#commits)).
 
 ## Before creating an issue
 
-- **Search** the [open and closed issues](https://github.com/emrys-health/afon-core/issues?q=is%3Aissue) first.
+- **Search** the [open and closed issues](https://github.com/emrys-health/afon/issues?q=is%3Aissue) first.
   If one already covers it, add your details, or a 👍, there rather than opening a duplicate.
 - **Check the docs**, eg the troubleshooting sections of [smoke tests](../smoke_tests.md) and
   [operations](../operations.md), in case it is a known problem with a known fix.
 <!-- TODO: the advisory link below 404s until private vulnerability reporting is enabled (Settings > Advanced Security),
      which is planned once the repo is made public.  The same link is in .github/ISSUE_TEMPLATE/config.yml -->
 - **Security vulnerabilities must not be reported in a public issue**: use GitHub's
-  [private vulnerability reporting](https://github.com/emrys-health/afon-core/security/advisories/new) instead.
+  [private vulnerability reporting](https://github.com/emrys-health/afon/security/advisories/new) instead.
 - **Never include secrets** in an issue: credentials, tokens, passwords, keys, the content of `secret*.properties`
   or `users.csv`, or any real (eg patient) data.  Redact them from logs and config before pasting, eg as `<redacted>`.
 
@@ -55,7 +55,7 @@ What you expected to happen.
 What actually happened, including the full error message.
 
 ## Logs
-Relevant extract of `$AFON_HOME/logs/afon-core.log`, or of the console output, with secrets redacted.
+Relevant extract of `$AFON_HOME/logs/afon.log`, or of the console output, with secrets redacted.
 
 <details><summary>Log</summary>
 
