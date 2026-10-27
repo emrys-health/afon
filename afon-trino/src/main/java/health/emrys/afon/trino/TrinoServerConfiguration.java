@@ -1,11 +1,10 @@
 package health.emrys.afon.trino;
 
-import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import org.jspecify.annotations.NonNull;
 
-import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.config.AfonProperty.AWS_REGION;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static java.lang.String.format;
 
@@ -18,19 +17,30 @@ import static java.lang.String.format;
  */
 public class TrinoServerConfiguration {
 
-    /** The environment variable of the Trino pods that holds the credential with which each catalog starts. */
+    /**
+     * The environment variable of the Trino pods that holds the credential with which each catalog starts.
+     */
     public static final String CREDENTIAL_ENV         = "TRINO_POLARIS_CREDENTIAL";
-    /** The extra credential, of a query, that holds the token with which Trino calls Polaris for it. */
+    /**
+     * The extra credential, of a query, that holds the token with which Trino calls Polaris for it.
+     */
     public static final String TOKEN_EXTRA_CREDENTIAL = "token";
 
     private final AfonPropertyProvider properties;
-    private final String polarisDomainName;
-    private final AfonUser user;
+    private final String               polarisDomainName;
+    private final AfonUser             user;
 
-    public TrinoServerConfiguration(AfonPropertyProvider properties, String polarisDomainName, AfonUser user) {
-        this.properties = properties;
+    /**
+     * @param user This is an admin user that allows Trino to talk to Polaris (with the associated JWT) as it appears
+     *             that Trino eagerly checks the configured catalogs, not lazily. It's an architectural decision so it
+     *             can fail fast if something is amiss.
+     */
+    public TrinoServerConfiguration(AfonPropertyProvider properties,
+                                    String polarisDomainName,
+                                    AfonUser user) {
+        this.properties        = properties;
         this.polarisDomainName = polarisDomainName;
-        this.user = user;
+        this.user              = user;
     }
 
     public String catalogProperties(String catalogName) {
@@ -62,7 +72,7 @@ public class TrinoServerConfiguration {
             getOauthScope(),
             fileSystemProperties(catalogName),
             additionalProperties()
-            );
+        );
     }
 
     /**
