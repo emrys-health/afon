@@ -254,6 +254,25 @@ Setting it on a cluster that already runs changes the addresses its outbound tra
 open for a moment: check the plan before applying it, and restart what holds long-lived connections to an external service afterwards,
 as on [Azure](#egress-ip-azure). Whoever allow-lists the cluster's address must switch to the new one.
 
+### Deleting an AKS cluster that hangs (Azure)
+
+Azure starts a "VM Agent Rolling Upgrade" of its own on the node scale set of a new cluster, within the hour or so after it is created (the
+activity log shows the operation `upgradeVMAgent`, with no caller). While it runs, Azure refuses to delete the scale set
+(`OperationNotAllowed: Virtual Machine Scale Set updates are not allowed while there is a Rolling Upgrade in progress`), so the load balancer and
+the network security group that it uses, and then the managed resource group of the cluster (`MC_<group>_<cluster>_<region>`), cannot be deleted
+either: the delete of the cluster fails, while `tofu destroy` goes on waiting for it, saying `Still destroying...` for as long as you let it.
+
+Check for a running upgrade, and cancel it, for the cluster of a stack, by its id or its role:
+
+```shell
+afon-cli.sh azure-rolling-upgrades azure-full           # status is the default
+afon-cli.sh azure-rolling-upgrades azure-full cancel
+```
+
+Then stop the hanging `tofu destroy` (Ctrl-C, once) and run the delete again. If a delete has left resources of the stack in the resource group,
+tofu says they already exist when the stack is deployed again: delete the cluster, its vnet and its identity with `az`, never the resource group,
+which holds the rest of the environment.
+
 ### Reaching Polaris from the setup steps
 
 The setup steps that call the REST API of Polaris **from the machine running them**, ie creating the catalogs, configuring the Polaris

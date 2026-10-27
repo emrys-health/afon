@@ -90,6 +90,7 @@ public class GenerateScriptMains {
         new ScriptEntry("azure", "AzureEgressIpMain", "azure/egress-ip.sh"),
         new ScriptEntry("azure", "AzureRbacMain", "azure/rbac.sh"),
         new ScriptEntry("azure", "AzureRolesMain", "azure/roles.sh"),
+        new ScriptEntry("azure", "AzureRollingUpgradesMain", "azure/rolling-upgrades.sh", "azure"),
         new ScriptEntry("azure", "AzureUpdateKubeConfigMain", "azure/update-kube-config.sh", "azure"),
 
         new ScriptEntry("gcp", "GcpAccountMain", "gcp/account.sh"),
