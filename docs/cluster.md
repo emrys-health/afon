@@ -371,23 +371,30 @@ afon-cli.sh kube-polaris-whitelist gcp remove
 afon-cli.sh kube-polaris-whitelist gcp set
 ```
 
-## Volumes that outlive the cluster (AWS)
+## Volumes that outlive the cluster
 
-Gitea's repositories are kept on an EBS volume that is not destroyed with the stack, so that a cluster of the same
-name mounts the same volume again.  It is tagged `Name=gitea-<cluster>`, eg `gitea-full-emrys-cluster`, is in the
-zone `<AWS_REGION>a`, and is sized by `GITEA_STORAGE_SIZE` (default `10Gi`).  On deploy, the stack imports the
-volume of that name if there is one, else creates it.  Gitea's database `gitea_<cluster>` and its path
-`gitea/<cluster>/` in `AWS_GITEA_BUCKET` are named after the same cluster, so all three are found again together.
+Gitea's repositories are kept on a disk that is not destroyed with the stack, so that a cluster of the same name mounts the same disk
+again.  Its database `gitea_<cluster>` and its path `gitea/<cluster>/` in the Gitea bucket are named after the cluster and outlive it too,
+so without the disk the database would list repositories that no longer exist, and Gitea would answer `500` for them (`fork/exec
+/usr/bin/git: no such file or directory`, which Go also says when the repository's directory is missing). On deploy, the stack imports the disk of
+that name if there is one, else creates it. The disk is sized by `GITEA_STORAGE_SIZE` (default `10Gi`; it can grow, not shrink), and is named
+`gitea-<cluster>`, eg `gitea-full-emrys-cluster`.
 
-`afon-cli.sh manage-stack delete` keeps the volume: it excludes every resource with `prevent_destroy` from
-`tofu destroy`.  A plain `tofu destroy` fails on it instead, rather than delete it.  To destroy the stack by hand:
+`afon-cli.sh manage-stack delete` keeps the disk: it excludes every resource with `prevent_destroy` from `tofu destroy`. A plain `tofu destroy`
+fails on it instead, rather than delete it. To destroy the stack by hand, exclude the disk (`aws_ebs_volume.retained_gitea_volume` on AWS,
+`azurerm_managed_disk.retained_gitea_volume` on Azure), eg:
 
 ```shell
 tofu destroy -exclude=aws_ebs_volume.retained_gitea_volume
 ```
 
-While the cluster runs, Data Lifecycle Manager snapshots the volume daily at 03:00 UTC and keeps the last 7.
-The snapshots outlive the cluster too, so those of earlier clusters stay until deleted.
+The volume is bound statically: its PersistentVolume has the reclaim policy `Retain` and a storage class that no provisioner serves.
+GCP does not keep it yet: there, Gitea's disk still goes with the cluster, as Azure's did before.
+
+### AWS
+
+The disk is an EBS volume tagged `Name=gitea-<cluster>`, in the zone `<AWS_REGION>a`. While the cluster runs, Data Lifecycle Manager snapshots
+it daily at 03:00 UTC and keeps the last 7. The snapshots outlive the cluster too, so those of earlier clusters stay until deleted.
 
 To grow the volume, raise `GITEA_STORAGE_SIZE` and redeploy, which grows the EBS volume in place, then grow its
 filesystem on the node running Gitea, as the volume is bound statically, outside the CSI driver's resizing:
@@ -396,7 +403,24 @@ filesystem on the node running Gitea, as the volume is bound statically, outside
 kubectl debug node/<node> -it --image=ubuntu -- chroot /host resize2fs /dev/<device>
 ```
 
-It cannot shrink.  To delete it for good, delete the stack, then `aws ec2 delete-volume --volume-id <id>`.
+To delete it for good, delete the stack, then `aws ec2 delete-volume --volume-id <id>`.
+
+### Azure
+
+The disk is a managed disk named `gitea-<cluster>` (a `StandardSSD_LRS` one, like the default storage class provisions, and not zonal, as the
+nodes are not), in `AZURE_RESOURCE_GROUP`, ie outside the resource group `MC_<group>_<cluster>_<region>` that AKS creates for the cluster and
+deletes with it. The stack finds it by its name among the resources of the resource group, so a cluster of the same name binds the same disk.
+The identity of the cluster is given the `Contributor` role on the disk, which it needs to attach a disk of another resource group to a node;
+the role assignment goes with the stack, and is made again on the next deploy.
+
+Azure has no counterpart of the snapshots of AWS here: the disk is not backed up.  Back it up with Azure Backup for managed disks, or take
+snapshots, if the repositories matter.
+
+To grow it, raise `GITEA_STORAGE_SIZE` and redeploy, which grows the managed disk in place, then grow its filesystem on the node running Gitea,
+as on AWS. To delete it for good, delete the stack, then `az disk delete --name gitea-<cluster> --resource-group $AZURE_RESOURCE_GROUP`.
+
+The first deploy of a stack that had Gitea's disk in the cluster, ie before this, creates the disk empty: its database still lists the
+repositories of the earlier cluster, which have to be deleted in Gitea (the repositories without a directory), or the database dropped.
 
 ## Logging & Monitoring
 

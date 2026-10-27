@@ -1534,10 +1534,10 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     @Override
     public synchronized Optional<RetainedVolumeClaim> retainedVolumeClaim(String name, String size, String namespace) {
-        RetainedVolumeClaim claim = AwsRetainedVolume.create(
-            this, name, componentNames.getRetainedVolumeName(name), size, namespace,
+        RetainedVolumeClaim claim = new AwsRetainedVolume(
+            name, componentNames.getRetainedVolumeName(name), size, namespace,
             // The zone of the first subnets, private and public, so that it has nodes.
-            region + "a", snapshotRole(), storageDependencies(), retainedVolumeImports);
+            region + "a", snapshotRole()).deploy(this, storageDependencies(), retainedVolumeImports);
         // CDKTF has no import blocks, let alone conditional ones, so they are written to the stack as they are.
         TerraformStack.of(this).addOverride("import", retainedVolumeImports);
         return Optional.of(claim);

@@ -3,6 +3,7 @@ package health.emrys.afon.cdk.azure;
 import com.hashicorp.cdktf.Aspects;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.ITerraformDependable;
+import health.emrys.afon.cdk.RetainedVolumeClaim;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.IAspect;
 import com.hashicorp.cdktf.TerraformResource;
@@ -98,6 +99,10 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     private              RoleAssignment          clusterAdminAssignment;
     private              KubernetesProvider      k8sProvider;
     private              HelmProvider            helmProvider;
+    private              DataAzurermResourceGroup resourceGroupLookup;
+    private              UserAssignedIdentity    clusterIdentity;
+    /** The stack's {@code import} blocks, of the disks {@link #retainedVolumeClaim} adopts if they exist. */
+    private final        List<Map<String, String>> retainedVolumeImports = new ArrayList<>();
 
     /**
      * @param pinnedEgressIp whether the egress IP of the stack is pinned to {@code AZURE_EGRESS_IP}, if set, which only
@@ -176,6 +181,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
      */
     private @NonNull KubernetesCluster createCluster(DataAzurermResourceGroup resourceGroup) {
         UserAssignedIdentity identity   = createIdentity(resourceGroup);
+        clusterIdentity = identity;
         Subnet               nodeSubnet = createNetworking(resourceGroup, identity);
         return createCluster(resourceGroup, nodeSubnet, identity);
     }
@@ -286,13 +292,14 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
      * from the group itself rather than from the region.
      */
     private DataAzurermResourceGroup lookupResourceGroup() {
-        return new DataAzurermResourceGroup(
+        resourceGroupLookup = new DataAzurermResourceGroup(
             this,
             "aks-rg",
             DataAzurermResourceGroupConfig
                 .builder()
                 .name(resourceGroup)
                 .build());
+        return resourceGroupLookup;
     }
 
     // -------------------------------------------------------------------------
@@ -594,6 +601,29 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         List<String> ids       = Token.asList(each.pluckProperty("id"));
         List<String> addresses = Token.asList(each.pluckProperty("ip_address"));
         return Token.asString(Fn.element(Fn.matchkeys(ids, addresses, List.of(egressIp)), 0));
+    }
+
+    /**
+     * The disk is in the resource group of the stack, not in the one that AKS creates for the cluster, so that it is kept when the
+     * cluster is destroyed, see {@link AzureRetainedVolume}.
+     */
+    @Override
+    public synchronized Optional<RetainedVolumeClaim> retainedVolumeClaim(String name, String size, String namespace) {
+        RetainedVolumeClaim claim = new AzureRetainedVolume(
+            name, retainedVolumeName(name), size, namespace, resourceGroup, resourceGroupLookup.getLocation(),
+            clusterIdentity).deploy(this, storageDependencies(), retainedVolumeImports);
+        // CDKTF has no import blocks, let alone conditional ones, so they are written to the stack as they are.
+        TerraformStack.of(this).addOverride("import", retainedVolumeImports);
+        return Optional.of(claim);
+    }
+
+    /**
+     * @param name what the volume is for, eg {@code gitea}
+     * @return the name of the disk, after what it is for and the cluster, eg {@code gitea-full-emrys-cluster}, so that a cluster of the
+     * same name finds it again
+     */
+    String retainedVolumeName(String name) {
+        return name + "-" + clusterName;
     }
 
     // -------------------------------------------------------------------------
