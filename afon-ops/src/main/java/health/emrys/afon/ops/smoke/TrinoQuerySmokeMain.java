@@ -28,19 +28,6 @@ import static health.emrys.afon.ops.kube.KubeClient.nameOfPod;
 import static health.emrys.afon.trino.TrinoServerConfiguration.TOKEN_EXTRA_CREDENTIAL;
 import static java.lang.String.format;
 
-/**
- * To run against Kubernetes, run this first:
- * <pre>kubectl port-forward svc/trino 8080:8080</pre>
- * Populate the cloud Polaris with something like:
- * <pre>
- * ./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "GCP acceptancetests smoketesttable260601231212 gs://emrys_afon_core/acceptancetests/smoketesttable260601231212/metadata/00000-0cf4c26f-668b-474c-9542-618d3fba2e19.metadata.json  emryspolaris.click"
- * </pre>
- * or <pre>
- * ./afon.sh -a exec --exec-class ops.RegisterPolarisTableMain --exec-args "AZURE acceptancetests smoketesttable260601231212 abfss://afonstorage@afonstorageaccount.dfs.core.windows.net/acceptancetests/smoketesttable260601231212/metadata/00001-ba11f3b6-6920-4007-9368-ab913506716f.metadata.json  emryspolaris.click"
- * </pre>
- * The query runs as the configured user, with a token from the KeyCloak of the {@code TRE_CLOUD}, which Trino passes on
- * to Polaris: Trino has no credentials of its own for queries.
- */
 public class TrinoQuerySmokeMain {
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(TrinoQuerySmokeMain.class);
 
@@ -89,13 +76,6 @@ public class TrinoQuerySmokeMain {
         return cnxnProperties;
     }
 
-    /**
-     * @param args For the table that is not the default one, pass an argument like:
-     *             gcp.acceptancetests.smoketesttable260601231212
-     *             or
-     *             azure.acceptancetests.smoketesttable260601231212
-     *             after running the mvn commands above
-     */
     public static void main(String[] args) throws Exception {
         try {
             TrinoQuerySmokeMain app    = new TrinoQuerySmokeMain();
@@ -111,28 +91,58 @@ public class TrinoQuerySmokeMain {
         }
     }
 
-    private List<String> checkPolarisLogsUsers(OffsetDateTime start,
-                                               LokiClient loki,
-                                               String polarisPodName) throws IOException {
+    /**
+     * Might take some time for the logs to appear in Polaris
+     */
+    private List<String> findUsersInPolarisLogsWithBackoff(OffsetDateTime start,
+                                                           LokiClient loki,
+                                                           String polarisPodName
+    ) throws IOException, InterruptedException {
+        List<String> errors     = new ArrayList<>();
+        int          numRetries = 3;
+        for (int i = 1; i <= numRetries; i++) {
+            List<String> xs = findUsersInPolarisLogs(start, loki, polarisPodName);
+            if (xs.isEmpty()) {
+                return List.of();
+            } else {
+                if (i == numRetries) {
+                    errors.addAll(xs);
+                } else {
+                    int ms = 1_000 * i;
+                    logger.warn("Logs not (yet) in Polaris. Sleeping {} ms then trying again...", ms);
+                    Thread.sleep(ms);
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    private List<String> findUsersInPolarisLogs(OffsetDateTime start,
+                                                LokiClient loki,
+                                                String polarisPodName
+    ) throws IOException {
         List<String> errors = new ArrayList<>();
         String       query  = format("{namespace=\"default\", pod=\"%s\"}", polarisPodName);
         List<String> logs   = loki.queryRange(query, start, 1_000);
         if (logs.isEmpty()) {
-            errors.add(format("Query '%s' with start time %s returned no logs from Loki",
-                              query,
-                              start));
+            errors.add(format(
+                "Query '%s' with start time %s returned no logs from Loki",
+                query,
+                start));
         } else {
             logger.info("Polaris logs:\n{}", String.join("\n", logs));
-            for (AfonUser user: userProvider.getUsers()) {
+            for (AfonUser user : userProvider.getUsers()) {
                 boolean found = false;
-                for (String log: logs) {
+                for (String log : logs) {
                     if (log.contains("Resolving principal for credentials: PolarisCredential{principalName="
-                                         + user.username())) {
+                                     + user.username())) {
                         found = true;
                         break;
                     }
                 }
-                if (!found) errors.add("No Polaris log for user " + user.username());
+                if (!found)
+                    errors.add("No Polaris log for user " + user.username());
             }
         }
         return errors;
@@ -146,7 +156,7 @@ public class TrinoQuerySmokeMain {
 
             V1Pod polarisPod = client.getOnlyPodBegginingWith("polaris-deployment");
             try (LokiClient loki = new LokiClient(client, properties)) {
-                errors.addAll(checkPolarisLogsUsers(start, loki, KubeClient.nameOfPod(polarisPod)));
+                errors.addAll(findUsersInPolarisLogsWithBackoff(start, loki, KubeClient.nameOfPod(polarisPod)));
             }
         }
         return errors;
@@ -155,16 +165,18 @@ public class TrinoQuerySmokeMain {
     private List<String> hitTrinoWithAllUsers(KubeClient client) throws ApiException, SQLException, IOException {
         List<String> errors = new ArrayList<>();
         V1Pod        pod    = client.getOnlyPodBegginingWith("trino-coordinator");
-        try (PortForwarder forward = new PortForwarder(client,
-                                                       TRINO_NAMESPACE,
-                                                       nameOfPod(pod),
-                                                       0,
-                                                       8080)) {
+        try (PortForwarder forward = new PortForwarder(
+            client,
+            TRINO_NAMESPACE,
+            nameOfPod(pod),
+            0,
+            8080)) {
             int localPort = forward.localPort();
-            String url = format("jdbc:trino://localhost:%d/%s/%s",
-                                localPort,
-                                cloud.toString(),
-                                POLARIS_NAMESPACE_EXTERNAL);
+            String url = format(
+                "jdbc:trino://localhost:%d/%s/%s",
+                localPort,
+                cloud.toString(),
+                POLARIS_NAMESPACE_EXTERNAL);
             String query = "SELECT COUNT(*) FROM " + POLARIS_TABLE_NAME;
             errors.addAll(tryQueriesForAllUsers(url, query));
         }
@@ -196,8 +208,9 @@ public class TrinoQuerySmokeMain {
             query(query, query, user, "bad token");
             errors.add(format("Could execute SQL {} for user {} using a bad token", query, user.username()));
         } catch (SQLException ex) {
-            logger.info("Tried a deliberately bad token for {} and was correctly refused",
-                        user.username());
+            logger.info(
+                "Tried a deliberately bad token for {} and was correctly refused",
+                user.username());
         }
         return errors;
     }
