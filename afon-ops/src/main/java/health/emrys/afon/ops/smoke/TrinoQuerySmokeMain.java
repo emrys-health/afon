@@ -92,7 +92,7 @@ public class TrinoQuerySmokeMain {
     }
 
     /**
-     * Might take some time for the logs to appear in Polaris
+     * Might take some time for the Polaris logs to appear in Loki
      */
     private List<String> findUsersInPolarisLogsWithBackoff(OffsetDateTime start,
                                                            LokiClient loki,
