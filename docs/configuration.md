@@ -109,7 +109,15 @@ Afon uses two types configuration properties in the config dir:
 - [afon-azure.properties](../templates/config/afon-azure.properties)
 - [afon-gcp.properties](../templates/config/afon-gcp.properties)
 
-**`whitelist.yaml`**: the domain names that the TRE's notebooks and Spark may resolve, per cloud and per catalog.  It is not mandatory yet: without it the deprecated `ALLOWED_DOMAINS_CSV` is used, if set, else no domains are allowed:
+**`whitelist.yaml`**: the domain names that the TRE's notebooks and Spark may resolve.  It is not mandatory yet: without it the deprecated `ALLOWED_DOMAINS_CSV` is used, if set, else no domains are allowed.
+
+It has a `common` section, for the domains of any cloud, and a section per cloud (`aws`, `azure`, `gcp`), each with a list of `domains`.
+Each domain is spelled out as an RFC 1123 compliant host name, one per entry, with no URL and no wildcard.  A `${NAME}` in an entry is
+replaced by the value of that property, which is an `AfonProperty` or the key of a catalog (`<CLOUD>_BUCKET_NAME_<id>`, eg
+`${AWS_BUCKET_NAME_aws_trino}.s3.${AWS_REGION}.amazonaws.com`, one entry per catalog bucket); any other name is an error.  An entry whose
+property is not set is left out, with a warning, so a cloud that is not deployed to needs none of its properties.  GCP lists the shared
+`storage.googleapis.com` instead of one entry per bucket, as GCS bucket names may contain `_`, so are not RFC 1123 compliant.  Write the
+lists in block style, as `${NAME}` is not valid YAML in a `[flow, list]`.
 
 - [whitelist.yaml](../templates/config/whitelist.yaml)
 
@@ -200,7 +208,7 @@ symlink, eg to a file shared by the envs, is updated in place through the link.
 It also moves the domain names of the deprecated `ALLOWED_DOMAINS_CSV` of `afon.properties` to a new `whitelist.yaml` in the config dir,
 as its `common` domains, which are allowed on any cloud, so that the same names are allowed as before, and removes the property (its
 previous value is in the backup).  An existing `whitelist.yaml` is never overwritten: then the command only says so, and the names are
-to be added by hand.  Arrange the generated domains per cloud and catalog as in the [template](../templates/config/whitelist.yaml).
+to be added by hand.  Arrange the generated domains per cloud, with the catalog buckets, as in the [template](../templates/config/whitelist.yaml).
 Until then, `ALLOWED_DOMAINS_CSV` is still used if `whitelist.yaml` is missing.
 
 A file is only touched if it changes, and then its previous contents are kept as `<file>.bak`, or `<file>.bak.<timestamp>` if

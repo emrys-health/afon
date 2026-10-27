@@ -38,4 +38,5 @@ gcp:
     - ${GCP_OIDC_DOMAIN_NAME}
     - ${GCP_POLARIS_DOMAIN_NAME}
     - ${GCP_JUPYTER_DOMAIN_NAME}
+    # one shared endpoint for all the buckets: GCS bucket names may contain "_", so a per-bucket name is not RFC 1123 compliant
     - storage.googleapis.com
