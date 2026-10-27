@@ -206,9 +206,16 @@ It renames the properties that were renamed, and removes those that are no longe
 symlink, eg to a file shared by the envs, is updated in place through the link.
 
 It also moves the domain names of the deprecated `ALLOWED_DOMAINS_CSV` of `afon.properties` to a new `whitelist.yaml` in the config dir,
-as its `common` domains, which are allowed on any cloud, so that the same names are allowed as before, and removes the property (its
-previous value is in the backup).  An existing `whitelist.yaml` is never overwritten: then the command only says so, and the names are
-to be added by hand.  Arrange the generated domains per cloud, with the catalog buckets, as in the [template](../templates/config/whitelist.yaml).
+so that the same names are allowed as before, and removes the property (its previous value is in the backup).  The Polaris, Jupyter and
+OIDC domain names of a cloud, as the config of the dir says, go in the section of that cloud, because the smoke tests only check the
+`common` names and those of the cloud of the TRE (a domain name of another cloud only resolves, and admits the caller, while its stack
+is deployed): `OIDC_DOMAIN_NAME` goes in the section of each cloud without an `<CLOUD>_OIDC_DOMAIN_NAME` of its own, or in `common` if
+that is every cloud.  A catalog bucket goes in the section of the cloud whose storage endpoint it is at (`*.amazonaws.com`,
+`*.blob.core.windows.net` or `*.googleapis.com`), so the smoke tests do not check, from the pods of one cloud, the storage of another.
+Any other name stays in `common`.  Every section is allowed on every cloud when the stacks are
+deployed, as before: the sections only decide what the smoke tests check.  An existing `whitelist.yaml` is never overwritten: then the
+command only says so, and the names are to be added by hand.  Arrange the generated domains further, with the catalog buckets, as in
+the [template](../templates/config/whitelist.yaml).
 Until then, `ALLOWED_DOMAINS_CSV` is still used if `whitelist.yaml` is missing.
 
 A file is only touched if it changes, and then its previous contents are kept as `<file>.bak`, or `<file>.bak.<timestamp>` if

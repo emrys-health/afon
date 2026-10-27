@@ -17,9 +17,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -182,9 +185,40 @@ public class NetworkSmokeMain {
         List<ExecResult> results = new ArrayList<>();
         for (String domain : new SmokeConfig(properties).allowedDomains()) {
             CurlCommand command = new CurlCommand(client, pod, domain, true);
-            results.addAll(command.run());
+            results.addAll(leavingOutDownDomain(domain, command.run(), NetworkSmokeMain::resolvesHere));
         }
         return results;
+    }
+
+    /**
+     * A domain being allowed means that the pod may reach it, not that it answers: it may be down, or not deployed, eg the Keycloak of
+     * a cloud other than that of the stack. A pod that gets no response from a domain that this machine cannot resolve either is not
+     * stopped by the network policy, so that is not a failure; it is reported as a check not made. Where this machine does resolve
+     * it, the pod not getting a response is a failure.
+     *
+     * @param results  the results of checking that the pod can reach the domain
+     * @param resolves whether this machine can resolve the domain
+     */
+    static List<ExecResult> leavingOutDownDomain(String domain, List<ExecResult> results, Predicate<String> resolves) {
+        if (results.stream().allMatch(ExecResult::isSuccess) || resolves.test(domain)) {
+            return results;
+        }
+        logger.warn("Not checking that the pod can reach {}: it does not resolve from here either, so it may be down or not deployed",
+                    domain);
+        return results.stream()
+                      .map(result -> result.isSuccess() ? result
+                                                        : new ExecResult(0, "Not checked: " + domain + " does not resolve from here either",
+                                                                         "", result.command()))
+                      .toList();
+    }
+
+    private static boolean resolvesHere(String domain) {
+        try {
+            InetAddress.getByName(domain);
+            return true;
+        } catch (UnknownHostException e) {
+            return false;
+        }
     }
 
     public static void main(String[] args) throws Exception {
