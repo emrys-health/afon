@@ -56,10 +56,14 @@ public class LokiClient implements AutoCloseable {
 
     /**
      * @return the values Loki has for the label since the start, eg the names of the pods it has logs of
+     * @param label eg, "pod"
      */
-    public List<String> labelValues(String label, String start) throws IOException {
+    public List<String> labelValues(String label, OffsetDateTime start) throws IOException {
         String url = format("http://localhost:%d/loki/api/v1/label/%s/values?start=%s",
-                            forward.localPort(), label, URLEncoder.encode(start, StandardCharsets.UTF_8));
+                            forward.localPort(),
+                            label,
+                            URLEncoder.encode(start.toInstant().toString(),
+                                              StandardCharsets.UTF_8));
         Map result = localCurl(new HttpGet(url));
         if (!"success".equals(result.get("status"))) {
             throw new RuntimeException(format("Could not reach Loki on %s. Result = %s", url, result));
@@ -70,16 +74,16 @@ public class LokiClient implements AutoCloseable {
     /**
      * @return the lines of all the streams matching the LogQL query since the start, without their timestamps
      */
-    public List<String> queryRange(String query, String start, int limit) throws IOException {
+    public List<String> queryRange(String query, OffsetDateTime start, int limit) throws IOException {
         HttpPost request = new HttpPost(format("http://localhost:%d/loki/api/v1/query_range", forward.localPort()));
         request.setEntity(new UrlEncodedFormEntity(
             List.of(new BasicNameValuePair("query", query),
-                    new BasicNameValuePair("start", start),
+                    new BasicNameValuePair("start", start.toInstant().toString()),
                     new BasicNameValuePair("limit", String.valueOf(limit))),
             StandardCharsets.UTF_8
         ));
-        Map        logs    = localCurl(request);
-        Map        data    = (Map) logs.get("data");
+        Map logs = localCurl(request);
+        Map data = (Map) logs.get("data");
         if (data == null) {
             throw new RuntimeException(format("Loki could not run %s. Result = %s", query, logs));
         }
@@ -112,7 +116,7 @@ public class LokiClient implements AutoCloseable {
      * @return the start time of the pod as RFC3339, which Loki accepts as a query's start, falling back to its creation
      * time if it has not started yet
      */
-    public static String startTimeOf(KubeClient client, String podName) throws ApiException {
+    public static OffsetDateTime startTimeOf(KubeClient client, String podName) throws ApiException {
         V1Pod pod = client.listPodsBeginningWith(podName)
                           .stream()
                           .filter(x -> podName.equals(nameOfPod(x)))
@@ -121,7 +125,7 @@ public class LokiClient implements AutoCloseable {
         OffsetDateTime started = pod.getStatus() != null && pod.getStatus().getStartTime() != null
                                  ? pod.getStatus().getStartTime()
                                  : pod.getMetadata().getCreationTimestamp();
-        return started.toInstant().toString();
+        return started;
     }
 
     private static V1Pod getLokiPod(KubeClient client) throws ApiException {

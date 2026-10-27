@@ -9,6 +9,7 @@ import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -55,10 +56,9 @@ public class TetragonLokiSmokeMain {
             String jupyterPod = new JupyterHubSpawner(client).spawnWithJupyterToken(properties);
             logger.info("Started a Jupyter pod called: {}", jupyterPod);
             // the pod's clock, rather than ours, so the command necessarily runs after it
-            String start = startTimeOf(client, jupyterPod);
-
-            String     marker = "afon-tetragon-smoke-" + UUID.randomUUID();
-            ExecResult echo   = client.exec(jupyterPod, BINARY, marker);
+            OffsetDateTime start  = startTimeOf(client, jupyterPod);
+            String         marker = "afon-tetragon-smoke-" + UUID.randomUUID();
+            ExecResult     echo   = client.exec(jupyterPod, BINARY, marker);
             if (!echo.isSuccess()) {
                 throw new RuntimeException(format("Could not run the command in %s: %s", jupyterPod, echo));
             }
@@ -80,7 +80,7 @@ public class TetragonLokiSmokeMain {
     private static List<JsonNode> execEventsOf(LokiClient loki,
                                                String jupyterPod,
                                                String marker,
-                                               String start)
+                                               OffsetDateTime start)
     throws Exception {
         String         query  = format("{namespace=\"default\", container=\"export-stdout\"} |= \"%s\"", marker);
         List<String>   lines  = loki.queryRange(query, start, 20);
