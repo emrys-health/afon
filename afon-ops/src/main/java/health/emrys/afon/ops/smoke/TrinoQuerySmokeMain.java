@@ -109,7 +109,7 @@ public class TrinoQuerySmokeMain {
                     errors.addAll(xs);
                 } else {
                     int ms = 1_000 * i;
-                    logger.warn("Logs not (yet) in Polaris. Sleeping {} ms then trying again...", ms);
+                    logger.warn("Polaris logs not (yet) in Loki. Sleeping {} ms then trying again...", ms);
                     Thread.sleep(ms);
                 }
             }
