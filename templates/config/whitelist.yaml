@@ -1,36 +1,41 @@
 # TRE whitelist: the only domain names that the notebooks, the Spark master and the Spark driver can resolve, so any name
-# they use must be listed.  It is a security control, so there is no default: keep only what your deployment needs.
+# they use must be listed.  It is a security control, so keep only what your deployment needs.
 #
 # A section per cloud (aws, azure, gcp) lists what that cloud's stack needs, and "common" what any cloud needs.  Each has:
-#   domains:  domain names, spelled out, one per entry, RFC 1123 compliant host names
-#             (no URLs, no wildcards).
-#   catalogs: (clouds only) templates expanded once for each catalog of the cloud that has a bucket.
+#   domains:  domain names, spelled out, one per entry, RFC 1123 compliant host names (no URLs, no wildcards).
 #
-# ${NAME} is replaced by the value of that property.  In a cloud's section, ${POLARIS_DOMAIN_NAME}, ${JUPYTER_DOMAIN_NAME}
-# and ${OIDC_DOMAIN_NAME} are the cloud's own, eg AWS_POLARIS_DOMAIN_NAME in "aws".  In "catalogs", ${BUCKET_NAME} is the
-# catalog's bucket.  An entry with a property that is not set is left out, so a cloud you do not deploy to needs no
-# properties.  Write the lists in block style, as above: a ${NAME} in a [flow, list] is not valid YAML.  The smoke tests only check the domains of the TRE cloud, TRE_CLOUD.
+# ${NAME} is replaced by the value of that property, which is an AfonProperty (see AfonProperty.java) or the key of a catalog
+# in catalogs-<cloud>.properties: <CLOUD>_BUCKET_NAME_<id>, <CLOUD>_CATALOG_NAME_<id>, <CLOUD>_CATALOG_TYPE_<id> or
+# <CLOUD>_ADMIN_GRANTS_<id>, eg ${AWS_BUCKET_NAME_aws_trino}.  Any other name is an error.  An entry whose property is not set
+# is left out, so a cloud you do not deploy to needs no properties.  Write the lists in block style, as below: a ${NAME} in
+# a [flow, list] is not valid YAML.  The smoke tests only check the domains of the common section and of the TRE cloud, TRE_CLOUD.
+#
+# whitelist.yaml is not mandatory yet: without it the deprecated ALLOWED_DOMAINS_CSV is used, if set, else no domains are allowed.
 common:
-  domains: []
+  domains:
+    - ${OIDC_DOMAIN_NAME}
 
 aws:
   domains:
-    - ${OIDC_DOMAIN_NAME}
-    - ${POLARIS_DOMAIN_NAME}
-    - ${JUPYTER_DOMAIN_NAME}
-  catalogs:
-    - ${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com
+    - ${AWS_OIDC_DOMAIN_NAME}
+    - ${AWS_POLARIS_DOMAIN_NAME}
+    - ${AWS_JUPYTER_DOMAIN_NAME}
+    # one entry per catalog bucket, ie per AWS_CATALOG_IDS of catalogs-aws.properties
+    - ${AWS_BUCKET_NAME_aws}.s3.${AWS_REGION}.amazonaws.com
+    - ${AWS_BUCKET_NAME_aws_trino}.s3.${AWS_REGION}.amazonaws.com
+    - ${AWS_BUCKET_NAME_aws_external}.s3.${AWS_REGION}.amazonaws.com
+    - ${AWS_BUCKET_NAME_aws_forbidden}.s3.${AWS_REGION}.amazonaws.com
 
 azure:
   domains:
-    - ${OIDC_DOMAIN_NAME}
-    - ${POLARIS_DOMAIN_NAME}
-    - ${JUPYTER_DOMAIN_NAME}
+    - ${AZURE_OIDC_DOMAIN_NAME}
+    - ${AZURE_POLARIS_DOMAIN_NAME}
+    - ${AZURE_JUPYTER_DOMAIN_NAME}
     - ${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net
 
 gcp:
   domains:
-    - ${OIDC_DOMAIN_NAME}
-    - ${POLARIS_DOMAIN_NAME}
-    - ${JUPYTER_DOMAIN_NAME}
+    - ${GCP_OIDC_DOMAIN_NAME}
+    - ${GCP_POLARIS_DOMAIN_NAME}
+    - ${GCP_JUPYTER_DOMAIN_NAME}
     - storage.googleapis.com

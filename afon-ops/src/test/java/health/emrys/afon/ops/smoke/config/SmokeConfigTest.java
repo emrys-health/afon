@@ -36,22 +36,25 @@ import static org.mockito.Mockito.withSettings;
 class SmokeConfigTest {
 
     private static final String WHITELIST = """
+        common:
+          domains:
+            - ${OIDC_DOMAIN_NAME}
         aws:
           domains:
-            - ${OIDC_DOMAIN_NAME}
-            - ${POLARIS_DOMAIN_NAME}
-            - ${JUPYTER_DOMAIN_NAME}
+            - ${AWS_OIDC_DOMAIN_NAME}
+            - ${AWS_POLARIS_DOMAIN_NAME}
+            - ${AWS_JUPYTER_DOMAIN_NAME}
         azure:
           domains:
-            - ${OIDC_DOMAIN_NAME}
-            - ${POLARIS_DOMAIN_NAME}
-            - ${JUPYTER_DOMAIN_NAME}
+            - ${AZURE_OIDC_DOMAIN_NAME}
+            - ${AZURE_POLARIS_DOMAIN_NAME}
+            - ${AZURE_JUPYTER_DOMAIN_NAME}
             - store.blob.core.windows.net
         gcp:
           domains:
-            - ${OIDC_DOMAIN_NAME}
-            - ${POLARIS_DOMAIN_NAME}
-            - ${JUPYTER_DOMAIN_NAME}
+            - ${GCP_OIDC_DOMAIN_NAME}
+            - ${GCP_POLARIS_DOMAIN_NAME}
+            - ${GCP_JUPYTER_DOMAIN_NAME}
         """;
 
     @TempDir
@@ -117,10 +120,10 @@ class SmokeConfigTest {
     }
 
     @Test
-    void ownOidcDomainNameReplacesTheGlobalOne() throws IOException {
+    void ownOidcDomainNameIsAllowedBesideTheGlobalOne() throws IOException {
         SmokeConfig config = config("aws", Map.of(AWS_OIDC_DOMAIN_NAME, "oidc-aws.example",
                                                   AZURE_OIDC_DOMAIN_NAME, "oidc-az.example"));
-        assertThat(config.allowedDomains()).containsExactly("oidc-aws.example", "pol-aws.example", "jup-aws.example");
+        assertThat(config.allowedDomains()).containsExactly("oidc.example", "oidc-aws.example", "pol-aws.example", "jup-aws.example");
     }
 
     @Test

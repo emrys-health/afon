@@ -198,7 +198,7 @@ It renames the properties that were renamed, and removes those that are no longe
 symlink, eg to a file shared by the envs, is updated in place through the link.
 
 It also moves the domain names of the deprecated `ALLOWED_DOMAINS_CSV` of `afon.properties` to a new `whitelist.yaml` in the config dir,
-as its `common` domains, which are allowed on any cloud, so that the same names are allowed as before, and empties the property (its
+as its `common` domains, which are allowed on any cloud, so that the same names are allowed as before, and removes the property (its
 previous value is in the backup).  An existing `whitelist.yaml` is never overwritten: then the command only says so, and the names are
 to be added by hand.  Arrange the generated domains per cloud and catalog as in the [template](../templates/config/whitelist.yaml).
 Until then, `ALLOWED_DOMAINS_CSV` is still used if `whitelist.yaml` is missing.

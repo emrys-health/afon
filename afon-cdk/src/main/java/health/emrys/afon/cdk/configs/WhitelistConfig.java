@@ -1,9 +1,6 @@
 package health.emrys.afon.cdk.configs;
 
-import health.emrys.afon.config.AfonCatalog;
-import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
@@ -18,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -30,31 +29,24 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * The domain names that the TRE's notebooks, Spark master and Spark driver may resolve, read from {@code whitelist.yaml} in
- * the config dir ({@link ConfigUtils#configDir()}).  The file is not mandatory yet: if it is missing, the deprecated {@code ALLOWED_DOMAINS_CSV} is used as the
- * common domains, or no domains are allowed if that is not set either.  It has a {@code common} section, for the domains of any cloud, and a section per cloud ({@code aws},
- * {@code azure}, {@code gcp}), each with:
- * <UL>
- * <LI>{@code domains}: the domain names, spelled out as RFC 1123 host names (so no wildcards)</LI>
- * <LI>{@code catalogs}: templates expanded once for each catalog of the cloud that has a bucket, eg the bucket's endpoint</LI>
- * </UL>
- * as in
+ * the config dir ({@link ConfigUtils#configDir()}).  The file is not mandatory yet: if it is missing, the deprecated
+ * {@code ALLOWED_DOMAINS_CSV} is used as the common domains, or no domains are allowed if that is not set either.  The file has a
+ * {@code common} section, for the domains of any cloud, and a section per cloud ({@code aws}, {@code azure}, {@code gcp}),
+ * each with a list of {@code domains}, spelled out as RFC 1123 host names (so no wildcards), as in
  * <pre>
  * common:
  *   domains:
- *     - pypi.org
+ *     - ${OIDC_DOMAIN_NAME}
  * aws:
  *   domains:
- *     - ${OIDC_DOMAIN_NAME}
- *     - ${POLARIS_DOMAIN_NAME}
- *   catalogs:
- *     - ${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com
+ *     - ${AWS_POLARIS_DOMAIN_NAME}
+ *     - ${AWS_BUCKET_NAME_aws}.s3.${AWS_REGION}.amazonaws.com
  * </pre>
- * A {@code ${NAME}} is replaced by the value of the property of that name, except that in the section of a cloud, a
- * {@link AfonCloudProperty cloud-agnostic name} is that of the cloud's own property, eg {@code ${POLARIS_DOMAIN_NAME}} is
- * {@code AWS_POLARIS_DOMAIN_NAME} in {@code aws}, and {@code ${OIDC_DOMAIN_NAME}} is the cloud's own OIDC domain if it has
- * one, else the global one, see {@link AfonPropertyProvider#getOidcDomainName(AfonCloud)}.  In {@code catalogs},
- * {@code ${BUCKET_NAME}} is the catalog's bucket.  An entry that refers to a property that is not set or blank is left out,
- * with a warning, so that a cloud that is not deployed to needs none of its properties.
+ * A {@code ${NAME}} is replaced by the value of the property of that name, which is either an {@link AfonProperty} or the
+ * key of a catalog, {@code <CLOUD>_BUCKET_NAME_<id>}, {@code <CLOUD>_CATALOG_NAME_<id>}, {@code <CLOUD>_CATALOG_TYPE_<id>} or
+ * {@code <CLOUD>_ADMIN_GRANTS_<id>}, see {@link health.emrys.afon.config.AfonCatalogs}.  Any other name fails the load, so
+ * a typo cannot silently drop a domain.  An entry that refers to a property that is not set or blank is left out, with a
+ * warning, so that a cloud that is not deployed to needs none of its properties.
  */
 public class WhitelistConfig {
 
@@ -65,18 +57,18 @@ public class WhitelistConfig {
 
     private static final Logger logger = getLogger(WhitelistConfig.class);
 
-    private static final String COMMON = "common";
+    private static final String COMMON  = "common";
     private static final String DOMAINS = "domains";
-    private static final String CATALOGS = "catalogs";
-    private static final String BUCKET_NAME = "BUCKET_NAME";
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Za-z0-9_.]+)}");
 
-    private final AfonPropertyProvider properties;
-    private final Map<String, Section> sections;
+    /**
+     * The keys of a catalog, which are not {@link AfonProperty}s as they depend on the catalog ids.
+     */
+    private static final Pattern CATALOG_KEY = Pattern.compile("^(AWS|AZURE|GCP)_(BUCKET_NAME|CATALOG_NAME|CATALOG_TYPE|ADMIN_GRANTS)_.+");
 
-    private record Section(List<String> domains, List<String> catalogs) {
-    }
+    private final AfonPropertyProvider properties;
+    private final Map<String, List<String>> sections;
 
     public WhitelistConfig(AfonPropertyProvider properties) {
         this(properties, ConfigUtils.configDir());
@@ -99,24 +91,24 @@ public class WhitelistConfig {
     /**
      * @return the domains of the deprecated {@code ALLOWED_DOMAINS_CSV} as the common ones, or none if it is not set either
      */
-    private Map<String, Section> fallback(Path file) {
-        List<String> csv = java.util.Arrays.stream(properties.getValue(AfonProperty.ALLOWED_DOMAINS_CSV, "").split(","))
-                                           .map(String::trim).filter(domain -> !domain.isEmpty()).toList();
+    private Map<String, List<String>> fallback(Path file) {
+        List<String> csv = Arrays.stream(properties.getValue(AfonProperty.ALLOWED_DOMAINS_CSV, "").split(","))
+                                 .map(String::trim).filter(domain -> !domain.isEmpty()).toList();
         if (csv.isEmpty()) {
             logger.warn("{} not found and ALLOWED_DOMAINS_CSV not set: no domains are allowed, copy it from templates/config", file);
             return Map.of();
         }
         logger.warn("{} not found: using the deprecated ALLOWED_DOMAINS_CSV, for all clouds", file);
-        return Map.of(COMMON, new Section(csv, List.of()));
+        return Map.of(COMMON, csv);
     }
 
     /**
      * @return the domains of all the sections: the common ones and those of every cloud
      */
     public List<String> domains() {
-        Set<String> domains = new LinkedHashSet<>(commonDomains());
+        Set<String> domains = new LinkedHashSet<>(resolve(COMMON));
         for (AfonCloud cloud : AfonCloud.values()) {
-            domains.addAll(cloudDomains(cloud));
+            domains.addAll(resolve(cloud.toString()));
         }
         return List.copyOf(domains);
     }
@@ -125,43 +117,17 @@ public class WhitelistConfig {
      * @return the common domains and those of the cloud only
      */
     public List<String> domains(AfonCloud cloud) {
-        Set<String> domains = new LinkedHashSet<>(commonDomains());
-        domains.addAll(cloudDomains(cloud));
+        Set<String> domains = new LinkedHashSet<>(resolve(COMMON));
+        domains.addAll(resolve(cloud.toString()));
         return List.copyOf(domains);
     }
 
-    private List<String> commonDomains() {
-        return resolve(COMMON, section(COMMON).domains(), null);
-    }
-
-    private List<String> cloudDomains(AfonCloud cloud) {
-        Section section = section(cloud.toString());
-        List<String> domains = new ArrayList<>(resolve(cloud.toString(), section.domains(), cloud));
-        if (!section.catalogs().isEmpty()) {
-            for (AfonCatalog catalog : new AfonCatalogs(properties).all()) {
-                if (catalog.cloud() == cloud && catalog.bucketName() != null && !catalog.bucketName().isBlank()) {
-                    domains.addAll(resolve(cloud + " catalog " + catalog.id(), section.catalogs(), cloud,
-                                           Map.of(BUCKET_NAME, catalog.bucketName().trim())));
-                }
-            }
-        }
-        return domains;
-    }
-
-    private Section section(String name) {
-        return sections.getOrDefault(name, new Section(List.of(), List.of()));
-    }
-
-    private List<String> resolve(String where, List<String> templates, AfonCloud cloud) {
-        return resolve(where, templates, cloud, Map.of());
-    }
-
-    private List<String> resolve(String where, List<String> templates, AfonCloud cloud, Map<String, String> extra) {
+    private List<String> resolve(String section) {
         List<String> resolved = new ArrayList<>();
-        for (String template : templates) {
-            String domain = expand(template, cloud, extra);
+        for (String template : sections.getOrDefault(section, List.of())) {
+            String domain = expand(template);
             if (domain == null || domain.isBlank()) {
-                logger.warn("Leaving out whitelist entry '{}' of {}: it refers to a property that is not set", template, where);
+                logger.warn("Leaving out whitelist entry '{}' of {}: it refers to a property that is not set", template, section);
             } else {
                 resolved.add(domain.trim());
             }
@@ -172,11 +138,11 @@ public class WhitelistConfig {
     /**
      * @return the template with its placeholders replaced, or {@code null} if one has no value
      */
-    private String expand(String template, AfonCloud cloud, Map<String, String> extra) {
+    private String expand(String template) {
         Matcher matcher = PLACEHOLDER.matcher(template);
         StringBuilder expanded = new StringBuilder();
         while (matcher.find()) {
-            String value = value(matcher.group(1), cloud, extra);
+            String value = properties.getProperties().getProperty(matcher.group(1));
             if (value == null || value.isBlank()) {
                 return null;
             }
@@ -186,29 +152,13 @@ public class WhitelistConfig {
         return expanded.toString();
     }
 
-    private String value(String name, AfonCloud cloud, Map<String, String> extra) {
-        if (extra.containsKey(name)) {
-            return extra.get(name);
-        }
-        if (cloud != null) {
-            for (AfonCloudProperty cloudProperty : AfonCloudProperty.values()) {
-                if (cloudProperty.name().equals(name)) {
-                    if (cloudProperty == AfonCloudProperty.OIDC_DOMAIN_NAME) {
-                        return properties.getValue(properties.getOidcDomainProperty(cloud), "");
-                    }
-                    return properties.getCloudValue(cloud, cloudProperty, "");
-                }
-            }
-        }
-        return properties.getProperties().getProperty(name);
-    }
-
     /**
      * @param yaml   the content of the whitelist file
      * @param source the file's name, for messages
+     * @return the templates of the domains of each section
      * @throws IllegalStateException if the whitelist is not defined correctly
      */
-    static Map<String, Section> parse(String yaml, String source) {
+    static Map<String, List<String>> parse(String yaml, String source) {
         LoaderOptions options = new LoaderOptions();
         options.setAllowDuplicateKeys(false);
         Object root;
@@ -224,7 +174,7 @@ public class WhitelistConfig {
         for (AfonCloud cloud : AfonCloud.values()) {
             allowed.add(cloud.toString());
         }
-        Map<String, Section> sections = new java.util.HashMap<>();
+        Map<String, List<String>> sections = new HashMap<>();
         for (Map.Entry<String, Object> entry : asMap(root, source, "the file").entrySet()) {
             String name = entry.getKey().toLowerCase(Locale.ROOT);
             if (!allowed.contains(name)) {
@@ -236,19 +186,18 @@ public class WhitelistConfig {
         return sections;
     }
 
-    private static Section section(Object value, String name, String source) {
+    private static List<String> section(Object value, String name, String source) {
         if (value == null) {
-            return new Section(List.of(), List.of());
+            return List.of();
         }
         Map<String, Object> map = asMap(value, source, "section '" + name + "'");
         for (String key : map.keySet()) {
-            if (!key.equals(DOMAINS) && !(key.equals(CATALOGS) && !name.equals(COMMON))) {
+            if (!key.equals(DOMAINS)) {
                 throw new IllegalStateException(
                     "Invalid whitelist " + source + ": unknown key '" + key + "' in section '" + name + "'");
             }
         }
-        return new Section(strings(map.get(DOMAINS), name + "." + DOMAINS, source),
-                           strings(map.get(CATALOGS), name + "." + CATALOGS, source));
+        return domains(map.get(DOMAINS), name + "." + DOMAINS, source);
     }
 
     @SuppressWarnings("unchecked")
@@ -259,14 +208,14 @@ public class WhitelistConfig {
         return (Map<String, Object>) value;
     }
 
-    private static List<String> strings(Object value, String where, String source) {
+    private static List<String> domains(Object value, String where, String source) {
         if (value == null) {
             return List.of();
         }
         if (!(value instanceof List<?> list)) {
             throw new IllegalStateException("Invalid whitelist " + source + ": " + where + " must be a list");
         }
-        List<String> strings = new ArrayList<>();
+        List<String> domains = new ArrayList<>();
         for (Object item : list) {
             if (!(item instanceof String string) || string.isBlank()) {
                 throw new IllegalStateException(
@@ -276,8 +225,23 @@ public class WhitelistConfig {
                 throw new IllegalStateException(
                     "Invalid whitelist " + source + ": " + where + " must not have wildcards, spell out '" + string + "'");
             }
-            strings.add(string.trim());
+            checkPlaceholders(string, where, source);
+            domains.add(string.trim());
         }
-        return strings;
+        return domains;
+    }
+
+    /**
+     * @throws IllegalStateException if a {@code ${NAME}} of the entry is neither an {@link AfonProperty} nor a catalog key
+     */
+    private static void checkPlaceholders(String entry, String where, String source) {
+        Matcher matcher = PLACEHOLDER.matcher(entry);
+        while (matcher.find()) {
+            String name = matcher.group(1);
+            if (!AfonProperty.getAllNames().contains(name) && !CATALOG_KEY.matcher(name).matches()) {
+                throw new IllegalStateException("Invalid whitelist " + source + ": " + where + " refers to '" + name
+                                                + "' in '" + entry + "', which is neither an AfonProperty nor a catalog key");
+            }
+        }
     }
 }

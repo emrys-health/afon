@@ -38,22 +38,23 @@ class WhitelistConfigTest {
         common:
           domains:
             - pypi.org
+            - ${OIDC_DOMAIN_NAME}
         aws:
           domains:
-            - ${OIDC_DOMAIN_NAME}
-            - ${POLARIS_DOMAIN_NAME}
-            - ${JUPYTER_DOMAIN_NAME}
-          catalogs:
-            - ${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com
+            - ${AWS_POLARIS_DOMAIN_NAME}
+            - ${AWS_JUPYTER_DOMAIN_NAME}
+            - ${AWS_BUCKET_NAME_one}.s3.${AWS_REGION}.amazonaws.com
+            - ${AWS_BUCKET_NAME_two}.s3.${AWS_REGION}.amazonaws.com
+            - ${AWS_BUCKET_NAME_three}.s3.${AWS_REGION}.amazonaws.com
         azure:
           domains:
-            - ${OIDC_DOMAIN_NAME}
-            - ${POLARIS_DOMAIN_NAME}
-            - ${JUPYTER_DOMAIN_NAME}
+            - ${AZURE_OIDC_DOMAIN_NAME}
+            - ${AZURE_POLARIS_DOMAIN_NAME}
+            - ${AZURE_JUPYTER_DOMAIN_NAME}
             - ${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net
         gcp:
           domains:
-            - ${GCP_UNSET_PROPERTY}.example
+            - ${GCP_POLARIS_DOMAIN_NAME}
             - storage.googleapis.com
         """;
 
@@ -67,21 +68,22 @@ class WhitelistConfigTest {
     }
 
     @Test
-    void awsDomainsAreThoseOfCommonAndAws() throws IOException {
+    void awsDomainsAreThoseOfCommonAndAwsWithTheBucketOfEachCatalogOnce() throws IOException {
         assertThat(whitelist(WHITELIST).domains(AfonCloud.AWS))
             .containsExactly("pypi.org", "oidc.example", "pol-aws.example", "jup-aws.example",
                              "bucket-1.s3.eu-west-1.amazonaws.com", "bucket-2.s3.eu-west-1.amazonaws.com");
     }
 
     @Test
-    void cloudAgnosticNamesAreThoseOfTheCloudWhichUsesItsOwnOidcDomainIfItHasOne() throws IOException {
+    void azureDomainsAreThoseOfCommonAndAzure() throws IOException {
         assertThat(whitelist(WHITELIST).domains(AfonCloud.AZURE))
-            .containsExactly("pypi.org", "oidc-az.example", "pol-az.example", "store.blob.core.windows.net");
+            .containsExactly("pypi.org", "oidc.example", "oidc-az.example", "pol-az.example", "store.blob.core.windows.net");
     }
 
     @Test
     void entriesWithAPropertyNotSetAreLeftOut() throws IOException {
-        assertThat(whitelist(WHITELIST).domains(AfonCloud.GCP)).containsExactly("pypi.org", "storage.googleapis.com");
+        assertThat(whitelist(WHITELIST).domains(AfonCloud.GCP))
+            .containsExactly("pypi.org", "oidc.example", "storage.googleapis.com");
     }
 
     @Test
@@ -90,6 +92,19 @@ class WhitelistConfigTest {
             .containsExactly("pypi.org", "oidc.example", "pol-aws.example", "jup-aws.example",
                              "bucket-1.s3.eu-west-1.amazonaws.com", "bucket-2.s3.eu-west-1.amazonaws.com",
                              "oidc-az.example", "pol-az.example", "store.blob.core.windows.net", "storage.googleapis.com");
+    }
+
+    @Test
+    void aCatalogKeyOfACatalogThatIsNotDefinedIsLeftOut() throws IOException {
+        assertThat(whitelist("aws:\n  domains:\n    - ${AWS_BUCKET_NAME_missing}.s3.${AWS_REGION}.amazonaws.com\n    - a.example\n")
+                       .domains(AfonCloud.AWS))
+            .containsExactly("a.example");
+    }
+
+    @Test
+    void aNameThatIsNeitherAnAfonPropertyNorACatalogKeyFails() {
+        assertThatThrownBy(() -> whitelist("aws:\n  domains:\n    - ${BUCKET_NAME}.example\n"))
+            .hasMessageContaining("BUCKET_NAME").hasMessageContaining("neither an AfonProperty nor a catalog key");
     }
 
     @Test
@@ -119,12 +134,6 @@ class WhitelistConfigTest {
     void unknownKeyFails() {
         assertThatThrownBy(() -> whitelist("aws:\n  domain: [a.example]\n"))
             .hasMessageContaining("unknown key 'domain'");
-    }
-
-    @Test
-    void catalogsOfCommonFail() {
-        assertThatThrownBy(() -> whitelist("common:\n  catalogs: [a.example]\n"))
-            .hasMessageContaining("unknown key 'catalogs'");
     }
 
     @Test
