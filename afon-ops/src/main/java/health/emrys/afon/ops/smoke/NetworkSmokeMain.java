@@ -53,7 +53,8 @@ public class NetworkSmokeMain {
         this.allowedIngressHosts = Set.of(
                                           AWS_JUPYTER_DOMAIN_NAME, AZURE_JUPYTER_DOMAIN_NAME, GCP_JUPYTER_DOMAIN_NAME,
                                           AWS_OIDC_DOMAIN_NAME, AZURE_OIDC_DOMAIN_NAME, GCP_OIDC_DOMAIN_NAME,
-                                          AWS_POLARIS_DOMAIN_NAME, AZURE_POLARIS_DOMAIN_NAME, GCP_POLARIS_DOMAIN_NAME)
+                                          AWS_POLARIS_DOMAIN_NAME, AZURE_POLARIS_DOMAIN_NAME, GCP_POLARIS_DOMAIN_NAME,
+                                          OIDC_DOMAIN_NAME)
                                       .stream()
                                       .map(x -> properties.getValue(x, ""))
                                       .filter(x -> !x.isEmpty())
