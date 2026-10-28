@@ -12,6 +12,9 @@ import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.rest.HttpResponses;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.models.V1LoadBalancerIngress;
+import io.kubernetes.client.openapi.models.V1Service;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,11 +54,59 @@ public class NetworkSmokeMain {
 
     public List<ExecResult> checkNetworkWithPods() throws Exception {
         List<ExecResult> results = new ArrayList<>();
+        results.addAll(checkPublicFacingInterfaces());
         results.addAll(checkPolarisOnlyAccessibleFromCluster());
         results.addAll(checkNetworkWithPods(sparkPods(), List.of(this::checkCanSeeAllowedDomains,
                                                              this::checkCannotSeeOtherBuckets)));
         results.addAll(checkNetworkWithPods(jupyterPods(), List.of(this::checkCannotSeeOtherBuckets)));
         return results;
+    }
+
+    /**
+     * Checks that no service of the cluster has an EXTERNAL-IP, as {@code kubectl get services} shows it, ie that none
+     * is exposed outside the cluster other than through an ingress.
+     */
+    private List<ExecResult> checkPublicFacingInterfaces() throws ApiException {
+        List<V1Service> services = client.listServices();
+        logger.info("Checking services have no EXTERNAL-IP: {}", services.stream().map(s -> s.getMetadata().getName()).toList());
+        return publicFacingInterfaces(services);
+    }
+
+    /**
+     * @return for each service, a failure if it has an EXTERNAL-IP, else a success
+     */
+    static List<ExecResult> publicFacingInterfaces(List<V1Service> services) {
+        return services.stream().map(service -> {
+            String       name     = service.getMetadata().getName();
+            List<String> external = externalIps(service);
+            String       command  = format("kubectl get service %s", name);
+            return external.isEmpty()
+                   ? new ExecResult(0, format("Service %s has no EXTERNAL-IP", name), "", command)
+                   : new ExecResult(-1, "", format("Service %s has EXTERNAL-IP %s", name, String.join(",", external)), command);
+        }).toList();
+    }
+
+    /**
+     * What {@code kubectl} shows as a service's EXTERNAL-IP: the addresses, or host names, of its load balancer, and any
+     * external IPs it is given.  A load balancer still {@code <pending>} has none yet.
+     */
+    static List<String> externalIps(V1Service service) {
+        List<String> ips = new ArrayList<>();
+        if (service.getStatus() != null && service.getStatus().getLoadBalancer() != null
+            && service.getStatus().getLoadBalancer().getIngress() != null) {
+            for (V1LoadBalancerIngress ingress : service.getStatus().getLoadBalancer().getIngress()) {
+                if (ingress.getIp() != null && !ingress.getIp().isBlank()) {
+                    ips.add(ingress.getIp());
+                }
+                if (ingress.getHostname() != null && !ingress.getHostname().isBlank()) {
+                    ips.add(ingress.getHostname());
+                }
+            }
+        }
+        if (service.getSpec() != null && service.getSpec().getExternalIPs() != null) {
+            ips.addAll(service.getSpec().getExternalIPs());
+        }
+        return ips;
     }
 
     /**
