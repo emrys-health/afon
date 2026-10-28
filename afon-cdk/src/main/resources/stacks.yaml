@@ -24,7 +24,7 @@ stacks:
     components: [Polaris]
   # Polaris with JupyterHub and Guacamole behind the oauth2-proxy MFA gate, the Spark operator the notebooks' Spark
   # runs on (which only launches Spark in response to the resources of the Spark component), Trino and monitoring, with
-  # Tetragon watching the processes of the notebook pods and shipping them to Loki
+  # Tetragon watching the processes of the notebook pods and shipping them to Loki, and Kyverno auditing that the images are signed
   aws-full:
     role: tre
     components:
@@ -39,6 +39,7 @@ stacks:
       - Trino
       - Monitoring
       - Tetragon
+      - Kyverno
       - Logging
       - Git
   # Snowflake queries the catalogs of the full stack through its Polaris, so it holds what the full stack holds
@@ -69,6 +70,7 @@ stacks:
       - Trino
       - Monitoring
       - Tetragon
+      - Kyverno
       - Logging
       - Git
 

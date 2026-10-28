@@ -15,7 +15,7 @@ java_distribution: openjdk
 # The versions of the tools are pinned in scripts/local/pinned.sh, which local-setup shares with this playbook,
 # so that local and runner setups are the same.  The linux pins apply, as the playbook may run from another platform.
 afon_pinned_sh: "{{ playbook_dir }}/../local/pinned.sh"
-afon_pinned_versions: "{{ lookup('ansible.builtin.pipe', 'bash ' ~ afon_pinned_sh ~ ' linux java git jq mvn docker kubectl tofu yq helm hubble aws eksctl kubelogin az gcloud') }}"
+afon_pinned_versions: "{{ lookup('ansible.builtin.pipe', 'bash ' ~ afon_pinned_sh ~ ' linux java git jq mvn docker kubectl tofu yq helm hubble kind cosign aws eksctl kubelogin az gcloud') }}"
 afon_pinned: "{{ dict(afon_pinned_versions.splitlines() | map('split', '=') | list) }}"
 
 # java, git, jq, maven and the cloud clis are installed with apt, as `afon-cli.sh local-setup` does on linux, at these versions
@@ -31,6 +31,8 @@ awscli_version: "{{ afon_pinned.aws }}"
 yq_version: "{{ afon_pinned.yq }}"
 helm_version: "{{ afon_pinned.helm }}"
 hubble_version: "{{ afon_pinned.hubble }}"
+kind_version: "{{ afon_pinned.kind }}"
+cosign_version: "{{ afon_pinned.cosign }}"
 eksctl_version: "{{ afon_pinned.eksctl }}"
 kubelogin_version: "{{ afon_pinned.kubelogin }}"
 azurecli_version: "{{ afon_pinned.az }}"

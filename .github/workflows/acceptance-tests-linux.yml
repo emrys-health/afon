@@ -1,6 +1,6 @@
 name: Acceptance Tests (Linux)
 
-# Runs the acceptance tests (default tags: Access, External, Forbidden) on the self-hosted Linux runner.
+# Runs the acceptance tests (all of them, unless a cloud is given, see docs/acceptance_tests.md) on the self-hosted Linux runner.
 #
 # The acceptance tests hit real AWS/Azure/GCP storage and spin up local
 # KeyCloak/Polaris/Trino via Testcontainers, so the runner needs:

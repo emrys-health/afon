@@ -103,6 +103,16 @@ install_hubble(){
   install_release_binary hubble 'https://github.com/cilium/hubble/releases/download/v${version}/hubble-${os}-${arch}.tar.gz' tgz hubble
 }
 
+# kind, which runs the Kubernetes cluster of the image signing acceptance test in Docker, and cosign, which signs the images.  Neither is in a
+# default apt repository, and brew offers only their current versions, so the release binaries are installed.
+install_kind(){
+  install_release_binary kind 'https://kind.sigs.k8s.io/dl/v${version}/kind-${os}-${arch}' raw
+}
+
+install_cosign(){
+  install_release_binary cosign 'https://github.com/sigstore/cosign/releases/download/v${version}/cosign-${os}-${arch}' raw
+}
+
 # jq, from its release binary.
 install_jq(){
   local jqos=$(bin_os)
@@ -138,7 +148,8 @@ apt_install_pinned(){
 # version is reported, not pinned.
 brew_install_pinned(){
   local formula=$1 tool=$2
-  brew install "$formula" || return 1
+  # not installed again if it is, as brew then fails if a newer version exists, which the pin holds back, while still being the one wanted
+  brew list "$formula" >/dev/null 2>&1 || brew install "$formula" || return 1
   if check_tool_version "$tool" >/dev/null; then
     brew list --pinned | grep -qx "${formula##*/}" || brew pin "$formula" 2>/dev/null || echo "WARNING: brew $formula cannot be pinned, as it is a cask" >&2
   else
@@ -221,6 +232,8 @@ setup_tools(){
   install_tofu
   install_yq
   install_helm
+  install_kind
+  install_cosign
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then
     install_package awscli awscli aws
     install_eksctl

@@ -32,6 +32,7 @@ stacks:
       - CrdCleanup
       - Monitoring
       - Tetragon
+      - Kyverno
       - Logging
       - Git
   # A stack that is not bundled, composed here alone: the notebooks and Spark, but no Trino, Monitoring, Tetragon or Git
@@ -73,6 +74,7 @@ stacks:
       - CrdCleanup
       - Monitoring
       - Tetragon
+      - Kyverno
       - Logging
       - Git
 

@@ -24,6 +24,15 @@
   - The file is not mandatory yet: without it `ALLOWED_DOMAINS_CSV` is still used, for every cloud, so existing configs keep working.
   - `afon-cli.sh config-updates` moves the domains of `ALLOWED_DOMAINS_CSV` to a new `whitelist.yaml`, organised by cloud: the Polaris, Jupyter and OIDC domain names of a cloud, and its storage endpoints (S3, Azure blob, `googleapis.com`), go in the section of that cloud, and any other name in `common`.  The same names are allowed, and the property is removed from `afon.properties` (its previous value is in the `.bak`).  It never overwrites an existing `whitelist.yaml`: then add the names by hand and remove the property.
   - If you use the GitHub workflows, publish the file with `afon-cli.sh github-secrets push`, which sets the `WHITELIST_YAML` secret.
+- **`kind` and `cosign` for the acceptance tests ([#316](https://github.com/emrys-health/afon/issues/316)):**
+  - The acceptance tests now include an image signing spec, which runs a [kind](https://kind.sigs.k8s.io) cluster in Docker and signs images with `cosign`, so **run `afon-cli.sh local-setup` to install `kind` and `cosign`** (pinned release binaries, like `kubectl` and `helm`, which it needs too).  Without them the spec is cancelled, saying what is missing.
+  - On the self-hosted GitHub runners, run the ansible playbook again (`ansible-playbook runner-setup.yml`): its new `signing_tools` role installs them.
+  - The acceptance tests are now chosen by profile, and all are run by default: `-bp acceptance,-signing` leaves the signing spec out, `-bp acceptance,signing` runs only it, and `-c <cloud>` (the profiles `aws`, `azure`, `gcp`) now runs only the access specs of that cloud, so **not the users spec any more**: add `-bp acceptance,users` for it.  See [acceptance tests](docs/acceptance_tests.md).
+- **Kyverno audits the signatures of images in the `tre` stacks ([#316](https://github.com/emrys-health/afon/issues/316)):**
+  - **Redeploying `aws-full` or `azure-full` installs Kyverno** (a `kyverno` namespace with its controllers, as a new Helm release), whatever your config.
+  - It applies no policy until `AWS_COSIGN_PUBLIC_KEY` or `AZURE_COSIGN_PUBLIC_KEY` is set, and only logs a warning, so existing configs keep working: set it with `afon-cli.sh signing-public-key <aws|azure|gcp>`, which generates a throwaway key pair, or uses `<CLOUD>_COSIGN_KEY`, and writes the public key to `afon-<cloud>.properties`.  The new properties, all optional and blank by default, are in `templates/config`: copy the ones you need.
+  - With the key, the `default` namespace is **audited**, never enforced: pods are admitted, and the images that are not signed with the key are recorded in the policy reports.  Read them with `afon-cli.sh signing-report`, and enforce a namespace, once its images are signed, with `<CLOUD>_IMAGE_POLICY_ENFORCED_NAMESPACES`.  Expect every image to be reported until the images are mirrored and signed with `afon-cli.sh docker-image --sign` (which needs cosign 3).
+  - See [Kyverno](docs/stacks.md#define-your-own-docker-images) in the stacks documentation.
 
 ## 1.0-beta-7
 

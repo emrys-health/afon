@@ -1,0 +1,10 @@
+---
+# Installed with the tasks of the cloud_tools role, which install a release binary unless it already prints the pinned version.
+- name: Install the release binaries of the image signing test
+  ansible.builtin.include_role:
+    name: cloud_tools
+    tasks_from: release_binary
+  loop: "{{ signing_binaries }}"
+  loop_control:
+    loop_var: afon_bin
+    label: "{{ afon_bin.name }} {{ afon_bin.version }}"

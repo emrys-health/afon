@@ -14,9 +14,13 @@ verify_commands:
   - perl --version
   - jq --version
   - curl --version
+  # the image signing test
+  - kubectl version --client
+  - helm version --short
+  - kind version
+  - cosign version
 
 verify_cloud_commands:
-  - kubectl version --client
   - tofu --version
 
 verify_aws_commands:

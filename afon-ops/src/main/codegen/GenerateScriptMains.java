@@ -126,6 +126,9 @@ public class GenerateScriptMains {
         new ScriptEntry("kube", "KubePolarisDbMain", "kube/polaris-db.sh"),
         new ScriptEntry("kube", "KubePolarisWhitelistMain", "kube/polaris-whitelist.sh"),
 
+        new ScriptEntry("signing", "SigningPublicKeyMain", "signing/public-key.sh"),
+        new ScriptEntry("signing", "SigningReportMain", "signing/report.sh"),
+
         new ScriptEntry("smoke", "SmokeNotebookMain", "smoke/notebook.sh"),
         new ScriptEntry("smoke", "SmokeTestMain", "smoke/test.sh")
     );

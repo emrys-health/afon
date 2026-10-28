@@ -24,6 +24,7 @@ All the other tools are downloaded with `curl` (needing `curl`, `tar` and `unzip
 - gh
 - docker (the client only: the engine, ie Docker Desktop, Colima or dockerd, is a prerequisite)
 - opentofu, kubectl, hubble, jq, yq, helm
+- kind and cosign (for the image signing acceptance test and `docker-image --sign`; they are in no default apt repository, and brew offers only their current versions)
 - eksctl, kubelogin
 
 Of the cloud cli packages, only the ones relative to the `<cloud>` specified are installed.

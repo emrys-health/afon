@@ -2,12 +2,31 @@
 
 The acceptance tests in `afon-acceptance` verify that cross-cloud access works correctly — including that access to "forbidden" buckets is properly denied.
 
-The acceptance tests can be run against all cloud providers or just a single one:
+By default **all the specs are run**. The profiles of [afon-acceptance/pom.xml](../afon-acceptance/pom.xml) select them by their tags and
+packages, in two ways:
+
+| Profile | Specs | Tag | By default |
+|---|---|---|---|
+| `access` | the access, forbidden and external table specs of every cloud | `Access`, `Forbidden`, `External` | on |
+| `users` | the onboarding of users in KeyCloak and Polaris (it uses an AWS catalog, but could use another cloud's) | `Users` | on |
+| `signing` | the signing of images and their verification at admission, in a kind cluster, see [below](#image-signing-test) | `Signing` | on |
+| `aws`, `azure`, `gcp` | the access, forbidden and external table specs of that cloud | `Aws`, `Azure`, `Gcp` | off |
+
+- **Disable categories** by deactivating their profiles, with a `-` before the name: everything else is still run.
+- **Select** by activating profiles: only the specs of those given are run, and the clouds are only selected this way.
+
 ```shell
-./afon.sh -a build -bp acceptance # builds components running acceptance tests for all cloud providers
-./afon.sh -a build -bp acceptance -c <cloud> # builds components running acceptance tests for cloud <cloud>
+./afon.sh -a build -bp acceptance                         # all the acceptance tests
+./afon.sh -a build -bp acceptance,-signing              # all but the signing test
+./afon.sh -a build -bp acceptance,-access,-users        # only the signing test
+./afon.sh -a build -bp acceptance,access                  # only the access specs, of all the clouds
+./afon.sh -a build -bp acceptance -c <cloud>              # only the access specs of the cloud <cloud> (the profile aws, azure or gcp)
+./afon.sh -a build -bp acceptance,signing -c gcp          # the signing test and the specs of GCP
 ```
-## Acceptance test flow
+With Maven alone, `mvn test -pl afon-acceptance -am
+-Pacceptance,access,signing`. `-c <cloud>` adds the profile of the cloud to those of `-bp`.
+
+## Access specs
 
 The `AbstractAccessSpec` demonstrates the full lifecycle:
 
@@ -32,6 +51,49 @@ Test specs include:
 - [AzureExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/azure/AzureExternalTableSpec.scala) — cross-cloud: Spark talks to AWS Polaris which federates to Azure Polaris
 - [GcpExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpExternalTableSpec.scala) — cross-cloud: Spark talks to AWS Polaris which federates to GCP Polaris
 
+## Users spec
+
+[UsersSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/users/UsersSpec.scala) checks the onboarding of users, and that a
+user only gets the catalogs they are authorised for. It starts KeyCloak and Polaris in Docker, onboards users in both with
+`ConfigureUsersMain`, as `configure-users` does, and has a user try `CREATE NAMESPACE` on a catalog through the shared Spark session. A
+user denied access gets Polaris' `ForbiddenException` (403, a role but not the privilege) or `NotAuthorizedException` (401, no role on the
+catalog). It exercises the authorisation of Polaris only, not the storage, so the catalogs are ad hoc ones on the bucket of the AWS
+forbidden catalog, which the spec does not read; it could as well use another cloud's.
+
+- **Users should not see catalogs they should not** — a user whose authorisation is withheld cannot create a namespace.
+- **Users should not see catalogs authorised only for other users** — with one user authorised for one catalog and another for all, the
+  first can use their catalog and not the other (ticket 225: all the users used to share one principal role).
+- **Granting catalog privileges** — a principal that has not been permissioned is denied; once configured it is allowed; and configuring it
+  for a second catalog does not revoke its access to the first (ticket 117).
+- **Configuring the users should be idempotent** — configuring the users again for an existing catalog gives no errors.
+
+It is the `users` profile, on by default, so it is left out with `-bp acceptance,-users` and run alone with `-bp acceptance,users`. It needs
+Docker, and the AWS config of the catalogs, but runs no cloud storage.
+
+## Image signing spec
+
+[ImageSigningSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/signing/ImageSigningSpec.scala) checks the signing of
+Docker images and their verification at admission, in a throwaway [kind](https://kind.sigs.k8s.io) cluster, so it needs no cloud. It:
+
+1. creates a kind cluster (with its own kubeconfig, not yours), a local registry joined to its network, and installs Kyverno from the chart
+   the stacks vendor;
+2. pushes one image to the registry three times, and signs the copies with the signer of `docker-image --sign`, one with a key, one with
+   another key, and leaves the third unsigned;
+3. applies the two Kyverno policies of the `Kyverno` component for the first key, to a namespace labelled `audit` and another labelled
+   `enforce`, and checks that the enforced one rejects the unsigned image and the one signed with the other key, and admits the signed one,
+   and rejects a pod whose init container is not signed, while the audited one admits all of them;
+4. relabels the audited namespace `enforce`, the rollout from Audit to Deny, and checks that it now rejects the unsigned image; then removes
+   the label of the enforced namespace, the break-glass, and checks that it admits it again;
+5. limits the egress of the Kyverno admission controller to DNS and the API server with a `NetworkPolicy`, and checks that it then cannot
+   verify an image, and, once the registry is allowed too and nothing else (no KMS, no transparency log), that it verifies and admits it.
+
+The public key the policies verify with is the one `docker-image --public-key` exports, read back the way the Kyverno component reads it.
+
+Admission is checked with server-side dry runs of `kubectl run`, which run the admission webhooks and create nothing. It needs `docker`,
+`kind`, `kubectl`, `helm` and `cosign` installed, and is cancelled, saying which are missing, if not. It pulls the Kyverno images, so it
+takes a few minutes. It is part of the default acceptance tests, left out with `-bp acceptance,-signing`, and
+alone with the profile `signing` (`./afon.sh -a build -bp acceptance,signing`).
+
 ## Continuous integration
 
 The [Acceptance tests (Linux)](../.github/workflows/acceptance-tests-linux.yml) workflow runs the same
@@ -45,7 +107,7 @@ only one run executes at a time.
 ### Runner requirements
 
 The runner must have a Docker daemon reachable by the runner user, since the specs start KeyCloak,
-Polaris and Trino via Testcontainers. Java 17 is provisioned by `actions/setup-java`. The runner
+Polaris and Trino via Testcontainers, and `kind`, `kubectl`, `helm` and `cosign` for the image signing spec, which is otherwise cancelled. Java 17 is provisioned by `actions/setup-java`. The runner
 itself is installed and registered by [scripts/github/runner.sh](../scripts/github/runner.sh), either
 by hand or through the `github` role of the ansible playbook below.
 

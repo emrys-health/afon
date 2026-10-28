@@ -12,6 +12,48 @@
 
     <artifactId>afon-acceptance</artifactId>
 
+    <!-- Which specs the scalatest plugin runs is chosen by the profiles below, by the tags and the packages (wildcardSuites) they include, and
+         what a run takes is the union of what the profiles active select.  A spec is run if it is in a package selected and has a tag selected.
+           access   the access, forbidden and external table specs of every cloud   (tags Access, Forbidden, External)  } on by default:
+           users    the onboarding of users                                         (tag Users)                          } with none of the
+           signing  the signing and verification of images, in a kind cluster      (tag Signing)                        } profiles active, all
+           aws      the access specs of AWS                                         (tag Aws)                            ] to select only these,
+           azure    the access specs of Azure                                       (tag Azure)                          ] when activated, eg
+           gcp      the access specs of GCP                                         (tag Gcp)                            ] -Paws,users
+         So by default all the specs are run, and a category is disabled by deactivating its profile, eg -P-signing or -P-access,-users.
+         Giving any profile instead selects only what the profiles given select, eg -Paws,signing; the clouds are only selected this way.
+         Each profile sets, for itself, <name>.tags and <name>.suites to the values <name>.tags.on and <name>.suites.on; what is not selected
+         stays at 'none', which matches no tag and no package, as the plugin cannot be given empty ones. -->
+    <properties>
+        <acceptance.tags.package>health.emrys.afon.acceptance.tags</acceptance.tags.package>
+
+        <acceptance.access.tags.on>${acceptance.tags.package}.Access,${acceptance.tags.package}.Forbidden,${acceptance.tags.package}.External</acceptance.access.tags.on>
+        <acceptance.access.suites.on>health.emrys.afon.acceptance.aws,health.emrys.afon.acceptance.azure,health.emrys.afon.acceptance.gcp</acceptance.access.suites.on>
+        <acceptance.aws.tags.on>${acceptance.tags.package}.Aws</acceptance.aws.tags.on>
+        <acceptance.aws.suites.on>health.emrys.afon.acceptance.aws</acceptance.aws.suites.on>
+        <acceptance.azure.tags.on>${acceptance.tags.package}.Azure</acceptance.azure.tags.on>
+        <acceptance.azure.suites.on>health.emrys.afon.acceptance.azure</acceptance.azure.suites.on>
+        <acceptance.gcp.tags.on>${acceptance.tags.package}.Gcp</acceptance.gcp.tags.on>
+        <acceptance.gcp.suites.on>health.emrys.afon.acceptance.gcp</acceptance.gcp.suites.on>
+        <acceptance.users.tags.on>${acceptance.tags.package}.Users</acceptance.users.tags.on>
+        <acceptance.users.suites.on>health.emrys.afon.acceptance.users</acceptance.users.suites.on>
+        <acceptance.signing.tags.on>${acceptance.tags.package}.Signing</acceptance.signing.tags.on>
+        <acceptance.signing.suites.on>health.emrys.afon.acceptance.signing</acceptance.signing.suites.on>
+
+        <acceptance.access.tags>none</acceptance.access.tags>
+        <acceptance.access.suites>none</acceptance.access.suites>
+        <acceptance.aws.tags>none</acceptance.aws.tags>
+        <acceptance.aws.suites>none</acceptance.aws.suites>
+        <acceptance.azure.tags>none</acceptance.azure.tags>
+        <acceptance.azure.suites>none</acceptance.azure.suites>
+        <acceptance.gcp.tags>none</acceptance.gcp.tags>
+        <acceptance.gcp.suites>none</acceptance.gcp.suites>
+        <acceptance.users.tags>none</acceptance.users.tags>
+        <acceptance.users.suites>none</acceptance.users.suites>
+        <acceptance.signing.tags>none</acceptance.signing.tags>
+        <acceptance.signing.suites>none</acceptance.signing.suites>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>ch.qos.logback</groupId>
@@ -74,60 +116,70 @@
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
                 <configuration>
-                    <tagsToInclude>health.emrys.afon.acceptance.tags.Access,health.emrys.afon.acceptance.tags.External,health.emrys.afon.acceptance.tags.Forbidden,health.emrys.afon.acceptance.tags.Users</tagsToInclude>
+                    <tagsToInclude>${acceptance.access.tags},${acceptance.aws.tags},${acceptance.azure.tags},${acceptance.gcp.tags},${acceptance.users.tags},${acceptance.signing.tags}</tagsToInclude>
+                    <wildcardSuites>${acceptance.access.suites},${acceptance.aws.suites},${acceptance.azure.suites},${acceptance.gcp.suites},${acceptance.users.suites},${acceptance.signing.suites}</wildcardSuites>
                 </configuration>
             </plugin>
         </plugins>
     </build>
 
-    <!-- Pity scalatest-maven-plugin does not support empty values for tagsToInclude.
-         Consider moving to maven-surefire-plugin as the scala code will have been compiled to bytecode.
-    -->
     <profiles>
         <profile>
+            <!-- The access, forbidden and external table specs of every cloud, on by default -->
+            <id>access</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <acceptance.access.tags>${acceptance.access.tags.on}</acceptance.access.tags>
+                <acceptance.access.suites>${acceptance.access.suites.on}</acceptance.access.suites>
+            </properties>
+        </profile>
+        <profile>
+            <!-- The access specs of AWS, only when activated -->
             <id>aws</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.scalatest</groupId>
-                        <artifactId>scalatest-maven-plugin</artifactId>
-                        <configuration>
-                            <tagsToInclude>health.emrys.afon.acceptance.tags.Aws,health.emrys.afon.acceptance.tags.Users</tagsToInclude>
-                            <wildcardSuites>health.emrys.afon.acceptance.aws,health.emrys.afon.acceptance.users</wildcardSuites>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
+            <properties>
+                <acceptance.aws.tags>${acceptance.aws.tags.on}</acceptance.aws.tags>
+                <acceptance.aws.suites>${acceptance.aws.suites.on}</acceptance.aws.suites>
+            </properties>
         </profile>
         <profile>
+            <!-- The access specs of Azure, only when activated -->
             <id>azure</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.scalatest</groupId>
-                        <artifactId>scalatest-maven-plugin</artifactId>
-                        <configuration>
-                            <tagsToInclude>health.emrys.afon.acceptance.tags.Azure</tagsToInclude>
-                            <wildcardSuites>health.emrys.afon.acceptance.azure</wildcardSuites>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
+            <properties>
+                <acceptance.azure.tags>${acceptance.azure.tags.on}</acceptance.azure.tags>
+                <acceptance.azure.suites>${acceptance.azure.suites.on}</acceptance.azure.suites>
+            </properties>
         </profile>
         <profile>
+            <!-- The access specs of GCP, only when activated -->
             <id>gcp</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.scalatest</groupId>
-                        <artifactId>scalatest-maven-plugin</artifactId>
-                        <configuration>
-                            <tagsToInclude>health.emrys.afon.acceptance.tags.Gcp</tagsToInclude>
-                            <wildcardSuites>health.emrys.afon.acceptance.gcp</wildcardSuites>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
+            <properties>
+                <acceptance.gcp.tags>${acceptance.gcp.tags.on}</acceptance.gcp.tags>
+                <acceptance.gcp.suites>${acceptance.gcp.suites.on}</acceptance.gcp.suites>
+            </properties>
+        </profile>
+        <profile>
+            <!-- The onboarding of users in KeyCloak and Polaris, on by default -->
+            <id>users</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <acceptance.users.tags>${acceptance.users.tags.on}</acceptance.users.tags>
+                <acceptance.users.suites>${acceptance.users.suites.on}</acceptance.users.suites>
+            </properties>
+        </profile>
+        <profile>
+            <!-- The signing of images and their verification at admission, in a kind cluster, on by default -->
+            <id>signing</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <acceptance.signing.tags>${acceptance.signing.tags.on}</acceptance.signing.tags>
+                <acceptance.signing.suites>${acceptance.signing.suites.on}</acceptance.signing.suites>
+            </properties>
         </profile>
     </profiles>
 

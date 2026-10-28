@@ -30,6 +30,10 @@ echo "### yq" >> $VERSIONS_OUTPUT
 yq --version >> $VERSIONS_OUTPUT
 echo "### helm" >> $VERSIONS_OUTPUT
 helm version --short >> $VERSIONS_OUTPUT
+echo "### kind" >> $VERSIONS_OUTPUT
+kind version >> $VERSIONS_OUTPUT
+echo "### cosign" >> $VERSIONS_OUTPUT
+cosign version >> $VERSIONS_OUTPUT
 if [ -z "$CLOUD" ]; then
   echo "### aws" >> $VERSIONS_OUTPUT
   aws --version >> $VERSIONS_OUTPUT

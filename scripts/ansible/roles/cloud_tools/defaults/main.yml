@@ -24,7 +24,7 @@ release_binaries:
   - name: kubectl
     version: "{{ kubectl_version }}"
     check: kubectl version --client
-    url: "https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/{{ apt_arch }}/kubectl"
+    url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/{{ apt_arch }}/kubectl"
     kind: raw
   - name: tofu
     version: "{{ opentofu_version }}"

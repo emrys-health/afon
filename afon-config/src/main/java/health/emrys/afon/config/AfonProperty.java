@@ -25,6 +25,27 @@ public enum AfonProperty {
     AWS_ACCOUNT_ID("AWS_ACCOUNT_ID"),
     AWS_ACCESS_KEY_ID("AWS_ACCESS_KEY_ID"),
     AWS_SECRET_ACCESS_KEY("AWS_SECRET_ACCESS_KEY"),
+    /**
+     * Container registry that {@code docker-image --sign} mirrors the images that are not ours to, and signs the images in, for the
+     * stacks of the cloud, eg {@code <account>.dkr.ecr.<region>.amazonaws.com/emrys}.  Optional: the images cannot be signed without it.
+     */
+    AWS_IMAGE_REGISTRY("AWS_IMAGE_REGISTRY"),
+    /**
+     * Reference of the cosign key that signs the images, as {@code cosign sign --key} takes it, eg {@code awskms:///alias/afon-image-signing}.  Only the deployer role
+     * can use the key.  Optional: the images cannot be signed without it.
+     */
+    AWS_COSIGN_KEY("AWS_COSIGN_KEY"),
+    /**
+     * PEM public key of {@link #AWS_COSIGN_KEY}, which Kyverno verifies the signatures of the images with, so that the cluster needs
+     * neither the KMS nor a transparency log.  Its base64, without the lines that begin and end the PEM, ie a single word, as the shell reads the config too, see {@code docker-image --public-key}.  Optional: Kyverno
+     * deploys with no image policy when it is empty.
+     */
+    AWS_COSIGN_PUBLIC_KEY("AWS_COSIGN_PUBLIC_KEY"),
+    /**
+     * Comma-separated namespaces in which Kyverno rejects the pods that have an image that is not signed, see
+     * {@code KyvernoComponent}; in the others it only records them.  Optional: none, ie only audited.
+     */
+    AWS_IMAGE_POLICY_ENFORCED_NAMESPACES("AWS_IMAGE_POLICY_ENFORCED_NAMESPACES"),
     AWS_GLUE_ROLE_ARN("AWS_GLUE_ROLE_ARN"),
     AWS_S3_ROLE_ARN("AWS_S3_ROLE_ARN"),
     AWS_POLARIS_DOMAIN_NAME("AWS_POLARIS_DOMAIN_NAME"),
@@ -74,6 +95,27 @@ public enum AfonProperty {
      * directly in the project {@link #GCP_PROJECT_ID}.
      */
     GCP_SECRETS_ENABLED("GCP_SECRETS_ENABLED"),
+    /**
+     * Container registry that {@code docker-image --sign} mirrors the images that are not ours to, and signs the images in, for the
+     * stacks of the cloud, eg {@code <region>-docker.pkg.dev/<project>/emrys}.  Optional: the images cannot be signed without it.
+     */
+    GCP_IMAGE_REGISTRY("GCP_IMAGE_REGISTRY"),
+    /**
+     * Reference of the cosign key that signs the images, as {@code cosign sign --key} takes it, eg {@code gcpkms://projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>}.  Only the deployer role
+     * can use the key.  Optional: the images cannot be signed without it.
+     */
+    GCP_COSIGN_KEY("GCP_COSIGN_KEY"),
+    /**
+     * PEM public key of {@link #GCP_COSIGN_KEY}, which Kyverno verifies the signatures of the images with, so that the cluster needs
+     * neither the KMS nor a transparency log.  Its base64, without the lines that begin and end the PEM, ie a single word, as the shell reads the config too, see {@code docker-image --public-key}.  Optional: Kyverno
+     * deploys with no image policy when it is empty.
+     */
+    GCP_COSIGN_PUBLIC_KEY("GCP_COSIGN_PUBLIC_KEY"),
+    /**
+     * Comma-separated namespaces in which Kyverno rejects the pods that have an image that is not signed, see
+     * {@code KyvernoComponent}; in the others it only records them.  Optional: none, ie only audited.
+     */
+    GCP_IMAGE_POLICY_ENFORCED_NAMESPACES("GCP_IMAGE_POLICY_ENFORCED_NAMESPACES"),
     /** GCS bucket that Gitea keeps its LFS objects, attachments, packages etc in, under {@code gitea/<cluster>/}. */
     GCP_GITEA_BUCKET("GCP_GITEA_BUCKET"),
     /**
@@ -87,6 +129,27 @@ public enum AfonProperty {
     AZURE_SUBSCRIPTION("AZURE_SUBSCRIPTION"),
     AZURE_REGION("AZURE_REGION"),
     AZURE_RESOURCE_GROUP("AZURE_RESOURCE_GROUP"),
+    /**
+     * Container registry that {@code docker-image --sign} mirrors the images that are not ours to, and signs the images in, for the
+     * stacks of the cloud, eg {@code <name>.azurecr.io/emrys}.  Optional: the images cannot be signed without it.
+     */
+    AZURE_IMAGE_REGISTRY("AZURE_IMAGE_REGISTRY"),
+    /**
+     * Reference of the cosign key that signs the images, as {@code cosign sign --key} takes it, eg {@code azurekms://<vault>.vault.azure.net/<key>}.  Only the deployer role
+     * can use the key.  Optional: the images cannot be signed without it.
+     */
+    AZURE_COSIGN_KEY("AZURE_COSIGN_KEY"),
+    /**
+     * PEM public key of {@link #AZURE_COSIGN_KEY}, which Kyverno verifies the signatures of the images with, so that the cluster needs
+     * neither the KMS nor a transparency log.  Its base64, without the lines that begin and end the PEM, ie a single word, as the shell reads the config too, see {@code docker-image --public-key}.  Optional: Kyverno
+     * deploys with no image policy when it is empty.
+     */
+    AZURE_COSIGN_PUBLIC_KEY("AZURE_COSIGN_PUBLIC_KEY"),
+    /**
+     * Comma-separated namespaces in which Kyverno rejects the pods that have an image that is not signed, see
+     * {@code KyvernoComponent}; in the others it only records them.  Optional: none, ie only audited.
+     */
+    AZURE_IMAGE_POLICY_ENFORCED_NAMESPACES("AZURE_IMAGE_POLICY_ENFORCED_NAMESPACES"),
     AZURE_KEY_VAULT_NAME("AZURE_KEY_VAULT_NAME"),
     AZURE_CA_ID("AZURE_CA_ID"),
     AZURE_CA_PASSWORD("AZURE_CA_PASSWORD"),

@@ -49,6 +49,8 @@
       tags: [maven]
     - role: docker
       tags: [docker]
+    - role: signing_tools
+      tags: [signing]
     - role: cloud_tools
       when: install_cloud_tools | bool
       tags: [cloud]

@@ -21,7 +21,11 @@ public enum AfonCloudProperty {
     EGRESS_IP,
     POLARIS_LOG_BUCKET,
     KEYCLOAK_EXTERNAL,
-    GITEA_BUCKET;
+    GITEA_BUCKET,
+    IMAGE_REGISTRY,
+    COSIGN_KEY,
+    COSIGN_PUBLIC_KEY,
+    IMAGE_POLICY_ENFORCED_NAMESPACES;
 
     /**
      * @return the property of the cloud, or empty if the cloud has none of this name

@@ -83,6 +83,12 @@ images:
     tag: 8.11.1
     digest: sha256:c1fe1679c34d9784c1b0d1e5f62ac0a79fca01fb6377cdd33e90473c6f9f9a69
     category: third-party
+  registry:
+    # the local registry of the signing acceptance test
+    image: registry
+    tag: 2.8.3
+    digest: sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+    category: third-party
   postgres-alpine:
     image: postgres
     tag: 16-alpine

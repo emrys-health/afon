@@ -1,0 +1,30 @@
+---
+# The tools of the image signing acceptance test (afon-acceptance, ImageSigningSpec), which runs a kind cluster in Docker, installs Kyverno
+# in it and signs images with cosign.  Like local-setup, they are the pinned release binaries, installed in /usr/local/bin unless already
+# at the pinned version, as none is in a default apt repository.  kubectl and helm are also among those of the cloud_tools role, which
+# is off by default, so they are installed here too: the same pinned versions, so installing both changes nothing.
+#   check:  a command printing the version, which is looked for in its output
+#   kind:   raw (the binary itself), tgz or zip (an archive)
+#   member: the binary within the archive
+signing_binaries:
+  - name: kubectl
+    version: "{{ kubectl_version }}"
+    check: kubectl version --client
+    url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/{{ apt_arch }}/kubectl"
+    kind: raw
+  - name: helm
+    version: "{{ helm_version }}"
+    check: helm version --short
+    url: "https://get.helm.sh/helm-v{{ helm_version }}-linux-{{ apt_arch }}.tar.gz"
+    kind: tgz
+    member: "linux-{{ apt_arch }}/helm"
+  - name: kind
+    version: "{{ kind_version }}"
+    check: kind version
+    url: "https://kind.sigs.k8s.io/dl/v{{ kind_version }}/kind-linux-{{ apt_arch }}"
+    kind: raw
+  - name: cosign
+    version: "{{ cosign_version }}"
+    check: cosign version
+    url: "https://github.com/sigstore/cosign/releases/download/v{{ cosign_version }}/cosign-linux-{{ apt_arch }}"
+    kind: raw

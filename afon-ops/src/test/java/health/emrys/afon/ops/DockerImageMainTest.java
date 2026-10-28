@@ -43,4 +43,42 @@ class DockerImageMainTest {
         assertThatThrownBy(() -> DockerImageMain.PinArguments.of(new String[]{"--verify", "--report"}, dir.toString(), false))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("requires a file");
     }
+
+    @Test
+    void signTakesTheCloudGivenElseTheDefaultAndNames() {
+        var given = DockerImageMain.SignArguments.of(new String[]{"--sign", "--cloud", "azure", "keycloak"}, "");
+        assertThat(given.cloud()).isEqualTo(health.emrys.afon.config.AfonCloud.AZURE);
+        assertThat(given.names()).containsExactly("keycloak");
+        assertThat(DockerImageMain.SignArguments.of(new String[]{"--sign"}, "gcp").cloud()).isEqualTo(health.emrys.afon.config.AfonCloud.GCP);
+        assertThatThrownBy(() -> DockerImageMain.SignArguments.of(new String[]{"--sign"}, "ALL"))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("one cloud");
+        assertThatThrownBy(() -> DockerImageMain.SignArguments.of(new String[]{"--sign", "--cloud", "mars"}, ""))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Unknown cloud 'mars'");
+        assertThatThrownBy(() -> DockerImageMain.SignArguments.of(new String[]{"--sign", "--bogus"}, "aws"))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Unknown option --bogus");
+    }
+
+    @Test
+    void publicKeyTakesTheCloudAndNoImageNames() {
+        assertThat(DockerImageMain.SignArguments.of(new String[]{"--public-key", "--cloud", "gcp"}, "", false).cloud())
+            .isEqualTo(health.emrys.afon.config.AfonCloud.GCP);
+        assertThatThrownBy(() -> DockerImageMain.SignArguments.of(new String[]{"--public-key", "keycloak"}, "aws", false))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("takes no image names");
+        assertThatThrownBy(() -> DockerImageMain.SignArguments.of(new String[]{"--public-key", "--bogus"}, "aws", false))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("usage: docker-image --public-key [--cloud <cloud>]");
+    }
+
+    @Test
+    void signTakesTheFileToRecordItsResultIn() {
+        var arguments = DockerImageMain.SignArguments.of(new String[]{"--sign", "--report", "out/sign.md", "keycloak"}, "aws");
+        assertThat(arguments.report()).isEqualTo(java.nio.file.Path.of("out/sign.md"));
+        assertThat(arguments.names()).containsExactly("keycloak");
+        assertThat(DockerImageMain.SignArguments.of(new String[]{"--sign"}, "aws").report()).isNull();
+        assertThatThrownBy(() -> DockerImageMain.SignArguments.of(new String[]{"--sign", "--report", "out.txt"}, "aws"))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("*.json or *.md");
+        assertThatThrownBy(() -> DockerImageMain.SignArguments.of(new String[]{"--sign", "--report"}, "aws"))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("requires a file");
+        assertThatThrownBy(() -> DockerImageMain.SignArguments.of(new String[]{"--public-key", "--report", "x.md"}, "aws", false))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Unknown option --report");
+    }
 }

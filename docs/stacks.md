@@ -347,6 +347,82 @@ The report is written even when the check fails, for a CI job to keep: it has th
 The Polaris images are unpinned, as their tag is the version of Polaris the project builds against, which a pinned digest of another
 version would outlive, and so is the Trino one, only its tag being set, the image being that of the Helm chart.
 
+`docker-image --sign` signs the images with [cosign](https://docs.sigstore.dev/cosign/), at the digests they are pinned to, so that the
+cluster can be made to admit only images that we signed.  It works for one cloud, `--cloud aws|azure|gcp` or else `AFON_CLOUD`, whose
+properties give the registry and the key: `<CLOUD>_IMAGE_REGISTRY`, the registry with the path in it to keep the images in, eg
+`123456789012.dkr.ecr.eu-west-2.amazonaws.com/emrys`, and `<CLOUD>_COSIGN_KEY`, the reference of a key in the KMS of the cloud, as
+`cosign sign --key` takes it, eg `awskms:///alias/afon-image-signing`, which only the deployer role should be able to use.  The `first-party`
+images are signed where they are; the others (`upstream` and `third-party`) are first copied at their digest to the registry, under
+the path of the image without its own registry (`quay.io/keycloak/keycloak` becomes `<registry>/keycloak/keycloak`), and the copy is
+signed, after checking that it has the digest of the source, so what the cluster pulls is in our registry and signed with our key.  An
+image with no digest cannot be signed, and nothing is done if any named cannot be.  It needs Docker, cosign 3 (the flags are its own),
+network access and the credentials of the registry and the key (for a key file, its password in `COSIGN_PASSWORD`, empty if it has none: the command asks for no input).  The signatures are not uploaded to a transparency log, and are stored in
+the legacy layout, a `sha256-<digest>.sig` tag of the repository, which Kyverno reads, rather than cosign 3's new bundle format. The
+record, for a CI job to keep, has the cloud, registry and key reference, when, and each image signed with its source, the image at its
+digest that was signed and whether it was copied. It is written even when signing stops on an error, with what was signed before.
+```shell
+afon-cli.sh docker-image --sign --cloud aws             # every image that has a digest
+afon-cli.sh docker-image --sign --cloud aws keycloak    # one image
+afon-cli.sh docker-image --sign --cloud aws --report signed.md   # also records the result, as Markdown, or JSON if named *.json
+cosign verify --key <public key> --insecure-ignore-tlog=true <registry>/keycloak/keycloak@<digest>
+```
+
+The `Kyverno` component of the full stacks installs [Kyverno](https://kyverno.io) in the `kyverno` namespace, and applies two
+`ImageValidatingPolicy`s that check that the images of the pods, the `containers` and the `initContainers`, are signed with the key of the
+cloud. Which namespaces are checked, and how, is decided by the label `afon.emrys.health/verify-images` of the namespace:
+
+| Label | Policy | An image that is not signed | Kyverno down |
+|---|---|---|---|
+| `audit` | `emrys-verify-images-audit` | is recorded in the policy reports (`kubectl get policyreport -A`), the pod is admitted | pods are admitted (`failurePolicy: Ignore`) |
+| `enforce` | `emrys-verify-images-enforce` | the pod is rejected | pods are rejected (`failurePolicy: Fail`), as the image cannot be checked |
+| none | | not checked, as for the namespaces of Kyverno and the system | |
+
+The `default` namespace, where the workloads run, is labelled `audit`, so the stacks only audit by default. To enforce in a namespace, list
+it in `<CLOUD>_IMAGE_POLICY_ENFORCED_NAMESPACES` (comma-separated, eg `default`) and deploy the stack again, or relabel it:
+```shell
+kubectl label namespace default afon.emrys.health/verify-images=enforce --overwrite     # audit -> enforce, one namespace at a time
+```
+Audit the images of a namespace until the reports have no violations (every image of its pods mirrored and signed, see `docker-image
+--sign`) before enforcing it. **Break-glass:** if pods are rejected that must run, remove the label of the namespace, which stops it being
+checked, and put it back after:
+```shell
+kubectl label namespace default afon.emrys.health/verify-images-
+```
+If Kyverno itself is down, an enforced namespace rejects its pods too, but the namespace of Kyverno is never checked, so it can recover; to
+let the pods in meanwhile, remove the label, or delete the policy with `kubectl delete imagevalidatingpolicies.policies.kyverno.io
+emrys-verify-images-enforce`.
+
+`afon-cli.sh signing-public-key <aws|azure|gcp>` sets it for you: it generates a key pair (once, in `$AFON_HOME/cosign/<cloud>`) unless
+`<CLOUD>_COSIGN_KEY` is set, in which case it uses that key, and writes the public key to `<CLOUD>_COSIGN_PUBLIC_KEY` in
+`afon-<cloud>.properties`, keeping a `.bak` copy, with `--print` only printing the line.  A generated key has no password unless
+`COSIGN_PASSWORD` is set, and a key file of `<CLOUD>_COSIGN_KEY` needs its password in `COSIGN_PASSWORD` (empty if it has none).  It reads the
+config as text, so it also repairs a config where the property was written as a PEM with spaces, as it used to be, which the scripts cannot source.
+
+Kyverno verifies with the public key alone, `<CLOUD>_COSIGN_PUBLIC_KEY`, so it needs no access to the key. `docker-image --public-key`
+prints it from `<CLOUD>_COSIGN_KEY`, as the line to put in the config, the base64 of the key (a single word, as the scripts `source` the config files and a PEM, with its spaces, would break them):
+```shell
+afon-cli.sh docker-image --public-key --cloud aws     # AWS_COSIGN_PUBLIC_KEY=MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
+```
+Without that property Kyverno is installed and no policy is applied. The signatures are not uploaded to a transparency log, so to verify
+an image the admission controller only needs to reach **the registry** (and, as always, DNS and the API server), not the KMS or a log.
+That is what an egress-restricted TRE must allow it: the acceptance test restricts it to exactly that with a `NetworkPolicy` and checks that
+images are still verified (and, without the registry, that they are not).
+
+`afon-cli.sh signing-report` reads the policy reports that Kyverno writes on the current kubectl context (it needs `kubectl` and `jq`), and
+tells which pods the policies checked, whether each passed, and with `--images`, the images of the pods that failed, with the number of pods:
+that is what is left to sign. The pods are those of the namespaces labelled `afon.emrys.health/verify-images`, and Kyverno finds them by
+scanning the namespace in the background, so it also reports the pods that were running before the policy, within moments.
+```shell
+afon-cli.sh signing-report                  # the pods checked and their images, in all the namespaces
+afon-cli.sh signing-report default --images # only the images of the pods in default that failed
+afon-cli.sh signing-report --json | jq .summary
+```
+A pod that failed may have images that are signed: the report is of the pod, not of each image. The reports of the controllers (Deployments,
+ReplicaSets...) repeat those of their pods, so they are left out.
+
+The `ephemeralContainers` are not checked yet, and images that no one has signed are reported, such as those of the Helm charts, until
+they are mirrored and signed.
+
 The images that the Helm charts of the stacks pull are the charts' own, so they are not in the file.  `docker-image --charts` reports them,
 from the plans synthesised for the stacks (`validate-stack <stack-id>` makes one), so with the values the stack gives each chart, eg the
 Trino tag it overrides: it renders every chart with `helm template`, which needs helm installed but no cluster, and lists the images of

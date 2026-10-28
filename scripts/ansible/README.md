@@ -19,6 +19,7 @@ repository secrets pushed by [secrets.sh](../github/secrets.sh).
 | `java`        | JDK 17 (`openjdk` by default, `temurin` optionally)                           | JDK 17 is enforced by the maven build                                    |
 | `maven`       | Maven from apt, at the pinned version                                        | `./afon.sh -a build -p acceptance`                                       |
 | `docker`      | docker engine + buildx/compose plugins, runner user in the `docker` group     | The specs start KeyCloak, Polaris, Trino and Spark Connect via Testcontainers |
+| `signing_tools` | kubectl, helm, kind, cosign (release downloads) | The image signing spec runs a kind cluster in Docker, installs Kyverno in it and signs images; without them it is cancelled |
 | `cloud_tools` | aws, az, gcloud (apt), kubectl, tofu, yq, helm, hubble, eksctl, kubelogin (release downloads) — **off by default** | Only needed if the runner also drives the ops/tofu actions of `afon.sh`  |
 | `github`      | installs and registers the actions runner via `runner.sh` — **off by default** | Registering acts on the repo on GitHub, not just on this host            |
 | `verify`      | runs each tool as the runner user, asserts the JDK version and the runner size | Same checks as the workflow's *Verify runner tooling* step               |
@@ -32,7 +33,8 @@ The tools come from the same sources as in `local-setup`:
   maven, docker (`docker-ce`, the engine and its cli), and the aws, azure and gcloud clis with the gke auth plugin.
   The apt version of git has the epoch `1:`, which the `shell_tools` role spells out;
 - release downloads in `/usr/local/bin`, only if not already at the pinned version (`roles/cloud_tools/defaults/main.yml`
-  lists them): kubectl, tofu, yq, helm, hubble, eksctl, kubelogin.
+  lists them): kubectl, tofu, yq, helm, hubble, eksctl, kubelogin; and, in the `signing_tools` role, which is not optional,
+  kubectl, helm, kind and cosign.
 
 The `verify` role checks the installed versions against the pins and fails on a mismatch (`-e verify_pinned=false` to only report).
 

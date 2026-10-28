@@ -28,6 +28,7 @@ public final class StackComponents {
         COMPONENTS.put("Trino", TrinoComponent::new);
         COMPONENTS.put("Monitoring", MonitoringComponent::new);
         COMPONENTS.put("Tetragon", TetragonComponent::new);
+        COMPONENTS.put("Kyverno", KyvernoComponent::new);
         COMPONENTS.put("Logging", LoggingComponent::new);
         COMPONENTS.put("Git", GitComponent::new);
         COMPONENTS.put("Snowflake", SnowflakeComponent::new);
