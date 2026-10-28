@@ -9,7 +9,9 @@ import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.apis.NetworkingV1Api;
 import io.kubernetes.client.openapi.models.V1Deployment;
+import io.kubernetes.client.openapi.models.V1Ingress;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.util.ClientBuilder;
@@ -126,6 +128,13 @@ public class KubeClient implements AutoCloseable {
 
     public List<V1Service> listServices() throws ApiException {
         return new CoreV1Api().listNamespacedService("default").execute().getItems();
+    }
+
+    /**
+     * @return the ingresses of every namespace, as an ingress of any of them exposes the cluster
+     */
+    public List<V1Ingress> listIngresses() throws ApiException {
+        return new NetworkingV1Api().listIngressForAllNamespaces().execute().getItems();
     }
 
     public List<V1Pod> listPodsBeginningWith(String prefix) throws ApiException {
