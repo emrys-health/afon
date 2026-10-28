@@ -5,11 +5,12 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.commands.CurlCommand;
+import health.emrys.afon.ops.kube.commands.PodCommand;
 import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisRestClient;
-import health.emrys.afon.rest.HttpResponses;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
+import health.emrys.afon.rest.HttpResponses;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Ingress;
 import io.kubernetes.client.openapi.models.V1IngressRule;
@@ -26,13 +27,8 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.*;
 import java.util.function.Predicate;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.*;
@@ -67,6 +63,7 @@ public class NetworkSmokeMain {
 
     public List<ExecResult> checkNetworkWithPods() throws Exception {
         List<ExecResult> results = new ArrayList<>();
+        results.addAll(checkPolarisCanTalkToDB());
         results.addAll(checkPublicFacingInterfaces());
         results.addAll(checkPolarisOnlyAccessibleFromCluster());
         results.addAll(checkNetworkWithPods(
@@ -77,6 +74,18 @@ public class NetworkSmokeMain {
         return results;
     }
 
+    public List<ExecResult> checkPolarisCanTalkToDB() throws Exception {
+        String     polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
+//        String     cli      = "(timeout 3 bash -c 'echo > /dev/tcp/polaris-db.crsocia0o0bd.eu-west-2.rds.amazonaws.com/5431' && echo success) || echo failed";
+//        String     cli      = "curl -I polaris-db.crsocia0o0bd.eu-west-2.rds.amazonaws.com:5432";
+//        PodCommand command        = new PodCommand(client, polarisPodName, cli);
+        CurlCommand command = new CurlCommand(client,
+                                              polarisPodName,
+                                              properties.getValue(POLARIS_DB_HOST) + ":5432",
+                                              false);
+
+        return command.run();
+    }
 
     /**
      * Stands for every host, which an ingress serves when a rule of it names none, or when it has no rules.
@@ -107,7 +116,7 @@ public class NetworkSmokeMain {
         return ingresses.stream().map(ingress -> {
             String       name       = ingress.getMetadata().getNamespace() + "/" + ingress.getMetadata().getName();
             List<String> notAllowed = hostsOf(ingress).stream().filter(host -> !allowed.contains(host)).toList();
-            String       command   = format(
+            String command = format(
                 "kubectl get ingress -n %s %s", ingress.getMetadata().getNamespace(),
                 ingress.getMetadata().getName());
             logger.info("Checking ingress: {}", name);
