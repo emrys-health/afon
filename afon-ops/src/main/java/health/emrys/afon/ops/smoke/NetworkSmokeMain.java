@@ -34,6 +34,7 @@ import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static health.emrys.afon.polaris.config.PolarisEndpoint.getPolarisEndpointFor;
 import static java.lang.String.format;
+import static py4j.Protocol.SUCCESS;
 
 public class NetworkSmokeMain {
 
@@ -83,9 +84,9 @@ public class NetworkSmokeMain {
 
         return command.run().stream().map(x -> {
             if (x.stderr().contains("no application protocol")) {
-                return new ExecResult(0, x.stdout(), x.stderr(), x.command()); // this is a good error!
+                return x.makeSuccessful(); // this is a good error!
             }
-            return x;
+            return x.makeFailed();
         }).toList();
     }
 

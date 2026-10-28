@@ -10,6 +10,9 @@ import java.util.stream.Collectors;
  */
 public record ExecResult(int exitCode, String stdout, String stderr, String command) {
 
+    public static int SUCCESS = 0;
+    public static int FAILURE = 1;
+
     public static @NonNull String join(List<ExecResult> results) {
         String total = results.stream()
                 .map(error -> error + "\n")
@@ -19,5 +22,13 @@ public record ExecResult(int exitCode, String stdout, String stderr, String comm
 
     public boolean isSuccess() {
         return exitCode == 0;
+    }
+
+    public ExecResult makeSuccessful() {
+        return new ExecResult(SUCCESS, stdout, stderr, command);
+    }
+
+    public ExecResult makeFailed() {
+        return new ExecResult(FAILURE, stdout, stderr, command);
     }
 }
