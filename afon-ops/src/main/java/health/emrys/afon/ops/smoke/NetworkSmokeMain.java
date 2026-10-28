@@ -5,7 +5,6 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.commands.CurlCommand;
-import health.emrys.afon.ops.kube.commands.PodCommand;
 import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisRestClient;
@@ -75,16 +74,19 @@ public class NetworkSmokeMain {
     }
 
     public List<ExecResult> checkPolarisCanTalkToDB() throws Exception {
-        String     polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
-//        String     cli      = "(timeout 3 bash -c 'echo > /dev/tcp/polaris-db.crsocia0o0bd.eu-west-2.rds.amazonaws.com/5431' && echo success) || echo failed";
-//        String     cli      = "curl -I polaris-db.crsocia0o0bd.eu-west-2.rds.amazonaws.com:5432";
-//        PodCommand command        = new PodCommand(client, polarisPodName, cli);
-        CurlCommand command = new CurlCommand(client,
-                                              polarisPodName,
-                                              properties.getValue(POLARIS_DB_HOST) + ":5432",
-                                              false);
+        String polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
+        CurlCommand command = new CurlCommand(
+            client,
+            polarisPodName,
+            properties.getValue(POLARIS_DB_HOST) + ":5432",
+            false);
 
-        return command.run();
+        return command.run().stream().map(x -> {
+            if (x.stderr().contains("no application protocol")) {
+                return new ExecResult(0, x.stdout(), x.stderr(), x.command()); // this is a good error!
+            }
+            return x;
+        }).toList();
     }
 
     /**
