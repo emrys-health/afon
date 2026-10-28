@@ -1203,7 +1203,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
 
     @Override
     public void exposeSparkMaster(List<ITerraformDependable> eksDependOn) {
-        String subnetIds = getSubnetIds().stream().collect(Collectors.joining(","));
+        // Internal, in the nodes' subnets, so that the master is reachable from within the VPC but not the internet.
+        String subnetIds = getPrivateSubnetIds().stream().collect(Collectors.joining(","));
         ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
         lbDependencies.add(loadBalancerRole);
         // Creating this LoadBalancer Service fires the AWS LB Controller's
@@ -1223,7 +1224,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                                                              )))
                                                .annotations(Map.of(
                                                        "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
-                                                       "service.beta.kubernetes.io/aws-load-balancer-internal", "false"))
+                                                       "service.beta.kubernetes.io/aws-load-balancer-scheme", "internal"))
                                                .build())
                       .dependsOn(lbDependencies)
                       .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
