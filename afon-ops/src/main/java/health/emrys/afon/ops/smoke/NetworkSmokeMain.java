@@ -109,6 +109,7 @@ public class NetworkSmokeMain {
             String       command   = format(
                 "kubectl get ingress -n %s %s", ingress.getMetadata().getNamespace(),
                 ingress.getMetadata().getName());
+            logger.info("Checking ingress: {}", name);
             return notAllowed.isEmpty()
                    ? new ExecResult(0, format("Ingress %s serves only allowed hosts", name), "", command)
                    : new ExecResult(
