@@ -19,6 +19,11 @@
   - `OIDC_ISSUER_URL` is now a template: set it to `https://[OIDC_DOMAIN_NAME]/realms/polaris` so that it follows the domain name of the cloud.  An issuer with another host fails the stack synthesis.
   - `check-oidc` now takes the cloud: `afon-cli.sh check-oidc <cloud>`.
   - If a domain has several issued certificates, the latest is used.
+- **TRE domain whitelist in `whitelist.yaml` ([#322](https://github.com/emrys-health/afon/issues/322)):**
+  - `ALLOWED_DOMAINS_CSV` is deprecated: the domains are now listed per cloud in `whitelist.yaml` in the config dir (see [`whitelist.yaml`](templates/config/whitelist.yaml) and [configuration](docs/configuration.md)).
+  - The file is not mandatory yet: without it `ALLOWED_DOMAINS_CSV` is still used, for every cloud, so existing configs keep working.
+  - `afon-cli.sh config-updates` moves the domains of `ALLOWED_DOMAINS_CSV` to a new `whitelist.yaml`, organised by cloud: the Polaris, Jupyter and OIDC domain names of a cloud, and its storage endpoints (S3, Azure blob, `googleapis.com`), go in the section of that cloud, and any other name in `common`.  The same names are allowed, and the property is removed from `afon.properties` (its previous value is in the `.bak`).  It never overwrites an existing `whitelist.yaml`: then add the names by hand and remove the property.
+  - If you use the GitHub workflows, publish the file with `afon-cli.sh github-secrets push`, which sets the `WHITELIST_YAML` secret.
 
 ## 1.0-beta-7
 
