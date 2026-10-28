@@ -78,19 +78,20 @@ public class SparkConnectSmokeMain {
         logger.info(format("Users defined as: %s", row));
     }
 
-    private void callSparkConnectorInCluster() {
+    private void callSparkConnectorInCluster() throws Exception {
         int exitCode = 0;
         try {
-            KubeClient client = new KubeClient(properties);
-            try (PortForwarder session = new PortForwarder(
-                client,
-                KUBERNETES_NAMESPACE,
-                SmokeConfig.SPARK_CONNECTOR_POD,
-                15002,
-                15002)) {
-                SparkSession spark = readTable(new SparkConnectClient(properties, users));
-                logger.info("Test successful. About to close Spark session. Please wait for threads to die...");
-                spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
+            try (KubeClient client = new KubeClient(properties)) {
+                try (PortForwarder session = new PortForwarder(
+                    client,
+                    KUBERNETES_NAMESPACE,
+                    SmokeConfig.SPARK_CONNECTOR_POD,
+                    15002,
+                    15002)) {
+                    SparkSession spark = readTable(new SparkConnectClient(properties, users));
+                    logger.info("Test successful. About to close Spark session. Please wait for threads to die...");
+                    spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
+                }
             }
         } catch (IOException e) {
             logger.error("Error while closing Spark Session. Please check your configuration.", e);
@@ -100,7 +101,13 @@ public class SparkConnectSmokeMain {
     }
 
     public static void main(String[] args) {
-        new SparkConnectSmokeMain(smokeTestProperties(), new FileUserProvider()).callSparkConnectorInCluster();
+        try {
+            new SparkConnectSmokeMain(smokeTestProperties(), new FileUserProvider()).callSparkConnectorInCluster();
+            logger.info("Test past");
+        } catch (Exception e) {
+            logger.error("Error reading Spark Connector", e);
+            throw new RuntimeException(e);
+        }
     }
 
 }

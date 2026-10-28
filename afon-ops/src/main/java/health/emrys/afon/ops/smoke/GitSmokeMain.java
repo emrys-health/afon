@@ -18,7 +18,7 @@ import static java.lang.String.format;
 
 public class GitSmokeMain {
 
-    static final Logger logger = LoggerFactory.getLogger(GitSmokeMain.class);
+    private static final Logger logger = LoggerFactory.getLogger(GitSmokeMain.class);
 
     public static void main(String[] args) {
         GitSmokeMain         app        = new GitSmokeMain(smokeTestProperties());
