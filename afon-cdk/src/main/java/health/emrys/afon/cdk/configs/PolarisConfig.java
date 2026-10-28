@@ -47,25 +47,27 @@ import static java.lang.String.format;
 
 public class PolarisConfig extends Construct {
 
+    private static final String DB_INIT_JOB          = "polaris-db-init";
+    private static final String REALM                = "POLARIS";
+    private static final String SECRETS_DIR          = "/etc/app-secrets";
+    private static final String SECRET_NAME          = "polaris-secret";
+    private static final String SECRET_VOLUME        = "secret-volume";
+    private static final String POLARIS_ENV_FILE     = "polaris_env.sh";
+    private static final String GCP_CREDENTIALS_FILE = "service-account.json";
+    /**
+     * Quarkus' management interface, which serves Polaris' health checks (not the API port).
+     */
     // TODO make DB_PORT configurable via properties?
-    private static final int             DB_PORT          = 5432;
-    private static final String          DB_INIT_JOB      = "polaris-db-init";
-    private static final String          REALM            = "POLARIS";
-    private static final String          SECRETS_DIR      = "/etc/app-secrets";
-    private static final String          SECRET_NAME      = "polaris-secret";
-    private static final String          SECRET_VOLUME    = "secret-volume";
-    private static final String          POLARIS_ENV_FILE = "polaris_env.sh";
-    private static final String      GCP_CREDENTIALS_FILE = "service-account.json";
-    /** Quarkus' management interface, which serves Polaris' health checks (not the API port). */
-    public static final int             MANAGEMENT_PORT      = 8182;
-    public static final String          MANAGEMENT_PORT_NAME = "management";
-    public static final String          HEALTH_READY_PATH    = "/q/health/ready";
+    public static final  int    DB_PORT              = 5432;
+    public static final  int    MANAGEMENT_PORT      = 8182;
+    public static final  String MANAGEMENT_PORT_NAME = "management";
+    public static final  String HEALTH_READY_PATH    = "/q/health/ready";
 
-    private final JobV1 polarisDbInitJob;
-    private final ServiceSpecPort polarisSpecPort;
-    private final ServiceSpecPort polarisManagementSpecPort;
+    private final JobV1               polarisDbInitJob;
+    private final ServiceSpecPort     polarisSpecPort;
+    private final ServiceSpecPort     polarisManagementSpecPort;
     private final Map<String, String> polarisLabels;
-    private final CloudProvider cloudProvider;
+    private final CloudProvider       cloudProvider;
 
     public PolarisConfig(@NonNull Construct scope, @NonNull String id, CloudProvider cloudProvider, AfonPropertyProvider properties) {
         super(scope, id);
@@ -101,27 +103,33 @@ public class PolarisConfig extends Construct {
             properties.getValue(POLARIS_ID),
             properties.getValue(POLARIS_SECRET));
 
-        polarisSpecPort = ServiceSpecPort.builder()
-                .name("web")
-                .port(8181)
-                .targetPort("8181")
-                .protocol("TCP")
-                .build();
+        polarisSpecPort           = ServiceSpecPort.builder()
+                                                   .name("web")
+                                                   .port(8181)
+                                                   .targetPort("8181")
+                                                   .protocol("TCP")
+                                                   .build();
         polarisManagementSpecPort = ServiceSpecPort.builder()
-                .name(MANAGEMENT_PORT_NAME)
-                .port(MANAGEMENT_PORT)
-                .targetPort(String.valueOf(MANAGEMENT_PORT))
-                .protocol("TCP")
-                .build();
+                                                   .name(MANAGEMENT_PORT_NAME)
+                                                   .port(MANAGEMENT_PORT)
+                                                   .targetPort(String.valueOf(MANAGEMENT_PORT))
+                                                   .protocol("TCP")
+                                                   .build();
 
         polarisLabels = Map.of("app", "polaris");
     }
 
-    public ServiceSpecPort getPolarisSpecPort() { return polarisSpecPort; }
+    public ServiceSpecPort getPolarisSpecPort() {
+        return polarisSpecPort;
+    }
 
-    public ServiceSpecPort getPolarisManagementSpecPort() { return polarisManagementSpecPort; }
+    public ServiceSpecPort getPolarisManagementSpecPort() {
+        return polarisManagementSpecPort;
+    }
 
-    public Map<String, String> getPolarisLabels() { return polarisLabels; }
+    public Map<String, String> getPolarisLabels() {
+        return polarisLabels;
+    }
 
     /**
      * One-shot Job that prepares the Polaris database on the shared Postgres instance:
@@ -145,11 +153,13 @@ public class PolarisConfig extends Construct {
                                         String password,
                                         String dbName,
                                         String polarisId,
-                                        String polarisSecret) {
-        String stateDir     = "/state";
+                                        String polarisSecret
+    ) {
+        String stateDir      = "/state";
         String bootstrapFlag = stateDir + "/already-bootstrapped";
 
-        String createDbScript = String.join("\n",
+        String createDbScript = String.join(
+            "\n",
             "set -e",
             "until pg_isready -h \"$PGHOST\" -p \"$PGPORT\" -U \"$PGUSER\"; do echo 'waiting for postgres'; sleep 2; done",
             "psql -d postgres -tAc \"SELECT 1 FROM pg_database WHERE datname='$POLARIS_DB'\" | grep -q 1 \\",
@@ -161,77 +171,79 @@ public class PolarisConfig extends Construct {
             "echo 'polaris db ready'");
 
         JobV1SpecTemplateSpecInitContainer dbCreate = JobV1SpecTemplateSpecInitContainer
-                .builder()
-                .name("db-create")
-                .image(DockerImages.POSTGRES_ALPINE_IMAGE)
-                .command(List.of("sh", "-c", createDbScript))
-                .env(List.of(
-                        initJobEnv("PGHOST", host),
-                        initJobEnv("PGPORT", String.valueOf(DB_PORT)),
-                        initJobEnv("PGUSER", "postgres"),
-                        initJobEnv("PGPASSWORD", password),
-                        initJobEnv("POLARIS_DB", dbName)))
-                .volumeMount(List.of(JobV1SpecTemplateSpecInitContainerVolumeMount.builder()
-                                                                                   .name("state")
-                                                                                   .mountPath(stateDir)
-                                                                                   .build()))
-                .build();
+            .builder()
+            .name("db-create")
+            .image(DockerImages.POSTGRES_ALPINE_IMAGE)
+            .command(List.of("sh", "-c", createDbScript))
+            .env(List.of(
+                initJobEnv("PGHOST", host),
+                initJobEnv("PGPORT", String.valueOf(DB_PORT)),
+                initJobEnv("PGUSER", "postgres"),
+                initJobEnv("PGPASSWORD", password),
+                initJobEnv("POLARIS_DB", dbName)))
+            .volumeMount(List.of(JobV1SpecTemplateSpecInitContainerVolumeMount.builder()
+                                                                              .name("state")
+                                                                              .mountPath(stateDir)
+                                                                              .build()))
+            .build();
 
         // apache/polaris-admin-tool's entrypoint runs the bootstrap tool directly (no shell), so
         // "sh -c" is used here to make the skip conditional on the initContainer's flag file.
-        String bootstrapScript = String.join("\n",
+        String bootstrapScript = String.join(
+            "\n",
             "set -e",
             "if [ -f " + bootstrapFlag + " ]; then",
             "  echo 'Polaris realm " + REALM + " already bootstrapped, skipping'",
             "  exit 0",
             "fi",
             "java -jar /deployments/polaris-admin-tool.jar bootstrap -r " + REALM
-                + " -c \"" + REALM + ",$POLARIS_ID,$POLARIS_SECRET\"");
+            + " -c \"" + REALM + ",$POLARIS_ID,$POLARIS_SECRET\"");
 
         JobV1SpecTemplateSpecContainer bootstrap = JobV1SpecTemplateSpecContainer
-                .builder()
-                .name("bootstrap")
-                .image(DockerImages.POLARIS_ADMIN_TOOL_IMAGE)
-                .command(List.of("sh", "-c", bootstrapScript))
-                .env(List.of(
-                        jobEnv("POLARIS_PERSISTENCE_TYPE", "relational-jdbc"),
-                        jobEnv("QUARKUS_DATASOURCE_JDBC_URL",
-                                format("jdbc:postgresql://%s:%d/%s", host, DB_PORT, dbName)),
-                        jobEnv("QUARKUS_DATASOURCE_USERNAME", "postgres"),
-                        jobEnv("QUARKUS_DATASOURCE_PASSWORD", password),
-                        jobEnv("POLARIS_ID", polarisId),
-                        jobEnv("POLARIS_SECRET", polarisSecret)))
-                .volumeMount(List.of(JobV1SpecTemplateSpecContainerVolumeMount.builder()
-                                                                               .name("state")
-                                                                               .mountPath(stateDir)
-                                                                               .readOnly(true)
-                                                                               .build()))
-                .build();
+            .builder()
+            .name("bootstrap")
+            .image(DockerImages.POLARIS_ADMIN_TOOL_IMAGE)
+            .command(List.of("sh", "-c", bootstrapScript))
+            .env(List.of(
+                jobEnv("POLARIS_PERSISTENCE_TYPE", "relational-jdbc"),
+                jobEnv(
+                    "QUARKUS_DATASOURCE_JDBC_URL",
+                    format("jdbc:postgresql://%s:%d/%s", host, DB_PORT, dbName)),
+                jobEnv("QUARKUS_DATASOURCE_USERNAME", "postgres"),
+                jobEnv("QUARKUS_DATASOURCE_PASSWORD", password),
+                jobEnv("POLARIS_ID", polarisId),
+                jobEnv("POLARIS_SECRET", polarisSecret)))
+            .volumeMount(List.of(JobV1SpecTemplateSpecContainerVolumeMount.builder()
+                                                                          .name("state")
+                                                                          .mountPath(stateDir)
+                                                                          .readOnly(true)
+                                                                          .build()))
+            .build();
 
         return JobV1.Builder.create(scope, "polarisDbInitJob")
-                .dependsOn(dependsOn)
-                // The provider waits only 1 minute for completion by default, most of which is spent
-                // pulling the images before any work runs. The work itself takes a few seconds.
-                .timeouts(JobV1Timeouts.builder().create("10m").build())
-                .metadata(JobV1Metadata.builder().name(DB_INIT_JOB).namespace("default").build())
-                .spec(JobV1Spec.builder()
-                              .backoffLimit(6)
-                              .template(JobV1SpecTemplate.builder()
-                                    .metadata(JobV1SpecTemplateMetadata.builder()
-                                                      .labels(Map.of("app", DB_INIT_JOB))
-                                                      .build())
-                                    .spec(JobV1SpecTemplateSpec.builder()
-                                                  .restartPolicy("OnFailure")
-                                                  .initContainer(List.of(dbCreate))
-                                                  .container(List.of(bootstrap))
-                                                  .volume(List.of(JobV1SpecTemplateSpecVolume.builder()
-                                                          .name("state")
-                                                          .emptyDir(JobV1SpecTemplateSpecVolumeEmptyDir.builder().build())
-                                                          .build()))
-                                                  .build())
-                                    .build())
-                              .build())
-                .build();
+                            .dependsOn(dependsOn)
+                            // The provider waits only 1 minute for completion by default, most of which is spent
+                            // pulling the images before any work runs. The work itself takes a few seconds.
+                            .timeouts(JobV1Timeouts.builder().create("10m").build())
+                            .metadata(JobV1Metadata.builder().name(DB_INIT_JOB).namespace("default").build())
+                            .spec(JobV1Spec.builder()
+                                           .backoffLimit(6)
+                                           .template(JobV1SpecTemplate.builder()
+                                                                      .metadata(JobV1SpecTemplateMetadata.builder()
+                                                                                                         .labels(Map.of("app", DB_INIT_JOB))
+                                                                                                         .build())
+                                                                      .spec(JobV1SpecTemplateSpec.builder()
+                                                                                                 .restartPolicy("OnFailure")
+                                                                                                 .initContainer(List.of(dbCreate))
+                                                                                                 .container(List.of(bootstrap))
+                                                                                                 .volume(List.of(JobV1SpecTemplateSpecVolume.builder()
+                                                                                                                                            .name("state")
+                                                                                                                                            .emptyDir(JobV1SpecTemplateSpecVolumeEmptyDir.builder().build())
+                                                                                                                                            .build()))
+                                                                                                 .build())
+                                                                      .build())
+                                           .build())
+                            .build();
     }
 
     private static JobV1SpecTemplateSpecContainerEnv jobEnv(String name, String value) {
@@ -250,9 +262,10 @@ public class PolarisConfig extends Construct {
      */
     static String getProviderCredentials(
         AfonPropertyProvider properties,
-        String deploymentId) {
-        AfonCloud deploymentCloud = toCloud(deploymentId);
-        Map<String, String> env = new TreeMap<>();
+        String deploymentId
+    ) {
+        AfonCloud           deploymentCloud = toCloud(deploymentId);
+        Map<String, String> env             = new TreeMap<>();
         getPolarisProperties(deploymentCloud)
             .forEach((property, envName) -> env.put(envName, properties.getValue(property)));
         Arrays.stream(AfonCloud.values())
@@ -269,8 +282,8 @@ public class PolarisConfig extends Construct {
             .map(e -> format("export %s='%s'", e.getKey(), e.getValue()))
             .toList();
         String gcpExport = gcpCredentials(properties, deploymentId).isBlank()
-            ? ""
-            : format("export %s='%s'", GOOGLE_APPLICATION_CREDENTIALS.getName(), SECRETS_DIR + "/" + GCP_CREDENTIALS_FILE);
+                           ? ""
+                           : format("export %s='%s'", GOOGLE_APPLICATION_CREDENTIALS.getName(), SECRETS_DIR + "/" + GCP_CREDENTIALS_FILE);
 
         String kcConfig = kcExports(properties, deploymentCloud);
 
@@ -280,7 +293,7 @@ public class PolarisConfig extends Construct {
             export QUARKUS_DATASOURCE_JDBC_URL="jdbc:postgresql://%s:%d/%s"
             export QUARKUS_DATASOURCE_USERNAME=postgres
             export QUARKUS_DATASOURCE_PASSWORD="%s"
-
+            
             """,
             properties.getValue(POLARIS_DB_HOST),
             DB_PORT,
@@ -290,16 +303,16 @@ public class PolarisConfig extends Construct {
         return pgConfig + format(
             """
             %s
-
+            
             %s
             %s
-
+            
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_CATALOG_API__LEVEL=DEBUG
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE__LEVEL=DEBUG
             export QUARKUS_LOG_CATEGORY__ORG_APACHE_POLARIS_SERVICE_EXCEPTION__LEVEL=ERROR
             export QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS_LOG__LEVEL=ERROR
             export QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING=true
-
+            
             export POLARIS_FEATURES_ENABLE_CATALOG_FEDERATION=true
             export POLARIS_FEATURES_SUPPORTED_CATALOG_CONNECTION_TYPES="ICEBERG_REST,HIVE"
             export JAVA_OPTS_APPEND=-D"polaris.features.\\"ENABLE_CATALOG_FEDERATION\\"=true"
@@ -315,8 +328,8 @@ public class PolarisConfig extends Construct {
      */
     private static String gcpCredentials(AfonPropertyProvider properties, String deploymentId) {
         return toCloud(deploymentId) == AfonCloud.GCP
-            ? properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)
-            : properties.getValue(GOOGLE_APPLICATION_CREDENTIALS, "");
+               ? properties.getValue(GOOGLE_APPLICATION_CREDENTIALS)
+               : properties.getValue(GOOGLE_APPLICATION_CREDENTIALS, "");
     }
 
     private static AfonCloud toCloud(String deploymentId) {
@@ -358,9 +371,9 @@ public class PolarisConfig extends Construct {
 
     static @NonNull String toExports(Map<String, String> properties) {
         return properties
-                .entrySet().stream().map(x ->
-                        format("export %s=%s", toEnvironmentVariable(x.getKey()), x.getValue())
-                ).collect(Collectors.joining("\n"));
+            .entrySet().stream().map(x ->
+                                         format("export %s=%s", toEnvironmentVariable(x.getKey()), x.getValue())
+            ).collect(Collectors.joining("\n"));
     }
 
     private static String toEnvironmentVariable(String propertyName) {
@@ -435,7 +448,7 @@ public class PolarisConfig extends Construct {
         return clusterIpService(
             List.of(polarisDeployment),
             polarisLabels,
-                POLARIS_INTERNAL_SERVICE_NAME,
+            POLARIS_INTERNAL_SERVICE_NAME,
             List.of(polarisSpecPort),
             this,
             cloudProvider.getServiceAnnotations());

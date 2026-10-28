@@ -30,6 +30,7 @@ import java.util.concurrent.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static health.emrys.afon.cdk.configs.PolarisConfig.DB_PORT;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static health.emrys.afon.polaris.config.PolarisEndpoint.getPolarisEndpointFor;
@@ -79,7 +80,7 @@ public class NetworkSmokeMain {
         CurlCommand command = new CurlCommand(
             client,
             polarisPodName,
-            properties.getValue(POLARIS_DB_HOST) + ":5432",
+            properties.getValue(POLARIS_DB_HOST) + ":" + DB_PORT,
             false);
 
         return command.run().stream().map(x -> {

@@ -47,7 +47,7 @@ public class DbSmokeMain {
         String url = format(
             "jdbc:postgresql://%s/?user=%s&password=%s",
             properties.getValue(POLARIS_DB_HOST),
-            "postgres", // this should not be hard coded, I guess. See PolarisConfig
+            "postgres", // TODO this should not be hard coded, I guess. See PolarisConfig
             properties.getValue(POLARIS_DB_PASSWORD)
         );
         logger.info("Connecting to {}", url);
