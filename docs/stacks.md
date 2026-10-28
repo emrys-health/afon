@@ -566,6 +566,30 @@ afon-cli.sh generate-cleanup-script <stack-id>  # eg aws-keycloak, generating $A
 You can run the generated cleanup scripts.
 You may need to run them multiple times for the VPC to disappear from your cloud.
 
+### The delete checks that nothing is left before it deletes the state
+
+`manage-stack delete` (and the delete that `deploy` and `setup` do with `--replace`) runs `tofu destroy`, then **checks the tofu state itself**
+before deleting it and the stack dir. It reads the state file and lists the resources that it still has as deployed. Only the resources that outlive the
+stack are allowed to remain, ie the Gitea volume (see [Volumes that outlive the cluster](cluster.md#volumes-that-outlive-the-cluster)); data sources
+are not counted.
+
+- **Nothing left:** the state and the stack dir are deleted, as before.
+- **Resources left, or the state cannot be read:** the delete fails, naming up to 15 of the resources, and **keeps the state and the stack dir**. Run the
+  delete again. If the same resources are still there, look at why, in the stack dir (`$AFON_CDKTF/stacks/<stack-id>`):
+
+```shell
+tofu state list     # what the state still has
+tofu destroy        # try again, and read what stops it
+tofu state rm '<address>'   # only for a resource you know is gone from the cloud
+```
+
+The check is there because `tofu destroy` can finish successfully without having destroyed what is in the state, eg after it was interrupted or when
+it reports `0 destroyed`. Deleting the state then leaves the stack running in the cloud with nothing to destroy it, which costs money, and deploying
+the stack again fails with `already exists` (an EKS cluster, a VPC, an IAM role). The state is checked, not what tofu says.
+
+It cannot help if the state had already lost the resources before the delete, eg after a `tofu state rm` or by deleting the state file by hand: then use
+the cleanup script above, or delete the leftovers in the cloud.
+
 ### AWS
 
 The AWS components of each stack are named from its cluster name `<stack>-<CLUSTER_NAME>`, where `<stack>` is the stack id without the cloud, eg

@@ -91,6 +91,87 @@ class StepActionsTest {
                                              "tofu destroy --auto-approve -exclude=aws_ebs_volume.retained_gitea_volume");
     }
 
+    private static final String STATE_WITH_RESOURCES = """
+        {"version": 4, "resources": [
+          {"mode": "data", "type": "aws_region", "name": "current", "instances": [{"attributes": {}}]},
+          {"mode": "managed", "type": "aws_ebs_volume", "name": "retained_gitea_volume", "instances": [{"attributes": {}}]},
+          {"mode": "managed", "type": "aws_vpc", "name": "eksVpc", "instances": [{"attributes": {}}]},
+          {"mode": "managed", "type": "aws_eks_cluster", "name": "eksCluster", "instances": [{"attributes": {}}]},
+          {"module": "module.net", "mode": "managed", "type": "aws_subnet", "name": "private", "instances": [{"attributes": {}}]},
+          {"mode": "managed", "type": "aws_route_table", "name": "gone", "instances": []}
+        ]}""";
+
+    @Test
+    void doesNotDeleteTheStateOrTheStackDirIfTofuLeftResourcesInIt() throws IOException {
+        // eg tofu saying "0 destroyed" while the state still lists what was deployed
+        Path stackDir = createDirs("stacks/aws-full").get(0);
+        Path tfState = createFiles("terraform.aws-full.tfstate").get(0);
+        Files.writeString(tfState, STATE_WITH_RESOURCES);
+
+        assertThatThrownBy(() -> actions.deleteStack(stackDir, tfState, 1, OutputStream.nullOutputStream()))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("still has 4 resource(s)")
+            .hasMessageContaining("aws_vpc.eksVpc")
+            .hasMessageContaining("aws_eks_cluster.eksCluster")
+            .hasMessageContaining("module.net.aws_subnet.private")
+            .hasMessageContaining("tofu state list");
+
+        assertThat(stackDir).exists();
+        assertThat(tfState).exists();
+    }
+
+    @Test
+    void deletesTheStateWhenOnlyWhatOutlivesTheStackIsLeftInIt() throws IOException {
+        Path stackDir = createDirs("stacks/aws-full").get(0);
+        Path tfState = createFiles("terraform.aws-full.tfstate").get(0);
+        Files.writeString(stackDir.resolve("cdk.tf.json"), """
+            {"resource": {"aws_ebs_volume": {"retained_gitea_volume": {"lifecycle": {"prevent_destroy": true}}}}}""");
+        Files.writeString(tfState, """
+            {"version": 4, "resources": [
+              {"mode": "data", "type": "aws_region", "name": "current", "instances": [{"attributes": {}}]},
+              {"mode": "managed", "type": "aws_ebs_volume", "name": "retained_gitea_volume", "instances": [{"attributes": {}}]}
+            ]}""");
+
+        actions.deleteStack(stackDir, tfState, 1, OutputStream.nullOutputStream());
+
+        assertThat(stackDir).doesNotExist();
+        assertThat(tfState).doesNotExist();
+    }
+
+    @Test
+    void listsOnlyTheManagedResourcesThatAreDeployedAndNotKept() throws IOException {
+        Path tfState = createFiles("terraform.aws-full.tfstate").get(0);
+        Files.writeString(tfState, STATE_WITH_RESOURCES);
+
+        assertThat(StepActions.managedResourcesLeft(tfState, List.of("aws_ebs_volume.retained_gitea_volume")))
+            .containsExactly("aws_vpc.eksVpc", "aws_eks_cluster.eksCluster", "module.net.aws_subnet.private");
+        assertThat(StepActions.managedResourcesLeft(tfState, List.of())).contains("aws_ebs_volume.retained_gitea_volume").hasSize(4);
+    }
+
+    @Test
+    void anEmptyStateOrOneWithoutResourcesHasNothingLeft() throws IOException {
+        Path empty = createFiles("terraform.empty.tfstate").get(0);
+        Path none = createFiles("terraform.none.tfstate").get(0);
+        Files.writeString(none, "{\"version\": 4, \"resources\": []}");
+
+        assertThat(StepActions.managedResourcesLeft(empty, List.of())).isEmpty();
+        assertThat(StepActions.managedResourcesLeft(none, List.of())).isEmpty();
+    }
+
+    @Test
+    void doesNotDeleteAStateThatCannotBeRead() throws IOException {
+        Path stackDir = createDirs("stacks/aws-full").get(0);
+        Path tfState = createFiles("terraform.aws-full.tfstate").get(0);
+        Files.writeString(tfState, "this is not json");
+
+        assertThatThrownBy(() -> actions.deleteStack(stackDir, tfState, 1, OutputStream.nullOutputStream()))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Could not read the tofu state");
+
+        assertThat(stackDir).exists();
+        assertThat(tfState).exists();
+    }
+
     @Test
     void canDeleteStackWithoutTfStateWithoutRunningTofu() throws IOException {
         Path stackDir = createDirs("stacks/aws-keycloak").get(0);

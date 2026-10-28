@@ -184,6 +184,15 @@ public class DocumentingStepActions extends StepActions {
     }
 
     @Override
+    protected void checkNothingLeft(Path stackDir, Path tfState) {
+        out.println("""
+                   After `tofu destroy`, check that the tofu state lists no resource that is still deployed, other than those that outlive
+                   the stack: if it does, the state and the stack dir are not deleted, and the delete fails, naming them.
+                   """);
+        out.flush();
+    }
+
+    @Override
     protected void checkNoRefusal(StackFilter filter, List<String> stackNames) {
         out.println(format("""
                    Unless run with `--replace`, fail if any of the %s must be kept, ie is another stack than the one

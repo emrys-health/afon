@@ -209,6 +209,7 @@ public class StepActions {
         }
         try {
             tofuDestroy(stackDir, maxAttempts, outputStream);
+            checkNothingLeft(stackDir, tfState);
             deletePath(stackDir);
             deletePath(tfState);
         } catch (ManagedProcessException e) {
@@ -227,6 +228,62 @@ public class StepActions {
             logger.error(message, e);
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Checks, before the tofu state and the stack dir are deleted, that the state lists no resource that is still deployed, other than
+     * those that outlive the stack, see {@link #retainedExclusions}.  {@code tofu destroy} can finish successfully without having
+     * destroyed what is in the state, eg saying {@code 0 destroyed}; deleting the state then leaves those resources in the cloud
+     * with nothing to destroy them, and a redeploy fails because they exist.  The state itself is what is checked, not what tofu says.
+     *
+     * @throws IllegalStateException if the state still has such resources, or cannot be read, naming them: nothing is deleted
+     */
+    protected void checkNothingLeft(Path stackDir, Path tfState) {
+        List<String> kept = retainedExclusions(stackDir).stream().map(exclusion -> exclusion.substring("-exclude=".length())).toList();
+        List<String> left = managedResourcesLeft(tfState, kept);
+        if (left.isEmpty()) {
+            return;
+        }
+        throw new IllegalStateException(String.format("""
+            tofu destroy finished, but the tofu state %s still has %d resource(s) that are deployed:
+                %s%s
+            Neither the state nor the stack dir %s is deleted, as that would leave them in the cloud with nothing to destroy them.
+            Run the delete again. If they are still there, find out why in the stack dir:
+                tofu state list
+                tofu destroy
+            If you know they are gone from the cloud, remove them from the state with 'tofu state rm <address>' and run again.
+            """, tfState, left.size(), String.join("\n    ", left.stream().limit(15).toList()),
+            left.size() > 15 ? "\n    ... and " + (left.size() - 15) + " more" : "", stackDir));
+    }
+
+    /**
+     * @param kept the addresses of the resources that outlive the stack, eg {@code aws_ebs_volume.retained_gitea_volume}
+     * @return the addresses of the resources that the state lists as deployed, except those kept: data sources are not resources of
+     * the cloud, and an entry without instances is deployed nowhere.  An empty state file is an empty state, as it is for tofu.
+     * @throws IllegalStateException if the state cannot be read
+     */
+    static List<String> managedResourcesLeft(Path tfState, List<String> kept) {
+        List<String> left = new ArrayList<>();
+        try {
+            String content = Files.readString(tfState);
+            if (content.isBlank()) {
+                return left;
+            }
+            for (JsonNode resource : new ObjectMapper().readTree(content).path("resources")) {
+                if (!"managed".equals(resource.path("mode").asText("managed")) || resource.path("instances").isEmpty()) {
+                    continue;
+                }
+                String module  = resource.path("module").asText("");
+                String address = (module.isEmpty() ? "" : module + ".") + resource.path("type").asText() + "." + resource.path("name").asText();
+                if (!kept.contains(address)) {
+                    left.add(address);
+                }
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not read the tofu state " + tfState + " to check that nothing is left of the stack, "
+                                            + "so it is not deleted: " + e.getMessage(), e);
+        }
+        return left;
     }
 
     protected boolean exists(Path path) {
