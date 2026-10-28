@@ -122,7 +122,6 @@ public class AwsCleanupHelper extends CleanupHelper {
                 %s
                 %s
                 %s
-                %s
                 for LB in $(aws elbv2 describe-load-balancers  --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text) ; do {
                   echo $LB
                   aws elbv2 delete-load-balancer  --load-balancer-arn $LB
@@ -205,7 +204,6 @@ public class AwsCleanupHelper extends CleanupHelper {
             NO_POLARIS_FINALIZERS,
             NO_JUPYTER_FINALIZERS,
             NO_JUPYTER_LB_FINALIZERS,
-            NO_SPARK_LB_FINALIZERS,
             deleteClusterCommand(),
             componentNames.getClusterRoleName(),
             componentNames.getNodeGroupRoleName(),

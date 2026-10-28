@@ -11,8 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The Spark cluster and the Spark Connect application, which the {@link SparkOperatorComponent} launches, exposed
- * outside the cluster on the platforms that do.
+ * The Spark cluster and the Spark Connect application, which the {@link SparkOperatorComponent} launches.
  */
 public class SparkComponent implements StackComponent {
 
@@ -28,6 +27,5 @@ public class SparkComponent implements StackComponent {
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.getDependables());
         dependsOn.add(context.require(SparkOperatorComponent.class).operatorReady());
         new SparkWorkloads().deploy(context.stack(), platform.cloud(), dependsOn);
-        platform.exposeSparkMaster(dependsOn);
     }
 }

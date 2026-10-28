@@ -55,10 +55,6 @@ import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
-import com.hashicorp.cdktf.providers.kubernetes.service.Service;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
-import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
 import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.storage_class_v1.StorageClassV1;
@@ -87,11 +83,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.*;
-import static health.emrys.afon.cdk.CdkUtils.addMaps;
 import static health.emrys.afon.cdk.CdkUtils.uponCreateRun;
 import static health.emrys.afon.cdk.CdkUtils.uponDestroyRun;
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
-import static health.emrys.afon.cdk.configs.SparkWorkloads.MASTER_LABELS;
 import static health.emrys.afon.config.AfonCloud.AWS;
 import static health.emrys.afon.config.AfonProperty.AWS_ACCOUNT_ID;
 import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
@@ -1200,65 +1194,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     public boolean routesToNodePorts() {
         return true;
     }
-
-    @Override
-    public void exposeSparkMaster(List<ITerraformDependable> eksDependOn) {
-        // Internal, in the nodes' subnets, so that the master is reachable from within the VPC but not the internet.
-        String subnetIds = getPrivateSubnetIds().stream().collect(Collectors.joining(","));
-        ArrayList<ITerraformDependable> lbDependencies = new ArrayList<>(eksDependOn);
-        lbDependencies.add(loadBalancerRole);
-        // Creating this LoadBalancer Service fires the AWS LB Controller's
-        // mutating webhook (mservice.elbv2.k8s.aws). Depend on the controller's
-        // Helm release — which is installed atomically, so Terraform waits for
-        // its pods to be Ready — otherwise the webhook Service can still have
-        // zero endpoints and the apply fails with "no endpoints available for
-        // service aws-load-balancer-webhook-service".
-        lbDependencies.add(getLbRelease());
-        Service.Builder.create(stack(), SPARK_SERVICE_NAME)
-                      .metadata(ServiceMetadata.builder()
-                                               .name(SPARK_SERVICE_NAME)
-                                               .labels(addMaps(MASTER_LABELS, Map.of(
-                                                              "spark-version", "4.0.1",
-                                                              "spark.operator/name", "spark-kubernetes-operator",
-                                                              "spark.operator/spark-cluster-name", "prod"
-                                                             )))
-                                               .annotations(Map.of(
-                                                       "service.beta.kubernetes.io/aws-load-balancer-subnets", subnetIds,
-                                                       "service.beta.kubernetes.io/aws-load-balancer-scheme", "internal"))
-                                               .build())
-                      .dependsOn(lbDependencies)
-                      .provisioners(uponDestroyRun(NO_SPARK_LB_FINALIZERS))
-                      .spec(ServiceSpec.builder()
-                                       .selector(MASTER_LABELS)
-                                       .type("LoadBalancer")
-                                       // The load balancer controller's webhook sets the class of every LoadBalancer
-                                       // service. If the plan leaves it out, the provider sees it removed from the
-                                       // live service, and replaces the service, and its load balancer, on each apply.
-                                       .loadBalancerClass(LOAD_BALANCER_CLASS)
-                                       .port(List.of(
-                                               ServiceSpecPort.builder()
-                                                              .name("web")
-                                                              .port(8080) // Port the load balancer listens on
-                                                              .targetPort("web") // Port the container is listening on
-                                                              .protocol("TCP")
-                                                              .build(),
-                                               ServiceSpecPort.builder()
-                                                              .name("spark")
-                                                              .port(7077) // Port the load balancer listens on
-                                                              .targetPort("7077") // Port the container is listening on
-                                                              .protocol("TCP")
-                                                              .build(),
-                                               ServiceSpecPort.builder()
-                                                              .name("rest")
-                                                              .port(6066) // Port the load balancer listens on
-                                                              .targetPort("rest") // Port the container is listening on
-                                                              .protocol("TCP")
-                                                              .build()
-                                                    ))
-                                       .build())
-                              .build();
-    }
-
 
     /**
      * Exposes the component behind an ALB, whose ACM certificate and Route 53 zone are looked up from the domain name, rather

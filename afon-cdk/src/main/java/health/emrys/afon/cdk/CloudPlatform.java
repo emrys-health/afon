@@ -86,14 +86,6 @@ public interface CloudPlatform extends CloudProvider {
     }
 
     /**
-     * Exposes the Spark master outside the cluster, for the platforms that do.  By default it is not exposed.
-     *
-     * @param dependsOn the cluster's dependables, including that the Spark operator is ready
-     */
-    default void exposeSparkMaster(List<ITerraformDependable> dependsOn) {
-    }
-
-    /**
      * Makes the component reachable over HTTPS at its domain name, ie creates the ingress, and the certificate and DNS
      * record it needs.
      */

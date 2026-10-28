@@ -47,7 +47,6 @@ public class CdkHelper {
     public static final String JUPYTER_INGRESS_NAME = "jupyter-ingress";
     public static final String JUPYTER_SERVICE_NAME = "jupyter-web";
     public static final String SPARK_CONNECTOR_NAME = "spark-connector";
-    public static final String SPARK_SERVICE_NAME = "spark-master-lb";
     public static final String SPARK_SERVICE_ACCOUNT_NAME = "spark-application-sa";
     public static final String TRINO_SERVICE_NAME = "trino";
 
@@ -57,7 +56,6 @@ public class CdkHelper {
     public static final String NO_KEYCLOAK_FINALIZERS = finalizeIngress(KEYCLOAK_INGRESS_NAME);
     public static final String NO_JUPYTER_FINALIZERS = finalizeIngress(JUPYTER_INGRESS_NAME);
     public static final String NO_JUPYTER_LB_FINALIZERS = finalizeService(JUPYTER_SERVICE_NAME);
-    public static final String NO_SPARK_LB_FINALIZERS = finalizeService(SPARK_SERVICE_NAME);
     public static final String NO_INSTALLATION_FINALIZERS = finalizeInstallation("default");
 
     public static String finalizeIngress(String service) {
