@@ -16,7 +16,7 @@ import scala.jdk.CollectionConverters._
 /**
  * Signs images with the signer of `docker-image --sign` and checks the Kyverno policies of the Kyverno component: that they audit or reject, at
  * admission in a kind cluster, the images that are not signed with the key, and admits those that are.  Needs docker, kind, kubectl, helm
- * and cosign installed, else it is cancelled.
+ * and cosign installed, else it fails.
  */
 @Signing
 class ImageSigningSpec extends SpecPretifier with GivenWhenThen with Eventually {
@@ -31,7 +31,9 @@ class ImageSigningSpec extends SpecPretifier with GivenWhenThen with Eventually 
   "Images" should {
     "be rejected unless signed with the key of the policy" in {
       val missing = KindHelper.missingTools()
-      assume(missing.isEmpty, s"Needs ${missing.asScala.mkString(", ")} installed")
+      if (!missing.isEmpty) {
+        fail(s"Needs ${missing.asScala.mkString(", ")} installed: run afon-cli.sh local-setup, or run without the spec with -bp acceptance,-signing")
+      }
 
       val kind = new KindHelper()
       try {

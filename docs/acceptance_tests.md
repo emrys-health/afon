@@ -90,7 +90,7 @@ Docker images and their verification at admission, in a throwaway [kind](https:/
 The public key the policies verify with is the one `docker-image --public-key` exports, read back the way the Kyverno component reads it.
 
 Admission is checked with server-side dry runs of `kubectl run`, which run the admission webhooks and create nothing. It needs `docker`,
-`kind`, `kubectl`, `helm` and `cosign` installed, and is cancelled, saying which are missing, if not. It pulls the Kyverno images, so it
+`kind`, `kubectl`, `helm` and `cosign` installed, and fails, saying which are missing, if not (leave the spec out with `-bp acceptance,-signing`). It pulls the Kyverno images, so it
 takes a few minutes. It is part of the default acceptance tests, left out with `-bp acceptance,-signing`, and
 alone with the profile `signing` (`./afon.sh -a build -bp acceptance,signing`).
 
@@ -107,7 +107,7 @@ only one run executes at a time.
 ### Runner requirements
 
 The runner must have a Docker daemon reachable by the runner user, since the specs start KeyCloak,
-Polaris and Trino via Testcontainers, and `kind`, `kubectl`, `helm` and `cosign` for the image signing spec, which is otherwise cancelled. Java 17 is provisioned by `actions/setup-java`. The runner
+Polaris and Trino via Testcontainers, and `kind`, `kubectl`, `helm` and `cosign` for the image signing spec, which otherwise fails. Java 17 is provisioned by `actions/setup-java`. The runner
 itself is installed and registered by [scripts/github/runner.sh](../scripts/github/runner.sh), either
 by hand or through the `github` role of the ansible playbook below.
 
