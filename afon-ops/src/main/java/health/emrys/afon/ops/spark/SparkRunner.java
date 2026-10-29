@@ -7,17 +7,13 @@ import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
-import java.util.Properties;
-import java.util.stream.Collectors;
 
-import static health.emrys.afon.config.AfonProperty.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
 abstract public class SparkRunner {
     private static final Logger logger = getLogger(SparkRunner.class);
-    public static final String CONFIGURED_USERS_KEY = "Configured users";
+
 
     private AfonPropertyProvider properties;
 
@@ -46,7 +42,8 @@ abstract public class SparkRunner {
                 values = args[4];
                 Arrays.stream(values.split(",")).forEach(lines::add);
             } else {
-                appendTo(lines, properties);
+                Audit audit = new Audit(properties);
+                lines.addAll(audit.configuration());
             }
             AfonUser user;
             if (args.length == 7) {
@@ -60,26 +57,6 @@ abstract public class SparkRunner {
             logger.warn(e.getMessage(), e);
             throw new RuntimeException(e);
         }
-    }
-
-    static void appendTo(List<String> lines, AfonPropertyProvider properties) {
-        Date       now     = new Date();
-        String     prepend = String.format("%s %s", now, properties.getValue(CLUSTER_NAME));
-        Properties secrets = properties.getSecretProperties();
-        properties
-            .getProperties()
-            .entrySet()
-            .stream()
-            .filter(x -> !secrets.containsKey(x.getKey()))
-            .forEach(x -> {
-                lines.add(String.format("%s %s=%s", prepend, x.getKey(), x.getValue()));
-            });
-        String users = new FileUserProvider()
-            .getUsers()
-            .stream()
-            .map( x-> x.email())
-            .collect(Collectors.joining(", "));
-        lines.add(String.format("%s %s: %s", prepend, CONFIGURED_USERS_KEY, users));
     }
 
     protected abstract void doRun(SparkSession spark, String catalogName, String namespace, String tableName, List<String> values);

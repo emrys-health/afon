@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.spark;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.Audit;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -21,8 +22,9 @@ class SparkRunnerTest {
     @Test
     void noSecretsInProperties() {
         Properties   secrets = properties.getSecretProperties();
-        List<String> lines   = new ArrayList<>();
-        SparkRunner.appendTo(lines, properties);
+        List<String> lines = new ArrayList<>();
+        Audit        audit = new Audit(properties);
+        lines.addAll(audit.configuration());
 
         assertThat(secrets).isNotEmpty();
         logger.info("Secrets = {}", secrets.keySet().stream().toList());

@@ -17,11 +17,11 @@ import java.util.Arrays;
 
 import static health.emrys.afon.config.AfonCatalog.catalogFor;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.Audit.CONFIGURED_USERS_KEY;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
-import static health.emrys.afon.ops.spark.SparkRunner.CONFIGURED_USERS_KEY;
 import static health.emrys.afon.ops.spark.SparkTestWriter.LOG_COLUMN_NAME;
 import static java.lang.String.format;
 
