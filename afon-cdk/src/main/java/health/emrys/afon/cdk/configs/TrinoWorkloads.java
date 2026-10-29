@@ -94,6 +94,7 @@ public class TrinoWorkloads {
             "env", List.of(Map.of(
                 "name", CREDENTIAL_ENV,
                 "valueFrom", Map.of("secretKeyRef", Map.of("name", SECRET_NAME, "key", CREDENTIAL_ENV)))),
+            "eventListenerProperties", queryLogProperties(),
             "additionalCatalogs", catalogFiles(id.toString()));
 
         Secret credential = Secret.Builder
@@ -135,6 +136,23 @@ public class TrinoWorkloads {
             "resources", Map.of("requests", Map.of("cpu", "500m", "memory", "1Gi")),
             "startupProbe", Map.of("initialDelaySeconds", 10, "periodSeconds", 5, "timeoutSeconds", 10,
                                    "failureThreshold", 60));
+    }
+
+    /**
+     * Logs every query, with who ran it, to the coordinator's stdout (and so to Loki) - Trino itself logs neither.  The
+     * OpenLineage listener ships with Trino and its console transport writes, per query, a START and a COMPLETE event as
+     * one line of JSON, with the SQL in {@code job.facets.sql.query} and the user in
+     * {@code run.facets.trino_query_context.user}.  By default it ignores SELECTs, so every query type is listed.  The
+     * COMPLETE event holds the query's plan and statistics too, which {@code disabled-facets} does not (as of 481)
+     * remove.  The URI only names the job's namespace; Trino is never called on it.
+     */
+    private static List<String> queryLogProperties() {
+        return List.of(
+            "event-listener.name=openlineage",
+            "openlineage-event-listener.transport.type=CONSOLE",
+            "openlineage-event-listener.trino.uri=http://" + CdkHelper.TRINO_SERVICE_NAME + ":" + TRINO_PORT,
+            "openlineage-event-listener.trino.include-query-types="
+            + "SELECT,EXPLAIN,DESCRIBE,ANALYZE,INSERT,UPDATE,DELETE,MERGE,ALTER_TABLE_EXECUTE,DATA_DEFINITION");
     }
 
     /**

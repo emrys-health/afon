@@ -89,6 +89,7 @@ public class TrinoQuerySmokeMain {
             e.printStackTrace();
             throw e;
         }
+        logger.info("Test passed");
     }
 
     /**
