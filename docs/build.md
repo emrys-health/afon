@@ -28,7 +28,7 @@ a failing check on the commit/PR) since this repo's plan doesn't support branch 
 
 ## Build
 
-We assume [setup](setup_local.md) has been done. 
+We assume [setup](local_setup.md) has been done. 
 
 To build all components, running acceptance tests:
 ```shell

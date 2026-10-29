@@ -3,7 +3,8 @@
 # come from apt or brew, and by versions.sh, which checks the installed versions against them.
 # Pin to a prefix to allow any version under it, eg java 17 allows 17.0.20.1.
 # PINNED_<tool> applies to all platforms; PINNED_<tool>_linux or PINNED_<tool>_macos overrides it for that platform,
-# as apt and brew offer different versions of what they provide.
+# as apt and brew offer different versions of what they provide.  On Ubuntu, PINNED_<tool>_ubuntu<release without the dot>, eg
+# PINNED_git_ubuntu2204 for 22.04, overrides the linux one, as each release offers other versions.
 
 PINNED_git=2.56
 PINNED_java=17.0.20
@@ -29,20 +30,31 @@ PINNED_git_linux=2.53
 PINNED_mvn_linux=3.9.12
 PINNED_aws_linux=2.31.35
 
+# Ubuntu 22.04 (jammy) overrides.
+PINNED_git_ubuntu2204=2.34
+PINNED_mvn_ubuntu2204=3.6.3
+
 # macOS overrides, where brew does not offer the common pin.  Brew offers only the current version of a formula, and gcloud,
 # a cask which updates itself, cannot be pinned.
 PINNED_gcloud_macos=590.0.0
 PINNED_java_macos=17.0.21
 
 # The version pinned for the tool on this platform, or on the platform in PINNED_PLATFORM (linux or macos) if set,
-# eg by the ansible playbooks, which run on another platform than they provision.
+# eg by the ansible playbooks, which run on another platform than they provision.  On Ubuntu, and not with PINNED_PLATFORM,
+# the pin of its release, eg ubuntu2204, comes first.
 pinned_version(){
-  local platform="${PINNED_PLATFORM:-}" var
+  local platform="${PINNED_PLATFORM:-}" var release=
   if [ -z "$platform" ]; then
     case "$(uname -s)" in
-      Linux) platform=linux ;;
+      Linux) platform=linux
+             release=$( . /etc/os-release 2>/dev/null && [ "${ID:-}" == ubuntu ] && echo "ubuntu${VERSION_ID//./}" ) || release=
+             ;;
       Darwin) platform=macos ;;
     esac
+  fi
+  if [ -n "$release" ]; then
+    var="PINNED_$1_$release"
+    if [ -n "${!var:-}" ]; then echo "${!var}"; return; fi
   fi
   var="PINNED_$1_$platform"
   if [ -n "${!var:-}" ]; then echo "${!var}"; return; fi

@@ -38,6 +38,7 @@ install_bin(){
     mkdir -p "$dir" && [ -w "$dir" ] || { echo "ERROR: $dir is not writable and NO_SUDO=true: set BIN_DIR to a directory that is" >&2; return 1; }
   fi
   [ -w "$dir" ] || sudo=sudo
+  echo "Installing $tool in $dir"
   if [ -n "$link" ]; then $sudo ln -sf "$file" "$dir/$tool"; else $sudo install -m 0755 "$file" "$dir/$tool"; fi || return 1
   found=$(command -v "$tool")
   if [ "$found" != "$dir/$tool" ]; then
@@ -58,8 +59,16 @@ release_vars(){
 #   $1 tool, $2 url, $3 kind of download: raw, tgz or zip, $4 the binary within the archive, if one
 # The url and the binary can use the variables set by release_vars.
 install_release_binary(){
-  local tool=$1 url=$2 kind=$3 member=${4:-} os arch version Os arch2 arch3 dir
-  check_tool_version "$tool" >/dev/null && return 0
+  local tool=$1 url=$2 kind=$3 member=${4:-} os arch version Os arch2 arch3 dir found
+  if check_tool_version "$tool" >/dev/null; then
+    found=$(command -v "$tool")
+    if [ "$found" == "$(bin_dir)/$tool" ]; then
+      echo "$tool is up to date in $(bin_dir)"
+    else
+      echo "$tool is up to date at $found (release binaries are installed in $(bin_dir))"
+    fi
+    return 0
+  fi
   release_vars "$tool" || return 1
   url=$(eval echo "$url")
   member=$(eval echo "$member")

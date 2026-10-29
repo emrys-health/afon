@@ -8,7 +8,7 @@ You can choose one of the Afon [entry points](afon_entry_points.md).
 
 ### Setup Local Env
 
-You need to have set up you [local env](setup_local.md).
+You need to have set up you [local env](local_setup.md).
 
 ## Stack deployment
 

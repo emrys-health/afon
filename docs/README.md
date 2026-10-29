@@ -30,7 +30,7 @@ If you are looking to deploy the data fabric, the easiest way to do so is throug
 
 - [Entry points](./afon_entry_points.md)
 - [CLI binary distribution](./afon_cli.md)
-- [Setup local env](./setup_local.md)
+- [Setup local env](./local_setup.md)
 - [Configure properties and users](./configuration.md)
 - [Theming](./theme.md)
 

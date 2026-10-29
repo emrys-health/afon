@@ -28,7 +28,7 @@ Enable the git hooks, once per clone (see [build](../build.md#git-hooks)):
 git config core.hooksPath .githooks
 ```
 
-Then set up your environment and build, as per [setup](../setup_local.md) and [build](../build.md).
+Then set up your environment and build, as per [setup](../local_setup.md) and [build](../build.md).
 
 ### 3. Create a branch
 

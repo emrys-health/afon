@@ -98,7 +98,7 @@ If you have never contributed to Afon before, we recommend starting with issues 
 
 1. Read the [README](../../README.md) and the [architecture](../architecture.md) to understand what Afon does and
    how it is structured.
-2. Set up your local environment: [setup](../setup_local.md).
+2. Set up your local environment: [setup](../local_setup.md).
 3. Build from source: [build](../build.md).
 4. Find, or [create](issues.md), an issue to work on, and comment on it to say you are working on it.
 5. Follow the [pull request](pull_requests.md) workflow.

@@ -39,17 +39,35 @@ afon-cli.sh local-versions -c <cloud>
 
 The tool versions are pinned in `scripts/local/pinned.sh`, to make local setups reproducible.
 `local-setup` installs the pinned version of each tool, unless it is already at that version:
-- downloaded binaries are put in `/usr/local/bin` (override with `BIN_DIR`, using `sudo` if it is not writable);
-- apt packages are installed as `package=<pinned version>` and held with `apt-mark hold`;
+- downloaded binaries are put in `/usr/local/bin` (override with `BIN_DIR`, using `sudo` if it is not writable), replacing any file of
+  that name there if the tool is not at the pinned version;
+- apt packages are installed as `package=<pinned version>` and held with `apt-mark hold`.  If apt offers no version starting with the pin,
+  a warning is printed and the version apt offers is installed, which `local-versions` then reports as a `MISMATCH`;
 - brew formulae are pinned with `brew pin` once at the pinned version, otherwise a warning is printed, as brew only offers the
   current version.  A cask, ie gcloud, cannot be pinned.
 
+For each downloaded binary, `local-setup` says where it is: `<tool> is up to date in <dir>` if it is in the directory it installs to,
+`<tool> is up to date at <path> (release binaries are installed in <dir>)` if it is elsewhere, eg a brew copy, or `Installing <tool> in <dir>` when
+it installs it.
+
 Another copy of a tool earlier on the PATH, eg brew's, shadows the pinned one: `local-setup` warns, so remove it (eg `brew uninstall`).
+
+### Without sudo
+
+With `NO_SUDO=true`, `local-setup` never runs `sudo`:
+```shell
+NO_SUDO=true afon-cli.sh local-setup -c <cloud>
+```
+- downloaded binaries are put in `~/.local/bin` (or `BIN_DIR`), which is created if needed and must be on the `PATH`; it stops with an error if
+  the directory is not writable;
+- what needs apt (git, java, maven and the cloud clis on linux) is not installed, nor are the Azure and Google apt repositories added: for each
+  that is not at the pinned version a warning says to install the package yourself.
 
 It ends by checking the installed versions against the pins.
 `local-versions` reports each tool as `OK`, `MISMATCH`, `MISSING` or `UNPINNED`.
 A pin is a version prefix, eg `17.0.20` for java matches any 17.0.20.x.
 A pin can be overridden per platform, eg `PINNED_git_linux`, as apt and brew offer different versions of git and the cloud clis.
+On Ubuntu a pin can also be overridden per release, eg `PINNED_git_ubuntu2204` for 22.04, which takes precedence over the linux one.
 
 ## Docker 
 

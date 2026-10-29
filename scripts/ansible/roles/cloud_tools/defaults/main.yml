@@ -1,5 +1,5 @@
 ---
-# Mirrors the tools installed by `./afon.sh -a local-setup` (see docs/setup_local.md): the cloud clis from apt, at the versions
+# Mirrors the tools installed by `./afon.sh -a local-setup` (see docs/local_setup.md): the cloud clis from apt, at the versions
 # pinned in scripts/local/pinned.sh (read by group_vars/github_runners.yml), and the other tools as pinned release downloads.
 # Not needed by the acceptance tests themselves — they use the cloud SDKs — but
 # required if the runner also drives the ops/tofu actions.
