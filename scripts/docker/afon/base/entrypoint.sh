@@ -15,10 +15,8 @@ if ! id -u $NEW_USER >/dev/null 2>&1; then
     useradd -m -u $USER_ID -g $GROUP_ID -s /bin/bash $NEW_USER
 fi
 
-# Ensure home directory exists with correct ownership
 mkdir -p /home/$NEW_USER
 chown $USER_ID:$GROUP_ID /home/$NEW_USER
 
-# -m keeps the environment, but PATH is reset by pam_env from /etc/environment, so pass the image's PATH on
 export HOME=/home/$NEW_USER
 exec su -m $NEW_USER -c "PATH=$PATH exec $@"

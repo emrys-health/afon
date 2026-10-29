@@ -8,10 +8,6 @@
 #             the images to build (default: all).  cli needs the base image of the same version, so build it first.
 #   --push    pushes every tag of the built images
 #
-# The version is that of 'git describe' over the afon-* release tags, less the afon- prefix, eg 1.0-beta-7 on a
-# release tag, else 1.0-beta-7-126-ga7358e58, with -dirty if the tree has local changes.  Each image is tagged with
-# the version and the short commit, and also latest when on a release tag with a clean tree.
-#
 # The images are linux/amd64 only, as the base image installs the amd64 binaries of the tools.
 set -euo pipefail
 

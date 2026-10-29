@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 
 ARG TOFU_VERSION=1.13.2
 ARG AWS_CLI_VERSION=2.30.1
-ARG NODE_VERSION=24.12.0
+ARG NODE_VERSION=22.23.4
 ARG AZ_CLI_VERSION=2.90.0
 ARG GCLOUD_VERSION=565.0.0
 ARG EKSCTL_VERSION=v0.215.0
@@ -79,10 +79,8 @@ RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
  && apt-get install -y azure-cli=${AZ_CLI_VERSION}-1~jammy \
  && rm -rf /var/lib/apt/lists/*
 
-# kubectl and kubelogin, both the latest
 RUN az aks install-cli
 
-# Declared last, as they change every commit and would otherwise bust the cache of the installs above
 ARG AFON_VERSION AFON_COMMIT AFON_REPO AFON_CREATED
 LABEL org.opencontainers.image.title="afon-base-image" \
       org.opencontainers.image.version="${AFON_VERSION}" \
