@@ -3,16 +3,17 @@
 # Builds the afon docker images: the base image of the cli tools, and the cli image, being the base image with the
 # afon-cli built from this repo.  The version and tags are taken from git.
 #
-# usage: scripts/docker/afon/build.sh [--push] [base|cli|all]
+# usage: scripts/docker/afon/build.sh [--push] [--platform <platform>] [base|cli|all]
 #   base|cli|all
 #             the images to build (default: all).  cli needs the base image of the same version, so build it first.
 #   --push    pushes every tag of the built images
+#   --platform
+#             linux/amd64 (default) or linux/arm64.  The tags are the same for both, so a push of one replaces the other.
 #
-# The images are linux/amd64 only, as the base image installs the amd64 binaries of the tools.
 set -euo pipefail
 
 usage() {
-  sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//'
+  awk 'NR > 2 && !/^#/ { exit } NR > 2 { sub(/^# ?/, ""); print }' "$0"
 }
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,12 +21,14 @@ AFON_ROOT="$(cd "$DIR/../../.." && pwd)"
 
 BASE_IMAGE="${BASE_IMAGE:-emryshealth/afon-base-image}"
 CLI_IMAGE="${CLI_IMAGE:-emryshealth/afon-cli}"
+PLATFORM=linux/amd64
 PUSH=false
 WHAT=all
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --push) PUSH=true ;;
+    --platform) PLATFORM="$2"; shift ;;
     base|cli|all) WHAT="$1" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
@@ -62,14 +65,14 @@ push() {
 }
 
 COMMON_ARGS=(
-  --platform linux/amd64
+  --platform "$PLATFORM"
   --build-arg "AFON_VERSION=$VERSION"
   --build-arg "AFON_COMMIT=$COMMIT"
   --build-arg "AFON_REPO=$REPO"
   --build-arg "AFON_CREATED=$CREATED"
 )
 
-echo "Building afon images $WHAT, version $VERSION ($SHORT_COMMIT)$($RELEASE && echo ', release')"
+echo "Building afon images $WHAT, version $VERSION ($SHORT_COMMIT) for $PLATFORM$($RELEASE && echo ', release')"
 
 if [ "$WHAT" = base ] || [ "$WHAT" = all ]; then
   # shellcheck disable=SC2046

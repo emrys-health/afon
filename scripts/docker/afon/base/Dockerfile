@@ -1,5 +1,7 @@
-# amd64 only: the downloads below are all of the linux amd64/x64 binaries
+# linux/amd64 or linux/arm64: TARGETARCH is amd64 or arm64, mapped to each download's own arch name where it differs
 FROM ubuntu:22.04
+
+ARG TARGETARCH
 
 ARG TOFU_VERSION=1.13.2
 ARG AWS_CLI_VERSION=2.30.1
@@ -28,7 +30,8 @@ RUN apt-get update && apt-get install -y \
     python-is-python3 \
  && rm -rf /var/lib/apt/lists/*
 
-RUN curl -L https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse \
+RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo aarch64 || echo x64) \
+ && curl -L https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/${ARCH}/jdk/hotspot/normal/eclipse \
     -o openjdk.tar.gz \
  && mkdir -p $JAVA_HOME \
  && tar -xzf openjdk.tar.gz -C $JAVA_HOME --strip-components=1 \
@@ -40,32 +43,35 @@ RUN curl -L https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binar
  && tar -xzf maven.tar.gz -C $MAVEN_HOME --strip-components=1 \
  && rm maven.tar.gz
 
-RUN curl -L https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_amd64.zip -o tofu.zip \
+RUN curl -L https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_${TARGETARCH}.zip -o tofu.zip \
  && unzip -q tofu.zip tofu \
  && install -m 0755 tofu /usr/local/bin/tofu \
  && rm tofu tofu.zip
 
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWS_CLI_VERSION}.zip" -o "awscliv2.zip" \
+RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo aarch64 || echo x86_64) \
+ && curl "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}-${AWS_CLI_VERSION}.zip" -o "awscliv2.zip" \
  && unzip -q awscliv2.zip \
  && ./aws/install \
  && rm -rf aws awscliv2.zip
 
-RUN curl -L "https://github.com/eksctl-io/eksctl/releases/download/${EKSCTL_VERSION}/eksctl_Linux_amd64.tar.gz" -o eksctl.tar.gz \
+RUN curl -L "https://github.com/eksctl-io/eksctl/releases/download/${EKSCTL_VERSION}/eksctl_Linux_${TARGETARCH}.tar.gz" -o eksctl.tar.gz \
  && tar -xzf eksctl.tar.gz -C /usr/local/bin eksctl \
  && chmod +x /usr/local/bin/eksctl \
  && rm eksctl.tar.gz
 
-RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
-    | tar -xz -C /usr/local/bin --strip-components=1 linux-amd64/helm \
- && curl -fsSLo /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" \
+RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
+    | tar -xz -C /usr/local/bin --strip-components=1 linux-${TARGETARCH}/helm \
+ && curl -fsSLo /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${TARGETARCH}" \
  && chmod 0755 /usr/local/bin/yq
 
-RUN curl -L https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz -o node.tar.gz \
+RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo arm64 || echo x64) \
+ && curl -L https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${ARCH}.tar.gz -o node.tar.gz \
  && mkdir -p /opt/node \
  && tar -xzf node.tar.gz -C /opt/node --strip-components=1 \
  && rm node.tar.gz
 
-RUN curl -L https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-x86_64.tar.gz -o gcloud.tar.gz \
+RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo arm || echo x86_64) \
+ && curl -L https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${ARCH}.tar.gz -o gcloud.tar.gz \
  && tar -xzf gcloud.tar.gz -C /opt \
  && /opt/google-cloud-sdk/install.sh --quiet --usage-reporting=false --path-update=false \
  && rm gcloud.tar.gz
@@ -73,7 +79,7 @@ RUN curl -L https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
 # Add Microsoft signing key + repo and install exact version
 RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
     | install -o root -g root -m 644 /dev/stdin /usr/share/keyrings/microsoft.gpg \
- && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ jammy main" \
+ && echo "deb [arch=${TARGETARCH} signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ jammy main" \
     > /etc/apt/sources.list.d/azure-cli.list \
  && apt-get update \
  && apt-get install -y azure-cli=${AZ_CLI_VERSION}-1~jammy \
