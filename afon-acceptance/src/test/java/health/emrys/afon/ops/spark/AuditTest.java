@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import static health.emrys.afon.config.Audit.REDACTED;
+import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AuditTest {
@@ -33,7 +35,10 @@ class AuditTest {
                .stream()
                .forEach(entry -> {
                    lines.forEach(line -> {
-                       assertThat(line).doesNotContain(entry.getKey().toString());
+                       String key = entry.getKey().toString();
+                       if (line.contains(format(" %s=", key))) {
+                           assertThat(line).contains(format("%s=%s", key, REDACTED));
+                       }
                    });
                });
     }

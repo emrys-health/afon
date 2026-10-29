@@ -8,10 +8,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.CLUSTER_NAME;
@@ -24,8 +21,9 @@ import static org.slf4j.LoggerFactory.getLogger;
  */
 public class Audit {
 
-    private static final Logger logger               = getLogger(Audit.class);
+    private static final Logger logger = getLogger(Audit.class);
     public static final  String CONFIGURED_USERS_KEY = "Configured users";
+    public static final String REDACTED = "REDACTED";
 
     private final AfonPropertyProvider properties;
     private final String               prepend;
@@ -55,7 +53,12 @@ public class Audit {
             .getProperties()
             .entrySet()
             .stream()
-            .filter(x -> !secrets.containsKey(x.getKey()))
+            .map(x -> {
+                if (secrets.containsKey(x.getKey())) {
+                    return new AbstractMap.SimpleEntry(x.getKey(), REDACTED);
+                }
+                return x;
+            })
             .forEach(x -> {
                 lines.add(format("%s %s=%s", prepend, x.getKey(), x.getValue()));
             });
