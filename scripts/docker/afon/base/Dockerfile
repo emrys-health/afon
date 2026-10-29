@@ -1,21 +1,14 @@
+# amd64 only: the downloads below are all of the linux amd64/x64 binaries
 FROM ubuntu:22.04
 
-ARG TARGETARCH
-RUN echo "Building for $TARGETARCH"
-ARG TOFU_VERSION=1.11.6
+ARG TOFU_VERSION=1.13.2
 ARG AWS_CLI_VERSION=2.30.1
-ARG KUBECTL_VERSION=v1.32.1
 ARG NODE_VERSION=24.12.0
-ARG AZ_CLI_VERSION=2.85.0
+ARG AZ_CLI_VERSION=2.90.0
 ARG GCLOUD_VERSION=565.0.0
 ARG EKSCTL_VERSION=v0.215.0
-
-ARG KUBE_MINOR=v1.37
-ARG AZ_CLI_VERSION=2.90.0
-ARG TOFU_VERSION=1.13.2
 ARG HELM_VERSION=v4.3.1
 ARG YQ_VERSION=v4.54.1
-ARG KUBELOGIN_VERSION=v0.2.21
 
 ARG JAVA_VERSION=17
 ARG MAVEN_VERSION=3.9.16
@@ -29,10 +22,11 @@ ENV PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$NODE_HOME/bin:$GCLOUD_HOME/bin:$PATH
 RUN apt-get update && apt-get install -y \
     curl \
     less \
-    tar \
+    unzip \
     ca-certificates \
     gnupg \
-    python-is-python3
+    python-is-python3 \
+ && rm -rf /var/lib/apt/lists/*
 
 RUN curl -L https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse \
     -o openjdk.tar.gz \
@@ -46,26 +40,25 @@ RUN curl -L https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binar
  && tar -xzf maven.tar.gz -C $MAVEN_HOME --strip-components=1 \
  && rm maven.tar.gz
 
-RUN apt-get update && apt-get install -y curl unzip \
- && curl -L https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_amd64.zip -o tofu.zip \
- && unzip tofu.zip \
- && mv tofu /usr/local/bin/ \
- && chmod +x /usr/local/bin/tofu \
- && rm tofu.zip
+RUN curl -L https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_amd64.zip -o tofu.zip \
+ && unzip -q tofu.zip tofu \
+ && install -m 0755 tofu /usr/local/bin/tofu \
+ && rm tofu tofu.zip
 
-RUN apt-get update && apt-get install -y curl unzip \
- && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWS_CLI_VERSION}.zip" -o "awscliv2.zip" \
- && unzip awscliv2.zip \
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWS_CLI_VERSION}.zip" -o "awscliv2.zip" \
+ && unzip -q awscliv2.zip \
  && ./aws/install \
  && rm -rf aws awscliv2.zip
-
-RUN curl -L https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl \
- && chmod +x /usr/local/bin/kubectl
 
 RUN curl -L "https://github.com/eksctl-io/eksctl/releases/download/${EKSCTL_VERSION}/eksctl_Linux_amd64.tar.gz" -o eksctl.tar.gz \
  && tar -xzf eksctl.tar.gz -C /usr/local/bin eksctl \
  && chmod +x /usr/local/bin/eksctl \
  && rm eksctl.tar.gz
+
+RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+    | tar -xz -C /usr/local/bin --strip-components=1 linux-amd64/helm \
+ && curl -fsSLo /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" \
+ && chmod 0755 /usr/local/bin/yq
 
 RUN curl -L https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz -o node.tar.gz \
  && mkdir -p /opt/node \
@@ -80,23 +73,13 @@ RUN curl -L https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
 # Add Microsoft signing key + repo and install exact version
 RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
     | install -o root -g root -m 644 /dev/stdin /usr/share/keyrings/microsoft.gpg \
- && echo "deb [arch=${TARGETARCH} signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ jammy main" \
+ && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ jammy main" \
     > /etc/apt/sources.list.d/azure-cli.list \
  && apt-get update \
- && apt-get install -y azure-cli=${AZ_CLI_VERSION}-1~jammy
+ && apt-get install -y azure-cli=${AZ_CLI_VERSION}-1~jammy \
+ && rm -rf /var/lib/apt/lists/*
 
-# Kublogin etc.
- 
- RUN cd /tmp \
-  && curl -fsSLo kubelogin.zip "https://github.com/Azure/kubelogin/releases/download/${KUBELOGIN_VERSION}/kubelogin-linux-${TARGETARCH}.zip" \
-  && unzip -q kubelogin.zip && install -m 0755 "bin/linux_${TARGETARCH}/kubelogin" /usr/local/bin/kubelogin \
-  && curl -fsSLo tofu.zip "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_${TARGETARCH}.zip" \
-  && unzip -q tofu.zip tofu && install -m 0755 tofu /usr/local/bin/tofu \
-  && curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
-       | tar -xz "linux-${TARGETARCH}/helm" && install -m 0755 "linux-${TARGETARCH}/helm" /usr/local/bin/helm \
-  && curl -fsSLo /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${TARGETARCH}" \
-  && chmod 0755 /usr/local/bin/yq \
-  && rm -rf /tmp/*
+# kubectl and kubelogin, both the latest
 RUN az aks install-cli
 
 # Declared last, as they change every commit and would otherwise bust the cache of the installs above
