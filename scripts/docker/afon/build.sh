@@ -23,8 +23,8 @@ usage() {
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AFON_ROOT="$(cd "$DIR/../../.." && pwd)"
 
-BASE_IMAGE="${BASE_IMAGE:-afon-base-image}"
-CLI_IMAGE="${CLI_IMAGE:-emryshealth/afon}"
+BASE_IMAGE="${BASE_IMAGE:-emryshealth/afon-base-image}"
+CLI_IMAGE="${CLI_IMAGE:-emryshealth/afon-cli}"
 PUSH=false
 WHAT=all
 
@@ -45,7 +45,6 @@ SHORT_COMMIT="$(git rev-parse --short HEAD)"
 DESCRIBE="$(git describe --tags --match 'afon-*' --dirty --always)"
 VERSION="${DESCRIBE#afon-}"
 CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-# The https url of origin, without any credentials, eg git@github.com:org/afon.git -> https://github.com/org/afon
 REPO="$(git remote get-url origin 2>/dev/null \
   | sed -E 's#^git@([^:]+):#https://\1/#; s#^(https?://)[^@/]+@#\1#; s#\.git$##')" || REPO=""
 
