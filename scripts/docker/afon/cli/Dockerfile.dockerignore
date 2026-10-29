@@ -1,0 +1,12 @@
+.git
+.github
+.githooks
+.idea
+.vscode
+**/target
+**/node_modules
+**/cdk.out
+**/*.iml
+**/.DS_Store
+demo
+scripts/docker
