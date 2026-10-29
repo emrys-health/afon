@@ -195,11 +195,11 @@ wait_for_dns_zone_access() {
     export AZURE_CONFIG_DIR="$PROBE_DIR"
     trap 'rm -rf "$PROBE_DIR"' EXIT
     az login --service-principal -u "$AZURE_APP_ID" -p "$AZURE_APP_SECRET" --tenant "$AZURE_TENANT_ID" -o none || exit 1
-    PROBE_ARGS="--subscription $AZURE_SUBSCRIPTION --resource-group $AZURE_RESOURCE_GROUP --zone-name $DOMAIN_NAME --record-set-name _afon-access-probe"
+    PROBE_ARGS="--subscription $AZURE_SUBSCRIPTION --resource-group $AZURE_RESOURCE_GROUP --zone-name $DOMAIN_NAME"
     ERROR=""
     for ATTEMPT in $(seq 1 30); do
-      if ERROR="$(az network dns record-set txt add-record $PROBE_ARGS --value probe -o none 2>&1)"; then
-        az network dns record-set txt delete $PROBE_ARGS --yes -o none
+      if ERROR="$(az network dns record-set txt add-record $PROBE_ARGS --record-set-name _afon-access-probe --value probe -o none 2>&1)"; then
+        az network dns record-set txt delete $PROBE_ARGS --name _afon-access-probe --yes -o none
         echo "- The service principal may write to the zone of $DOMAIN_NAME"
         exit 0
       fi
