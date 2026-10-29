@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     less \
     unzip \
+    jq \
+    dnsutils \
     ca-certificates \
     gnupg \
     python-is-python3 \

@@ -3,10 +3,13 @@
 # Builds the afon docker images: the base image of the cli tools, and the cli image, being the base image with the
 # afon-cli built from this repo.  The version and tags are taken from git.
 #
-# usage: scripts/docker/afon/build.sh [--push] [--platform <platform>] [base|cli|all]
+# usage: scripts/docker/afon/build.sh [--push] [--registry <registry>] [--platform <platform>] [base|cli|all]
 #   base|cli|all
 #             the images to build (default: all).  cli needs the base image of the same version, so build it first.
 #   --push    pushes every tag of the built images
+#   --registry
+#             the registry to prefix the image names with, eg myacr.azurecr.io.  An Azure Container Registry is logged
+#             in to with 'az acr login' before pushing, so needs 'az login' first.
 #   --platform
 #             linux/amd64 (default) or linux/arm64.  The tags are the same for both, so a push of one replaces the other.
 #
@@ -23,18 +26,25 @@ BASE_IMAGE="${BASE_IMAGE:-emryshealth/afon-base-image}"
 CLI_IMAGE="${CLI_IMAGE:-emryshealth/afon-cli}"
 PLATFORM=linux/amd64
 PUSH=false
+REGISTRY=""
 WHAT=all
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --push) PUSH=true ;;
     --platform) PLATFORM="$2"; shift ;;
+    --registry) REGISTRY="$2"; shift ;;
     base|cli|all) WHAT="$1" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
   shift
 done
+
+if [ -n "$REGISTRY" ]; then
+  BASE_IMAGE="$REGISTRY/$BASE_IMAGE"
+  CLI_IMAGE="$REGISTRY/$CLI_IMAGE"
+fi
 
 cd "$AFON_ROOT"
 
@@ -71,6 +81,10 @@ COMMON_ARGS=(
   --build-arg "AFON_REPO=$REPO"
   --build-arg "AFON_CREATED=$CREATED"
 )
+
+if $PUSH && [[ "$REGISTRY" == *.azurecr.io ]]; then
+  az acr login --name "${REGISTRY%%.*}"
+fi
 
 echo "Building afon images $WHAT, version $VERSION ($SHORT_COMMIT) for $PLATFORM$($RELEASE && echo ', release')"
 
