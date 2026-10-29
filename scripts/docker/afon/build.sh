@@ -13,7 +13,6 @@
 # the version and the short commit, and also latest when on a release tag with a clean tree.
 #
 # The images are linux/amd64 only, as the base image installs the amd64 binaries of the tools.
-# Env: BASE_IMAGE (default: afon-base-image) and CLI_IMAGE (default: emryshealth/afon) are the image names.
 set -euo pipefail
 
 usage() {

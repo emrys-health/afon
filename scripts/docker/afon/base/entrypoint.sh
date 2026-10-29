@@ -19,6 +19,6 @@ fi
 mkdir -p /home/$NEW_USER
 chown $USER_ID:$GROUP_ID /home/$NEW_USER
 
-# -m keeps the environment, including the PATH of the image
+# -m keeps the environment, but PATH is reset by pam_env from /etc/environment, so pass the image's PATH on
 export HOME=/home/$NEW_USER
-exec su -m $NEW_USER -c "exec $@"
+exec su -m $NEW_USER -c "PATH=$PATH exec $@"
