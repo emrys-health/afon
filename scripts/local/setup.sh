@@ -133,7 +133,8 @@ apt_install_pinned(){
   pinned=$(pinned_version "$tool")
   version=
   if [ -n "$pinned" ]; then
-    version=$(apt-cache madison "$package" | awk '{print $3}' | grep -E "^(.*:)?${pinned//./\\.}" | head -1)
+    # grep finding no version must not stop the script (set -e, pipefail): the fallback below is for that
+    version=$(apt-cache madison "$package" | awk '{print $3}' | grep -E "^(.*:)?${pinned//./\\.}" | head -1 || true)
     [ -z "$version" ] && echo "WARNING: $package has no version $pinned available in apt, installing the available one" >&2
   fi
   if [ -n "$version" ]; then
