@@ -1,6 +1,6 @@
 # Docker images
 
-Two Docker images give a ready-made environment for running Afon, with the right version of every tool, without a
+Two Docker images give a ready-made environment for running Afon, with the right version of every tool, reproduce a
 [local setup](local_setup.md):
 
 - `emryshealth/afon-base-image`: Ubuntu 22.04 with the cli tools Afon uses, at pinned versions: java, maven, node,
@@ -8,7 +8,7 @@ Two Docker images give a ready-made environment for running Afon, with the right
 - `emryshealth/afon-cli`: the base image with the [Afon CLI](afon_cli.md) built from the source, installed in
   `/opt/afon/cli` (`AFON_CLI_DIR`) and on the `PATH`.
 
-Both are built for `linux/amd64` or `linux/arm64`.  Their Dockerfiles are in `scripts/docker/afon/base` and
+Both can be built for `linux/amd64` or `linux/arm64`.  Their Dockerfiles are in `scripts/docker/afon/base` and
 `scripts/docker/afon/cli`.
 
 ## Building
@@ -49,7 +49,6 @@ the build time.
 
 ### Helper Flags
 
-
 `--push` pushes every tag of the built images.  `--registry` prefixes the image names with a registry, eg to push to
 an Azure Container Registry:
 ```shell
@@ -59,3 +58,23 @@ scripts/docker/afon/build.sh --registry myacr.azurecr.io --push
 which pushes `myacr.azurecr.io/emryshealth/afon-base-image` and `myacr.azurecr.io/emryshealth/afon-cli`.  For a
 registry ending in `.azurecr.io`, the script logs in with `az acr login` before building.  For any other registry,
 `docker login` to it first.
+
+### Running
+
+The environment can invoked like so:
+
+```sh
+ocker run -it --rm \
+  -v "~/.afon/config:/home/afon/.afon/config:ro" \
+  emryshealth/afon-cli:1.0-beta-7 \
+  'afon-cli.sh validate-stack azure-polaris' # or `/bin/bash` for an interactive session
+```
+
+Use in a CI pipeline in - for example Azure DevOps - can be done like so:
+
+```yaml
+# ...
+container:
+    image: ${{ variables.afonRegistry }}/emryshealth/afon-cli:${{ variables.runtime }} # dynamic or hardcoded version
+# ...
+```
