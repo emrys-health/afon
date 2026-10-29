@@ -15,15 +15,28 @@ bin_arch(){
   esac
 }
 
-# Where the release binaries are installed, using sudo if not writable.  BIN_DIR overrides it.
+# True if NO_SUDO=true: sudo is never run, so the release binaries go to a directory the user can write to, and what needs apt (git, java,
+# maven and the cloud clis on linux) is not installed, only reported.
+no_sudo(){
+  [ "${NO_SUDO:-}" == true ]
+}
+
+# Where the release binaries are installed, using sudo if not writable.  BIN_DIR overrides it; with NO_SUDO=true it is ~/.local/bin, which
+# must be on the PATH.
 bin_dir(){
-  echo "${BIN_DIR:-/usr/local/bin}"
+  if [ -n "${BIN_DIR:-}" ]; then echo "$BIN_DIR"
+  elif no_sudo; then echo "$HOME/.local/bin"
+  else echo /usr/local/bin
+  fi
 }
 
 # Installs the file as the tool's binary, or a link to it if a third argument is given, warning if another one of the tool, eg brew's, would shadow it on the PATH.
 install_bin(){
   local file=$1 tool=$2 link=${3:-} dir found sudo=
   dir=$(bin_dir)
+  if no_sudo; then
+    mkdir -p "$dir" && [ -w "$dir" ] || { echo "ERROR: $dir is not writable and NO_SUDO=true: set BIN_DIR to a directory that is" >&2; return 1; }
+  fi
   [ -w "$dir" ] || sudo=sudo
   if [ -n "$link" ]; then $sudo ln -sf "$file" "$dir/$tool"; else $sudo install -m 0755 "$file" "$dir/$tool"; fi || return 1
   found=$(command -v "$tool")
@@ -130,6 +143,10 @@ install_kubelogin(){
 # and holds it so that upgrades leave it alone.  Falls back to the available version, with a warning, if none matches.
 apt_install_pinned(){
   local package=$1 tool=$2 pinned version
+  if no_sudo; then
+    check_tool_version "$tool" >/dev/null || echo "WARNING: $tool is not installed at the pinned version, and NO_SUDO=true: install the apt package $package yourself" >&2
+    return 0
+  fi
   pinned=$(pinned_version "$tool")
   version=
   if [ -n "$pinned" ]; then
@@ -191,6 +208,7 @@ add_apt_repo(){
   local name=$1 keyring="/etc/apt/keyrings/$2.asc" key_url=$3 repo_url=$4 suite=$5
   local list="/etc/apt/sources.list.d/$name.list"
   [ -f "$list" ] && return 0
+  no_sudo && return 0
   sudo install -m 0755 -d /etc/apt/keyrings
   sudo curl -fsSL -o "$keyring" "$key_url" && sudo chmod a+r "$keyring" || return 1
   echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] $repo_url $suite" | sudo tee "$list" >/dev/null
