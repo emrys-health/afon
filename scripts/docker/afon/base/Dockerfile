@@ -10,6 +10,13 @@ ARG AZ_CLI_VERSION=2.85.0
 ARG GCLOUD_VERSION=565.0.0
 ARG EKSCTL_VERSION=v0.215.0
 
+ARG KUBE_MINOR=v1.37
+ARG AZ_CLI_VERSION=2.90.0
+ARG TOFU_VERSION=1.13.2
+ARG HELM_VERSION=v4.3.1
+ARG YQ_VERSION=v4.54.1
+ARG KUBELOGIN_VERSION=v0.2.21
+
 ARG JAVA_VERSION=17
 ARG MAVEN_VERSION=3.9.16
 
@@ -78,7 +85,28 @@ RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
  && apt-get update \
  && apt-get install -y azure-cli=${AZ_CLI_VERSION}-1~jammy
 
+# Kublogin etc.
+ 
+ RUN cd /tmp \
+  && curl -fsSLo kubelogin.zip "https://github.com/Azure/kubelogin/releases/download/${KUBELOGIN_VERSION}/kubelogin-linux-${TARGETARCH}.zip" \
+  && unzip -q kubelogin.zip && install -m 0755 "bin/linux_${TARGETARCH}/kubelogin" /usr/local/bin/kubelogin \
+  && curl -fsSLo tofu.zip "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_${TARGETARCH}.zip" \
+  && unzip -q tofu.zip tofu && install -m 0755 tofu /usr/local/bin/tofu \
+  && curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
+       | tar -xz "linux-${TARGETARCH}/helm" && install -m 0755 "linux-${TARGETARCH}/helm" /usr/local/bin/helm \
+  && curl -fsSLo /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${TARGETARCH}" \
+  && chmod 0755 /usr/local/bin/yq \
+  && rm -rf /tmp/*
 RUN az aks install-cli
+
+# Declared last, as they change every commit and would otherwise bust the cache of the installs above
+ARG AFON_VERSION AFON_COMMIT AFON_REPO AFON_CREATED
+LABEL org.opencontainers.image.title="afon-base-image" \
+      org.opencontainers.image.version="${AFON_VERSION}" \
+      org.opencontainers.image.revision="${AFON_COMMIT}" \
+      org.opencontainers.image.source="${AFON_REPO}" \
+      org.opencontainers.image.created="${AFON_CREATED}" \
+      org.opencontainers.image.description="Afon base image"
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
