@@ -13,9 +13,9 @@ import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class SparkRunnerTest {
+class AuditTest {
 
-    private final static Logger logger = LoggerFactory.getLogger(SparkRunnerTest.class);
+    private final static Logger logger = LoggerFactory.getLogger(AuditTest.class);
 
     private AfonPropertyProvider properties = new FilePropertyProvider(); // MUST test real properties to prevent insecure code from being deplopyed DO NOT CHANGE!
 

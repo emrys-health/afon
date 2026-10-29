@@ -51,6 +51,11 @@ public class ConfigUtils {
     public static final String CLOUD_ALL = "ALL";
 
     /**
+     * The file with the whitelist of domains.
+     */
+    public static final String WHITELIST_FILE = "whitelist.yaml";
+
+    /**
      * Returns the Afon home dir specified by env {@link #AFON_HOME_ENV} or system property {@link #AFON_HOME_PROPERTY}.
      * If none found, it defaults to $HOME/.afon
      *

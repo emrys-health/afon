@@ -53,7 +53,7 @@ public class WhitelistConfig {
     /**
      * The file in the config dir with the whitelist.
      */
-    public static final String WHITELIST_FILE = "whitelist.yaml";
+    public static final String WHITELIST_FILE = ConfigUtils.WHITELIST_FILE;
 
     private static final Logger logger = getLogger(WhitelistConfig.class);
 

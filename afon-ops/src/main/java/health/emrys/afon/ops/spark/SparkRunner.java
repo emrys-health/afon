@@ -14,7 +14,6 @@ import static org.slf4j.LoggerFactory.getLogger;
 abstract public class SparkRunner {
     private static final Logger logger = getLogger(SparkRunner.class);
 
-
     private AfonPropertyProvider properties;
 
     protected SparkRunner(AfonPropertyProvider properties) {
