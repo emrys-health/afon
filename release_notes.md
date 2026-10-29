@@ -1,5 +1,49 @@
 # Release Notes
 
+## 1.0-beta-8
+
+**Milestone:** [1.0-beta-8](https://github.com/emrys-health/afon/milestone/9)
+**Due:** 2026-10-30
+
+### Closed Issues (36)
+
+- **bug** — [#337](https://github.com/emrys-health/afon/issues/337) Azure issue-cert: DNS access probe failed to clean up
+- **devops** — [#331](https://github.com/emrys-health/afon/issues/331) Check deployed resources are deleted before deleting a stack tofu state
+- **devops** — [#330](https://github.com/emrys-health/afon/issues/330) Add command `azure-rolling-upgrades` to show/cancel the rolling upgrades of an AKS cluster
+- **usability** — [#329](https://github.com/emrys-health/afon/issues/329) Keep Gitea's repositories on a disk that outlives the cluster on Azure, as on AWS
+- **bug** — [#324](https://github.com/emrys-health/afon/issues/324) bug: Azure Cluster Admin Princpal type is hardcoded as `User` - prevents `ServicePrincipal` / Pipeline based deployment
+- **security, configuration** — [#322](https://github.com/emrys-health/afon/issues/322) Allow configuration of domain whitelisting via `whitelist.yaml`
+- **logging, security, smoke test** — [#321](https://github.com/emrys-health/afon/issues/321) Smoke test: check commands executed on a Pod are captured by Tetragon and consumed by Loki
+- **testing** — [#320](https://github.com/emrys-health/afon/issues/320) Move synthetic ehr generation to `scripts/data/synthetic-ehr.sh`
+- [#319](https://github.com/emrys-health/afon/issues/319) Add 'unit' build profile
+- **security, devops, api** — [#318](https://github.com/emrys-health/afon/issues/318) Move smoke test scripts under `scripts/smoke` so they run via the CLI
+- **security, devops, configuration** — [#317](https://github.com/emrys-health/afon/issues/317) Support per-cloud OIDC domain names
+- **security, configuration** — [#316](https://github.com/emrys-health/afon/issues/316) Docker Image signing and auditing
+- **devops, configuration** — [#315](https://github.com/emrys-health/afon/issues/315) Add command to show the name servers of the cloud DNS zones, and whether the domains are delegated to them
+- **security, configuration** — [#314](https://github.com/emrys-health/afon/issues/314) AWS DNS zones and certificates looked up from the domain name, not configured
+- **bug** — [#313](https://github.com/emrys-health/afon/issues/313) IP whitelisting happens before setup for Polaris
+- [#312](https://github.com/emrys-health/afon/issues/312) Allow Polaris access through a port-forward to its pod in the stack setup
+- **security, configuration, api** — [#308](https://github.com/emrys-health/afon/issues/308) Add the `gcp-keycloak` stack
+- **security, configuration** — [#307](https://github.com/emrys-health/afon/issues/307) Add whitelisting to GCP Polaris
+- **security, devops, configuration** — [#306](https://github.com/emrys-health/afon/issues/306) Pin the egress IP on GCP
+- **security, configuration** — [#305](https://github.com/emrys-health/afon/issues/305) Docker Image inventory, pinning and verification.
+- **bug** — [#304](https://github.com/emrys-health/afon/issues/304) `config-init` does not create `catalogs.properties`, so a new env fails with "Unknown Afon catalog"
+- **bug** — [#302](https://github.com/emrys-health/afon/issues/302) NetworkSmokeMain passes when it should fail if Polaris is unpatched
+- **security, configuration** — [#301](https://github.com/emrys-health/afon/issues/301) Make `smoke/test.sh` check the Polaris https ingress by default
+- **devops, configuration** — [#300](https://github.com/emrys-health/afon/issues/300) Pin the versions of the local setup tools and check them against the installed ones
+- **documentation** — [#299](https://github.com/emrys-health/afon/issues/299) Add Azure guide docs
+- **logging, security** — [#298](https://github.com/emrys-health/afon/issues/298) Deploy Tetragon
+- **security, devops, configuration** — [#297](https://github.com/emrys-health/afon/issues/297) Pin the egress IP on Azure
+- **configuration, tech debt** — [#296](https://github.com/emrys-health/afon/issues/296) Introduce AfonCloudProperty enum to replace String logical names in AfonPropertyProvider.getCloudValue()
+- **enhancement** — [#295](https://github.com/emrys-health/afon/issues/295) Pass a single AfonUserProvider from the entry points instead of instantiating FileUserProvider in components
+- **devops, community** — [#294](https://github.com/emrys-health/afon/issues/294) Add GitHub issue and pull request templates
+- [#290](https://github.com/emrys-health/afon/issues/290) SmokeTest: make sure Git can be contacted from the Jupyter pod
+- [#288](https://github.com/emrys-health/afon/issues/288) Write users to the same Iceberg table as config
+- **security, configuration, api** — [#284](https://github.com/emrys-health/afon/issues/284) Deploy `aws-full` and `azure-full` together
+- **testing** — [#201](https://github.com/emrys-health/afon/issues/201) Convert synthetic data from csv to parquet
+- **configuration, tech debt** — [#135](https://github.com/emrys-health/afon/issues/135) Move trino config properties out of source control
+- [#71](https://github.com/emrys-health/afon/issues/71) Trino security
+
 ## 1.0-beta-8 
 
 **Milestone:** [1.0-beta-8](https://github.com/emrys-health/afon/milestone/9)
