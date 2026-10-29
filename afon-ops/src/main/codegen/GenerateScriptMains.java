@@ -130,6 +130,7 @@ public class GenerateScriptMains {
         new ScriptEntry("signing", "SigningReportMain", "signing/report.sh"),
 
         new ScriptEntry("smoke", "SmokeNotebookMain", "smoke/notebook.sh"),
+        new ScriptEntry("smoke", "SmokeSigningMain", "smoke/signing.sh"),
         new ScriptEntry("smoke", "SmokeTestMain", "smoke/test.sh")
     );
 

@@ -126,4 +126,43 @@ class DockerImageSignerTest {
         assertThatThrownBy(() -> DockerImageSigner.outputs().output(List.of("sh", "-c", "echo 'Enter password for private key:'; exit 1")))
             .isInstanceOf(IOException.class).hasMessageContaining("Enter password").hasMessageContaining("set COSIGN_PASSWORD, empty if it has none");
     }
+
+    private static final String PUBLIC_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEexample";
+
+    @Test
+    void verifiesTheImagesWhereTheyAreSignedWithThePublicKey() throws IOException {
+        var verified = DockerImageSigner.verify(images(), List.of(), REGISTRY, PUBLIC_KEY, commands::add);
+
+        assertThat(verified).extracting(DockerImageSigner.Verified::name).containsExactly("spark", "keycloak");
+        assertThat(verified).allMatch(DockerImageSigner.Verified::isOk);
+        assertThat(verified.get(0).image()).isEqualTo("emryshealth/spark@" + OURS);
+        assertThat(verified.get(1).image()).isEqualTo(REGISTRY + "/keycloak/keycloak@" + THEIRS);
+        assertThat(commands).hasSize(2).allSatisfy(command -> assertThat(command)
+            .startsWith("cosign", "verify", "--key").contains("--insecure-ignore-tlog=true"));
+        assertThat(commands.get(0).get(commands.get(0).size() - 1)).isEqualTo("emryshealth/spark@" + OURS);
+        assertThat(commands.get(1).get(commands.get(1).size() - 1)).isEqualTo(REGISTRY + "/keycloak/keycloak@" + THEIRS);
+    }
+
+    @Test
+    void verifyReportsEachImageThatFailsAndStillChecksTheOthers() throws IOException {
+        var verified = DockerImageSigner.verify(images(), List.of("spark", "keycloak", "trino"), REGISTRY, PUBLIC_KEY, command -> {
+            if (command.get(command.size() - 1).startsWith("emryshealth/spark")) {
+                throw new IOException("cosign verify failed: Error: no signatures found");
+            }
+        });
+
+        assertThat(verified).extracting(DockerImageSigner.Verified::error)
+            .containsExactly("not signed", null, "no digest to verify: chart image");
+    }
+
+    @Test
+    void verifyNeedsARegistryAndAPublicKeyAndKnownNames() {
+        assertThatThrownBy(() -> DockerImageSigner.verify(images(), List.of(), "", PUBLIC_KEY, commands::add))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> DockerImageSigner.verify(images(), List.of(), REGISTRY, " ", commands::add))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> DockerImageSigner.verify(images(), List.of("nope"), REGISTRY, PUBLIC_KEY, commands::add))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("Unknown image 'nope'");
+        assertThat(commands).isEmpty();
+    }
 }

@@ -10,6 +10,7 @@ import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.reports.ChartImageReport;
 import health.emrys.afon.ops.reports.DockerImageReport;
+import health.emrys.afon.ops.reports.SignatureReport;
 import health.emrys.afon.ops.reports.SignReport;
 import health.emrys.afon.ops.synth.ChartImages;
 
@@ -24,6 +25,7 @@ import java.util.List;
  * {@code docker-image --export} writes the bundled images file to the config dir instead, to edit it, and
  * {@code docker-image --pin [--file <file>] [<name>...]} looks up the digests of its images in their registries and writes them to it,
  * and {@code docker-image --verify [--file <file>] [--report <file>] [<name>...]} only checks that they are those the tags point to, failing if not,
+ * and {@code docker-image --verify --signatures [--cloud <cloud>] [--report <file>] [<name>...]} checks instead that they have a signature that verifies with the public key of the cloud,
  * and {@code docker-image --sign [--cloud <cloud>] [--report <file>] [<name>...]} signs them at their digests with the cosign key of the cloud, after mirroring those that are not ours
  * to its registry, and {@code docker-image --public-key [--cloud <cloud>]} prints the public key of that key, as the property that Kyverno verifies the images with.
  */
@@ -40,6 +42,7 @@ public class DockerImageMain {
     static final String VERIFY_OPTION = "--verify";
     static final String SIGN_OPTION = "--sign";
     static final String PUBLIC_KEY_OPTION = "--public-key";
+    static final String SIGNATURES_OPTION = "--signatures";
     private static final String CLOUD_OPTION = "--cloud";
     private static final String FILE_OPTION = "--file";
     private static final String REPORT_OPTION = "--report";
@@ -164,6 +167,38 @@ public class DockerImageMain {
         } catch (IOException e) {
             throw new IllegalStateException(e.getMessage(), e);
         }
+    }
+
+    /**
+     * @return whether every image checked has a signature that verifies with the public key of the cloud
+     */
+    private static boolean verifySignatures(SignArguments arguments) {
+        var properties = new OpsPropertyProvider();
+        String registry = properties.getCloudValue(arguments.cloud(), AfonCloudProperty.IMAGE_REGISTRY, "");
+        String publicKey = properties.getCloudValue(arguments.cloud(), AfonCloudProperty.COSIGN_PUBLIC_KEY, "");
+        if (registry.isBlank() || publicKey.isBlank()) {
+            throw new IllegalArgumentException(String.format("Set %s and %s to verify the signatures of the images for %s",
+                AfonCloudProperty.IMAGE_REGISTRY.forCloud(arguments.cloud()).orElseThrow(),
+                AfonCloudProperty.COSIGN_PUBLIC_KEY.forCloud(arguments.cloud()).orElseThrow(), arguments.cloud()));
+        }
+        List<DockerImageSigner.Verified> checks;
+        try {
+            checks = DockerImageSigner.verify(DockerImages.all(), arguments.names(), registry, publicKey, DockerImageSigner.processes());
+        } catch (IOException e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
+        checks.forEach(check -> System.out.printf("%-18s %s: %s%n", check.name(), check.image(),
+                                                  check.isOk() ? "OK" : "FAILED, " + check.error()));
+        long failed = checks.stream().filter(check -> !check.isOk()).count();
+        System.out.printf("Verified the signatures of %d images, %d failed%n", checks.size(), failed);
+        if (failed > 0) {
+            System.out.printf("Sign them with docker-image %s --cloud %s%n", SIGN_OPTION, arguments.cloud().toString().toLowerCase(java.util.Locale.ROOT));
+        }
+        if (arguments.report() != null) {
+            new SignatureReport(arguments.cloud().toString(), registry, java.time.Instant.now(), checks).write(arguments.report());
+            System.out.printf("Report written to %s%n", arguments.report());
+        }
+        return failed == 0;
     }
 
     private static void sign(SignArguments arguments) {
@@ -324,6 +359,11 @@ public class DockerImageMain {
             if (args.length == 1 && EXPORT_OPTION.equals(args[0])) {
                 Path file = DockerImageDefinitions.exportBundled(Path.of(ConfigUtils.configDir()));
                 System.out.printf("Exported the bundled Docker images to %s, which now replaces them: edit it to define the images differently%n", file);
+                return;
+            }
+            if (args.length >= 1 && VERIFY_OPTION.equals(args[0]) && List.of(args).contains(SIGNATURES_OPTION)) {
+                String[] rest = java.util.Arrays.stream(args).filter(arg -> !SIGNATURES_OPTION.equals(arg)).toArray(String[]::new);
+                System.exit(verifySignatures(SignArguments.of(rest, ConfigUtils.afonCloud())) ? 0 : 1);
                 return;
             }
             if (args.length >= 1 && VERIFY_OPTION.equals(args[0])) {

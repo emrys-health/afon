@@ -316,3 +316,25 @@ regression suite completed in 27:03
 
 - `ops.demo.GeneratePySparkKeycloakMain` and `ops.demo.GeneratePySparkContextMain` generate PySpark code declaring
   all the configured catalogs, authenticated with `OIDC_TOKEN`, to paste into a notebook.
+
+## Image signing
+
+`afon-cli.sh smoke-signing [<cloud>] [<image>]` ([signing.sh](../scripts/smoke/signing.sh)) runs the [image signing](stacks.md#image-signing)
+flow on your machine, with a throwaway local registry and a throwaway key, so that it needs no deployed stack, cloud registry or KMS:
+
+1. starts a registry, the image of `docker-images.yaml`, on a free local port;
+2. generates a key pair with no password, and gets its public key with `docker-image --public-key`;
+3. signs one image (`postgres-alpine` unless one is named) with `docker-image --sign`, which copies it to the registry first;
+4. checks with `docker-image --verify --signatures` that the image verifies, and that the others, which were not signed, do not;
+5. removes the registry and the key, also when a step fails.
+
+It needs `docker`, `cosign` and `curl` (see [local setup](local_setup.md)), and network access to pull the image. The cloud only gives the names of the
+properties: the registry, the key and the public key are set for the run, so your config and your own keys are neither read nor changed. It exits
+with 1 if the image does not verify, or if the unsigned images do.
+```shell
+afon-cli.sh smoke-signing azure
+afon-cli.sh smoke-signing aws keycloak     # signs keycloak instead
+```
+
+This is a stand-in until each cloud provides its KMS key and registry: it will then be replaced by a test in the cluster, which signs with the
+KMS key, pushes to the registry of the cloud and checks that Kyverno admits the signed image and reports the unsigned ones.

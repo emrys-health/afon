@@ -323,8 +323,19 @@ images:
     image: apache/polaris
     tag: ${polaris.version}             # the version of Polaris that the project builds against
 ```
+
+The names are those of the bundled file, which the code needs all of; an entry of another name is accepted but nothing uses it.  The `trino` entry
+only sets the image tag, the image being that of the vendored Helm chart.
+
+A shell script that needs the reference of an image asks the ops command `docker-image <name>`, eg `afon-cli.sh docker-image postgres-alpine`
+prints `AFON_DOCKER_IMAGE=postgres:16-alpine`, as `scripts/stack/docker-image-source.sh` does for `kube-polaris-db`.  (Run by `afon.sh`,
+which has no JVM, the script asks it the same way, a Maven run, so a few seconds slower.)  The system property `afon.docker-images`
+names a file to use instead, or `bundled` for only the bundled one.
+
+#### Image pinning
+
 The bundled images are pinned by digest, so that what is pulled is what was pinned, not whatever the tag points to by then (the digest
-only fixes the content, it does not say who built it: that is what a signature is for).  The digest is that of the manifest list, so
+only fixes the content, it does not say who built it: that is what a [signature](#image-signing) is for).  The digest is that of the manifest list, so
 that it holds for each platform.  An image is pulled by its digest, the tag then only documenting it, so when bumping a tag, update the
 digest with it, or the old version is still pulled.  `docker-image --pin` looks up in the registries the digest that each tag points to
 and writes it to the file, leaving the rest of the file, comments included, as it is (it needs Docker and network access, and writes
@@ -347,25 +358,62 @@ The report is written even when the check fails, for a CI job to keep: it has th
 The Polaris images are unpinned, as their tag is the version of Polaris the project builds against, which a pinned digest of another
 version would outlive, and so is the Trino one, only its tag being set, the image being that of the Helm chart.
 
-`docker-image --sign` signs the images with [cosign](https://docs.sigstore.dev/cosign/), at the digests they are pinned to, so that the
-cluster can be made to admit only images that we signed.  It works for one cloud, `--cloud aws|azure|gcp` or else `AFON_CLOUD`, whose
-properties give the registry and the key: `<CLOUD>_IMAGE_REGISTRY`, the registry with the path in it to keep the images in, eg
-`123456789012.dkr.ecr.eu-west-2.amazonaws.com/emrys`, and `<CLOUD>_COSIGN_KEY`, the reference of a key in the KMS of the cloud, as
-`cosign sign --key` takes it, eg `awskms:///alias/afon-image-signing`, which only the deployer role should be able to use.  The `first-party`
-images are signed where they are; the others (`upstream` and `third-party`) are first copied at their digest to the registry, under
-the path of the image without its own registry (`quay.io/keycloak/keycloak` becomes `<registry>/keycloak/keycloak`), and the copy is
-signed, after checking that it has the digest of the source, so what the cluster pulls is in our registry and signed with our key.  An
-image with no digest cannot be signed, and nothing is done if any named cannot be.  It needs Docker, cosign 3 (the flags are its own),
-network access and the credentials of the registry and the key (for a key file, its password in `COSIGN_PASSWORD`, empty if it has none: the command asks for no input).  The signatures are not uploaded to a transparency log, and are stored in
-the legacy layout, a `sha256-<digest>.sig` tag of the repository, which Kyverno reads, rather than cosign 3's new bundle format. The
-record, for a CI job to keep, has the cloud, registry and key reference, when, and each image signed with its source, the image at its
-digest that was signed and whether it was copied. It is written even when signing stops on an error, with what was signed before.
+To check instead that the images are signed, see `docker-image --verify --signatures` in [Image signing](#image-signing).
+
+The images that the Helm charts of the stacks pull are the charts' own, so they are not in the file.  `docker-image --charts` reports them,
+from the plans synthesised for the stacks (`validate-stack <stack-id>` makes one), so with the values the stack gives each chart, eg the
+Trino tag it overrides: it renders every chart with `helm template`, which needs helm installed but no cluster, and lists the images of
+each release, saying if each is pinned by digest, has a tag only or none, and which the file lists.  The images that only `helm test`
+pods use are counted, not listed.
+```shell
+afon-cli.sh docker-image --charts aws-full azure-full
+afon-cli.sh docker-image --charts --report charts.md      # the stacks that are synthesised, also as a report, JSON if named *.json
+```
+
+#### Image signing
+
+##### Sign the images
+
+`docker-image --sign` signs the images with [cosign](https://docs.sigstore.dev/cosign/), so that the cluster can be made to admit only
+images that we signed.  Each signature covers the digest the image is pinned to, not its tag, so an image with no digest cannot be
+signed, and nothing is done if any of the named images cannot be.
+
+It works for one cloud, `--cloud aws|azure|gcp` or else `AFON_CLOUD`, whose properties give:
+- `<CLOUD>_IMAGE_REGISTRY`: the registry, with the path in it, to keep the images in, eg `123456789012.dkr.ecr.eu-west-2.amazonaws.com/emrys`;
+- `<CLOUD>_COSIGN_KEY`: the reference of a key in the KMS of the cloud, as `cosign sign --key` takes it, eg `awskms:///alias/afon-image-signing`,
+  which only the deployer role should be able to use.
+
+The `first-party` images are signed where they are.  The others (`upstream` and `third-party`) are first copied to the registry: the exact
+content that their pinned digest identifies, whatever their tag points to by now.  The copy goes under the path of the image without its
+own registry (`quay.io/keycloak/keycloak` becomes `<registry>/keycloak/keycloak`) and is signed, after checking that it has the digest of
+the source.  So what the cluster pulls is in our registry, signed with our key.
+
+It needs Docker, cosign 3 (the flags are its own), network access and the credentials of the registry and the key.  For a key file, its
+password goes in `COSIGN_PASSWORD`, empty if it has none, as the command asks for no input.
+
+The signatures are not uploaded to a transparency log, and are stored in the legacy layout, a `sha256-<digest>.sig` tag of the repository,
+which Kyverno reads, rather than cosign 3's new bundle format.
+
+`--report` writes a record of the signing, for a CI job to keep: the cloud, registry and key reference, when, and each image signed with
+its source, the reference of the image that was signed, with its digest, and whether it was copied.  It is written even when signing stops on an error, with
+what was signed before.
 ```shell
 afon-cli.sh docker-image --sign --cloud aws             # every image that has a digest
 afon-cli.sh docker-image --sign --cloud aws keycloak    # one image
 afon-cli.sh docker-image --sign --cloud aws --report signed.md   # also records the result, as Markdown, or JSON if named *.json
-cosign verify --key <public key> --insecure-ignore-tlog=true <registry>/keycloak/keycloak@<digest>
 ```
+
+To check that the images are signed, without a cluster, `docker-image --verify --signatures` runs `cosign verify` on each image with the public
+key of the cloud, `<CLOUD>_COSIGN_PUBLIC_KEY`, where `--sign` put the signature: the image itself if it is first-party, else its copy in the registry.  It needs
+cosign and access to the registry, not the private key.  Every image is checked even if one fails, and it exits with 1, naming the images and
+why (not signed, or signed with another key), if any does, so a CI job can run it before a deploy:
+```shell
+afon-cli.sh docker-image --verify --signatures --cloud aws             # every image that has a digest
+afon-cli.sh docker-image --verify --signatures --cloud aws keycloak    # one image
+afon-cli.sh docker-image --verify --signatures --cloud aws --report signatures.md   # also writes a report, as Markdown, or JSON if named *.json
+```
+
+##### Verify the signatures in the cluster
 
 The `Kyverno` component of the full stacks installs [Kyverno](https://kyverno.io) in the `kyverno` namespace, and applies two
 `ImageValidatingPolicy`s that check that the images of the pods, the `containers` and the `initContainers`, are signed with the key of the
@@ -392,6 +440,8 @@ If Kyverno itself is down, an enforced namespace rejects its pods too, but the n
 let the pods in meanwhile, remove the label, or delete the policy with `kubectl delete imagevalidatingpolicies.policies.kyverno.io
 emrys-verify-images-enforce`.
 
+##### The public key
+
 `afon-cli.sh signing-public-key <aws|azure|gcp>` sets it for you: it generates a key pair (once, in `$AFON_HOME/cosign/<cloud>`) unless
 `<CLOUD>_COSIGN_KEY` is set, in which case it uses that key, and writes the public key to `<CLOUD>_COSIGN_PUBLIC_KEY` in
 `afon-<cloud>.properties`, keeping a `.bak` copy, with `--print` only printing the line.  A generated key has no password unless
@@ -408,6 +458,8 @@ an image the admission controller only needs to reach **the registry** (and, as 
 That is what an egress-restricted TRE must allow it: the acceptance test restricts it to exactly that with a `NetworkPolicy` and checks that
 images are still verified (and, without the registry, that they are not).
 
+##### The signing report
+
 `afon-cli.sh signing-report` reads the policy reports that Kyverno writes on the current kubectl context (it needs `kubectl` and `jq`), and
 tells which pods the policies checked, whether each passed, and with `--images`, the images of the pods that failed, with the number of pods:
 that is what is left to sign. The pods are those of the namespaces labelled `afon.emrys.health/verify-images`, and Kyverno finds them by
@@ -422,24 +474,6 @@ ReplicaSets...) repeat those of their pods, so they are left out.
 
 The `ephemeralContainers` are not checked yet, and images that no one has signed are reported, such as those of the Helm charts, until
 they are mirrored and signed.
-
-The images that the Helm charts of the stacks pull are the charts' own, so they are not in the file.  `docker-image --charts` reports them,
-from the plans synthesised for the stacks (`validate-stack <stack-id>` makes one), so with the values the stack gives each chart, eg the
-Trino tag it overrides: it renders every chart with `helm template`, which needs helm installed but no cluster, and lists the images of
-each release, saying if each is pinned by digest, has a tag only or none, and which the file lists.  The images that only `helm test`
-pods use are counted, not listed.
-```shell
-afon-cli.sh docker-image --charts aws-full azure-full
-afon-cli.sh docker-image --charts --report charts.md      # the stacks that are synthesised, also as a report, JSON if named *.json
-```
-
-The names are those of the bundled file, which the code needs all of; an entry of another name is accepted but nothing uses it.  The `trino` entry
-only sets the image tag, the image being that of the vendored Helm chart.
-
-A shell script that needs the reference of an image asks the ops command `docker-image <name>`, eg `afon-cli.sh docker-image postgres-alpine`
-prints `AFON_DOCKER_IMAGE=postgres:16-alpine`, as `scripts/stack/docker-image-source.sh` does for `kube-polaris-db`.  (Run by `afon.sh`,
-which has no JVM, the script asks it the same way, a Maven run, so a few seconds slower.)  The system property `afon.docker-images`
-names a file to use instead, or `bundled` for only the bundled one.
 
 ### Setup AWS full stack
 

@@ -31,7 +31,13 @@ own registry, eg quay.io/keycloak/keycloak to <registry>/keycloak/keycloak, and 
 of the source.  Without names it signs each image that has a digest.  It needs Docker, cosign 3, network access and the credentials of the
 registry and the key, with COSIGN_PASSWORD set to the password of a key file (empty if it has none).  Signing an image again adds a signature.  --report <file> writes the record of the signing, JSON if the file is named *.json, Markdown if *.md, even when
 signing stops on an error: the cloud, registry and key reference, when, and each image signed, with its source, the image at its digest that
-was signed, and whether it was copied, for a CI job to keep.  The signatures are not uploaded to a transparency log, so verify one with cosign verify --key <public key> --insecure-ignore-tlog=true <image>@<digest>.
+was signed, and whether it was copied, for a CI job to keep.  The signatures are not uploaded to a transparency log.
+
+--verify --signatures checks instead that the images have a signature that verifies with the public key of one cloud (--cloud <aws|azure|gcp> or
+else AFON_CLOUD), <CLOUD>_COSIGN_PUBLIC_KEY, in the place --sign puts it: the image itself if it is ours, else its copy in <CLOUD>_IMAGE_REGISTRY.  It runs
+cosign verify, so it needs cosign and the registry, but not the private key or a cluster.  Without names it checks each image that has a digest; every image is
+checked even if one fails, and the exit code is 1, naming them with the reason (not signed, or signed with another key), if any does.  --report <file> writes
+the result, JSON if it is named *.json, Markdown if *.md, even when the check fails.
 
 --public-key prints the public key of the cosign key of one cloud (--cloud <aws|azure|gcp> or else AFON_CLOUD), <CLOUD>_COSIGN_KEY, as the
 line <CLOUD>_COSIGN_PUBLIC_KEY=<the base64 of the key, a single word> to put in the config of the stack, which Kyverno verifies the
@@ -50,6 +56,7 @@ Usage:
   afon-cli.sh docker-image --export
   afon-cli.sh docker-image --pin [--file <file>] [<name>...]
   afon-cli.sh docker-image --verify [--file <file>] [--report <file>] [<name>...]
+  afon-cli.sh docker-image --verify --signatures [--cloud <aws|azure|gcp>] [--report <file>] [<name>...]
   afon-cli.sh docker-image --sign [--cloud <aws|azure|gcp>] [--report <file>] [<name>...]
   afon-cli.sh docker-image --public-key [--cloud <aws|azure|gcp>]
   afon-cli.sh docker-image --charts [--report <file>] [<stack-id>...]
