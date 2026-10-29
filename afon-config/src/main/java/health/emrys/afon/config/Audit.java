@@ -38,9 +38,13 @@ public class Audit {
 
     public List<String> configuration() {
         List<String> lines = new ArrayList<>();
+        lines.add(format("%s Properties taken from %s deployed by %s",
+                         prepend,
+                         ConfigUtils.configDir(),
+                         System.getProperty("user.name")));
         appendNonSecrets(lines);
         lines.add(allUsers());
-        lines.add(whitelistYamlIfPresent());
+        lines.addAll(whitelistYamlIfPresent());
         logger.info("Audited configuration:\n{}", String.join("\n", lines));
         return lines;
     }
@@ -67,22 +71,22 @@ public class Audit {
         return allUsers;
     }
 
-    private String whitelistYamlIfPresent() {
+    private List<String> whitelistYamlIfPresent() {
         String path      = ConfigUtils.configDir() + File.separator + ConfigUtils.WHITELIST_FILE;
         Path   whitelist = Path.of(path);
-        String content   = "";
         if (Files.isRegularFile(whitelist)) {
             try {
-                content = Files.readString(whitelist, StandardCharsets.UTF_8);
+                String content = Files.readString(whitelist, StandardCharsets.UTF_8);
+                return List.of(format(
+                    """
+                    %s Configured allowlist as defined in %s:
+                    %s
+                    """, prepend, path, content));
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot read whitelist " + whitelist, e);
             }
         }
-        return format(
-            """
-            %s Configured allowlist as defined in %s:
-            %s
-            """, prepend, path, content);
+        return List.of();
     }
 
 }
