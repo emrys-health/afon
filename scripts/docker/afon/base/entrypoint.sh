@@ -15,8 +15,9 @@ if ! id -u $NEW_USER >/dev/null 2>&1; then
     useradd -m -u $USER_ID -g $GROUP_ID -s /bin/bash $NEW_USER
 fi
 
-mkdir -p /home/$NEW_USER
-chown $USER_ID:$GROUP_ID /home/$NEW_USER
+# .afon too, as mounting eg ~/.afon/config has docker create it as root
+mkdir -p /home/$NEW_USER/.afon
+chown $USER_ID:$GROUP_ID /home/$NEW_USER /home/$NEW_USER/.afon
 
 export HOME=/home/$NEW_USER
 exec su -m $NEW_USER -c "PATH=$PATH exec $@"
