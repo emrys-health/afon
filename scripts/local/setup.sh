@@ -193,6 +193,43 @@ install_package(){
   esac
 }
 
+# The aws cli, from apt if it offers the pinned version, ie version 2 of awscli, which only the newer Ubuntu releases do (22.04 has version 1 and
+# 24.04 has no awscli), else from the official installer, which installs the pinned version itself.
+install_aws(){
+  local pinned
+  pinned=$(pinned_version aws)
+  if is_linux && ! apt-cache madison awscli 2>/dev/null | awk '{print $3}' | grep -qE "^(.*:)?${pinned//./\\.}"; then
+    install_aws_bundle
+  else
+    install_package awscli awscli aws
+  fi
+}
+
+# Installs the pinned aws cli from the zip of the official installer, unless it is at the pinned version: the bundle in /usr/local/aws-cli
+# (~/.local/aws-cli with NO_SUDO=true) and a link to it in the directory of the release binaries.
+install_aws_bundle(){
+  local os arch version Os arch2 arch3 dir bundle tmp sudo= found
+  if check_tool_version aws >/dev/null; then
+    echo "aws is up to date at $(command -v aws)"
+    return 0
+  fi
+  release_vars aws || return 1
+  dir=$(bin_dir)
+  if no_sudo; then bundle=$HOME/.local/aws-cli; mkdir -p "$dir" "$bundle"; else bundle=/usr/local/aws-cli; fi
+  if ! no_sudo && { [ ! -w "$dir" ] || [ ! -w "$(dirname "$bundle")" ]; }; then sudo=sudo; fi
+  tmp=$(mktemp -d)
+  echo "Installing aws in $dir"
+  curl -fsSL -o "$tmp/awscli.zip" "https://awscli.amazonaws.com/awscli-exe-linux-${arch3}-${version}.zip" \
+    && unzip -oq "$tmp/awscli.zip" -d "$tmp" && $sudo "$tmp/aws/install" --update -i "$bundle" -b "$dir" >/dev/null
+  local rc=$?
+  rm -rf "$tmp"
+  [ $rc -eq 0 ] || return 1
+  found=$(command -v aws)
+  if [ "$found" != "$dir/aws" ]; then
+    echo "WARNING: $found shadows the pinned aws installed in $dir: remove it, eg with 'sudo apt remove awscli', or fix the PATH" >&2
+  fi
+}
+
 # The gke auth plugin, needed by kubectl to authenticate to GKE, of the same version as gcloud: its own package on linux, as a gcloud
 # installed by apt has its component manager disabled, and a gcloud component on macos.
 install_gke_auth_plugin(){
@@ -263,7 +300,7 @@ setup_tools(){
   install_kind
   install_cosign
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then
-    install_package awscli awscli aws
+    install_aws
     install_eksctl
   fi
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "azure" ]; then

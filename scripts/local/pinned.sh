@@ -34,6 +34,10 @@ PINNED_aws_linux=2.31.35
 PINNED_git_ubuntu2204=2.34
 PINNED_mvn_ubuntu2204=3.6.3
 
+# Ubuntu 24.04 (noble) overrides.
+PINNED_git_ubuntu2404=2.43
+PINNED_mvn_ubuntu2404=3.8.7
+
 # macOS overrides, where brew does not offer the common pin.  Brew offers only the current version of a formula, and gcloud,
 # a cask which updates itself, cannot be pinned.
 PINNED_gcloud_macos=590.0.0
