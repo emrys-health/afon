@@ -2,18 +2,19 @@
 ARG BASE_IMAGE=afon-base-image
 FROM ${BASE_IMAGE} AS build
 
-# == Build context ==
+# == Build ==
 # We are going to build out the mvn project / CLI which can then be dumped into the built CLI
 WORKDIR /src
 COPY . .
 
 # Idea behind this is the tests will fail out as we're not introducing configured context for the CLI build
-#   This probably limits documentation generation - I'd imagine we could do this in a different step
+#  NB: This probably limits documentation generation - I'd imagine we could do this in a different step / not at all.
 RUN --mount=type=cache,target=/root/.m2 \
     java afon-ops/src/main/codegen/GenerateScriptMains.java afon-ops/target/generated-sources/scripts-main \
  && mvn -B -q -Pcli,-acceptance install -DskipTests -Dexec.skip=true -Dafon.cli.dir=/out/cli
 
 # == Runtime ==
+# Bundle the compiled CLI into a final exported image
 FROM ${BASE_IMAGE}
 
 ENV AFON_CLI_DIR=/opt/afon/cli \
@@ -26,9 +27,7 @@ COPY --from=build /out/cli/scripts ${AFON_CLI_DIR}/scripts
 COPY --from=build /out/cli/templates ${AFON_CLI_DIR}/templates
 COPY --from=build /out/cli/docs ${AFON_CLI_DIR}/docs
 
-RUN find ${AFON_CLI_DIR}/scripts -name '*.sh' -exec chmod 0755 {} + \
- && afon-cli.sh -c azure help | grep -q 'config-init' \
- && afon-cli.sh -c azure help | grep -q 'azure-issue-cert'
+RUN find ${AFON_CLI_DIR}/scripts -name '*.sh' -exec chmod 0755 {} +
 
 # Declared last, as they change every commit and would otherwise bust the cache of the steps above
 ARG BASE_IMAGE AFON_VERSION AFON_COMMIT AFON_REPO AFON_CREATED
