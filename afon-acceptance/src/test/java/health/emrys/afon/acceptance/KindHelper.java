@@ -30,7 +30,7 @@ import static org.slf4j.LoggerFactory.getLogger;
  * tests of the signing of images.  It drives the {@code docker}, {@code kind}, {@code kubectl}, {@code helm} and {@code cosign}
  * commands, which must be installed, and never touches the user's kubeconfig, using one of its own.
  * <p>
- * The registry is a Testcontainers container, joined to kind's Docker network (see {@link #connectRegistry()}) under the alias {@value #REGISTRY_ALIAS}, so that the
+ * The registry is a Testcontainers container, joined to kind's Docker network (see {@link #connectRegistry()}) under an alias of its own, so that the
  * Kyverno of the cluster reaches it by that name, while the tests reach it at {@code localhost:<port>}: both see the same repositories,
  * and a signature is found by the digest of the image whatever the name of the registry.
  */
@@ -39,7 +39,6 @@ public class KindHelper implements AutoCloseable {
     private static final Logger logger = getLogger(KindHelper.class);
 
     public static final List<String> TOOLS = List.of("docker", "kind", "kubectl", "helm", "cosign");
-    public static final String REGISTRY_ALIAS = "kind-registry";
     public static final int REGISTRY_PORT = 5000;
     private static final String KIND_NETWORK = "kind";
     private static final String KYVERNO_CHART = "kyverno-3.9.2.tgz";
@@ -55,6 +54,9 @@ public class KindHelper implements AutoCloseable {
 
     private final Path directory;
     private final String clusterName = "afon-signing-" + UUID.randomUUID().toString().substring(0, 8);
+    // Not shared with any other run or registry: the clusters of kind share one Docker network, where an alias that two containers have, eg
+    // the "kind-registry" of kind's own local registry setup, is answered with both, so that the cluster may reach the other registry
+    private final String registryAlias = "registry-" + clusterName;
     private final Path kubeconfig;
     private GenericContainer<?> registry;
     private int hostPort;
@@ -155,7 +157,7 @@ public class KindHelper implements AutoCloseable {
      * which is IPv6-enabled.
      */
     public void connectRegistry() {
-        runOrFail(null, Map.of(), "docker", "network", "connect", "--alias", REGISTRY_ALIAS, KIND_NETWORK, registry.getContainerId());
+        runOrFail(null, Map.of(), "docker", "network", "connect", "--alias", registryAlias, KIND_NETWORK, registry.getContainerId());
     }
 
     /**
@@ -214,7 +216,7 @@ public class KindHelper implements AutoCloseable {
      * @return the address of the registry for the cluster
      */
     public String clusterRegistry() {
-        return REGISTRY_ALIAS + ":" + REGISTRY_PORT;
+        return registryAlias + ":" + REGISTRY_PORT;
     }
 
     public Result kubectl(String... args) {
