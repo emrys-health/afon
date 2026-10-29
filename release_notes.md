@@ -33,6 +33,10 @@
   - It applies no policy until `AWS_COSIGN_PUBLIC_KEY` or `AZURE_COSIGN_PUBLIC_KEY` is set, and only logs a warning, so existing configs keep working: set it with `afon-cli.sh signing-public-key <aws|azure|gcp>`, which generates a throwaway key pair, or uses `<CLOUD>_COSIGN_KEY`, and writes the public key to `afon-<cloud>.properties`.  The new properties, all optional and blank by default, are in `templates/config`: copy the ones you need.
   - With the key, the `default` namespace is **audited**, never enforced: pods are admitted, and the images that are not signed with the key are recorded in the policy reports.  Read them with `afon-cli.sh signing-report`, and enforce a namespace, once its images are signed, with `<CLOUD>_IMAGE_POLICY_ENFORCED_NAMESPACES`.  Expect every image to be reported until the images are mirrored and signed with `afon-cli.sh docker-image --sign` (which needs cosign 3).
   - See [Kyverno](docs/stacks.md#define-your-own-docker-images) in the stacks documentation.
+- **Azure deployer may be a service principal or a managed identity ([#324](https://github.com/emrys-health/afon/issues/324)):**
+  - The cluster admin role assignment no longer fixes the principal type to `User`: Azure resolves it from the object id, so a pipeline can deploy as a service principal or a managed identity.  No config change is needed.
+  - The deployer needs a role that can create role assignments (see [Azure roles](scripts/azure/roles.md)), and the identity deploying is now logged, eg `Deploying to Azure as servicePrincipal <app id>`.
+- **`AZURE_AKS_NODE_POOL` separated by commas:** write `vmSize:Standard_D4s_v6,nodeCount:2`.  The old `;` separator is still read by the deploy, but the shell scripts that source `afon-azure.properties` take it as the end of a command (`nodeCount:2: command not found`), so an existing value with a `;` must be changed to `,` (or the `;` escaped as `\;`).
 
 ## 1.0-beta-7
 

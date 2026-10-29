@@ -155,16 +155,18 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     }
 
     /**
-     * Parses the {@code key1:value1;...;keyN:valueN} encoding used by {@link AfonProperty#AZURE_AKS_NODE_POOL}
+     * Parses the {@code key1:value1,...,keyN:valueN} encoding used by {@link AfonProperty#AZURE_AKS_NODE_POOL}
      * into a {@code Map} keyed on the camel-cased name of the node pool builder method, eg {@code nodeCount} or {@code vmSize}.
-     * If a key is missing, the value will fall back to its own default upon {@code Map#getOrDefault()}. .
+     * If a key is missing, the value will fall back to its own default upon {@code Map#getOrDefault()}.
+     * The pairs may also be separated by {@code ;}, which the property used before, but which a shell reading the
+     * properties file takes as the end of a command, so it must be escaped there: {@code ,} is safe in both.
      */
-    private static Map<String, String> parseNodePoolConfig(String encoded) {
+    static Map<String, String> parseNodePoolConfig(String encoded) {
         Map<String, String> config = new HashMap<>();
         if (encoded == null || encoded.isBlank()) {
             return config;
         }
-        for (String entry : encoded.split(";")) {
+        for (String entry : encoded.split("[,;]")) {
             String[] keyValue = entry.split(":", 2);
             if (keyValue.length == 2) {
                 config.put(keyValue[0].trim(), keyValue[1].trim());
@@ -193,7 +195,10 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
      *
      * <p>An Azure RBAC assignment returns immediately from ARM but takes some minutes to
      * propagate to the AKS authorization webhook, so a same-run apply of in-cluster
-     * resources can still be Forbidden. The create-time provisioner blocks until
+     * resources can still be Forbidden.
+     *
+     * <p>The principal type is deliberately left unset, so that Azure resolves it from the object id: the deployer may be
+     * a user, a service principal or a managed identity. The create-time provisioner blocks until
      * {@code kubectl auth can-i} confirms the grant is effective; because the in-cluster
      * resources depend on this assignment, they will not start until it does.
      */
@@ -217,7 +222,6 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             this, "tofu-cluster-admin", RoleAssignmentConfig
             .builder()
             .principalId(clientConfig.getObjectId())
-            .principalType("User")
             .roleDefinitionName("Azure Kubernetes Service RBAC Cluster Admin")
             .scope(aksCluster.getId())
             .provisioners(List.of(waitForRbac))

@@ -91,6 +91,25 @@ class StepActionsTest {
                                              "tofu destroy --auto-approve -exclude=aws_ebs_volume.retained_gitea_volume");
     }
 
+    /**
+     * The kind of identity deploying to Azure is logged, read from {@code az account show}, whether a user, a service
+     * principal or a managed identity.
+     */
+    @Test
+    void describesTheAzureDeployer() {
+        assertThat(StepActions.describeAzureDeployer("user\nuser@example.com\n")).isEqualTo("user user@example.com");
+        assertThat(StepActions.describeAzureDeployer("servicePrincipal\n0000-1111\n")).isEqualTo("servicePrincipal 0000-1111");
+        assertThat(StepActions.describeAzureDeployer("servicePrincipal\nuserAssignedIdentity\n"))
+            .isEqualTo("servicePrincipal userAssignedIdentity");
+    }
+
+    @Test
+    void toleratesMissingAzureDeployerOutput() {
+        assertThat(StepActions.describeAzureDeployer("")).isEqualTo("an unknown identity");
+        assertThat(StepActions.describeAzureDeployer("null\nnull\n")).isEqualTo("an unknown identity");
+        assertThat(StepActions.describeAzureDeployer("user\n")).isEqualTo("user");
+    }
+
     private static final String STATE_WITH_RESOURCES = """
         {"version": 4, "resources": [
           {"mode": "data", "type": "aws_region", "name": "current", "instances": [{"attributes": {}}]},

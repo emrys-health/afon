@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.URI;
@@ -413,8 +414,49 @@ public class StepActions {
         // google_container_cluster resource and uses GKE's built-in CNI, so the targeted apply
         // yields a Ready cluster whose endpoint and CA cert are then known for phase two.
         // Stacks without a managed cluster yield no targets and skip straight to the full apply.
+        if (stackId.cloud() == AfonCloud.AZURE) {
+            logAzureDeployer();
+        }
         Path stackDir = stackDir(stackId);
         tofuApply(stackDir, clusterBootstrapTargets(stackDir), maxAttempts, outputStream);
+    }
+
+    /**
+     * Logs the kind of identity that deploys to Azure, ie a user, a service principal or a managed identity, so that a
+     * failure to grant it a role, eg cluster admin, is read against who is deploying.  Informational only: if the identity
+     * cannot be read, eg because {@code az} is not logged in, it is logged and the deployment goes on.
+     */
+    private void logAzureDeployer() {
+        try {
+            // read from the process directly, as the output given to run() is pumped asynchronously, and may still be empty
+            Process process = new ProcessBuilder("az", "account", "show", "--query", "[user.type, user.name]", "--output", "tsv")
+                .redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            int exit = process.waitFor();
+            if (exit != 0) {
+                logger.warn("Could not determine the identity deploying to Azure: az account show exited with {}", exit);
+                return;
+            }
+            logger.info("Deploying to Azure as {}", describeAzureDeployer(output));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            logger.warn("Could not determine the identity deploying to Azure: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * @param accountUser the {@code user.type} and {@code user.name} of {@code az account show}, one per line
+     * @return a description of the deployer, eg {@code user user@example.com} or {@code servicePrincipal <app id>}
+     */
+    static String describeAzureDeployer(String accountUser) {
+        String[] lines = accountUser.strip().split("\\R");
+        String type = lines[0].strip();
+        String name = lines.length > 1 ? lines[1].strip() : "";
+        if (type.isEmpty() || type.equals("null")) {
+            return "an unknown identity";
+        }
+        return name.isEmpty() || name.equals("null") ? type : type + " " + name;
     }
 
     private void tofuApply(Path tofuDir, List<String> bootstrapTargets, int maxAttempts, OutputStream outputStream) throws IOException {

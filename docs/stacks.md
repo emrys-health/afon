@@ -495,9 +495,9 @@ Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_st
 afon-cli.sh manage-stack setup azure-full
 ```
 
-**NOTE:** `azure-full` needs 4 nodes of the default size, not the 3 that are the default: set `AZURE_AKS_NODE_POOL=nodeCount:4` in
-`afon-azure.properties` first, else pods such as the Spark Connect driver stay Pending (`Insufficient cpu`).  Check with
-`afon-cli.sh kube-estimator azure-full 4`.
+**NOTE:** `azure-full` does not fit on the default nodes (3 × `Standard_D2s_v3`), nor on 4 of them: pods such as the Spark Connect driver
+stay Pending (`Insufficient cpu`).  Set larger nodes in `afon-azure.properties` first, eg
+`AZURE_AKS_NODE_POOL=vmSize:Standard_D4s_v6,nodeCount:2`, and check with `afon-cli.sh kube-estimator azure-full <nodes>`.
 
 **NOTE:** `azure-full` deploys the network policies, which limit what the notebooks and the Spark master and driver can resolve to
 the domains of `whitelist.yaml`.  Its `azure` section, as in the template, lists the Azure names: the OIDC, Polaris and Jupyter domain
@@ -724,7 +724,7 @@ They check the same layers as on AWS.  The stacks serving KeyCloak are those tha
 A pod is placed on a node by its CPU and memory *requests*, so one that no node has the requests left for stays Pending
 (`FailedScheduling: ... Insufficient cpu`) until the Helm release it belongs to times out, although the cluster is
 mostly idle.  Before deploying, estimate whether a stack fits on the nodes, from its synthesised plan and the requests
-of its pods and Helm charts, eg with the 4 nodes that `azure-full` needs, configured by `AZURE_AKS_NODE_POOL=nodeCount:4`:
+of its pods and Helm charts, eg with the nodes configured by `AZURE_AKS_NODE_POOL`:
 ```shell
 afon-cli.sh validate-stack azure-full
 afon-cli.sh kube-estimator azure-full 4 Standard_D2s_v3

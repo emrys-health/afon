@@ -6,6 +6,9 @@ We have different kinds of identity, with different principals:
 
 - **Deployer**:
   - a human or CI identity, whoever is logged in via `az login` when a script runs.
+  - It may be a user, a service principal or a managed identity, eg that of a pipeline.  The principal type of the role
+    assignments it receives is left for Azure to resolve from the object id, not fixed to a user.
+  - `tofu apply` logs which it is, eg `Deploying to Azure as servicePrincipal <app id>`, read from `az account show`.
   - Creates resources and creates role assignments.
 - **Operational identities**: 
   - multi-tenant app's service principal (`APP_SP_ID`) 
@@ -63,7 +66,8 @@ Roles required for the **deployer**:
 - **A role-assignment-granting role**
   - One of roles, as above for the Env creation/teardown, used to create two more role assignments:
   - **Network Contributor** → `aks-identity` (subnet scope)
-  - **Azure Kubernetes Service RBAC Cluster Admin** → the deployer itself (cluster scope)
+  - **Azure Kubernetes Service RBAC Cluster Admin** → the deployer itself (cluster scope), whether a user, a service
+    principal or a managed identity ([#324](https://github.com/emrys-health/afon/issues/324))
 
 ## TLS certs issuance (`issue-cert.sh`)
 
@@ -131,4 +135,4 @@ the limit of weekly issuances of Let's Encrypt.
 | Property | Set where | Purpose |
 |---|---|---|
 | `AZURE_GRANT_ROLES` | `afon-azure.properties`, read by `rbac.sh` | Which role(s) count as "can manage role assignments". Optional, defaults to the three built-ins. |
-| `AZURE_AKS_NODE_POOL` | `afon-azure.properties`, read by `AzureCloudProvider` | AKS system node pool overrides (`vmSize`, `nodeCount`). Optional, defaults to `Standard_D2s_v3`/`3`, but `azure-full` needs `nodeCount:4`. |
+| `AZURE_AKS_NODE_POOL` | `afon-azure.properties`, read by `AzureCloudProvider` | AKS system node pool overrides (`vmSize`, `nodeCount`), comma-separated, eg `vmSize:Standard_D4s_v6,nodeCount:2`. Optional, defaults to `Standard_D2s_v3`/`3`, but `azure-full` needs larger nodes, eg `vmSize:Standard_D4s_v6,nodeCount:2`. |

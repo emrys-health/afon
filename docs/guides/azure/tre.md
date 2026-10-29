@@ -27,7 +27,7 @@ AZURE_POLARIS_DOMAIN_NAME=${ENV_NAME}polarisazure.click
 AZURE_JUPYTER_DOMAIN_NAME=${ENV_NAME}jupyterazure.click
 AZURE_GITEA_BUCKET=<required: blob container for Gitea, made by azure-create>
 AZURE_POLARIS_LOG_BUCKET=<optional>
-AZURE_AKS_NODE_POOL=nodeCount:4
+AZURE_AKS_NODE_POOL=vmSize:Standard_D4s_v6,nodeCount:2
 ```
 `afon.properties`:
 ```shell
@@ -39,8 +39,8 @@ account, so keep it (the entries of the clouds you do not deploy to are left out
 `secret-azure.properties`: `AZURE_CONNECTION_STRING` is required (Loki keeps the monitoring logs in the `azure` catalog container).
 
 **Why these matter:**
-- `azure-full` needs **4 nodes** of the default size, else pods such as the Spark Connect driver stay Pending (`Insufficient cpu`).
-  Check with `afon-cli.sh kube-estimator azure-full 4`.
+- `azure-full` does not fit on the default nodes, nor on 4 of them: pods such as the Spark Connect driver stay Pending (`Insufficient cpu`),
+  so use larger nodes, eg `vmSize:Standard_D4s_v6,nodeCount:2`.  Check with `afon-cli.sh kube-estimator azure-full <nodes>`.
 - The network policies limit what notebooks and Spark can resolve to `whitelist.yaml`; missing names give
   `UnknownHostException: <polaris domain>: Temporary failure in name resolution`.  They use the cluster's Advanced Container
   Networking Services, which the stack enables.
