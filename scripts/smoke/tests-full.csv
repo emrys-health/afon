@@ -1,4 +1,5 @@
 name|command|args
+db|db-smoke|
 trino|trino-query-smoke|
 tetragon|tetragon-loki-smoke|
 loki|promtail-loki-smoke|
