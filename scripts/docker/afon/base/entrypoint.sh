@@ -19,10 +19,6 @@ fi
 mkdir -p /home/$NEW_USER
 chown $USER_ID:$GROUP_ID /home/$NEW_USER
 
+# -m keeps the environment, including the PATH of the image
 export HOME=/home/$NEW_USER
-
-export PATH=/opt/java/bin:/opt/maven/bin:$PATH
-
-exec su -m $NEW_USER -c "PATH=$PATH exec $@"
-
-
+exec su -m $NEW_USER -c "exec $@"
