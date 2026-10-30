@@ -5,6 +5,39 @@
 **Milestone:** [1.0-beta-8](https://github.com/emrys-health/afon/milestone/9)
 **Due:** 2026-10-30
 
+### Upgrade notes
+
+**IMPORTANT:** one-off steps when upgrading from 1.0-beta-7:
+
+- **AWS DNS zones and certificates looked up ([#314](https://github.com/emrys-health/afon/issues/314)):**
+  - The properties in `AWS_*_{DNS_ZONES|CERT_ARN}` in `afon-aws.properties` are now ignored, so existing configs keep working;
+  - `afon-cli.sh config-updates` removes them.
+- **Check that each domain name has a hosted zone of its own name and an issued certificate before you deploy:**
+  - `afon-cli.sh aws-issue-cert` issues the certificates, skips domain that already has one (`--force` requests a new one).
+- **Optional KeyCloak domain name per cloud ([#317](https://github.com/emrys-health/afon/issues/317)):**
+  - `AWS_`, `AZURE_` and `GCP_OIDC_DOMAIN_NAME`, blank by default, give a cloud a KeyCloak of its own; blank, the cloud uses `OIDC_DOMAIN_NAME`, so existing configs behave as before.
+  - `OIDC_ISSUER_URL` is now a template: set it to `https://[OIDC_DOMAIN_NAME]/realms/polaris` so that it follows the domain name of the cloud.  An issuer with another host fails the stack synthesis.
+  - `check-oidc` now takes the cloud: `afon-cli.sh check-oidc <cloud>`.
+  - If a domain has several issued certificates, the latest is used.
+- **TRE domain whitelist in `whitelist.yaml` ([#322](https://github.com/emrys-health/afon/issues/322)):**
+  - `ALLOWED_DOMAINS_CSV` is deprecated: the domains are now listed per cloud in `whitelist.yaml` in the config dir (see [`whitelist.yaml`](templates/config/whitelist.yaml) and [configuration](docs/configuration.md)).
+  - The file is not mandatory yet: without it `ALLOWED_DOMAINS_CSV` is still used, for every cloud, so existing configs keep working.
+  - `afon-cli.sh config-updates` moves the domains of `ALLOWED_DOMAINS_CSV` to a new `whitelist.yaml`, organised by cloud: the Polaris, Jupyter and OIDC domain names of a cloud, and its storage endpoints (S3, Azure blob, `googleapis.com`), go in the section of that cloud, and any other name in `common`.  The same names are allowed, and the property is removed from `afon.properties` (its previous value is in the `.bak`).  It never overwrites an existing `whitelist.yaml`: then add the names by hand and remove the property.
+  - If you use the GitHub workflows, publish the file with `afon-cli.sh github-secrets push`, which sets the `WHITELIST_YAML` secret.
+- **`kind` and `cosign` for the acceptance tests ([#316](https://github.com/emrys-health/afon/issues/316)):**
+  - The acceptance tests now include an image signing spec, which runs a [kind](https://kind.sigs.k8s.io) cluster in Docker and signs images with `cosign`, so **run `afon-cli.sh local-setup` to install `kind` and `cosign`** (pinned release binaries, like `kubectl` and `helm`, which it needs too).  Without them the spec fails, saying what is missing; leave it out with `-bp acceptance,-signing`.
+  - On the self-hosted GitHub runners, run the ansible playbook again (`ansible-playbook runner-setup.yml`): its new `signing_tools` role installs them.
+  - The acceptance tests are now chosen by profile, and all are run by default: `-bp acceptance,-signing` leaves the signing spec out, `-bp acceptance,signing` runs only it, and `-c <cloud>` (the profiles `aws`, `azure`, `gcp`) now runs only the access specs of that cloud, so **not the users spec any more**: add `-bp acceptance,users` for it.  See [acceptance tests](docs/acceptance_tests.md).
+- **Kyverno audits the signatures of images in the `tre` stacks ([#316](https://github.com/emrys-health/afon/issues/316)):**
+  - **Redeploying `aws-full` or `azure-full` installs Kyverno** (a `kyverno` namespace with its controllers, as a new Helm release), whatever your config.
+  - It applies no policy until `AWS_COSIGN_PUBLIC_KEY` or `AZURE_COSIGN_PUBLIC_KEY` is set, and only logs a warning, so existing configs keep working: set it with `afon-cli.sh signing-public-key <aws|azure|gcp>`, which generates a throwaway key pair, or uses `<CLOUD>_COSIGN_KEY`, and writes the public key to `afon-<cloud>.properties`.  The new properties, all optional and blank by default, are in `templates/config`: copy the ones you need.
+  - With the key, the `default` namespace is **audited**, never enforced: pods are admitted, and the images that are not signed with the key are recorded in the policy reports.  Read them with `afon-cli.sh signing-report`, and enforce a namespace, once its images are signed, with `<CLOUD>_IMAGE_POLICY_ENFORCED_NAMESPACES`.  Expect every image to be reported until the images are mirrored and signed with `afon-cli.sh docker-image --sign` (which needs cosign 3).
+  - See [Kyverno](docs/stacks.md#verify-the-signatures-in-the-cluster) in the stacks documentation.
+- **Azure deployer may be a service principal or a managed identity ([#324](https://github.com/emrys-health/afon/issues/324)):**
+  - The cluster admin role assignment no longer fixes the principal type to `User`: Azure resolves it from the object id, so a pipeline can deploy as a service principal or a managed identity.  No config change is needed.
+  - The deployer needs a role that can create role assignments (see [Azure roles](scripts/azure/roles.md)), and the identity deploying is now logged, eg `Deploying to Azure as servicePrincipal <app id>`.
+- **`AZURE_AKS_NODE_POOL` separated by commas:** write `vmSize:Standard_D4s_v6,nodeCount:2`.  The old `;` separator is still read by the deploy, but the shell scripts that source `afon-azure.properties` take it as the end of a command (`nodeCount:2: command not found`), so an existing value with a `;` must be changed to `,` (or the `;` escaped as `\;`).
+
 ### Closed Issues (36)
 
 - **bug** — [#337](https://github.com/emrys-health/afon/issues/337) Azure issue-cert: DNS access probe failed to clean up
@@ -43,44 +76,6 @@
 - **testing** — [#201](https://github.com/emrys-health/afon/issues/201) Convert synthetic data from csv to parquet
 - **configuration, tech debt** — [#135](https://github.com/emrys-health/afon/issues/135) Move trino config properties out of source control
 - [#71](https://github.com/emrys-health/afon/issues/71) Trino security
-
-## 1.0-beta-8 
-
-**Milestone:** [1.0-beta-8](https://github.com/emrys-health/afon/milestone/9)
-**Due:** 2026-10-30
-
-### Upgrade notes
-
-**IMPORTANT:** one-off steps when upgrading from 1.0-beta-7:
-
-- **AWS DNS zones and certificates looked up ([#314](https://github.com/emrys-health/afon/issues/314)):**
-  - The properties in `AWS_*_{DNS_ZONES|CERT_ARN}` in `afon-aws.properties` are now ignored, so existing configs keep working; 
-  - `afon-cli.sh config-updates` removes them.
-- **Check that each domain name has a hosted zone of its own name and an issued certificate before you deploy:**
-  - `afon-cli.sh aws-issue-cert` issues the certificates, skips domain that already has one (`--force` requests a new one).
-- **Optional KeyCloak domain name per cloud ([#317](https://github.com/emrys-health/afon/issues/317)):**
-  - `AWS_`, `AZURE_` and `GCP_OIDC_DOMAIN_NAME`, blank by default, give a cloud a KeyCloak of its own; blank, the cloud uses `OIDC_DOMAIN_NAME`, so existing configs behave as before.
-  - `OIDC_ISSUER_URL` is now a template: set it to `https://[OIDC_DOMAIN_NAME]/realms/polaris` so that it follows the domain name of the cloud.  An issuer with another host fails the stack synthesis.
-  - `check-oidc` now takes the cloud: `afon-cli.sh check-oidc <cloud>`.
-  - If a domain has several issued certificates, the latest is used.
-- **TRE domain whitelist in `whitelist.yaml` ([#322](https://github.com/emrys-health/afon/issues/322)):**
-  - `ALLOWED_DOMAINS_CSV` is deprecated: the domains are now listed per cloud in `whitelist.yaml` in the config dir (see [`whitelist.yaml`](templates/config/whitelist.yaml) and [configuration](docs/configuration.md)).
-  - The file is not mandatory yet: without it `ALLOWED_DOMAINS_CSV` is still used, for every cloud, so existing configs keep working.
-  - `afon-cli.sh config-updates` moves the domains of `ALLOWED_DOMAINS_CSV` to a new `whitelist.yaml`, organised by cloud: the Polaris, Jupyter and OIDC domain names of a cloud, and its storage endpoints (S3, Azure blob, `googleapis.com`), go in the section of that cloud, and any other name in `common`.  The same names are allowed, and the property is removed from `afon.properties` (its previous value is in the `.bak`).  It never overwrites an existing `whitelist.yaml`: then add the names by hand and remove the property.
-  - If you use the GitHub workflows, publish the file with `afon-cli.sh github-secrets push`, which sets the `WHITELIST_YAML` secret.
-- **`kind` and `cosign` for the acceptance tests ([#316](https://github.com/emrys-health/afon/issues/316)):**
-  - The acceptance tests now include an image signing spec, which runs a [kind](https://kind.sigs.k8s.io) cluster in Docker and signs images with `cosign`, so **run `afon-cli.sh local-setup` to install `kind` and `cosign`** (pinned release binaries, like `kubectl` and `helm`, which it needs too).  Without them the spec fails, saying what is missing; leave it out with `-bp acceptance,-signing`.
-  - On the self-hosted GitHub runners, run the ansible playbook again (`ansible-playbook runner-setup.yml`): its new `signing_tools` role installs them.
-  - The acceptance tests are now chosen by profile, and all are run by default: `-bp acceptance,-signing` leaves the signing spec out, `-bp acceptance,signing` runs only it, and `-c <cloud>` (the profiles `aws`, `azure`, `gcp`) now runs only the access specs of that cloud, so **not the users spec any more**: add `-bp acceptance,users` for it.  See [acceptance tests](docs/acceptance_tests.md).
-- **Kyverno audits the signatures of images in the `tre` stacks ([#316](https://github.com/emrys-health/afon/issues/316)):**
-  - **Redeploying `aws-full` or `azure-full` installs Kyverno** (a `kyverno` namespace with its controllers, as a new Helm release), whatever your config.
-  - It applies no policy until `AWS_COSIGN_PUBLIC_KEY` or `AZURE_COSIGN_PUBLIC_KEY` is set, and only logs a warning, so existing configs keep working: set it with `afon-cli.sh signing-public-key <aws|azure|gcp>`, which generates a throwaway key pair, or uses `<CLOUD>_COSIGN_KEY`, and writes the public key to `afon-<cloud>.properties`.  The new properties, all optional and blank by default, are in `templates/config`: copy the ones you need.
-  - With the key, the `default` namespace is **audited**, never enforced: pods are admitted, and the images that are not signed with the key are recorded in the policy reports.  Read them with `afon-cli.sh signing-report`, and enforce a namespace, once its images are signed, with `<CLOUD>_IMAGE_POLICY_ENFORCED_NAMESPACES`.  Expect every image to be reported until the images are mirrored and signed with `afon-cli.sh docker-image --sign` (which needs cosign 3).
-  - See [Kyverno](docs/stacks.md#verify-the-signatures-in-the-cluster) in the stacks documentation.
-- **Azure deployer may be a service principal or a managed identity ([#324](https://github.com/emrys-health/afon/issues/324)):**
-  - The cluster admin role assignment no longer fixes the principal type to `User`: Azure resolves it from the object id, so a pipeline can deploy as a service principal or a managed identity.  No config change is needed.
-  - The deployer needs a role that can create role assignments (see [Azure roles](scripts/azure/roles.md)), and the identity deploying is now logged, eg `Deploying to Azure as servicePrincipal <app id>`.
-- **`AZURE_AKS_NODE_POOL` separated by commas:** write `vmSize:Standard_D4s_v6,nodeCount:2`.  The old `;` separator is still read by the deploy, but the shell scripts that source `afon-azure.properties` take it as the end of a command (`nodeCount:2: command not found`), so an existing value with a `;` must be changed to `,` (or the `;` escaped as `\;`).
 
 ## 1.0-beta-7
 
