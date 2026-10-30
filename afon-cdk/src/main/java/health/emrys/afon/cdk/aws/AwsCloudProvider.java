@@ -496,7 +496,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             // would egress from that instead of the NAT gateway's single address.
             .subnetIds(privateSubnetIds)
             .nodeRoleArn(nodeGroupRole.getArn())
-            .instanceTypes(List.of("r6i.large"))
+            .instanceTypes(List.of("r6i.xlarge"))
             .scalingConfig(scalingConfig)
             .diskSize(50)
             // The nodes live in public subnets and reach the EKS API endpoint through the
