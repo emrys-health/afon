@@ -32,6 +32,8 @@ import static java.lang.String.format;
  */
 public class SparkWorkloads {
     public static final String MASTER = "emrys-master";
+    /** Logs the user and SQL of each query against an Iceberg table; it is in the Spark image, not on this classpath. */
+    static final String AUDIT_LISTENER = "health.emrys.afon.spark.audit.AuditQueryListener";
     /** How long the Spark Connect driver waits for the master to be Ready before the deploy fails. */
     static final int MASTER_WAIT_SECONDS = 600;
     public static final Map<String, String> MASTER_LABELS = Map.of(
@@ -169,10 +171,11 @@ public class SparkWorkloads {
     }
 
     /**
-     * Turned all Spark logging on. Probably too much. But watch the SQL executed with:
+     * Turned all Spark logging on. Probably too much. But watch who ran what against the Iceberg tables with:
      * <code>
-     * kubectl logs -f spark-connector-0-driver  | egrep -i 'SparkSqlParser|iceberg'
+     * kubectl logs -f spark-connector-0-driver | grep health.emrys.afon.spark.audit
      * </code>
+     * The {@code AuditQueryListener} that logs it is in the Spark image, see scripts/docker/spark-connect/Dockerfile.
      */
     private Map<String, String> sparkConfig() {
         var first = Map.of(
@@ -205,6 +208,7 @@ public class SparkWorkloads {
         );
         Map<String, String> config = new HashMap<>();
         config.put("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
+        config.put("spark.sql.queryExecutionListeners", AUDIT_LISTENER);
         config.putAll(first);
         config.putAll(second);
         return config;

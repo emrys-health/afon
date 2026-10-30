@@ -216,3 +216,4 @@ prediction_modelling/data/**
 # bloop
 .bloop
 .bloop/**
+scripts/docker/spark-connect/*.jar

@@ -90,6 +90,7 @@
         <module>afon-security</module>
         <module>afon-spark</module>
         <module>afon-spark-connect</module>
+        <module>afon-spark-audit</module>
         <module>afon-snowflake</module>
         <module>afon-trino</module>
         <module>afon-cdk</module>
