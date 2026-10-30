@@ -1,4 +1,5 @@
 # Build this with:
+# mvn -pl afon-spark-audit -am package -DskipTests && cp afon-spark-audit/target/afon-spark-audit-*.jar scripts/docker/spark-connect/
 # docker build -t emryshealth/spark_jars:4.0.1 .
 # docker push emryshealth/spark_jars:4.0.1
 
@@ -24,6 +25,9 @@ RUN /opt/spark/bin/spark-submit \
     /opt/spark/examples/src/main/python/pi.py 10 && \
     mv /tmp/.ivy/jars/* /opt/spark/jars/ && \
     rm -rf /tmp/.ivy
+
+# The audit listener SparkWorkloads registers with spark.sql.queryExecutionListeners: without it no session can start
+COPY afon-spark-audit-*.jar /opt/spark/jars/
 
 # Switch back to the default non-root user (spark) for security
 USER 185
