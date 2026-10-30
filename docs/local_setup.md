@@ -69,15 +69,6 @@ A pin is a version prefix, eg `17.0.20` for java matches any 17.0.20.x.
 A pin can be overridden per platform, eg `PINNED_git_linux`, as apt and brew offer different versions of git and the cloud clis.
 On Ubuntu a pin can also be overridden per release, eg `PINNED_git_ubuntu2204` for 22.04, which takes precedence over the linux one.
 
-## Docker 
+## Docker
 
-To build the Docker container, run:
-```shell
-cd scripts/docker/afon
-docker build -t emryshealth/afon .
-```
-
-To run the Docker container, link your afon dir to $HOME/afon and use following docker command:
-```shell
-ln -s <your afon dir> $HOME/afon
-docker run -it -v $HOME/.kube:$HOME/.kube -v $HOME/.config/gcloud:$HOME/.config/gcloud -v $HOME/.azure:$HOME/.azure -v $HOME/.aws:$HOME/.aws  -v $HOME/afon/:$HOME/afon  -v $HOME/.m2:$HOME/.m2 -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) -e HOST_USER=$(whoami)  emryshealth/afon
+Instead of a local setup, the tools can be run from a Docker image: see [Docker images](docker.md).
