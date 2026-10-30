@@ -35,7 +35,6 @@ import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static health.emrys.afon.polaris.config.PolarisEndpoint.getPolarisEndpointFor;
 import static java.lang.String.format;
-import static py4j.Protocol.SUCCESS;
 
 public class NetworkSmokeMain {
 
