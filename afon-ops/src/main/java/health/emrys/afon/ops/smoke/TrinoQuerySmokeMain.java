@@ -78,7 +78,7 @@ public class TrinoQuerySmokeMain {
         return "empty, like my life";
     }
 
-    private @NonNull Properties trinoAccessPropertiesFor(AfonUser user, String token) throws IOException {
+    private @NonNull Properties trinoAccessPropertiesFor(AfonUser user, String token) {
         Properties cnxnProperties = new Properties();
         cnxnProperties.setProperty("user", user.username());
         cnxnProperties.setProperty("extraCredentials", TOKEN_EXTRA_CREDENTIAL + ":" + token);
@@ -271,22 +271,22 @@ public class TrinoQuerySmokeMain {
             String result = query(url, user, query);
             logger.info("Trino returned {} for {}", result, user.username());
             if (!isBadPasswordTested) {
-                errors.addAll(tryQueryWithBadToken(user, query));
+                errors.addAll(tryQueryWithBadToken(url, user, query));
                 isBadPasswordTested = true;
             }
         }
         return errors;
     }
 
-    private List<String> tryQueryWithBadToken(AfonUser user, String query) throws IOException {
+    private List<String> tryQueryWithBadToken(String url, AfonUser user, String query) throws IOException {
         List<String> errors = new ArrayList<>();
         try {
-            query(query, query, user, "bad token");
-            errors.add(format("Could execute SQL {} for user {} using a bad token", query, user.username()));
+            query(url, query, user, "bad token");
+            errors.add(format("Could execute SQL %s for user %s using a bad token", query, user.username()));
         } catch (SQLException ex) {
             logger.info(
-                "Tried a deliberately bad token for {} and was correctly refused",
-                user.username());
+                "Tried a deliberately bad token for {} and was correctly refused: {}",
+                user.username(), ex.getMessage());
         }
         return errors;
     }
