@@ -32,6 +32,8 @@ import static java.lang.String.format;
  */
 public class SparkWorkloads {
     public static final String MASTER = "emrys-master";
+    /** How long the Spark Connect driver waits for the master to be Ready before the deploy fails. */
+    static final int MASTER_WAIT_SECONDS = 600;
     public static final Map<String, String> MASTER_LABELS = Map.of(
         "spark-role", "master");
     public static final Map<String, String> DRIVER_LABELS = Map.of(
@@ -87,20 +89,38 @@ public class SparkWorkloads {
             "kubectl delete statefulset emrys-worker --force --grace-period=0",
             "kubectl patch sparkclusters emrys  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
         ));
-        Resource.Builder.create(scope, "sparkClusterManifest")
+        Resource sparkCluster = Resource.Builder.create(scope, "sparkClusterManifest")
                         .provisioners(allClusterProvisioners)
                         .dependsOn(dependsOn)
                         .build();
 
+        // The driver gives up registering with the master after about a minute, and the master can take longer than that to be
+        // Ready on a cold node, which pulls its image first, so the driver is only started once the master is.
+        List<ITerraformDependable> connectDependsOn = new ArrayList<>(dependsOn);
+        connectDependsOn.add(sparkCluster);
         List<LocalExecProvisioner> allConnectProvisioners = new ArrayList<>();
-        allConnectProvisioners.addAll(uponCreateRun(startConnectCommand()));
+        allConnectProvisioners.addAll(uponCreateRun(waitForMasterCommand(), startConnectCommand()));
         allConnectProvisioners.addAll(uponDestroyRun(
             "kubectl patch sparkapplication spark-connector  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
         ));
         Resource.Builder.create(scope, "sparkConnectManifest")
                         .provisioners(allConnectProvisioners)
-                        .dependsOn(dependsOn)
+                        .dependsOn(connectDependsOn)
                         .build();
+    }
+
+    /**
+     * @return the command that waits until the pod of the Spark master exists, which the operator creates in response to the
+     * {@code SparkCluster}, and is Ready, which is when its headless service starts to resolve; it fails after
+     * {@value #MASTER_WAIT_SECONDS}s, saying why, rather than leaving a driver that cannot register
+     */
+    public String waitForMasterCommand() {
+        String pod = MASTER + "-0";
+        return format(
+            "for i in $(seq 1 %d); do kubectl get pod %s >/dev/null 2>&1 && break; sleep 5; done; "
+            + "kubectl wait --for=condition=Ready pod/%s --timeout=%ds "
+            + "|| { echo 'Spark master %s is not Ready, so the Spark Connect driver would not find it' >&2; exit 1; }",
+            MASTER_WAIT_SECONDS / 5, pod, pod, MASTER_WAIT_SECONDS, pod);
     }
 
     public String startConnectCommand() {

@@ -16,4 +16,16 @@ class SparkWorkloadsTest {
             .doesNotContain(".credential")
             .doesNotContain(".token");
     }
+
+    @Test
+    void sparkConnectWaitsForTheMasterToBeReadyAndFailsIfItIsNot() {
+        String command = new SparkWorkloads().waitForMasterCommand();
+
+        assertThat(command)
+            .contains("kubectl get pod emrys-master-0")
+            .contains("kubectl wait --for=condition=Ready pod/emrys-master-0 --timeout=600s")
+            .contains("exit 1")
+            // a shell expansion would be read by Terraform as an interpolation
+            .doesNotContain("${");
+    }
 }

@@ -176,7 +176,7 @@ Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-key
 
 On Azure it is the same with `azure-keycloak` and `AZURE_KEYCLOAK_EXTERNAL=true` in `afon-azure.properties` (it is `false` when empty):
 `azure-full` then uses the KeyCloak `azure-keycloak` deploys, so it runs side by side with it, and its `deploy` and `setup` check first that KeyCloak answers.
-The KeyCloak domain `OIDC_DOMAIN_NAME` must then have its DNS zone in the Azure resource group, which `afon-cli.sh azure-create false azure-keycloak` creates.
+The KeyCloak domain `OIDC_DOMAIN_NAME` must then have its DNS zone in the Azure resource group, which `afon-cli.sh dns-create-zones azure azure-keycloak` creates, once `azure-create` has created the resource group.
 
 ### A KeyCloak domain name per cloud
 
@@ -784,9 +784,9 @@ The scripts acting on a stack are given it by its id or its role (`identity` or 
 afon-cli.sh gcp-update-kube-config catalog     # point kubectl at the GKE cluster
 afon-cli.sh gcp-polaris                        # is Polaris serving?
 afon-cli.sh gcp-keycloak                       # is KeyCloak serving?
-afon-cli.sh gcp-create identity                # create the env (DNS zones, buckets, service accounts) for the stack
+afon-cli.sh gcp-create identity                # create the env (buckets, service accounts) for the stack
 ```
-`gcp-create` needs the stack, as the DNS zones it creates are those of the domain names the stack serves, and `gcp-issue-cert` issues
+`gcp-create` needs the stack, as what it creates depends on it; `dns-create-zones gcp <stack>` creates the DNS zones of the domain names the stack serves, and `gcp-issue-cert` issues
 the certs of every configured domain name (`GCP_POLARIS_DOMAIN_NAME`, `GCP_JUPYTER_DOMAIN_NAME` and `OIDC_DOMAIN_NAME`).
 `gcp-update-kube-config` needs `gke-gcloud-auth-plugin` for kubectl to reach the cluster, and warns if it is missing: install it with
 `afon-cli.sh local-setup -c gcp`.
@@ -828,7 +828,7 @@ afon-cli.sh manage-stack run snowflake-reading-all
 ## Deployment checklist
 
 - [ ] **Domain names** purchased via your domain registrar, one per cloud (e.g. `polaris.yourdomain.com`)
-- [ ] **DNS zones** created in each target cloud and nameservers configured at your domain registrar
+- [ ] **DNS zones** created in each target cloud (`dns-create-zones`) and delegated to (`dns-delegate` for a subdomain, else the nameservers at your domain registrar), see [DNS configuration](dns_config.md)
 - [ ] **SSL certificates** requested and validated (ACM for AWS, Let's Encrypt for others)
 - [ ] **External Polaris database** provisioned for Polaris metadata storage
 - [ ] **OIDC provider** configured OIDC provider for Jupyter access

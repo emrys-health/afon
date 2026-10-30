@@ -13,13 +13,8 @@ if [ -n "${1:-}" ]; then
   exit 1
 fi
 
-if [ -z "${GCP_PROJECT_ID:-}" ]; then
-  echo "- GCP_PROJECT_ID is not set - set it in afon-gcp.properties"
-  exit 1
-fi
+dns_check_cloud_config gcp || exit 1
 
-for DOMAIN in $(dns_unique_domains "${GCP_POLARIS_DOMAIN_NAME:-}" "${GCP_JUPYTER_DOMAIN_NAME:-}" "${OIDC_DOMAIN_NAME:-}"); do
-  NAMESERVERS="$(gcloud dns managed-zones describe ${DOMAIN//./-} --project $GCP_PROJECT_ID --format='value(nameServers)' \
-                   2>/dev/null || true)"
-  show_dns_zone GCP "$DOMAIN" "$NAMESERVERS"
+for DOMAIN in $(dns_cloud_domains gcp); do
+  show_dns_zone GCP "$DOMAIN" "$(dns_zone_nameservers gcp $DOMAIN)"
 done

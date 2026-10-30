@@ -2,7 +2,7 @@ source $AFON_ROOT/scripts/config/afon-source.sh azure
 source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 # Args, in any order: whether to run as admin, true|false, and the stack the env is created for, given as its id, or its role
-# in the cloud (identity, catalog or tre), which decides the DNS zones and storage, and is required, as what the env needs
+# in the cloud (identity, catalog or tre), which decides the storage, and is required, as what the env needs
 # depends on it.  By default not as admin.  What the stack needs is looked up in stacks.yaml and given as the AFON_STACK_* env
 # vars: AFON_STACK_ID, AFON_STACK_ROLE, AFON_STACK_DOMAINS and AFON_STACK_COMPONENTS, by the launcher when run by afon-cli.sh, see
 # ScriptMain, else by asking the ops command stack-needs, as when run by afon.sh, see scripts/stack/needs-source.sh.
@@ -31,10 +31,6 @@ has_component() {
   esac
 }
 
-# The properties of the domain names whose DNS zones the stack needs: those that its components hold, which the launcher works
-# out from stacks.yaml, eg Polaris, Jupyter and the KeyCloak, which a stack has unless AZURE_KEYCLOAK_EXTERNAL is true, as it
-# then uses the one of another stack.
-DOMAIN_PROPERTIES="$AFON_STACK_DOMAINS"
 APP_ID="${AZURE_APP_ID:-}"
 APP_SP_ID="${AZURE_SP_ID:-}"
 
@@ -77,25 +73,6 @@ else
   echo "- Creating group '$AZURE_RESOURCE_GROUP' in region '$AZURE_REGION'"
   az group create --name $AZURE_RESOURCE_GROUP  --location $AZURE_REGION || exit 1
 fi
-
-# DNS zone
-
-echo "- Creating DNS zone"
-
-# One zone per domain name the stack serves from the cluster, which must be set
-for DOMAIN_PROPERTY in $DOMAIN_PROPERTIES; do
-  DOMAIN_NAME="${!DOMAIN_PROPERTY:-}"
-  if [ -z "$DOMAIN_NAME" ]; then
-    echo "-- $DOMAIN_PROPERTY is not set, which stack '$STACK_ID' needs for its DNS zone"
-    exit 1
-  fi
-  if az network dns zone show --resource-group $AZURE_RESOURCE_GROUP --name $DOMAIN_NAME -o none 2>/dev/null; then
-    echo "- DNS zone for domain name '$DOMAIN_NAME' ($DOMAIN_PROPERTY) already exists, skipping"
-  else
-    echo "- Creating DNS zone for domain name '$DOMAIN_NAME' ($DOMAIN_PROPERTY)"
-    az network dns zone create --resource-group $AZURE_RESOURCE_GROUP --name $DOMAIN_NAME || exit 1
-  fi
-done
 
 # Storage
 

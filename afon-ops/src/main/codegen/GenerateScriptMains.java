@@ -56,6 +56,9 @@ public class GenerateScriptMains {
         new ScriptEntry("tofu", "TofuPlanMain", "tofu/plan.sh"),
         new ScriptEntry("tofu", "TofuStateMain", "tofu/state.sh"),
 
+        new ScriptEntry("dns", "DnsCreateZonesMain", "dns/create-zones.sh"),
+        new ScriptEntry("dns", "DnsDelegateMain", "dns/delegate.sh"),
+
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
         new ScriptEntry("aws", "AwsClusterMain", "aws/cluster.sh", "aws"),
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),

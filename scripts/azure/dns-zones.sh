@@ -13,13 +13,8 @@ if [ -n "${1:-}" ]; then
   exit 1
 fi
 
-if [ -z "${AZURE_RESOURCE_GROUP:-}" ]; then
-  echo "- AZURE_RESOURCE_GROUP is not set - set it in afon-azure.properties"
-  exit 1
-fi
+dns_check_cloud_config azure || exit 1
 
-for DOMAIN in $(dns_unique_domains "${AZURE_POLARIS_DOMAIN_NAME:-}" "${AZURE_JUPYTER_DOMAIN_NAME:-}" "${OIDC_DOMAIN_NAME:-}"); do
-  NAMESERVERS="$(az network dns zone show --name $DOMAIN --resource-group $AZURE_RESOURCE_GROUP --query 'nameServers' --output tsv \
-                   2>/dev/null || true)"
-  show_dns_zone Azure "$DOMAIN" "$NAMESERVERS"
+for DOMAIN in $(dns_cloud_domains azure); do
+  show_dns_zone Azure "$DOMAIN" "$(dns_zone_nameservers azure $DOMAIN)"
 done

@@ -7,8 +7,8 @@ of a [data provider](data.md) (stack `azure-polaris`).  Do these first, then fol
 
 - An Azure subscription with the permissions to create the env's elements (see [roles](../../../scripts/azure/roles.md)).
 - A registered domain name for each endpoint the stack serves (see [DNS configuration](../../dns_config.md)), eg
-  `<env>polarisazure.click`.  Its DNS zone is created by `azure-create`, after which the registrar's nameservers must
-  be pointed at the Azure ones.
+  `<env>polarisazure.click`.  Its DNS zone is created by `dns-create-zones azure`, after which the domain must be
+  delegated to the Azure nameservers.
 - A Linux or macOS machine.
 
 ## 2. Install the Afon CLI
@@ -138,8 +138,9 @@ Use `azure-account` to select the subscription again without logging in, eg afte
 
 ## 7. DNS zones
 
-`azure-create` creates one DNS zone per domain the stack serves.  Afterwards, get the zone's nameservers
-and set them at the domain registrar (see [DNS configuration](../../dns_config.md)):
+After `azure-create` (step 9), which creates the resource group, `afon-cli.sh dns-create-zones azure <stack>` creates one DNS zone per domain
+the stack serves.  Then delegate each domain to it, at the registrar or, for a subdomain, with `afon-cli.sh dns-delegate azure <stack>`
+(see [DNS configuration](../../dns_config.md)), and check:
 ```shell
 az network dns zone show --name <domain> --resource-group $AZURE_RESOURCE_GROUP --query nameServers
 dig +short A <domain>
@@ -160,7 +161,7 @@ afon-cli.sh azure-keyvault list                    # check the certs are stored
 ```shell
 afon-cli.sh azure-create [<as-admin>] <stack-id>   # stack-id: azure-full|azure-keycloak|azure-polaris, or its role tre|catalog|identity
 ```
-The flag defaults to `false`.  The stack decides what is created: the DNS zone of each domain it serves, the Gitea
+The flag defaults to `false`.  The stack decides what is created: the Gitea
 container `AZURE_GITEA_BUCKET` (stacks with Git, ie `azure-full`) and the Polaris logs container `AZURE_POLARIS_LOG_BUCKET` if set.
 
 `azure-create` ends by checking that `AZURE_CONNECTION_STRING` is the storage account's, which it is not if the account
