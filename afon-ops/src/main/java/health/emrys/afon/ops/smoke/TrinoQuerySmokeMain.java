@@ -1,5 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
@@ -25,11 +27,18 @@ import static health.emrys.afon.cdk.configs.TrinoWorkloads.TRINO_NAMESPACE;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
 import static health.emrys.afon.ops.kube.KubeClient.nameOfPod;
+import static health.emrys.afon.ops.smoke.LokiClient.withRetries;
 import static health.emrys.afon.trino.TrinoServerConfiguration.TOKEN_EXTRA_CREDENTIAL;
 import static java.lang.String.format;
 
 public class TrinoQuerySmokeMain {
-    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(TrinoQuerySmokeMain.class);
+    private static final Logger       logger = org.slf4j.LoggerFactory.getLogger(TrinoQuerySmokeMain.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String       QUERY  = "SELECT COUNT(*) FROM " + POLARIS_TABLE_NAME;
+    /**
+     * The logger of the OpenLineage event listener that logs each query, see {@code TrinoWorkloads.queryLogProperties}
+     */
+    private static final String       QUERY_LOGGER = "io.openlineage.client.transports.ConsoleTransport";
 
     private final AfonCloud            cloud;
     private final AfonPropertyProvider properties;
@@ -153,19 +162,86 @@ public class TrinoQuerySmokeMain {
         List<String> errors = new ArrayList<>();
         try (KubeClient client = new KubeClient(properties)) {
             OffsetDateTime start = OffsetDateTime.now();
-            errors.addAll(hitTrinoWithAllUsers(client));
+            V1Pod trinoPod = client.getOnlyPodBegginingWith("trino-coordinator");
+            errors.addAll(hitTrinoWithAllUsers(client, trinoPod));
 
             V1Pod polarisPod = client.getOnlyPodBegginingWith("polaris-deployment");
             try (LokiClient loki = new LokiClient(client, properties)) {
                 errors.addAll(findUsersInPolarisLogsWithBackoff(start, loki, KubeClient.nameOfPod(polarisPod)));
+                errors.addAll(findQueriesInTrinoLogsWithBackoff(start, loki, nameOfPod(trinoPod)));
             }
         }
         return errors;
     }
 
-    private List<String> hitTrinoWithAllUsers(KubeClient client) throws ApiException, SQLException, IOException {
+    /**
+     * Might take some time for the Trino logs to appear in Loki
+     */
+    private List<String> findQueriesInTrinoLogsWithBackoff(OffsetDateTime start,
+                                                           LokiClient loki,
+                                                           String trinoPodName) throws Exception {
+        try {
+            return withRetries(3, () -> {
+                List<String> errors = findQueriesInTrinoLogs(start, loki, trinoPodName);
+                if (!errors.isEmpty()) {
+                    throw new IllegalStateException(String.join("\n", errors));
+                }
+                return errors;
+            });
+        } catch (IllegalStateException e) {
+            return List.of(e.getMessage());
+        }
+    }
+
+    /**
+     * @return an error for each user that has no line in Trino's logs that has both the SQL it ran and it as the
+     * principal that ran it
+     */
+    private List<String> findQueriesInTrinoLogs(OffsetDateTime start,
+                                                LokiClient loki,
+                                                String trinoPodName) throws IOException {
         List<String> errors = new ArrayList<>();
-        V1Pod        pod    = client.getOnlyPodBegginingWith("trino-coordinator");
+        String query = format("{namespace=\"%s\", pod=\"%s\"} |= \"%s\"", TRINO_NAMESPACE, trinoPodName, QUERY_LOGGER);
+        List<String> logs = loki.queryRange(query, start, 1_000);
+        if (logs.isEmpty()) {
+            errors.add(format("Query '%s' with start time %s returned no logs from Loki", query, start));
+            return errors;
+        }
+        List<String> principals = new ArrayList<>();
+        for (String log : logs) {
+            String principal = principalThatRan(log, QUERY);
+            if (principal != null) {
+                principals.add(principal);
+            }
+        }
+        for (AfonUser user : userProvider.getUsers()) {
+            if (!principals.contains(user.username())) {
+                errors.add(format("No Trino log of principal %s running '%s'", user.username(), QUERY));
+            }
+        }
+        return errors;
+    }
+
+    /**
+     * @param log a line logged by {@value #QUERY_LOGGER}: its OpenLineage event, as JSON, follows the logger's name
+     * @return the principal of the event, if it is of the SQL, else null
+     */
+    static String principalThatRan(String log, String sql) throws IOException {
+        int logger = log.indexOf(QUERY_LOGGER);
+        int json   = logger < 0 ? -1 : log.indexOf('{', logger);
+        if (json < 0) {
+            return null;
+        }
+        JsonNode event = MAPPER.readTree(log.substring(json));
+        if (!sql.equals(event.path("job").path("facets").path("sql").path("query").asText())) {
+            return null;
+        }
+        JsonNode principal = event.path("run").path("facets").path("trino_query_context").path("principal");
+        return principal.isTextual() ? principal.asText() : null;
+    }
+
+    private List<String> hitTrinoWithAllUsers(KubeClient client, V1Pod pod) throws ApiException, SQLException, IOException {
+        List<String> errors = new ArrayList<>();
         try (PortForwarder forward = new PortForwarder(
             client,
             TRINO_NAMESPACE,
@@ -178,8 +254,7 @@ public class TrinoQuerySmokeMain {
                 localPort,
                 cloud.toString(),
                 POLARIS_NAMESPACE_EXTERNAL);
-            String query = "SELECT COUNT(*) FROM " + POLARIS_TABLE_NAME;
-            errors.addAll(tryQueriesForAllUsers(url, query));
+            errors.addAll(tryQueriesForAllUsers(url, QUERY));
         }
         return errors;
     }
