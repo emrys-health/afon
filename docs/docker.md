@@ -64,7 +64,7 @@ registry ending in `.azurecr.io`, the script logs in with `az acr login` before 
 The environment can invoked like so:
 
 ```sh
-ocker run -it --rm \
+docker run -it --rm \
   -v "~/.afon/config:/home/afon/.afon/config:ro" \
   emryshealth/afon-cli:1.0-beta-7 \
   'afon-cli.sh validate-stack azure-polaris' # or `/bin/bash` for an interactive session
