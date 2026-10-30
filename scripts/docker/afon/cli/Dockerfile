@@ -7,11 +7,14 @@ FROM ${BASE_IMAGE} AS build
 WORKDIR /src
 COPY . .
 
-# Idea behind this is the tests will fail out as we're not introducing configured context for the CLI build
+# Use templates as a bootstrap for the rest of the cli generation.
+# Use afon.sh script for commonality with other build commands.
 #  NB: This probably limits documentation generation - I'd imagine we could do this in a different step / not at all.
 RUN --mount=type=cache,target=/root/.m2 \
-    java afon-ops/src/main/codegen/GenerateScriptMains.java afon-ops/target/generated-sources/scripts-main \
- && mvn -B -q -Pcli,-acceptance install -DskipTests -Dexec.skip=true -Dafon.cli.dir=/out/cli
+    mkdir -p /tmp/afon-build/config \
+ && cp templates/config/* /tmp/afon-build/config/ \
+ && ./afon.sh --home /tmp/afon-build -bg "clean package" -bp cli,distribution \
+      -ba "-Dafon.cli.dir=/out/cli"
 
 # == Runtime ==
 # Bundle the compiled CLI into a final exported image
