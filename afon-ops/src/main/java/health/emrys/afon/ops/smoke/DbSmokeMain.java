@@ -46,7 +46,7 @@ public class DbSmokeMain {
         String url = format(
             "jdbc:postgresql://%s/?user=%s&password=%s",
             properties.getValue(POLARIS_DB_HOST),
-            properties.getValue(POLARIS_DB_USER),
+            properties.getValue(POLARIS_DB_USERNAME),
             properties.getValue(POLARIS_DB_PASSWORD)
         );
         logger.info("Connecting to {}", url);

@@ -106,7 +106,7 @@ public class PolarisConfig extends Construct {
             polarisDbName(properties, cloudProvider.getId()),
             properties.getValue(POLARIS_ID),
             properties.getValue(POLARIS_SECRET),
-            properties.getValue(POLARIS_DB_USER));
+            properties.getValue(POLARIS_DB_USERNAME));
 
         polarisSpecPort           = ServiceSpecPort.builder()
                                                    .name("web")

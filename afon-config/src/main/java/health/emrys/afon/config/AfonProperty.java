@@ -1,7 +1,6 @@
 package health.emrys.afon.config;
 
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -248,7 +247,7 @@ public enum AfonProperty {
     POLARIS_ACCESS("POLARIS_ACCESS"),
     POLARIS_DB_PASSWORD("POLARIS_DB_PASSWORD"),
     POLARIS_DB_HOST("POLARIS_DB_HOST"),
-    POLARIS_DB_USER("POLARIS_DB_USER"),
+    POLARIS_DB_USERNAME("POLARIS_DB_USERNAME"),
     POLARIS_NAMESPACE("POLARIS_NAMESPACE"),
     POLARIS_NAMESPACE_EXTERNAL("POLARIS_NAMESPACE_EXTERNAL"),
     POLARIS_TABLE_NAME("POLARIS_TABLE_NAME"),
