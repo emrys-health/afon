@@ -69,7 +69,11 @@ public class PolarisConfig extends Construct {
     private final Map<String, String> polarisLabels;
     private final CloudProvider       cloudProvider;
 
-    public PolarisConfig(@NonNull Construct scope, @NonNull String id, CloudProvider cloudProvider, AfonPropertyProvider properties) {
+    public PolarisConfig(@NonNull Construct scope,
+                         @NonNull String id,
+                         CloudProvider cloudProvider,
+                         AfonPropertyProvider properties
+    ) {
         super(scope, id);
         this.cloudProvider = cloudProvider;
         // Configure the Kubernetes Provider
@@ -101,7 +105,8 @@ public class PolarisConfig extends Construct {
             properties.getValue(POLARIS_DB_PASSWORD),
             polarisDbName(properties, cloudProvider.getId()),
             properties.getValue(POLARIS_ID),
-            properties.getValue(POLARIS_SECRET));
+            properties.getValue(POLARIS_SECRET),
+            properties.getValue(POLARIS_DB_USER));
 
         polarisSpecPort           = ServiceSpecPort.builder()
                                                    .name("web")
@@ -153,7 +158,8 @@ public class PolarisConfig extends Construct {
                                         String password,
                                         String dbName,
                                         String polarisId,
-                                        String polarisSecret
+                                        String polarisSecret,
+                                        String dbUser
     ) {
         String stateDir      = "/state";
         String bootstrapFlag = stateDir + "/already-bootstrapped";
@@ -178,7 +184,7 @@ public class PolarisConfig extends Construct {
             .env(List.of(
                 initJobEnv("PGHOST", host),
                 initJobEnv("PGPORT", String.valueOf(DB_PORT)),
-                initJobEnv("PGUSER", "postgres"),
+                initJobEnv("PGUSER", dbUser),
                 initJobEnv("PGPASSWORD", password),
                 initJobEnv("POLARIS_DB", dbName)))
             .volumeMount(List.of(JobV1SpecTemplateSpecInitContainerVolumeMount.builder()
@@ -209,7 +215,7 @@ public class PolarisConfig extends Construct {
                 jobEnv(
                     "QUARKUS_DATASOURCE_JDBC_URL",
                     format("jdbc:postgresql://%s:%d/%s", host, DB_PORT, dbName)),
-                jobEnv("QUARKUS_DATASOURCE_USERNAME", "postgres"),
+                jobEnv("QUARKUS_DATASOURCE_USERNAME", dbUser),
                 jobEnv("QUARKUS_DATASOURCE_PASSWORD", password),
                 jobEnv("POLARIS_ID", polarisId),
                 jobEnv("POLARIS_SECRET", polarisSecret)))

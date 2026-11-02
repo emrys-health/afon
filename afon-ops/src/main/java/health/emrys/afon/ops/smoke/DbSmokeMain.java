@@ -12,8 +12,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static health.emrys.afon.config.AfonProperty.POLARIS_DB_HOST;
-import static health.emrys.afon.config.AfonProperty.POLARIS_DB_PASSWORD;
+import static health.emrys.afon.config.AfonProperty.*;
 import static java.lang.String.format;
 
 public class DbSmokeMain {
@@ -47,7 +46,7 @@ public class DbSmokeMain {
         String url = format(
             "jdbc:postgresql://%s/?user=%s&password=%s",
             properties.getValue(POLARIS_DB_HOST),
-            "postgres", // TODO this should not be hard coded, I guess. See PolarisConfig
+            properties.getValue(POLARIS_DB_USER),
             properties.getValue(POLARIS_DB_PASSWORD)
         );
         logger.info("Connecting to {}", url);
