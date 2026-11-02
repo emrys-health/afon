@@ -27,8 +27,35 @@ To release a stable version and move to the next SNAPSHOT version:
 
 The release commits and tag are pushed upon successful release.
 
-**NOTE:** For the moment, the `deploy` stage of the release to a Repository Manager is disabled, 
-and only the distribution CLI is uploaded to the "Afon Distribution" share drive.
+**NOTE:** The `deploy` stage of `release.sh` itself is disabled (`maven.deploy.skip`), and only the distribution CLI
+is uploaded to the "Afon Distribution" share drive.  Publishing to GitHub Packages and creating the GitHub Release are
+done by the [Publish workflow](#publish-workflow), triggered by the pushed tag.
+
+## Publish workflow
+
+**NOTE:** The tag trigger is disabled for now (commented out in the workflow): run the workflow by hand from the
+Actions tab.  The rest of this section describes the run for a tag.
+
+Pushing the tag `afon-<version>` triggers the [Publish](../.github/workflows/publish.yml) workflow, on a GitHub-hosted
+runner and with the job's own `GITHUB_TOKEN`, so it needs no secrets.  It:
+
+1. checks that the tag matches the project version;
+2. builds with the unit tests (not the acceptance tests, which need cloud credentials) and deploys the artifacts to
+   [GitHub Packages](https://github.com/emrys-health/afon/packages), using the `github` profile and
+   `-Dmaven.deploy.skip=false`;
+3. creates the GitHub Release `<version>`, with the section of `release_notes.md` for that version (or generated notes
+   if there is none) and the CLI distribution zip attached.  A version with a qualifier, eg `1.0-beta-1`, is marked as
+   a pre-release.
+
+It can also be run from the Actions tab (`workflow_dispatch`) on a branch, eg to publish a `SNAPSHOT` of `main`; no
+GitHub Release is created then.  A release version cannot be published twice: GitHub Packages rejects the second deploy.
+
+### Consuming the artifacts
+
+GitHub Packages requires authentication to download, even from a public repository.  Create a personal access token
+with the `read:packages` scope, and add to `~/.m2/settings.xml` the server `github-maven-packages`
+(username: your GitHub user, password: the token), and the repository
+`https://maven.pkg.github.com/emrys-health/afon`, as in the `github` profile of [settings.xml](../settings.xml).
 
 ## Release notes
 

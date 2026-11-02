@@ -75,7 +75,7 @@ Afon handles credentials and controls access to sensitive data, so security is p
   in the issue.
 - **Do not report security vulnerabilities in public issues.**  Report them privately, via GitHub's
   [private vulnerability reporting](https://github.com/emrys-health/afon/security/advisories/new), so that they
-  can be fixed before they are disclosed.
+  can be fixed before they are disclosed.  See the [security policy](../../SECURITY.md).
 
 ### Conduct
 
