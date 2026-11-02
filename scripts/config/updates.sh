@@ -63,6 +63,14 @@ REMOVED_COMMENTS=(
   "# Cert ARNs"
 )
 
+# Properties that are new and required, to add, with their default value, to the named $CONFIG_DIR file, just before another property of it,
+# "FILE:NEW=DEFAULT:BEFORE" per entry (no colon in the default), so that they come in the same order as in the template.  Only added if not already set, and
+# if the file has the property to add it before, else it is left for config-validate to report.
+# Add an entry here whenever a required property is added to a template file.
+ADDITIONS=(
+  "secret.properties:POLARIS_DB_USERNAME=postgres:POLARIS_DB_PASSWORD"
+)
+
 shopt -s nullglob
 FILES=("$CONFIG_DIR"/*.properties)
 shopt -u nullglob
@@ -76,7 +84,7 @@ real_path() {
   perl -MCwd=abs_path -e 'print abs_path(shift)' "$1"
 }
 
-echo "Renaming and removing properties in $CONFIG_DIR"
+echo "Renaming, removing and adding properties in $CONFIG_DIR"
 for LISTED in "${FILES[@]}"; do {
   # A file that is a symlink is updated through it, so that it stays one, rather than being replaced by a copy.
   FILE="$(real_path "$LISTED")"
@@ -99,6 +107,14 @@ for LISTED in "${FILES[@]}"; do {
   for KEY in "${REMOVALS[@]}"; do {
     perl -ni -e "print unless /^\\s*\Q${KEY}\E\\s*=/" "$WORK"
   } done
+  for ADDITION in "${ADDITIONS[@]}"; do {
+    IFS=: read -r ADD_FILE ADD_ENTRY ADD_BEFORE <<< "$ADDITION"
+    ADD_KEY="${ADD_ENTRY%%=*}"
+    [ "$(basename "$LISTED")" = "$ADD_FILE" ] || continue
+    if ! grep -Eq "^[[:space:]]*${ADD_KEY}[[:space:]]*=" "$WORK"; then
+      perl -pi -e "print \"${ADD_ENTRY}\\n\" if !\$done && /^\\s*\\Q${ADD_BEFORE}\\E\\s*=/ && (\$done = 1)" "$WORK"
+    fi
+  } done
   for COMMENT in "${REMOVED_COMMENTS[@]}"; do {
     # only where nothing is left under the comment, ie the next line is blank or the end of the file
     perl -0pi -e "s/^\Q${COMMENT}\E\\n(?:\\n|\\z)//mg" "$WORK"
@@ -106,7 +122,7 @@ for LISTED in "${FILES[@]}"; do {
 
   if cmp -s "$FILE" "$WORK"; then
     rm "$WORK"
-    echo "$(basename "$LISTED"): no properties to rename or remove$NOTE"
+    echo "$(basename "$LISTED"): no properties to rename, remove or add$NOTE"
   else
     # never overwrites the backup of an earlier run, which may be the only copy of the original
     BACKUP="$FILE.bak"
