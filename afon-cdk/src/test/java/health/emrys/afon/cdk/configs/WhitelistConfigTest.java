@@ -1,9 +1,14 @@
 package health.emrys.afon.cdk.configs;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -84,6 +89,27 @@ class WhitelistConfigTest {
     void entriesWithAPropertyNotSetAreLeftOut() throws IOException {
         assertThat(whitelist(WHITELIST).domains(AfonCloud.GCP))
             .containsExactly("pypi.org", "oidc.example", "storage.googleapis.com");
+    }
+
+    @Test
+    void anEntryWithABlankPropertyIsLeftOutQuietlyButOneWithAMissingPropertyWarns() throws IOException {
+        Logger logger = (Logger) LoggerFactory.getLogger(WhitelistConfig.class);
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            Files.writeString(dir.resolve("afon.properties"), PROPERTIES + "GCP_OIDC_DOMAIN_NAME=\n");
+            Files.writeString(dir.resolve("whitelist.yaml"),
+                              "gcp:\n  domains:\n    - ${GCP_OIDC_DOMAIN_NAME}\n    - ${GCP_POLARIS_DOMAIN_NAME}\n    - a.example\n");
+            WhitelistConfig whitelist = new WhitelistConfig(new FilePropertyProvider(dir.toString(), List.of("afon")), dir.toString());
+
+            assertThat(whitelist.domains(AfonCloud.GCP)).containsExactly("a.example");
+            assertThat(logs.list).filteredOn(e -> e.getLevel() == Level.WARN)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .singleElement().asString().contains("${GCP_POLARIS_DOMAIN_NAME}");
+        } finally {
+            logger.detachAppender(logs);
+        }
     }
 
     @Test
