@@ -10,13 +10,19 @@
 #   Xvfb :i   ──►  fluxbox (decorations/dragging)
 #                  x11vnc (rfbport 5900+i, password-protected)
 #
-# N is controlled by JUPYTER_VNC_SESSIONS (default 3). Display indices and
-# VNC ports match what GuacamoleConfig.SESSIONS hands to Guacamole.
+# N is controlled by JUPYTER_VNC_SESSIONS (default 1, which is what JupyterHub
+# spawns: one pod per user). Display indices and VNC ports match what
+# GuacamoleConfig hands to Guacamole.
+#
+# JUPYTER_VNC_PASSWORD is required: under JupyterHub it is the user's own,
+# from their vnc-password-<slug> Secret. There is deliberately no default, as a
+# default would be the same, known, password on every user's desktop. Note that
+# VNC authentication only uses its first 8 characters.
 
 set -e
 
-VNC_SESSIONS="${JUPYTER_VNC_SESSIONS:-3}"
-VNC_PASSWORD="${JUPYTER_VNC_PASSWORD:-afon}"
+VNC_SESSIONS="${JUPYTER_VNC_SESSIONS:-1}"
+VNC_PASSWORD="${JUPYTER_VNC_PASSWORD:?JUPYTER_VNC_PASSWORD must be set, see start-vnc.sh}"
 
 # Idempotent: if Xvfb is already running, this hook has been sourced before
 # (e.g. by an earlier invocation of start-notebook.sh) — skip everything.

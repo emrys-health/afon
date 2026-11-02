@@ -30,8 +30,11 @@ import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import org.slf4j.Logger;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -84,6 +87,14 @@ public class JupyterHubConfig {
      * Port the in-pod VNC server listens on (display :1) — Guacamole connects here per user.
      */
     private static final int VNC_PORT        = 5901;
+    /**
+     * VNC authentication only uses the first 8 characters of a password; both x11vnc and Guacamole silently drop the rest.
+     */
+    static final int VNC_PASSWORD_LENGTH     = 8;
+    /**
+     * Key, in each user's {@link #vncSecretName VNC Secret}, of their VNC password.
+     */
+    private static final String VNC_PASSWORD_KEY = "password";
 
     private static final String HUB_SVC          = "hub";
     private static final String PROXY_PUBLIC_SVC = "proxy-public";
@@ -179,10 +190,12 @@ public class JupyterHubConfig {
         this.userProvider    = userProvider;
         this.jupyterPassword = properties.getValue(AfonProperty.JUPYTER_VNC_PASSWORD);
         // One Guacamole login per user, keyed by email; each streams that user's own pod desktop on
-        // the single VNC port (each user now has their own pod rather than sharing ports on one).
+        // the single VNC port (each user now has their own pod rather than sharing ports on one),
+        // behind that user's own VNC password, so one user's cannot open another's desktop.
         this.sessions = new ArrayList<>();
         for (AfonUser user : userProvider.getUsers()) {
-            sessions.add(new GuacamoleConfig.Session(user.email(), jupyterPassword, VNC_PORT));
+            sessions.add(new GuacamoleConfig.Session(user.email(), jupyterPassword, VNC_PORT,
+                                                     vncPassword(jupyterPassword, user.slug())));
         }
     }
 
@@ -310,6 +323,17 @@ public class JupyterHubConfig {
                                                         .build());
             Map<String, String> guacUserConfig = Map.of(GUACAMOLE_USER, user.slug());
             guacamoleDeps.add(clusterIpService(eksDependOn, guacUserConfig, vncServiceName(user.slug()), userPorts, stack));
+            // The user's VNC password, which the spawn hook hands to their pod by reference, so the
+            // hub never reads it and it is not in the pod's spec.
+            guacamoleDeps.add(Secret.Builder
+                .create(stack, "vncSecret-" + user.slug())
+                .metadata(SecretMetadata.builder()
+                                        .name(vncSecretName(user.slug()))
+                                        .namespace("default")
+                                        .build())
+                .data(Map.of(VNC_PASSWORD_KEY, vncPassword(jupyterPassword, user.slug())))
+                .dependsOn(eksDependOn)
+                .build());
         }
 
         // Guacamole streams each user's pod desktop. Transparent SSO: no Guacamole login page — the
@@ -322,7 +346,6 @@ public class JupyterHubConfig {
             stack,
             guacamoleDeps,
             session -> emailToVncHost.get(session.username()),
-            jupyterPassword,
             sessions,
             guacamoleDb,
             "X-Forwarded-Email",
@@ -342,6 +365,35 @@ public class JupyterHubConfig {
 
     private static String vncServiceName(String slug) {
         return "guac-vnc-" + slug;
+    }
+
+    /**
+     * The name of the Secret holding the user's VNC password, which the spawn hook in {@link #jupyterhubConfigPy()} also
+     * derives from the slug.
+     */
+    static String vncSecretName(String slug) {
+        return "vnc-password-" + slug;
+    }
+
+    /**
+     * The user's own VNC password, derived rather than random so that it is stable across deploys, keeping the running pods
+     * and Guacamole's connections in step, as the hub's secrets are.  An HMAC keyed on {@code JUPYTER_VNC_PASSWORD}, so it
+     * cannot be worked out from the slug, nor one user's password from another's.
+     *
+     * @return {@value #VNC_PASSWORD_LENGTH} URL-safe base64 characters, ie about 48 bits, all that VNC authentication uses
+     */
+    static String vncPassword(String masterKey, String slug) {
+        if (masterKey == null || masterKey.isBlank()) {
+            throw new IllegalArgumentException("JUPYTER_VNC_PASSWORD must be set, as the users' VNC passwords are derived from it");
+        }
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(masterKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(("vnc:" + slug).getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest).substring(0, VNC_PASSWORD_LENGTH);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("HmacSHA256 unavailable", e);
+        }
     }
 
     private void deployHub(List<ITerraformDependable> dependsOn) {
@@ -468,6 +520,7 @@ public class JupyterHubConfig {
         return """
                import os, json, re, time
                from urllib.request import urlopen
+               from tornado import web
 
                def _discover(url, deadline_s=600, interval_s=5):
                    # The issuer is a public, ALB-backed hostname whose DNS record only appears once the
@@ -518,8 +571,9 @@ public class JupyterHubConfig {
                c.KubeSpawner.port = %6$d
                c.KubeSpawner.start_timeout = 300
                c.KubeSpawner.http_timeout = 120
-               # One in-pod VNC session per single-user server (see start-vnc.sh in the image).
-               c.KubeSpawner.environment = {'VNC_SESSIONS': '1'}
+               # One in-pod VNC session per single-user server (see start-vnc.sh in the image). Its
+               # password, JUPYTER_VNC_PASSWORD, is the user's own, so is set by the auth_state hook below.
+               c.KubeSpawner.environment = {'JUPYTER_VNC_SESSIONS': '1'}
                # Stamp every spawned pod so the egress NetworkPolicy (NetworkConfig) selects it. The
                # per-user guacamole-user label is added on top of this by the auth_state hook below.
                c.KubeSpawner.extra_labels = {'%14$s': '%15$s'}
@@ -554,10 +608,17 @@ public class JupyterHubConfig {
                
                async def _on_spawn(spawner, auth_state):
                    spawner.extra_labels = dict(spawner.extra_labels or {})
-                   # Label the pod with the user's slug so their guac-vnc-<slug> Service selects it.
+                   # Label the pod with the user's slug so their guac-vnc-<slug> Service selects it. A user
+                   # without one has no VNC Service nor password, so would get a desktop nobody can reach.
                    slug = _GUAC_SLUGS.get(spawner.user.name)
-                   if slug:
-                       spawner.extra_labels['%8$s'] = slug
+                   if not slug:
+                       raise web.HTTPError(403, 'No desktop is provisioned for %%s' %% spawner.user.name)
+                   spawner.extra_labels['%8$s'] = slug
+                   # The user's own VNC password, by reference to their Secret, so it is not in the pod's
+                   # spec and the hub never reads it.
+                   spawner.environment = dict(spawner.environment or {})
+                   spawner.environment['JUPYTER_VNC_PASSWORD'] = {
+                       'valueFrom': {'secretKeyRef': {'name': '%18$s' + slug, 'key': '%19$s'}}}
                    # The sub rather than the email, as it is opaque to whoever can read the pod's labels.
                    if _AUDIT_LABELS:
                        sub = ((auth_state or {}).get('oauth_user') or {}).get('sub') or ''
@@ -581,7 +642,8 @@ public class JupyterHubConfig {
             pythonSlugMap(),
             URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8),
             SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE,
-            pythonDictOf(auditPodLabels(properties)), AUDIT_USER_LABEL);
+            pythonDictOf(auditPodLabels(properties)), AUDIT_USER_LABEL,
+            vncSecretName(""), VNC_PASSWORD_KEY);
     }
 
     /**

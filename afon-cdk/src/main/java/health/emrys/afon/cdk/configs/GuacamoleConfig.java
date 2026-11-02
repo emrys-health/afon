@@ -70,8 +70,11 @@ public class GuacamoleConfig {
 
     /**
      * One Guacamole login → one in-pod VNC port → one independent X session.
+     *
+     * @param password    the Guacamole login, only used by the classic file login
+     * @param vncPassword the password of that user's own VNC server
      */
-    public record Session(String username, String password, int vncPort) {
+    public record Session(String username, String password, int vncPort, String vncPassword) {
     }
 
     /**
@@ -114,12 +117,11 @@ public class GuacamoleConfig {
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
                     String jupyterVncHost,
-                    String jupyterVncPassword,
                     List<Session> sessions,
                     String theme
     ) {
         // All sessions live on the same (single) Jupyter pod, just on different VNC ports.
-        this(scope, dependsOn, session -> jupyterVncHost, jupyterVncPassword, sessions, theme);
+        this(scope, dependsOn, session -> jupyterVncHost, sessions, theme);
     }
 
     /**
@@ -130,11 +132,10 @@ public class GuacamoleConfig {
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
                     Function<Session, String> hostResolver,
-                    String jupyterVncPassword,
                     List<Session> sessions,
                     String theme
     ) {
-        this(scope, dependsOn, hostResolver, jupyterVncPassword, sessions, null, theme);
+        this(scope, dependsOn, hostResolver, sessions, null, theme);
     }
 
     /**
@@ -155,7 +156,6 @@ public class GuacamoleConfig {
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
                     Function<Session, String> hostResolver,
-                    String jupyterVncPassword,
                     List<Session> sessions,
                     String ssoUsernameHeader,
                     String theme
@@ -175,7 +175,6 @@ public class GuacamoleConfig {
             .data(Map.of(
                 "user-mapping.xml", buildUserMappingXml(
                     hostResolver,
-                    jupyterVncPassword,
                     sessions),
                 "guacamole.properties", guacamoleProperties))
             .build();
@@ -299,7 +298,6 @@ public class GuacamoleConfig {
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
                     Function<Session, String> hostResolver,
-                    String vncPassword,
                     List<Session> sessions,
                     DbConfig db,
                     String httpAuthHeader,
@@ -312,7 +310,7 @@ public class GuacamoleConfig {
                                        .name(PROVISION_CM)
                                        .namespace("default")
                                        .build())
-            .data(Map.of("provision.sql", buildProvisioningSql(hostResolver, vncPassword, sessions)))
+            .data(Map.of("provision.sql", buildProvisioningSql(hostResolver, sessions)))
             .build();
 
         List<ITerraformDependable> jobDeps = new ArrayList<>(dependsOn);
@@ -516,7 +514,6 @@ public class GuacamoleConfig {
      * persist via ON CONFLICT. Delivered via a ConfigMap file, so no shell escaping is involved.
      */
     private static String buildProvisioningSql(Function<Session, String> hostResolver,
-                                               String vncPassword,
                                                List<Session> sessions
     ) {
         StringBuilder sb = new StringBuilder();
@@ -526,9 +523,9 @@ public class GuacamoleConfig {
                   COMMIT;
                   """);
         for (Session s : sessions) {
-            String user = s.username();
-            String conn = "vnc-" + user;
-            String host = hostResolver.apply(s);
+            String user = sqlString(s.username());
+            String conn = sqlString("vnc-" + s.username());
+            String host = sqlString(hostResolver.apply(s));
             sb.append("BEGIN;\n")
               .append("DELETE FROM guacamole_connection WHERE connection_name = '").append(conn).append("';\n")
 //              .append("DELETE FROM guacamole_entity WHERE name = 'guacadmin' AND type = 'USER';\n")
@@ -542,7 +539,7 @@ public class GuacamoleConfig {
               .append("  INSERT INTO guacamole_connection_parameter (connection_id, parameter_name, parameter_value) VALUES\n")
               .append("    (cid, 'hostname', '").append(host).append("'),\n")
               .append("    (cid, 'port', '").append(s.vncPort()).append("'),\n")
-              .append("    (cid, 'password', '").append(vncPassword).append("'),\n")
+              .append("    (cid, 'password', '").append(sqlString(s.vncPassword())).append("'),\n")
               .append("    (cid, 'disable-copy', 'true'),\n")
               .append("    (cid, 'disable-paste', 'true');\n")
               .append("  INSERT INTO guacamole_connection_permission (entity_id, connection_id, permission) VALUES (eid, cid, 'READ') ON CONFLICT DO NOTHING;\n")
@@ -552,8 +549,15 @@ public class GuacamoleConfig {
         return sb.toString();
     }
 
+    /**
+     * @return the value as the body of a standard SQL string literal, its quotes doubled, so that eg an email with a quote in
+     *         it cannot end the literal
+     */
+    static String sqlString(String value) {
+        return value.replace("'", "''");
+    }
+
     private static String buildUserMappingXml(java.util.function.Function<Session, String> hostResolver,
-                                              String vncPassword,
                                               List<Session> sessions
     ) {
         StringBuilder sb = new StringBuilder("<user-mapping>\n");
@@ -562,7 +566,7 @@ public class GuacamoleConfig {
                 AUTHORIZE_BLOCK_TEMPLATE,
                 s.username(), s.password(),
                 s.username(),
-                hostResolver.apply(s), s.vncPort(), vncPassword));
+                hostResolver.apply(s), s.vncPort(), s.vncPassword()));
         }
         sb.append("</user-mapping>\n");
         return sb.toString();
