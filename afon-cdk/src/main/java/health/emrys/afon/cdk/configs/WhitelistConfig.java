@@ -45,8 +45,9 @@ import static org.slf4j.LoggerFactory.getLogger;
  * A {@code ${NAME}} is replaced by the value of the property of that name, which is either an {@link AfonProperty} or the
  * key of a catalog, {@code <CLOUD>_BUCKET_NAME_<id>}, {@code <CLOUD>_CATALOG_NAME_<id>}, {@code <CLOUD>_CATALOG_TYPE_<id>} or
  * {@code <CLOUD>_ADMIN_GRANTS_<id>}, see {@link health.emrys.afon.config.AfonCatalogs}.  Any other name fails the load, so
- * a typo cannot silently drop a domain.  An entry that refers to a property that is not set or blank is left out, with a
- * warning, so that a cloud that is not deployed to needs none of its properties.
+ * a typo cannot silently drop a domain.  An entry that refers to a property that is not set or blank is left out, so that a
+ * cloud that is not deployed to needs none of its properties.  It is logged as a warning if the property is missing from the
+ * config, and only at debug level if it is left blank, as the templates do for the optional ones, eg {@code AWS_OIDC_DOMAIN_NAME}.
  */
 public class WhitelistConfig {
 
@@ -127,12 +128,29 @@ public class WhitelistConfig {
         for (String template : sections.getOrDefault(section, List.of())) {
             String domain = expand(template);
             if (domain == null || domain.isBlank()) {
-                logger.warn("Leaving out whitelist entry '{}' of {}: it refers to a property that is not set", template, section);
+                if (isBlankOnly(template)) {
+                    logger.debug("Leaving out whitelist entry '{}' of {}: it refers to a property that is left blank", template, section);
+                } else {
+                    logger.warn("Leaving out whitelist entry '{}' of {}: it refers to a property that is not set", template, section);
+                }
             } else {
                 resolved.add(domain.trim());
             }
         }
         return resolved;
+    }
+
+    /**
+     * @return whether the template has no placeholder that is missing from the config, ie those without a value are blank
+     */
+    private boolean isBlankOnly(String template) {
+        Matcher matcher = PLACEHOLDER.matcher(template);
+        while (matcher.find()) {
+            if (properties.getProperties().getProperty(matcher.group(1)) == null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
