@@ -3,8 +3,7 @@
 # Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally setting them up first.
 #
 # usage: scripts/smoke/test.sh [--cli] [--env|-e <env>] [--setup <stacks> [--teardown]] [--suite|-s <file>]
-#                                      [--tests|-t <tests>] [--restrict-polaris]
-#                                      [--logging-console|-lc <level>] [--list|-l] [--help|-h] [<cloud>]
+#                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--list|-l] [--help|-h] [<cloud>]
 #   <cloud>   the cloud of the full stack to run the tests against, aws, azure or gcp (default: aws), ie <cloud>-full.  The
 #             kubectl context is set to the cluster of that stack, with the afon command '<cloud>-update-kube-config
 #             tre', and the tests are run with TRE_CLOUD=<cloud>, as the cloud of the stack hosting the TRE.
@@ -27,14 +26,6 @@
 #             stacks are printed instead.
 #   --suite   the CSV file of the tests (default: scripts/smoke/tests-full.csv)
 #   --tests   the comma-separated names of the tests to run (default: all), as listed by --list
-#   --restrict-polaris
-#             restricts the Polaris ingress for the run, for the network smoke test to pass on a stack whose deploy
-#             did not, see below.  Changes the cluster, so it is opt-in: it records how the ingress is, ie its
-#             annotation, and on Azure and GCP the ingress controller's externalTrafficPolicy, in
-#             smoke/target/regression/polaris-ingress-snapshot-<yyyymmdd-hhmmss>.txt, then restores exactly that on exit,
-#             before any teardown, whatever the properties say.  The file is kept as a record of the run, with the
-#             outcome of the restore.  A run killed before it restored, eg with kill -9, leaves a file without an
-#             outcome, which the next run restores first.  Not done if no test is the network smoke test.
 #   --logging-console
 #             the logging console level of every afon command, one of OFF|DEBUG|INFO|WARN|ERROR (default: that of
 #             afon.sh, INFO, or of afon-cli.sh, OFF).  Exported as AFON_LOGGING_CONSOLE, which it overrides.
@@ -52,7 +43,7 @@
 # Their logging goes to the afon log file, $AFON_HOME/logs/afon.log, and to the console as set by
 # --logging-console.  The script exits non-zero if any test fails.  The results of each run, ie its settings, the
 # times and outcomes of its stack setups, tests and teardowns, and its summary, are also written, without any
-# logging, to smoke/target/regression/results-<yyyymmdd-hhmmss>.txt.
+# logging, to $AFON_HOME/smoke/tests/results-<yyyymmdd-hhmmss>.txt.
 #
 # The tests run against the full stack's cluster of the <cloud>: the Spark Connect tests read the catalogs of the
 # clouds through its Spark Connect server.  After any setups, the current kubectl context is set to the full stack
@@ -60,12 +51,12 @@
 # '<cloud>-update-kube-config tre', ie the stack with the role tre, and left so.  The stacks are tested as deployed:
 # eg the network smoke test, which checks that Polaris cannot be reached from outside of the cluster, only passes if
 # the deploy restricted its ingress, ie with AWS_POLARIS_ALLOWED_CIDRS, AZURE_POLARIS_ALLOWED_CIDRS or GCP_POLARIS_ALLOWED_CIDRS set.  The suite
-# changes nothing in the cluster, unless given --restrict-polaris: it only checks, before the tests, that the ingress is
-# restricted, and if it is not, warns that the network smoke test is expected to fail, and prints the kubectl commands
-# that restrict it for the cloud: the configured CIDRs plus the cluster's own addresses, ie its egress IP on AWS, or its
-# outbound IP and pod CIDR on Azure, or its pod range, node subnet and pinned egress IP on GCP, with the ingress controller keeping the
-# callers' IPs on Azure and GCP.  The machine running the
-# tests must not be among the CIDRs, else the call to Polaris from outside of the cluster gets through.
+# changes nothing in the cluster: it only checks, before the tests, that the ingress is restricted, and if it is not,
+# warns that the network smoke test is expected to fail, and prints the kubectl commands that restrict it for the cloud:
+# the configured CIDRs plus the cluster's own addresses, ie its egress IP on AWS, or its outbound IP and pod CIDR on
+# Azure, or its pod range, node subnet and pinned egress IP on GCP, with the ingress controller keeping the callers' IPs
+# on Azure and GCP.  The machine running the tests must not be among the CIDRs, else the call to Polaris from outside of
+# the cluster gets through.
 # The env vars of afon.sh and afon-cli.sh apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
 #
 # As switching env re-points the shared $AFON_HOME symlinks, and the current context of the shared ~/.kube/config,
@@ -78,7 +69,7 @@ AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEFAULT_SUITE_FILE="$AFON_ROOT/scripts/smoke/tests-full.csv"
 OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
 # The dir of the results files, one per run, eg results-<yyyymmdd-hhmmss>.txt.
-RESULTS_DIR="$AFON_ROOT/smoke/target/regression"
+RESULTS_DIR="${AFON_HOME:-$HOME/.afon}/smoke/tests"
 # Turns off the Maven loggers of afon.sh reporting a test's non-zero exit, as the exec plugin's stack trace and
 # Maven's failure summary, the test's own output being what tells why it failed.
 QUIET_MAVEN_OPTS="-Dorg.slf4j.simpleLogger.log.org.codehaus.mojo.exec=off -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.MavenCli=off"
@@ -136,11 +127,7 @@ start_results() {
     echo "suite: $SUITE_FILE"
     echo "tests: ${SELECTED:-all}"
     echo "stacks set up: ${SETUP:-none}${TEARDOWN:+, then torn down}"
-    if [ -n "$RESTRICT_POLARIS" ]; then
-      echo "polaris ingress: restricted for the run, then restored"
-    else
-      echo "polaris ingress: as deployed"
-    fi
+    echo "polaris ingress: as deployed"
     if [ -n "$CLI" ]; then
       echo "commands run with: $(cli_script)"
     else
@@ -368,15 +355,6 @@ update_kube_config() {
 # The reading of the Polaris ingress, and the CIDRs to restrict it to, shared with kube/polaris-whitelist.sh
 source "$AFON_ROOT/scripts/kube/polaris-whitelist-source.sh"
 
-
-# The snapshots of the Polaris ingress that --restrict-polaris takes before changing it, one file per run,
-# polaris-ingress-snapshot-<yyyymmdd-hhmmss>.txt, like the results files, one key=value per line.  Kept in files rather
-# than in memory, so that a run killed before it restored the ingress, eg with kill -9, leaves what is needed to restore
-# it, which the next run does first.  They are kept after the restore as a record of the run, which gives the file an
-# outcome= line: only a file without one is still to be restored.  SNAPSHOT_FILE is that of this run, once it is taken.
-SNAPSHOT_PREFIX="$RESULTS_DIR/polaris-ingress-snapshot-"
-SNAPSHOT_FILE=
-
 # Whether a selected test of the suite is the network smoke test, which is what needs the Polaris ingress restricted.
 runs_network_smoke() {
   local test_line
@@ -390,8 +368,8 @@ runs_network_smoke() {
 
 # Checks, without changing the cluster, that the Polaris ingress of the current kubectl context is restricted, as the
 # network smoke test, which checks that Polaris cannot be reached from outside of the cluster, needs.  If it is not,
-# warns that the test is expected to fail, and prints the commands that restrict the ingress, for the user to run, or the
-# --restrict-polaris option, which runs them for the duration of the suite.  The tests run either way.
+# warns that the test is expected to fail, and prints the commands that restrict the ingress, for the user to run.  The
+# tests run either way.
 check_polaris_ingress() {
   local context annotation state controller policy cidrs
   context=$(kubectl config current-context)
@@ -432,159 +410,12 @@ check_polaris_ingress() {
     print_restrict_commands "$context" "$cidrs"
   fi
   echo "or, with the same CIDRs: afon-cli.sh kube-polaris-whitelist $CLOUD set"
-  echo "or run the suite with --restrict-polaris, which restricts the ingress for the run and restores it after to its exact state."
 }
 
 # Whether the ingress controller, nginx, runs in the cluster, as on Azure and GCP, rather than being the AWS ALB, outside of it: its
 # service must then keep the callers' IPs, with externalTrafficPolicy Local, for the restriction of the ingress to apply to them.
 ingress_controller_in_cluster() {
   [ "$CLOUD" = "azure" ] || [ "$CLOUD" = "gcp" ]
-}
-
-# Prints the value of key $1 of the snapshot of the Polaris ingress.
-snapshot_value() {
-  grep "^$1=" "$SNAPSHOT_FILE" | head -1 | cut -d= -f2-
-}
-
-# Whether the snapshot file $1 is still to be restored, ie it has no outcome.
-snapshot_pending() {
-  [ -f "$1" ] && ! grep -q "^outcome=" "$1"
-}
-
-# Prints the snapshot files that are still to be restored, ie of runs that did not restore the ingress, oldest first.
-pending_snapshots() {
-  local file
-  for file in "${SNAPSHOT_PREFIX}"*.txt; do
-    if snapshot_pending "$file"; then
-      echo "$file"
-    fi
-  done
-}
-
-# Records in the snapshot file of the Polaris ingress what became of it, $1, once it has been restored, or is no longer to be:
-# the ingress is gone, or was changed since the suite restricted it.  The file is kept, as a record of the run, but is no
-# longer pending.
-record_snapshot_outcome() {
-  {
-    echo "outcome=$1"
-    echo "finished=$(date '+%Y-%m-%d %H:%M:%S')"
-  } >> "$SNAPSHOT_FILE"
-}
-
-# Puts the Polaris ingress back as the snapshot of --restrict-polaris recorded it, ie the annotation set to its recorded
-# value, or removed if it was not set, and, on Azure and GCP, the controller's externalTrafficPolicy as it was, whatever the
-# properties say.  Does nothing without a pending snapshot, ie one with no outcome.  If the annotation is no longer what the
-# suite set, someone changed it since, and it is left as it is.  The snapshot gets its outcome once the ingress is restored,
-# else is left pending for the next run to restore.  It runs on exit, so it only warns on failure, keeping the exit status of
-# the script.
-restore_polaris_ingress() {
-  local context annotation state controller policy applied current
-  if [ -z "$SNAPSHOT_FILE" ] || ! snapshot_pending "$SNAPSHOT_FILE"; then
-    return 0
-  fi
-  context=$(snapshot_value context)
-  annotation=$(snapshot_value annotation)
-  state=$(snapshot_value state)
-  controller=$(snapshot_value controller)
-  policy=$(snapshot_value policy)
-  applied=$(snapshot_value applied)
-  if ! kubectl --context "$context" get ingress polaris-ingress -n default >/dev/null 2>&1; then
-    # eg torn down since, so nothing to restore
-    record_snapshot_outcome "not restored, as the ingress is gone"
-    return 0
-  fi
-  current=$(ingress_annotation "$annotation" "$context")
-  if [ "$current" != "present:$applied" ] && [ "$current" != "$state" ]; then
-    warning "the Polaris ingress was changed since the suite restricted it (now $current, not present:$applied):" \
-            "not restoring it to $state"
-    record_snapshot_outcome "not restored, as the annotation was changed since the suite set it (now $current)"
-    return 0
-  fi
-  banner "Restoring the Polaris ingress of $context to how it was: $state"
-  case "$state" in
-    present:*)
-      if ! kubectl --context "$context" annotate ingress polaris-ingress -n default --overwrite \
-             "$annotation=${state#present:}" >/dev/null; then
-        warning "failed to restore the Polaris ingress: left pending in $SNAPSHOT_FILE, which the next run restores"
-        return 0
-      fi ;;
-    *)
-      if ! kubectl --context "$context" annotate ingress polaris-ingress -n default "$annotation-" >/dev/null; then
-        warning "failed to restore the Polaris ingress: left pending in $SNAPSHOT_FILE, which the next run restores"
-        return 0
-      fi ;;
-  esac
-  if [ -n "$controller" ] && [ -n "$policy" ]; then
-    if ! kubectl --context "$context" patch "$controller" -n ingress-nginx --type merge \
-           -p "{\"spec\":{\"externalTrafficPolicy\":\"$policy\"}}" >/dev/null; then
-      warning "failed to restore externalTrafficPolicy $policy of $controller: left pending in $SNAPSHOT_FILE, which the next run restores"
-      return 0
-    fi
-  fi
-  record_snapshot_outcome "restored"
-}
-
-# For --restrict-polaris: restricts the Polaris ingress of the current kubectl context to the restriction_cidrs, which the
-# network smoke test needs, for the run, first recording how it is in a new snapshot file, to restore it on exit with
-# restore_polaris_ingress, as a run killed before it did leaves the ingress restricted: the pending snapshots of those
-# runs are restored first.  Exits if the ingress cannot be restricted, and skips it, with a warning, if there are no CIDRs.
-restrict_polaris_ingress() {
-  local context annotation state controller= policy= cidrs pending
-  for pending in $(pending_snapshots); do
-    warning "a previous run did not restore the Polaris ingress: restoring it first, from $pending"
-    SNAPSHOT_FILE="$pending"
-    restore_polaris_ingress
-    if snapshot_pending "$pending"; then
-      error "Could not restore the Polaris ingress from $pending: not running the tests"
-      exit 1
-    fi
-  done
-  SNAPSHOT_FILE=
-  context=$(kubectl config current-context)
-  annotation=$(polaris_annotation)
-  state=$(ingress_annotation "$annotation" "$context")
-  if [ "$state" = "missing" ]; then
-    error "No Polaris ingress in kubectl context $context to restrict: not running the tests"
-    exit 1
-  fi
-  if ingress_controller_in_cluster; then
-    controller=$(controller_service "$context")
-    if [ -z "$controller" ]; then
-      error "No ingress controller service in kubectl context $context: not running the tests"
-      exit 1
-    fi
-    policy=$(kubectl --context "$context" get "$controller" -n ingress-nginx \
-               -o jsonpath='{.spec.externalTrafficPolicy}' 2>/dev/null || true)
-  fi
-  cidrs=$(restriction_cidrs)
-  if [ -z "$cidrs" ]; then
-    warning "no CIDRs to restrict the Polaris ingress to: leaving it as it is"
-    return 0
-  fi
-  mkdir -p "$RESULTS_DIR"
-  SNAPSHOT_FILE="${SNAPSHOT_PREFIX}$(date +%Y%m%d-%H%M%S).txt"
-  {
-    echo "taken=$(date '+%Y-%m-%d %H:%M:%S')"
-    echo "context=$context"
-    echo "annotation=$annotation"
-    echo "state=$state"
-    echo "controller=$controller"
-    echo "policy=$policy"
-    echo "applied=$cidrs"
-  } > "$SNAPSHOT_FILE"
-  banner "Restricting the Polaris ingress of $context to $cidrs, to restore it as it is now ($state) on exit"
-  record "Polaris ingress restricted for the run to $cidrs, to be restored to $state, as recorded in $SNAPSHOT_FILE"
-  if ingress_controller_in_cluster; then
-    if ! kubectl --context "$context" patch "$controller" -n ingress-nginx --type merge \
-           -p '{"spec":{"externalTrafficPolicy":"Local"}}'; then
-      error "Failed to set externalTrafficPolicy Local on the ingress controller: not running the tests"
-      exit 1
-    fi
-  fi
-  if ! kubectl --context "$context" annotate ingress polaris-ingress -n default --overwrite "$annotation=$cidrs"; then
-    error "Failed to restrict the Polaris ingress: not running the tests"
-    exit 1
-  fi
 }
 
 # Sets up the comma-separated stacks $1, in order, exiting if any fails.  Each stack is recorded in SETUP_STACKS
@@ -658,8 +489,6 @@ teardown_stacks() {
 finish_stacks() {
   local status=$?
   trap - EXIT
-  # before any teardown, while the ingress is there
-  restore_polaris_ingress
   if [ ${#SETUP_STACKS[@]} -eq 0 ]; then
     exit $status
   fi
@@ -687,7 +516,6 @@ SETUP=
 SETUP_STACKS=()
 INTERRUPTED=
 TEARDOWN=
-RESTRICT_POLARIS=
 ENV=
 LIST=
 LOGGING_CONSOLE=
@@ -706,8 +534,6 @@ while [[ $# -gt 0 ]]; do
       require_value "$1" "${2:-}"; SETUP="$2"; shift 2 ;;
     --teardown)
       TEARDOWN=true; shift ;;
-    --restrict-polaris)
-      RESTRICT_POLARIS=true; shift ;;
     --suite|-s)
       require_value "$1" "${2:-}"; SUITE_FILE="$2"; shift 2 ;;
     --tests|-t)
@@ -788,11 +614,7 @@ setup_stacks "$SETUP"
 
 update_kube_config
 if runs_network_smoke; then
-  if [ -n "$RESTRICT_POLARIS" ]; then
-    restrict_polaris_ingress
-  else
-    check_polaris_ingress
-  fi
+  check_polaris_ingress
 fi
 
 # The results of the passed and failed tests, eg "test network passed in 02:11", recorded as they are, and printed

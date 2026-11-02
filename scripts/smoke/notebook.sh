@@ -19,7 +19,7 @@
 # each other line a notebook: its name, its file, in scripts/smoke/notebooks if not an absolute path, and its description.  Blank lines and lines
 # starting with '#' are ignored.
 #
-# Each executed notebook, with its outputs, is written to smoke/target/<notebook file name>, leaving the
+# Each executed notebook, with its outputs, is written to $AFON_HOME/smoke/notebooks/<notebook file name>, leaving the
 # original clean.
 #
 # Sets up and checks the python env with the afon command 'python-setup', checks Keycloak is serving requests with
@@ -211,7 +211,7 @@ FAILED=()
 for i in "${!NOTEBOOKS[@]}"; do
   notebook="${NOTEBOOKS[$i]}"
   # absolute: jupyter resolves it relative to the notebook
-  output="$AFON_ROOT/smoke/target/$(basename "$notebook")"
+  output="$AFON_HOME/smoke/notebooks/$(basename "$notebook")"
   mkdir -p "$(dirname "$output")"
   echo "=== Running notebook ${NAMES[$i]}"
   if afon jupyter-execute "$notebook" "$output"; then
