@@ -31,10 +31,10 @@ public class CurlCommand extends CliCommand {
             logger.warn("Problem running {} on {}. Error: {}", command, pod, result.stderr());
         }
         if (result.stdout().startsWith("HTTP") == expectHttp) {
-            return new ExecResult(0, result.stdout(), result.stderr(), result.command());
+            return new ExecResult(0, result.stdout(), result.stderr(), result.command(), result.host());
         }
         logger.info("Unexpected response. Stdout:\n{}\nStderr:{}", result.stdout(), result.stderr());
-        return new ExecResult(result.isSuccess() ? -1 : result.exitCode(), result.stdout(), result.stderr(), result.command());
+        return new ExecResult(result.isSuccess() ? -1 : result.exitCode(), result.stdout(), result.stderr(), result.command(), result.host());
     }
 
 }

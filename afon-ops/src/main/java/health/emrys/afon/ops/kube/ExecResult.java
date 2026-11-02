@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
 /**
  * The outcome of running a command inside a pod's container, as with {@code kubectl exec}.
  */
-public record ExecResult(int exitCode, String stdout, String stderr, String command) {
+public record ExecResult(int exitCode, String stdout, String stderr, String command, String host) {
 
     public static int SUCCESS = 0;
     public static int FAILURE = 1;
@@ -25,10 +25,10 @@ public record ExecResult(int exitCode, String stdout, String stderr, String comm
     }
 
     public ExecResult makeSuccessful() {
-        return new ExecResult(SUCCESS, stdout, stderr, command);
+        return new ExecResult(SUCCESS, stdout, stderr, command, host);
     }
 
     public ExecResult makeFailed() {
-        return new ExecResult(FAILURE, stdout, stderr, command);
+        return new ExecResult(FAILURE, stdout, stderr, command, host);
     }
 }

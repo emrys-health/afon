@@ -205,7 +205,7 @@ public class KubeClient implements AutoCloseable {
                 logger.warn("Command {} in {}/{} did not run (eg executable not found). Each argument must be a"
                         + " separate element of the command array", Arrays.toString(command), namespace, pod);
             }
-            return new ExecResult(exitCode, stdout.join(), stderr.join(), String.join(" ", command));
+            return new ExecResult(exitCode, stdout.join(), stderr.join(), String.join(" ", command), pod);
         } finally {
             process.destroy();
         }

@@ -31,6 +31,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.configs.PolarisConfig.DB_PORT;
+import static health.emrys.afon.cdk.configs.SparkWorkloads.MASTER;
 import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
@@ -125,11 +126,11 @@ public class NetworkSmokeMain {
                 ingress.getMetadata().getName());
             logger.info("Checking ingress: {}", name);
             return notAllowed.isEmpty()
-                   ? new ExecResult(0, format("Ingress %s serves only allowed hosts", name), "", command)
+                   ? new ExecResult(0, format("Ingress %s serves only allowed hosts", name), "", command, "localhost")
                    : new ExecResult(
                 -1, "", format(
                 "Ingress %s serves hosts that are not allowed: %s",
-                name, String.join(",", notAllowed)), command);
+                name, String.join(",", notAllowed)), command, "localhost");
         }).toList();
     }
 
@@ -156,8 +157,8 @@ public class NetworkSmokeMain {
             List<String> external = externalIps(service);
             String       command  = format("kubectl get service %s", name);
             return external.isEmpty()
-                   ? new ExecResult(0, format("Service %s has no EXTERNAL-IP", name), "", command)
-                   : new ExecResult(-1, "", format("Service %s has EXTERNAL-IP %s", name, String.join(",", external)), command);
+                   ? new ExecResult(0, format("Service %s has no EXTERNAL-IP", name), "", command, "localhost")
+                   : new ExecResult(-1, "", format("Service %s has EXTERNAL-IP %s", name, String.join(",", external)), command, "localhost");
         }).toList();
     }
 
@@ -210,17 +211,17 @@ public class NetworkSmokeMain {
             if (smokeConfig.rejectedByIngress(httpCode, HttpResponses.contentOf(response))) {
                 String msg = format("The ingress of %s rejected the call with HTTP code %d, as it should", polarisHost, httpCode);
                 logger.info(msg);
-                results.add(new ExecResult(0, msg, "", format("curl https://%s", polarisHost)));
+                results.add(new ExecResult(0, msg, "", format("curl https://%s", polarisHost), "localhost"));
                 return results;
             }
             String message = format(
                 "Managed to make an HTTP call to %s. Received HTTP code %d.%n%n%s",
                 polarisHost, httpCode, smokeConfig.polarisRestrictionAdvice());
-            results.add(new ExecResult(-1, message, "", format("curl https://%s", polarisHost)));
+            results.add(new ExecResult(-1, message, "", format("curl https://%s", polarisHost), "localhost"));
         } catch (IOException x) {
             String msg = format("Was unable to talk to %s. Error = %s", polarisHost, x.getMessage());
             logger.info(msg);
-            results.add(new ExecResult(0, msg, "", format("curl https://%s", polarisHost)));
+            results.add(new ExecResult(0, msg, "", format("curl https://%s", polarisHost), "localhost"));
         }
         return results;
     }
@@ -271,7 +272,7 @@ public class NetworkSmokeMain {
                 }
             } catch (Exception e) {
                 logger.error("Could not execute on pod " + pod, e);
-                results.add(new ExecResult(-1, "", e.getMessage(), format("checks on pod %s", pod)));
+                results.add(new ExecResult(-1, "", e.getMessage(), format("checks on pod %s", pod), pod));
             }
         }
         return results;
@@ -338,7 +339,7 @@ public class NetworkSmokeMain {
                       .map(result -> result.isSuccess() ? result
                                                         : new ExecResult(
                           0, "Not checked: " + domain + " does not resolve from here either",
-                          "", result.command()))
+                          "", result.command(), result.host()))
                       .toList();
     }
 
